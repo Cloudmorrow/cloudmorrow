@@ -1,0 +1,156 @@
+/* Tasks: the board picker, the add row, the circle on a row, and the lane control. */
+
+.chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 0 -16px 14px;
+  padding: 0 16px;
+  scrollbar-width: none;
+}
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+.chip.active { background: var(--accent); color: var(--accent-ink); }
+
+.add {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 16px;
+  margin: 0 0 12px;
+  background: var(--card);
+  border-radius: 12px;
+}
+.add input {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  border: 0;
+  background: none;
+  outline: none;
+}
+.add input::placeholder { color: var(--muted); }
+.add .check { opacity: .5; }
+
+.check {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-ink);
+}
+.check.doing { border-color: var(--accent); }
+.check.doing::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.check.done { background: var(--accent); border-color: var(--accent); }
+
+.row.task { padding: 0 12px 0 4px; gap: 4px; }
+.row.task .tick {
+  flex: none;
+  width: 44px;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.row.task .main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 52px;
+  padding: 10px 0;
+}
+.row.task + .row.task::before { left: 48px; }
+.row.lane-done .title { color: var(--muted); font-weight: 500; text-decoration: line-through; }
+
+.lanes {
+  display: flex;
+  padding: 2px;
+  margin: 0 0 16px;
+  background: var(--field);
+  border-radius: 10px;
+}
+.lanes button {
+  flex: 1;
+  min-height: 32px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.lanes button.active {
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+  color: var(--ink);
+}
+
+/* -- the lanes ------------------------------------------------------------ */
+/* On the phone a lane is a plain block around what was already there, so
+   the three of them stack exactly as they did when they were loose in the
+   listing. Two things have to be said to keep that true: a lane with
+   nothing in it is not there at all, and the first lane that does have
+   something keeps the four pixels a listing's first group label has —
+   `:first-child` used to do that and cannot see through the wrapper. */
+.lane-empty { display: none; }
+.listing .board .lane:not(.lane-empty) .group-label { margin-top: 4px; }
+.listing .board .lane:not(.lane-empty) ~ .lane .group-label { margin-top: 22px; }
+.group.nothing {
+  padding: 14px 16px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Side by side once there is room for three of them, which is the board
+   the TUI draws and the shape the lanes were named for. */
+@media (min-width: 1180px) and (min-height: 600px) {
+  .board {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 18px;
+    align-items: start;
+  }
+  .lane { min-width: 0; }
+  .lane-empty { display: block; }
+  /* A card in a lane is a third as wide as a row across the page, so a
+     long title wraps rather than being cut after four words. */
+  .lane .row.task .title { white-space: normal; overflow-wrap: anywhere; }
+  /* Every lane starts on the same line, whether or not the one before it
+     had anything in it. */
+  .listing .board .lane .group-label,
+  .listing .board .lane:not(.lane-empty) ~ .lane .group-label { margin-top: 4px; }
+  /* A lane is somewhere to drop a card, so it keeps a floor under the
+     last one rather than ending where its cards do. */
+  .lane { min-height: 120px; }
+  .row.task.dragging { opacity: .4; }
+  .lane.over .group {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 7%, var(--card));
+  }
+  .lane.over .group.nothing { border-style: dashed; }
+}
+
+/* -- what the removed terminal layer used to say about these -------------- */
+.chip, .lanes, .lanes button, .check, .add { border-radius: var(--radius); }
+.chip, .lanes, .add { border: 1px solid var(--line); }
+.add:focus-within { border-color: var(--accent); }
+.chip { background: var(--card); }
+/* A chosen thing is a filled accent, not an outlined one. */
+.chip.active { border-color: transparent; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.lanes { background: var(--card); padding: 0; overflow: hidden; }
+.lanes button { border-radius: 0; }
+.lanes button + button { border-left: 1px solid var(--line); }
+.lanes button.active { background: var(--accent); color: var(--accent-ink); }
+
+/* The way to another board looks like a board, but is drawn rather than filled. */
+.chip.new-board { border: 1px dashed var(--line-bright); }

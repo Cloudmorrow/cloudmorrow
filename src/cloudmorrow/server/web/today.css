@@ -1,0 +1,72 @@
+/* Today: the front page. Cards rather than rows, because a clock and a
+   forecast are not a list; the events under them are the calendar's own
+   rows, unchanged. */
+
+.today .card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin: 0 0 12px;
+}
+
+/* -- the time ---------------------------------------------------------- */
+.today .clock { display: flex; flex-direction: column; justify-content: center; }
+.today .clock .time {
+  font-size: 56px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+}
+.today .clock .date { margin-top: 6px; color: var(--muted); font-size: 15px; }
+
+/* -- the weather -------------------------------------------------------- */
+.today .weather { display: flex; align-items: center; gap: 16px; }
+.today .weather .sky-wrap { flex: none; color: var(--accent); }
+.today .weather .sky { width: 56px; height: 56px; }
+.today .weather .reading { display: flex; flex-direction: column; min-width: 0; }
+.today .weather .temp {
+  font-size: 40px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+.today .weather .summary { font-weight: 600; }
+.today .weather .facts, .today .weather .place { color: var(--muted); font-size: 14px; }
+.today .weather .place { margin-top: 4px; }
+.today .weather .sun { white-space: nowrap; }
+.today .weather.stale .temp { opacity: .6; }
+/* Nothing to show yet: what it says, and what to do about it. */
+.today .weather.off { flex-direction: column; align-items: flex-start; gap: 2px; color: var(--muted); font-size: 15px; }
+.today .weather.off b { color: var(--ink); font-weight: 600; }
+.today .weather.off code { font-family: var(--mono); font-size: 13px; color: var(--ink); }
+
+/* -- the line to think on -------------------------------------------------- */
+.today .quote { margin-left: 0; margin-right: 0; margin-bottom: 12px; }
+.today .quote p {
+  margin: 0 0 8px;
+  font-size: 19px;
+  line-height: 1.45;
+  font-weight: 500;
+  letter-spacing: -.005em;
+}
+.today .quote p::before { content: "“"; color: var(--second); }
+.today .quote p::after { content: "”"; color: var(--second); }
+.today .quote footer { color: var(--muted); font-size: 14px; }
+.today .quote footer::before { content: "— "; }
+
+/* -- what is on ---------------------------------------------------------------- */
+.today .on-today { display: flex; justify-content: space-between; align-items: baseline; margin-top: 18px; }
+.today .on-today a { color: var(--accent); text-transform: none; letter-spacing: 0; }
+.today .empty.small { padding: 24px 16px; }
+
+/* On a computer the clock and the weather sit side by side: it is the same
+   query desktop.css uses, so the two agree on what a computer is. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .today .now { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .today .now .card { margin-bottom: 0; }
+  .today .now { margin-bottom: 12px; }
+  .today .clock .time { font-size: 64px; }
+}

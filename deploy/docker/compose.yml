@@ -1,0 +1,44 @@
+# One Cloudmorrow behind Caddy, which gets and renews the certificate.
+#
+#   cd deploy/docker
+#   CLOUDMORROW_DOMAIN=cloud.example.com docker compose up -d
+#
+# Then open https://cloud.example.com — the first visit names the cloud and
+# makes the administrator. A hosted tenant is this, once per customer, with
+# the domain set to their subdomain and the certificate handled at the edge.
+services:
+  cloudmorrow:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    image: cloudmorrow
+    restart: unless-stopped
+    environment:
+      CLOUDMORROW_PUBLIC_URL: https://${CLOUDMORROW_DOMAIN:-cloud.example.com}
+      # Optional. The setup page asks anyway; this is the default it offers.
+      CLOUDMORROW_NAME: ${CLOUDMORROW_NAME:-Cloudmorrow}
+      # Optional: where the weather on the front page is for.
+      CLOUDMORROW_WEATHER_PLACE: ${CLOUDMORROW_WEATHER_PLACE:-}
+    volumes:
+      - data:/data
+      - keys:/keys
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CLOUDMORROW_DOMAIN: ${CLOUDMORROW_DOMAIN:-cloud.example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  # Back these two up separately: the data is ciphertext without the key.
+  data:
+  keys:
+  caddy_data:
+  caddy_config:

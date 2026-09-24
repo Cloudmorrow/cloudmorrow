@@ -1,0 +1,21 @@
+# Cloudmorrow agent configuration.
+# Written by `cloudmorrow-agent enroll`; edit it to widen or narrow what this
+# machine is allowed to do. The agent refuses anything not permitted here,
+# regardless of what the server asks for.
+
+[agent]
+server_url = "https://cm.hl.bramlabs.io"
+agent_token = "bca_…"          # written at enrolment; keep this file 0600
+name = "nas"
+poll_seconds = 30
+verify_tls = true
+
+# Backups may only read below these roots, and always write into backup_dir.
+allow_backup = true
+backup_roots = ["/home/bram", "/srv"]
+backup_dir = "/srv/backups/cloudmorrow"
+backup_retention = 7
+
+# Running arbitrary commands is off until this machine opts in.
+allow_shell = false
+shell_timeout_seconds = 300

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set up __NAME__</title>
+<style>
+  :root {
+    --bg: #0d0f16;
+    --panel: #12141d;
+    --line: #232838;
+    --ink: #d7dbe4;
+    --dim: #8b93a7;
+    --accent: #22d3ee;
+    --accent-soft: #7dd3fc;
+    --bad: #f87171;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 3rem 1.25rem 5rem;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.6 var(--mono);
+  }
+  main { max-width: 34rem; margin: 0 auto; }
+  pre.logo {
+    color: var(--accent);
+    font-size: clamp(4px, 1.42vw, 11px);
+    line-height: 1.15;
+    margin: 0 0 .5rem;
+    overflow-x: auto;
+  }
+  .tagline { color: var(--dim); font-style: italic; margin: 0 0 2.5rem; }
+  h1 { font-size: 1.3rem; margin: 0 0 .5rem; }
+  p { color: var(--dim); margin: 0 0 1.5rem; }
+  form {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--accent);
+    border-radius: 6px;
+    padding: 1.25rem;
+  }
+  label {
+    display: block;
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    color: var(--accent);
+    margin: 1rem 0 .35rem;
+    font-weight: 600;
+  }
+  label:first-child { margin-top: 0; }
+  input {
+    width: 100%;
+    font: inherit;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: .55rem .7rem;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  small { display: block; color: var(--dim); margin-top: .3rem; font-size: .8rem; }
+  button {
+    margin-top: 1.5rem;
+    width: 100%;
+    font: inherit;
+    font-weight: 600;
+    color: var(--bg);
+    background: var(--accent);
+    border: 0;
+    border-radius: 4px;
+    padding: .7rem 1rem;
+    cursor: pointer;
+  }
+  button:hover { background: var(--accent-soft); }
+  button:disabled { opacity: .6; cursor: default; }
+  .error { color: var(--bad); min-height: 1.6em; margin: .75rem 0 0; }
+  footer {
+    margin-top: 3.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--line);
+    color: var(--dim);
+    font-size: .85rem;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f6f7f9; --panel: #fff; --line: #dfe3ea;
+      --ink: #1a1d26; --dim: #5a6472; --accent: #0e7490; --accent-soft: #0369a1;
+      --bad: #b91c1c;
+    }
+  }
+</style>
+</head>
+<body>
+<main>
+  <pre class="logo">__LOGO__</pre>
+  <p class="tagline">own your data, choose your apps &nbsp;·&nbsp; v__VERSION__</p>
+
+  <h1>Welcome. Let's set this up.</h1>
+  <p>Two things and it is yours: a name for this cloud, and the first account,
+  which is the administrator's. Everyone else is added from the app.</p>
+
+  <form id="setup" autocomplete="on">
+    <label for="name">Name your cloud</label>
+    <input id="name" name="name" value="__NAME__" maxlength="64" required autofocus>
+    <small>On the sign-in screen and under the icon on everyone's phone.</small>
+
+    <label for="username">Your username</label>
+    <input id="username" name="username" autocapitalize="none" autocorrect="off"
+           autocomplete="username" pattern="[a-z_][a-z0-9_\-]{0,31}" required>
+    <small>Lowercase letters, digits, <code>_</code> or <code>-</code>.</small>
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="new-password"
+           minlength="8" required>
+    <small>At least eight characters.</small>
+
+    <label for="repeat">Repeat the password</label>
+    <input id="repeat" name="repeat" type="password" autocomplete="new-password" required>
+
+    <button type="submit">Create my cloud</button>
+    <p class="error" id="error" role="alert"></p>
+  </form>
+
+  <footer>Cloudmorrow __VERSION__ &nbsp;·&nbsp; free software under the AGPL</footer>
+</main>
+<script>
+  const form = document.getElementById("setup");
+  const error = document.getElementById("error");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    error.textContent = "";
+    if (form.password.value !== form.repeat.value) {
+      error.textContent = "The two passwords are not the same.";
+      return;
+    }
+    const button = form.querySelector("button");
+    button.disabled = true;
+    try {
+      const response = await fetch("/api/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name.value.trim(),
+          username: form.username.value.trim(),
+          password: form.password.value,
+        }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(typeof body.detail === "string" ? body.detail : "That did not work.");
+      }
+      location.replace("/app");
+    } catch (err) {
+      error.textContent = err.message;
+      button.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

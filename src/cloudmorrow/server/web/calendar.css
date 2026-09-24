@@ -1,0 +1,276 @@
+/* Calendar: the month grid, the dots on it, the day under it, and the forms.
+
+   The month is the one grid in the app. Everything else here is the shapes
+   base.css already has — rows in boxed groups — because an event is a row
+   and a calendar is a row, and a calendar app that invented a new shape for
+   them would only be harder to read. */
+
+/* -- the colours a calendar can be ---------------------------------------- */
+/* Named, not spelled: the server stores "violet", and this is the one place
+   that decides what violet looks like. The same five names are in the
+   terminal app's own palette. */
+:root {
+  --c-cyan: var(--accent);
+  --c-violet: var(--second);
+  --c-green: var(--good);
+  --c-amber: var(--warn);
+  --c-rose: var(--bad);
+}
+.dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: none;
+}
+.c-cyan { background: var(--c-cyan); }
+.c-violet { background: var(--c-violet); }
+.c-green { background: var(--c-green); }
+.c-amber { background: var(--c-amber); }
+.c-rose { background: var(--c-rose); }
+
+/* -- the month ------------------------------------------------------------ */
+
+.month-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 10px;
+}
+.month-bar h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  text-align: center;
+}
+.month-bar .step, .month-bar .calendars-link {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius);
+  color: var(--accent);
+}
+.month-bar .step:active, .month-bar .calendars-link:active { background: var(--card); }
+.month-bar .calendars-link { color: var(--muted); }
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.month {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.month .cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  /* Tall enough for the number and a row of dots, and no taller: six weeks
+     of these has to leave room for the day underneath. */
+  min-height: 46px;
+  padding: 5px 0 4px;
+  border-radius: 10px;
+  background: var(--card);
+  font-variant-numeric: tabular-nums;
+}
+.month .cell .n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 15px;
+}
+/* A day from the month either side is there to make the week whole. */
+.month .cell.away { background: transparent; }
+.month .cell.away .n { color: var(--muted); opacity: .6; }
+.month .cell.today .n { color: var(--accent); font-weight: 700; }
+.month .cell.picked .n { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.month .cell.picked.today .n { color: var(--accent-ink); }
+.month .cell:active { background: var(--card-2); }
+
+.month .dots {
+  display: flex;
+  gap: 2px;
+  min-height: 6px;
+  align-items: center;
+}
+.month .dots .dot { width: 5px; height: 5px; }
+
+/* What is on that day, written out. The phone has the dots and never
+   these; past the width where a cell is tall enough to hold a line of
+   text, it is the other way round. */
+.month .cell .named { display: none; }
+
+@media (min-width: 1180px) and (min-height: 600px) {
+  .month .cell { align-items: stretch; padding: 5px 6px; }
+  .month .cell .n { align-self: center; }
+  .month .cell .dots { display: none; }
+  .month .cell .named {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .month .cell .named .on {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  .month .cell .named .on .dot { width: 6px; height: 6px; }
+  .month .cell .named .on .what {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .month .cell .named .more {
+    padding-left: 11px;
+    color: var(--muted);
+    font-size: 11px;
+    text-align: left;
+  }
+  .month .cell.away .named { opacity: .55; }
+}
+
+.day-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.day-label .today-link {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* -- an event in a list --------------------------------------------------- */
+.row.event { gap: 10px; padding-right: 12px; }
+.row.event .dot { margin-top: 2px; align-self: center; }
+.row.event .main { min-width: 0; }
+.row.event .preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row.note { white-space: pre-wrap; display: block; padding: 12px 16px; line-height: 1.5; }
+
+/* -- the form ------------------------------------------------------------- */
+.event-form input[type="text"], .event-form input:not([type]),
+.new-calendar input:not([type]) {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--ink);
+  font: inherit;
+  /* 16px or iOS zooms the page the moment the field is focused. */
+  font-size: 16px;
+}
+.event-form input::placeholder, .new-calendar input::placeholder,
+.event-form textarea::placeholder { color: var(--muted); }
+
+.event-form .when {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.event-form input[type="date"], .event-form input[type="time"] {
+  min-height: 32px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+}
+.event-form input[type="checkbox"], .new-calendar input[type="checkbox"],
+.new-calendar input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.event-form select {
+  margin-left: auto;
+  max-width: 60%;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+}
+.event-form textarea {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.45;
+  resize: none;
+}
+.new-calendar .kinds .row, .new-calendar .who-list .row { align-items: flex-start; }
+.new-calendar .kinds input, .new-calendar .who-list input { margin-top: 15px; }
+
+/* What is on the right of a row here is a sentence, not data: its own
+   class rather than the shared `.value`, which is monospaced for a version
+   or a hash and cut off at one line. */
+.row .said {
+  flex: none;
+  max-width: 62%;
+  color: var(--muted);
+  font-size: 15px;
+  text-align: right;
+}
+
+/* -- a calendar's own page ------------------------------------------------- */
+.row.colours { gap: 14px; }
+.swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--accent);
+}
+.swatch.on { border-color: var(--ink); }
+.swatch.c-cyan { background: var(--c-cyan); }
+.swatch.c-violet { background: var(--c-violet); }
+.swatch.c-green { background: var(--c-green); }
+.swatch.c-amber { background: var(--c-amber); }
+.swatch.c-rose { background: var(--c-rose); }
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 8px;
+  color: var(--bar-accent);
+  font-size: 16px;
+}

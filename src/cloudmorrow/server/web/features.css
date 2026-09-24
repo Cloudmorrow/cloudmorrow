@@ -1,0 +1,42 @@
+/* The switches in Me: which of the app this account wants.
+
+   A row per feature with a tick box on the right, in the same boxed group
+   every other list of rows uses — because what is being switched is a tab,
+   and a tab is not a special kind of thing. */
+
+.features-card .row.feature {
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+.features-card .row.feature .main { min-width: 0; }
+/* What a feature is wraps rather than being cut off at the edge. Every
+   other list in the app shows a preview of something you can open and read
+   in full; this one is the whole of what there is to read, and a row that
+   ends in "…" would be hiding the part that says where the switch lands. */
+.features-card .row.feature .meta {
+  white-space: normal;
+  overflow: visible;
+}
+.features-card .row.feature .preview {
+  display: block;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+.features-card input[type="checkbox"] {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+.features-card input[type="checkbox"]:disabled { opacity: .5; }
+
+/* The sentence under the group, in the shape a group label has: the same
+   size and colour, without the shouting. */
+.features-note {
+  margin: 8px 4px 20px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}

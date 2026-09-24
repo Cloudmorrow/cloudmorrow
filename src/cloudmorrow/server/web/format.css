@@ -1,0 +1,58 @@
+/* The formatting bar, which is only there while words are selected. */
+
+.format {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  background: var(--bar);
+  border-top: 1px solid var(--line);
+  padding: 8px 0 calc(8px + var(--bottom));
+  /* Off screen rather than hidden, so it can slide; `visibility` takes it
+     out of the reading order and out of the way of taps while it is down. */
+  transform: translateY(120%);
+  visibility: hidden;
+  transition: transform .18s ease, visibility .18s;
+}
+.format.up {
+  transform: none;
+  visibility: visible;
+}
+@media (prefers-reduced-motion: reduce) {
+  .format { transition: none; }
+}
+
+/* Ten marks is more than a phone is wide, so the row scrolls rather than
+   wrapping to a second line the thumb would have to reach over. */
+.format-row {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.format-row::-webkit-scrollbar { display: none; }
+
+.format button {
+  flex: none;
+  min-width: 46px;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--bar-ink);
+  font: 600 15px/1 var(--mono);
+}
+.format button:active {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+/* Each mark wears what it does. */
+.format [data-format="bold"] span { font-weight: 800; }
+.format [data-format="italic"] span { font-style: italic; }
+.format [data-format="strike"] span { text-decoration: line-through; }
+.format [data-format="link"] span { text-decoration: underline; }

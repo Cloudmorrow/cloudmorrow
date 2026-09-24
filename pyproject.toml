@@ -1,0 +1,94 @@
+[project]
+name = "cloudmorrow"
+# From git tags, not typed here: see [tool.hatch.version] below.
+dynamic = ["version"]
+description = "Cloudmorrow — a local cloud you install on your own hardware: API server + TUI client"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "AGPL-3.0-or-later" }
+authors = [{ name = "Jimmi Bram" }]
+
+dependencies = [
+    "rich>=13.7",
+]
+
+[project.optional-dependencies]
+tui = [
+    "textual>=0.83",
+    # Pictures in notes, drawn in the terminal: Kitty or Sixel graphics where
+    # the terminal has them, coloured half-cells everywhere else.
+    "textual-image>=0.14",
+    "httpx>=0.27",
+    "typer>=0.12",
+    "platformdirs>=4.2",
+    "tomli-w>=1.0",
+]
+agent = [
+    "httpx>=0.27",
+    "typer>=0.12",
+    "platformdirs>=4.2",
+    "tomli-w>=1.0",
+    # Not here: WsgiDAV, which the agent needs only to serve a machine share,
+    # and fetches into its own venv the first time it has one to serve.
+]
+server = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "pyjwt>=2.8",
+    "argon2-cffi>=23.1",
+    "cryptography>=42.0",
+    "typer>=0.12",
+    "tomli-w>=1.0",
+    # The fileshares: WsgiDAV speaks WebDAV, a2wsgi lets FastAPI mount it.
+    "wsgidav>=4.3",
+    "a2wsgi>=1.10",
+    # The web app's grid of files shows pictures small; this makes them small.
+    "pillow>=10.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+cloudmorrow = "cloudmorrow.cli.main:main"
+# The same command, two letters: `cm note list`, or just `cm` for the TUI.
+cm = "cloudmorrow.cli.main:main"
+cloudmorrow-server = "cloudmorrow.server.cli:main"
+cloudmorrow-agent = "cloudmorrow.agent.cli:main"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+# The version is the nearest git tag, so it is a fact about the history rather
+# than a number somebody remembered to change. A release is a tag: `v0.7.0` on
+# the commit being pushed, and this reads `0.7.0` back off it. Between tags it
+# reads `0.8.0.dev3+g1c91c8b`, which says plainly that it is not a release.
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+# Each push bumps the minor, so the version being worked towards is the next
+# minor — not the next patch, which is what setuptools-scm would assume.
+version_scheme = "release-branch-semver"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cloudmorrow"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+# So `from tests.conftest import …` resolves when pytest is run bare.
+pythonpath = ["."]

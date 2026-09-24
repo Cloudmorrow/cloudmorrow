@@ -1,0 +1,52 @@
+/* Pictures in a note: shown in the text where they are, and one shown large. */
+
+/* The body is boxes of text with pictures between; each box is only as tall
+   as its text, and the last one leaves room to keep writing. */
+.editor .blocks .body { min-height: 1.5em; }
+.editor .blocks .body:last-child { min-height: 6em; }
+
+.editor .picture {
+  position: relative;
+  /* Edge to edge, the way a phone's notes app lays a photo into a note. */
+  width: 100%;
+  margin: 10px 0;
+}
+.editor .picture img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  background: var(--card);
+  cursor: zoom-in;
+}
+.editor .picture img:not([src]) { aspect-ratio: 4 / 3; }
+.editor .picture .remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .55);
+  color: #fff;
+}
+.editor .picture figcaption { margin-top: 4px; font-size: 12px; color: var(--muted); }
+.editor .picture.missing img { display: none; }
+
+.editor.dropping { outline: 2px dashed var(--accent); outline-offset: 8px; border-radius: 8px; }
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .94);
+  cursor: zoom-out;
+}
+.lightbox img { max-width: 100vw; max-height: 100dvh; object-fit: contain; }
+
+.editor .picture img, .editor .picture .remove, .editor.dropping { border-radius: var(--radius); }

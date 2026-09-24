@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__NAME__</title>
+<style>
+  :root {
+    --bg: #0d0f16;
+    --panel: #12141d;
+    --line: #232838;
+    --ink: #d7dbe4;
+    --dim: #8b93a7;
+    --accent: #22d3ee;
+    --accent-soft: #7dd3fc;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 3rem 1.25rem 5rem;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.6 var(--mono);
+  }
+  main { max-width: 46rem; margin: 0 auto; }
+  pre.logo {
+    color: var(--accent);
+    font-size: clamp(4px, 1.42vw, 11px);
+    line-height: 1.15;
+    margin: 0 0 .5rem;
+    overflow-x: auto;
+  }
+  .tagline { color: var(--dim); font-style: italic; margin: 0 0 2.5rem; }
+  h2 {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    color: var(--accent);
+    margin: 2.5rem 0 .75rem;
+    font-weight: 600;
+  }
+  p { color: var(--dim); margin: 0 0 1rem; }
+  .cmd {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--accent);
+    border-radius: 6px;
+    padding: 1rem 1rem 1rem 1.25rem;
+  }
+  .cmd code {
+    flex: 1;
+    /* Wrap at spaces, and only break inside a token when one is too long. */
+    white-space: pre-wrap;
+    word-break: normal;
+    overflow-wrap: break-word;
+    color: var(--ink);
+  }
+  .cmd code .prompt { color: var(--dim); user-select: none; }
+  button {
+    flex: none;
+    font: inherit;
+    font-size: .8rem;
+    color: var(--bg);
+    background: var(--accent);
+    border: 0;
+    border-radius: 4px;
+    padding: .35rem .8rem;
+    cursor: pointer;
+  }
+  button:hover { background: var(--accent-soft); }
+  button.copied { background: #4ade80; }
+  ul { color: var(--dim); padding-left: 1.2rem; margin: 0 0 1rem; }
+  li { margin: .3rem 0; }
+  li b { color: var(--ink); font-weight: 600; }
+  code.inline { color: var(--accent-soft); }
+  .signin {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: .9rem 1rem .9rem 1.25rem;
+    margin: 0 0 2.5rem;
+  }
+  .signin p { margin: 0; }
+  a.button {
+    flex: none;
+    color: var(--bg);
+    background: var(--accent);
+    border-radius: 4px;
+    padding: .45rem .9rem;
+    font-size: .85rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  a.button:hover { background: var(--accent-soft); }
+  footer {
+    margin-top: 3.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--line);
+    color: var(--dim);
+    font-size: .85rem;
+  }
+  footer a { color: var(--accent-soft); }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f6f7f9; --panel: #fff; --line: #dfe3ea;
+      --ink: #1a1d26; --dim: #5a6472; --accent: #0e7490; --accent-soft: #0369a1;
+    }
+  }
+</style>
+</head>
+<body>
+<main>
+  <pre class="logo">__LOGO__</pre>
+  <p class="tagline">__NAME__ &nbsp;·&nbsp; v__VERSION__</p>
+
+  <div class="signin">
+    <p>Notes, tasks, calendar, chat and files — made for the phone.</p>
+    <a class="button" href="/app">Sign in</a>
+  </div>
+
+  <h2>Install on a new machine</h2>
+  <div class="cmd">
+    <code id="install-cmd"><span class="prompt">$ </span>curl -fsSL __BASE_URL__/install.sh | sh</code>
+    <button data-copy="#install-cmd">copy</button>
+  </div>
+  <p>Needs Python 3.11+. Nothing else.</p>
+  <ul>
+    <li>installs into <b>__VENV_HINT__</b> and links <code class="inline">cloudmorrow</code>, its short name <code class="inline">cm</code>, and <code class="inline">cloudmorrow-agent</code> onto your <code class="inline">PATH</code></li>
+    <li>points the CLI at <b>__BASE_URL__</b></li>
+    <li>run <code class="inline">cloudmorrow login</code>, then <code class="inline">cloudmorrow</code> for the notes TUI</li>
+  </ul>
+
+  <footer>
+    Cloudmorrow __VERSION__ &nbsp;·&nbsp; <a href="/app">notes</a> &nbsp;·&nbsp;
+    <a href="/docs">API docs</a> &nbsp;·&nbsp;
+    <a href="/install.sh">read install.sh</a> &nbsp;·&nbsp; <a href="/api/health">health</a>
+  </footer>
+</main>
+<script>
+  for (const button of document.querySelectorAll("button[data-copy]")) {
+    button.addEventListener("click", async () => {
+      const source = document.querySelector(button.dataset.copy);
+      const text = source.textContent.replace(/^\$\s*/, "");
+      let label = "copied";
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        // No clipboard access: select the command so it can be copied by hand.
+        const range = document.createRange();
+        range.selectNodeContents(source);
+        const selection = getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        label = "selected";
+      }
+      const original = button.textContent;
+      button.textContent = label;
+      button.classList.add("copied");
+      setTimeout(() => {
+        button.textContent = original;
+        button.classList.remove("copied");
+      }, 1400);
+    });
+  }
+</script>
+</body>
+</html>

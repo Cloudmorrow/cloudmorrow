@@ -1,0 +1,36 @@
+# /etc/systemd/system/cloudmorrow.service
+#
+# deploy/install-server.sh writes this file for you — this copy is here for
+# reference, or for a hand-rolled install:
+#
+#   sudo useradd --system --home /var/lib/cloudmorrow --shell /usr/sbin/nologin cloudmorrow
+#   sudo mkdir -p /srv/cloudmorrow/notes /var/lib/cloudmorrow /etc/cloudmorrow
+#   sudo chown -R cloudmorrow:cloudmorrow /srv/cloudmorrow /var/lib/cloudmorrow
+#   sudo systemctl enable --now cloudmorrow
+[Unit]
+Description=Cloudmorrow API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cloudmorrow
+Group=cloudmorrow
+Environment=CLOUDMORROW_SERVER_CONFIG=/etc/cloudmorrow/server.toml
+Environment=HOME=/var/lib/cloudmorrow
+ExecStart=/opt/cloudmorrow/venv/bin/cloudmorrow-server serve
+# always, not on-failure: an API deploy restarts the server by stopping it and
+# letting systemd start it again on the new code. An explicit `systemctl stop`
+# still stops it — systemd knows the difference.
+Restart=always
+RestartSec=3
+
+# The service only ever needs its own two directories.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/cloudmorrow /var/lib/cloudmorrow /opt/cloudmorrow
+
+[Install]
+WantedBy=multi-user.target

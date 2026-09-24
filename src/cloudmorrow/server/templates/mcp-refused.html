@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect to Cloudmorrow</title>
+<style>
+  :root {
+    --bg: #14171f;
+    --card: #1f242e;
+    --line: #333a48;
+    --ink: #dfe5f0;
+    --muted: #99a1b3;
+    --bad: #ff6b81;
+    --radius: 14px;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Inter, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 1.5rem 1rem;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.5 var(--sans);
+  }
+  main {
+    width: 100%;
+    max-width: 24rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1.75rem 1.5rem 1.5rem;
+  }
+  .brand {
+    font-weight: 800;
+    letter-spacing: .02em;
+    background: linear-gradient(100deg, #4fe3d7, #7c8cf8, #f472b6);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin: 0 0 1rem;
+  }
+  h1 { font-size: 1.25rem; margin: 0 0 .5rem; color: var(--bad); }
+  p { color: var(--muted); margin: 0; }
+  .foot { margin: 1.25rem 0 0; font-size: .8rem; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">Cloudmorrow</div>
+  <h1>That request cannot go ahead</h1>
+  <p>__MESSAGE__</p>
+  <p class="foot">Cloudmorrow __VERSION__</p>
+</main>
+</body>
+</html>

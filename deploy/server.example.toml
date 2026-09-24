@@ -1,0 +1,81 @@
+# Cloudmorrow server configuration.
+# Copy to /etc/cloudmorrow/server.toml and edit. Every key can also be set with an
+# environment variable: CLOUDMORROW_NOTES_DIR, CLOUDMORROW_PORT, and so on.
+
+[server]
+# What this cloud is called: on the sign-in screen, the install page, the
+# phone's home screen and /api/health. The installer asks for it.
+name = "Cloudmorrow"
+
+# The directory your notes live in. Plain markdown files, nothing else.
+notes_dir = "/srv/cloudmorrow/notes"
+
+# Database (users) and the generated token signing key.
+data_dir = "/var/lib/cloudmorrow"
+
+# true  -> every user gets notes_dir/<username>
+# false -> all users share notes_dir
+per_user_dirs = true
+
+# The Shares folder: every server share is a folder in it. Unset, it is
+# notes_dir/Shares, in the Cloudmorrow directory. Whatever you set, keep it
+# under a path the service unit may write to (ReadWritePaths); the rest of
+# the filesystem is read-only to the server.
+# shares_dir = "/srv/cloudmorrow/Shares"
+
+# Bind locally and let the reverse proxy terminate TLS.
+host = "127.0.0.1"
+port = 8787
+
+# Refuse a request that did not come over TLS (426), and send HSTS on the
+# ones that did. Unset, it follows public_url: on for https. A call from
+# this machine with no proxy header is always let through.
+# require_tls = true
+
+# How long an access token stays valid. 30 days by default.
+token_ttl_hours = 720
+
+# Leave unset to generate and store one in data_dir/secret.key on first boot.
+# secret_key = ""
+
+# The key everything is sealed with at rest: chat, calendar, tasks, notes,
+# pictures, secrets. Generated at mode 600 on first boot if the file is not
+# there. The installer puts it in /etc, away from the data, so a copy of
+# data_dir alone opens nothing. Unset, it is data_dir/secrets.key. Back it
+# up with the data, and never instead of it: lose it and everything is gone.
+key_file = "/etc/cloudmorrow/cloudmorrow.key"
+
+# Only needed if a browser app ever talks to this API. The TUI does not.
+cors_origins = []
+
+# Hosts allowed to talk to the API at all — addresses or CIDR ranges, matched
+# against the real TCP peer. Empty means anyone who can reach the port. Set it
+# to your reverse proxy on a machine that also serves other things and where a
+# host firewall would be in the way.
+#   allowed_client_ips = ["192.168.10.88"]
+allowed_client_ips = []
+
+# The URL machines reach this server on. The install page bakes it into the
+# command it hands out, so set it when you run behind a reverse proxy.
+public_url = "https://cm.hl.bramlabs.io"
+
+# What /install.sh pip-installs. A wheel published with
+# `cloudmorrow-server publish` overrides this, which is what lets a machine with
+# no route to PyPI install from the server itself.
+package_spec = "cloudmorrow[tui,agent]"
+
+# Whether an admin may deploy from git over the API — `cloudmorrow update server`
+# without a shell on this box. The server can only move to a commit
+# already on its remote, so nothing runs here that was not pushed there first,
+# but it does mean an admin token can change the running code. Set it false to
+# require ssh; `cloudmorrow update server --ssh` then remains the way in.
+allow_api_update = true
+
+# The unit an API deploy stops so systemd starts it again on the new code.
+# It needs Restart=always, which install-server.sh writes.
+service_name = "cloudmorrow"
+
+# Where the weather on the app's front page is for: a place name, or
+# "latitude,longitude" when the name is ambiguous. Looked up on Open-Meteo,
+# which needs no key. Leave it empty and the page shows no weather.
+weather_place = "Copenhagen"

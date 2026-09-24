@@ -1,0 +1,21 @@
+/* Cloudmorrow on the phone: the stylesheet is only this list.
+
+   base.css is the shapes every feature shares; after it, one file per
+   feature, beside its script. A new feature is a new file and one line
+   here. Order matters only in that base comes first, so a feature's rule
+   wins a tie with a shared one. */
+
+@import "./base.css";
+@import "./install.css";
+@import "./today.css";
+@import "./notes.css";
+@import "./pictures.css";
+@import "./tasks.css";
+@import "./chat.css";
+@import "./calendar.css";
+@import "./format.css";
+@import "./files.css";
+@import "./features.css";
+@import "./me.css";
+@import "./admin.css";
+@import "./desktop.css";

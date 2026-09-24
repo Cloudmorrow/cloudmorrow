@@ -1,0 +1,21 @@
+/* Me: who you are, the facts about you, and the way out. */
+
+.who { display: flex; align-items: center; gap: 14px; margin: 4px 0 18px; }
+.who .avatar {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 26px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.who .text { min-width: 0; color: var(--muted); font-size: 15px; overflow-wrap: anywhere; }
+.who .text b { display: block; color: var(--ink); font-size: 20px; font-weight: 700; }
+/* A version or a date is data, so it is set in the monospace face. */
+.row .value { font-family: var(--mono); font-size: 14px; flex: none; max-width: 60%; color: var(--muted); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.row.signout { justify-content: center; color: var(--bad); font-weight: 600; }

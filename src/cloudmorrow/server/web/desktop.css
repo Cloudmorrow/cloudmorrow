@@ -1,0 +1,205 @@
+/* Cloudmorrow on a computer: the same app, given the room it has.
+
+   The phone is the app, and nothing here changes it. Every rule that
+   touches a shape the phone already draws is inside the query below; the
+   two rules above it are for elements that did not exist before this
+   file, and their whole job is to keep them off the phone.
+
+   The query asks for width *and* height. A phone held sideways is 932
+   points wide and 430 tall, and a phone held sideways is still a phone —
+   the height is what tells the two apart. Above it the tabs stand up into
+   a rail down the left, the bar's buttons come in to meet the column they
+   act on, and everything the pointer is over says so.
+
+   The second step, at 1180px, is for the two screens that want more than
+   a column: the month, and a folder of pictures. */
+
+/* The wordmark at the head of the rail, and the bar core.js puts on a
+   screen that draws none of its own. Both are in the page on a phone as
+   well; neither is for it. */
+.tabs .rail-head { display: none; }
+.aside-tabs .tabs { display: none; }
+
+@media (min-width: 900px) and (min-height: 600px) {
+  :root {
+    /* The rail down the left, and the measure the page is set to. */
+    --rail: 232px;
+    --column: 820px;
+    /* The bar's own height, without the notch a computer does not have. */
+    --bar-h: calc(44px + var(--bar-top));
+  }
+
+  /* A screen that is not a list wants its own measure. On the shell
+     rather than on `main`, because the bar is main's sibling and has to
+     line up with what main draws. */
+  #app:has(.editor) { --column: 720px; }
+  #app:has(main.thread) { --column: 880px; }
+  #app:has(.month) { --column: 900px; }
+  #app:has(.tiles) { --column: 960px; }
+
+  #app { padding-left: var(--rail); }
+
+  /* -- the tabs stand up ---------------------------------------------------- */
+  /* The same markup the phone draws along the bottom, turned on its side.
+     It keeps its `bottom: 0` and gains a top, so it is the height of the
+     window; the padding above the first tab is the height of the bar, so
+     the rail and the page start on the same line. */
+  .tabs, .aside-tabs .tabs {
+    display: flex;
+    top: 0;
+    right: auto;
+    width: var(--rail);
+    height: auto;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 2px;
+    padding: 8px 12px calc(12px + var(--bottom));
+    border-right: 1px solid var(--line);
+  }
+  /* The wordmark sits at the head of the rail, where a program on a
+     computer puts its name. */
+  .tabs .rail-head {
+    display: flex;
+    align-items: center;
+    height: var(--bar-h);
+    padding: var(--bar-top) 12px 0;
+    margin-bottom: 8px;
+    color: var(--bar-accent);
+  }
+  .tabs .rail-head .wordmark { width: 157px; }
+
+  .tab {
+    flex: none;
+    width: 100%;
+    max-width: none;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    min-height: 38px;
+    padding: 0 12px;
+    border-radius: 10px;
+    font-size: 14.5px;
+    font-weight: 600;
+  }
+  .tab .pixel-icon { width: 18px; height: 18px; }
+  .tab.active { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+  /* The pip goes to the end of the row, the way a sidebar counts. */
+  .tab.pipped::after {
+    position: static;
+    top: auto;
+    left: auto;
+    margin: 0 0 0 auto;
+  }
+
+  /* -- the bar -------------------------------------------------------------- */
+  /* Its buttons belong to the column, not to the window: a Compose out at
+     the right edge of a 1440px screen is a third of a screen away from
+     the list it writes into. */
+  .nav {
+    padding-left: max(8px, calc((100% - var(--column)) / 2));
+    padding-right: max(8px, calc((100% - var(--column)) / 2));
+    border-bottom: 1px solid transparent;
+  }
+  /* Once the large title has gone under it, the bar needs a floor — the
+     page scrolls past it here rather than under a notch. */
+  .nav.lined { border-bottom-color: var(--line); }
+  /* The wordmark is in the rail now, so the middle of the bar can say
+     what the phone keeps there for the screen reader alone: which screen
+     this is. It says it when the page's own title is not on the screen to
+     say it — the same moment the bar grows its line — and holds the room
+     the whole time, so nothing moves when it arrives. It is only ever
+     faded, never taken away, because what is reading the page aloud
+     wanted it in the first place. */
+  .nav .center .wordmark { display: none; }
+  .nav .center .text {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: hidden;
+    clip: auto;
+    max-width: 40ch;
+    opacity: 0;
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--bar-ink);
+  }
+  .nav.lined .center .text { opacity: 1; }
+
+  /* -- the page ------------------------------------------------------------- */
+  main { max-width: var(--column); }
+  /* There is no bar along the bottom to leave room for. */
+  main:not(.thread) { padding-bottom: 56px; }
+  #toast { left: calc(50% + var(--rail) / 2); bottom: 24px; }
+
+  /* A thumb wants a big target; a pointer would rather see more at once. */
+  .row { min-height: 46px; }
+  .row.task .tick, .row.task .main { min-height: 46px; }
+
+  /* The boards run along the top rather than off the side: they all fit,
+     and there is nothing to swipe with. */
+  .chips {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    margin: 0 0 14px;
+    padding: 0;
+  }
+
+  /* What slid up from under the thumb is a dialog in the middle here. */
+  .sheet-backdrop { align-items: center; padding: 16px; }
+  .sheet { max-width: 420px; }
+
+  /* A line of chat is for reading, not for crossing a metre of glass. */
+  .bubble { max-width: min(82%, 62ch); }
+
+  /* The scrollbars are the page's own colours. */
+  * { scrollbar-width: thin; scrollbar-color: var(--line-bright) transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: var(--line-bright);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-track { background: transparent; }
+}
+
+/* -- what the pointer is over ---------------------------------------------- */
+/* Behind `hover`, so a laptop with a touchscreen does not leave the last
+   thing tapped lit up. The phone says what it is on with `:active`; a
+   mouse never sees that, and a row that does nothing until it is clicked
+   is most of what makes an app feel like a page. */
+@media (hover: hover) and (pointer: fine) and (min-width: 900px) and (min-height: 600px) {
+  .row:hover { background: var(--card-2); }
+  /* The rows that are a filled colour already brighten instead. */
+  .row.primary:hover, .row.bad:hover, .sheet-row:hover { filter: brightness(1.12); }
+  .tab:hover { background: var(--card); color: var(--bar-ink); }
+  .tab.active:hover { color: var(--bar-accent); }
+  .nav button:hover, .nav a.button:hover, .nav .nav-link:hover,
+  .heading button:hover, .heading a.button:hover { opacity: .72; }
+  .tile:hover .thumb { border-color: var(--line-bright); background: var(--card-2); }
+  .month .cell:hover { background: var(--card-2); }
+  .month .cell.away:hover { background: var(--card); }
+  .chip:hover, .sort button:hover, .sides button:hover, .lanes button:hover { color: var(--ink); }
+  .chip.active:hover, .sort button.active:hover,
+  .sides button.active:hover, .lanes button.active:hover { color: var(--accent-ink); }
+  .swatch:hover { border-color: var(--line-bright); }
+  .month-bar .step:hover, .month-bar .calendars-link:hover { background: var(--card); }
+  .composer button:hover, .nav button.strong:hover, .login .submit:hover { filter: brightness(1.08); }
+}
+
+/* -- the screens that want more than a column ------------------------------ */
+@media (min-width: 1180px) and (min-height: 600px) {
+  /* A month on a computer has the room to be a month rather than a strip
+     of dots — the height for a few lines in a cell, and the width for
+     them to be worth reading. What goes in the cells is the calendar's
+     own business; this is only the room for it. */
+  #app:has(.month) { --column: 1080px; }
+  .month .cell { min-height: 92px; }
+  /* Three lanes want three columns' worth: a card cut off after four
+     words is not a card you can read the board from. */
+  #app:has(.board) { --column: 1120px; }
+  /* Thumbnails at the size a picture is worth looking at. */
+  .tiles { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}

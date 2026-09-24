@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>__NAME__</title>
+<meta name="description" content="Your Cloudmorrow notes, in the browser — made for the phone.">
+<meta name="theme-color" content="#1c212b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<!-- Not black-translucent. That lets the page run under the status bar, and
+     since iOS 26 the system fills that strip with a frosted gradient of its
+     own — a white wash over the dark bar, with no way to turn it off. Stop
+     the page at the status bar instead: there is no strip left to fill, and
+     iOS takes the colour from the top edge of the page, which is the bar. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="__NAME__">
+<link rel="manifest" href="/app/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/app/icon-180.png">
+<link rel="icon" href="/app/icon-180.png" type="image/png">
+<link rel="stylesheet" href="/app/__ASSET_VERSION__/app.css">
+</head>
+<body>
+<div id="app" data-name="__NAME__" data-version="__VERSION__" data-deploy="__ASSET_VERSION__"></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+<script type="module" src="/app/__ASSET_VERSION__/app.js"></script>
+</body>
+</html>

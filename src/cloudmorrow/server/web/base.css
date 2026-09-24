@@ -1,0 +1,391 @@
+/* The shapes every feature is built from.
+
+   CATHODE: a colour monitor at two in the morning, which is the look
+   chosen at /brand. Blue-black glass, phosphor cyan for the thing you are
+   on, violet for a name or a link — the same twelve colours the CLI and
+   the terminal app are painted from, in `cloudmorrow/palette.py`, so the
+   three of them look like one product. A bar at the top, a large title,
+   boxed groups of rows, an editor, and three tabs along the bottom. The
+   terminal touches — the cursor, the prompts, the brackets — are in
+   A feature's own shapes live in its own stylesheet, beside its script.
+
+   The type is the rule from /brand: pixels for the marks, real type for
+   the words. The wordmark in the bar is drawn dot by dot; everything you
+   read is set in the system's own UI face, because a note is prose and
+   prose in a monospace face is a thing to decode rather than read. What
+   is genuinely monospaced data — a version, a hash — asks for --mono by
+   name. */
+
+:root {
+  --bg: #14171f;
+  --card: #1f242e;
+  --card-2: #272d39;
+  --line: #333a48;
+  --line-bright: #4a5364;
+  --ink: #dfe5f0;
+  --muted: #99a1b3;
+  --accent: #4fe3d7;
+  --accent-ink: #0e1117;
+  --second: #a78bfa;
+  --field: #272d39;
+  --good: #5ce89b;
+  --warn: #ffc857;
+  --bad: #ff6b81;
+  /* The bars above and below: a step lighter than the page, so they read
+     as surfaces it sits between rather than as holes in it. */
+  --bar: #1c212b;
+  --bar-ink: #dfe5f0;
+  --bar-muted: #99a1b3;
+  --bar-accent: #4fe3d7;
+  --bar-bad: #ff6b81;
+  /* Two gradients, because they are not interchangeable. --brand is for
+     line art and long thin shapes, where 154° of hue is a pleasure.
+     --brand-mark is the same idea at 59° and half the chroma, for the
+     wordmark and anything else that is a dense field rather than a few
+     strokes — a wide arc across one of those on a dark ground has its two
+     ends focusing at different depths, and it is genuinely hard to look
+     at. Neither belongs on a control: a selected thing is a flat fill. */
+  --brand: linear-gradient(100deg, #4fe3d7, #7c8cf8, #f472b6);
+  --brand-mark: linear-gradient(100deg, #3fbdb4, #4886c9, #6d74c6);
+  --radius: 14px;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Inter,
+          system-ui, sans-serif;
+  --mono: ui-monospace, "JetBrains Mono", "Fira Code", "Cascadia Mono", SFMono-Regular,
+          "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  --top: env(safe-area-inset-top, 0px);
+  --bottom: env(safe-area-inset-bottom, 0px);
+  /* What the bar at the top puts above itself. In a browser that is the
+     notch, and nothing on a desktop. */
+  --bar-top: var(--top);
+  color-scheme: dark;
+}
+
+/* Added to the Home Screen, the top of the page needs a floor under it.
+
+   Since iOS 26 the system draws a Liquid Glass band over the top of a
+   web app — a gradient from its own colour down to nothing, about 35pt
+   of it — and it is painted on top of the web view, not in it. There is
+   no way to turn it off: no meta tag, no CSS, and the private property
+   that would do it (`-apple-visual-effect`) does nothing on the web. The
+   safe-area insets do not grow to account for it either, and with the
+   opaque status bar we ask for, `env(safe-area-inset-top)` is 0 in
+   standalone — which is what left the wordmark sitting flush against the
+   very top, in the darkest part of the band.
+
+   So the only lever is not putting anything up there. Added to the inset
+   rather than a floor under it, because the two cases want different
+   things and both want more: with the opaque status bar the inset is 0
+   and this is the whole of the gap, and on a copy still installed with
+   the old translucent bar the inset is the notch and the band reaches
+   well below it. Only in standalone: a browser has its own chrome above
+   us and needs none of this. Raise the 20px if the band still reaches
+   the wordmark; it is the only number here. */
+@media (display-mode: standalone) {
+  :root { --bar-top: calc(var(--top) + 20px); }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+button, input, textarea { font: inherit; color: inherit; }
+input, textarea { caret-color: var(--accent); }
+::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button { background: none; border: 0; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
+svg { display: block; }
+
+#app { min-height: 100dvh; display: flex; flex-direction: column; }
+
+/* -- the bar at the top ------------------------------------------------- */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  /* The 44px is the bar's own, under the notch: with border-box sizing a
+     plain 44px would count the padding above, and a screen with no button
+     in the bar — Files, Me — would come up shorter than one with. */
+  min-height: calc(44px + var(--bar-top));
+  padding: var(--bar-top) 8px 0;
+  background: var(--bar);
+  color: var(--bar-ink);
+}
+.nav .left { justify-self: start; }
+.nav .right { justify-self: end; }
+.nav .center { display: flex; align-items: center; }
+.wordmark { display: block; height: auto; color: var(--accent); }
+.nav .wordmark { color: var(--bar-accent); }
+.nav .center .wordmark { width: 145px; }
+/* The title is on the page for what reads it, not for the eye: the bar is
+   the wordmark, and the wordmark does not move. */
+.nav .center .text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.nav button, .nav a.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 0 8px;
+  color: var(--bar-accent);
+  font-size: 16px;
+}
+/* The one button on the bar that is the point of the screen: a filled
+   pill, the way a selected thing is filled everywhere else. */
+.nav button.strong {
+  align-self: center;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.nav button.danger { color: var(--bar-bad); }
+.nav .back svg { margin-left: -6px; }
+/* Who you are, in the corner: the one tab that is on every screen. */
+.nav .me-link .pixel-icon { width: 22px; height: 22px; }
+/* A long board or folder name stays on one line and is cut, not wrapped. */
+.nav .left { min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
+.nav .back { white-space: nowrap; max-width: 100%; }
+
+/* -- the body ------------------------------------------------------------ */
+main {
+  flex: 1;
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 16px calc(72px + var(--bottom));
+}
+h1.large {
+  font-size: 30px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  margin: 6px 0 14px;
+  overflow-wrap: anywhere;
+}
+/* The title with what the screen makes beside it, on the right. The
+   buttons are the bar's buttons — the same colour, the same 44-point
+   target — moved down to the thing they act on; the negative margin puts
+   the glyph, not the padding around it, on the column's edge. */
+.heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.heading h1 { min-width: 0; flex: 1; }
+.heading .actions { display: flex; align-items: center; flex: none; margin: 6px -8px 14px 0; }
+.heading button, .heading a.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 0 8px;
+  color: var(--accent);
+  font-size: 16px;
+}
+.group-label {
+  margin: 22px 0 8px 4px;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+.listing .group-label:first-child { margin-top: 4px; }
+.group {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin: 0 0 12px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 10px 12px 10px 16px;
+  position: relative;
+  width: 100%;
+  text-align: left;
+}
+.row + .row::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 0;
+  top: 0;
+  border-top: 1px solid var(--line);
+}
+.row.has-icon + .row.has-icon::before { left: 54px; }
+.row:active { background: var(--card-2); }
+.row .icon { flex: none; color: var(--accent); width: 26px; display: flex; justify-content: center; }
+.row .main { flex: 1; min-width: 0; }
+.row .title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row .meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 14px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.row .meta .date { flex: none; color: var(--ink); opacity: .8; }
+.row .meta .preview { overflow: hidden; text-overflow: ellipsis; }
+.row .count { flex: none; color: var(--muted); font-size: 17px; }
+.row .chevron { flex: none; color: var(--muted); }
+.empty {
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--muted);
+}
+.empty b { color: var(--ink); font-weight: 600; display: block; margin-bottom: 4px; }
+
+/* -- the tabs at the bottom --------------------------------------------- */
+.tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  height: calc(50px + var(--bottom));
+  padding: 0 0 var(--bottom);
+  background: var(--bar);
+}
+.tab {
+  flex: 1 1 0;
+  max-width: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--bar-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .01em;
+}
+.tab .pixel-icon { width: 22px; height: 22px; }
+.tab.active { color: var(--bar-accent); font-weight: 600; }
+.tab:active { opacity: .6; }
+
+/* -- the editor ---------------------------------------------------------- */
+.editor { padding-top: 4px; min-height: 70vh; cursor: text; }
+.editor .title {
+  width: 100%;
+  border: 0;
+  background: none;
+  outline: none;
+  padding: 4px 0;
+  font-size: 25px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+.editor .title::placeholder { color: var(--muted); font-weight: 600; }
+.editor .stamp {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  min-height: 1.2em;
+}
+.editor .stamp .status:not(:empty)::before { content: "·"; margin: 0 6px; }
+.editor .stamp .status.bad { color: var(--bad); }
+.editor .body {
+  display: block;
+  width: 100%;
+  min-height: 6em;
+  border: 0;
+  background: none;
+  outline: none;
+  padding: 0;
+  resize: none;
+  overflow: hidden;
+  font-size: 17px;
+  line-height: 1.6;
+}
+.editor .body::placeholder { color: var(--muted); }
+
+/* -- signing in ---------------------------------------------------------- */
+.login {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: calc(var(--top) + 24px) 16px calc(var(--bottom) + 24px);
+}
+.login .brand { margin: 0 0 12px; }
+.login .brand .wordmark { width: min(100%, 280px); }
+.login h1 { font-size: 28px; letter-spacing: -.02em; margin: 0 0 24px; }
+.login .fields {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin: 0 0 16px;
+}
+.login .fields:focus-within { border-color: var(--accent); }
+.login .fields input {
+  display: block;
+  width: 100%;
+  height: 52px;
+  padding: 0 16px;
+  border: 0;
+  background: none;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.login .fields input + input { border-top: 1px solid var(--line); }
+.login .fields input::placeholder { color: var(--muted); }
+.login .submit {
+  display: block;
+  width: 100%;
+  height: 50px;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.login .submit:disabled { opacity: .6; }
+.login .error { color: var(--muted); font-size: 15px; margin: 0 0 12px; min-height: 1.3em; }
+.login .error.bad { color: var(--bad); }
+.login .foot { margin-top: 32px; font-size: 12px; color: var(--muted); text-align: center; }
+.login .foot a { color: var(--second); }
+
+/* -- the toast ----------------------------------------------------------- */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(64px + var(--bottom));
+  transform: translateX(-50%);
+  z-index: 10;
+  max-width: calc(100vw - 32px);
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .35);
+}

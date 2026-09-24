@@ -1,0 +1,121 @@
+/* Administration: the section switch, the account rows, and the two forms.
+
+   Deliberately plain. This is the screen where a wrong tap makes somebody
+   an administrator or stops them signing in, so every row says what it is
+   in words and nothing here is a clever control. */
+
+/* -- the switch above the two sections ----------------------------------- */
+.seg {
+  display: flex;
+  margin: 0 0 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.seg button {
+  flex: 1;
+  min-height: 38px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.active { background: var(--accent); color: var(--accent-ink); }
+
+.panel .note {
+  margin: 0 4px 14px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* -- the accounts -------------------------------------------------------- */
+.row.user-row { padding-right: 12px; }
+.user-row .avatar {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+.user-row .main { min-width: 0; }
+.user-row .preview { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.user-row svg { flex: none; color: var(--muted); }
+
+/* The role is the one thing worth spotting down a list of accounts, so it
+   is a chip rather than another line of grey. */
+.user-row .off { color: var(--bad); font-weight: 600; }
+.role-chip {
+  flex: none;
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  white-space: nowrap;
+}
+.role-chip.role-administrator { border-color: var(--accent); color: var(--accent); }
+.role-chip.role-dashboard_displayer { border-color: var(--second); color: var(--second); }
+/* An ordinary account is the ordinary case, and does not need pointing at. */
+.role-chip.role-user { display: none; }
+
+/* Narrow enough that the chip and the name would fight: the name wins. */
+@media (max-width: 380px) {
+  .role-chip { display: none; }
+}
+
+/* -- switches and choices ------------------------------------------------- */
+.feature-row, .choices .row, .account .row { align-items: flex-start; }
+.feature-row input[type="checkbox"],
+.account input[type="checkbox"],
+.choices input[type="radio"] {
+  flex: none;
+  /* On the baseline of the row's first line, rather than floating against
+     a two-line label. */
+  margin: 15px 0 0;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+.feature-row .main, .choices .main { min-width: 0; }
+.feature-row .preview, .choices .preview { white-space: normal; overflow: visible; }
+.feature-row .meta, .choices .meta { white-space: normal; overflow: visible; }
+
+/* -- the account form ----------------------------------------------------- */
+.account .row { align-items: center; }
+.account .choices .row { align-items: flex-start; }
+.account input[type="text"],
+.account input[type="password"],
+.account input:not([type]) {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--ink);
+  font: inherit;
+  /* 16px or iOS zooms the page the moment it is focused. */
+  font-size: 16px;
+  text-align: right;
+}
+.account input::placeholder { color: var(--muted); }
+.account .value { min-width: 0; }
+
+.row.primary {
+  justify-content: center;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.row.primary:disabled { opacity: .5; }
+.row.bad { justify-content: center; color: var(--bad); font-weight: 600; }

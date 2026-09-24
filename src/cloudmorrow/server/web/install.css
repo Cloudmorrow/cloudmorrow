@@ -1,0 +1,35 @@
+/* The card that offers to put the app on the home screen. */
+
+.install {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 0 0 18px;
+  font-size: 15px;
+  color: var(--muted);
+}
+.install .brand .wordmark { width: 162px; margin: 2px 0 8px; }
+.install .text b { display: block; color: var(--ink); font-size: 17px; font-weight: 600; margin-bottom: 2px; }
+.install .key {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.install .actions { display: flex; gap: 6px; margin-top: 6px; }
+.install .actions button {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 15px;
+}
+.install .actions button.strong { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+.install, .install .actions button { border-radius: var(--radius); }

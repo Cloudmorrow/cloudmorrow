@@ -1,0 +1,7 @@
+{$CLOUDMORROW_DOMAIN:cloud.example.com} {
+	reverse_proxy cloudmorrow:8787
+
+	request_body {
+		max_size 25MB
+	}
+}

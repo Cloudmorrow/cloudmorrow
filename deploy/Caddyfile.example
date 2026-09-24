@@ -1,0 +1,13 @@
+# Caddy already handles the certificate for cm.hl.bramlabs.io.
+#
+# 127.0.0.1 is right when Caddy and the app share a machine. When the proxy is
+# a separate box, install the app with --host <its tailnet IP> and point this
+# at that address instead — the default loopback bind is unreachable from here.
+cm.hl.bramlabs.io {
+	reverse_proxy 127.0.0.1:8787
+
+	# Notes can get long; do not truncate uploads.
+	request_body {
+		max_size 10MB
+	}
+}
