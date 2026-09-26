@@ -200,18 +200,19 @@ class ConflictModal(Modal[str]):
 
 
 class SearchModal(Modal[str | None]):
-    """Full-text search across notes; dismisses with the chosen note path."""
+    """Full-text search; dismisses with the path of the page chosen."""
 
     BINDINGS = [("escape", "cancel", "Cancel")]
 
-    def __init__(self, search_callback: Any) -> None:
+    def __init__(self, search_callback: Any, *, title: str = "Search notes") -> None:
         super().__init__()
         self._search = search_callback
+        self._title = title
         self._paths: list[str] = []
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="modal modal-wide"):
-            yield Label("Search notes", classes="modal-title")
+            yield Label(self._title, classes="modal-title")
             yield Input(placeholder="text or file name…", id="search-input")
             with VerticalScroll(id="search-results-wrapper"):
                 yield ListView(id="search-results")

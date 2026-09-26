@@ -13,9 +13,10 @@ Two kinds of entry:
 * **Foundation** types the server itself owns: users, secrets, files,
   machines, notifications. No app may switch these off; every app that
   wants one asks for it.
-* **App** types an included app provides — notes, calendars and events,
-  channels and messages. (Boards and tasks are datamodels now, in the
-  record store, and listed at `/api/datamodels` with every other Quill's.) Switching the app off takes
+* **App** types an included app provides — channels and messages.
+  (Boards, tasks, calendars, events and notes are datamodels now, served
+  through the record API — notes by their backend — and listed at
+  `/api/datamodels` with every other Quill's.) Switching the app off takes
   its type with it, for now. When the same type is stored by the platform
   rather than by the app, that stops being true, and this catalogue is
   where the change shows.
@@ -175,69 +176,6 @@ TYPES: tuple[DataType, ...] = (
             _f("read", "bool"),
         ),
         sealed=("title", "body"),
-    ),
-    # -- what the included apps keep ----------------------------------------
-    DataType(
-        "note",
-        "Note",
-        "Markdown, in a folder, with pictures. A file on the server.",
-        "notes",
-        ("personal",),
-        (
-            _f("path", "string", "The title, as a file name; slashes are folders."),
-            _f("content", "markdown"),
-            _f("modified", "datetime"),
-        ),
-        sealed=("content",),
-        assistant=True,
-    ),
-    DataType(
-        "calendar",
-        "Calendar",
-        "Your own, one you share, or everybody's.",
-        "calendar",
-        ("personal", "shared", "public"),
-        (_f("slug", "string"), _f("name", "string"), _f("colour", "string")),
-    ),
-    DataType(
-        "event",
-        "Event",
-        "A title and two moments, on a calendar. Times are wall-clock times.",
-        "calendar",
-        ("personal", "shared", "public"),
-        (
-            _f("calendar", "ref", ref="calendar"),
-            _f("title", "string"),
-            _f("starts_at", "datetime"),
-            _f("ends_at", "datetime"),
-            _f("all_day", "bool"),
-            _f("location", "string"),
-            _f("notes", "text"),
-        ),
-        sealed=("title", "notes", "location"),
-    ),
-    DataType(
-        "channel",
-        "Channel",
-        "A public room, a private one, or the line between two people.",
-        "chat",
-        ("shared", "public"),
-        (_f("slug", "string"), _f("name", "string"), _f("kind", "string"), _f("topic", "string")),
-        sealed=("topic",),
-    ),
-    DataType(
-        "message",
-        "Message",
-        "What somebody said in a channel.",
-        "chat",
-        ("shared", "public"),
-        (
-            _f("channel", "ref", ref="channel"),
-            _f("author", "ref", ref="user"),
-            _f("body", "text"),
-            _f("sent_at", "datetime"),
-        ),
-        sealed=("body",),
     ),
 )
 

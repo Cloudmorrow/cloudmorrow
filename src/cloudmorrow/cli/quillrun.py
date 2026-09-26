@@ -15,6 +15,23 @@ come from the Quill's first screen (or `--screen`) and its datamodel.
     cm secrets list -g work/production # a list's group and subgroup, by value
     cm secrets show API_KEY --reveal   # a secret field is dots until asked for
 
+A `calendar` screen lists a range of days, and adds with its two moments:
+
+    cm calendar list --from 2026-10-01 --to 2026-10-31
+    cm calendar add "Dentist" starts=2026-10-01T10:00 ends=2026-10-01T11:00
+    cm calendar add "Holiday" starts=2026-10-12 ends=2026-10-16 calendar=House
+
+A field may be named by what the screen binds it as (`starts=` for the
+calendar's `starts_at`), and a link field (`calendar=House`) takes the
+linked record's name or id.
+
+An `editor` screen is pages of Markdown, found by their path:
+
+    cm notes list                      # every page, folders and all
+    cm notes show ideas/garden         # the Markdown, as it is: pipe it on
+    cm notes add ideas/garden          # from stdin, or $EDITOR
+    cm notes edit ideas/garden         # $EDITOR, or the new text from stdin
+    cm notes search tomatoes           # names and every line
 A `grid` (files) takes its group and folder as words instead:
 
     cm files list                      # the groups: My Files, the shares
@@ -23,6 +40,11 @@ A `grid` (files) takes its group and folder as words instead:
     cm files put my-files Photos ./dog.jpg [more…]
     cm files add my-files Photos/2026  # a new folder
     cm files delete my-files Photos/old.jpg
+A `thread` screen is spaces and what is said in them:
+
+    cm chat list                       # the channels, with what is unread
+    cm chat show general               # the conversation, newest at the bottom
+    cm chat say general "on my way"    # a channel by name, id, or the person
 
 `main` sends a first word that is not one of the built-in commands here, so
 `cm tasks` works without the CLI knowing, when it starts, what is installed.
@@ -30,7 +52,9 @@ A `grid` (files) takes its group and folder as words instead:
 
 from __future__ import annotations
 
+import datetime as dt
 import json
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -38,13 +62,25 @@ import typer
 from rich.markup import escape
 from rich.table import Table
 
-from cloudmorrow.cli.common import client, console, emit, fail, out, run
+from cloudmorrow.cli.common import (
+    client,
+    console,
+    edit_text,
+    emit,
+    fail,
+    out,
+    run,
+    stdin_is_a_terminal,
+)
 from cloudmorrow.client.api import ApiError, CloudmorrowClient
 from cloudmorrow.console import TITLE
 
 ACTIONS = (
     "list", "add", "show", "set", "move", "done", "undone", "delete", "groups", "get", "put",
+    "edit", "search", "say",
 )
+# How much of a conversation `show` prints.
+PAGE = 50
 
 # What a secret field says until it is asked for.
 MASK = "••••••••"
@@ -90,6 +126,13 @@ class Screen:
     def secret(self, name: str) -> bool:
         return bool(self.fields.get(name, {}).get("secret"))
 
+    @property
+    def moments(self) -> tuple[str, str] | None:
+        """A calendar's two moment fields, which a list asks for a range of."""
+        if self.kit != "calendar":
+            return None
+        return self.spec["starts"], self.spec["ends"]
+
     def group_title(self, record: dict) -> str:
         target = self.models[self.group["to"]]
         return str(record["fields"].get(target["title"], record["id"]))
@@ -118,6 +161,11 @@ def _pairs(values: list[str], screen: Screen) -> dict:
         name, sep, value = pair.partition("=")
         if not sep:
             fail(f"{pair!r}: set fields as name=value")
+        # What the screen calls a field is a name for it too: a calendar's
+        # `starts=` is whichever field its screen binds as the start.
+        bound = screen.spec.get(name)
+        if name not in screen.fields and isinstance(bound, str) and bound in screen.fields:
+            name = bound
         if name not in screen.fields:
             fail(f"{screen.model} has no field {name!r}: {', '.join(screen.fields)}")
         kind = screen.fields[name]["kind"]
@@ -213,6 +261,78 @@ def _show_list(screen: Screen, records: list[dict], heading: str, shown_levels=(
     out.print(table)
 
 
+def _day(value: str, what: str) -> str:
+    try:
+        return dt.date.fromisoformat(value).isoformat()
+    except ValueError:
+        fail(f"{what} is a date, as 2026-10-01")
+    return ""
+
+
+async def _link_values(api: CloudmorrowClient, screen: Screen, fields: dict) -> dict:
+    """A link given by the linked record's name, made its id."""
+    for name, value in list(fields.items()):
+        field = screen.fields[name]
+        if field["kind"] != "link" or not value or str(value).startswith("r_"):
+            continue
+        target = screen.models.get(field["to"]) or {"title": "title"}
+        fields[name] = _find(await api.records(field["to"]), str(value), target["title"])["id"]
+    return fields
+
+
+def _event_defaults(screen: Screen, fields: dict, spaces: list[dict]) -> dict:
+    """What a calendar's add fills in: the end, whole days, and your own space."""
+    starts, ends = screen.moments
+    all_day = screen.spec.get("all_day")
+    space = screen.spec.get("space")
+    start = str(fields.get(starts) or "")
+    if not start:
+        fail(f"when? {starts}=2026-10-01T10:00, or a date for the whole day")
+    if all_day and all_day not in fields:
+        fields[all_day] = len(start) == 10
+    if not fields.get(ends):
+        # Something with no end is an hour long, or the day it is on.
+        if len(start) == 10:
+            fields[ends] = start
+        else:
+            moment = dt.datetime.fromisoformat(start) + dt.timedelta(hours=1)
+            fields[ends] = moment.strftime("%Y-%m-%dT%H:%M")
+    if space and not fields.get(space):
+        mine = next((s for s in spaces if s.get("scope") == "personal"), None) or (
+            spaces[0] if spaces else None
+        )
+        if mine is None:
+            fail(f"there is nothing to put it in: {space}=<name>")
+        fields[space] = mine["id"]
+    return fields
+
+
+def _show_calendar(screen: Screen, records: list[dict], spaces: list[dict], heading: str) -> None:
+    starts, ends = screen.moments
+    space_field = screen.spec.get("space")
+    space_model = screen.models[screen.fields[space_field]["to"]] if space_field else None
+    names = {s["id"]: str(s["fields"].get(space_model["title"], "")) for s in spaces} if space_model else {}
+    table = Table(title=heading, title_style=TITLE)
+    table.add_column("day")
+    table.add_column("when")
+    table.add_column("id", style="dim")
+    table.add_column(screen.fields[screen.title].get("label", screen.title))
+    if space_model:
+        table.add_column(space_model["label"])
+    for record in sorted(records, key=lambda r: str(r["fields"].get(starts) or "")):
+        start = str(record["fields"].get(starts) or "")
+        end = str(record["fields"].get(ends) or start)
+        if len(start) == 10:
+            when = "all day" if end[:10] == start else f"to {end[:10]}"
+        else:
+            when = f"{start[11:16]}–{end[11:16]}" if end[:10] == start[:10] else f"{start[11:16]} → {end[:16]}"
+        row = [start[:10], when, record["id"][2:6], escape(str(record["fields"].get(screen.title, "")))]
+        if space_model:
+            row.append(escape(names.get(record["fields"].get(space_field), "")))
+        table.add_row(*row)
+    out.print(table)
+
+
 def _short(record_id: str) -> str:
     """Enough of an id to pick a record by: a record store id's first four after `r_`."""
     return record_id[2:6] if record_id.startswith("r_") else record_id[:10]
@@ -255,6 +375,12 @@ def main(
     reveal: Annotated[
         bool, typer.Option("--reveal", help="show: include a hidden field's value.")
     ] = False,
+    first: Annotated[
+        str, typer.Option("--from", help="A calendar: the first day, as 2026-10-01 (today).")
+    ] = "",
+    last: Annotated[
+        str, typer.Option("--to", help="A calendar: the last day (a week after --from).")
+    ] = "",
 ) -> None:
     """Run ACTION on an installed Quill."""
     args = list(args or [])
@@ -265,7 +391,7 @@ def main(
         _, api = client()
         try:
             screen = _screen(await api.quills(), quill, screen_id)
-            await _act(api, screen, action, args, group, index, plain, reveal)
+            await _act(api, screen, action, args, group, index, plain, (first, last), reveal)
         finally:
             await api.aclose()
 
@@ -280,11 +406,22 @@ async def _act(
     group: str,
     index: int | None,
     plain: bool,
+    days: tuple[str, str] = ("", ""),
     reveal: bool = False,
 ) -> None:
+    if screen.kit == "editor":
+        await _act_editor(api, screen, action, args, plain)
+        return
     if screen.kit == "grid":
         await _act_grid(api, screen, action, args, plain)
         return
+    if screen.kit == "thread":
+        await _thread(api, screen, action, args, plain)
+        return
+    if action == "say":
+        fail(f"{screen.quill['id']} is not a conversation; say is for a thread")
+    if action in ("edit", "search"):
+        fail(f"{action} is for an editor; {screen.quill['id']} is a {screen.kit}")
     group_id, groups = await _group_id(api, screen, group)
     where = {screen.group["name"]: group_id} if group_id else {}
     # A list picked by value: --group work, or work/production for the subgroup too.
@@ -305,6 +442,18 @@ async def _act(
         for place, count in sorted(counts.items()):
             out.print(f"{escape(place)}  [dim]{count}[/]")
         return
+    spaces: list[dict] = []
+    if screen.moments:
+        # A calendar lists a range of days, across every space it can see.
+        start = _day(days[0], "--from") if days[0] else dt.date.today().isoformat()
+        end = _day(days[1], "--to") if days[1] else (
+            dt.date.fromisoformat(start) + dt.timedelta(days=6)
+        ).isoformat()
+        if end < start:
+            fail("--to is before --from")
+        where = {f"{screen.moments[0]}__lte": f"{end}T23:59", f"{screen.moments[1]}__gte": start}
+        if screen.spec.get("space"):
+            spaces = await api.records(screen.fields[screen.spec["space"]]["to"])
 
     if action == "groups":
         if screen.group is None:
@@ -328,6 +477,8 @@ async def _act(
             heading += " · " + " · ".join(picked)
         if screen.kit == "board":
             _show_board(screen, records, heading)
+        elif screen.moments:
+            _show_calendar(screen, records, spaces, f"{heading} · {start} to {end}")
         else:
             _show_list(screen, records, heading, screen.levels[len(picked):])
         return
@@ -335,13 +486,23 @@ async def _act(
     if action == "add":
         if not args:
             fail(f'add what? cm {screen.quill["id"]} add "<{screen.title}>" [name=value …]')
-        fields = {screen.title: args[0], **_pairs(args[1:], screen), **where}
-        made = await api.create_record(screen.model, fields, index=index)
+        if screen.moments:
+            fields = await _link_values(api, screen, {screen.title: args[0], **_pairs(args[1:], screen)})
+            fields = _event_defaults(screen, fields, spaces)
+        else:
+            fields = {screen.title: args[0], **_pairs(args[1:], screen), **where}
+        try:
+            made = await api.create_record(screen.model, fields, index=index)
+        except ApiError as exc:
+            fail(str(exc))
         console.print(f"[green]Added[/] {escape(args[0])} [dim]{made['id'][2:6]}[/]")
         return
 
     if not args:
         fail(f"which one? cm {screen.quill['id']} {action} <id>")
+    if screen.moments:
+        # A record is found by id or title among all of them, not only this week's.
+        records = await api.records(screen.model)
     record = _find(records if records else await api.records(screen.model), args[0], screen.title)
     rest = args[1:]
     try:
@@ -355,7 +516,8 @@ async def _act(
                 _show_record(screen, record, reveal=reveal)
         elif action == "set":
             changed = await api.update_record(
-                screen.model, record["id"], _pairs(rest, screen), rev=record["rev"]
+                screen.model, record["id"], await _link_values(api, screen, _pairs(rest, screen)),
+                rev=record["rev"],
             )
             console.print(f"[green]Saved[/] {escape(str(changed['fields'].get(screen.title, '')))}")
         elif action == "move":
@@ -382,6 +544,116 @@ async def _act(
             console.print(
                 f"[green]Deleted[/] {escape(str(record['fields'].get(screen.title, '')))}"
             )
+    except ApiError as exc:
+        fail(str(exc))
+
+
+# -- an editor: pages of Markdown, by path ------------------------------------------------
+def _page_key(screen: Screen, record: dict) -> str:
+    """What a page is called on the command line: its path, else its title."""
+    fields = record["fields"]
+    return str(fields.get(screen.spec.get("path") or screen.title) or fields.get(screen.title) or "")
+
+
+def _find_page(screen: Screen, records: list[dict], key: str) -> dict:
+    """A page by its path, its title, or its id — whole, or the start of one."""
+    wanted = key.strip().strip("/").removesuffix(".md")
+    for test in (
+        lambda r: _page_key(screen, r) == wanted,
+        lambda r: r["id"] == key,
+        lambda r: _page_key(screen, r).casefold() == wanted.casefold(),
+        lambda r: str(r["fields"].get(screen.title, "")).casefold() == wanted.casefold(),
+    ):
+        matches = [r for r in records if test(r)]
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            fail(f"more than one page matches {key!r}: {', '.join(_page_key(screen, r) for r in matches)}")
+    fail(f"no page matches {key!r}")
+
+
+def _text(initial: str, *, what: str) -> str:
+    """The new text: what is piped in, else what $EDITOR saves."""
+    if not stdin_is_a_terminal():
+        return sys.stdin.read()
+    text = edit_text(initial)
+    if not text.strip():
+        fail(f"{what} is empty — nothing was saved")
+    return text
+
+
+async def _act_editor(
+    api: CloudmorrowClient, screen: Screen, action: str, args: list[str], plain: bool
+) -> None:
+    body = screen.spec.get("body") or "body"
+    path = screen.spec.get("path")
+    if action == "search":
+        if not args:
+            fail(f"search for what? cm {screen.quill['id']} search <text>")
+        found = await api.records(screen.model, q=" ".join(args))
+        if plain:
+            emit(json.dumps(found, indent=2) + "\n")
+            return
+        for record in found:
+            line = record.get("preview") or ""
+            out.print(f"{escape(_page_key(screen, record))}  [dim]{escape(line)}[/]")
+        if not found:
+            console.print("[dim]nothing matches[/]")
+        return
+    records = await api.records(screen.model)
+    if action == "list":
+        if plain:
+            emit(json.dumps(records, indent=2) + "\n")
+            return
+        table = Table(title=screen.spec.get("label") or screen.quill["name"], title_style=TITLE)
+        table.add_column(screen.fields[path]["label"] if path else screen.fields[screen.title].get("label", "Title"))
+        stamp = next((n for n, f in screen.fields.items() if f["kind"] == "datetime"), None)
+        if stamp:
+            table.add_column(screen.fields[stamp].get("label", stamp), style="dim")
+        for record in sorted(records, key=lambda r: _page_key(screen, r).casefold()):
+            row = [escape(_page_key(screen, record))]
+            if stamp:
+                row.append(str(record["fields"].get(stamp) or "")[:16].replace("T", " "))
+            table.add_row(*row)
+        out.print(table)
+        return
+    if not args:
+        fail(f"which page? cm {screen.quill['id']} {action} <path>")
+    try:
+        if action == "add":
+            if any(_page_key(screen, r) == args[0].strip("/") for r in records):
+                fail(f"there is already a page {args[0]!r}; edit it instead")
+            text = " ".join(args[1:]) if len(args) > 1 else _text("", what="the page")
+            fields = {(path or screen.title): args[0].strip("/"), body: text}
+            made = await api.create_record(screen.model, fields)
+            console.print(f"[green]Added[/] {escape(_page_key(screen, made))}")
+            return
+        found = await api.record(screen.model, _find_page(screen, records, args[0])["id"])
+        if action == "show":
+            emit(json.dumps(found, indent=2) + "\n" if plain else str(found["fields"].get(body) or ""))
+        elif action == "edit":
+            before = str(found["fields"].get(body) or "")
+            text = " ".join(args[1:]) if len(args) > 1 else _text(before, what="the page")
+            if text == before:
+                console.print("[dim]unchanged[/]")
+                return
+            try:
+                await api.update_record(screen.model, found["id"], {body: text}, rev=found["rev"])
+            except ApiError as exc:
+                if exc.status_code == 409:
+                    fail("it changed somewhere else while you were editing; nothing was saved")
+                raise
+            console.print(f"[green]Saved[/] {escape(_page_key(screen, found))}")
+        elif action == "delete":
+            await api.delete_record(screen.model, found["id"])
+            console.print(f"[green]Deleted[/] {escape(_page_key(screen, found))}")
+        elif action == "set":
+            changed = await api.update_record(
+                screen.model, found["id"], _pairs(args[1:], screen), rev=found["rev"]
+            )
+            console.print(f"[green]Saved[/] {escape(_page_key(screen, changed))}")
+        else:
+            fail(f"an editor has list, show, add, edit, set, delete and search, not {action}")
     except ApiError as exc:
         fail(str(exc))
 
@@ -535,3 +807,102 @@ async def _act_grid(
             fail(f"a {screen.kit} has list, get, put, add, show, set and delete, not {action}")
     except ApiError as exc:
         fail(str(exc))
+# -- a thread: spaces, and what is said in them ------------------------------------
+def space_name(space: dict, me: str, screen: Screen) -> str:
+    """What a space is called to *me*: its title, or, made between people, who else is in it."""
+    marks = (screen.spec.get("made_as") or {}).get("direct") or {}
+    if marks and all(space["fields"].get(k) == v for k, v in marks.items()):
+        others = [who for who in [space["owner"], *(space.get("members") or [])] if who != me]
+        return ", ".join(others) or me
+    target = screen.models[screen.fields[screen.spec["space"]]["to"]]
+    return str(space["fields"].get(target["title"]) or space["id"])
+
+
+def _find_space(spaces: list[dict], key: str, me: str, screen: Screen) -> dict:
+    """A space by its id (or the start of it), its name, or the person it is with."""
+    wanted = key.lstrip("#")
+    by_id = [s for s in spaces if s["id"].startswith(wanted if wanted.startswith("r_") else f"r_{wanted}")]
+    named = [s for s in spaces if space_name(s, me, screen).casefold() == wanted.casefold()]
+    matches = named or by_id
+    if len(matches) != 1:
+        fail(f"{'no' if not matches else 'more than one'} {screen.fields[screen.spec['space']]['to']}"
+             f" matches {key!r}")
+    return matches[0]
+
+
+def _date_of(stamp: str) -> str:
+    return (stamp or "")[:10]
+
+
+def _show_thread(screen: Screen, name: str, lines: list[dict], me: str) -> None:
+    """A conversation as a terminal prints one: a rule per day, a name per run."""
+    out.print(f"[{TITLE}]{escape(name)}[/]")
+    if not lines:
+        out.print("[dim]Nothing said here yet.[/]")
+        return
+    body = screen.spec["body"]
+    day = author = ""
+    for line in lines:
+        if _date_of(line["created_at"]) != day:
+            day = _date_of(line["created_at"])
+            author = ""
+            out.print(f"[dim]── {day} ──[/]")
+        if line["owner"] != author:
+            author = line["owner"]
+            who = "you" if author == me else author
+            out.print(f"[bold]{escape(who)}[/] [dim]{line['created_at'][11:16]}[/]")
+        edited = " [dim](edited)[/]" if line.get("updated_at") != line.get("created_at") else ""
+        for text in str(line["fields"].get(body) or "").splitlines() or [""]:
+            out.print(f"  {escape(text)}{edited}")
+            edited = ""
+
+
+async def _thread(api: CloudmorrowClient, screen: Screen, action: str, args: list[str], plain: bool) -> None:
+    link = screen.fields[screen.spec["space"]]
+    space_model = link["to"]
+    me = str((await api.me()).get("username", ""))
+    spaces = await api.records(space_model)
+    if action == "list":
+        if plain:
+            emit(json.dumps(spaces, indent=2) + "\n")
+            return
+        table = Table(title=screen.spec.get("label") or screen.quill["name"], title_style=TITLE)
+        table.add_column("id", style="dim")
+        table.add_column(screen.models[space_model]["label"])
+        table.add_column("new", justify="right")
+        table.add_column("last")
+        ordered = sorted(spaces, key=lambda s: (s.get("last") or {}).get("created_at") or s["created_at"],
+                         reverse=True)
+        for space in ordered:
+            last = space.get("last") or {}
+            said = f"{last.get('owner', '')}: {last.get('title', '')}" if last else ""
+            unread = space.get("unread") or 0
+            table.add_row(
+                space["id"][2:6],
+                f"[bold]{escape(space_name(space, me, screen))}[/]" if unread else escape(space_name(space, me, screen)),
+                f"[bold]{unread}[/]" if unread else "",
+                escape(said[:60]),
+            )
+        out.print(table)
+        return
+    if action not in ("show", "say"):
+        fail(f"a {screen.kit} is list, show and say")
+    if not args:
+        fail(f"which one? cm {screen.quill['id']} {action} <{space_model}>")
+    space = _find_space(spaces, args[0], me, screen)
+    try:
+        if action == "say":
+            text = " ".join(args[1:]).strip()
+            if not text:
+                fail(f'say what? cm {screen.quill["id"]} say {args[0]} "<words>"')
+            await api.create_record(screen.model, {link["name"]: space["id"], screen.spec["body"]: text})
+            console.print(f"[green]Said[/] in {escape(space_name(space, me, screen))}")
+            return
+        lines = await api.records(screen.model, last=PAGE, **{link["name"]: space["id"]})
+        await api.mark_seen(space_model, space["id"])
+    except ApiError as exc:
+        fail(str(exc))
+    if plain:
+        emit(json.dumps(lines, indent=2) + "\n")
+        return
+    _show_thread(screen, space_name(space, me, screen), lines, me)

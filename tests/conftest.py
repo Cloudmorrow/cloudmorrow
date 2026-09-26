@@ -92,6 +92,20 @@ def tasks_quill(client) -> TestClient:
 
 
 @pytest.fixture()
+def chat_quill(client) -> TestClient:
+    """The client, with the Chat Quill installed from the local catalog."""
+    client.app.state.cloudmorrow.quills.install_from_catalog("chat")
+    return client
+
+
+@pytest.fixture()
+def notes_quill(client) -> TestClient:
+    """The client, with the Notes Quill installed from the local catalog."""
+    client.app.state.cloudmorrow.quills.install_from_catalog("notes")
+    return client
+
+
+@pytest.fixture()
 def secrets_quill(client) -> TestClient:
     """The client, with the Secrets Quill installed from the local catalog."""
     client.app.state.cloudmorrow.quills.install_from_catalog("secrets")

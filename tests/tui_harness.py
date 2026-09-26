@@ -7,14 +7,15 @@ rather than one per module.
 from __future__ import annotations
 
 import copy
-import datetime as dt
 import re
 
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.app import CloudmorrowApp
 from cloudmorrow.tui.screens.workspace import WorkspaceScreen
+from tests.tui_chat import CHAT_QUILL, FakeSpaces
 from tests.tui_files import FILES_QUILL, FakeFiles
-from tests.tui_quills import FakeQuills
+from tests.tui_notes import FakeNotes
+from tests.tui_quills import SECRETS_QUILL, FakeQuills
 
 TREE = {
     "name": "notes",
@@ -107,115 +108,9 @@ FEATURES = [
     feature_row("secrets", "Secrets"),
     feature_row("files", "Files"),
     feature_row("chat", "Chat"),
-    feature_row("calendar", "Calendar"),
 ]
 
 
-CHANNELS = [
-    {
-        "slug": "general",
-        "name": "general",
-        "topic": "everything else",
-        "kind": "public",
-        "created_by": "bram",
-        "created_at": "2026-09-01T09:00:00",
-        "updated_at": "2026-09-19T14:03:00",
-        "members": ["bram", "guest"],
-        "other": "",
-        "member": True,
-        "unread": 0,
-        "last_read": 2,
-        "last_message": None,
-    },
-    {
-        "slug": "dm-bram-guest",
-        "name": "guest",
-        "topic": "",
-        "kind": "direct",
-        "created_by": "guest",
-        "created_at": "2026-09-18T08:00:00",
-        "updated_at": "2026-09-18T08:30:00",
-        "members": ["bram", "guest"],
-        "other": "guest",
-        "member": True,
-        "unread": 2,
-        "last_read": 0,
-        "last_message": None,
-    },
-]
-
-MESSAGES = {
-    "general": [
-        {"id": 1, "author": "bram", "body": "the fans are loud again",
-         "created_at": "2026-09-19T14:02:00", "edited_at": None},
-        {"id": 2, "author": "guest", "body": "I turned the fan curve down",
-         "created_at": "2026-09-19T14:03:00", "edited_at": None},
-    ],
-    "dm-bram-guest": [
-        {"id": 3, "author": "guest", "body": "are you up",
-         "created_at": "2026-09-18T08:30:00", "edited_at": None},
-    ],
-}
-
-
-# The calendar, hung on today rather than on a date in the past: the pane
-# opens on the month it is, so a fixture from last September would leave
-# every one of these tests looking at an empty grid.
-TODAY = dt.date.today()
-TOMORROW = TODAY + dt.timedelta(days=1)
-
-
-def calendar_row(slug: str, name: str, kind: str, colour: str, **extra) -> dict:
-    members = extra.get("members", ["bram"])
-    return {
-        "slug": slug,
-        "name": name,
-        "kind": kind,
-        "colour": colour,
-        "owner": extra.get("owner", "bram"),
-        "created_at": "2026-09-01T09:00:00",
-        "updated_at": "2026-09-01T09:00:00",
-        "members": members,
-        "member": True,
-        "mine": extra.get("owner", "bram") == "bram",
-        "events": extra.get("events", 0),
-    }
-
-
-CALENDARS = [
-    calendar_row("my-bram", "Jimmi", "personal", "cyan"),
-    calendar_row("household", "Household", "shared", "violet", members=["bram", "guest"]),
-    calendar_row("holidays", "Holidays", "public", "green", members=["bram", "guest"]),
-]
-
-
-def event_row(event_id: int, title: str, calendar: str, starts_at: str, ends_at: str,
-              **extra) -> dict:
-    colour = next(c["colour"] for c in CALENDARS if c["slug"] == calendar)
-    return {
-        "id": event_id,
-        "calendar": calendar,
-        "calendar_name": next(c["name"] for c in CALENDARS if c["slug"] == calendar),
-        "colour": colour,
-        "title": title,
-        "notes": extra.get("notes", ""),
-        "location": extra.get("location", ""),
-        "starts_at": starts_at,
-        "ends_at": ends_at,
-        "all_day": extra.get("all_day", False),
-        "created_by": extra.get("created_by", "bram"),
-        "created_at": "2026-09-01T09:00:00",
-        "updated_at": "2026-09-01T09:00:00",
-    }
-
-
-EVENTS = [
-    event_row(1, "Dentist", "my-bram", f"{TODAY}T10:00", f"{TODAY}T11:00",
-              location="High Street"),
-    event_row(2, "Bins out", "household", str(TODAY), str(TODAY), all_day=True,
-              created_by="guest"),
-    event_row(3, "Boiler service", "household", f"{TOMORROW}T09:00", f"{TOMORROW}T10:00"),
-]
 
 
 def share_row(name: str, **extra) -> dict:
@@ -256,11 +151,12 @@ def _one_pixel_png() -> bytes:
 PNG_1PX = _one_pixel_png()
 
 
-class FakeClient(FakeFiles, FakeQuills):
+class FakeClient(FakeSpaces, FakeNotes, FakeFiles, FakeQuills):
     """Enough of the API for the workspace, with a record of what was asked.
 
     The Quills and the record store behind them are in tui_quills.py; the
-    Files Quill and the shares behind it in tui_files.py.
+    Files Quill and the shares behind it in tui_files.py; the spaces in the
+    store — Chat's channels — in tui_chat.py.
     """
 
     # What a mount signs in with.
@@ -271,9 +167,13 @@ class FakeClient(FakeFiles, FakeQuills):
         # so a call that wants one names it itself.
         self.vault: str | None = None
         self.setup_quills()
+        self.setup_notes()
         # Files is a Quill, installed the way a server that had it built in
         # gets it: after Tasks.
         self.quill_list.append(copy.deepcopy(FILES_QUILL))
+        self.quill_list.append(copy.deepcopy(CHAT_QUILL))
+        # Secrets last, as the catalog has it: the last built-in to become a Quill.
+        self.quill_list.append(copy.deepcopy(SECRETS_QUILL))
         self.file_calls: list[tuple] = []
         self.share_list: list[dict] = [share_row("media"), share_row("photos")]
         self.share_calls: list[tuple] = []
@@ -317,20 +217,6 @@ class FakeClient(FakeFiles, FakeQuills):
         self.bundle: dict = dict(BUNDLE)
         self.notes: list[dict] = [dict(note) for note in NOTIFICATIONS]
         self.sync_calls: list[tuple[int, list[str]]] = []
-        # Chat: the channels the pane lists, what is in them, and
-        # what it was asked to do to them.
-        self.channel_list: list[dict] = [dict(row) for row in CHANNELS]
-        self.channel_messages: dict[str, list[dict]] = {
-            slug: [dict(m) for m in rows] for slug, rows in MESSAGES.items()
-        }
-        self.sent_messages: list[tuple[str, str]] = []
-        self.read_marks: list[tuple[str, int | None]] = []
-        self.channel_calls: list[tuple] = []
-        # The calendar: what it lists, and what it was asked to change.
-        self.calendar_list: list[dict] = [dict(row) for row in CALENDARS]
-        self.event_list: list[dict] = [dict(row) for row in EVENTS]
-        self.event_calls: list[tuple] = []
-        self.calendar_calls: list[tuple] = []
 
     async def aclose(self) -> None: ...
 
@@ -515,154 +401,6 @@ class FakeClient(FakeFiles, FakeQuills):
             note["unread"] = False
         return {"marked": len(self.notes), "unread": 0}
 
-    # -- chat ---------------------------------------------------------------
-    async def channels(self) -> list[dict]:
-        return [dict(row) for row in self.channel_list]
-
-    async def messages(
-        self, slug: str, *, limit: int = 50, before: int | None = None,
-        after: int | None = None,
-    ) -> list[dict]:
-        rows = [dict(m) for m in self.channel_messages.get(slug, [])]
-        if after is not None:
-            rows = [m for m in rows if m["id"] > after]
-        return rows[-limit:]
-
-    async def send_message(self, slug: str, body: str) -> dict:
-        sent = {
-            "id": 100 + len(self.sent_messages),
-            "author": "bram",
-            "body": body,
-            "created_at": "2026-09-19T15:00:00",
-            "edited_at": None,
-        }
-        self.sent_messages.append((slug, body))
-        self.channel_messages.setdefault(slug, []).append(sent)
-        return sent
-
-    async def mark_channel_read(self, slug: str, upto: int | None = None) -> dict:
-        self.read_marks.append((slug, upto))
-        for channel in self.channel_list:
-            if channel["slug"] == slug:
-                channel["unread"] = 0
-        return {"last_read": upto or 0, "unread": 0, "total": 0}
-
-    async def chat_unread(self) -> dict:
-        waiting = {c["slug"]: c["unread"] for c in self.channel_list if c["unread"]}
-        return {"channels": waiting, "total": sum(waiting.values())}
-
-    async def create_channel(self, name, *, kind="private", topic="", members=None) -> dict:
-        made = dict(
-            CHANNELS[0], slug=name.strip().lower().replace(" ", "-"), name=name.strip(),
-            kind=kind, topic=topic, unread=0, members=["bram", *(members or [])],
-        )
-        self.channel_calls.append(("create", made["slug"], kind, list(members or [])))
-        self.channel_list.append(made)
-        self.channel_messages[made["slug"]] = []
-        return made
-
-    async def direct_channel(self, username: str) -> dict:
-        slug = "dm-" + "-".join(sorted(("bram", username)))
-        self.channel_calls.append(("direct", slug, username))
-        found = next((c for c in self.channel_list if c["slug"] == slug), None)
-        if found:
-            return found
-        made = dict(CHANNELS[1], slug=slug, name=username, other=username, unread=0)
-        self.channel_list.append(made)
-        self.channel_messages[slug] = []
-        return made
-
-    async def chat_people(self) -> list[dict]:
-        return [
-            {"username": "guest", "display_name": "Guest"},
-            {"username": "ada", "display_name": ""},
-        ]
-
-    async def add_channel_members(self, slug: str, usernames: list[str]) -> dict:
-        self.channel_calls.append(("add", slug, usernames))
-        return {"added": usernames, "members": ["bram", *usernames]}
-
-    async def leave_channel(self, slug: str) -> None:
-        self.channel_calls.append(("leave", slug, None))
-        self.channel_list = [c for c in self.channel_list if c["slug"] != slug]
-
-    # -- the calendar --------------------------------------------------------
-    async def calendars(self) -> list[dict]:
-        return [dict(row) for row in self.calendar_list]
-
-    async def calendar(self, slug: str) -> dict:
-        return next(dict(c) for c in self.calendar_list if c["slug"] == slug)
-
-    async def events(self, *, start: str, end: str, calendar: str | None = None) -> list[dict]:
-        """Filtered the way the server filters: whatever overlaps the window."""
-        last = f"{end}T23:59"
-        rows = [
-            dict(event)
-            for event in self.event_list
-            if event["starts_at"] <= last
-            and event["ends_at"] >= start
-            and (calendar is None or event["calendar"] == calendar)
-        ]
-        return sorted(rows, key=lambda e: e["starts_at"])
-
-    async def create_event(self, slug: str, **fields: object) -> dict:
-        self.event_calls.append(("create", slug, fields))
-        made = event_row(
-            max((e["id"] for e in self.event_list), default=0) + 1,
-            str(fields["title"]),
-            slug,
-            str(fields["starts_at"]),
-            str(fields.get("ends_at") or fields["starts_at"]),
-            all_day=bool(fields.get("all_day")),
-            location=str(fields.get("location") or ""),
-            notes=str(fields.get("notes") or ""),
-        )
-        self.event_list.append(made)
-        return made
-
-    async def edit_event(self, event_id: int, **fields: object) -> dict:
-        self.event_calls.append(("edit", event_id, fields))
-        for event in self.event_list:
-            if event["id"] == event_id:
-                event.update({k: v for k, v in fields.items() if v is not None})
-                return dict(event)
-        raise AssertionError(f"no such event: {event_id}")
-
-    async def delete_event(self, event_id: int) -> None:
-        self.event_calls.append(("delete", event_id, None))
-        self.event_list = [e for e in self.event_list if e["id"] != event_id]
-
-    async def create_calendar(self, name: str, *, kind: str = "shared", colour: str = "",
-                              members: list[str] | None = None) -> dict:
-        slug = name.strip().lower().replace(" ", "-")
-        self.calendar_calls.append(("create", slug, kind))
-        made = calendar_row(slug, name.strip(), kind, colour or "amber")
-        self.calendar_list.append(made)
-        return made
-
-    async def update_calendar(self, slug: str, **fields: object) -> dict:
-        self.calendar_calls.append(("update", slug, fields))
-        for calendar in self.calendar_list:
-            if calendar["slug"] == slug:
-                calendar.update({k: v for k, v in fields.items() if v is not None})
-                return dict(calendar)
-        raise AssertionError(f"no such calendar: {slug}")
-
-    async def add_calendar_members(self, slug: str, usernames: list[str]) -> dict:
-        self.calendar_calls.append(("share", slug, usernames))
-        return {"added": usernames, "members": ["bram", *usernames]}
-
-    async def leave_calendar(self, slug: str) -> None:
-        self.calendar_calls.append(("leave", slug, None))
-        self.calendar_list = [c for c in self.calendar_list if c["slug"] != slug]
-
-    async def delete_calendar(self, slug: str) -> None:
-        self.calendar_calls.append(("delete", slug, None))
-        self.calendar_list = [c for c in self.calendar_list if c["slug"] != slug]
-        self.event_list = [e for e in self.event_list if e["calendar"] != slug]
-
-    async def calendar_people(self) -> list[dict]:
-        return [{"username": "guest", "display_name": ""}]
 
 
 # A Button ignores a second click while its press animation is running, so

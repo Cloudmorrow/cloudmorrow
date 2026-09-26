@@ -60,19 +60,19 @@ start with the [README](../README.md); this is the page to come back to.
   the mounting on macOS with nothing installed; on Linux it is `rclone`.
   Made and mounted from the **Files** tab as well, which is the Files Quill:
   the files themselves stay where they are.
-- **Chat.** Channels and direct messages, between everyone on the server.
-  Anyone can make a channel: a **public** one is everybody's, in everyone's
-  list and open to write in; a **private** one is the people you pick, and
-  they are *added* rather than invited — nobody accepts anything, they are
-  simply in it and told so. A **direct** channel is two people, and it is
-  never made from a form: ask for the one with somebody and it is there.
-  Unread is a high-water mark per person per channel, so reading on the
-  laptop is reading on the phone.
+- **Chat.** Channels and direct messages, between everyone on the server —
+  a Quill, like Tasks, offered when you install. A **public** channel is
+  everybody's, in everyone's list and open to write in; a **private** one is
+  the people you pick, and they are *added* rather than invited — nobody
+  accepts anything, they are simply in it and told so. A **direct** channel
+  is two people, and it is never made from a form: pick somebody and it is
+  there. Unread is when you last looked, per person per channel, so reading
+  on the laptop is reading on the phone.
 - **The count on the icon.** Chat is why the web app has push. An app on a
   home screen is not running most of the time, so nothing it could poll
   would keep its badge right — a real Web Push wakes a service worker,
   which shows the banner and sets the number. The badge is everything
-  waiting: unread messages plus unread notifications. See
+  waiting: what is unread in your channels plus unread notifications. See
   [Push notifications](#push-notifications).
 - **Users.** Password login, bearer tokens, per-user trees, and an admin API for
   creating more accounts. Every account has a **role** — Administrator, User,
@@ -141,8 +141,6 @@ src/cloudmorrow/
     tasks.py         boards, lanes, and the week a finished task has left
     configsync.py    the one copy of the shared config, and its revisions
     notifications.py what the machines did, kept where all of them can leave it
-    chat.py          channels, messages, and who has read how far
-    calendar.py      the calendars, who shares them, and what is on them
     webpush.py       VAPID, aes128gcm, and the devices to push
     shares.py        the fileshares: a name, a directory, whose directory it is
     dav.py           those directories over WebDAV, at /dav/<share>/
@@ -156,7 +154,7 @@ src/cloudmorrow/
   tui/               Textual client
     theme.py         the Textual theme, built from that palette
     screens/         splash, login, the workspace, and settings
-    panes/           notes, calendar, chat, the kit (Quills' screens),
+    panes/           the kit (kit_*.py: list, grouped list, board, editor, grid, calendar),
                      files (local backups + fileshares), and browse: what is
                      in a share, as a list or as thumbnails
     widgets/         the vault list, the note tree, the board, the toolbar,
@@ -535,20 +533,24 @@ one for everybody on the server, a different one tomorrow, from a list in
 which needs no key, for the place named by `weather_place` in the server
 config (`"Copenhagen"`, or `"55.68,12.57"` when a name is ambiguous); leave
 it out and the card says so instead of guessing. The events are the
-calendar's, in its own rows, and the section is gone when that tab is
-switched off.
+calendar's — any installed Quill with a `calendar` screen, asked through the
+record API for what overlaps today — in its own rows, and the section is
+gone when there is none or it is switched off.
 
 **Me** — who you are signed in as, your switches, and the way out — is in
 the top-right corner of every tab rather than a tab of its own, which is
 where a phone keeps it. What a screen makes — a note, a task, an event, a
 file — is the button beside its title.
 
-Notes is three screens, the way a phone's notes app is: **Folders**, the
-notes in one (newest first, with the first lines of each), and the note. The
-pen beside the title starts a new note in the folder you are looking at; the
-title is the file name, and the note saves itself as you type. Back out of a
-note you never wrote anything in and it is thrown away. Search looks inside
-the notes, not only at their names.
+Notes is a Quill (the first in the catalog, and its tab is where Notes
+always was), drawn by the kit's **editor**. On the phone that is three
+screens, the way a phone's notes app is: **Folders**, the notes in one
+(newest first, with the first lines of each), and the note; on a computer the
+list and the note are side by side. The pen beside the title starts a new
+note in the folder you are looking at; the title is the file name, and the
+note saves itself as you type. Back out of a note you never wrote anything in
+and it is thrown away. Search looks inside the notes, not only at their
+names.
 
 It writes the same files the TUI does. A new note starts with a `# Title`
 heading matching its file name, as the TUI's do, and the app shows that heading
@@ -647,13 +649,16 @@ that draws tabs asks the second one.
 
 ## Quills
 
-Everything beyond the foundation is a **Quill**: Tasks today, and whatever
-the [Quill Catalog](https://github.com/Cloudmorrow/quill-catalog) has next.
+Everything beyond the foundation is a **Quill**: Notes, Tasks, Files and
+Calendar today, and whatever the
+[Quill Catalog](https://github.com/Cloudmorrow/quill-catalog) has next.
 The contract is [QUILLS.md](QUILLS.md); this is how to use them.
 
-**On a fresh server** the catalog's foundation Quills — Tasks, for now — are
-installed at first boot, and boards and tasks from before Tasks was a Quill
-move into the record store the first time the new version starts. Nothing
+**On a fresh server** the catalog's foundation Quills are installed at first
+boot. A server from before each was a Quill gets it the first time the new
+version starts: Notes if it was on (the notes themselves never move; they
+are files), Tasks with its boards and tasks moved into the record store, and
+Calendar with its calendars and events moved the same way. Nothing
 needs doing by hand. The server needs to reach GitHub for both; if it cannot,
 it says so in the log and tries again at the next start.
 
@@ -696,102 +701,140 @@ the GitHub URL by default, or a local folder.
 ## Chat
 
 Everything else in Cloudmorrow is one person's. Chat is the exception, and it
-is the reason the server now knows how to talk to somebody who is not asking.
+is the reason the server knows how to talk to somebody who is not asking.
+
+Chat is a Quill — [`Cloudmorrow/quill-chat`](https://github.com/Cloudmorrow/quill-chat),
+in the catalog with Tasks and offered, ticked, when you install. It has no
+code: a channel is a record of the foundational `channel` datamodel (a
+*space*), a message one of `message` (in a channel, its author's), and its one
+screen is the kit's `thread`. A server that had Chat before it was a Quill
+gets the Quill at boot, switched on or off as the feature was, and its
+channels, messages and read marks move into records once; the old tables stay
+where they were.
 
 There are three kinds of channel, and the kind *is* the access rule — there
 is nothing else to check, and no permissions screen:
 
 - **Public.** Everybody is in it. It is in everyone's list, anyone may write
   in it, and nobody can leave — leaving a room everybody is in is a mute, and
-  a mute is not this. Making one tells everyone it now exists.
+  a mute is not this. `#general` is one, made once for the whole server the
+  first time anybody opens Chat.
 - **Private.** The people in it. Anyone can make one and put people in it;
   there is no invitation to accept, because an invitation you have to accept
   is a second thing to build and a second thing to forget. You are added, you
-  get a notification saying so, and you can leave. Somebody can add you back.
-- **Direct.** Two people, and it is never made from a form. Ask for the
-  channel with `ada` and it is there, whether or not it existed a moment ago;
-  `ada` asking for you names the same one. It cannot be renamed, added to or
-  left.
+  get a notification saying so, and you can leave. Its maker can take
+  somebody out, and anybody in it can add somebody.
+- **Direct.** Two people, and it is never made from a form. Pick `ada` and the
+  conversation with her is there, whether or not it existed a moment ago;
+  `ada` picking you finds the same one. It is called after the other person.
 
-Everyone can write to everyone. There is no setting for that.
+Everyone can write to everyone. There is no setting for that. A channel is
+its maker's to rename, re-topic or delete (and an administrator's); a message
+is its author's to change or take back.
 
-**Unread is a high-water mark**, not a flag on each message: your membership
-of a channel remembers the id of the last message you have read, and unread
-is everything after it. One small integer per person per channel, which is
-why reading a channel on the laptop clears it on the phone, why the mark only
-ever moves *up* (a second client scrolled back must not un-read what the
-first saw), and why answering a channel reads it — you cannot reply to
-something you have not looked at.
+**Unread** is when you last looked: everything somebody else wrote in a
+channel after that is unread, and opening the channel — on any device — moves
+it on. Writing in a channel reads it, since you cannot reply to what you have
+not looked at. Somebody added to a channel counts from when they were added,
+and a new account counts the public channels from when it was made: the
+history is there to scroll back through, but a year of it is not a badge.
 
-Somebody added to a private channel joins **at the tip**: the history is
-there to scroll back through, but a year of it is not a badge. A new account
-joins the public channels the same way.
+It is on every surface. On the phone it is the channels, then a conversation;
+on a computer both side by side. In the terminal it is the **Chat** card
+(`f4`), channels on the left and the conversation on the right, with `n` for a
+new channel, `m` to write to one person, `a` to add somebody, `e` to rename or
+delete one of yours and `l` to leave. On the command line:
 
-It is in both clients. In the terminal it is the **Chat** tab (`f6`),
-channels on the left and the conversation on the right, with `n` for a new
-channel, `m` to write to one person, `a` to add somebody and `l` to leave. On
-the phone it is a tab with a switch at the top — **Channels** and **Direct** —
-and the pencil makes whichever of those you are looking at.
+```
+cm chat list                     # the channels, with what is unread in each
+cm chat show general             # the conversation, newest at the bottom
+cm chat say ada "on my way"      # a channel by name, or the person
+```
 
-Neither client holds a socket open. A channel that is on screen asks for
-anything after the last id it has, every few seconds, and a push wakes it the
-moment something arrives — so the common case is instant, the fallback is a
-small request that usually answers with an empty list, and the server stays a
+An assistant reaches it with the generic record tools.
+
+Neither client holds a socket open. A conversation that is on screen asks for
+what changed since the newest line it has, every few seconds, and a push wakes
+it the moment something arrives — so the common case is instant, the fallback
+is a small request that usually answers with nothing, and the server stays a
 plain request-and-response thing that a phone on a train reconnects to
 without noticing.
 
-An administrator can switch the whole thing off in the Administration panel,
-like any other feature: the tab goes and the API answers 403.
+An administrator can switch it off in the Administration panel, like any
+other Quill: the tab goes and the API answers 403. Removing the Quill takes
+its tab and nothing else; the channels and messages are records, and stay.
 
 ## Calendar
 
-The second thing here that is not one person's, and it borrows chat's shape
-on purpose: the kind of a calendar *is* the access rule.
+Calendar is a Quill — `calendar` in the catalog, offered and ticked on a
+fresh server — drawn by the kit's `calendar` element (see [QUILLS.md](QUILLS.md)).
+Its data is the foundational `calendar` and `event` datamodels: a calendar is
+a **space**, and an event is a record in one, so who may see what is the
+record store's rule for spaces and nothing of its own.
 
-- **Personal.** Yours. Everybody has exactly one, made the first time they
-  ask for their calendars and named after them. It cannot be shared, left or
-  deleted — it is where your own things go, and a place that can vanish is
-  not that. If you want one other people can see, make a shared one.
-- **Shared.** The people in it. Anyone can make one and put people in it;
-  as with a private channel there is nothing to accept, you are added, told
-  so, and can leave again. Whoever made it can rename it, recolour it and
-  delete it; everybody in it can write in it, because a shared calendar you
-  cannot write in is one you are being *shown*.
-- **Public.** Everybody's. In everyone's list, anyone may put something in
-  it, and nobody can leave it.
+- **Personal.** Yours. Everybody has one, made the first time they look and
+  named after them (the `yours` dataset). Nobody else sees it, and it has no
+  one to add. If you want one other people can see, make a shared one.
+- **Shared.** Its maker's and the people in it. Anyone can make one and put
+  people in it; there is nothing to accept — you are added, told so behind
+  the bell and with a push, and can leave again. Whoever made it (and an
+  administrator) can rename it, recolour it and delete it; everybody in it
+  can write in it, because a shared calendar you cannot write in is one you
+  are being *shown*.
+- **Public.** Everybody's: one is made for the server the first time anybody
+  looks (the `everybody` dataset). In everyone's list, anyone may put
+  something in it, and nobody can leave it.
 
-**An event is a title and two moments**, plus where it is and anything else
-worth writing down. Leave the end off and it is an hour long, or the whole
-of the day it is on. Whoever wrote it may change it, and so may whoever owns
-the calendar it is on — a shared calendar with somebody's stale event stuck
-on it, and only that somebody able to fix it, is a worse rule than this one.
-Moving an event keeps how long it is: an hour at ten, dragged to half
-eleven, is an hour at half eleven.
+**An event is a title and two moments**, plus where it is and notes.
+Whoever wrote it may change or delete it, and so may whoever manages the
+calendar it is on (`authored = "or-manager"` on the datamodel) — a shared
+calendar with somebody's stale event stuck on it, and only that somebody
+able to fix it, is a worse rule than this one. The kit fills in an end when
+none is given — an hour, or the day it is on — and
+moving the start on a record sheet keeps how long it is: an hour at ten,
+moved to half eleven, is an hour at half eleven.
 
-**The times are the times on the wall.** A moment is stored as the local
-time somebody typed — `2026-09-19T14:00` — and an all-day event as a bare
-date. No zone, no conversion: this is one house on one clock, and "the
-dentist at ten" is at ten on every screen in it, in October and in June
-alike. It also makes "what is on this month" a pair of string comparisons,
-because ISO sorts the way time does.
+**The times are the times on the wall.** A `datetime` sent without a zone is
+kept as it was typed — `2026-09-19T14:00` — and an all-day event is a bare
+date whose end is the last day it is on. No zone, no conversion: "the
+dentist at ten" is at ten on every screen, in October and in June alike. It
+also makes "what is on this month" one call with a range on each moment —
+`GET /api/records/event?starts_at__lte=2026-09-30T23:59&ends_at__gte=2026-09-01`
+— because ISO sorts the way time does.
 
-Being given a calendar leaves a notification and a push, the way being added
-to a channel does. An event does not: a house calendar that pinged everybody
-for every appointment is one nobody reads.
+Every calendar you can see is drawn at once, each event in its calendar's
+colour (cyan, violet, green, amber or rose), because a calendar you have to
+switch between is a calendar that lets you double-book yourself.
 
-It is in both clients. In the terminal it is the **Calendar** tab (`f7`) —
-the calendars on the left, the month beside them with a coloured dot per
-event, and the day you are standing on written out underneath. `n` makes an
-event on that day, `e` changes the one under the cursor, `del` removes it,
-`c` makes a calendar, `s` shares it, `l` leaves it, `t` is today, and `[`
-and `]` are the months. The list on the left is not a filter: what it picks
-is which calendar a new event goes in. On the phone it is a month you tap a
-day in, the day's events under it, and the little people icon beside the
-month for the calendars themselves — where one is made, coloured, shared
-and left.
+- **On the phone**, a month with a dot per event and the day you tap written
+  out under it; the add row takes "10:00 Dentist" for a time, or just a title
+  for a whole day, into the calendar picked beside it. The people icon is the
+  list of calendars — yours, shared, everybody's — where one is made (its
+  name, who can see it, who is in it), and a calendar's own sheet is where it
+  is renamed, recoloured, shared, left and deleted.
+- **On a computer**, a week of hours with whole-day things along the top, or
+  the month with the events written in its cells; the switch is beside the
+  month's name.
+- **In the terminal**, the **Calendar** card (`f7`): the calendars on the
+  left, the month beside them with a coloured dot per event, the day you are
+  standing on underneath. `n` makes an event on that day, `e` (or enter)
+  opens the one under the cursor on its record sheet, `del` removes it, `c`
+  makes a calendar, `p` (or enter on a calendar) is who is in it — add, take
+  out, leave — `r` renames and recolours it, `t` is today, and `[` and `]`
+  are the months. The list on the left is not a filter: it picks which
+  calendar a new event goes in.
+- **On the command line**, `cm calendar list --from 2026-10-01 --to 2026-10-31`,
+  and `cm calendar add "Dentist" starts=2026-10-01T10:00` (into your own,
+  or `calendar=House`).
 
-An administrator can switch the whole thing off in the Administration panel,
-like any other feature: the tab goes and the API answers 403.
+An event does not notify anybody: a house calendar that pinged everybody for
+every appointment is one nobody reads. An administrator can switch the Quill
+off like any other feature: the tab goes and the API answers 403.
+
+**From before it was a Quill.** A server that had the built-in calendar gets
+the Quill installed at boot, and its calendars (with their people) and events
+move into records once, keeping names, colours, owners, times and when they
+were made. The old tables stay in the database, untouched.
 
 ## Push notifications
 
@@ -815,8 +858,10 @@ library):
 - **RFC 8291 / 8188 (aes128gcm)** — the body, encrypted to the subscription's
   own key, so the push service carries something it cannot read.
 
-The number on the icon is **everything waiting**: unread chat messages plus
-unread notifications. It is worked out in one place (`/api/push/badge`) so
+The number on the icon is **everything waiting**: everything unread in the
+spaces you are in — a channel's messages, or whatever another Quill declares
+`unread` — plus unread notifications. It is worked out in one place
+(`/api/push/badge`) so
 the page, the service worker and the push payload cannot disagree about it.
 Each push carries the recipient's own badge, which is why a message to four
 people is four requests rather than one.
@@ -1274,9 +1319,32 @@ cloudmorrow note add "verticore/deployment"
 cloudmorrow note list
 ```
 
-In the TUI, `f1` opens notes: the list on the left, the live editor on the
-right. `f6` imports a file into the selected folder and `f7` writes the open
-note back out.
+`cm note` is the command notes always had, and it stays. The Notes Quill
+has its own, `cm notes`, drawn by the kit like every Quill's — the same
+notes, found by their path:
+
+```bash
+cm notes list
+cm notes show ideas/garden          # the Markdown, as it is
+cm notes add ideas/garden           # from stdin, or $EDITOR
+cm notes edit ideas/garden
+cm notes search tomatoes            # names and every line
+```
+
+In the TUI, `f1` opens notes — the first card, and the one the workspace
+opens on: the tree on the left, with every folder, empty ones too, and the
+live editor on the right. `ctrl+o` makes a folder, `r` renames or moves what
+is selected in the tree (a folder takes what is in it along), `d` deletes it,
+`ctrl+f` searches. `f6` imports a file into the selected folder and `f7`
+writes the open note back out.
+
+Everybody with no notes at all gets one the first time they open Notes, on
+how the editor works. Notes are still the files they were — WebDAV, `cm
+note` and an assistant's notes tools reach the same ones — and the screens
+reach them through the record API as the `note` datamodel (see *Backends* in
+[QUILLS.md](QUILLS.md)). A server that had Notes before it was a Quill gets
+the Quill at its first start on the new version, unless an administrator
+had switched Notes off; the switch keeps its meaning either way.
 
 ### Pictures
 
@@ -1299,8 +1367,9 @@ is something a note shows, not a thing to find — and a copy of the notes
 tree takes the pictures with it, because they are files like everything else,
 sealed like everything else.
 
-**How they show.** The phone puts every picture the note mentions in a strip
-under the text, in the order it mentions them; tap one to see it full size.
+**How they show.** The phone and the web app put each picture where the
+note has it, between the text above and below it; tap one to see it full
+size.
 The TUI draws the picture the cursor is on — or the note's first, when the
 cursor is elsewhere — in a panel beside the editor. Where the terminal speaks
 Kitty's graphics protocol or Sixel (Kitty, Ghostty, WezTerm, foot, iTerm2)
@@ -1709,7 +1778,7 @@ Anywhere:
 
 | key | action |
 | --- | --- |
-| `f1` … `f7` | notes, tasks, secrets, files, chat, calendar — `f4` is spare |
+| `f1` … `f7` | notes, tasks (`f2`), secrets, files, calendar; the other Quills take `f4`, `f10`, `f11`, `f12` in turn — Chat is `f4` |
 | `f8` | notifications: what the machines have been up to |
 | `ctrl+g` | settings: this machine, and its config sync |
 | `ctrl+r` | refresh |
@@ -1817,9 +1886,15 @@ All note paths are relative to the calling user's notes root.
 | `POST`/`DELETE` | `/api/quills`, `/api/quills/{id}` | install, or remove; records are kept (administrators) |
 | `POST` | `/api/quills/upload` | a `.tar.gz` of a Quill's folder, as a development Quill — `cm quill dev` |
 | `GET` | `/api/datamodels` | every datamodel on the server, with its fields and the Quills that use it |
-| `GET`/`POST` | `/api/records/{model}` | your records of a datamodel (`?field=value` filters on indexed fields); make one |
+| `GET`/`POST` | `/api/records/{model}` | your records of a datamodel (`?field=value` filters on indexed fields, `?field__gte=…` and `__gt`, `__lte`, `__lt` are ranges); make one (`scope` for a space) |
 | `GET`/`PATCH`/`DELETE` | `/api/records/{model}/{id}` | one record; send `rev` with a change to get a 409 rather than overwrite |
 | `POST` | `/api/records/{model}/{id}/move` | `{fields, index}` — another lane or group, and a place in it |
+| `POST` | `/api/records/{model}` with `scope`, `members`, `unique` | a space — a channel, a calendar — made public or shared, with its people; `unique` finds the one with exactly those people instead of making another |
+| `POST` | `/api/records/{model}/{id}/members` | `{username}` — put somebody in a shared space; they are told |
+| `DELETE` | `/api/records/{model}/{id}/members/{username}` | take somebody out, or with your own name leave |
+| `POST` | `/api/records/{model}/{id}/seen` | you have looked in a space: what is in it is not unread |
+| `GET` | `/api/records/{model}?_last=50&_since=…` | the newest fifty, still in order; only what changed at or after a moment |
+| `GET` | `/api/people` | everybody a space could be shared with, or written to |
 | `GET`/`POST` | `/api/shares` | your fileshares; a share carries its `url` |
 | `GET`/`DELETE` | `/api/shares/{name}` | one share; `?remove_files=true` deletes a directory the server made |
 | `*` | `/dav/{name}/…` | the share itself, as WebDAV — Basic auth with your password or token |
@@ -1830,26 +1905,6 @@ All note paths are relative to the calling user's notes root.
 | `DELETE` | `/api/config/{bundle}` | unclaim it, so the next machine to tick the box decides |
 | `GET`/`POST` | `/api/notifications` | what the machines have been doing |
 | `POST` | `/api/notifications/read` | mark them read; omit `ids` for all of them |
-| `GET`/`POST` | `/api/chat/channels` | the channels you can see; make one |
-| `GET`/`PATCH`/`DELETE` | `/api/chat/channels/{slug}` | one channel; rename or set its topic; delete it |
-| `POST` | `/api/chat/direct` | `{username}` — the channel with one person, made if new |
-| `GET` | `/api/chat/people` | everybody there is to write to |
-| `POST` | `/api/chat/channels/{slug}/members` | `{usernames}` — put people in; they are told |
-| `POST` | `/api/chat/channels/{slug}/leave` | leave a private channel |
-| `GET`/`POST` | `/api/chat/channels/{slug}/messages` | a page of it (`?before=`, `?after=`); say something |
-| `PATCH`/`DELETE` | `/api/chat/channels/{slug}/messages/{id}` | change or remove what you said |
-| `POST` | `/api/chat/channels/{slug}/read` | move the read mark up; omit `upto` for all |
-| `GET` | `/api/chat/unread` | what is waiting, per channel and altogether |
-| `GET`/`POST` | `/api/calendar/calendars` | the calendars you can see; make one |
-| `GET`/`PATCH`/`DELETE` | `/api/calendar/calendars/{slug}` | one calendar; rename or recolour it; delete it |
-| `POST` | `/api/calendar/calendars/{slug}/members` | `{usernames}` — share it; they are told |
-| `POST` | `/api/calendar/calendars/{slug}/leave` | leave a shared calendar |
-| `GET` | `/api/calendar/people` | everybody a calendar could be shared with |
-| `GET` | `/api/calendar/colours` | the colours a calendar may be |
-| `GET` | `/api/calendar/events` | everything in `?from=`–`?to=`, across every calendar (`?calendar=` for one) |
-| `GET` | `/api/calendar/upcoming` | the next few things (`?days=`, `?limit=`) |
-| `POST` | `/api/calendar/calendars/{slug}/events` | put something in it |
-| `GET`/`PATCH`/`DELETE` | `/api/calendar/events/{id}` | one event; change it, or `{calendar}` to move it |
 | `GET` | `/api/push/key` | the VAPID public key, to subscribe a browser with |
 | `POST` | `/api/push/subscribe` | a `PushSubscription`, as the browser gives it |
 | `POST` | `/api/push/unsubscribe` | `{endpoint}` — forget this device |

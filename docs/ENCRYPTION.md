@@ -26,7 +26,7 @@ range over stays plain.
 
 | Store | Sealed | Plain |
 | --- | --- | --- |
-| Chat | message bodies, channel topics | channel slugs and names, who is in a channel, authors, timestamps, read marks |
+| Chat (records) | message bodies, channel names and topics — sealed to the channel | channel kind and scope, who is in a channel, authors, timestamps, when each person last looked |
 | Calendar | event titles, notes, locations | calendar slugs and names, colours, members, start and end times, all-day flag |
 | Tasks | board titles, task titles and bodies | board slugs, lanes, positions, timestamps |
 | Notifications | title and body | kind, machine, timestamps, read state |

@@ -141,7 +141,7 @@ def test_the_icons_are_the_ones_the_app_draws():
 
 def test_every_tab_is_drawn_with_one_of_them():
     """No tab is left on the line art the pixel set replaced."""
-    for name in ("today.js", "notes.js"):
+    for name in ("today.js",):
         source = (WEB / name).read_text(encoding="utf-8")
         tab = re.search(r"registerTab\(\{[^}]*\}\)", source, re.S)
         assert tab, name

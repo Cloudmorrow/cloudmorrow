@@ -46,7 +46,7 @@ why = "to show who looks after each plant"
 
 [[screens]]                        # one tab per screen, on every surface
 id = "plants"
-kit = "list"                       # list, board, detail, form, grid (calendar, thread, editor: next)
+kit = "list"                       # list, board, detail, form, calendar, grid, editor, thread
 label = "Plants"
 model = "plants.plant"
 title = "name"
@@ -121,6 +121,9 @@ Field kinds: string, text, markdown, bool, int, decimal, date, datetime, enum,
 email, phone, url, link, json. `indexed` fields are plain on disk so the server
 can filter and sort by them; everything else is encrypted at rest. Links are
 record ids and are always indexed. `on_delete` is `cascade` or `clear`.
+A datetime without a zone is the wall clock, kept as typed; a bare date is a
+whole day. Filter a list with `?field=value`, or a range with `__lt`,
+`__lte`, `__gt`, `__gte` on an indexed field.
 `stamp` sets a datetime when another field takes a value and clears it when it
 leaves. `secret = true` on a string or text field keeps it out of every listing
 and has every surface draw it hidden until asked for.
@@ -132,10 +135,28 @@ and has every surface draw it hidden until asked for.
 | list | model, title; optional subtitle, tick (bool), fields (the sheet's), group and subgroup (link, enum or indexed string) | rows, a circle per row if tick; chips (phone, web) or a list and buttons (terminal) to pick the group and subgroup |
 | board | model, lane (enum, in ordered_within), title; optional group (link: chips), body (markdown), done (a lane value) | lanes; cards dragged between them |
 | detail / form | model; optional fields = [...] | one record's fields, editable |
+| calendar | model, starts, ends (indexed datetime/date), space (a link to a space datamodel); optional all_day (bool), colour (a field of the space), subtitle | every space's things at once: a month, a week, the day's list; the spaces and their people |
+| editor | model, title, body (markdown); optional path (a string like folder/sub/title: the folders) | a tree of folders and records beside a page of Markdown; pictures where the backend keeps attachments |
 | grid | a model with bytes beside its fields (the foundational `file`); group (link: the places, picked first), folder (string), kind (an enum with "folder"); optional size, modified, mime, group_subtitle and group_open (fields of the group's model) | the groups, then folders and tiles with pictures; put in, get, new folder, rename, move, delete |
+| thread | model (in a space), space (its link to the space), body; optional about (a field of the space), made_as | the spaces with unread counts, then a conversation: newest at the bottom, grouped by author and day, a box to write in |
+
+A thread's `made_as` says what fields a space gets for how it is made — by
+scope, or `direct`: a shared space found-or-made between you and the person
+you pick, named for them (its fields must be indexed):
+
+```toml
+[screens.made_as]
+public = { kind = "public" }
+shared = { kind = "private" }
+direct = { kind = "direct" }
+```
+
+On the command line a thread is `cm <quill> list` (the spaces, with unread),
+`show <space>` and `say <space> "text"`.
 
 Every screen opens a record sheet when a row or card is chosen: every field,
-with the widget for its kind, editable, with delete. No other UI exists, on
+with the widget for its kind, editable, with delete. An editor opens its page
+instead. No other UI exists, on
 purpose: what the kit cannot say, the kit grows to say, for every Quill at once.
 
 ## Rules

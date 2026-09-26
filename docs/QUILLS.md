@@ -138,6 +138,13 @@ done_at = { kind = "datetime", indexed = true, stamp = { field = "lane", value =
 `date`, `datetime`, `enum`, `email`, `phone`, `url`, `link`, `json`. Each kind
 has a widget on every surface; adding a kind means adding all of them.
 
+**`datetime`** keeps what it was given. With a zone it is a moment, kept
+with its zone; without one it is the time on the wall — `2026-10-01T10:00`,
+"the dentist at ten" — kept as typed, to the minute, and never converted; a
+bare date (`2026-10-01`) is a whole day and stays one. Every client sends
+what a person typed without a zone, so a calendar is on one clock. A stamp
+the server sets is a moment, in UTC.
+
 **`secret = true`** on a string or text field keeps it out of every
 listing — the record store and every backend send it as null there — and
 every surface draws it hidden until asked: dots and an eye on a row, a
@@ -193,11 +200,18 @@ The core serves every installed datamodel at the same API:
 | call | what it does |
 | --- | --- |
 | `GET /api/records/{model}?field=value` | list, filtered on indexed fields, in order |
-| `POST /api/records/{model}` | create, from `{"fields": {...}}` |
+| `GET /api/records/{model}?field__gte=…&field__lt=…` | a range on an indexed field: `__lt`, `__lte`, `__gt`, `__gte`; a record without the field never matches |
+| `GET /api/records/{model}?q=text` | the records whose text holds it; each found one's `preview` is the line that matched |
+| `GET /api/records/{model}?previews=true` | the list, with a line of each record's text as `preview` |
+| `GET /api/records/{model}?_last=50&_since=<time>` | the newest fifty, still in order; only what changed at or after a moment — a conversation's page, and what an open one has not got |
+| `POST /api/records/{model}` | create, from `{"fields": {...}}`; a space also takes `scope`, `members` and `unique` (see *Spaces*) |
 | `GET /api/records/{model}/{id}` | one record |
 | `PATCH /api/records/{model}/{id}` | change fields; send `rev` to get a 409 instead of overwriting |
 | `POST /api/records/{model}/{id}/move` | `{"fields": {"lane": "done"}, "index": 0}`: change group fields and position together |
 | `DELETE /api/records/{model}/{id}` | delete, cascading along `on_delete = "cascade"` links |
+| `POST /api/records/{model}/{id}/members` | `{"username": …}`: put somebody in a shared space (see *Spaces*) |
+| `DELETE /api/records/{model}/{id}/members/{username}` | take them out; with your own name, leave |
+| `GET /api/people` | everybody on the server a space could be shared with |
 | `GET /api/datamodels` | every datamodel on the server, with its fields and who uses it |
 | `GET /api/quills` | every installed Quill, with its manifest |
 | `GET /api/quills/catalog` | the catalog, with what is installed |
@@ -231,15 +245,30 @@ in_space = "calendar"             # a link field: whoever may see the calendar s
 | `shared` | its owner and its members | its owner, and administrators | a member may |
 | `public` | everybody on the server | its owner, and administrators | nobody can |
 
-A space's scope is set when it is made. Members are added with
+A space's scope is set when it is made, and a shared one may be made with
+its people in it (`"members": [...]`). Members are added with
 `POST /api/records/{model}/{id}/members` and removed with `DELETE
-…/members/{username}`; being added leaves a notification. A record in a
+…/members/{username}`; being added leaves a notification. `"unique": true`
+finds the space of that datamodel with exactly you and `members` in it, and
+the same indexed fields, before making one (200 rather than 201) — the one
+conversation between two people, from either side; its people are not told
+they were added, because the first thing written in it tells them.
+`GET /api/people` is everybody else there is to share with. A record in a
 space is sealed to the space, so moving a message to another channel by
 editing the database opens as nothing.
 
 A dataset can seed a space once per server (`seed = "once"`, for the
 public calendar and `#general`) or once per person (`seed = "per-owner"`,
 for everyone's own calendar).
+
+Being able to see a space is being able to write in it. Who may change
+or delete what is written there is the datamodel's `authored`:
+
+| `authored` | who changes and deletes a record | for |
+| --- | --- | --- |
+| `false` (the default) | anybody who may see it | a shared list |
+| `true` | only whoever wrote it | a message |
+| `"or-manager"` | whoever wrote it, or whoever manages its space | an event: the calendar's maker can clear somebody's stale one |
 
 A space may declare what happens when something is written in it:
 
@@ -267,6 +296,21 @@ A backend answers the same list, get, create, change and delete, with the
 same envelope, so a Quill, `cm <quill>` and an assistant cannot tell the
 difference. The Notes, Files and Secrets Quills carry only their screens.
 
+`q` and `previews` are not filters, and every listing takes them: the record
+store searches the text fields it unseals, and a backend searches its own
+way (notes read their files, names and every line). A backend may do two
+things more, and a datamodel says which in `can` beside it in
+`GET /api/quills` — `["search", "folders", "attachments"]` for a note:
+
+| capability | calls | what it is |
+| --- | --- | --- |
+| `folders` | `GET`, `POST {path}`, `PATCH {path, to}`, `DELETE ?path=` on `/api/records/{model}/_folders` | folders a record's path is in, which exist before anything is put in them and take everything in them when they go |
+| `attachments` | `POST` (the body is the file) and `GET …/{name}` on `/api/records/{model}/_attachments` | files kept beside the records; the answer's `path` is what Markdown writes (`![alt](img/<name>)`) |
+
+A folder is not a record: it has no fields, no rev and nothing to seal, and
+a listing of notes with folders in it would be a listing of two things. So
+it is a capability a backend declares by having the methods, and any other
+backend with folders — the fileshares — answers the same calls.
 A backend may also keep **content**: bytes beside a record's fields. The
 `shares` backend does — a file's — and the record API has three more calls
 for any datamodel whose backend keeps some:
@@ -293,16 +337,53 @@ each element needs:
 | `list` | `model`, `title`, optional `subtitle`, `tick` (a bool field), `fields` (the sheet's), `group` and `subgroup` (a link, an enum or an indexed string: picked through) | chips for the group and subgroup, a list with a circle per row | the same, wider | the groups down the left, the subgroup as buttons, a table | `cm <quill> list [-g group/subgroup]`, `add`, `done` |
 | `board` | `model`, `lane` (enum), `title`, optional `group` (link), `body`, `done` | lanes stacked | lanes as columns, drag and drop | lanes as columns, drag and keys | `cm <quill> list`, `add`, `move` |
 | `detail` / `form` | `model`, `fields` | a sheet | a panel | a modal | `cm <quill> show`, `set` |
-| `calendar` | `model`, `starts`, `ends`, optional `all_day`, `space` (the calendars) | a day list and a month | a week and a month | a month and the day's list | `cm <quill> list --from --to`, `add` |
-| `thread` | `model`, `body`, `space` (the channels) | channels, then a conversation | both side by side | both side by side | `cm <quill> list`, `say` |
-| `editor` | `model` with a `markdown` field, optional folders from the title | a tree, then a page | both side by side | both side by side | `cm <quill> show`, `add`, `edit` |
+| `calendar` | `model`, `starts`, `ends` (indexed datetime or date fields), `space` (a link to a space: the calendars), optional `all_day` (bool), `colour` (a field of the space: cyan, violet, green, amber, rose), `title`, `subtitle` | a month with a dot per thing, and the day's list | a week of hours or a month written in | the spaces, a month, and the day's list | `cm <quill> list --from --to`, `add "<title>" starts=… ends=…` |
+| `thread` | `model` (in a space), `space` (its link to the space), `body`; optional `about` (a field of the space), `made_as` | the spaces with unread, then a conversation | both side by side | both side by side | `cm <quill> list`, `show`, `say` |
+| `editor` | `model`, `title`, `body` (markdown), optional `path` (a string, `folder/sub/title`: the folders) | a tree, then a list, then the page | the list and the page side by side | the tree and the live editor side by side | `cm <quill> list`, `show`, `add`, `edit`, `search` |
 | `grid` | `model` with content (`file`), `group` (a link: the places, picked first), `folder`, `kind` (an enum with `folder`), optional `size`, `modified`, `mime`, `group_subtitle`, `group_open` | the groups, then folders and tiles | the same, wider; drag and drop in | the groups in a table, then the folder, with the picture beside | `cm <quill> list [group] [folder]`, `get`, `put`, `add` |
 
 Every screen gets a record sheet for free: opening a card or a row shows the
-record's fields with the widget for each kind, editable, with delete.
+record's fields with the widget for each kind, editable, with delete. An
+editor opens its own page instead, and takes pictures when its datamodel has
+`attachments`.
+
+A screen whose things are in spaces (`space` on a `calendar`) also gets the
+spaces: a list of them — yours, shared, everybody's — the way to make one
+(its name, who can see it, who is in it), and on a space's own sheet who is
+in it, adding somebody, taking somebody out and leaving. That is the kit's,
+not the calendar's: every surface has it once (web `kit_space.js`, terminal
+`widgets/kit_space.py`), for any element that draws things in spaces.
+
+A `thread` is the kit's conversation: things written (`body`) in spaces. Its
+`made_as` says what fields a space gets for how it is made — by its scope, or
+`direct`, a shared space found-or-made between you and the person you pick
+and named for them — and the kit draws around it what every space has: making
+one, the people in it, adding and taking out, leaving. Chat is:
+
+```toml
+[[screens]]
+id = "chat"
+kit = "thread"
+model = "message"
+space = "channel"
+body = "body"
+about = "topic"
+[screens.made_as]
+public = { kind = "public" }
+shared = { kind = "private" }
+direct = { kind = "direct" }
+```
+
+A conversation opens on its newest page (`?_last=100`), asks what changed
+since (`?_since=`) every few seconds and when a push arrives, and marks the
+space seen (`POST …/seen`) as it is read. The unread counts come on the
+spaces themselves (`unread`, and `last`: the newest line), and the number on
+the phone's icon adds them up across every space whose Quill is on for you.
 
 A Quill's screens become a tab, in the order of `[[screens]]`, on every
-surface. An administrator switches a Quill off for the server; a person
+surface; Quills from the catalog stand in the catalog's order (Notes, then
+Tasks), and the rest follow, oldest first. The clients open on the first tab
+there is. An administrator switches a Quill off for the server; a person
 switches its tab off for themselves — the same two switches the included
 features have always had.
 
@@ -416,10 +497,11 @@ manifest written, checked and installed in one conversation.
 | records, sealing, positions, stamps, the gate | `server/records.py` |
 | manifests, sources, install, catalog | `server/quills.py`, `server/routes/quills.py` |
 | the record API | `server/routes/records.py` |
-| jobs | `server/quilljobs.py` |
-| backends: notes, shares and files, secrets | `server/backends.py`; a share's files in `server/fileops.py` |
-| the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; the grid in `kit_grid.js`, `kit_grid.css` (with `registerGridHook`, which the desktop app's mount lines come in by); a grouped list and hidden fields in `kit_grouped.js`, `kit_grouped.css`; the catalog and install sheet in `quillsadmin.js` |
-| the kit in the terminal | `tui/panes/kit.py` (list), `tui/panes/kit_grouped.py` (a grouped list, hidden fields) with `tui/widgets/group_list.py`, `tui/panes/kit_board.py`, `tui/panes/kit_grid.py` (with `register_group_extension`; the mount column and buttons for shares are `tui/sharemounts.py`), `tui/widgets/kit.py`, `tui/screens/record_sheet.py`; the catalog in `tui/panes/admin_quills.py` |
+| jobs, and the boot work (foundation Quills, built-ins that became Quills, old tables into records: `move_legacy_tasks`, `move_legacy_calendar`, `move_legacy_chat`) | `server/quilljobs.py` |
+| spaces: who is told what, the badge, the people there are | `server/spacenotify.py`, `server/routes/push.py` (`badge_for`), `GET /api/people` in `server/routes/records.py` |
+| backends: notes (their folders and pictures), shares and files, secrets | `server/backends.py`; a share's files in `server/fileops.py` |
+| the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; the grid in `kit_grid.js`, `kit_grid.css` (with `registerGridHook`, which the desktop app's mount lines come in by); the editor in `kit_editor.js`, `kit_editor.css` and `pictures.js`; the calendar in `kit_calendar.js`, `kit_calendar.css`; the thread in `kit_thread.js`, `kit_thread.css`; spaces (their list, making one, writing to somebody, their people) in `kit_space.js`, `kit_space.css`, shared by calendar and thread; a grouped list and hidden fields in `kit_grouped.js`, `kit_grouped.css`; the catalog and install sheet in `quillsadmin.js` |
+| the kit in the terminal | `tui/panes/kit.py` (list), `tui/panes/kit_grouped.py` + `kit_grouped.tcss` (a grouped list, hidden fields) with `tui/widgets/group_list.py`, `tui/panes/kit_board.py`, `tui/panes/kit_editor.py` + `kit_editor.tcss` (with `widgets/editor.py`, `note_tree.py`, `picture.py`), `tui/panes/kit_grid.py` (with `register_group_extension`; the mount column and buttons for shares are `tui/sharemounts.py`), `tui/panes/kit_calendar.py` + `kit_calendar.tcss`, `tui/panes/kit_thread.py`, `tui/widgets/kit_space.py` + `kit_space.tcss` (spaces: `NewSpaceModal`, `SpaceModal`, `PickPersonModal`), `tui/widgets/kit.py`, `tui/screens/record_sheet.py`; the catalog in `tui/panes/admin_quills.py` |
 | the kit on the command line | `cli/quillrun.py` (`cm <quill> …`) |
 | building one | `cli/quill.py` (`cm quill new/check/dev/add`), `quill_reference.md`, `quill_template/` |
 | the kit to an assistant | `server/mcptools.py` (generic record tools) |
@@ -429,9 +511,10 @@ manifest written, checked and installed in one conversation.
 1. Tasks is the first Quill, and the proof: no task code left in the core.
 2. Services, webhooks and APIs run, with Quill tokens and the gate on them.
 3. `calendar` and `thread` in the kit; Calendar and Chat become Quills.
-4. `grid` and `editor`; Files and Notes become Quills. (`grid` is drawn,
-   and Files is a Quill.) Secrets is a Quill too — a grouped `list` of the
-   `secret` datamodel — while its store stays foundation, and it is the one
+   (Both are Quills: `calendar` and `thread` are drawn on every surface.)
+4. `grid` and `editor`; Files and Notes become Quills. (Both are drawn,
+   and both are Quills.) Secrets is a Quill too, a grouped `list` of the
+   `secret` datamodel, while its store stays foundation, and it is the one
    datamodel no assistant may ever reach.
 5. Shared and public scopes in the record store; named datasets.
 6. The catalog page at cloudmorrow.com, and the first Quill we did not write.

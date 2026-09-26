@@ -166,12 +166,13 @@ async def test_moving_a_card_to_another_board_from_the_sheet(app):
 # -- Quill tabs ----------------------------------------------------------------
 
 
-async def test_a_quill_screen_is_a_tab_after_notes(app):
+async def test_the_quill_tabs_come_first_notes_then_tasks(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
         assert tab_labels(screen)[0] == "Notes  f1"
-        # Tasks, Secrets, then Files: the order they were installed in, each with its old key.
-        assert tab_labels(screen)[-3:] == ["Tasks  f2", "Secrets  f3", "Files  f5"]
+        # Then Tasks, Files and Chat: the catalog's order, Tasks and Files
+        # with their old keys and Chat with the next one free.
+        assert tab_labels(screen)[1:4] == ["Tasks  f2", "Files  f5", "Chat  f4"]
         assert screen.query_one("#nav-section-quills").display
         assert isinstance(screen.query_one("#pane-tasks"), BoardPane)
 
@@ -185,8 +186,9 @@ async def test_the_quill_key_brings_its_tab(app):
 
 
 async def test_a_kit_the_terminal_does_not_draw_yet_has_no_tab(app):
+    # Every kit is drawn now; one from a server newer than this client is not.
     quill = dict(READING_QUILL, id="diary", name="Diary", installed_version="0.2.0")
-    quill["screens"] = [dict(READING_QUILL["screens"][0], kit="calendar")]
+    quill["screens"] = [dict(READING_QUILL["screens"][0], kit="spreadsheet")]
     app.client.quill_list.append(quill)
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
@@ -222,7 +224,7 @@ async def open_reading(app, pilot):
 async def test_a_list_screen_is_a_table_with_a_circle(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen, pane = await open_reading(app, pilot)
-        assert "Reading  f4" in tab_labels(screen)
+        assert "Reading  f10" in tab_labels(screen)
         table = pane.query_one("#kit-table")
         cells = [[str(c) for c in table.get_row_at(i)] for i in range(table.row_count)]
         assert "○" in cells[0][0] and "Middlemarch" in cells[0][1] and "George Eliot" in cells[0][2]
@@ -316,7 +318,7 @@ async def test_installing_shows_the_sheet_then_adds_the_tab(app):
 
         assert ("install", "reading") in app.client.quill_calls
         # The workspace behind the panel grew the tab, with the next free key.
-        assert "Reading  f4" in tab_labels(screen)
+        assert "Reading  f10" in tab_labels(screen)
         assert "0.2.0" in str(table.get_row_at(3)[1])
 
 
@@ -335,7 +337,8 @@ async def test_removing_asks_then_takes_the_tab_and_keeps_the_records(app):
 
         assert ("uninstall", "tasks") in app.client.quill_calls
         assert not screen.query("#nav-tasks")
-        # Secrets is still a Quill, so the section stays for it.
+        # Notes and Chat are still Quills, so the section stays.
         assert screen.query_one("#nav-section-quills").display
+        assert tab_labels(screen)[0] == "Notes  f1"
         assert not screen.query("#pane-tasks")
         assert len(app.client.record_store["task"]) == 3

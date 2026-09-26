@@ -209,11 +209,24 @@ class Record:
     members: list[str] | None = None
     can_manage: bool = False
     unread: int = 0
+    # The newest thing written in it that counts as unread: who, when, and
+    # its title — what a list of conversations shows under each one.
+    last: dict | None = None
+    # A line of what it says, when a listing was asked for one: the start of
+    # its text with `?previews=true`, the line that matched with `?q=`.
+    preview: str | None = None
 
     def to_dict(self) -> dict:
         extra: dict = {}
         if self.members is not None:
-            extra = {"members": list(self.members), "can_manage": self.can_manage, "unread": self.unread}
+            extra = {
+                "members": list(self.members),
+                "can_manage": self.can_manage,
+                "unread": self.unread,
+                "last": dict(self.last) if self.last else None,
+            }
+        if self.preview is not None:
+            extra["preview"] = self.preview
         return extra | {
             "id": self.id,
             "model": self.model,
@@ -292,10 +305,7 @@ def _coerce(model: Datamodel, f: Field, value: object) -> object:
         except ValueError:
             raise RecordError(f"{where} is a date, YYYY-MM-DD") from None
     if kind == "datetime":
-        moment = _parse_moment(str(value))
-        if moment is None:
-            raise RecordError(f"{where} is a date and time, ISO 8601")
-        return moment.isoformat(timespec="seconds")
+        return _wall_or_moment(where, str(value).strip())
     if kind == "enum":
         text = str(value).strip().lower()
         if text not in f.values:
@@ -310,6 +320,34 @@ def _coerce(model: Datamodel, f: Field, value: object) -> object:
     raise RecordError(f"{where}: unknown kind {kind}")  # pragma: no cover
 
 
+_BARE_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _wall_or_moment(where: str, text: str) -> str:
+    """A datetime field's value, kept the way it was meant.
+
+    With a zone it is a moment, and is kept with its zone. Without one it is
+    the time on the wall — "the dentist at ten" — and is kept as typed, to
+    the minute, converting nothing: that is what a calendar needs, and a
+    server guessing a zone for it would move the dentist twice a year. A
+    bare date is a whole day, and stays one. ISO sorts the way time does, so
+    all three compare as strings, which is what a range filter does.
+    """
+    if _BARE_DATE_RE.match(text):
+        try:
+            return dt.date.fromisoformat(text).isoformat()
+        except ValueError:
+            raise RecordError(f"{where} is a date, YYYY-MM-DD") from None
+    try:
+        moment = dt.datetime.fromisoformat(text)
+    except ValueError:
+        raise RecordError(f"{where} is a date and time, ISO 8601") from None
+    if moment.tzinfo is None:
+        exact = moment.second or moment.microsecond
+        return moment.isoformat(timespec="seconds" if exact else "minutes")
+    return moment.isoformat(timespec="seconds")
+
+
 def _is(value: object, target: str) -> bool:
     """Does a field's value read as *target*? `false` is how TOML says a bool."""
     if isinstance(value, bool):
@@ -322,8 +360,70 @@ def _stored_indexed(model: Datamodel) -> set[str]:
     return {f.name for f in model.fields if f.indexed or f.kind == "link"}
 
 
+# `?starts_at__lt=2026-10-01`: a range on an indexed field, for anything
+# that asks "between these two" — the events in a month, the invoices in a
+# quarter. A field that is missing never matches a range.
+RANGES = {"lt": "<", "lte": "<=", "gt": ">", "gte": ">="}
+
+
+def _filter(key: str) -> tuple[str, str]:
+    """A filter's field and its comparison: `due` is equal, `due__gte` is at least."""
+    name, sep, suffix = key.rpartition("__")
+    if sep and suffix in RANGES:
+        return name, RANGES[suffix]
+    return key, "IS"
+
+
 def _new_id() -> str:
     return "r_" + secrets.token_hex(5)
+
+
+# -- what a listing may ask for besides filters ----------------------------------
+# `?q=` is a text search and `?previews=true` a line of each record's text.
+# Neither is a field, so neither is a filter; a backend answers them its own
+# way (a note's search reads the files), and the store answers them here.
+LIST_OPTIONS = frozenset({"q", "previews"})
+
+# The kinds a text search reads, and a preview is taken from.
+TEXT_KINDS = ("string", "text", "markdown", "email", "url", "phone")
+
+# What a datamodel can do besides the five calls, and the backend method
+# that does it. The store searches its own records; a backend has folders
+# and attachments when it has the methods. See `RecordStore.capabilities`.
+BACKEND_CAPABILITIES = {"folders": "folders", "attachments": "attach", "content": "content"}
+
+PREVIEW_CHARS = 120
+
+
+def _truthy(value: object) -> bool:
+    return str(value).lower() in ("1", "true", "yes", "on")
+
+
+def _matches(model: Datamodel, record: Record, query: str) -> bool:
+    """Does any text of *record* hold *query*? The preview says where."""
+    needle = query.casefold()
+    for f in model.fields:
+        # A secret field is never searched: a match would say what is in it.
+        if f.kind not in TEXT_KINDS or f.secret:
+            continue
+        for line in str(record.fields.get(f.name) or "").splitlines():
+            if needle in line.casefold():
+                record.preview = line.strip()[:200]
+                return True
+    return False
+
+
+def _preview_of(model: Datamodel, record: Record) -> str:
+    """The first line of its long text — Markdown first — that says something."""
+    for kind in ("markdown", "text"):
+        for f in model.fields:
+            if f.kind != kind or f.secret:
+                continue
+            for line in str(record.fields.get(f.name) or "").splitlines():
+                line = line.strip().lstrip("#").strip()
+                if line:
+                    return line[: PREVIEW_CHARS - 1] + "…" if len(line) > PREVIEW_CHARS else line
+    return ""
 
 
 # -- the store -----------------------------------------------------------------
@@ -413,6 +513,7 @@ class RecordStore:
             if asker is not None:
                 record.can_manage = self._may_manage(asker, row)
                 record.unread = self._unread(conn, model, row["id"], asker.username)
+                record.last = self._latest(conn, model, row["id"])
         return record
 
     # -- who may see what --------------------------------------------------------
@@ -472,11 +573,21 @@ class RecordStore:
         return row
 
     def _writable(self, conn: Connection, principal: Principal, model: Datamodel, row: sqlite3.Row) -> None:
-        """Seeing is not always changing: a space is its manager's, a message its author's."""
+        """Seeing is not always changing: a space is its manager's, a message its author's,
+        and an event its writer's or its calendar's manager's."""
         if model.space and not self._may_manage(principal, row):
             raise Refused(f"only whoever made this {model.label.lower()} may change it")
-        if model.authored and row["owner"] != principal.username:
-            raise Refused(f"only whoever wrote this {model.label.lower()} may change it")
+        if not model.authored or row["owner"] == principal.username:
+            return
+        if model.authored == "or-manager":
+            space = self._space_of(conn, model, json.loads(row["indexed"] or "{}"))
+            if space is not None and self._may_manage(principal, space):
+                return
+            raise Refused(
+                f"only whoever wrote this {model.label.lower()}, or whoever manages where it is,"
+                " may change it"
+            )
+        raise Refused(f"only whoever wrote this {model.label.lower()} may change it")
 
     def _visible_clause(self, model: Datamodel, username: str) -> tuple[str, list[object]]:
         """SQL that keeps the rows of *model* this person may see."""
@@ -494,50 +605,186 @@ class RecordStore:
             )
         return "owner = ?", [username]
 
+    def _unread_children(self, space_model: Datamodel) -> list[Datamodel]:
+        """The datamodels written in this kind of space that count as unread."""
+        return [
+            child
+            for child in self._models().values()
+            if child.in_space
+            and child.get_field(child.in_space).to == space_model.id
+            and any(rule.get("unread") for rule in child.notify)
+        ]
+
+    def _seen_since(self, conn: Connection, space_id: str, username: str) -> tuple[str, str]:
+        """Since when what is written in a space is news to this person, as (op, stamp).
+
+        After they last looked; else from when they were put in it; else, for
+        a public space they have never opened, from when their account was
+        made — somebody who arrives today does not open to a year of unread.
+        A stamp is to the second, so what is written the second somebody is
+        added still reaches them, and what they looked at that second is read.
+        """
+        seen = conn.execute(
+            "SELECT seen_at FROM record_seen WHERE space_id = ? AND username = ?",
+            (space_id, username),
+        ).fetchone()
+        if seen:
+            return ">", str(seen["seen_at"])
+        joined = conn.execute(
+            "SELECT joined_at FROM record_members WHERE space_id = ? AND username = ?",
+            (space_id, username),
+        ).fetchone()
+        if joined:
+            return ">=", str(joined["joined_at"])
+        try:
+            # The accounts live in the same database; a store made on its own,
+            # as a test makes one, has no such table and counts from the start.
+            account = conn.execute(
+                "SELECT created_at FROM users WHERE username = ?", (username,)
+            ).fetchone()
+        except sqlite3.OperationalError:
+            account = None
+        return ">=", str(account["created_at"]) if account else ""
+
     def _unread(self, conn: Connection, space_model: Datamodel, space_id: str, username: str) -> int:
         """Things written in a space since this person last looked, by others."""
+        children = self._unread_children(space_model)
+        if not children:
+            return 0
+        op, since = self._seen_since(conn, space_id, username)
         count = 0
-        for child in self._models().values():
-            if child.in_space and child.get_field(child.in_space).to == space_model.id and any(
-                rule.get("unread") for rule in child.notify
-            ):
-                seen = conn.execute(
-                    "SELECT seen_at FROM record_seen WHERE space_id = ? AND username = ?",
-                    (space_id, username),
-                ).fetchone()
-                row = conn.execute(
-                    "SELECT COUNT(*) FROM records WHERE model = ? AND owner != ?"
-                    f" AND json_extract(indexed, '$.\"{child.in_space}\"') = ? AND created_at > ?",
-                    (child.id, username, space_id, seen["seen_at"] if seen else ""),
-                ).fetchone()
-                count += int(row[0])
+        for child in children:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM records WHERE model = ? AND owner != ?"
+                f" AND json_extract(indexed, '$.\"{child.in_space}\"') = ? AND created_at {op} ?",
+                (child.id, username, space_id, since),
+            ).fetchone()
+            count += int(row[0])
         return count
+
+    def _latest(self, conn: Connection, space_model: Datamodel, space_id: str) -> dict | None:
+        """The newest thing written in a space, of a kind that counts as unread."""
+        newest: tuple[sqlite3.Row, Datamodel] | None = None
+        for child in self._unread_children(space_model):
+            row = conn.execute(
+                "SELECT * FROM records WHERE model = ?"
+                f" AND json_extract(indexed, '$.\"{child.in_space}\"') = ?"
+                " ORDER BY created_at DESC, rowid DESC LIMIT 1",
+                (child.id, space_id),
+            ).fetchone()
+            if row is not None and (newest is None or row["created_at"] > newest[0]["created_at"]):
+                newest = (row, child)
+        if newest is None:
+            return None
+        row, child = newest
+        fields = self._record(conn, child, row).fields
+        return {
+            "id": row["id"],
+            "model": child.id,
+            "owner": row["owner"],
+            "created_at": row["created_at"],
+            "title": str(fields.get(child.title) or ""),
+        }
+
+    def unread_total(self, principal: Principal, models: Iterable[str] | None = None) -> int:
+        """Everything waiting for one person, across every space they can see.
+
+        The number on the phone's icon: things, not spaces, so "3" means
+        three things to read. *models* narrows it to some space datamodels —
+        the ones whose Quill this person has switched on.
+        """
+        wanted = set(models) if models is not None else None
+        total = 0
+        with connect(self.db_path) as conn:
+            for model in self._models().values():
+                if not model.space or model.backend or (wanted is not None and model.id not in wanted):
+                    continue
+                if not self._unread_children(model):
+                    continue
+                clause, params = self._visible_clause(model, principal.username)
+                for row in conn.execute(
+                    f"SELECT id FROM records WHERE model = ? AND {clause}", [model.id, *params]
+                ).fetchall():
+                    total += self._unread(conn, model, row["id"], principal.username)
+        conn.close()
+        return total
 
     # -- reading ---------------------------------------------------------------
     def list(
-        self, principal: Principal, model_id: str, where: dict[str, object] | None = None
+        self,
+        principal: Principal,
+        model_id: str,
+        where: dict[str, object] | None = None,
+        *,
+        last: int | None = None,
+        since: str | None = None,
     ) -> list[Record]:
-        """Every record of *model_id* the principal owns, filtered, in order.
+        """Every record of *model_id* the principal may see, filtered, in order.
 
         Filters are on indexed fields and links only: those are what the server
-        can see. Sweeps what an expire job would take first.
+        can see. `name` is equal to; `name__lt`, `__lte`, `__gt` and `__gte`
+        are a range. Sweeps what an expire job would take first.
+
+        *last* keeps only the last so many, still in order — the newest page
+        of a conversation. *since* keeps only what was made or changed at or
+        after that moment — what an open screen has not got yet.
         """
         check(principal, "read", model_id)
         model = self.model(model_id)
+        where = dict(where or {})
+        # Not filters: what else the listing is asked for (see LIST_OPTIONS).
+        query = str(where.pop("q", "") or "").strip()
+        previews = _truthy(where.pop("previews", False))
         if model.backend:
-            return self._backend(model).list(principal, model, dict(where or {}))
+            return self._backend(model).list(
+                principal, model, where, q=query, previews=previews
+            )
+        records = self._list_stored(principal, model, where, last=last, since=since)
+        if query:
+            records = [r for r in records if _matches(model, r, query)]
+        elif previews:
+            for record in records:
+                record.preview = _preview_of(model, record)
+        return records
+
+    def _list_stored(
+        self, principal: Principal, model: Datamodel, where: dict, *,
+        last: int | None = None, since: str | None = None,
+    ) -> list[Record]:
+        model_id = model.id
         self.sweep(model_id, owner=None if (model.space or model.in_space) else principal.username)
         plain = _stored_indexed(model)
         clause, clause_params = self._visible_clause(model, principal.username)
-        query = f"SELECT * FROM records WHERE model = ? AND {clause}"
+        query = f"SELECT *, rowid AS seq FROM records WHERE model = ? AND {clause}"
         params: list[object] = [model.id, *clause_params]
-        for name, value in (where or {}).items():
+        for key, value in (where or {}).items():
+            name, operator = _filter(key)
             if name not in plain:
                 raise RecordError(f"{model.id} cannot be filtered by {name!r}: it is not indexed")
             coerced = _coerce(model, model.get_field(name), value)
-            query += " AND json_extract(indexed, ?) IS ?"
+            query += f" AND json_extract(indexed, ?) {operator} ?"
             params += [f'$."{name}"', coerced if not isinstance(coerced, bool) else int(coerced)]
-        query += " ORDER BY position, created_at, id"
+        if since:
+            # A `+` in a query string arrives as a space, if it was not escaped.
+            moment = _parse_moment(since.strip().replace(" ", "+"))
+            if moment is None:
+                raise RecordError("since is a date and time, ISO 8601")
+            # At or after: a second is the stamp's grain, so the caller gets
+            # what it already had that second again, and keeps it once by id.
+            query += " AND updated_at >= ?"
+            params.append(_stamp(moment))
+        # Ties go to whichever was written first: two lines said in the same
+        # second read in the order they were said.
+        if last is not None:
+            if last < 1:
+                raise RecordError("last is a whole number above nothing")
+            # The newest *last* of them, then turned back the right way round.
+            query = (
+                f"SELECT * FROM ({query} ORDER BY position DESC, created_at DESC, seq DESC"
+                f" LIMIT {int(last)}) ORDER BY position, created_at, seq"
+            )
+        else:
+            query += " ORDER BY position, created_at, seq"
         with connect(self.db_path) as conn:
             rows = conn.execute(query, params).fetchall()
             records = [self._record(conn, model, row, principal) for row in rows]
@@ -559,6 +806,59 @@ class RecordStore:
             record = self._record(conn, model, self._row(conn, principal, model, record_id), principal)
         conn.close()
         return record
+
+    # -- what a datamodel can do besides the five calls ------------------------
+    def capabilities(self, model_id: str) -> list[str]:
+        """`search` for every datamodel; `folders` and `attachments` when its backend has them.
+
+        A client reads this beside the datamodel (`GET /api/quills` puts it on
+        each model as `can`) rather than trying a call to find out.
+        """
+        model = self.model(model_id)
+        can = ["search"]
+        if model.backend:
+            backend = self.backends.get(model.backend)
+            can += [name for name, method in BACKEND_CAPABILITIES.items() if hasattr(backend, method)]
+        return can
+
+    def _capable(self, principal: Principal, model_id: str, action: str, capability: str):
+        check(principal, action, model_id)
+        model = self.model(model_id)
+        if capability not in self.capabilities(model_id):
+            raise RecordError(f"a {model.label.lower()} has no {capability}")
+        return model, self._backend(model)
+
+    def folders(self, principal: Principal, model_id: str) -> list[dict]:
+        """Every folder there is, empty ones too, as `{path, name}`, parents first."""
+        model, backend = self._capable(principal, model_id, "read", "folders")
+        return backend.folders(principal, model)
+
+    def make_folder(self, principal: Principal, model_id: str, path: str) -> dict:
+        model, backend = self._capable(principal, model_id, "write", "folders")
+        return backend.make_folder(principal, model, path)
+
+    def move_folder(self, principal: Principal, model_id: str, path: str, to: str) -> dict:
+        """Rename or move a folder, and everything in it with it."""
+        model, backend = self._capable(principal, model_id, "write", "folders")
+        return backend.move_folder(principal, model, path, to)
+
+    def delete_folder(self, principal: Principal, model_id: str, path: str) -> None:
+        """A folder and everything in it."""
+        model, backend = self._capable(principal, model_id, "write", "folders")
+        backend.delete_folder(principal, model, path)
+
+    def attach(self, principal: Principal, model_id: str, data: bytes, filename: str = "") -> dict:
+        """Keep a file beside the records: `{name, path, size, content_type}`.
+
+        `path` is what a record's Markdown writes to point at it.
+        """
+        model, backend = self._capable(principal, model_id, "write", "attachments")
+        return backend.attach(principal, model, data, filename)
+
+    def attachment(self, principal: Principal, model_id: str, name: str) -> tuple[bytes, str]:
+        """A kept file's bytes and media type."""
+        model, backend = self._capable(principal, model_id, "read", "attachments")
+        return backend.attachment(principal, model, name)
 
     def count(self, owner: str, model_id: str, *, scope: str | None = None) -> int:
         query = "SELECT COUNT(*) FROM records WHERE model = ? AND owner = ?"
@@ -757,7 +1057,15 @@ class RecordStore:
         *,
         index: int | None = None,
         scope: str | None = None,
+        members: Iterable[str] = (),
+        announce: bool = True,
     ) -> Record:
+        """Make a record. For a shared space, *members* are put in it at once.
+
+        Each of them is told, as being added later tells them — unless
+        *announce* is off, for a space found-or-made between people, where the
+        first thing written in it is the news.
+        """
         check(principal, "write", model_id)
         model = self.model(model_id)
         if model.backend:
@@ -766,6 +1074,9 @@ class RecordStore:
         record_id = _new_id()
         now = _stamp()
         scope = self._scope_for(model, scope)
+        people = [who for who in dict.fromkeys(str(m).strip() for m in members) if who and who != owner]
+        if people and (not model.space or scope != "shared"):
+            raise RecordError(f"only a shared {model.label.lower()} has members")
         with connect(self.db_path) as conn:
             fields = self._clean(conn, model, principal, incoming, current=None)
             indexed, body = self._write_row(conn, model, owner, record_id, fields)
@@ -781,14 +1092,78 @@ class RecordStore:
                 self._renumber(
                     conn, model, owner, self._group(model, fields), moved=record_id, insert_at=index
                 )
+            for username in people:
+                conn.execute(
+                    "INSERT OR IGNORE INTO record_members (space_id, username, added_by, joined_at)"
+                    " VALUES (?, ?, ?, ?)",
+                    (record_id, username, owner, now),
+                )
             self._log(conn, principal, model.id, record_id, "created", 1)
             recipients = self._recipients(conn, model, fields, owner) if model.notify else []
+            if model.in_space and any(rule.get("unread") for rule in model.notify):
+                # Writing in a space is looking at it: what was above your
+                # line is not news to you, and neither is your line.
+                conn.execute(
+                    "INSERT INTO record_seen (space_id, username, seen_at) VALUES (?, ?, ?)"
+                    " ON CONFLICT(space_id, username) DO UPDATE SET seen_at = excluded.seen_at",
+                    (fields.get(model.in_space), owner, now),
+                )
         conn.close()
         made = self.get(principal, model.id, record_id)
         for rule in model.notify:
             for hook in self.on_notify:
                 hook(made, rule, recipients)
+        if announce:
+            for username in people:
+                for hook in self.on_member_added:
+                    hook(made, username, owner)
         return made
+
+    def find_space(
+        self,
+        principal: Principal,
+        model_id: str,
+        incoming: dict,
+        *,
+        scope: str | None = None,
+        members: Iterable[str] = (),
+    ) -> Record | None:
+        """The space of *model_id* with exactly these people in it, and these fields.
+
+        What "write to somebody" finds before it makes anything: the one
+        conversation between two people, from either side. The people are the
+        asker and *members*; the fields are compared on what the server can
+        see — the indexed ones among *incoming*.
+        """
+        check(principal, "read", model_id)
+        model = self.model(model_id)
+        if not model.space or model.backend:
+            raise RecordError(f"a {model.label.lower()} is not a space")
+        scope = self._scope_for(model, scope)
+        people = {principal.username, *(str(m).strip() for m in members if str(m).strip())}
+        plain = _stored_indexed(model)
+        wanted = {
+            name: _coerce(model, model.get_field(name), value)
+            for name, value in incoming.items()
+            if name in plain and name in model.by_name
+        }
+        clause, params = self._visible_clause(model, principal.username)
+        with connect(self.db_path) as conn:
+            rows = conn.execute(
+                f"SELECT * FROM records WHERE model = ? AND scope = ? AND {clause}"
+                " ORDER BY created_at, rowid",
+                [model.id, scope, *params],
+            ).fetchall()
+            found = None
+            for row in rows:
+                indexed = json.loads(row["indexed"] or "{}")
+                if any(indexed.get(name) != value for name, value in wanted.items()):
+                    continue
+                if {row["owner"], *self._members(conn, row["id"])} == people:
+                    found = row["id"]
+                    break
+        conn.close()
+        return self.get(principal, model.id, found) if found else None
 
     def _scope_for(self, model: Datamodel, asked: str | None) -> str:
         """A space's scope is chosen when it is made; everything else is personal."""
@@ -1011,6 +1386,10 @@ class RecordStore:
             conn.close()
             if row is not None:
                 return []
+        elif self.model(model_id).backend:
+            # Kept elsewhere, so counted there: a note is a file in your folder.
+            if self.list(principal, model_id):
+                return []
         elif self.count(principal.username, model_id, scope=scope):
             return []
         who = Principal("quill", principal.username, quill=writer, models=frozenset({model_id}))
@@ -1041,6 +1420,16 @@ class RecordStore:
         with connect(self.db_path) as conn:
             conn.execute("DELETE FROM records WHERE owner = ?", (owner,))
             conn.execute("DELETE FROM record_changes WHERE owner = ?", (owner,))
+        conn.close()
+
+    def import_seen(self, space_id: str, username: str, seen_at: str) -> None:
+        """When somebody last looked in a space, as it was elsewhere. For migrations."""
+        with connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT INTO record_seen (space_id, username, seen_at) VALUES (?, ?, ?)"
+                " ON CONFLICT(space_id, username) DO UPDATE SET seen_at = excluded.seen_at",
+                (space_id, username, seen_at),
+            )
         conn.close()
 
     def import_row(

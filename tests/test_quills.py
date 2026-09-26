@@ -90,7 +90,7 @@ def models_source() -> Path:
 
 def test_the_catalog_is_read_with_its_categories(registry):
     catalog = load_catalog(str(QUILL_CATALOG))
-    assert [c["id"] for c in catalog.categories] == ["personal", "developer"]
+    assert [c["id"] for c in catalog.categories] == ["personal", "home", "developer"]
     assert catalog.entry("tasks")["foundation"] is True
     with pytest.raises(QuillError):
         catalog.entry("nope")
@@ -155,8 +155,8 @@ def test_removing_a_quill_keeps_its_records(registry, tmp_path):
     ("change", "says"),
     [
         (
-            lambda m: m.replace('kit = "list"\nlabel = "Cars"', 'kit = "calendar"\nlabel = "Cars"'),
-            "does not draw",
+            lambda m: m.replace('kit = "list"\nlabel = "Cars"', 'kit = "spreadsheet"\nlabel = "Cars"'),
+            "kit is one of",
         ),
         (lambda m: m.replace('title = "name"', 'title = "colour"'), "does not have"),
         (lambda m: m.replace('why = "to show who drives each car"', 'why = ""'), "says why"),
@@ -205,7 +205,8 @@ def test_github_releases_are_fetched_as_tarballs():
 # -- the API ---------------------------------------------------------------------------
 def test_an_administrator_installs_from_the_catalog_and_the_tabs_follow(client, auth):
     catalog = client.get("/api/quills/catalog", headers=auth).json()
-    assert catalog["quills"][0]["installed_version"] is None
+    entry = {q["id"]: q for q in catalog["quills"]}
+    assert entry["tasks"]["installed_version"] is None
     plan = client.post("/api/quills/plan", headers=auth, json={"id": "tasks"}).json()
     assert [row["id"] for row in plan["data"]] == ["board", "task"]
     assert all(row["new"] for row in plan["data"])
@@ -215,10 +216,8 @@ def test_an_administrator_installs_from_the_catalog_and_the_tabs_follow(client, 
     quills = client.get("/api/quills", headers=auth).json()
     assert [(q["id"], q["enabled"]) for q in quills] == [("tasks", True)]
     assert set(quills[0]["models"]) == {"board", "task"}
-    assert (
-        client.get("/api/quills/catalog", headers=auth).json()["quills"][0]["installed_version"]
-        == "1.1.0"
-    )
+    after = {q["id"]: q for q in client.get("/api/quills/catalog", headers=auth).json()["quills"]}
+    assert after["tasks"]["installed_version"] == "1.1.0"
     # A Quill is one more feature to switch.
     mine = {row["key"] for row in client.get("/api/me/features", headers=auth).json()}
     assert "tasks" in mine
@@ -243,10 +242,11 @@ def test_a_bad_request_is_a_400_with_the_reason(client, auth):
 # -- boot ------------------------------------------------------------------------------
 def test_a_fresh_server_gets_the_foundation_quills_once(config, users, registry, tmp_path):
     db = config.db_path
-    assert install_foundation(db, registry) == ["tasks", "secrets", "files"]
-    registry.uninstall("tasks")
-    registry.uninstall("secrets")
-    registry.uninstall("files")
+    assert install_foundation(db, registry) == [
+        "notes", "tasks", "files", "calendar", "chat", "secrets",
+    ]
+    for quill in ("notes", "tasks", "files", "calendar", "chat", "secrets"):
+        registry.uninstall(quill)
     # Removed by an administrator, they stay removed.
     assert install_foundation(db, registry) == []
     assert registry.quills == {}

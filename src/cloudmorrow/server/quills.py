@@ -66,7 +66,11 @@ ORIGIN = ".origin.json"
 KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor")
 # The ones every surface draws *today*. A screen of another kind is refused at
 # install, so a Quill never lands with a tab that draws nothing somewhere.
-KIT_READY = frozenset({"list", "board", "detail", "form", "grid"})
+KIT_READY = frozenset({"list", "board", "detail", "form", "calendar", "grid", "editor", "thread"})
+
+# How a thread screen may make a space: in one of the scopes, or `direct`,
+# found-or-made between the people picked.
+MADE_AS = ("personal", "shared", "public", "direct")
 
 JOB_ACTIONS = frozenset({"expire", "run"})
 SEED_KINDS = frozenset({"per-owner", "once"})
@@ -679,7 +683,11 @@ class QuillRegistry:
             return self.install(
                 folder,
                 models,
-                origin={"catalog": True, "repo": entry["repo"], "ref": entry.get("ref", "")},
+                origin={
+                    "catalog": True, "repo": entry["repo"], "ref": entry.get("ref", ""),
+                    # Where it stands in the catalog, which is where its tabs stand.
+                    "position": catalog.quills.index(entry),
+                },
             )
 
     def datamodels_source(self, catalog: Catalog, into: Path) -> Path | None:
@@ -690,10 +698,19 @@ class QuillRegistry:
 
     # -- telling -----------------------------------------------------------------------
     def installed(self) -> list[dict]:
-        """Every installed Quill, oldest first: the order its tabs appear in."""
-        ordered = sorted(
-            self.quills.values(), key=lambda m: (m.origin.get("installed_at", ""), m.id)
-        )
+        """Every installed Quill, in the order its tabs appear in.
+
+        The catalog's order first — Notes, then Tasks, as they stand there —
+        whenever each was installed; then every other Quill, oldest first.
+        One installed before the catalog said where (Tasks, on a server from
+        before this) goes after those that know.
+        """
+        def place(m: Manifest) -> tuple:
+            position = m.origin.get("position")
+            known = isinstance(position, int)
+            return (not known, position if known else 0, m.origin.get("installed_at", ""), m.id)
+
+        ordered = sorted(self.quills.values(), key=place)
         return [describe(m, self.datamodels, installed=m) for m in ordered]
 
     def catalogue_of_models(self) -> list[dict]:
@@ -832,6 +849,14 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
         elif kit in ("detail", "form"):
             for name in screen.get("fields", []):
                 need(model, thing, name)
+        elif kit == "calendar":
+            _check_calendar(screen, model, models, thing, need, where)
+        elif kit == "editor":
+            # A page of Markdown with a title; `path`, when bound, is a string
+            # like `folder/sub/title` whose folders are the tree beside it.
+            need(model, thing + " body", screen.get("body"), ("markdown",))
+            if screen.get("path"):
+                need(model, thing + " path", screen["path"], ("string",))
         elif kit == "grid":
             # Files: folders and tiles, in groups (the shares) picked first.
             if not model.backend:
@@ -853,6 +878,8 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
                     need(group_model, thing + " group_subtitle", screen["group_subtitle"])
                 if screen.get("group_open"):
                     need(group_model, thing + " group_open", screen["group_open"], ("bool",))
+        elif kit == "thread":
+            _check_thread(manifest, screen, model, models, need)
     for job in manifest.jobs:
         if job["action"] == "expire":
             model = model_of(f"job {job['id']!r}", job["model"])
@@ -896,6 +923,67 @@ def _surfaces(manifest: Manifest) -> list[str]:
     if all(screen["model"] in NEVER_FOR_ASSISTANTS for screen in manifest.screens):
         return [s for s in SURFACES if s != "assistant"]
     return list(SURFACES)
+
+
+def _check_thread(manifest: Manifest, screen: dict, model: Datamodel, models: dict, need) -> None:
+    """A thread: things written (`body`) in a space (`space`), and how spaces are made.
+
+    `space` is the link field that puts a record in its space, `about` a field
+    of the space shown under its name, and `made_as` the fields a space gets
+    for how it is made: `public`, `shared` or `personal` — its scope — or
+    `direct`, a shared space found-or-made between the people picked, named
+    for whoever else is in it.
+    """
+    where = manifest.id
+    thing = f"screen {screen['id']!r}"
+    need(model, thing + " space", screen.get("space"), ("link",))
+    if model.in_space != screen["space"]:
+        raise QuillError(f"{where}: {thing} space {screen['space']!r} is not what {model.id} is in")
+    need(model, thing + " body", screen.get("body"), ("text", "markdown", "string"))
+    space_model = models[model.by_name[screen["space"]].to]
+    if screen.get("about"):
+        need(space_model, thing + " about", screen["about"])
+    made_as = screen.get("made_as") or {}
+    if not isinstance(made_as, dict):
+        raise QuillError(f"{where}: {thing} made_as is a table of how a space is made")
+    for how, fields in made_as.items():
+        if how not in MADE_AS:
+            raise QuillError(f"{where}: {thing} made_as {how!r} is one of {', '.join(MADE_AS)}")
+        scope = "shared" if how == "direct" else how
+        if scope not in space_model.scopes:
+            raise QuillError(f"{where}: {thing} made_as {how}, but a {space_model.id} is never {scope}")
+        if not isinstance(fields, dict):
+            raise QuillError(f"{where}: {thing} made_as {how} is the fields it sets")
+        for name, value in fields.items():
+            need(space_model, f"{thing} made_as {how}", name)
+            f = space_model.by_name[name]
+            if f.kind == "enum" and value not in f.values:
+                raise QuillError(f"{where}: {thing} made_as {how}: {value!r} is not a value of {name}")
+            if how == "direct" and not f.indexed:
+                raise QuillError(
+                    f"{where}: {thing} made_as direct marks a space by {name}, which must be indexed"
+                )
+def _check_calendar(screen: dict, model: Datamodel, models: dict[str, Datamodel],
+                    thing: str, need, where: str) -> None:
+    """A calendar: two moments, whether it is all day, and the spaces it is drawn from."""
+    moments = ("datetime", "date")
+    need(model, thing + " starts", screen.get("starts"), moments)
+    need(model, thing + " ends", screen.get("ends"), moments)
+    for name in ("starts", "ends"):
+        if not model.by_name[screen[name]].indexed:
+            raise QuillError(
+                f"{where}: {thing} {name} {screen[name]!r} must be indexed, to ask for a range of days"
+            )
+    if screen.get("all_day"):
+        need(model, thing + " all_day", screen["all_day"], ("bool",))
+    need(model, thing + " space", screen.get("space"), ("link",))
+    space = models.get(model.by_name[screen["space"]].to)
+    if space is None or not space.space:
+        raise QuillError(f"{where}: {thing} space {screen['space']!r} must link to a space")
+    if screen.get("colour"):
+        need(space, thing + " colour", screen["colour"], ("string", "enum"))
+    if screen.get("subtitle"):
+        need(model, thing + " subtitle", screen["subtitle"])
 
 
 def describe(

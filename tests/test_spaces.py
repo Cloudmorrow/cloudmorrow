@@ -106,7 +106,9 @@ def test_a_shared_calendar_is_its_members_and_nobody_elses(spaces):
     shared = next(c for c in seen if c["fields"]["name"] == "House")
     assert shared["can_manage"] is False
     assert [e["fields"]["title"] for e in spaces("GET", "/api/records/event", who=spaces.guest)] == ["Plumber"]
-    spaces("PATCH", f"/api/records/event/{event['id']}", {"fields": {"title": "Plumber at 10"}}, who=spaces.guest)
+    # What somebody else wrote is theirs, or the calendar's maker's, to change.
+    spaces("PATCH", f"/api/records/event/{event['id']}", {"fields": {"title": "Plumber at 10"}}, who=spaces.guest,
+           expect=403)
     spaces("PATCH", f"/api/records/calendar/{house['id']}", {"fields": {"name": "Mine now"}}, who=spaces.guest, expect=403)
     # Leaving: and it is gone again.
     spaces("DELETE", f"/api/records/calendar/{house['id']}/members/guest", who=spaces.guest, expect=204)

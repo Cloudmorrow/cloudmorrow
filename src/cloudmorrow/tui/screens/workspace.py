@@ -3,15 +3,16 @@
     ▄▀▀▀▄ █     ▄▀▀▀▄ …        BRAM'S CLOUD · cloudmorrow
     (the pixel wordmark)       bram@cm.example.org   ⚙ Settings ^g
                                server ● connected    🔔 1  f8
-    YOUR CLOUD        ╭──────────────────────────────────────────╮
-    ╭ Notes ───────╮  │ Notes  your notes, in Markdown   read 12:03 │
-    │ ● 12 notes   │  │ [New note ^n]  Rename  Delete              │
+    QUILLS            ╭──────────────────────────────────────────╮
+    ╭ Notes ───────╮  │ Notes  Markdown notes in folders  read 12:03 │
+    │ ● 12 notes   │  │ [New note ^n]  New folder  Search          │
     ╰───────── f1 ╯  │ …                                          │
-    QUILLS            ╰──────────────────────────────────────────╯
-    ╭ Tasks ───────╮  ╭ LOG ─────────────────────────────────────╮
-    │ ● 3 to do    │  │ 12:03:04 omarchy config changed on desktop │
-    ╰───────── f2 ╯  ╰──────────────────────────────────────────╯
-    ADMINISTRATION     ^r Refresh   ^c Quit
+    ╭ Tasks ───────╮  ╰──────────────────────────────────────────╯
+    │ ● 3 to do    │  ╭ LOG ─────────────────────────────────────╮
+    ╰───────── f2 ╯  │ 12:03:04 omarchy config changed on desktop │
+    YOUR CLOUD        ╰──────────────────────────────────────────╯
+      Calendar  f7 …   ^r Refresh   ^c Quit
+    ADMINISTRATION
       Users  f9
 
 The layout is borrowed, in spirit, from the release console we like for its
@@ -19,11 +20,13 @@ plainness: a place per card down the left, each saying how it is; one rounded
 panel for the place you are on; a strip of what happened along the bottom;
 the keys on the last line.
 
-Down the left: YOUR CLOUD — notes, your days, the chat, your secrets —
-then QUILLS, a card for every screen of every Quill this server has
-installed (Tasks is the first), drawn from the kit by tui/panes/kit.py. Those
-are asked for after sign-in rather than built in, so installing one in
-Administration puts its card here without a restart. An administrator has a
+Down the left: QUILLS, a card for every screen of every Quill this server
+has installed, in the catalog's order (Notes, Tasks, Files, Calendar, Chat,
+Secrets), drawn from the kit by tui/panes/kit.py. YOUR CLOUD, what was
+still built in, has nothing left in it and is not drawn. The Quills are asked for after sign-in
+rather than built in, so installing one in Administration puts its card here
+without a restart, and the workspace opens on the first card there is:
+Notes, where it is installed. An administrator has a
 third section, ADMINISTRATION, whose entries put the server's own panel —
 accounts, features, Quills — in place of the workspace. A feature switched
 off there loses its card here, for everybody.
@@ -47,14 +50,11 @@ from textual.widgets import Button, ContentSwitcher, Static
 
 from cloudmorrow.cli import dev
 from cloudmorrow.client.api import ApiError
-from cloudmorrow.tui.panes.admin import AdminPanel
-from cloudmorrow.tui.panes.base import Pane
-from cloudmorrow.tui.panes.calendar import CalendarPane
-from cloudmorrow.tui.panes.chat import ChatPane
-from cloudmorrow.tui.panes.kit import pane_for, screen_key
 # Shares on this machine: mounted here or not, on any grid of shares.
 from cloudmorrow.tui import sharemounts  # noqa: F401
-from cloudmorrow.tui.panes.notes import NotesPane
+from cloudmorrow.tui.panes.admin import AdminPanel
+from cloudmorrow.tui.panes.base import Pane
+from cloudmorrow.tui.panes.kit import pane_for, screen_key
 from cloudmorrow.tui.screens.modals import PasswordModal
 from cloudmorrow.tui.screens.notifications import (
     NOTIFICATIONS,
@@ -69,24 +69,27 @@ from cloudmorrow.tui.widgets.header import Header
 from cloudmorrow.tui.widgets.logstrip import LogStrip
 from cloudmorrow.tui.widgets.sidebar import NavCard, SectionLabel
 
-PANES: tuple[type[Pane], ...] = (
-    NotesPane, CalendarPane, ChatPane,
-)
+# The places still built into the core, each a card under YOUR CLOUD. None
+# is left: every one is a Quill now, drawn from the kit. The section, the
+# switcher and the landing all cope with there being none.
+PANES: tuple[type[Pane], ...] = ()
 
 # The function keys no built-in card has, handed to Quill cards in the order
-# they appear. f2 was Tasks' before Tasks was a Quill, and still is; f5 was
-# Files' and f3 Secrets', and each is kept for it the same way.
-QUILL_KEYS: tuple[str, ...] = ("f2", "f5", "f4", "f10", "f11", "f12", "f3")
-KEPT_KEYS: dict[str, str] = {"tasks": "f2", "files": "f5", "secrets": "f3"}
+# they appear, which is the catalog's.
+QUILL_KEYS: tuple[str, ...] = ("f1", "f2", "f5", "f7", "f4", "f10", "f11", "f12", "f3")
+# The keys the built-in cards had before each became a Quill, kept for the
+# card of the same name wherever it comes in the order, so nobody's fingers
+# have to learn them again. Chat's f6 is not one: in Notes it was Import as
+# well, so Chat takes the next key free, f4.
+FORMER_KEYS: dict[str, str] = {
+    "notes": "f1", "tasks": "f2", "files": "f5", "calendar": "f7", "secrets": "f3",
+}
 
 # How often the bell asks the server whether anything happened.
 BELL_POLL = 60.0
 
 # Which server feature each built-in card belongs to.
 FEATURE_OF: dict[str, str] = {
-    "notes": "notes",
-    "calendar": "calendar",
-    "chat": "chat",
 }
 
 # Below this many columns the sidebar narrows, and its cards become one line.
@@ -95,6 +98,11 @@ NARROW = 90
 
 def _key(pane: type[Pane]) -> str:
     return pane.TAB_LABEL.lower()
+
+
+def _first_pane() -> str | None:
+    """The switcher's first pane, before the Quills come: a built-in's, if any is left."""
+    return f"pane-{_key(PANES[0])}" if PANES else None
 
 
 class WorkspaceScreen(Screen):
@@ -113,7 +121,10 @@ class WorkspaceScreen(Screen):
         ),
         # A Quill card's key is decided at run time, so each free key is bound
         # to "whichever Quill card has it".
-        *(Binding(key, f"quill_key('{key}')", show=False) for key in QUILL_KEYS),
+        *(
+            Binding(key, f"quill_key('{key}')", show=False)
+            for key in dict.fromkeys((*QUILL_KEYS, *FORMER_KEYS.values()))
+        ),
         Binding("f9", "administration", "Administration", show=False),
         Binding("ctrl+g", "settings", "Settings", show=False),
         Binding("f8", "notifications", "Notifications", show=False),
@@ -147,14 +158,18 @@ class WorkspaceScreen(Screen):
         )
         with Horizontal(id="body"):
             with VerticalScroll(id="sidebar"):
-                yield SectionLabel("Your cloud", id="nav-section-cloud")
+                # The Quills first: Notes is one, and Notes has always been
+                # the first card and the one the workspace opens on.
+                quills = SectionLabel("Quills", id="nav-section-quills")
+                quills.display = False
+                yield quills
+                cloud = SectionLabel("Your cloud", id="nav-section-cloud")
+                cloud.display = bool(PANES)
+                yield cloud
                 for pane in PANES:
                     yield NavCard(
                         _key(pane), pane.TAB_LABEL, tag=pane.TAB_KEY, id=f"nav-{_key(pane)}"
                     )
-                quills = SectionLabel("Quills", id="nav-section-quills")
-                quills.display = False
-                yield quills
                 admin = SectionLabel("Administration", "f9", id="nav-section-admin")
                 admin.display = False
                 yield admin
@@ -172,7 +187,7 @@ class WorkspaceScreen(Screen):
                 # The workspace, and the administration panel that replaces it.
                 # One of the two is showing; never both.
                 with Vertical(id="workspace-view"):
-                    with ContentSwitcher(id="panes", initial="pane-notes"):
+                    with ContentSwitcher(id="panes", initial=_first_pane()):
                         for pane in PANES:
                             yield pane(id=f"pane-{_key(pane)}")
                     # What is here when an account has switched everything off.
@@ -195,7 +210,11 @@ class WorkspaceScreen(Screen):
         return f"{user}@{host}"
 
     def on_mount(self) -> None:
-        self._mark_active("notes")
+        # Until the server says which Quills there are, the first built-in
+        # card; once it has, the first card there is (see `land`).
+        if PANES:
+            self._mark_active(_key(PANES[0]))
+        self._landed = False
         self.call_after_refresh(self._focus_pane)
         self._fit(self.app.size.width, self.app.size.height)
         # The bell is about the machines, not about the card you are on, so it
@@ -243,6 +262,7 @@ class WorkspaceScreen(Screen):
             card.display = self._admin
         # The Quill cards before the switches, so the switches find them.
         await self.sync_quills()
+        self.land()
         # This account's own list rather than the server's: it is already
         # narrowed to what this server offers and carries what the account
         # has switched off for itself, so one call answers both questions.
@@ -251,6 +271,20 @@ class WorkspaceScreen(Screen):
         except ApiError:
             return
         self.apply_features([row["key"] for row in features if row["enabled"]])
+
+    def land(self) -> None:
+        """Once, after sign-in: open on the first card, whichever it is.
+
+        The first Quill's when there is one — Notes, where it is installed,
+        as the workspace always opened — and the first built-in card when
+        there is none.
+        """
+        if self._landed:
+            return
+        self._landed = True
+        first = next((key for key in self._quill_panes), None)
+        if first is not None:
+            self.action_show_pane(first)
 
     def _place_cards(self) -> list[NavCard]:
         """The cards for places in the workspace — not the administration ones."""
@@ -329,13 +363,13 @@ class WorkspaceScreen(Screen):
         if key in self._quill_keys:
             return self._quill_keys[key]
         taken = set(self._quill_keys.values())
-        kept = KEPT_KEYS.get(key)
-        if kept and kept not in taken:
-            free = kept
+        former = FORMER_KEYS.get(key)
+        if former and former not in taken:
+            free = former
         else:
-            spare = [k for k in QUILL_KEYS if k not in taken]
-            # A key kept for a Quill that was built in goes to another only when nothing else is left.
-            free = next((k for k in spare if k not in KEPT_KEYS.values()), spare[0] if spare else "")
+            # A key another Quill had before is kept for it, even before it comes.
+            spoken_for = set(FORMER_KEYS.values()) - {former}
+            free = next((k for k in QUILL_KEYS if k not in taken and k not in spoken_for), "")
         if free:
             self._quill_keys[key] = free
         return free
@@ -366,9 +400,12 @@ class WorkspaceScreen(Screen):
     async def _drop_quill_pane(self, key: str) -> None:
         switcher = self.query_one("#panes", ContentSwitcher)
         if switcher.current == f"pane-{key}":
-            # Standing on it: step onto Notes before the floor goes.
-            switcher.current = "pane-notes"
-            self._mark_active("notes")
+            # Standing on it: step onto another card before the floor goes.
+            other = next((k for k in self._quill_panes if k != key), None)
+            if other is None and PANES:
+                other = _key(PANES[0])
+            switcher.current = f"pane-{other}" if other else None
+            self._mark_active(other or "")
         for widget in [*self.query(f"#nav-{key}"), *switcher.query(f"#pane-{key}")]:
             await widget.remove()
         self._quill_panes.pop(key, None)
@@ -435,7 +472,7 @@ class WorkspaceScreen(Screen):
     def close_admin(self) -> None:
         self.query_one("#admin-view", AdminPanel).display = False
         self.query_one("#workspace-view", Vertical).display = True
-        current = self.query_one("#panes", ContentSwitcher).current or "pane-notes"
+        current = self.query_one("#panes", ContentSwitcher).current or _first_pane() or ""
         self._mark_active(current[len("pane-") :])
         self.set_status()
 

@@ -10,8 +10,6 @@ from fastapi import Depends, Header, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from cloudmorrow.server.agents import Agent, AgentStore, JobStore
-from cloudmorrow.server.calendar import CalendarStore
-from cloudmorrow.server.chat import ChatStore
 from cloudmorrow.server.config import ServerConfig
 from cloudmorrow.server.configsync import ConfigStore
 from cloudmorrow.server.db import User, UserStore
@@ -50,12 +48,6 @@ class AppState:
     notifications: NotificationStore
     features: FeatureStore
     shares: ShareStore
-    # Chat is the one store that is nobody's in particular, so every
-    # call into it carries the username asking rather than assuming it.
-    chat: ChatStore
-    # And the second: a calendar is one person's, everybody's, or the
-    # people it was shared with, so it is asked the same way.
-    calendar: CalendarStore
     push: PushStore
     # The assistants people have let in over MCP, and their tokens.
     mcp: MCPStore

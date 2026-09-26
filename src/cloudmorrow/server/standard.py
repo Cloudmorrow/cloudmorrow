@@ -3,10 +3,10 @@
 Two kinds, one list, because a person choosing does not care which is which:
 
 * **Catalog quills** marked `foundation = true` in the Quill Catalog —
-  Tasks, Files and Secrets today. Choosing one installs it; leaving one
-  out installs nothing.
+  Notes, Tasks, Files, Calendar, Chat and Secrets today. Choosing one
+  installs it; leaving one out installs nothing.
 * **Built-in features** that are still part of the core while the kit
-  grows to draw them — Notes, Calendar, Chat. Choosing one
+  grows to draw them — none left. Choosing one
   leaves it on; leaving one out switches it off for the server, which an
   administrator can undo from Administration. As each moves into a repo of
   its own it leaves `features.FEATURES` and turns up in the catalog, and
@@ -24,7 +24,15 @@ from dataclasses import dataclass
 
 from cloudmorrow.server.config import ServerConfig
 from cloudmorrow.server.features import FEATURES, FeatureStore
-from cloudmorrow.server.quilljobs import FILES_QUILL, SECRETS_QUILL, SEEDED, read_meta, write_meta
+from cloudmorrow.server.quilljobs import (
+    FILES_QUILL,
+    MOVED_BUILTINS,
+    SECRETS_QUILL,
+    SEEDED,
+    adopted_key,
+    read_meta,
+    write_meta,
+)
 from cloudmorrow.server.quills import Catalog, QuillError, QuillRegistry, load_catalog
 
 
@@ -104,6 +112,10 @@ def choose(
     # The choice is remembered before the downloads, so the boot work does
     # not install what was just left out while they run.
     write_meta(config.db_path, SEEDED, ",".join(sorted(wanted)) or "-")
+    # A feature that used to be built in is a choice like the rest now: the
+    # boot work is not to install it after it was left out.
+    for quill_id in MOVED_BUILTINS:
+        write_meta(config.db_path, adopted_key(quill_id), "chosen")
     # Secrets was built in until it was a Quill; chosen or left out here, it
     # is not installed again behind the installer's back at boot.
     write_meta(config.db_path, SECRETS_QUILL, "chosen")

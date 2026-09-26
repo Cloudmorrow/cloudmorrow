@@ -1,7 +1,7 @@
 """A Quill's screens in the terminal: one pane per screen, drawn from the kit.
 
 A Quill never ships UI (docs/QUILLS.md). It declares screens — `board`,
-`list`, `detail`, `form` — bound to the fields of its datamodels, and every
+`list`, `detail`, `form`, `calendar` — bound to the fields of its datamodels, and every
 surface draws them. This is where the terminal does: `pane_for` takes one
 screen of one installed Quill and returns the pane for its kit, and the
 workspace gives it a tab after Notes.
@@ -11,6 +11,10 @@ bindings and the datamodels the server sent beside them, and that is all a
 task board has to go on as much as a list of car services does.
 
 - `board` is in kit_board.py: lanes from an enum, cards you drag.
+- `calendar` is in kit_calendar.py: the spaces, a month, and the day's list;
+  a space's people are widgets/kit_space.py.
+- `editor` is in kit_editor.py: a tree of folders and pages beside the live
+  Markdown editor.
 - `grid` is in kit_grid.py: groups to pick from, then folders and files, as
   a table or as tiles, with the picture beside.
 - `list` is a table of records by `title` (and `subtitle`), with a circle for
@@ -19,6 +23,8 @@ task board has to go on as much as a list of car services does.
 - `detail` and `form` are the same table without the circle: the record
   sheet is the point of them, and enter or a click opens it, showing the
   screen's `fields` when it names them.
+- `thread` is in kit_thread.py: spaces on the left, what is said in the one
+  you are on to the right, and a line to write in.
 
 Every one of them opens a record in the record sheet, where every field has
 the widget its kind calls for.
@@ -336,22 +342,31 @@ class ListPane(KitPane):
 def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     """The pane for one screen of a Quill, or None for a kit not drawn here yet.
 
-    `calendar`, `thread` and `editor` come next (docs/QUILLS.md); a Quill
-    that declares one simply has no tab for it in this version.
+    Every element in the kit is drawn here now. Each that is more than a
+    table is a file of its own: panes/kit_<kit>.py.
     """
     from cloudmorrow.tui.panes.kit_board import BoardPane
     from cloudmorrow.tui.panes.kit_grouped import GroupedListPane, draws_here
+    from cloudmorrow.tui.panes.kit_calendar import CalendarPane
+    from cloudmorrow.tui.panes.kit_editor import EditorPane
     from cloudmorrow.tui.panes.kit_grid import GridPane
+    from cloudmorrow.tui.panes.kit_thread import ThreadPane
 
     kit = screen.get("kit")
     if screen.get("model") not in (quill.get("models") or {}):
         return None
     if kit == "board":
         return BoardPane(quill, screen, **kwargs)
+    if kit == "calendar":
+        return CalendarPane(quill, screen, **kwargs)
+    if kit == "editor":
+        return EditorPane(quill, screen, **kwargs)
     if kit == "list" and draws_here(quill["models"][screen["model"]], screen):
         return GroupedListPane(quill, screen, **kwargs)
     if kit == "grid":
         return GridPane(quill, screen, **kwargs)
     if kit in ("list", "detail", "form"):
         return ListPane(quill, screen, **kwargs)
+    if kit == "thread":
+        return ThreadPane(quill, screen, **kwargs)
     return None

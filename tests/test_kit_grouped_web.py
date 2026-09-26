@@ -33,7 +33,7 @@ def test_it_is_served_and_wired_in(client):
     # A list with a group, or a hidden field, is drawn there; the rest as before.
     assert 'kit === "list" && drawsHere(' in KIT_JS
     # The address carries a group and a subgroup: everything after the screen.
-    assert "const [quillId, screenId, ...group] = arg.split(\"/\");" in QUILLS_JS
+    assert "const [quillId, screenId, ...rest] = arg.split(\"/\");" in QUILLS_JS
 
 
 def test_nothing_in_it_is_named_for_one_quill():

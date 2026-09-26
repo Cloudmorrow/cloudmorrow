@@ -90,7 +90,7 @@ def test_an_account_from_before_roles_existed_keeps_its_rights(config, tmp_path)
 
 
 # -- features --------------------------------------------------------------
-def test_every_feature_is_on_to_begin_with(tasks_quill, secrets_quill, auth):
+def test_every_feature_is_on_to_begin_with(tasks_quill, notes_quill, secrets_quill, auth):
     client = tasks_quill
     listed = client.get("/api/server/features", headers=auth).json()
     # The catalogue grows with the app; these four are the ones with tabs.

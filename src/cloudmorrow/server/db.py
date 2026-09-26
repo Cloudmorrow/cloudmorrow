@@ -164,6 +164,37 @@ CREATE TABLE IF NOT EXISTS tasks (
     done_at    TEXT
 );
 CREATE INDEX IF NOT EXISTS tasks_lane ON tasks (owner, board, lane, position);
+-- Chat, from before it was a Quill. Nothing writes here any more: at boot
+-- the rows move into the record store once (quilljobs.move_legacy_chat),
+-- and the tables stay, untouched, because data is never dropped.
+CREATE TABLE IF NOT EXISTS chat_channels (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug       TEXT    NOT NULL UNIQUE,
+    name       TEXT    NOT NULL DEFAULT '',
+    topic      TEXT    NOT NULL DEFAULT '',
+    -- 'public', 'private' or 'direct'.
+    kind       TEXT    NOT NULL DEFAULT 'private',
+    created_by TEXT    NOT NULL DEFAULT '',
+    created_at TEXT    NOT NULL,
+    updated_at TEXT    NOT NULL
+);
+CREATE TABLE IF NOT EXISTS chat_members (
+    channel_id INTEGER NOT NULL REFERENCES chat_channels(id) ON DELETE CASCADE,
+    username   TEXT    NOT NULL,
+    added_by   TEXT    NOT NULL DEFAULT '',
+    joined_at  TEXT    NOT NULL,
+    -- The id of the last message this member had read.
+    last_read  INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (channel_id, username)
+);
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    channel_id INTEGER NOT NULL REFERENCES chat_channels(id) ON DELETE CASCADE,
+    author     TEXT    NOT NULL,
+    body       TEXT    NOT NULL,
+    created_at TEXT    NOT NULL,
+    edited_at  TEXT
+);
 CREATE TABLE IF NOT EXISTS config_bundles (
     owner      TEXT    NOT NULL,
     -- One synced set of dotfiles. "omarchy" is the only one so far.

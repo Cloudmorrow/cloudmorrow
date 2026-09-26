@@ -5,12 +5,14 @@ endpoint, and hands back that endpoint with two keys. All this has to do is
 remember them against the account, and hand out the server's public key so
 the browser has something to ask with.
 
-The badge is here rather than in chat because it is not only chat's: it is
-the one number on the home-screen icon, and it has to mean everything
-waiting — messages you have not read, plus notifications you have not read.
-Chat counts its own, notifications count theirs, and this adds them up. One
-number, one place it is worked out, so the page, the service worker and the
-push payload can never disagree about it.
+The badge is here rather than in any Quill because it is nobody's in
+particular: it is the one number on the home-screen icon, and it has to mean
+everything waiting — what was written in your spaces since you last looked
+(a channel's messages, whichever Quill declared them `unread`), plus
+notifications you have not read. The record store counts the one, the
+notifications the other, and this adds them up. One number, one place it is
+worked out, so the page, the service worker and the push payload can never
+disagree about it.
 
 The service worker is served from here too, at `/app/sw.js`. A service
 worker may only control pages at or below its own path, so it cannot live
@@ -29,6 +31,7 @@ from pydantic import BaseModel
 
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_current_user, get_state
+from cloudmorrow.server.records import Principal
 
 WEB = Path(__file__).resolve().parent.parent / "web"
 
@@ -78,12 +81,27 @@ class BadgeOut(BaseModel):
 
 
 # -- the count ------------------------------------------------------------------
+def unread_models(state: AppState, username: str) -> list[str]:
+    """The space datamodels whose unread counts for this person.
+
+    Their own switch counts here as well: a number on the icon for a tab
+    they have turned off is a count of something they cannot go and read.
+    So a space counts when some Quill that uses it is on for them.
+    """
+    return [
+        model.id
+        for model in state.quills.datamodels.values()
+        if model.space
+        and any(state.features.enabled_for(username, quill) for quill in state.quills.users_of(model.id))
+    ]
+
+
 def badge_for(state: AppState, username: str) -> dict:
     """Everything waiting for one person, as the icon would say it."""
-    # Their own switch counts here as well: a number on the icon for a tab
-    # they have turned off is a count of something they cannot go and read.
-    chat_on = state.features.enabled_for(username, "chat")
-    messages = state.chat.unread(username)["total"] if chat_on else 0
+    wanted = unread_models(state, username)
+    messages = (
+        state.records.unread_total(Principal.person(username), models=wanted) if wanted else 0
+    )
     notifications = state.notifications.unread_count(username)
     return {
         "messages": messages,
@@ -191,7 +209,7 @@ def send_test(
         {
             "title": "Cloudmorrow",
             "body": "Push works on this device.",
-            "url": "#/chat",
+            "url": "#/",
             "tag": "push-test",
             "badge": counts["badge"],
         },

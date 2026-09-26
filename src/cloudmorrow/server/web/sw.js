@@ -52,7 +52,7 @@ self.addEventListener("push", (event) => {
       renotify: true,
       icon: ICON,
       badge: ICON,
-      data: { url: data.url || "#/chat" },
+      data: { url: data.url || "#/" },
     });
     await setBadge(data.badge);
     // A page that happens to be open should not wait for its next poll.
@@ -64,7 +64,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const hash = (event.notification.data && event.notification.data.url) || "#/chat";
+  const hash = (event.notification.data && event.notification.data.url) || "#/";
   event.waitUntil((async () => {
     // Prefer the window that is already open — on a phone there is only
     // ever one, and opening a second is how you lose what was being typed.

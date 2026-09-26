@@ -10,10 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, RedirectResponse
 
 from cloudmorrow import __version__
+from cloudmorrow.server import spacenotify
 from cloudmorrow.server.access import is_allowed, parse_rules
 from cloudmorrow.server.agents import AgentStore, JobStore
-from cloudmorrow.server.calendar import CalendarStore
-from cloudmorrow.server.chat import ChatStore
+from cloudmorrow.server.backends import NotesBackend, SharesBackend, VaultsBackend
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.configsync import ConfigStore
 from cloudmorrow.server.dav import MOUNT_PATH, CredentialCheck, build_dav_app
@@ -26,14 +26,9 @@ from cloudmorrow.server.notifications import NotificationStore
 from cloudmorrow.server.quilljobs import Clock
 from cloudmorrow.server.quills import QuillRegistry
 from cloudmorrow.server.records import RecordStore
-from cloudmorrow.server import spacenotify
-from cloudmorrow.server.backends import NotesBackend, SharesBackend, VaultsBackend
-from cloudmorrow.server.drive import user_drive
 from cloudmorrow.server.routes import (
     agents,
     auth,
-    calendar,
-    chat,
     configsync,
     features,
     install,
@@ -104,8 +99,6 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
                 for q in quill_registry.quills.values()
             ),
         ),
-        chat=ChatStore(config.db_path),
-        calendar=CalendarStore(config.db_path),
         push=PushStore(
             config.db_path,
             config.vapid_key_path,
@@ -182,6 +175,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     )
     app.include_router(records.router)
     app.include_router(records.models_router)
+    app.include_router(records.people_router)
     app.include_router(quills.router)
     app.include_router(shares.router, dependencies=in_files)
     app.include_router(sharefiles.router, dependencies=in_files)
@@ -191,10 +185,6 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.include_router(configsync.agent_router)
     app.include_router(notifications.router)
     app.include_router(notifications.agent_router)
-    app.include_router(chat.router, dependencies=[Depends(features.require_feature("chat"))])
-    app.include_router(
-        calendar.router, dependencies=[Depends(features.require_feature("calendar"))]
-    )
     app.include_router(push.router)
     # Assistants: the OAuth pages and the MCP endpoint.
     app.include_router(mcp.router)

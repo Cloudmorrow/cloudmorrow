@@ -5,13 +5,16 @@
    The clock is the phone's own and ticks here; the rest is one call to
    `/api/today`, which the server answers from its config (where the
    weather is for) and its list of quotes (which one is the day's). The
-   events are the calendar's, asked for the way its own screen asks, and
-   left out altogether when that tab is switched off. */
+   events are those of any installed Quill with a `calendar` screen, asked
+   for through the record API the way that screen asks, and left out
+   altogether when there is none, or it is switched off. */
 
 import {
   api, app, esc, featureOff, heading, nav, pixelArt, pixelIcon, registerScreen, registerTab,
   setHome, tabs, wireShell,
 } from "./core.js";
+import { sheetHash } from "./kit.js";
+import { bindingsOf, eventRow, inOrder, occasion, today as todayIso } from "./kit_calendar.js";
 
 // -- the weather, in eight dots ----------------------------------------------
 // The same drawing as the tab icons: the app's marks are pixels. The
@@ -180,29 +183,50 @@ function quoteCard(today) {
     <footer>${esc(today.quote.who)}</footer></blockquote>`;
 }
 
-// The calendar's own row, fetched when it is first wanted rather than
-// imported at the top: a module evaluates the moment it is imported, and
-// the calendar's tab would then be registered before this one.
-const calendar = () => import("./calendar.js");
+// -- what is on today -----------------------------------------------------------------
+// The calendar screens there are: every installed Quill's, as quills.js has
+// them. Imported when asked rather than at the top: a module evaluates the
+// moment it is imported, and the Quills' tabs would then come before these.
+async function calendarScreens() {
+  let quills = [];
+  try { quills = await (await import("./quills.js")).loadQuills(); } catch { quills = []; }
+  return quills.filter((q) => !featureOff(q.id)).flatMap((quill) => quill.screens
+    .filter((screen) => screen.kit === "calendar" && quill.models[screen.model])
+    .map((screen) => ({ quill, screen })));
+}
 
-async function eventsSection(events) {
-  if (events === null) return "";   // the calendar is switched off, or unreachable
-  const { eventRow, inOrder } = await calendar();
-  const rows = inOrder(events);
-  return `<p class="group-label on-today">On today <a href="#/calendar">Calendar</a></p>` + (
+/** Today's events from one calendar screen, drawn as its own rows are. */
+async function todayFrom({ quill, screen }) {
+  const b = bindingsOf(quill, screen);
+  const day = todayIso();
+  const at = { quill, screen };
+  const base = `#/q/${encodeURIComponent(quill.id)}/${encodeURIComponent(screen.id)}`;
+  const [spaces, records] = await Promise.all([
+    api("GET", `/api/records/${encodeURIComponent(b.spaceModel.id)}`),
+    api("GET", `/api/records/${encodeURIComponent(b.model.id)}?${encodeURIComponent(b.starts + "__lte")}=${day}T23:59` +
+      `&${encodeURIComponent(b.ends + "__gte")}=${day}`),
+  ]);
+  const bySpace = new Map(spaces.map((s) => [s.id, s]));
+  const rows = inOrder(records.map((r) => occasion(b, r, bySpace)));
+  return `<p class="group-label on-today">On today <a href="${base}/${day}">${esc(screen.label || quill.name)}</a></p>` + (
     rows.length
-      ? `<div class="group">${rows.map(eventRow).join("")}</div>`
+      ? `<div class="group">${rows.map((e) => eventRow(sheetHash(at, b.model.id, e.id), e)).join("")}</div>`
       : `<p class="empty small"><b>Nothing on</b>The day is yours.</p>`);
+}
+
+async function eventsSection() {
+  const drawn = await Promise.allSettled((await calendarScreens()).map(todayFrom));
+  return drawn.filter((d) => d.status === "fulfilled").map((d) => d.value).join("");
 }
 
 // -- the screen -------------------------------------------------------------------
 async function renderToday() {
   const [todayResult, eventsResult] = await Promise.allSettled([
     api("GET", "/api/today"),
-    featureOff("calendar") ? Promise.resolve(null) : api("GET", "/api/calendar/events"),
+    eventsSection(),
   ]);
   const today = todayResult.status === "fulfilled" ? todayResult.value : null;
-  const events = eventsResult.status === "fulfilled" ? eventsResult.value : null;
+  const events = eventsResult.status === "fulfilled" ? eventsResult.value : "";
   if (todayResult.status === "rejected") console.error(todayResult.reason);
 
   app.innerHTML = nav({ title: "Today" }) + `
@@ -216,7 +240,7 @@ async function renderToday() {
         ${weatherCard(today)}
       </div>
       ${quoteCard(today)}
-      ${await eventsSection(events)}
+      ${events}
     </main>` + tabs("today");
   wireShell();
   startClock(app.querySelector(".clock .time"), app.querySelector(".clock .date"));

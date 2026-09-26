@@ -1,0 +1,271 @@
+/* The kit's thread: the list of spaces, the conversation, and the box you
+   type in — on a phone one after the other, on a computer side by side.
+
+   The conversation is the only screen in the app that scrolls from the
+   bottom, so it is also the only one that takes the scrolling away from the
+   page: the lines are their own scroller with the composer pinned under
+   them, or the keyboard coming up would push the box off the screen. */
+
+/* -- the list ------------------------------------------------------------ */
+.unread {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--fill);
+  color: var(--fill-ink);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.row.space-row { padding-right: 12px; }
+/* A room's mark is a rounded square and a person's a circle, so the two are
+   told apart before the name is read. */
+.space-row .hash {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--field);
+  color: var(--muted);
+  font-size: 18px;
+  font-weight: 700;
+}
+.space-row .avatar {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--fill);
+  color: var(--fill-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+.space-row .main { min-width: 0; }
+.space-row .preview { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.space-row .aside {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  margin-left: auto;
+}
+/* An unread space says so twice: the count, and the weight of its name. */
+.space-row.has-unread .title { font-weight: 700; }
+.space-row.has-unread .preview { color: var(--ink); }
+/* The one open beside the list: Sky, the colour of where you are. */
+.space-row.current { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.heading .write-to { display: inline-flex; align-items: center; color: var(--bar-accent); }
+
+/* The pip on the tab, for when the list is not the screen you are on. */
+.tab.pipped { position: relative; }
+.tab.pipped::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  margin-left: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* -- the conversation ------------------------------------------------------ */
+/* The one screen that does not scroll the page: it is the window's height,
+   the lines scroll, and the composer sits on the floor. */
+#app:has(main.thread) { height: 100dvh; min-height: 0; }
+main.thread {
+  display: flex;
+  flex-direction: column;
+  /* Without this a flex item refuses to shrink below its content, and the
+     long conversation inside pushes the page down instead of scrolling. */
+  min-height: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+main.thread > .about {
+  flex: none;
+  margin: 8px 4px 0;
+  color: var(--muted);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+main.thread > .about b { color: var(--ink); font-size: 16px; font-weight: 600; }
+.thread .messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 6px 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* A short conversation sits on the bottom, the way a chat does, rather than
+   hanging from the top of an empty column. An auto margin on a spacer, not
+   `justify-content: flex-end`, which cuts the top off a long one. */
+.thread .messages::before { content: ""; margin-top: auto; }
+.thread .messages > .empty { margin: auto 0; }
+
+/* A rule across the conversation for each day. */
+.day-rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.day-rule::before, .day-rule::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+
+.block { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.block.mine { align-items: flex-end; }
+.block .who {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 0 4px 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.block .who b { color: var(--second); font-weight: 600; }
+.block.mine .who b { color: var(--muted); }
+
+.bubble {
+  max-width: 82%;
+  margin: 0;
+  padding: 9px 13px;
+  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  line-height: 1.4;
+  /* A line is whatever somebody typed: long words, pasted URLs and all. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* A run of lines from one person reads as one shape. */
+.block .bubble + .bubble { border-top-left-radius: 6px; }
+.block.mine .bubble + .bubble { border-top-left-radius: 16px; border-top-right-radius: 6px; }
+.block.mine .bubble {
+  background: var(--fill);
+  border-color: transparent;
+  color: var(--fill-ink);
+}
+.bubble.own { cursor: pointer; }
+.bubble .edited { margin-left: 7px; font-size: 11px; opacity: .6; }
+.sheet-row.bad { color: var(--bad); font-weight: 600; }
+
+/* -- the box you type in ------------------------------------------------------ */
+/* The bar reaches the two edges of the column — the negative margin only
+   undoes `main`'s own gutter — and puts that gutter back as its padding. */
+.composer {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin: 0 -16px;
+  padding: 10px 16px calc(10px + var(--bottom));
+  background: var(--bar);
+  border-top: 1px solid var(--line);
+}
+.composer textarea {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  min-height: 40px;
+  max-height: 140px;
+  padding: 9px 15px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.35;
+  resize: none;
+  outline: none;
+  overflow-y: hidden;
+  overflow-wrap: anywhere;
+  /* 16px or iOS zooms the page the moment it is focused. */
+  font-size: 16px;
+}
+@media (min-width: 712px) {
+  .composer { background: none; }
+}
+.composer textarea::placeholder { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.composer textarea:focus { border-color: var(--accent); }
+.composer button {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  /* Sending is what a thread is for: its one amber. */
+  background: var(--action);
+  color: var(--action-ink);
+  box-shadow: inset 0 -2px 0 var(--action-edge);
+}
+.composer button:disabled { opacity: .4; }
+
+/* -- side by side, on a computer ------------------------------------------------ */
+@media (min-width: 900px) and (min-height: 600px) {
+  #app:has(main.kit-thread.split) { --column: 1120px; }
+  main.kit-thread.split {
+    display: grid;
+    grid-template-columns: minmax(260px, 340px) 1fr;
+    gap: 0;
+    padding: 0 16px;
+  }
+  .split .spaces {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0 16px 24px 0;
+    border-right: 1px solid var(--line);
+  }
+  .split .conversation {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    padding: 0 0 0 20px;
+  }
+  .split .conversation > .empty { margin: auto; }
+  .split .composer { margin: 0 0 0 -20px; padding-left: 20px; padding-right: 0; }
+  .conversation-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 56px;
+    border-bottom: 1px solid var(--line);
+  }
+  .conversation-head .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .conversation-head .title {
+    font-family: var(--display);
+    font-size: 20px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .conversation-head .about { color: var(--muted); font-size: 14px; }
+  .space-row:hover { background: var(--card-2); }
+  .space-row.current:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+}

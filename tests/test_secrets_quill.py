@@ -231,7 +231,7 @@ def test_an_installer_that_left_secrets_out_is_not_overruled_at_boot(config, use
     choose(config, {"tasks"}, registry=registry)
     store = RecordStore(config.db_path, registry.models, registry.expiries)
     boot(config.db_path, registry, store)
-    assert set(registry.quills) == {"tasks"}
+    assert "secrets" not in registry.quills
 
 
 # -- cm secrets, through the kit ---------------------------------------------------------
@@ -269,10 +269,16 @@ async def test_cm_secrets_lists_by_vault_and_shows_a_value_only_when_asked(api, 
 
         await quillrun._act(client, screen, "show", ["API_KEY"], "", None, False)
         assert "sk-hidden" not in printed.export_text()
-        await quillrun._act(client, screen, "show", ["API_KEY"], "", None, False, True)
+        await quillrun._act(client, screen, "show", ["API_KEY"], "", None, False, reveal=True)
         assert "sk-hidden" in printed.export_text()
 
         await quillrun._act(client, screen, "add", ["TOKEN", "value=t0k"], "home/local", None, False)
         assert api("GET", "/api/secrets/item/TOKEN?vault=home")["value"] == "t0k"
     finally:
         await client.aclose()
+
+
+def test_a_search_finds_a_secret_by_its_key_and_never_by_its_value(api):
+    put(api, "API_KEY", "findme-in-the-value")
+    assert [r["fields"]["key"] for r in api("GET", "/api/records/secret?q=api")] == ["API_KEY"]
+    assert api("GET", "/api/records/secret?q=findme") == []

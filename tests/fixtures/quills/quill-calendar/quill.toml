@@ -1,0 +1,54 @@
+[quill]
+id = "calendar"
+name = "Calendar"
+version = "1.0.0"
+summary = "Your own calendar, the ones you share, and one for everybody."
+category = "personal"
+icon = "calendar"
+publisher = "Cloudmorrow"
+license = "AGPL-3.0-or-later"
+features = [
+  "A calendar of your own, made the first time you look, named after you",
+  "One calendar everybody on the server sees and writes in",
+  "Shared calendars: make one, add people, and they are told",
+  "Every calendar you can see drawn at once, each in its own colour",
+  "Times on the wall clock: ten o'clock is ten o'clock, in June and in October",
+  "All-day events that run over as many days as they need",
+]
+
+[uses]
+datamodels = ["calendar", "event"]
+
+# One tab: the month, and the day you are on under it. On a phone that is a
+# month of dots and the day's list; on a computer, a week or a month with
+# the events written in; in the terminal, the month and the day's list.
+[[screens]]
+id = "month"
+kit = "calendar"
+label = "Calendar"
+model = "event"
+space = "calendar"        # the calendars: every one you can see, drawn at once
+colour = "colour"         # a field of the calendar: cyan, violet, green, amber or rose
+title = "title"
+subtitle = "location"     # said under the title, in a list of the day
+starts = "starts_at"
+ends = "ends_at"
+all_day = "all_day"
+
+# Everybody has exactly one calendar of their own, made the first time they
+# look, named after them. It is personal: nobody else sees it.
+[[datasets]]
+id = "yours"
+model = "calendar"
+seed = "per-owner"
+scope = "personal"
+records = [{ name = "{owner}", colour = "cyan" }]
+
+# And one the whole server shares: everybody sees it and may put things in
+# it, and nobody can leave it.
+[[datasets]]
+id = "everybody"
+model = "calendar"
+seed = "once"
+scope = "public"
+records = [{ name = "Everybody", colour = "violet" }]

@@ -11,9 +11,23 @@ label = "Personal"
 description = "Your own lists, plans and notes."
 
 [[categories]]
+id = "home"
+label = "Home"
+description = "The household: shopping, chores, the car, the plants."
+
+[[categories]]
 id = "developer"
 label = "Developer"
 description = "For people who build things: machines, secrets, pipelines."
+
+[[quills]]
+id = "notes"
+name = "Notes"
+summary = "Markdown notes in folders, with pictures."
+repo = "quill-notes"
+category = "personal"
+publisher = "Cloudmorrow"
+foundation = true
 
 [[quills]]
 id = "tasks"
@@ -25,19 +39,37 @@ publisher = "Cloudmorrow"
 foundation = true
 
 [[quills]]
-id = "secrets"
-name = "Secrets"
-summary = "Keys and passwords in vaults and environments, sealed, and never shown until you ask."
-repo = "quill-secrets"
-category = "developer"
-publisher = "Cloudmorrow"
-foundation = true
-
-[[quills]]
 id = "files"
 name = "Files"
 summary = "Your own drive on the server, your fileshares, and what is in them."
 repo = "quill-files"
 category = "personal"
+publisher = "Cloudmorrow"
+foundation = true
+
+[[quills]]
+id = "calendar"
+name = "Calendar"
+summary = "Your own calendar, the ones you share, and one for everybody."
+repo = "quill-calendar"
+category = "personal"
+publisher = "Cloudmorrow"
+foundation = true
+
+[[quills]]
+id = "chat"
+name = "Chat"
+summary = "Channels, direct messages, and the count on the icon."
+repo = "quill-chat"
+category = "home"
+publisher = "Cloudmorrow"
+foundation = true
+
+[[quills]]
+id = "secrets"
+name = "Secrets"
+summary = "Keys and passwords in vaults and environments, sealed, and never shown until you ask."
+repo = "quill-secrets"
+category = "developer"
 publisher = "Cloudmorrow"
 foundation = true

@@ -226,6 +226,9 @@ def note_preview(text: str, name: str, *, chars: int = PREVIEW_CHARS) -> str:
             continue
         if line.lstrip("#").strip() == stem and line.startswith("#"):
             continue
+        # A picture on a line of its own is shown in the note, not said in a list.
+        if line.startswith("![") and line.endswith(")"):
+            continue
         line = line.lstrip("#").strip()
         for marker in ("- [ ] ", "- [x] ", "- ", "* "):
             line = line.removeprefix(marker)
