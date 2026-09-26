@@ -39,7 +39,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from cloudmorrow.server.datamodels import (
-    SUPPORTED_SCOPES,
     Datamodel,
     DatamodelError,
     load_datamodel,
@@ -69,7 +68,7 @@ KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor"
 KIT_READY = frozenset({"list", "board", "detail", "form"})
 
 JOB_ACTIONS = frozenset({"expire", "run"})
-SEED_KINDS = frozenset({"per-owner"})
+SEED_KINDS = frozenset({"per-owner", "once"})
 
 ID_RE = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$")
@@ -283,8 +282,7 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
     for item in raw_sets:
         if item.get("seed") not in SEED_KINDS:
             raise QuillError(
-                f"{where}: dataset {item['id']!r} seed is {', '.join(sorted(SEED_KINDS))}; shared"
-                " reference data comes with shared scope"
+                f"{where}: dataset {item['id']!r} seed is {', '.join(sorted(SEED_KINDS))}"
             )
         if not item.get("model"):
             raise QuillError(f"{where}: dataset {item['id']!r} names a model")
@@ -550,7 +548,7 @@ class QuillRegistry:
             (manifest, dataset)
             for manifest in self.quills.values()
             for dataset in manifest.datasets
-            if dataset["model"] == model_id and dataset["seed"] == "per-owner"
+            if dataset["model"] == model_id
         ]
 
     # -- what a Quill would add ------------------------------------------------------
@@ -767,14 +765,13 @@ def _assemble(
                     problems.setdefault(
                         owner, f"{model.id}.{f.name} links to {f.to}, which is not installed"
                     )
-        unsupported = set(model.scopes) - SUPPORTED_SCOPES
-        if unsupported and not set(model.scopes) & SUPPORTED_SCOPES:
-            for q in quills.values():
-                if model.id in q.models:
-                    problems.setdefault(
-                        q.id,
-                        f"{model.id} is {', '.join(model.scopes)}; the record store keeps personal records only, so far",
-                    )
+        if model.in_space:
+            target = models.get(model.get_field(model.in_space).to)
+            if target is not None and not target.space:
+                owner = model.source if model.source != "foundation" else next(
+                    (q.id for q in quills.values() if model.id in q.models), "")
+                if owner:
+                    problems.setdefault(owner, f"{model.id} is in_space {target.id}, which is not a space")
     return models, problems
 
 

@@ -6,6 +6,7 @@ description = "Your own, one you share, or everybody's."
 domain = "calendars"
 scopes = ["personal", "shared", "public"]
 title = "name"
+space = true
 
 [fields]
 name = { kind = "string", required = true }

@@ -56,7 +56,14 @@ FIELD_KINDS = frozenset(
 SCOPES = frozenset({"personal", "shared", "public"})
 # What the record store does today. A datamodel asking for more is refused
 # at install, with that said, rather than quietly stored as personal.
-SUPPORTED_SCOPES = frozenset({"personal"})
+SUPPORTED_SCOPES = frozenset({"personal", "shared", "public"})
+
+# Where a datamodel's records live, when not in the record store. Each is a
+# store the core has always had and other things reach directly; see
+# `server/backends.py`.
+BACKENDS = frozenset({"notes", "shares", "vaults"})
+
+NOTIFY_WHEN = frozenset({"created"})
 
 # `task`, `board`, `fleet.service_visit`, and an extension's `fleet.odometer`.
 ID_RE = re.compile(r"^[a-z][a-z0-9_]{0,39}(\.[a-z][a-z0-9_]{0,39})?$")
@@ -129,6 +136,16 @@ class Datamodel:
     # Where it came from: "foundation", or the id of the Quill that introduced it.
     source: str = "foundation"
     extras: dict = field(default_factory=dict)
+    # A record of it is a space: personal, shared with members, or public.
+    space: bool = False
+    # The link field naming the space a record of it is in, if it lives in one.
+    in_space: str = ""
+    # Only the one who wrote a record may change or delete it: a message.
+    authored: bool = False
+    # What happens when a record of it is written in a space.
+    notify: tuple[dict, ...] = ()
+    # Not in the record store: served by this backend instead.
+    backend: str = ""
 
     @property
     def by_name(self) -> dict[str, Field]:
@@ -173,6 +190,11 @@ class Datamodel:
             ordered_within=self.ordered_within,
             source=self.source,
             extras=self.extras,
+            space=self.space,
+            in_space=self.in_space,
+            authored=self.authored,
+            notify=self.notify,
+            backend=self.backend,
         )
 
     def to_dict(self) -> dict:
@@ -186,6 +208,11 @@ class Datamodel:
             "title": self.title,
             "ordered_within": list(self.ordered_within),
             "source": self.source,
+            "space": self.space,
+            "in_space": self.in_space,
+            "authored": self.authored,
+            "notify": list(self.notify),
+            "backend": self.backend,
             "fields": [f.to_dict() for f in self.fields],
         }
 
@@ -320,6 +347,29 @@ def parse_datamodel(data: dict, *, source: str = "foundation", where: str = "") 
     version = head.get("version", 1)
     if not isinstance(version, int) or version < 1:
         raise DatamodelError(f"{where}: version is a whole number from 1")
+    space = bool(head.get("space", False))
+    in_space = str(head.get("in_space", ""))
+    if space and in_space:
+        raise DatamodelError(f"{where}: a space is not in another space")
+    if space and not set(scopes) - {"personal"}:
+        raise DatamodelError(f"{where}: a space is shared or public in at least one of its scopes")
+    if in_space:
+        link = by_name.get(in_space)
+        if link is None or link.kind != "link":
+            raise DatamodelError(f"{where}: in_space names {in_space!r}, which must be a link field")
+    notify = []
+    for rule in data.get("notify", []):
+        if not isinstance(rule, dict) or rule.get("when") not in NOTIFY_WHEN or rule.get("to") != "members":
+            raise DatamodelError(f"{where}: a notify rule is when = \"created\", to = \"members\"")
+        if not in_space:
+            raise DatamodelError(f"{where}: only a datamodel in a space notifies its members")
+        notify.append({"when": "created", "to": "members", "push": bool(rule.get("push", False)),
+                       "unread": bool(rule.get("unread", False))})
+    backend = str(head.get("backend", ""))
+    if backend and backend not in BACKENDS:
+        raise DatamodelError(f"{where}: backend is one of {', '.join(sorted(BACKENDS))}")
+    if backend and source != "foundation":
+        raise DatamodelError(f"{where}: only a foundational datamodel has a backend")
     return Datamodel(
         id=model_id,
         version=version,
@@ -331,6 +381,11 @@ def parse_datamodel(data: dict, *, source: str = "foundation", where: str = "") 
         title=title,
         ordered_within=ordered_within,
         source=source,
+        space=space,
+        in_space=in_space,
+        authored=bool(head.get("authored", False)),
+        notify=tuple(notify),
+        backend=backend,
     )
 
 

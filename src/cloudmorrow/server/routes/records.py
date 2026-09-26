@@ -36,12 +36,19 @@ class RecordIn(BaseModel):
     fields: dict[str, Any] = Field(default_factory=dict)
     # Where in its group it goes, for an ordered datamodel.
     index: int | None = None
+    # For a space: personal, shared or public. Chosen when it is made.
+    scope: str | None = None
+
+
+class MemberIn(BaseModel):
+    username: str
 
 
 class RecordChange(BaseModel):
     fields: dict[str, Any] = Field(default_factory=dict)
     # The revision the caller had. Sent, a stale write is a 409, not a loss.
-    rev: int | None = None
+    # A counter for most records; a note's is a string.
+    rev: int | str | None = None
 
 
 class RecordMove(BaseModel):
@@ -80,10 +87,17 @@ def switched_on(state: AppState, model: str) -> None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"{names} is switched off on this server")
 
 
+def person(user: User) -> Principal:
+    return Principal.person(user.username, admin=user.is_admin)
+
+
 def seed(state: AppState, principal: Principal, model: str) -> None:
-    """Write any per-owner dataset for *model* this person has not had yet."""
+    """Write any dataset for *model* not written yet: per person, or once per server."""
     for manifest, dataset in state.quills.seeds_for(model):
-        state.records.seed(principal, model, dataset["records"], writer=manifest.id)
+        state.records.seed(
+            principal, model, dataset["records"], writer=manifest.id,
+            once=dataset["seed"] == "once", scope=dataset.get("scope"),
+        )
 
 
 @models_router.get("")
@@ -103,7 +117,7 @@ def list_records(
 ) -> list[dict]:
     """Every record of *model* you have. Query parameters filter on indexed fields."""
     switched_on(state, model)
-    principal = Principal.person(user.username)
+    principal = person(user)
     try:
         seed(state, principal, model)
         records = state.records.list(principal, model, dict(request.query_params))
@@ -122,7 +136,7 @@ def create_record(
     switched_on(state, model)
     try:
         record = state.records.create(
-            Principal.person(user.username), model, payload.fields, index=payload.index
+            person(user), model, payload.fields, index=payload.index, scope=payload.scope
         )
     except ERRORS as exc:
         raise _refused(exc) from exc
@@ -138,7 +152,7 @@ def get_record(
 ) -> dict:
     switched_on(state, model)
     try:
-        return state.records.get(Principal.person(user.username), model, record_id).to_dict()
+        return state.records.get(person(user), model, record_id).to_dict()
     except ERRORS as exc:
         raise _refused(exc) from exc
 
@@ -154,7 +168,7 @@ def change_record(
     switched_on(state, model)
     try:
         record = state.records.update(
-            Principal.person(user.username), model, record_id, payload.fields, rev=payload.rev
+            person(user), model, record_id, payload.fields, rev=payload.rev
         )
     except ERRORS as exc:
         raise _refused(exc) from exc
@@ -173,7 +187,7 @@ def move_record(
     switched_on(state, model)
     try:
         record = state.records.move(
-            Principal.person(user.username), model, record_id, payload.fields, payload.index
+            person(user), model, record_id, payload.fields, payload.index
         )
     except ERRORS as exc:
         raise _refused(exc) from exc
@@ -189,6 +203,59 @@ def delete_record(
 ) -> None:
     switched_on(state, model)
     try:
-        state.records.delete(Principal.person(user.username), model, record_id)
+        state.records.delete(person(user), model, record_id)
+    except ERRORS as exc:
+        raise _refused(exc) from exc
+
+
+# -- the people in a space ---------------------------------------------------------
+def _known(state: AppState, username: str) -> None:
+    if state.users.get(username) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"no such account: {username}")
+
+
+@router.post("/{model}/{record_id}/members")
+def add_member(
+    model: str,
+    record_id: str,
+    payload: MemberIn,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Put somebody in a shared space. They are told; there is nothing to accept."""
+    switched_on(state, model)
+    _known(state, payload.username)
+    try:
+        return state.records.add_member(person(user), model, record_id, payload.username).to_dict()
+    except ERRORS as exc:
+        raise _refused(exc) from exc
+
+
+@router.delete("/{model}/{record_id}/members/{username}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_member(
+    model: str,
+    record_id: str,
+    username: str,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> None:
+    """Take somebody out of a shared space, or, with your own name, leave it."""
+    switched_on(state, model)
+    try:
+        state.records.remove_member(person(user), model, record_id, username)
+    except ERRORS as exc:
+        raise _refused(exc) from exc
+
+
+@router.post("/{model}/{record_id}/seen", status_code=status.HTTP_204_NO_CONTENT)
+def seen(
+    model: str,
+    record_id: str,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> None:
+    """You have looked in this space: what is in it is not unread any more."""
+    try:
+        state.records.mark_seen(person(user), model, record_id)
     except ERRORS as exc:
         raise _refused(exc) from exc

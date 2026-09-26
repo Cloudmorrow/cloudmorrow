@@ -6,8 +6,17 @@ description = "What somebody said in a channel."
 domain = "messaging"
 scopes = ["shared", "public"]
 title = "body"
+in_space = "channel"
+authored = true
 
 [fields]
 channel = { kind = "link", to = "channel", required = true, indexed = true, on_delete = "cascade" }
 body = { kind = "text", required = true }
 sent_at = { kind = "datetime", indexed = true }
+
+# Everybody else in the channel is told, and it counts as unread until they look.
+[[notify]]
+when = "created"
+to = "members"
+push = true
+unread = true

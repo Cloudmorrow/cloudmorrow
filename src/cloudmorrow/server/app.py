@@ -26,6 +26,8 @@ from cloudmorrow.server.notifications import NotificationStore
 from cloudmorrow.server.quilljobs import Clock
 from cloudmorrow.server.quills import QuillRegistry
 from cloudmorrow.server.records import RecordStore
+from cloudmorrow.server import spacenotify
+from cloudmorrow.server.backends import NotesBackend
 from cloudmorrow.server.routes import (
     agents,
     auth,
@@ -120,6 +122,12 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     # The foundation Quills on a fresh server, old tasks into records, and
     # the sweeps: on a thread, once the server is up, so none of it can
     # keep it from starting.
+    # What happens in shared spaces reaches the people in them.
+    spacenotify.install(app.state.cloudmorrow)
+    # Datamodels that live where they always have, served as records.
+    record_store.backends["notes"] = NotesBackend(
+        lambda username: app.state.cloudmorrow.note_store(user_store.require(username))
+    )
     clock = Clock(config.db_path, quill_registry, record_store)
     app.router.on_startup.append(clock.start)
     app.router.on_shutdown.append(clock.stop)

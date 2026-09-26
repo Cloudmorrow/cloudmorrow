@@ -29,3 +29,9 @@ id = "messaging"
 label = "Messaging"
 description = "Channels and the messages in them."
 datamodels = ["channel", "message"]
+
+[[domains]]
+id = "notes"
+label = "Notes"
+description = "Markdown notes in folders, as files you own."
+datamodels = ["note"]

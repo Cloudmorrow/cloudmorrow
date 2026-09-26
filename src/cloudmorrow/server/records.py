@@ -22,8 +22,15 @@ What the store does for every datamodel, so no Quill has to:
 * writes every change to `record_changes`, the feed sync and audit read.
 
 The gate is `check`: who is asking, what they want to do, to which datamodel.
-Personal scope only, for now; a datamodel that wants more is refused at
-install by the Quill loader.
+Then *which records*: a record of a plain datamodel is its owner's alone; a
+record of a space (a calendar, a channel) is its owner's, its members' or
+everybody's, by its scope; a record in a space (an event, a message) is for
+whoever may see the space. Every read and write finds the row first and
+asks `_visible` second, so there is one door and nothing reaches past it.
+
+A record in a space is sealed to the space rather than to whoever wrote it,
+so a message moved into another channel by editing the database opens as
+nothing, and nobody's leaving takes the conversation with them.
 """
 
 from __future__ import annotations
@@ -85,6 +92,22 @@ CREATE TABLE IF NOT EXISTS record_changes (
     at         TEXT    NOT NULL
 );
 CREATE INDEX IF NOT EXISTS record_changes_owner ON record_changes (owner, seq);
+CREATE TABLE IF NOT EXISTS record_members (
+    -- The people in a shared space, besides its owner.
+    space_id   TEXT    NOT NULL,
+    username   TEXT    NOT NULL,
+    added_by   TEXT    NOT NULL DEFAULT '',
+    joined_at  TEXT    NOT NULL,
+    PRIMARY KEY (space_id, username)
+);
+CREATE INDEX IF NOT EXISTS record_members_user ON record_members (username);
+CREATE TABLE IF NOT EXISTS record_seen (
+    -- When somebody last looked in a space: what is newer is unread.
+    space_id   TEXT    NOT NULL,
+    username   TEXT    NOT NULL,
+    seen_at    TEXT    NOT NULL,
+    PRIMARY KEY (space_id, username)
+);
 """
 
 
@@ -126,14 +149,17 @@ class Principal:
     # For a Quill: its id, and the datamodels it declared or was granted.
     quill: str = ""
     models: frozenset[str] = field(default_factory=frozenset)
+    # An administrator may manage any shared or public space, as on a server
+    # they are responsible for; it lets them see no personal record.
+    admin: bool = False
 
     @classmethod
-    def person(cls, username: str) -> Principal:
-        return cls("person", username)
+    def person(cls, username: str, *, admin: bool = False) -> Principal:
+        return cls("person", username, admin=admin)
 
     @classmethod
-    def assistant(cls, username: str) -> Principal:
-        return cls("assistant", username)
+    def assistant(cls, username: str, *, admin: bool = False) -> Principal:
+        return cls("assistant", username, admin=admin)
 
     @property
     def writer(self) -> str:
@@ -169,16 +195,26 @@ class Record:
     model: str
     owner: str
     scope: str
-    rev: int
+    # A counter in the record store; whatever a backend versions by otherwise
+    # (a note's is a hash of the file).
+    rev: int | str
     position: int
     fields: dict
     written_by: str
     created_at: str
     updated_at: str
     expires_at: str | None = None
+    # For a space: who is in it, whether the asker may manage it, and how
+    # many things written in it they have not seen.
+    members: list[str] | None = None
+    can_manage: bool = False
+    unread: int = 0
 
     def to_dict(self) -> dict:
-        return {
+        extra: dict = {}
+        if self.members is not None:
+            extra = {"members": list(self.members), "can_manage": self.can_manage, "unread": self.unread}
+        return extra | {
             "id": self.id,
             "model": self.model,
             "owner": self.owner,
@@ -311,6 +347,13 @@ class RecordStore:
         self.db_path = db_path
         self._models = models
         self._expiries = expiries or (lambda: {})
+        # Told about a record written in a space whose datamodel notifies:
+        # (record, rule, recipients). "*" in recipients means everybody.
+        self.on_notify: list[Callable[[Record, dict, list[str]], None]] = []
+        # Told when somebody is added to a space: (space, username, by).
+        self.on_member_added: list[Callable[[Record, str, str], None]] = []
+        # Datamodels served from elsewhere, by backend name (see backends.py).
+        self.backends: dict[str, object] = {}
         with connect(self.db_path) as conn:
             conn.executescript(TABLE)
         conn.close()
@@ -322,9 +365,25 @@ class RecordStore:
             raise UnknownModelError(model_id)
         return found
 
-    def _record(self, conn: Connection, model: Datamodel, row: sqlite3.Row) -> Record:
+    def _backend(self, model: Datamodel):
+        """The backend a datamodel is served by, when it is not stored here."""
+        found = self.backends.get(model.backend)
+        if found is None:
+            raise RecordError(f"{model.id} is kept by {model.backend}, which this server does not run")
+        return found
+
+    def _seal_scope(self, model: Datamodel, owner: str, record_id: str, indexed: dict) -> tuple:
+        """What a record's content is sealed to: its space, or its owner."""
+        if model.in_space:
+            return (model.id, "space", str(indexed.get(model.in_space) or ""), record_id)
+        return (model.id, owner, record_id)
+
+    def _record(
+        self, conn: Connection, model: Datamodel, row: sqlite3.Row, asker: Principal | None = None
+    ) -> Record:
         fields = json.loads(row["indexed"] or "{}")
-        body = conn.unseal("records", "body", (row["model"], row["owner"], row["id"]), row["body"])
+        scope = self._seal_scope(model, row["owner"], row["id"], fields)
+        body = conn.unseal("records", "body", scope, row["body"])
         if body:
             fields.update(json.loads(body))
         # Fields the datamodel has now and the record predates read as their
@@ -349,16 +408,110 @@ class RecordStore:
             since = _parse_moment(str(fields.get(expiry[0]) or ""))
             if since is not None:
                 record.expires_at = _stamp(since + expiry[1])
+        if model.space:
+            record.members = self._members(conn, row["id"])
+            if asker is not None:
+                record.can_manage = self._may_manage(asker, row)
+                record.unread = self._unread(conn, model, row["id"], asker.username)
         return record
 
-    def _row(self, conn: Connection, owner: str, model: str, record_id: str) -> sqlite3.Row:
+    # -- who may see what --------------------------------------------------------
+    def _members(self, conn: Connection, space_id: str) -> list[str]:
+        return [
+            r["username"]
+            for r in conn.execute(
+                "SELECT username FROM record_members WHERE space_id = ? ORDER BY joined_at, username",
+                (space_id,),
+            )
+        ]
+
+    @staticmethod
+    def _may_manage(principal: Principal, space_row: sqlite3.Row) -> bool:
+        if space_row["owner"] == principal.username:
+            return True
+        return principal.admin and space_row["scope"] != "personal"
+
+    def _space_visible(self, conn: Connection, principal: Principal, space_row: sqlite3.Row) -> bool:
+        if space_row["owner"] == principal.username or space_row["scope"] == "public":
+            return True
+        if space_row["scope"] != "shared":
+            return False
+        return (
+            conn.execute(
+                "SELECT 1 FROM record_members WHERE space_id = ? AND username = ?",
+                (space_row["id"], principal.username),
+            ).fetchone()
+            is not None
+        )
+
+    def _space_of(self, conn: Connection, model: Datamodel, indexed: dict) -> sqlite3.Row | None:
+        space_id = indexed.get(model.in_space)
+        if not space_id:
+            return None
+        return conn.execute("SELECT * FROM records WHERE id = ?", (space_id,)).fetchone()
+
+    def _visible(self, conn: Connection, principal: Principal, model: Datamodel, row: sqlite3.Row) -> bool:
+        """The one question: may this principal see this record at all?"""
+        if model.space:
+            return self._space_visible(conn, principal, row)
+        if model.in_space:
+            space = self._space_of(conn, model, json.loads(row["indexed"] or "{}"))
+            return space is not None and self._space_visible(conn, principal, space)
+        return row["owner"] == principal.username
+
+    def _row(
+        self, conn: Connection, principal: Principal, model: Datamodel, record_id: str
+    ) -> sqlite3.Row:
         row = conn.execute(
-            "SELECT * FROM records WHERE id = ? AND model = ? AND owner = ?",
-            (record_id, model, owner),
+            "SELECT * FROM records WHERE id = ? AND model = ?", (record_id, model.id)
         ).fetchone()
-        if row is None:
+        # Not there, and there but not yours, are the same answer: a record
+        # somebody cannot see is not one they can learn exists.
+        if row is None or not self._visible(conn, principal, model, row):
             raise UnknownRecordError(record_id)
         return row
+
+    def _writable(self, conn: Connection, principal: Principal, model: Datamodel, row: sqlite3.Row) -> None:
+        """Seeing is not always changing: a space is its manager's, a message its author's."""
+        if model.space and not self._may_manage(principal, row):
+            raise Refused(f"only whoever made this {model.label.lower()} may change it")
+        if model.authored and row["owner"] != principal.username:
+            raise Refused(f"only whoever wrote this {model.label.lower()} may change it")
+
+    def _visible_clause(self, model: Datamodel, username: str) -> tuple[str, list[object]]:
+        """SQL that keeps the rows of *model* this person may see."""
+        spaces = (
+            "SELECT id FROM records WHERE model = ? AND (owner = ? OR scope = 'public'"
+            " OR (scope = 'shared' AND id IN (SELECT space_id FROM record_members WHERE username = ?)))"
+        )
+        if model.space:
+            return f"id IN ({spaces})", [model.id, username, username]
+        if model.in_space:
+            space_model = model.get_field(model.in_space).to
+            return (
+                f"json_extract(indexed, '$.\"{model.in_space}\"') IN ({spaces})",
+                [space_model, username, username],
+            )
+        return "owner = ?", [username]
+
+    def _unread(self, conn: Connection, space_model: Datamodel, space_id: str, username: str) -> int:
+        """Things written in a space since this person last looked, by others."""
+        count = 0
+        for child in self._models().values():
+            if child.in_space and child.get_field(child.in_space).to == space_model.id and any(
+                rule.get("unread") for rule in child.notify
+            ):
+                seen = conn.execute(
+                    "SELECT seen_at FROM record_seen WHERE space_id = ? AND username = ?",
+                    (space_id, username),
+                ).fetchone()
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM records WHERE model = ? AND owner != ?"
+                    f" AND json_extract(indexed, '$.\"{child.in_space}\"') = ? AND created_at > ?",
+                    (child.id, username, space_id, seen["seen_at"] if seen else ""),
+                ).fetchone()
+                count += int(row[0])
+        return count
 
     # -- reading ---------------------------------------------------------------
     def list(
@@ -371,10 +524,13 @@ class RecordStore:
         """
         check(principal, "read", model_id)
         model = self.model(model_id)
-        self.sweep(model_id, owner=principal.username)
+        if model.backend:
+            return self._backend(model).list(principal, model, dict(where or {}))
+        self.sweep(model_id, owner=None if (model.space or model.in_space) else principal.username)
         plain = _stored_indexed(model)
-        query = "SELECT * FROM records WHERE model = ? AND owner = ?"
-        params: list[object] = [model.id, principal.username]
+        clause, clause_params = self._visible_clause(model, principal.username)
+        query = f"SELECT * FROM records WHERE model = ? AND {clause}"
+        params: list[object] = [model.id, *clause_params]
         for name, value in (where or {}).items():
             if name not in plain:
                 raise RecordError(f"{model.id} cannot be filtered by {name!r}: it is not indexed")
@@ -384,34 +540,93 @@ class RecordStore:
         query += " ORDER BY position, created_at, id"
         with connect(self.db_path) as conn:
             rows = conn.execute(query, params).fetchall()
-            records = [self._record(conn, model, row) for row in rows]
+            records = [self._record(conn, model, row, principal) for row in rows]
         conn.close()
         return records
 
     def get(self, principal: Principal, model_id: str, record_id: str) -> Record:
         check(principal, "read", model_id)
         model = self.model(model_id)
+        if model.backend:
+            return self._backend(model).get(principal, model, record_id)
         with connect(self.db_path) as conn:
-            record = self._record(
-                conn, model, self._row(conn, principal.username, model.id, record_id)
-            )
+            record = self._record(conn, model, self._row(conn, principal, model, record_id), principal)
         conn.close()
         return record
 
-    def count(self, owner: str, model_id: str) -> int:
+    def count(self, owner: str, model_id: str, *, scope: str | None = None) -> int:
+        query = "SELECT COUNT(*) FROM records WHERE model = ? AND owner = ?"
+        params: list[object] = [model_id, owner]
+        if scope:
+            query += " AND scope = ?"
+            params.append(scope)
         with connect(self.db_path) as conn:
-            row = conn.execute(
-                "SELECT COUNT(*) FROM records WHERE model = ? AND owner = ?", (model_id, owner)
-            ).fetchone()
+            row = conn.execute(query, params).fetchone()
         conn.close()
         return int(row[0])
+
+    # -- the people in a space -----------------------------------------------------
+    def add_member(self, principal: Principal, model_id: str, space_id: str, username: str) -> Record:
+        """Put somebody in a shared space. Its manager's to do; no invitation to accept."""
+        check(principal, "write", model_id)
+        model = self.model(model_id)
+        if not model.space:
+            raise RecordError(f"a {model.label.lower()} has no members")
+        with connect(self.db_path) as conn:
+            row = self._row(conn, principal, model, space_id)
+            if row["scope"] != "shared":
+                raise RecordError(f"only a shared {model.label.lower()} has members")
+            if not self._may_manage(principal, row) and not self._space_visible(conn, principal, row):
+                raise Refused("only somebody in it may add people")
+            added = conn.execute(
+                "INSERT OR IGNORE INTO record_members (space_id, username, added_by, joined_at)"
+                " VALUES (?, ?, ?, ?)",
+                (space_id, username, principal.username, _stamp()),
+            ).rowcount
+            if username == row["owner"]:
+                added = 0
+        conn.close()
+        space = self.get(principal, model_id, space_id)
+        if added:
+            for hook in self.on_member_added:
+                hook(space, username, principal.username)
+        return space
+
+    def remove_member(self, principal: Principal, model_id: str, space_id: str, username: str) -> None:
+        """Take somebody out of a shared space: its manager may, and anybody may leave."""
+        check(principal, "write", model_id)
+        model = self.model(model_id)
+        with connect(self.db_path) as conn:
+            row = self._row(conn, principal, model, space_id)
+            if row["scope"] != "shared":
+                raise RecordError(f"nobody leaves a {row['scope']} {model.label.lower()}")
+            if username != principal.username and not self._may_manage(principal, row):
+                raise Refused("only whoever made it may take somebody else out")
+            if username == row["owner"]:
+                raise RecordError("its owner cannot leave; delete it instead")
+            conn.execute(
+                "DELETE FROM record_members WHERE space_id = ? AND username = ?", (space_id, username)
+            )
+        conn.close()
+
+    def mark_seen(self, principal: Principal, model_id: str, space_id: str) -> None:
+        """Somebody has looked in a space: what is in it is no longer news to them."""
+        model = self.model(model_id)
+        with connect(self.db_path) as conn:
+            self._row(conn, principal, model, space_id)
+            conn.execute(
+                "INSERT INTO record_seen (space_id, username, seen_at) VALUES (?, ?, ?)"
+                " ON CONFLICT(space_id, username) DO UPDATE SET seen_at = excluded.seen_at",
+                (space_id, principal.username, _stamp()),
+            )
+        conn.close()
 
     # -- writing ---------------------------------------------------------------
     def _clean(
         self,
         conn: Connection,
         model: Datamodel,
-        owner: str,
+        principal: Principal,
         incoming: dict,
         *,
         current: dict | None,
@@ -436,10 +651,12 @@ class RecordStore:
                 raise RecordError(f"{model.id}.{f.name} is required")
             if f.kind == "link" and value:
                 target = conn.execute(
-                    "SELECT 1 FROM records WHERE id = ? AND model = ? AND owner = ?",
-                    (value, f.to, owner),
+                    "SELECT * FROM records WHERE id = ? AND model = ?", (value, f.to)
                 ).fetchone()
-                if target is None:
+                # A link only reaches what its writer may see: nobody puts a
+                # task on somebody else's board, or a message in a channel
+                # they are not in.
+                if target is None or not self._visible(conn, principal, self.model(f.to), target):
                     raise RecordError(f"{model.id}.{f.name}: no {f.to} {value!r}")
         # Stamps: set on entering the value, kept while it stays, cleared on leaving.
         for f in model.fields:
@@ -464,8 +681,13 @@ class RecordStore:
         return tuple(fields.get(name) for name in model.ordered_within)
 
     def _group_ids(self, conn: Connection, model: Datamodel, owner: str, group: tuple) -> list[str]:
-        query = "SELECT id FROM records WHERE model = ? AND owner = ?"
-        params: list[object] = [model.id, owner]
+        # A shared thing's order is everybody's, so only a personal one's
+        # group is narrowed to its owner.
+        if model.space or model.in_space:
+            query, params = "SELECT id FROM records WHERE model = ?", [model.id]
+        else:
+            query = "SELECT id FROM records WHERE model = ? AND owner = ?"
+            params = [model.id, owner]
         for name, value in zip(model.ordered_within, group, strict=True):
             query += " AND json_extract(indexed, ?) IS ?"
             params += [f'$."{name}"', value]
@@ -493,7 +715,8 @@ class RecordStore:
         self, conn: Connection, model: Datamodel, owner: str, record_id: str, fields: dict
     ) -> tuple[str, str]:
         indexed, rest = self._split(model, fields)
-        body = conn.seal("records", "body", (model.id, owner, record_id), json.dumps(rest))
+        scope = self._seal_scope(model, owner, record_id, indexed)
+        body = conn.seal("records", "body", scope, json.dumps(rest))
         return json.dumps(indexed), body or ""
 
     def _log(
@@ -521,31 +744,68 @@ class RecordStore:
         )
 
     def create(
-        self, principal: Principal, model_id: str, incoming: dict, *, index: int | None = None
+        self,
+        principal: Principal,
+        model_id: str,
+        incoming: dict,
+        *,
+        index: int | None = None,
+        scope: str | None = None,
     ) -> Record:
         check(principal, "write", model_id)
         model = self.model(model_id)
+        if model.backend:
+            return self._backend(model).create(principal, model, dict(incoming))
         owner = principal.username
         record_id = _new_id()
         now = _stamp()
+        scope = self._scope_for(model, scope)
         with connect(self.db_path) as conn:
-            fields = self._clean(conn, model, owner, incoming, current=None)
+            fields = self._clean(conn, model, principal, incoming, current=None)
             indexed, body = self._write_row(conn, model, owner, record_id, fields)
             position = 0
             if model.ordered:
                 position = len(self._group_ids(conn, model, owner, self._group(model, fields)))
             conn.execute(
                 "INSERT INTO records (id, model, owner, scope, rev, position, indexed, body,"
-                " written_by, created_at, updated_at) VALUES (?, ?, ?, 'personal', 1, ?, ?, ?, ?, ?, ?)",
-                (record_id, model.id, owner, position, indexed, body, principal.writer, now, now),
+                " written_by, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)",
+                (record_id, model.id, owner, scope, position, indexed, body, principal.writer, now, now),
             )
             if model.ordered and index is not None:
                 self._renumber(
                     conn, model, owner, self._group(model, fields), moved=record_id, insert_at=index
                 )
             self._log(conn, principal, model.id, record_id, "created", 1)
+            recipients = self._recipients(conn, model, fields, owner) if model.notify else []
         conn.close()
-        return self.get(principal, model.id, record_id)
+        made = self.get(principal, model.id, record_id)
+        for rule in model.notify:
+            for hook in self.on_notify:
+                hook(made, rule, recipients)
+        return made
+
+    def _scope_for(self, model: Datamodel, asked: str | None) -> str:
+        """A space's scope is chosen when it is made; everything else is personal."""
+        if not model.space:
+            if asked not in (None, "", "personal"):
+                raise RecordError(f"a {model.label.lower()} is not a space; it has no scope to choose")
+            return "personal"
+        if asked in (None, ""):
+            return "shared" if "shared" in model.scopes else model.scopes[0]
+        if asked not in model.scopes:
+            raise RecordError(f"a {model.label.lower()} is {', '.join(model.scopes)}")
+        return asked
+
+    def _recipients(self, conn: Connection, model: Datamodel, fields: dict, writer: str) -> list[str]:
+        """Who a record written in a space is news to: its people, not its writer."""
+        space = self._space_of(conn, model, fields)
+        if space is None:
+            return []
+        if space["scope"] == "public":
+            return ["*"]
+        people = {space["owner"], *self._members(conn, space["id"])}
+        people.discard(writer)
+        return sorted(people)
 
     def update(
         self,
@@ -554,7 +814,7 @@ class RecordStore:
         record_id: str,
         incoming: dict,
         *,
-        rev: int | None = None,
+        rev: int | str | None = None,
         index: int | None = None,
         action: str = "changed",
     ) -> Record:
@@ -565,16 +825,19 @@ class RecordStore:
         """
         check(principal, "write", model_id)
         model = self.model(model_id)
-        owner = principal.username
+        if model.backend:
+            return self._backend(model).update(principal, model, record_id, dict(incoming), rev)
         with connect(self.db_path) as conn:
             # Read and write under one lock, so two writers cannot both pass
             # the revision check. Anything raised below rolls the lot back.
             conn.execute("BEGIN IMMEDIATE")
-            row = self._row(conn, owner, model.id, record_id)
-            current = self._record(conn, model, row)
+            row = self._row(conn, principal, model, record_id)
+            self._writable(conn, principal, model, row)
+            owner = row["owner"]
+            current = self._record(conn, model, row, principal)
             if rev is not None and rev != current.rev:
                 raise RecordConflictError(current)
-            fields = self._clean(conn, model, owner, incoming, current=current.fields)
+            fields = self._clean(conn, model, principal, incoming, current=current.fields)
             indexed, body = self._write_row(conn, model, owner, record_id, fields)
             old_group = self._group(model, current.fields)
             new_group = self._group(model, fields)
@@ -606,9 +869,12 @@ class RecordStore:
         """Delete a record, and follow links that cascade. Returns how many went."""
         check(principal, "write", model_id)
         model = self.model(model_id)
+        if model.backend:
+            return self._backend(model).delete(principal, model, record_id)
         with connect(self.db_path) as conn:
             conn.execute("BEGIN IMMEDIATE")
-            self._row(conn, principal.username, model.id, record_id)
+            row = self._row(conn, principal, model, record_id)
+            self._writable(conn, principal, model, row)
             gone = self._delete(conn, principal, model, record_id, "deleted")
             conn.commit()
         conn.close()
@@ -617,12 +883,15 @@ class RecordStore:
     def _delete(
         self, conn: Connection, principal: Principal, model: Datamodel, record_id: str, action: str
     ) -> int:
-        owner = principal.username
         row = conn.execute("SELECT * FROM records WHERE id = ?", (record_id,)).fetchone()
         if row is None:
             return 0
+        owner = row["owner"]
         group = self._group(model, json.loads(row["indexed"] or "{}")) if model.ordered else ()
         conn.execute("DELETE FROM records WHERE id = ?", (record_id,))
+        if model.space:
+            conn.execute("DELETE FROM record_members WHERE space_id = ?", (record_id,))
+            conn.execute("DELETE FROM record_seen WHERE space_id = ?", (record_id,))
         self._log(conn, principal, model.id, record_id, action, row["rev"])
         gone = 1
         if model.ordered:
@@ -631,12 +900,13 @@ class RecordStore:
             for f in other.fields:
                 if f.kind != "link" or f.to != model.id or not f.on_delete:
                     continue
+                # Whoever wrote them: a channel deleted takes everybody's
+                # messages in it, not only its owner's.
                 pointing = [
                     r["id"]
                     for r in conn.execute(
-                        "SELECT id FROM records WHERE model = ? AND owner = ?"
-                        " AND json_extract(indexed, ?) = ?",
-                        (other.id, owner, f'$."{f.name}"', record_id),
+                        "SELECT id FROM records WHERE model = ? AND json_extract(indexed, ?) = ?",
+                        (other.id, f'$."{f.name}"', record_id),
                     )
                 ]
                 for child in pointing:
@@ -680,10 +950,30 @@ class RecordStore:
         return gone
 
     def seed(
-        self, principal: Principal, model_id: str, records: Iterable[dict], writer: str
+        self,
+        principal: Principal,
+        model_id: str,
+        records: Iterable[dict],
+        writer: str,
+        *,
+        once: bool = False,
+        scope: str | None = None,
     ) -> list[Record]:
-        """Write *records* for *principal* if they have none of *model_id* yet."""
-        if self.count(principal.username, model_id):
+        """Write *records* for *principal* if they have none of *model_id* yet.
+
+        With *once*, if the server has none of it yet, from anybody: the public
+        calendar, `#general`. With *scope*, of that scope, for a space.
+        """
+        if once:
+            with connect(self.db_path) as conn:
+                row = conn.execute(
+                    "SELECT 1 FROM records WHERE model = ? AND scope = ? LIMIT 1",
+                    (model_id, scope or "personal"),
+                ).fetchone()
+            conn.close()
+            if row is not None:
+                return []
+        elif self.count(principal.username, model_id, scope=scope):
             return []
         who = Principal("quill", principal.username, quill=writer, models=frozenset({model_id}))
         made = []
@@ -696,7 +986,7 @@ class RecordStore:
                 )
                 for key, value in fields.items()
             }
-            made.append(self.create(who, model_id, filled))
+            made.append(self.create(who, model_id, filled, scope=scope))
         return made
 
     def changes(self, owner: str, since: int = 0, limit: int = 200) -> list[dict]:
@@ -726,19 +1016,28 @@ class RecordStore:
         updated_at: str,
         writer: str,
         record_id: str | None = None,
+        scope: str = "personal",
+        members: Iterable[str] = (),
     ) -> str:
         """A record as it was elsewhere, times and position kept. For migrations."""
         model = self.model(model_id)
         record_id = record_id or _new_id()
         with connect(self.db_path) as conn:
             indexed, body = self._write_row(conn, model, owner, record_id, fields)
+            for username in members:
+                conn.execute(
+                    "INSERT OR IGNORE INTO record_members (space_id, username, added_by, joined_at)"
+                    " VALUES (?, ?, ?, ?)",
+                    (record_id, username, owner, created_at),
+                )
             conn.execute(
                 "INSERT INTO records (id, model, owner, scope, rev, position, indexed, body,"
-                " written_by, created_at, updated_at) VALUES (?, ?, ?, 'personal', 1, ?, ?, ?, ?, ?, ?)",
+                " written_by, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)",
                 (
                     record_id,
                     model.id,
                     owner,
+                    scope,
                     position,
                     indexed,
                     body,

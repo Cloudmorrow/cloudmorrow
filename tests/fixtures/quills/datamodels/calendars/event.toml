@@ -6,6 +6,7 @@ description = "A title and two moments, on a calendar. Times are wall-clock time
 domain = "calendars"
 scopes = ["personal", "shared", "public"]
 title = "title"
+in_space = "calendar"
 
 [fields]
 calendar = { kind = "link", to = "calendar", required = true, indexed = true, on_delete = "cascade" }

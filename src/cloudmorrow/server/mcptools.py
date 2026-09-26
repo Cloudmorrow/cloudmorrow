@@ -195,7 +195,7 @@ def create_folder(state: AppState, user: User, args: dict[str, Any]) -> Any:
 
 # -- records, of any installed datamodel ---------------------------------------
 def _principal(user: User) -> Principal:
-    return Principal.assistant(user.username)
+    return Principal.assistant(user.username, admin=user.is_admin)
 
 
 def _model(state: AppState, args: dict[str, Any]) -> str:
@@ -248,7 +248,7 @@ def create_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
 def update_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
     return state.records.update(
         _principal(user), _model(state, args), _str(args, "id", required=True), _fields(args),
-        rev=_int(args, "rev"),
+        rev=_rev(args),
     ).to_dict()
 
 
@@ -264,6 +264,14 @@ def delete_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
     record_id = _str(args, "id", required=True)
     gone = state.records.delete(_principal(user), model, record_id)
     return {"id": record_id, "deleted": gone}
+
+
+def _rev(args: dict[str, Any]) -> int | str | None:
+    """A record's rev: a whole number, or a note's string."""
+    value = args.get("rev")
+    if value is None or isinstance(value, int | str) and not isinstance(value, bool):
+        return value
+    raise ToolError("rev is the rev get_record gave")
 
 
 # -- building Quills, for an administrator's assistant -------------------------
@@ -478,7 +486,7 @@ TOOLS: tuple[Tool, ...] = (
         "Change some fields of a record. Pass the rev you read so a change made elsewhere "
         "is not overwritten.",
         _schema({"model": _MODEL, "id": _RECORD_ID, "fields": _FIELDS,
-                 "rev": {"type": "integer", "description": "The rev from get_record. Optional."}},
+                 "rev": {"type": ["integer", "string"], "description": "The rev from get_record. Optional."}},
                 ("model", "id", "fields")),
         "",
         update_record,

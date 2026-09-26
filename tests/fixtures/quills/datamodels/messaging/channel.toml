@@ -6,6 +6,7 @@ description = "A room people talk in: public, private, or between two people."
 domain = "messaging"
 scopes = ["shared", "public"]
 title = "name"
+space = true
 
 [fields]
 name = { kind = "string", required = true }

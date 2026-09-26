@@ -198,8 +198,68 @@ The core serves every installed datamodel at the same API:
 | `POST /api/quills` | install, from the catalog or a source (admin) |
 
 Scopes are `personal`, `shared` and `public`, as chat and calendar have them.
-The first release of the record store does `personal`; a datamodel that asks
-for another scope is refused at install with that said plainly.
+Records of a datamodel that is not a space, and not in one, are personal:
+their owner's alone. See *Spaces* for everything shared.
+
+### Spaces: what more than one person shares
+
+A calendar the household shares and a channel the team talks in are the
+same shape: a container some people are in, and things inside it that
+everybody in it may see. The record store has that shape once, for every
+Quill, as **spaces**.
+
+```toml
+[datamodel]
+id = "calendar"
+space = true                      # a record of it is a space
+scopes = ["personal", "shared", "public"]
+
+[datamodel]
+id = "event"
+in_space = "calendar"             # a link field: whoever may see the calendar sees the event
+```
+
+| scope | who sees it and writes in it | who manages it | leaving |
+| --- | --- | --- | --- |
+| `personal` | its owner | its owner | cannot |
+| `shared` | its owner and its members | its owner, and administrators | a member may |
+| `public` | everybody on the server | its owner, and administrators | nobody can |
+
+A space's scope is set when it is made. Members are added with
+`POST /api/records/{model}/{id}/members` and removed with `DELETE
+…/members/{username}`; being added leaves a notification. A record in a
+space is sealed to the space, so moving a message to another channel by
+editing the database opens as nothing.
+
+A dataset can seed a space once per server (`seed = "once"`, for the
+public calendar and `#general`) or once per person (`seed = "per-owner"`,
+for everyone's own calendar).
+
+A space may declare what happens when something is written in it:
+
+```toml
+[[notify]]                        # on the datamodel of what is written
+when = "created"
+to = "members"                    # everybody in the space but the writer
+push = true                       # and a push to their phones
+unread = true                     # counted until they open the space
+```
+
+### Backends: data that lives somewhere else
+
+Most datamodels live in the record store. Three foundational ones live where
+they always have, because other things reach them there, and are served
+through the same record API by a **backend**:
+
+| datamodel | backend | lives in | also reached by |
+| --- | --- | --- | --- |
+| `note` | `notes` | Markdown files in each person's notes folder, sealed | WebDAV, the notes MCP tools, `cm note` |
+| `file` | `shares` | the fileshares and each person's drive | WebDAV, the desktop app's mounts, `cm share` |
+| `secret` | `vaults` | the secrets store, sealed under its own key | `cm secret run`, and never an assistant |
+
+A backend answers the same list, get, create, change and delete, with the
+same envelope, so a Quill, `cm <quill>` and an assistant cannot tell the
+difference. The Notes, Files and Secrets Quills carry only their screens.
 
 ### Screens
 
@@ -208,13 +268,13 @@ each element needs:
 
 | kit | binds | on the phone | on the full web app | in the terminal | on the command line |
 | --- | --- | --- | --- | --- | --- |
-| `list` | `model`, `title`, optional `subtitle`, `tick` (a bool field) | a list with a circle per row | the same, wider | a table | `cm <quill> list`, `add`, `done` |
+| `list` | `model`, `title`, optional `subtitle`, `tick` (a bool field), `group` (a link: sections) | a list with a circle per row | the same, wider | a table | `cm <quill> list`, `add`, `done` |
 | `board` | `model`, `lane` (enum), `title`, optional `group` (link), `body`, `done` | lanes stacked | lanes as columns, drag and drop | lanes as columns, drag and keys | `cm <quill> list`, `add`, `move` |
 | `detail` / `form` | `model`, `fields` | a sheet | a panel | a modal | `cm <quill> show`, `set` |
-| `calendar` | `model`, `starts`, `ends` | *next* | | | |
-| `thread` | `model`, `body`, `at` | *next* | | | |
-| `grid` | a folder | *next* | | | |
-| `editor` | `model`, a markdown field | *next* | | | |
+| `calendar` | `model`, `starts`, `ends`, optional `all_day`, `space` (the calendars) | a day list and a month | a week and a month | a month and the day's list | `cm <quill> list --from --to`, `add` |
+| `thread` | `model`, `body`, `space` (the channels) | channels, then a conversation | both side by side | both side by side | `cm <quill> list`, `say` |
+| `editor` | `model` with a `markdown` field, optional folders from the title | a tree, then a page | both side by side | both side by side | `cm <quill> show`, `add`, `edit` |
+| `grid` | `model` of kind file | folders and tiles | the same, wider | a table | `cm <quill> list`, `get`, `put` |
 
 Every screen gets a record sheet for free: opening a card or a row shows the
 record's fields with the widget for each kind, editable, with delete.

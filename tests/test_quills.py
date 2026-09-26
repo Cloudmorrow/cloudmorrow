@@ -169,10 +169,6 @@ def test_removing_a_quill_keeps_its_records(registry, tmp_path):
             "cannot be required",
         ),
         (
-            lambda m: m.replace('datamodels = ["vehicle"]', 'datamodels = ["vehicle", "channel"]'),
-            "personal records only",
-        ),
-        (
             lambda m: m.replace('datamodels = ["vehicle"]', 'datamodels = ["spaceship"]'),
             "spaceship",
         ),

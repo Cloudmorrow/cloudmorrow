@@ -1,0 +1,17 @@
+[datamodel]
+id = "note"
+version = 1
+label = "Note"
+description = "Markdown in a folder, with pictures. A real file in your notes folder, sealed at rest."
+domain = "notes"
+scopes = ["personal"]
+title = "title"
+# Kept where notes have always been, as files, and served as records by the core.
+backend = "notes"
+
+[fields]
+path = { kind = "string", required = true, indexed = true, label = "Path" }
+folder = { kind = "string", indexed = true }
+title = { kind = "string", indexed = true }
+body = { kind = "markdown" }
+modified = { kind = "datetime", indexed = true }
