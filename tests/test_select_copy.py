@@ -21,15 +21,13 @@ async def test_selecting_text_with_the_mouse_copies_it(app):
         screen = await start(app, pilot)
         await pilot.click("#nav-files")
         await settle(app, pilot)
-        await pilot.click("#files-tab-local-backups")
-        await settle(app, pilot)
-        placeholder = screen.query_one("#backups-placeholder", Static)
-        assert placeholder.text_selection is None
-        # Offsets are on the widget, whose padding is 2 3, and the cell under
+        crumb = screen.query_one("#grid-crumb", Static)
+        assert crumb.text_selection is None
+        # Offsets are on the widget, whose padding is 0 3, and the cell under
         # the pointer when the button comes up is part of the selection.
-        await sweep(pilot, "#backups-placeholder", (3, 2), (15, 2))
-        assert screen.get_selected_text() == "Local backups"
-        assert app._clipboard == "Local backups"
+        await sweep(pilot, "#grid-crumb", (3, 0), (8, 0))
+        assert screen.get_selected_text() == "Shares"
+        assert app._clipboard == "Shares"
         # And the status bar says so — nothing else needs pressing, and
         # nothing pops up: a notification is what a machine sends.
         assert "Copied" in said(screen)
@@ -56,8 +54,6 @@ async def test_a_click_alone_copies_nothing(app):
         await start(app, pilot)
         await pilot.click("#nav-files")
         await settle(app, pilot)
-        await pilot.click("#files-tab-local-backups")
-        await settle(app, pilot)
-        await sweep(pilot, "#backups-placeholder", (3, 2), (3, 2))
+        await sweep(pilot, "#grid-crumb", (3, 0), (3, 0))
         assert app._clipboard == ""
         assert "Copied" not in said(app.screen)

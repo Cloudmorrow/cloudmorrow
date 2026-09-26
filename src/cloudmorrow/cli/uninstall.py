@@ -29,6 +29,7 @@ from cloudmorrow.agent.config import default_config_path as agent_config_path
 from cloudmorrow.cli import dev
 from cloudmorrow.cli.common import client, console
 from cloudmorrow.client.config import APP_NAME, config_dir, credentials_path
+from cloudmorrow.desktop import launcher
 from cloudmorrow.links import COMMANDS
 
 
@@ -84,6 +85,7 @@ class Plan:
     config: Path | None = None
     backups: Path | None = None
     links: list[Path] = field(default_factory=list)
+    launcher: list[Path] = field(default_factory=list)  # the desktop app in the menu
     prefix: Path | None = None  # the venv and whatever else install.sh put beside it
     checkout: Path | None = None  # running from source: the venv is left alone
     elsewhere: str = ""  # installed some other way: where, and left alone
@@ -100,6 +102,8 @@ class Plan:
             out.append(f"{self.backups}  [dim](backups the agent made)[/]")
         for link in self.links:
             out.append(str(link))
+        for path in self.launcher:
+            out.append(f"{path}  [dim](the desktop app's launcher)[/]")
         if self.prefix:
             out.append(f"{self.prefix}  [dim](the venv)[/]")
         return out
@@ -150,6 +154,7 @@ def plan(*, keep_backups: bool = False) -> Plan:
             ):
                 if link not in found.links:
                     found.links.append(link)
+    found.launcher = launcher.installed()
     return found
 
 
@@ -198,6 +203,11 @@ def remove(found: Plan, *, forget=forget_on_server) -> list[str]:
             link.unlink()
         except OSError as exc:
             notes.append(f"{link} could not be removed: {exc}")
+    if found.launcher:
+        try:
+            launcher.remove()
+        except OSError as exc:
+            notes.append(f"the desktop app's launcher could not be removed: {exc}")
     if found.checkout:
         notes.append(f"running from {found.checkout}, which is left as it is")
     if found.elsewhere:

@@ -46,7 +46,7 @@ why = "to show who looks after each plant"
 
 [[screens]]                        # one tab per screen, on every surface
 id = "plants"
-kit = "list"                       # list, board, detail, form, thread (calendar, grid, editor: next)
+kit = "list"                       # list, board, detail, form, grid, thread (calendar, editor: next)
 label = "Plants"
 model = "plants.plant"
 title = "name"
@@ -131,6 +131,7 @@ leaves.
 | list | model, title; optional subtitle, tick (bool) | rows, a circle per row if tick |
 | board | model, lane (enum, in ordered_within), title; optional group (link: chips), body (markdown), done (a lane value) | lanes; cards dragged between them |
 | detail / form | model; optional fields = [...] | one record's fields, editable |
+| grid | a model with bytes beside its fields (the foundational `file`); group (link: the places, picked first), folder (string), kind (an enum with "folder"); optional size, modified, mime, group_subtitle and group_open (fields of the group's model) | the groups, then folders and tiles with pictures; put in, get, new folder, rename, move, delete |
 | thread | model (in a space), space (its link to the space), body; optional about (a field of the space), made_as | the spaces with unread counts, then a conversation: newest at the bottom, grouped by author and day, a box to write in |
 
 A thread's `made_as` says what fields a space gets for how it is made — by

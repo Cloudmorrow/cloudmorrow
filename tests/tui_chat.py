@@ -170,6 +170,8 @@ class FakeSpaces:
     async def records(self, model: str, *, last: int | None = None, since: str | None = None,
                       **where: object) -> list[dict]:
         rows = await super().records(model, **where)  # type: ignore[misc]
+        if model not in CHAT_MODELS:
+            return rows
         rows = [r for r in rows if self._visible(model, r)]
         if self._model(model).get("in_space"):  # type: ignore[attr-defined]
             rows.sort(key=lambda r: r["created_at"])
@@ -184,6 +186,8 @@ class FakeSpaces:
     async def create_record(self, model: str, fields: dict, *, index: int | None = None,
                             scope: str | None = None, members: list[str] | None = None,
                             unique: bool = False) -> dict:
+        if model not in CHAT_MODELS:
+            return await super().create_record(model, fields, index=index)  # type: ignore[misc]
         definition = self._model(model)  # type: ignore[attr-defined]
         if definition.get("space"):
             people = {"bram", *(members or [])}

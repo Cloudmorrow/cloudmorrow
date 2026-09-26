@@ -366,6 +366,9 @@ async function drawConversation(at, s, spaces, id, { phone }) {
       merge([sent]);
       list.innerHTML = renderLines(state.lines, s.body, me);
       toBottom();
+      // Beside the list, this one now leads it, with your line under its name.
+      const listing = !phone && app.querySelector(".kit-thread .spaces .listing");
+      if (listing) listing.innerHTML = spaceGroups(at, s, await loadSpaces(at, s), id);
     } catch (err) {
       // The words go back rather than being lost to a dropped connection.
       box.value = text;

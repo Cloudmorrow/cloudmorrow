@@ -1,0 +1,39 @@
+[quill]
+id = "files"
+name = "Files"
+version = "1.0.0"
+summary = "Your own drive on the server, your fileshares, and what is in them."
+category = "personal"
+icon = "files"
+publisher = "Cloudmorrow"
+license = "AGPL-3.0-or-later"
+features = [
+  "My Files: a drive of your own on the server, there from the day your account is",
+  "Your fileshares beside it, on the server or on one of your machines",
+  "Folders and files as a list, or as tiles with a picture of each photo",
+  "Sort by name, date, size or type; folders first",
+  "Upload from the phone, the camera, a drag or a paste; make folders; rename, move and delete",
+  "Open a picture, save or share any file",
+  "In the desktop app: mount a share on this computer, open its folder, unmount it",
+]
+
+[uses]
+datamodels = ["share", "file"]
+
+# One tab: My Files and the shares to pick from, then the folders and files
+# in the one you picked. On a phone that is folders and tiles; on a computer
+# the same, wider; in the terminal a table with the picture beside it.
+[[screens]]
+id = "files"
+kit = "grid"
+label = "Files"
+model = "file"
+title = "name"
+group = "share"                 # the share picker: My Files, then your shares
+group_subtitle = "about"        # where each one is, and whether it can be reached
+group_open = "browsable"        # a machine share is listed, not opened
+folder = "folder"
+kind = "kind"
+size = "size"
+modified = "modified"
+mime = "mime"

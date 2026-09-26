@@ -3,15 +3,19 @@
 #
 #   curl -fsSL __BASE_URL__/install.sh | sh
 #   curl -fsSL __BASE_URL__/install.sh | sh -s -- --agent-token bce_xxx --allow-shell
+#   curl -fsSL __BASE_URL__/install.sh | sh -s -- --no-desktop
 #
 set -eu
 
 CLOUDMORROW_URL="__BASE_URL__"
 PACKAGE="__PACKAGE_SPEC__"
+# The same, with the desktop app's dependencies: added where there is a desktop.
+DESKTOP_PACKAGE="__DESKTOP_PACKAGE_SPEC__"
 AGENT_TOKEN="${CLOUDMORROW_AGENT_TOKEN:-}"
 AGENT_NAME=""
 ALLOW_SHELL=""
 NO_AGENT=""
+NO_DESKTOP=""
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -19,9 +23,10 @@ while [ $# -gt 0 ]; do
 	--agent-name) AGENT_NAME="$2"; shift 2 ;;
 	--allow-shell) ALLOW_SHELL="--allow-shell"; shift ;;
 	--no-agent) NO_AGENT="1"; shift ;;
+	--no-desktop) NO_DESKTOP="1"; shift ;;
 	--server) CLOUDMORROW_URL="$2"; shift 2 ;;
 	-h | --help)
-		sed -n '2,8p' "$0" 2>/dev/null || echo "see ${CLOUDMORROW_URL}"
+		sed -n '2,7p' "$0" 2>/dev/null || echo "see ${CLOUDMORROW_URL}"
 		exit 0
 		;;
 	*) echo "unknown option: $1" >&2; exit 2 ;;
@@ -75,6 +80,37 @@ done
 "$BINDIR/cloudmorrow" config set api_url "$CLOUDMORROW_URL" >/dev/null
 say "CLI configured for $CLOUDMORROW_URL"
 
+# --- the desktop app, where there is a desktop -----------------------------
+# The web app in a window of its own, which also mounts your shares on this
+# computer: `cloudmorrow app`. Only for a person at a graphical session — a
+# machine reached over ssh, a server or a root install gets the terminal app
+# alone, as before. The extra is installed on top of what is already there,
+# without --force-reinstall, so running this again does not fetch Qt again.
+DESKTOP=""
+if [ -n "$NO_DESKTOP" ]; then
+	say "skipping the desktop app (--no-desktop)"
+elif [ "$(id -u)" = "0" ]; then
+	: # a root install is for every user and none of them in particular
+elif [ "$(uname -s)" = "Linux" ]; then
+	if [ -n "${WAYLAND_DISPLAY:-}" ] || [ -n "${DISPLAY:-}" ]; then
+		say "a desktop is running here: adding the desktop app (this is the big download)"
+		if "$VENV/bin/python" -m pip install --quiet "$DESKTOP_PACKAGE" \
+			&& "$BINDIR/cloudmorrow" app --install-launcher; then
+			DESKTOP="1"
+			say "Cloudmorrow is in your applications menu"
+		else
+			printf '\033[33mnote:\033[0m the desktop app did not install; the terminal app is fine\n'
+		fi
+	fi
+fi
+# TODO(macos): the extra installs on a Mac as it is (pywebview uses the
+# system's WKWebView there), but there is no launcher yet: that needs an .app
+# bundle in ~/Applications that runs `cloudmorrow app` — see
+# cloudmorrow/desktop/launcher.py. Until it exists a Mac gets the terminal app,
+# and `pip install 'cloudmorrow[desktop]'` into $VENV by hand for the window.
+# TODO(windows): this script does not run on Windows; that needs a
+# PowerShell installer that makes the venv and a Start-menu shortcut.
+
 # --- optionally enrol the agent -------------------------------------------
 if [ -n "$AGENT_TOKEN" ] && [ -z "$NO_AGENT" ]; then
 	say "enrolling the local agent"
@@ -97,6 +133,15 @@ cat <<EOF
     cloudmorrow                    open the notes TUI  (cm does the same, in two letters)
 
 EOF
+
+if [ -n "$DESKTOP" ]; then
+	cat <<EOF
+  The desktop app is in your applications menu, or:
+
+    cloudmorrow app                the web app in a window, mounting shares here
+
+EOF
+fi
 
 if [ -n "$AGENT_TOKEN" ] && [ -z "$NO_AGENT" ]; then
 	cat <<EOF

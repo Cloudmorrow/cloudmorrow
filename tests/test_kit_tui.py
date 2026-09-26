@@ -170,8 +170,9 @@ async def test_a_quill_screen_is_a_tab_after_notes(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
         assert tab_labels(screen)[0] == "Notes  f1"
-        # The Quills after your cloud, each with the key it had when it was built in.
-        assert tab_labels(screen)[-2:] == ["Tasks  f2", "Chat  f4"]
+        # In the order they were installed; Tasks and Files with the keys
+        # they had when they were built in, Chat with the next one free.
+        assert tab_labels(screen)[-3:] == ["Tasks  f2", "Chat  f4", "Files  f5"]
         assert screen.query_one("#nav-section-quills").display
         assert isinstance(screen.query_one("#pane-tasks"), BoardPane)
 
@@ -321,6 +322,8 @@ async def test_installing_shows_the_sheet_then_adds_the_tab(app):
 
 
 async def test_removing_asks_then_takes_the_tab_and_keeps_the_records(app):
+    # Tasks alone, so taking it away leaves no Quills at all.
+    app.client.quill_list = [q for q in app.client.quill_list if q["id"] != "files"]
     async with app.run_test(size=(120, 34)) as pilot:
         screen, view = await open_quills(app, pilot)
         table = view.query_one("#admin-quill-table")

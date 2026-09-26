@@ -19,6 +19,15 @@ category = "personal"
 publisher = "Cloudmorrow"
 foundation = true
 
+[[quills]]
+id = "files"
+name = "Files"
+summary = "Your own drive on the server, your fileshares, and what is in them."
+repo = "quill-files"
+category = "personal"
+publisher = "Cloudmorrow"
+foundation = true
+
 [[categories]]
 id = "home"
 label = "Home"

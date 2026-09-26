@@ -88,9 +88,9 @@ async def test_secrets_is_a_card_of_its_own(app):
             ("Notes", "f1"),
             ("Calendar", "f7"),
             ("Secrets", "f3"),
-            ("Files", "f5"),
             ("Tasks", "f2"),
             ("Chat", "f4"),
+            ("Files", "f5"),
         ]
 
 

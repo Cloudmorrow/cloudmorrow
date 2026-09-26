@@ -28,14 +28,16 @@ __PAGE_CSS__
       <li><div>
         <b>On a computer</b>
         <p>One line in a terminal installs the terminal app, <code>cm</code>, and on a
-        computer with a desktop, the Cloudmorrow desktop app that also mounts your
-        fileshares:</p>
+        Linux computer with a desktop, the Cloudmorrow app in your applications menu,
+        which also mounts your fileshares:</p>
         <div class="cmd">
           <code id="install-cmd"><span class="prompt">$ </span>curl -fsSL __BASE_URL__/install.sh | sh</code>
           <button type="button" data-copy="#install-cmd">Copy</button>
         </div>
         <small>Needs Python 3.11 or newer. It installs into <code>__VENV_HINT__</code> and
-        signs this computer in to <b>__BASE_URL__</b>. Linux today; macOS and Windows next.</small>
+        signs this computer in to <b>__BASE_URL__</b>. Terminal only: add
+        <code>sh -s -- --no-desktop</code> in place of <code>sh</code>. Linux today;
+        macOS and Windows next.</small>
       </div></li>
       <li><div>
         <b>On a phone</b>

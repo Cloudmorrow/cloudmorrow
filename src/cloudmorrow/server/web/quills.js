@@ -7,6 +7,7 @@
 
      #/q/<quill>/<screen>              a screen: the board, the list
      #/q/<quill>/<screen>/<group>      a board, on one of its groups
+     #/q/<quill>/<screen>/<group>/<…>  a grid, in a folder of one of them
      #/q/<quill>/<screen>/<id>/…       a thread, on one space (and what is below it)
      #/r/<quill>/<screen>/<model>/<id> one record, on the record sheet
 
@@ -98,8 +99,8 @@ async function find(quillId, screenId) {
 }
 
 registerScreen("q", async (arg) => {
-  // Everything after the screen is the screen's own: a board's group, a
-  // thread's space and what is below it.
+  // Whatever follows the screen is the kit's: a board's group, a grid's
+  // group and the folder in it, a thread's space and what is below it.
   const [quillId, screenId, ...rest] = arg.split("/");
   const at = await find(quillId, screenId);
   if (at) await renderKitScreen(at, rest.join("/"));

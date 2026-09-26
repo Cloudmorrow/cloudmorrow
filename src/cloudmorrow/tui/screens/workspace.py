@@ -19,9 +19,9 @@ plainness: a place per card down the left, each saying how it is; one rounded
 panel for the place you are on; a strip of what happened along the bottom;
 the keys on the last line.
 
-Down the left: YOUR CLOUD — notes, your days, your secrets, your files —
+Down the left: YOUR CLOUD — notes, your days, your secrets —
 then QUILLS, a card for every screen of every Quill this server has
-installed (Tasks and Chat are the first), drawn from the kit by tui/panes/kit.py. Those
+installed (Tasks, Files and Chat are the first), drawn from the kit by tui/panes/kit.py. Those
 are asked for after sign-in rather than built in, so installing one in
 Administration puts its card here without a restart. An administrator has a
 third section, ADMINISTRATION, whose entries put the server's own panel —
@@ -50,8 +50,9 @@ from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.panes.admin import AdminPanel
 from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.panes.calendar import CalendarPane
-from cloudmorrow.tui.panes.files import FilesPane
 from cloudmorrow.tui.panes.kit import pane_for, screen_key
+# Shares on this machine: mounted here or not, on any grid of shares.
+from cloudmorrow.tui import sharemounts  # noqa: F401
 from cloudmorrow.tui.panes.notes import NotesPane
 from cloudmorrow.tui.panes.secrets import SecretsPane
 from cloudmorrow.tui.screens.modals import PasswordModal
@@ -69,16 +70,16 @@ from cloudmorrow.tui.widgets.logstrip import LogStrip
 from cloudmorrow.tui.widgets.sidebar import NavCard, SectionLabel
 
 PANES: tuple[type[Pane], ...] = (
-    NotesPane, CalendarPane, SecretsPane, FilesPane,
+    NotesPane, CalendarPane, SecretsPane,
 )
 
 # The function keys no built-in card has, handed to Quill cards in the order
 # they appear.
-QUILL_KEYS: tuple[str, ...] = ("f2", "f4", "f10", "f11", "f12")
-# A key a Quill had when it was built in, and keeps whatever order the
-# Quills arrive in: fingers remember f2 for Tasks. (Chat's f6 is not kept —
-# in Notes it was always Import as well, so it goes to the next free key.)
-KEPT_KEYS: dict[str, str] = {"tasks": "f2"}
+QUILL_KEYS: tuple[str, ...] = ("f2", "f5", "f4", "f10", "f11", "f12")
+# A key a Quill had when it was built in, and keeps whatever order the Quills
+# arrive in: fingers remember f2 for Tasks and f5 for Files. (Chat's f6 is not
+# kept — in Notes it was always Import as well — so it takes the next free key.)
+KEPT_KEYS: dict[str, str] = {"tasks": "f2", "files": "f5"}
 
 # How often the bell asks the server whether anything happened.
 BELL_POLL = 60.0
@@ -88,7 +89,6 @@ FEATURE_OF: dict[str, str] = {
     "notes": "notes",
     "calendar": "calendar",
     "secrets": "secrets",
-    "files": "files",
 }
 
 # Below this many columns the sidebar narrows, and its cards become one line.

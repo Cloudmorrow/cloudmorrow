@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 
 from cloudmorrow import __version__
+from cloudmorrow.desktop.extra import with_extra
 from cloudmorrow.logo import LOGO_LARGE
 from cloudmorrow.server.deps import AppState, get_state
 
@@ -64,13 +65,13 @@ def install_page(request: Request, state: AppState = Depends(get_state)) -> Resp
 
 @router.get("/install.sh", response_class=PlainTextResponse, include_in_schema=False)
 def install_script(request: Request, state: AppState = Depends(get_state)) -> PlainTextResponse:
+    package = state.config.resolve_package_spec(base_url(request, state))
     script = _render(
         "install.sh",
         {
             "__BASE_URL__": base_url(request, state),
-            "__PACKAGE_SPEC__": state.config.resolve_package_spec(
-                base_url(request, state)
-            ),
+            "__PACKAGE_SPEC__": package,
+            "__DESKTOP_PACKAGE_SPEC__": with_extra(package),
         },
     )
     return PlainTextResponse(script, media_type="text/x-shellscript")
