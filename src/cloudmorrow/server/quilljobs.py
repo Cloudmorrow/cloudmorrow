@@ -9,6 +9,8 @@ At boot:
 * Boards and tasks from before Tasks was a Quill move into the record store,
   under the `board` and `task` datamodels, keeping their titles, bodies,
   lanes, order and times. The old tables stay where they are, untouched.
+* A server that had Files built in gets the Files Quill, which draws the
+  same files where they are (`install_files`).
 
 Both reach the network for the catalog, so both run on a thread and neither
 can stop the server starting. What fails is logged and tried again at the
@@ -36,6 +38,8 @@ SWEEP_EVERY = 10 * 60.0
 # schema_meta keys: set once the thing is done, so it is done once.
 SEEDED = "quills_seeded"
 LEGACY_TASKS = "legacy_tasks_moved"
+# Files was built in until it became a Quill; set once that is settled.
+FILES_QUILL = "files_quill_settled"
 
 
 def read_meta(db_path: Path, key: str) -> str | None:
@@ -127,6 +131,30 @@ def move_legacy_tasks(db_path: Path, registry: QuillRegistry, records: RecordSto
     return moved
 
 
+def install_files(db_path: Path, registry: QuillRegistry) -> bool:
+    """Files, on a server that had it built in. Returns whether it was installed.
+
+    Nothing moves: the files are where they always were, and the `shares`
+    backend serves them as records. What a server from before the move lacks
+    is the Quill that draws them, so it gets it, once — switched on or off
+    as the built-in feature was, because the switch's key, `files`, is the
+    Quill's id too. A server set up since the move chose for itself (the
+    installer, or the foundation Quills at first boot), and is left alone.
+    """
+    if read_meta(db_path, FILES_QUILL):
+        return False
+    if "files" in registry.quills:
+        write_meta(db_path, FILES_QUILL, "present")
+        return False
+    if not (read_meta(db_path, SEEDED) or registry.quills):
+        # A fresh server: install_foundation, or the installer, decides.
+        return False
+    registry.install_from_catalog("files")
+    write_meta(db_path, FILES_QUILL, "installed")
+    log.info("installed the Files Quill in place of the built-in Files")
+    return True
+
+
 def boot(db_path: Path, registry: QuillRegistry, records: RecordStore) -> None:
     """The boot work, in order. Each step logs its own failure and lets the next run."""
     try:
@@ -137,6 +165,10 @@ def boot(db_path: Path, registry: QuillRegistry, records: RecordStore) -> None:
         move_legacy_tasks(db_path, registry, records)
     except (QuillError, UnknownModelError) as exc:
         log.warning("could not move the old tasks into records yet: %s", exc)
+    try:
+        install_files(db_path, registry)
+    except QuillError as exc:
+        log.warning("could not install the Files Quill yet: %s", exc)
 
 
 def sweep_all(registry: QuillRegistry, records: RecordStore) -> int:

@@ -1,5 +1,6 @@
-/* Files: the sort switch and the list-or-grid switch, what a file row
-   says, the grid's tiles, a picture shown, and a file that is not one. */
+/* The kit's grid (kit_grid.js): the sort switch and the list-or-tiles
+   switch, what a row says, the tiles, a picture shown, and a record that
+   is not one. */
 
 /* The sort across, and the two ways of showing the folder beside it. */
 .sort-row { display: flex; gap: 8px; margin: 0 0 14px; }
@@ -104,10 +105,20 @@
 .row .meta .size { flex: none; }
 .row .meta .type { flex: none; margin-left: auto; font-size: 13px; text-transform: none; }
 
-/* A machine share is on the list but not on offer here. */
-.row.machine { color: var(--muted); }
-.row.machine .icon { color: var(--muted); }
-.row.machine .title { color: var(--ink); }
+/* A place that is on the list but not on offer here — somewhere else,
+   and the line under it says where. */
+.row.elsewhere { color: var(--muted); }
+.row.elsewhere .icon { color: var(--muted); }
+.row.elsewhere .title { color: var(--ink); }
+
+/* The name of a place, and what is beside it, in the heading. */
+.heading .more { color: var(--accent); }
+
+/* A record's own page: what can be done to it, under its facts. Delete
+   is the one that cannot be undone, and says so in its colour. */
+.item-actions { margin-top: 14px; }
+.item-actions .row { min-height: 48px; font-weight: 600; }
+.item-actions .row.danger, .item-actions .row.danger .icon { color: var(--bad); }
 
 /* The picture, edge to edge, above its name and its facts. */
 .view {
@@ -166,7 +177,7 @@ main.dropping .listing {
 }
 main.dropping .listing > * { pointer-events: none; }
 
-/* -- the sheet: choose a file, or take a photo ---------------------------- */
+/* -- the sheet: choose a file, take a photo, make a folder ---------------- */
 .sheet-backdrop {
   position: fixed;
   inset: 0;
@@ -199,3 +210,4 @@ main.dropping .listing > * { pointer-events: none; }
 .sheet-row + .sheet-row { border-top: 1px solid var(--line); }
 .sheet-row:active { background: var(--card-2); }
 .sheet-row.cancel { color: var(--muted); font-weight: 600; }
+.sheet-row.danger { color: var(--bad); }

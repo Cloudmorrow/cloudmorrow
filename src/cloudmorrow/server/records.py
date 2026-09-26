@@ -865,6 +865,38 @@ class RecordStore:
         """Put a record in a group, at *index* in it: what dragging a card is."""
         return self.update(principal, model_id, record_id, incoming, index=index, action="moved")
 
+    # -- content: the bytes beside a record, for a backend that keeps some ------
+    def has_content(self, model_id: str) -> bool:
+        """Whether records of *model_id* have bytes beside their fields: a file's."""
+        model = self.model(model_id)
+        return bool(model.backend) and callable(
+            getattr(self.backends.get(model.backend), "content", None)
+        )
+
+    def _content_backend(self, model: Datamodel):
+        backend = self._backend(model) if model.backend else None
+        if backend is None or not callable(getattr(backend, "content", None)):
+            raise RecordError(f"a {model.label.lower()} has no content beside its fields")
+        return backend
+
+    def content(self, principal: Principal, model_id: str, record_id: str):
+        """(path, media type) of a record's bytes."""
+        check(principal, "read", model_id)
+        model = self.model(model_id)
+        return self._content_backend(model).content(principal, model, record_id)
+
+    def thumbnail(self, principal: Principal, model_id: str, record_id: str, size: int):
+        """The path of a small copy of a record's picture."""
+        check(principal, "read", model_id)
+        model = self.model(model_id)
+        return self._content_backend(model).thumbnail(principal, model, record_id, size)
+
+    def put(self, principal: Principal, model_id: str, fields: dict, source) -> Record:
+        """A new record from bytes that have arrived at *source*, and *fields* saying where."""
+        check(principal, "write", model_id)
+        model = self.model(model_id)
+        return self._content_backend(model).put(principal, model, dict(fields), source)
+
     def delete(self, principal: Principal, model_id: str, record_id: str) -> int:
         """Delete a record, and follow links that cascade. Returns how many went."""
         check(principal, "write", model_id)

@@ -1,0 +1,23 @@
+[datamodel]
+id = "share"
+version = 1
+label = "Share"
+description = "A place files are kept: your own drive on the server (My Files), a folder on the server that everyone's machines mount, or a directory on one of your machines, served by its agent."
+domain = "files"
+scopes = ["personal"]
+title = "label"
+# Kept where shares have always been — the shares table and the Shares
+# folder — and served as records by the core.
+backend = "shares"
+
+[fields]
+name = { kind = "string", required = true, indexed = true, label = "Name", description = "What it is mounted as: /dav/<name>/" }
+label = { kind = "string", indexed = true, label = "Shown as" }
+kind = { kind = "enum", values = ["drive", "server", "machine"], labels = ["My Files", "On the server", "On a machine"], default = "server", indexed = true }
+description = { kind = "text" }
+machine = { kind = "string", indexed = true, description = "The machine that serves a machine share" }
+path = { kind = "string", description = "Its directory, where it is" }
+online = { kind = "bool", indexed = true, description = "Whether it can be reached right now" }
+browsable = { kind = "bool", indexed = true, description = "Whether the server can show what is in it" }
+about = { kind = "string", description = "One line on where it is, and whether it can be reached" }
+url = { kind = "url", description = "Its WebDAV address" }

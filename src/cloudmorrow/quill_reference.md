@@ -46,7 +46,7 @@ why = "to show who looks after each plant"
 
 [[screens]]                        # one tab per screen, on every surface
 id = "plants"
-kit = "list"                       # list, board, detail, form (calendar, thread, grid, editor: next)
+kit = "list"                       # list, board, detail, form, grid (calendar, thread, editor: next)
 label = "Plants"
 model = "plants.plant"
 title = "name"
@@ -131,6 +131,7 @@ leaves.
 | list | model, title; optional subtitle, tick (bool) | rows, a circle per row if tick |
 | board | model, lane (enum, in ordered_within), title; optional group (link: chips), body (markdown), done (a lane value) | lanes; cards dragged between them |
 | detail / form | model; optional fields = [...] | one record's fields, editable |
+| grid | a model with bytes beside its fields (the foundational `file`); group (link: the places, picked first), folder (string), kind (an enum with "folder"); optional size, modified, mime, group_subtitle and group_open (fields of the group's model) | the groups, then folders and tiles with pictures; put in, get, new folder, rename, move, delete |
 
 Every screen opens a record sheet when a row or card is chosen: every field,
 with the widget for its kind, editable, with delete. No other UI exists, on

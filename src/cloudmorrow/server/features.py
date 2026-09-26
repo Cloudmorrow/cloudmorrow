@@ -1,7 +1,7 @@
 """Which parts of Cloudmorrow this server offers, and which of them you want.
 
 A feature is one whole area of the app — Notes, Tasks, Calendar, Chat,
-Secrets, Files — and there are two switches on each, which are not the same
+Secrets, and every Quill — and there are two switches on each, which are not the same
 kind of thing:
 
 * **The server's**, an administrator's to throw. Off means off everywhere:
@@ -72,7 +72,6 @@ class Feature:
 FEATURES: tuple[Feature, ...] = (
     Feature("notes", "Notes", "Markdown notes, in the app and on the phone", ("note",)),
     Feature("secrets", "Secrets", "Vaults of keys and passwords, encrypted", ("secret",)),
-    Feature("files", "Files", "Fileshares, and what is in them", ("file", "share", "machine")),
     Feature(
         "chat",
         "Chat",

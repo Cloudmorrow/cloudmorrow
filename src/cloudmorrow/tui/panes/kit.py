@@ -11,6 +11,8 @@ bindings and the datamodels the server sent beside them, and that is all a
 task board has to go on as much as a list of car services does.
 
 - `board` is in kit_board.py: lanes from an enum, cards you drag.
+- `grid` is in kit_grid.py: groups to pick from, then folders and files, as
+  a table or as tiles, with the picture beside.
 - `list` is a table of records by `title` (and `subtitle`), with a circle for
   the `tick` field that space fills in.
 - `detail` and `form` are the same table without the circle: the record
@@ -325,16 +327,19 @@ class ListPane(KitPane):
 def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     """The pane for one screen of a Quill, or None for a kit not drawn here yet.
 
-    `calendar`, `thread`, `grid` and `editor` come next (docs/QUILLS.md); a
-    Quill that declares one simply has no tab for it in this version.
+    `calendar`, `thread` and `editor` come next (docs/QUILLS.md); a Quill
+    that declares one simply has no tab for it in this version.
     """
     from cloudmorrow.tui.panes.kit_board import BoardPane
+    from cloudmorrow.tui.panes.kit_grid import GridPane
 
     kit = screen.get("kit")
     if screen.get("model") not in (quill.get("models") or {}):
         return None
     if kit == "board":
         return BoardPane(quill, screen, **kwargs)
+    if kit == "grid":
+        return GridPane(quill, screen, **kwargs)
     if kit in ("list", "detail", "form"):
         return ListPane(quill, screen, **kwargs)
     return None

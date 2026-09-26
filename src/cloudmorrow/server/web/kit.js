@@ -20,6 +20,7 @@ import {
   replace, seconds, setStatus, store, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
+import { renderGrid, renderGridItem } from "./kit_grid.js";
 
 const own = {
   // What a board is, for the button that opens its own sheet.
@@ -103,11 +104,12 @@ const canDrag = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
 // The kit elements this file draws. The server refuses to install a screen
 // of any other kind until every surface draws it, and a test holds this
 // list to the server's; the check below is for a server newer than the page.
-export const DRAWS = ["list", "board", "detail", "form"];
+export const DRAWS = ["list", "board", "detail", "form", "grid"];
 
 export async function renderKitScreen(at, arg) {
   const { kit } = at.screen;
   if (kit === "board") return renderBoard(at, arg);
+  if (kit === "grid") return renderGrid(at, arg);
   if (DRAWS.includes(kit)) return renderList(at);
   app.innerHTML = nav({ title: at.screen.label }) + `<main>${heading(at.screen.label)}
     <p class="empty"><b>Not on this app yet</b>This screen is a ${esc(kit)}, which this
@@ -514,6 +516,9 @@ function same(f, a, b) {
 
 export async function renderRecordSheet(at, modelId, id, arg) {
   const { quill, screen } = at;
+  // A grid's own records are files: shown, sent and saved on a page of the
+  // grid's rather than as a sheet of fields.
+  if (screen.kit === "grid" && modelId === screen.model) return renderGridItem(at, id);
   const model = quill.models[modelId];
   let record;
   try { record = await api("GET", recordsUrl(model.id, id)); }

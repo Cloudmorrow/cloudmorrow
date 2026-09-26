@@ -19,8 +19,8 @@ plainness: a place per card down the left, each saying how it is; one rounded
 panel for the place you are on; a strip of what happened along the bottom;
 the keys on the last line.
 
-Down the left: YOUR CLOUD — notes, your days, the chat, your secrets, your
-files — then QUILLS, a card for every screen of every Quill this server has
+Down the left: YOUR CLOUD — notes, your days, the chat, your secrets —
+then QUILLS, a card for every screen of every Quill this server has
 installed (Tasks is the first), drawn from the kit by tui/panes/kit.py. Those
 are asked for after sign-in rather than built in, so installing one in
 Administration puts its card here without a restart. An administrator has a
@@ -51,8 +51,9 @@ from cloudmorrow.tui.panes.admin import AdminPanel
 from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.panes.calendar import CalendarPane
 from cloudmorrow.tui.panes.chat import ChatPane
-from cloudmorrow.tui.panes.files import FilesPane
 from cloudmorrow.tui.panes.kit import pane_for, screen_key
+# Shares on this machine: mounted here or not, on any grid of shares.
+from cloudmorrow.tui import sharemounts  # noqa: F401
 from cloudmorrow.tui.panes.notes import NotesPane
 from cloudmorrow.tui.panes.secrets import SecretsPane
 from cloudmorrow.tui.screens.modals import PasswordModal
@@ -70,12 +71,13 @@ from cloudmorrow.tui.widgets.logstrip import LogStrip
 from cloudmorrow.tui.widgets.sidebar import NavCard, SectionLabel
 
 PANES: tuple[type[Pane], ...] = (
-    NotesPane, CalendarPane, ChatPane, SecretsPane, FilesPane,
+    NotesPane, CalendarPane, ChatPane, SecretsPane,
 )
 
 # The function keys no built-in card has, handed to Quill cards in the order
-# they appear. f2 was Tasks' before Tasks was a Quill, and still is.
-QUILL_KEYS: tuple[str, ...] = ("f2", "f4", "f10", "f11", "f12")
+# they appear. f2 was Tasks' before Tasks was a Quill, and still is; f5 was
+# Files', which is the second Quill a server has.
+QUILL_KEYS: tuple[str, ...] = ("f2", "f5", "f4", "f10", "f11", "f12")
 
 # How often the bell asks the server whether anything happened.
 BELL_POLL = 60.0
@@ -86,7 +88,6 @@ FEATURE_OF: dict[str, str] = {
     "calendar": "calendar",
     "chat": "chat",
     "secrets": "secrets",
-    "files": "files",
 }
 
 # Below this many columns the sidebar narrows, and its cards become one line.

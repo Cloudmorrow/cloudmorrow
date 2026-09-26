@@ -400,30 +400,6 @@ LoginScreen, SplashScreen {
     text-style: bold;
 }
 
-/* -- files: two tabs of its own ------------------------------------------ */
-#files-nav {
-    height: 2;
-    padding: 0 1;
-}
-
-#files-nav Tab {
-    padding: 0 2;
-}
-
-#files-views {
-    height: 1fr;
-}
-
-#shares-body {
-    height: 1fr;
-    padding: 1 2;
-}
-
-#backups-placeholder {
-    padding: 2 3;
-    color: $muted;
-}
-
 /* The three password fields sit one under the other, and the error under them. */
 #password-modal Input {
     margin-bottom: 1;

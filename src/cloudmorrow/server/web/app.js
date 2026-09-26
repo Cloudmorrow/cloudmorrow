@@ -12,7 +12,6 @@ import "./quills.js";
 import "./chat.js";
 import "./calendar.js";
 import "./format.js";
-import "./files.js";
 import "./features.js";
 import "./me.js";
 import "./admin.js";
