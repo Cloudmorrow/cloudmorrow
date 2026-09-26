@@ -18,8 +18,9 @@
 
 import {
   ApiError, api, app, authHeaders, encodePath, esc, formatDate, heading, icons, nav, onSignOut,
-  pixelIcon, registerScreen, registerTab, renderRoute, replace, store, tabs, toast, wireShell,
+  pixelIcon, registerScreen, registerTab, renderRoute, replace, route, store, tabs, toast, wireShell,
 } from "./core.js";
+import { call, desktop } from "./desktopbridge.js";
 
 const own = {
   share: '<svg width="22" height="20" viewBox="0 0 22 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="2" width="19" height="6" rx="1.5"/><rect x="1.5" y="12" width="19" height="6" rx="1.5"/><path d="M5 5h.01M5 15h.01" stroke-linecap="round" stroke-width="2.4"/></svg>',
@@ -143,7 +144,12 @@ function viewChoice() {
 
 // -- the shares -------------------------------------------------------------------
 async function renderShares() {
-  const listed = await api("GET", "/api/shares");
+  // In the desktop app, what this computer has mounted comes with the list,
+  // so the page is drawn once with it rather than twice.
+  const [listed, here] = await Promise.all([
+    api("GET", "/api/shares"), desktop() ? call("mounted_here") : null,
+  ]);
+  const mountRow = here ? (share) => mountLine(share, here.mounts || {}) : () => "";
   // The drive comes first from the server; here it stands on its own above
   // the shares, so what is yours and what is shared are not one list.
   const drives = listed.filter((share) => share.kind === "drive");
@@ -169,8 +175,8 @@ async function renderShares() {
       <span class="meta"><span class="preview">${esc(share.description || "on the server")}</span></span></span>
       <span class="chevron">${icons.chevronRight}</span></a>`;
   };
-  const driveRows = drives.map(rowOf).join("");
-  const shareRows = shares.map(rowOf).join("");
+  const driveRows = drives.map((share) => rowOf(share) + mountRow(share)).join("");
+  const shareRows = shares.map((share) => rowOf(share) + mountRow(share)).join("");
   app.innerHTML = nav({ title: "Files" }) + `
     <main>
       ${heading("Files")}
@@ -180,6 +186,56 @@ async function renderShares() {
         : `<p class="empty"><b>No shares yet</b>A share is made in the terminal app's Files tab.</p>`}
     </main>` + tabs("files");
   wireShell();
+  wireMounts();
+}
+
+// -- on this computer, in the desktop app ------------------------------------------------
+// Under each share, a line of its own: where it is mounted here and the way
+// to it, or the button that mounts it. Only the desktop app draws it — a
+// browser cannot mount anything — and it is the same mount the terminal app
+// and `cm share mount` make, so all three agree on what is mounted.
+// Mounting is Cloud blue: a strong choice, but not the one thing Files is for.
+function mountLine(share, mounted) {
+  const here = mounted[share.name] || {};
+  let words;
+  let buttons = "";
+  if (here.mounted) {
+    words = "Mounted at " + here.path;
+    buttons = `<button class="desk-button ghost" data-open="${esc(here.path)}">Open folder</button>` +
+      `<button class="desk-button ghost" data-unmount="${esc(share.name)}">Unmount</button>`;
+  } else if (share.kind === "machine" && !share.online) {
+    words = "Not mounted — its machine is offline";
+  } else {
+    words = "Not mounted on this computer";
+    buttons = `<button class="desk-button cloud" data-mount="${esc(share.name)}">Mount on this computer</button>`;
+  }
+  return `<div class="row mount-row${here.mounted ? " on" : ""}">` +
+    `<span class="main"><span class="meta"><span class="preview">${esc(words)}</span></span></span>` +
+    (buttons ? `<span class="mount-actions">${buttons}</span>` : "") + `</div>`;
+}
+
+function wireMounts() {
+  // One at a time: a mount waits for rclone, and a second click meanwhile
+  // would only be refused.
+  const act = (button, busy, method, done) => button.addEventListener("click", async () => {
+    for (const other of app.querySelectorAll(".mount-actions button")) other.disabled = true;
+    button.textContent = busy;
+    const answer = await call(method, button.dataset[method]);
+    toast(answer.error || done(answer), answer.error ? 6000 : 2200);
+    route();
+  });
+  for (const button of app.querySelectorAll("[data-mount]")) {
+    act(button, "Mounting…", "mount", (answer) => "Mounted at " + answer.path);
+  }
+  for (const button of app.querySelectorAll("[data-unmount]")) {
+    act(button, "Unmounting…", "unmount", () => "Unmounted");
+  }
+  for (const button of app.querySelectorAll("[data-open]")) {
+    button.addEventListener("click", async () => {
+      const answer = await call("open_folder", button.dataset.open);
+      if (answer.error) toast(answer.error, 6000);
+    });
+  }
 }
 
 // -- a folder in a share ------------------------------------------------------------

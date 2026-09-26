@@ -151,6 +151,8 @@ src/cloudmorrow/
   agent/             the local agent: config, tasks, poll loop
     omarchy.py       what "my Omarchy config" means on disk, read and written
     sync.py          claim, adopt, push, pull — one pass per poll
+  desktop/           the desktop app: the web app in a pywebview window, and the
+                     bridge that lets it mount shares here (`cloudmorrow app`)
   tui/               Textual client
     theme.py         the Textual theme, built from that palette
     screens/         splash, login, the workspace, and settings
@@ -948,7 +950,94 @@ and `cloudmorrow-agent` links, and last the venv under
 `~/.local/share/cloudmorrow`. It lists all of that and asks first; `--yes`
 skips the question. Nothing on the server is deleted except the agent record
 — your notes, projects and secrets are the server's. From a development
-checkout it leaves the checkout and its venv alone.
+checkout it leaves the checkout and its venv alone. The desktop app's entry
+in the applications menu goes with it.
+
+## The desktop app
+
+The client is two things on a computer: the terminal app, and a window with
+the web app in it that also does what a browser tab is not allowed to —
+mount a share on this computer, open the folder it landed in, say whether
+this machine's agent is running.
+
+```bash
+cloudmorrow app                       # open it (or click Cloudmorrow in the menu)
+cloudmorrow app --dry-run             # what it would open, and whether it could
+cloudmorrow app --print-url           # just the address
+cloudmorrow app --install-launcher    # put it in the applications menu
+```
+
+**It is the web app.** The window loads the signed-in server's `/app`, the
+same page a phone and a browser get, so a deploy reaches it the moment it
+reaches them and there is no second interface to keep level. The window is
+the system's own web view, driven by [pywebview](https://pywebview.flowrl.com):
+WebView2 on Windows, WKWebView on a Mac, and on Linux Qt WebEngine — which
+comes as wheels, so nothing is asked of the distribution. It runs in the
+client's own Python, in `cloudmorrow/desktop/`, and the window is titled with
+the cloud's name and wears the hedgehog.
+
+**What the page may ask.** Beside the page pywebview puts one object,
+`window.pywebview.api` — `desktop/bridge.py` — and `server/web/desktopbridge.js`
+finds it. A phone and a browser have no such object, and there the file does
+nothing at all, so none of what follows is ever drawn anywhere else. Every
+method is the command line's own code, called rather than copied — mounting
+is `client/mounts.py`, a missing rclone is `client/rclone.py`, the agent is
+`agent/setup.py` — and every answer is plain JSON: a refusal comes back as
+`{"error": …}` in the same words `cloudmorrow share mount` would print, never
+as an exception. Only a page from the cloud the window was opened on is
+answered; a link to anywhere else opens in the browser.
+
+| method | what it does |
+| --- | --- |
+| `platform()` | which system, the host name, the name the agent goes by, whether a share can be mounted here and with what |
+| `shares()` | the server's shares, each with whether and where it is mounted on this machine |
+| `mounted_here()` | the same, from `mounts.json` alone — quick, no server |
+| `mount(name)` / `unmount(name)` | as `cloudmorrow share mount` / `unmount`, signed in the same way |
+| `open_folder(path)` | Finder, Explorer, or `xdg-open` |
+| `agent_status()` | enrolled or not, and whether the service is running |
+| `notify(title, body)` | a system notification, best effort |
+| `version()` | this client's version, and the server it talks to |
+
+**Files.** In the desktop app every share in the **Files** tab has a line
+under it: *Mounted at ~/Fileshares/media* with **Open folder** and
+**Unmount**, or **Mount on this computer**. It is the same mount the terminal
+app and `cloudmorrow share mount` make — recorded in the same `mounts.json` —
+so all three agree on what is mounted. A machine share whose machine is
+offline says so and offers nothing. On Linux the mount is rclone's; if rclone
+is missing the answer is the one command that installs it, since the window
+has no terminal for sudo to ask its password in. **Me** gets a **This
+computer** group: the machine's name, whether its agent is running, what
+mounts shares here, and the desktop app's version.
+
+**One sign-in.** The token in `credentials.json` is the machine's, and the
+window shares it. When the window opens, the page asks for the stored token
+and takes it, so someone who ran `cloudmorrow login` is not asked again. A
+sign-in in the window is written back, so the terminal app is signed in by
+it — and, as `cloudmorrow login` does, a machine with no agent yet is
+enrolled. Signing out in the window, or its token running out, clears the
+stored one too, but only if it is still the window's: a sign-in the terminal
+app made since is left alone. At start the stored one always wins, being the
+most recent from either side. The page's own storage — which sort a folder
+was left in — is kept in `desktop/` beside the client config.
+
+**Installing it.** It is the `desktop` extra: `pywebview`, and on Linux
+`qtpy`, `PyQt6` and `PyQt6-WebEngine`. `/install.sh` adds it on Linux when
+it runs in a graphical session (`WAYLAND_DISPLAY` or `DISPLAY` set), without
+`--force-reinstall`, so running the installer again does not fetch Qt again,
+and then `cloudmorrow app --install-launcher` writes
+`~/.local/share/applications/cloudmorrow.desktop` and the hedgehog into
+`~/.local/share/icons`. A machine reached over ssh, a server and a root
+install get the terminal app alone, as before; `--no-desktop` says the same
+on purpose. `cloudmorrow update` keeps the extra where it was installed.
+
+**Not yet.** macOS: the extra installs as it is, and `cloudmorrow app` works
+from a terminal, but there is no `.app` bundle in `~/Applications` to click.
+Windows: the installer is a shell script and does not run there, mounting has
+no branch for it yet (`net use` on the WebDAV URL, or rclone with WinFsp),
+and there is no Start-menu shortcut or toast notification. Each is a marked
+`TODO` in `desktop/launcher.py`, `desktop/system.py` or the installer, where
+it will go. Push notifications are the browser's, and a desktop web view
+does not deliver them; `notify()` is there for when the app sends its own.
 
 ## Secrets
 
@@ -1330,7 +1419,9 @@ username and password.
 What was mounted, and where, is written to `mounts.json` beside the client
 config — per machine, since the same share is at a different path on each —
 which is how the Files tab says "mounted at …" and `share unmount` knows what
-to undo. A mount does not survive a reboot; run `share mount` again.
+to undo. A mount does not survive a reboot; run `share mount` again. In
+[the desktop app](#the-desktop-app) the same mount is a button on each share
+in the Files tab.
 
 ## The local agent
 
