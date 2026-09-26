@@ -79,12 +79,6 @@ FEATURES: tuple[Feature, ...] = (
         "Channels, direct messages, and the count on the icon",
         ("channel", "message", "user"),
     ),
-    Feature(
-        "calendar",
-        "Calendar",
-        "Your own calendar, and the ones you share",
-        ("calendar", "event", "user"),
-    ),
 )
 
 # What each app declared, for the types catalogue to say who reaches what.

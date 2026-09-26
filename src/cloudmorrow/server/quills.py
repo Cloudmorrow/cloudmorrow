@@ -65,7 +65,7 @@ ORIGIN = ".origin.json"
 KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor")
 # The ones every surface draws *today*. A screen of another kind is refused at
 # install, so a Quill never lands with a tab that draws nothing somewhere.
-KIT_READY = frozenset({"list", "board", "detail", "form"})
+KIT_READY = frozenset({"list", "board", "detail", "form", "calendar"})
 
 JOB_ACTIONS = frozenset({"expire", "run"})
 SEED_KINDS = frozenset({"per-owner", "once"})
@@ -823,6 +823,8 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
         elif kit in ("detail", "form"):
             for name in screen.get("fields", []):
                 need(model, thing, name)
+        elif kit == "calendar":
+            _check_calendar(screen, model, models, thing, need, where)
     for job in manifest.jobs:
         if job["action"] == "expire":
             model = model_of(f"job {job['id']!r}", job["model"])
@@ -836,6 +838,29 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
         for record in dataset["records"]:
             for name in record:
                 need(model, f"dataset {dataset['id']!r}", name)
+
+
+def _check_calendar(screen: dict, model: Datamodel, models: dict[str, Datamodel],
+                    thing: str, need, where: str) -> None:
+    """A calendar: two moments, whether it is all day, and the spaces it is drawn from."""
+    moments = ("datetime", "date")
+    need(model, thing + " starts", screen.get("starts"), moments)
+    need(model, thing + " ends", screen.get("ends"), moments)
+    for name in ("starts", "ends"):
+        if not model.by_name[screen[name]].indexed:
+            raise QuillError(
+                f"{where}: {thing} {name} {screen[name]!r} must be indexed, to ask for a range of days"
+            )
+    if screen.get("all_day"):
+        need(model, thing + " all_day", screen["all_day"], ("bool",))
+    need(model, thing + " space", screen.get("space"), ("link",))
+    space = models.get(model.by_name[screen["space"]].to)
+    if space is None or not space.space:
+        raise QuillError(f"{where}: {thing} space {screen['space']!r} must link to a space")
+    if screen.get("colour"):
+        need(space, thing + " colour", screen["colour"], ("string", "enum"))
+    if screen.get("subtitle"):
+        need(model, thing + " subtitle", screen["subtitle"])
 
 
 def describe(

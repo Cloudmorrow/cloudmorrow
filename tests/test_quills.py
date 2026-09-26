@@ -155,7 +155,7 @@ def test_removing_a_quill_keeps_its_records(registry, tmp_path):
     ("change", "says"),
     [
         (
-            lambda m: m.replace('kit = "list"\nlabel = "Cars"', 'kit = "calendar"\nlabel = "Cars"'),
+            lambda m: m.replace('kit = "list"\nlabel = "Cars"', 'kit = "thread"\nlabel = "Cars"'),
             "does not draw",
         ),
         (lambda m: m.replace('title = "name"', 'title = "colour"'), "does not have"),
@@ -243,9 +243,10 @@ def test_a_bad_request_is_a_400_with_the_reason(client, auth):
 # -- boot ------------------------------------------------------------------------------
 def test_a_fresh_server_gets_the_foundation_quills_once(config, users, registry, tmp_path):
     db = config.db_path
-    assert install_foundation(db, registry) == ["tasks"]
+    assert install_foundation(db, registry) == ["tasks", "calendar"]
     registry.uninstall("tasks")
-    # Removed by an administrator, it stays removed.
+    registry.uninstall("calendar")
+    # Removed by an administrator, they stay removed.
     assert install_foundation(db, registry) == []
     assert registry.quills == {}
 

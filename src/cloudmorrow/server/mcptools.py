@@ -459,7 +459,10 @@ TOOLS: tuple[Tool, ...] = (
     Tool(
         "list_records",
         "List the user's records of one datamodel, in order. Filter with `where` on indexed "
-        "fields, e.g. {\"board\": \"r_…\", \"lane\": \"todo\"}.",
+        "fields, e.g. {\"board\": \"r_…\", \"lane\": \"todo\"}; `name__lt`, `__lte`, `__gt`, "
+        "`__gte` are ranges, e.g. the events in October: {\"starts_at__lte\": "
+        "\"2026-10-31T23:59\", \"ends_at__gte\": \"2026-10-01\"}. A datetime without a zone is "
+        "the wall clock; a bare date is a whole day.",
         _schema({"model": _MODEL, "where": {"type": "object", "description": "Indexed field to value."}},
                 ("model",)),
         "",

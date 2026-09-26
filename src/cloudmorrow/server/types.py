@@ -13,8 +13,8 @@ Two kinds of entry:
 * **Foundation** types the server itself owns: users, secrets, files,
   machines, notifications. No app may switch these off; every app that
   wants one asks for it.
-* **App** types an included app provides — notes, calendars and events,
-  channels and messages. (Boards and tasks are datamodels now, in the
+* **App** types an included app provides — notes, channels and
+  messages. (Boards, tasks, calendars and events are datamodels now, in the
   record store, and listed at `/api/datamodels` with every other Quill's.) Switching the app off takes
   its type with it, for now. When the same type is stored by the platform
   rather than by the app, that stops being true, and this catalogue is
@@ -190,31 +190,6 @@ TYPES: tuple[DataType, ...] = (
         ),
         sealed=("content",),
         assistant=True,
-    ),
-    DataType(
-        "calendar",
-        "Calendar",
-        "Your own, one you share, or everybody's.",
-        "calendar",
-        ("personal", "shared", "public"),
-        (_f("slug", "string"), _f("name", "string"), _f("colour", "string")),
-    ),
-    DataType(
-        "event",
-        "Event",
-        "A title and two moments, on a calendar. Times are wall-clock times.",
-        "calendar",
-        ("personal", "shared", "public"),
-        (
-            _f("calendar", "ref", ref="calendar"),
-            _f("title", "string"),
-            _f("starts_at", "datetime"),
-            _f("ends_at", "datetime"),
-            _f("all_day", "bool"),
-            _f("location", "string"),
-            _f("notes", "text"),
-        ),
-        sealed=("title", "notes", "location"),
     ),
     DataType(
         "channel",

@@ -18,3 +18,12 @@ repo = "quill-tasks"
 category = "personal"
 publisher = "Cloudmorrow"
 foundation = true
+
+[[quills]]
+id = "calendar"
+name = "Calendar"
+summary = "Your own calendar, the ones you share, and one for everybody."
+repo = "quill-calendar"
+category = "personal"
+publisher = "Cloudmorrow"
+foundation = true

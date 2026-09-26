@@ -20,6 +20,8 @@ import {
   replace, seconds, setStatus, store, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
+import { calendarSheet, renderCalendar } from "./kit_calendar.js";
+import { spaceSection, wireSpace } from "./kit_space.js";
 
 const own = {
   // What a board is, for the button that opens its own sheet.
@@ -103,11 +105,17 @@ const canDrag = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
 // The kit elements this file draws. The server refuses to install a screen
 // of any other kind until every surface draws it, and a test holds this
 // list to the server's; the check below is for a server newer than the page.
-export const DRAWS = ["list", "board", "detail", "form"];
+export const DRAWS = ["list", "board", "detail", "form", "calendar"];
+
+// Each element that is more than rows is a file of its own: kit_<kit>.js.
+const OWN = { calendar: renderCalendar };
+// And what it changes on the record sheet, if anything: kit_<kit>.js again.
+const SHEETS = { calendar: calendarSheet };
 
 export async function renderKitScreen(at, arg) {
   const { kit } = at.screen;
   if (kit === "board") return renderBoard(at, arg);
+  if (OWN[kit]) return OWN[kit](at, arg);
   if (DRAWS.includes(kit)) return renderList(at);
   app.innerHTML = nav({ title: at.screen.label }) + `<main>${heading(at.screen.label)}
     <p class="empty"><b>Not on this app yet</b>This screen is a ${esc(kit)}, which this
@@ -443,16 +451,21 @@ export const WIDGET = {
 };
 const LONG = new Set(Object.keys(WIDGET).filter((kind) => WIDGET[kind] === "textarea"));
 
-// An ISO moment as a datetime-local box shows it, in the reader's own time.
+// A moment as a datetime-local box shows it. A wall-clock time — no zone —
+// is shown as it was typed; one with a zone, in the reader's own time.
 function localMoment(iso) {
-  const ms = Date.parse(iso || "");
+  const text = String(iso || "");
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(text)) return text.slice(0, 16);
+  const ms = Date.parse(text);
   if (Number.isNaN(ms)) return "";
   const d = new Date(ms);
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function widget(f, value, links) {
+function widget(f, value, links, own = null) {
+  const drawn = own && own.widget ? own.widget(f, value) : null;
+  if (drawn) return drawn;
   const data = `data-field="${esc(f.name)}"`;
   const label = `aria-label="${esc(f.label)}"`;
   if (f.stamp) return `<span class="value" ${data} data-readonly>${esc(spoken(f, value) || "—")}</span>`;
@@ -492,7 +505,8 @@ function read(f, el) {
     }
     case "int": return el.value === "" ? null : Math.trunc(Number(el.value));
     case "decimal": return el.value === "" ? null : el.value;
-    case "datetime": return el.value ? new Date(el.value).toISOString() : null;
+    // The time on the wall, as typed, or a whole day from a date box.
+    case "datetime": return el.value || null;
     case "json": {
       if (!el.value.trim()) return null;
       return JSON.parse(el.value);   // a SyntaxError is the caller's to show
@@ -508,7 +522,10 @@ function same(f, a, b) {
   if (a === b) return true;
   if ((a ?? "") === "" && (b ?? "") === "") return true;
   if (f.kind === "decimal") return a != null && b != null && Number(a) === Number(b);
-  if (f.kind === "datetime") return Math.floor(Date.parse(a) / 60000) === Math.floor(Date.parse(b) / 60000);
+  if (f.kind === "datetime") {
+    if (!a || !b || String(a).length === 10 || String(b).length === 10) return String(a || "") === String(b || "");
+    return Math.floor(Date.parse(a) / 60000) === Math.floor(Date.parse(b) / 60000);
+  }
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
@@ -536,12 +553,23 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   if (groupField && record.fields[groupField.name]) {
     parent = `${at.base}/${encodeURIComponent(record.fields[groupField.name])}`;
     backLabel = (links[groupField.name] || {})[record.fields[groupField.name]] || backLabel;
+  } else if (!onScreen && model.space && screen.space) {
+    // A space drawn by a screen of things in spaces: back to the list of them.
+    parent = `${at.base}/spaces`;
+    backLabel = `${model.label}s`;
   } else if (!onScreen) {
     parent = `${at.base}/${encodeURIComponent(record.id)}`;
     backLabel = titleOf(model, record);
   }
+  const own = SHEETS[screen.kit] ? SHEETS[screen.kit](at, model) : null;
+  // Back to the day it is on, rather than to wherever the screen starts.
+  if (own && own.parent && onScreen) parent = own.parent(record) || parent;
+  // A space is its manager's to change; everybody in it reads the same sheet.
+  const fixed = model.space && !record.can_manage;
+  const deletable = !fixed && !(model.space && record.scope === "personal");
+  const people = model.space ? await spaceSection(model, record) : "";
 
-  const ed = { model, id, record, title, fields, dirty: false, saving: false, pending: false, timer: null };
+  const ed = { model, id, record, title, fields, own, dirty: false, saving: false, pending: false, timer: null };
   editor = ed;
   const hold = {
     stays: (name, a) => name === "r" && a === arg,
@@ -565,7 +593,8 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   const left = timeLeft(record.expires_at);
   app.innerHTML = nav({
     back: parent, backLabel, title: titleOf(model, record, title),
-    right: `<button class="done strong" hidden>Done</button><button class="delete" aria-label="Delete ${esc(model.label.toLowerCase())}">${icons.trash}</button>`,
+    right: `<button class="done strong" hidden>Done</button>` +
+      (deletable ? `<button class="delete" aria-label="Delete ${esc(model.label.toLowerCase())}">${icons.trash}</button>` : ""),
   }) + `
     <main>
       <div class="editor record">
@@ -574,15 +603,21 @@ export async function renderRecordSheet(at, modelId, id, arg) {
           left ? `<span class="expires"> · ${esc(left)}</span>` : ""}<span class="status"></span></p>
         ${enums.map((f) => (enums.length > 1 ? `<p class="group-label">${esc(f.label)}</p>` : "") + segments(f, record.fields[f.name])).join("")}
         ${short.length ? `<div class="group fields">${short.map((f) =>
-          `<label class="row field kind-${esc(f.kind)}"><span class="main">${esc(f.label)}</span>${widget(f, record.fields[f.name], links)}</label>`).join("")}</div>` : ""}
+          `<label class="row field kind-${esc(f.kind)}"><span class="main">${esc(f.label)}</span>${widget(f, record.fields[f.name], links, own)}</label>`).join("")}</div>` : ""}
         ${more.map((f) => `<p class="group-label">${esc(f.label)}</p>` +
           `<textarea class="long" data-field="${esc(f.name)}" rows="3" aria-label="${esc(f.label)}">${esc(f.kind === "json" && record.fields[f.name] != null ? JSON.stringify(record.fields[f.name], null, 2) : record.fields[f.name] ?? "")}</textarea>`).join("")}
         ${body ? `<textarea class="body" data-field="${esc(body.name)}" aria-label="${esc(body.label)}" placeholder="${esc(body.label + hint)}" rows="1">${esc(
           body.kind === "json" && record.fields[body.name] != null ? JSON.stringify(record.fields[body.name], null, 2) : record.fields[body.name] ?? "")}</textarea>` : ""}
       </div>
+      ${people}
     </main>`;
   wireShell();
   app.querySelector(".nav").classList.add("lined");
+  if (fixed) {
+    for (const el of app.querySelectorAll(".editor [data-field], .editor .segments button, .editor .swatch")) el.disabled = true;
+  }
+  if (own && own.wire) own.wire(app.querySelector(".editor"));
+  if (model.space) wireSpace(app, model, record, { left: parent });
 
   const box = app.querySelector(".editor");
   const titleEl = app.querySelector(".editor .title");
@@ -638,17 +673,17 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   const typing = (el) => el && (el.tagName === "TEXTAREA" || el === titleEl ||
     (el.tagName === "INPUT" && ["text", "email", "tel", "url", "number"].includes(el.type)));
   box.addEventListener("focusin", (event) => {
-    if (typing(event.target)) { done.hidden = false; del.hidden = true; }
+    if (typing(event.target)) { done.hidden = false; if (del) del.hidden = true; }
   });
   box.addEventListener("focusout", () => {
     setTimeout(() => {
-      if (!typing(document.activeElement)) { done.hidden = true; del.hidden = false; }
+      if (!typing(document.activeElement)) { done.hidden = true; if (del) del.hidden = false; }
     }, 0);
     if (ed.dirty) { clearTimeout(ed.timer); saveSheet(ed); }
   });
   done.addEventListener("click", () => document.activeElement && document.activeElement.blur());
 
-  del.addEventListener("click", async () => {
+  if (del) del.addEventListener("click", async () => {
     // What goes with it, said before rather than found out after.
     const along = Object.values(quill.models).filter((m) => m.fields.some((f) =>
       f.kind === "link" && f.to === model.id && f.on_delete === "cascade"));
@@ -680,6 +715,11 @@ function changes(ed) {
     if (f.kind === "string" && typeof value === "string") value = value.trim();
     if (!same(f, value, ed.record.fields[f.name])) out[f.name] = value;
   }
+  if (ed.own && ed.own.adjust && Object.keys(out).length) {
+    const { out: adjusted, redraw } = ed.own.adjust(out, ed.record);
+    ed.redraw = redraw;
+    return adjusted;
+  }
   return out;
 }
 
@@ -709,6 +749,17 @@ async function saveSheet(ed, { keepalive = false } = {}) {
       }
     }
     setStatus(ed, "Saved");
+    if (ed.redraw && editor === ed) {
+      // What was saved moved another field with it — a whole day that is a
+      // date now, an end that kept the length — so the sheet is drawn again.
+      ed.redraw = false;
+      ed.dirty = false;
+      ed.pending = false;
+      vacate(ed.hold);
+      editor = null;
+      removeEventListener("resize", ed.grow);
+      renderRoute();
+    }
   } catch (err) {
     if (err.status === 409 && editor === ed) {
       // Somebody — another window, the terminal — got there first. Their

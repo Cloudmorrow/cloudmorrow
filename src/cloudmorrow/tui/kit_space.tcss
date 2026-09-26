@@ -1,0 +1,67 @@
+/* Spaces in the kit (widgets/kit_space.py): making one, and who is in one. */
+
+#new-space Input {
+    margin-bottom: 1;
+}
+
+#new-space RadioSet {
+    margin-bottom: 1;
+}
+
+#space-people {
+    height: auto;
+}
+
+#space-people-list {
+    height: auto;
+    max-height: 10;
+}
+
+#space-members {
+    height: auto;
+    max-height: 12;
+    margin-bottom: 1;
+}
+
+.space-member {
+    height: 1;
+}
+
+.space-member-name {
+    width: 1fr;
+}
+
+.space-take-out {
+    width: auto;
+    min-width: 10;
+    height: 1;
+    padding: 0 1;
+    background: transparent;
+    color: $error;
+    text-style: bold;
+}
+
+.space-take-out:hover, .space-take-out:focus {
+    background: $error 20%;
+}
+
+#space-add {
+    height: auto;
+    margin-bottom: 1;
+}
+
+#space-add Select {
+    width: 1fr;
+    margin-right: 1;
+}
+
+#space-add Button {
+    width: auto;
+    min-width: 7;
+    height: 1;
+    padding: 0 2;
+}
+
+#space-complaint {
+    height: auto;
+}

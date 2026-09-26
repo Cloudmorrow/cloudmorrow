@@ -30,6 +30,7 @@ from cloudmorrow.server.records import (
 
 router = APIRouter(prefix="/api/records", tags=["records"])
 models_router = APIRouter(prefix="/api/datamodels", tags=["records"])
+people_router = APIRouter(prefix="/api/people", tags=["records"])
 
 
 class RecordIn(BaseModel):
@@ -259,3 +260,20 @@ def seen(
         state.records.mark_seen(person(user), model, record_id)
     except ERRORS as exc:
         raise _refused(exc) from exc
+
+
+# -- who a space could be shared with ------------------------------------------------
+@people_router.get("")
+def list_people(
+    state: AppState = Depends(get_state), user: User = Depends(get_current_user)
+) -> list[dict]:
+    """Everybody a space could be shared with: the people on this server, not you.
+
+    What a "Share with" list is drawn from — for a calendar, a channel, any
+    space a Quill has. Machines and service accounts are not people.
+    """
+    return [
+        {"username": u.username, "display_name": u.display_name or u.username}
+        for u in state.users.list()
+        if u.is_active and u.user_type == "human" and u.username != user.username
+    ]

@@ -138,6 +138,13 @@ done_at = { kind = "datetime", indexed = true, stamp = { field = "lane", value =
 `date`, `datetime`, `enum`, `email`, `phone`, `url`, `link`, `json`. Each kind
 has a widget on every surface; adding a kind means adding all of them.
 
+**`datetime`** keeps what it was given. With a zone it is a moment, kept
+with its zone; without one it is the time on the wall — `2026-10-01T10:00`,
+"the dentist at ten" — kept as typed, to the minute, and never converted; a
+bare date (`2026-10-01`) is a whole day and stays one. Every client sends
+what a person typed without a zone, so a calendar is on one clock. A stamp
+the server sets is a moment, in UTC.
+
 **Indexed** fields are kept plain so the server can filter and sort by them.
 Everything else is sealed at rest under the server's key, bound to the
 datamodel, the owner and the record, so nothing can be moved by editing the
@@ -187,11 +194,15 @@ The core serves every installed datamodel at the same API:
 | call | what it does |
 | --- | --- |
 | `GET /api/records/{model}?field=value` | list, filtered on indexed fields, in order |
+| `GET /api/records/{model}?field__gte=…&field__lt=…` | a range on an indexed field: `__lt`, `__lte`, `__gt`, `__gte`; a record without the field never matches |
 | `POST /api/records/{model}` | create, from `{"fields": {...}}` |
 | `GET /api/records/{model}/{id}` | one record |
 | `PATCH /api/records/{model}/{id}` | change fields; send `rev` to get a 409 instead of overwriting |
 | `POST /api/records/{model}/{id}/move` | `{"fields": {"lane": "done"}, "index": 0}`: change group fields and position together |
 | `DELETE /api/records/{model}/{id}` | delete, cascading along `on_delete = "cascade"` links |
+| `POST /api/records/{model}/{id}/members` | `{"username": …}`: put somebody in a shared space (see *Spaces*) |
+| `DELETE /api/records/{model}/{id}/members/{username}` | take them out; with your own name, leave |
+| `GET /api/people` | everybody on the server a space could be shared with |
 | `GET /api/datamodels` | every datamodel on the server, with its fields and who uses it |
 | `GET /api/quills` | every installed Quill, with its manifest |
 | `GET /api/quills/catalog` | the catalog, with what is installed |
@@ -271,13 +282,20 @@ each element needs:
 | `list` | `model`, `title`, optional `subtitle`, `tick` (a bool field), `group` (a link: sections) | a list with a circle per row | the same, wider | a table | `cm <quill> list`, `add`, `done` |
 | `board` | `model`, `lane` (enum), `title`, optional `group` (link), `body`, `done` | lanes stacked | lanes as columns, drag and drop | lanes as columns, drag and keys | `cm <quill> list`, `add`, `move` |
 | `detail` / `form` | `model`, `fields` | a sheet | a panel | a modal | `cm <quill> show`, `set` |
-| `calendar` | `model`, `starts`, `ends`, optional `all_day`, `space` (the calendars) | a day list and a month | a week and a month | a month and the day's list | `cm <quill> list --from --to`, `add` |
+| `calendar` | `model`, `starts`, `ends` (indexed datetime or date fields), `space` (a link to a space: the calendars), optional `all_day` (bool), `colour` (a field of the space: cyan, violet, green, amber, rose), `title`, `subtitle` | a month with a dot per thing, and the day's list | a week of hours or a month written in | the spaces, a month, and the day's list | `cm <quill> list --from --to`, `add "<title>" starts=… ends=…` |
 | `thread` | `model`, `body`, `space` (the channels) | channels, then a conversation | both side by side | both side by side | `cm <quill> list`, `say` |
 | `editor` | `model` with a `markdown` field, optional folders from the title | a tree, then a page | both side by side | both side by side | `cm <quill> show`, `add`, `edit` |
 | `grid` | `model` of kind file | folders and tiles | the same, wider | a table | `cm <quill> list`, `get`, `put` |
 
 Every screen gets a record sheet for free: opening a card or a row shows the
 record's fields with the widget for each kind, editable, with delete.
+
+A screen whose things are in spaces (`space` on a `calendar`) also gets the
+spaces: a list of them — yours, shared, everybody's — the way to make one
+(its name, who can see it, who is in it), and on a space's own sheet who is
+in it, adding somebody, taking somebody out and leaving. That is the kit's,
+not the calendar's: every surface has it once (web `kit_space.js`, terminal
+`widgets/kit_space.py`), for any element that draws things in spaces.
 
 A Quill's screens become a tab, in the order of `[[screens]]`, on every
 surface. An administrator switches a Quill off for the server; a person
@@ -394,9 +412,10 @@ manifest written, checked and installed in one conversation.
 | records, sealing, positions, stamps, the gate | `server/records.py` |
 | manifests, sources, install, catalog | `server/quills.py`, `server/routes/quills.py` |
 | the record API | `server/routes/records.py` |
-| jobs | `server/quilljobs.py` |
-| the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; the catalog and install sheet in `quillsadmin.js` |
-| the kit in the terminal | `tui/panes/kit.py` (list), `tui/panes/kit_board.py`, `tui/widgets/kit.py`, `tui/screens/record_sheet.py`; the catalog in `tui/panes/admin_quills.py` |
+| jobs, and the boot work (foundation Quills, old tables into records) | `server/quilljobs.py` |
+| spaces: who is told what | `server/spacenotify.py` |
+| the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; an element that is more than rows in its own `kit_<element>.js`/`.css` (`kit_calendar`), spaces in `kit_space.js`/`.css`; the catalog and install sheet in `quillsadmin.js` |
+| the kit in the terminal | `tui/panes/kit.py` (list), `tui/panes/kit_board.py`, `tui/panes/kit_calendar.py`, `tui/widgets/kit.py`, `tui/widgets/kit_space.py` (spaces), `tui/screens/record_sheet.py`; the catalog in `tui/panes/admin_quills.py` |
 | the kit on the command line | `cli/quillrun.py` (`cm <quill> …`) |
 | building one | `cli/quill.py` (`cm quill new/check/dev/add`), `quill_reference.md`, `quill_template/` |
 | the kit to an assistant | `server/mcptools.py` (generic record tools) |
@@ -406,6 +425,7 @@ manifest written, checked and installed in one conversation.
 1. Tasks is the first Quill, and the proof: no task code left in the core.
 2. Services, webhooks and APIs run, with Quill tokens and the gate on them.
 3. `calendar` and `thread` in the kit; Calendar and Chat become Quills.
+   (Calendar is one: `calendar` is drawn on every surface.)
 4. `grid` and `editor`; Files and Notes become Quills. Secrets stays in the
    core: it is foundation, and the one datamodel no assistant may ever reach.
 5. Shared and public scopes in the record store; named datasets.

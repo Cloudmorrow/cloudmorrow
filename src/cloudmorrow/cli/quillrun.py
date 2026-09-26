@@ -13,12 +13,23 @@ come from the Quill's first screen (or `--screen`) and its datamodel.
     cm tasks groups                    # the boards, for a board with groups
     cm tasks list --group Garden       # another board, by name or id
 
+A `calendar` screen lists a range of days, and adds with its two moments:
+
+    cm calendar list --from 2026-10-01 --to 2026-10-31
+    cm calendar add "Dentist" starts=2026-10-01T10:00 ends=2026-10-01T11:00
+    cm calendar add "Holiday" starts=2026-10-12 ends=2026-10-16 calendar=House
+
+A field may be named by what the screen binds it as (`starts=` for the
+calendar's `starts_at`), and a link field (`calendar=House`) takes the
+linked record's name or id.
+
 `main` sends a first word that is not one of the built-in commands here, so
 `cm tasks` works without the CLI knowing, when it starts, what is installed.
 """
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 from typing import Annotated
 
@@ -60,6 +71,13 @@ class Screen:
     def group(self) -> dict | None:
         return self.fields.get(self.spec.get("group", "")) if self.spec.get("group") else None
 
+    @property
+    def moments(self) -> tuple[str, str] | None:
+        """A calendar's two moment fields, which a list asks for a range of."""
+        if self.kit != "calendar":
+            return None
+        return self.spec["starts"], self.spec["ends"]
+
     def group_title(self, record: dict) -> str:
         target = self.models[self.group["to"]]
         return str(record["fields"].get(target["title"], record["id"]))
@@ -88,6 +106,11 @@ def _pairs(values: list[str], screen: Screen) -> dict:
         name, sep, value = pair.partition("=")
         if not sep:
             fail(f"{pair!r}: set fields as name=value")
+        # What the screen calls a field is a name for it too: a calendar's
+        # `starts=` is whichever field its screen binds as the start.
+        bound = screen.spec.get(name)
+        if name not in screen.fields and isinstance(bound, str) and bound in screen.fields:
+            name = bound
         if name not in screen.fields:
             fail(f"{screen.model} has no field {name!r}: {', '.join(screen.fields)}")
         kind = screen.fields[name]["kind"]
@@ -175,6 +198,78 @@ def _show_list(screen: Screen, records: list[dict], heading: str) -> None:
     out.print(table)
 
 
+def _day(value: str, what: str) -> str:
+    try:
+        return dt.date.fromisoformat(value).isoformat()
+    except ValueError:
+        fail(f"{what} is a date, as 2026-10-01")
+    return ""
+
+
+async def _link_values(api: CloudmorrowClient, screen: Screen, fields: dict) -> dict:
+    """A link given by the linked record's name, made its id."""
+    for name, value in list(fields.items()):
+        field = screen.fields[name]
+        if field["kind"] != "link" or not value or str(value).startswith("r_"):
+            continue
+        target = screen.models.get(field["to"]) or {"title": "title"}
+        fields[name] = _find(await api.records(field["to"]), str(value), target["title"])["id"]
+    return fields
+
+
+def _event_defaults(screen: Screen, fields: dict, spaces: list[dict]) -> dict:
+    """What a calendar's add fills in: the end, whole days, and your own space."""
+    starts, ends = screen.moments
+    all_day = screen.spec.get("all_day")
+    space = screen.spec.get("space")
+    start = str(fields.get(starts) or "")
+    if not start:
+        fail(f"when? {starts}=2026-10-01T10:00, or a date for the whole day")
+    if all_day and all_day not in fields:
+        fields[all_day] = len(start) == 10
+    if not fields.get(ends):
+        # Something with no end is an hour long, or the day it is on.
+        if len(start) == 10:
+            fields[ends] = start
+        else:
+            moment = dt.datetime.fromisoformat(start) + dt.timedelta(hours=1)
+            fields[ends] = moment.strftime("%Y-%m-%dT%H:%M")
+    if space and not fields.get(space):
+        mine = next((s for s in spaces if s.get("scope") == "personal"), None) or (
+            spaces[0] if spaces else None
+        )
+        if mine is None:
+            fail(f"there is nothing to put it in: {space}=<name>")
+        fields[space] = mine["id"]
+    return fields
+
+
+def _show_calendar(screen: Screen, records: list[dict], spaces: list[dict], heading: str) -> None:
+    starts, ends = screen.moments
+    space_field = screen.spec.get("space")
+    space_model = screen.models[screen.fields[space_field]["to"]] if space_field else None
+    names = {s["id"]: str(s["fields"].get(space_model["title"], "")) for s in spaces} if space_model else {}
+    table = Table(title=heading, title_style=TITLE)
+    table.add_column("day")
+    table.add_column("when")
+    table.add_column("id", style="dim")
+    table.add_column(screen.fields[screen.title].get("label", screen.title))
+    if space_model:
+        table.add_column(space_model["label"])
+    for record in sorted(records, key=lambda r: str(r["fields"].get(starts) or "")):
+        start = str(record["fields"].get(starts) or "")
+        end = str(record["fields"].get(ends) or start)
+        if len(start) == 10:
+            when = "all day" if end[:10] == start else f"to {end[:10]}"
+        else:
+            when = f"{start[11:16]}–{end[11:16]}" if end[:10] == start[:10] else f"{start[11:16]} → {end[:16]}"
+        row = [start[:10], when, record["id"][2:6], escape(str(record["fields"].get(screen.title, "")))]
+        if space_model:
+            row.append(escape(names.get(record["fields"].get(space_field), "")))
+        table.add_row(*row)
+    out.print(table)
+
+
 def _show_record(screen: Screen, record: dict) -> None:
     table = Table(
         title=f"{screen.models[screen.model]['label']} {record['id']}",
@@ -206,6 +301,12 @@ def main(
         int | None, typer.Option("--index", help="Where in the lane, 0 for the top.")
     ] = None,
     plain: Annotated[bool, typer.Option("--plain", help="JSON, for scripts.")] = False,
+    first: Annotated[
+        str, typer.Option("--from", help="A calendar: the first day, as 2026-10-01 (today).")
+    ] = "",
+    last: Annotated[
+        str, typer.Option("--to", help="A calendar: the last day (a week after --from).")
+    ] = "",
 ) -> None:
     """Run ACTION on an installed Quill."""
     args = list(args or [])
@@ -216,7 +317,7 @@ def main(
         _, api = client()
         try:
             screen = _screen(await api.quills(), quill, screen_id)
-            await _act(api, screen, action, args, group, index, plain)
+            await _act(api, screen, action, args, group, index, plain, (first, last))
         finally:
             await api.aclose()
 
@@ -231,9 +332,22 @@ async def _act(
     group: str,
     index: int | None,
     plain: bool,
+    days: tuple[str, str] = ("", ""),
 ) -> None:
     group_id, groups = await _group_id(api, screen, group)
     where = {screen.group["name"]: group_id} if group_id else {}
+    spaces: list[dict] = []
+    if screen.moments:
+        # A calendar lists a range of days, across every space it can see.
+        start = _day(days[0], "--from") if days[0] else dt.date.today().isoformat()
+        end = _day(days[1], "--to") if days[1] else (
+            dt.date.fromisoformat(start) + dt.timedelta(days=6)
+        ).isoformat()
+        if end < start:
+            fail("--to is before --from")
+        where = {f"{screen.moments[0]}__lte": f"{end}T23:59", f"{screen.moments[1]}__gte": start}
+        if screen.spec.get("space"):
+            spaces = await api.records(screen.fields[screen.spec["space"]]["to"])
 
     if action == "groups":
         if screen.group is None:
@@ -255,6 +369,8 @@ async def _act(
             heading += f" · {screen.group_title(next(g for g in groups if g['id'] == group_id))}"
         if screen.kit == "board":
             _show_board(screen, records, heading)
+        elif screen.moments:
+            _show_calendar(screen, records, spaces, f"{heading} · {start} to {end}")
         else:
             _show_list(screen, records, heading)
         return
@@ -262,13 +378,23 @@ async def _act(
     if action == "add":
         if not args:
             fail(f'add what? cm {screen.quill["id"]} add "<{screen.title}>" [name=value …]')
-        fields = {screen.title: args[0], **_pairs(args[1:], screen), **where}
-        made = await api.create_record(screen.model, fields, index=index)
+        if screen.moments:
+            fields = await _link_values(api, screen, {screen.title: args[0], **_pairs(args[1:], screen)})
+            fields = _event_defaults(screen, fields, spaces)
+        else:
+            fields = {screen.title: args[0], **_pairs(args[1:], screen), **where}
+        try:
+            made = await api.create_record(screen.model, fields, index=index)
+        except ApiError as exc:
+            fail(str(exc))
         console.print(f"[green]Added[/] {escape(args[0])} [dim]{made['id'][2:6]}[/]")
         return
 
     if not args:
         fail(f"which one? cm {screen.quill['id']} {action} <id>")
+    if screen.moments:
+        # A record is found by id or title among all of them, not only this week's.
+        records = await api.records(screen.model)
     record = _find(records if records else await api.records(screen.model), args[0], screen.title)
     rest = args[1:]
     try:
@@ -279,7 +405,8 @@ async def _act(
                 _show_record(screen, record)
         elif action == "set":
             changed = await api.update_record(
-                screen.model, record["id"], _pairs(rest, screen), rev=record["rev"]
+                screen.model, record["id"], await _link_values(api, screen, _pairs(rest, screen)),
+                rev=record["rev"],
             )
             console.print(f"[green]Saved[/] {escape(str(changed['fields'].get(screen.title, '')))}")
         elif action == "move":

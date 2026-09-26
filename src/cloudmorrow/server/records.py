@@ -292,10 +292,7 @@ def _coerce(model: Datamodel, f: Field, value: object) -> object:
         except ValueError:
             raise RecordError(f"{where} is a date, YYYY-MM-DD") from None
     if kind == "datetime":
-        moment = _parse_moment(str(value))
-        if moment is None:
-            raise RecordError(f"{where} is a date and time, ISO 8601")
-        return moment.isoformat(timespec="seconds")
+        return _wall_or_moment(where, str(value).strip())
     if kind == "enum":
         text = str(value).strip().lower()
         if text not in f.values:
@@ -310,6 +307,34 @@ def _coerce(model: Datamodel, f: Field, value: object) -> object:
     raise RecordError(f"{where}: unknown kind {kind}")  # pragma: no cover
 
 
+_BARE_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _wall_or_moment(where: str, text: str) -> str:
+    """A datetime field's value, kept the way it was meant.
+
+    With a zone it is a moment, and is kept with its zone. Without one it is
+    the time on the wall — "the dentist at ten" — and is kept as typed, to
+    the minute, converting nothing: that is what a calendar needs, and a
+    server guessing a zone for it would move the dentist twice a year. A
+    bare date is a whole day, and stays one. ISO sorts the way time does, so
+    all three compare as strings, which is what a range filter does.
+    """
+    if _BARE_DATE_RE.match(text):
+        try:
+            return dt.date.fromisoformat(text).isoformat()
+        except ValueError:
+            raise RecordError(f"{where} is a date, YYYY-MM-DD") from None
+    try:
+        moment = dt.datetime.fromisoformat(text)
+    except ValueError:
+        raise RecordError(f"{where} is a date and time, ISO 8601") from None
+    if moment.tzinfo is None:
+        exact = moment.second or moment.microsecond
+        return moment.isoformat(timespec="seconds" if exact else "minutes")
+    return moment.isoformat(timespec="seconds")
+
+
 def _is(value: object, target: str) -> bool:
     """Does a field's value read as *target*? `false` is how TOML says a bool."""
     if isinstance(value, bool):
@@ -320,6 +345,20 @@ def _is(value: object, target: str) -> bool:
 def _stored_indexed(model: Datamodel) -> set[str]:
     """Links are always plain: they are what cascades and filters find by."""
     return {f.name for f in model.fields if f.indexed or f.kind == "link"}
+
+
+# `?starts_at__lt=2026-10-01`: a range on an indexed field, for anything
+# that asks "between these two" — the events in a month, the invoices in a
+# quarter. A field that is missing never matches a range.
+RANGES = {"lt": "<", "lte": "<=", "gt": ">", "gte": ">="}
+
+
+def _filter(key: str) -> tuple[str, str]:
+    """A filter's field and its comparison: `due` is equal, `due__gte` is at least."""
+    name, sep, suffix = key.rpartition("__")
+    if sep and suffix in RANGES:
+        return name, RANGES[suffix]
+    return key, "IS"
 
 
 def _new_id() -> str:
@@ -517,10 +556,11 @@ class RecordStore:
     def list(
         self, principal: Principal, model_id: str, where: dict[str, object] | None = None
     ) -> list[Record]:
-        """Every record of *model_id* the principal owns, filtered, in order.
+        """Every record of *model_id* the principal may see, filtered, in order.
 
         Filters are on indexed fields and links only: those are what the server
-        can see. Sweeps what an expire job would take first.
+        can see. `name` is equal to; `name__lt`, `__lte`, `__gt` and `__gte`
+        are a range. Sweeps what an expire job would take first.
         """
         check(principal, "read", model_id)
         model = self.model(model_id)
@@ -531,11 +571,12 @@ class RecordStore:
         clause, clause_params = self._visible_clause(model, principal.username)
         query = f"SELECT * FROM records WHERE model = ? AND {clause}"
         params: list[object] = [model.id, *clause_params]
-        for name, value in (where or {}).items():
+        for key, value in (where or {}).items():
+            name, operator = _filter(key)
             if name not in plain:
                 raise RecordError(f"{model.id} cannot be filtered by {name!r}: it is not indexed")
             coerced = _coerce(model, model.get_field(name), value)
-            query += " AND json_extract(indexed, ?) IS ?"
+            query += f" AND json_extract(indexed, ?) {operator} ?"
             params += [f'$."{name}"', coerced if not isinstance(coerced, bool) else int(coerced)]
         query += " ORDER BY position, created_at, id"
         with connect(self.db_path) as conn:

@@ -11,7 +11,9 @@ the web:
 
     string email phone url   a one-line input
     int decimal              a one-line input that only takes a number
-    date datetime            a one-line input, checked before it is sent
+    date datetime            a one-line input, checked before it is sent; a
+                             datetime typed without a zone is the wall clock,
+                             kept as typed, and a bare date is a whole day
     text json                a text area (json is checked before it is sent)
     markdown                 the notes' own live editor
     bool                     a tick box
@@ -33,6 +35,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from collections.abc import Callable
 from typing import Any
 
 from textual.app import ComposeResult
@@ -97,7 +100,10 @@ async def link_choices(client: Any, models: dict, model: dict) -> dict[str, list
 
 
 def _as_local(value: str) -> str:
-    """A stored ISO moment as the minute it is here."""
+    """A stored moment as the minute it is here: a zone converted, the wall
+    clock left as it is, and a whole day a date."""
+    if len(str(value or "")) == 10:
+        return str(value)
     try:
         moment = dt.datetime.fromisoformat(value)
     except (TypeError, ValueError):
@@ -142,6 +148,7 @@ class RecordSheet(Modal[dict | str | None]):
         only: list[str] | None = None,
         choices: dict[str, list[tuple[str, str]]] | None = None,
         heading: str = "",
+        adjust: Callable[[dict, dict | None], dict] | None = None,
     ) -> None:
         super().__init__()
         self.client = client
@@ -152,6 +159,10 @@ class RecordSheet(Modal[dict | str | None]):
         # What a new record starts with: the board it is on, the lane.
         self.preset = dict(preset or {})
         self.choices = choices or {}
+        # What a kit element changes in what is sent, knowing more than the
+        # datamodel says: a calendar keeps an event's length when its start
+        # moves. Given the fields to send and the record as it was.
+        self.adjust = adjust
         label = self.model.get("label") or model_id
         self.heading = heading or (label if record else f"New {label.lower()}")
         self.fields = self._ordered(only)
@@ -344,14 +355,17 @@ class RecordSheet(Modal[dict | str | None]):
                     raise ValueError(f"{label} is a date, like 2026-09-26.") from None
             if kind == "datetime":
                 try:
+                    if len(text) == 10:
+                        # A date alone is a whole day, and stays one.
+                        return dt.date.fromisoformat(text).isoformat()
                     moment = dt.datetime.fromisoformat(text)
                 except ValueError:
                     raise ValueError(
                         f"{label} is a date and a time, like 2026-09-26 14:30."
                     ) from None
                 if moment.tzinfo is None:
-                    # Typed here, so it is a time here.
-                    moment = moment.astimezone()
+                    # Typed here with no zone: the time on the wall, as typed.
+                    return moment.isoformat(timespec="minutes")
                 return moment.isoformat(timespec="seconds")
             if kind == "email" and "@" not in text:
                 raise ValueError(f"{label} is an email address.")
@@ -389,6 +403,8 @@ class RecordSheet(Modal[dict | str | None]):
             # when the sheet does not show that field.
             for name, value in self.preset.items():
                 collected.setdefault(name, value)
+        if self.adjust is not None and collected:
+            collected = self.adjust(collected, self.record)
         return collected
 
     def _focus(self, field: dict) -> None:
@@ -528,6 +544,8 @@ def _same(field: dict, before: Any, after: Any) -> bool:
         return True
     kind = field.get("kind")
     if kind == "datetime" and before and after:
+        if len(str(before)) == 10 or len(str(after)) == 10:
+            return str(before) == str(after)
         try:
             return dt.datetime.fromisoformat(str(before)) == dt.datetime.fromisoformat(str(after))
         except ValueError:

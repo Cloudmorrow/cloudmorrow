@@ -185,7 +185,7 @@ async def test_the_quill_key_brings_its_tab(app):
 
 async def test_a_kit_the_terminal_does_not_draw_yet_has_no_tab(app):
     quill = dict(READING_QUILL, id="diary", name="Diary", installed_version="0.2.0")
-    quill["screens"] = [dict(READING_QUILL["screens"][0], kit="calendar")]
+    quill["screens"] = [dict(READING_QUILL["screens"][0], kit="thread")]
     app.client.quill_list.append(quill)
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)

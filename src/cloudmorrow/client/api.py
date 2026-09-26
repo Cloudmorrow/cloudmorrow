@@ -425,10 +425,15 @@ class CloudmorrowClient:
     async def record(self, model: str, record_id: str) -> dict:
         return (await self._request("GET", f"/api/records/{model}/{record_id}")).json()
 
-    async def create_record(self, model: str, fields: dict, *, index: int | None = None) -> dict:
+    async def create_record(
+        self, model: str, fields: dict, *, index: int | None = None, scope: str | None = None
+    ) -> dict:
+        """Make a record. *scope* is for a space: personal, shared or public."""
         body: dict = {"fields": fields}
         if index is not None:
             body["index"] = index
+        if scope:
+            body["scope"] = scope
         return (await self._request("POST", f"/api/records/{model}", json=body)).json()
 
     async def update_record(
@@ -449,6 +454,23 @@ class CloudmorrowClient:
 
     async def delete_record(self, model: str, record_id: str) -> None:
         await self._request("DELETE", f"/api/records/{model}/{record_id}")
+
+    # -- the people in a space (a shared calendar, a channel) ------------------
+    async def people(self) -> list[dict]:
+        """Everybody on the server a space could be shared with."""
+        return (await self._request("GET", "/api/people")).json()
+
+    async def add_member(self, model: str, space_id: str, username: str) -> dict:
+        """Put somebody in a shared space. Returns the space, members and all."""
+        return (
+            await self._request(
+                "POST", f"/api/records/{model}/{space_id}/members", json={"username": username}
+            )
+        ).json()
+
+    async def remove_member(self, model: str, space_id: str, username: str) -> None:
+        """Take somebody out of a shared space; with your own name, leave it."""
+        await self._request("DELETE", f"/api/records/{model}/{space_id}/members/{username}")
 
     # -- fileshares --------------------------------------------------------
     async def shares(self) -> list[dict]:
@@ -693,118 +715,6 @@ class CloudmorrowClient:
     async def chat_unread(self) -> dict:
         """What is waiting, per channel and altogether."""
         return (await self._request("GET", "/api/chat/unread")).json()
-
-    # -- the calendar --------------------------------------------------------
-    # A calendar is addressed by its slug; an event by its id, which is the
-    # server's and unique across every calendar, so moving one between them
-    # is a field rather than a different address.
-    async def calendars(self) -> list[dict]:
-        """Every calendar this account can see, their own at the top."""
-        return (await self._request("GET", "/api/calendar/calendars")).json()
-
-    async def calendar(self, slug: str) -> dict:
-        return (await self._request("GET", f"/api/calendar/calendars/{slug}")).json()
-
-    async def create_calendar(
-        self,
-        name: str,
-        *,
-        kind: str = "shared",
-        colour: str = "",
-        members: list[str] | None = None,
-    ) -> dict:
-        return (
-            await self._request(
-                "POST",
-                "/api/calendar/calendars",
-                json={
-                    "name": name,
-                    "kind": kind,
-                    "colour": colour,
-                    "members": members or [],
-                },
-            )
-        ).json()
-
-    async def update_calendar(
-        self, slug: str, *, name: str | None = None, colour: str | None = None
-    ) -> dict:
-        return (
-            await self._request(
-                "PATCH",
-                f"/api/calendar/calendars/{slug}",
-                json={"name": name, "colour": colour},
-            )
-        ).json()
-
-    async def calendar_people(self) -> list[dict]:
-        return (await self._request("GET", "/api/calendar/people")).json()
-
-    async def add_calendar_members(self, slug: str, usernames: list[str]) -> dict:
-        return (
-            await self._request(
-                "POST",
-                f"/api/calendar/calendars/{slug}/members",
-                json={"usernames": usernames},
-            )
-        ).json()
-
-    async def leave_calendar(self, slug: str) -> None:
-        await self._request("POST", f"/api/calendar/calendars/{slug}/leave")
-
-    async def delete_calendar(self, slug: str) -> None:
-        await self._request("DELETE", f"/api/calendar/calendars/{slug}")
-
-    async def events(
-        self, *, start: str, end: str, calendar: str | None = None
-    ) -> list[dict]:
-        """Everything in a window of days, across every calendar you can see."""
-        params: dict[str, object] = {"from": start, "to": end}
-        if calendar:
-            params["calendar"] = calendar
-        return (await self._request("GET", "/api/calendar/events", params=params)).json()
-
-    async def upcoming_events(self, *, days: int = 7, limit: int = 20) -> list[dict]:
-        return (
-            await self._request(
-                "GET", "/api/calendar/upcoming", params={"days": days, "limit": limit}
-            )
-        ).json()
-
-    async def create_event(
-        self,
-        slug: str,
-        *,
-        title: str,
-        starts_at: str,
-        ends_at: str | None = None,
-        all_day: bool = False,
-        notes: str = "",
-        location: str = "",
-    ) -> dict:
-        return (
-            await self._request(
-                "POST",
-                f"/api/calendar/calendars/{slug}/events",
-                json={
-                    "title": title,
-                    "starts_at": starts_at,
-                    "ends_at": ends_at,
-                    "all_day": all_day,
-                    "notes": notes,
-                    "location": location,
-                },
-            )
-        ).json()
-
-    async def edit_event(self, event_id: int, **fields: object) -> dict:
-        """Change an event. `calendar=` moves it to another one."""
-        return (
-            await self._request("PATCH", f"/api/calendar/events/{event_id}", json=fields)
-        ).json()
-
-    async def delete_event(self, event_id: int) -> None:
-        await self._request("DELETE", f"/api/calendar/events/{event_id}")
 
 
 def _detail(response: httpx.Response) -> Any:

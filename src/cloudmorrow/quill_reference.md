@@ -46,7 +46,7 @@ why = "to show who looks after each plant"
 
 [[screens]]                        # one tab per screen, on every surface
 id = "plants"
-kit = "list"                       # list, board, detail, form (calendar, thread, grid, editor: next)
+kit = "list"                       # list, board, detail, form, calendar (thread, grid, editor: next)
 label = "Plants"
 model = "plants.plant"
 title = "name"
@@ -121,6 +121,9 @@ Field kinds: string, text, markdown, bool, int, decimal, date, datetime, enum,
 email, phone, url, link, json. `indexed` fields are plain on disk so the server
 can filter and sort by them; everything else is encrypted at rest. Links are
 record ids and are always indexed. `on_delete` is `cascade` or `clear`.
+A datetime without a zone is the wall clock, kept as typed; a bare date is a
+whole day. Filter a list with `?field=value`, or a range with `__lt`,
+`__lte`, `__gt`, `__gte` on an indexed field.
 `stamp` sets a datetime when another field takes a value and clears it when it
 leaves.
 
@@ -131,6 +134,7 @@ leaves.
 | list | model, title; optional subtitle, tick (bool) | rows, a circle per row if tick |
 | board | model, lane (enum, in ordered_within), title; optional group (link: chips), body (markdown), done (a lane value) | lanes; cards dragged between them |
 | detail / form | model; optional fields = [...] | one record's fields, editable |
+| calendar | model, starts, ends (indexed datetime/date), space (a link to a space datamodel); optional all_day (bool), colour (a field of the space), subtitle | every space's things at once: a month, a week, the day's list; the spaces and their people |
 
 Every screen opens a record sheet when a row or card is chosen: every field,
 with the widget for its kind, editable, with delete. No other UI exists, on

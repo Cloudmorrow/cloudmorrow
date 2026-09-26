@@ -71,7 +71,7 @@ def test_the_old_palette_is_gone():
     for name, css in _stylesheets():
         for old in ("#4fe3d7", "#a78bfa", "#ffc857", "#7c8cf8", "#f472b6"):
             # Calendar colours are the person's choice by name, and keep theirs.
-            if name == "calendar.css" and old in ("#4fe3d7", "#a78bfa"):
+            if name == "kit_calendar.css" and old in ("#4fe3d7", "#a78bfa"):
                 continue
             assert old not in css.lower(), f"{name} still has {old}"
 

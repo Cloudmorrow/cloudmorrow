@@ -141,6 +141,12 @@ def preview(plan: dict) -> str:
             sub = f"   <{screen['subtitle']}>" if screen.get("subtitle") else ""
             for _ in range(2):
                 lines.append(f"  {tick}<{title}>{sub}")
+        elif screen["kit"] == "calendar":
+            space = fields.get(screen.get("space", ""), {}).get("to", "space")
+            lines.append(f"  [ every {space} you can see ]   < month >   Mo Tu We Th Fr Sa Su")
+            lines.append(f"  a dot per {screen['model']} on each day from {screen['starts']} to {screen['ends']}")
+            whole = f", whole days when {screen['all_day']}" if screen.get("all_day") else ""
+            lines.append(f"  the day: <{screen['starts']}>  <{title}>  <{space}>{whole}")
         else:
             shown = screen.get("fields") or list(fields)
             lines.append("  " + ", ".join(shown))

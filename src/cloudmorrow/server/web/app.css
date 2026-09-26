@@ -13,7 +13,8 @@
 @import "./pictures.css";
 @import "./kit.css";
 @import "./chat.css";
-@import "./calendar.css";
+@import "./kit_calendar.css";
+@import "./kit_space.css";
 @import "./format.css";
 @import "./files.css";
 @import "./features.css";
