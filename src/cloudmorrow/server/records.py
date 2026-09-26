@@ -212,6 +212,9 @@ class Record:
     # The newest thing written in it that counts as unread: who, when, and
     # its title — what a list of conversations shows under each one.
     last: dict | None = None
+    # A line of what it says, when a listing was asked for one: the start of
+    # its text with `?previews=true`, the line that matched with `?q=`.
+    preview: str | None = None
 
     def to_dict(self) -> dict:
         extra: dict = {}
@@ -222,6 +225,8 @@ class Record:
                 "unread": self.unread,
                 "last": dict(self.last) if self.last else None,
             }
+        if self.preview is not None:
+            extra["preview"] = self.preview
         return extra | {
             "id": self.id,
             "model": self.model,
@@ -300,10 +305,7 @@ def _coerce(model: Datamodel, f: Field, value: object) -> object:
         except ValueError:
             raise RecordError(f"{where} is a date, YYYY-MM-DD") from None
     if kind == "datetime":
-        moment = _parse_moment(str(value))
-        if moment is None:
-            raise RecordError(f"{where} is a date and time, ISO 8601")
-        return moment.isoformat(timespec="seconds")
+        return _wall_or_moment(where, str(value).strip())
     if kind == "enum":
         text = str(value).strip().lower()
         if text not in f.values:
@@ -318,6 +320,34 @@ def _coerce(model: Datamodel, f: Field, value: object) -> object:
     raise RecordError(f"{where}: unknown kind {kind}")  # pragma: no cover
 
 
+_BARE_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _wall_or_moment(where: str, text: str) -> str:
+    """A datetime field's value, kept the way it was meant.
+
+    With a zone it is a moment, and is kept with its zone. Without one it is
+    the time on the wall — "the dentist at ten" — and is kept as typed, to
+    the minute, converting nothing: that is what a calendar needs, and a
+    server guessing a zone for it would move the dentist twice a year. A
+    bare date is a whole day, and stays one. ISO sorts the way time does, so
+    all three compare as strings, which is what a range filter does.
+    """
+    if _BARE_DATE_RE.match(text):
+        try:
+            return dt.date.fromisoformat(text).isoformat()
+        except ValueError:
+            raise RecordError(f"{where} is a date, YYYY-MM-DD") from None
+    try:
+        moment = dt.datetime.fromisoformat(text)
+    except ValueError:
+        raise RecordError(f"{where} is a date and time, ISO 8601") from None
+    if moment.tzinfo is None:
+        exact = moment.second or moment.microsecond
+        return moment.isoformat(timespec="seconds" if exact else "minutes")
+    return moment.isoformat(timespec="seconds")
+
+
 def _is(value: object, target: str) -> bool:
     """Does a field's value read as *target*? `false` is how TOML says a bool."""
     if isinstance(value, bool):
@@ -330,8 +360,69 @@ def _stored_indexed(model: Datamodel) -> set[str]:
     return {f.name for f in model.fields if f.indexed or f.kind == "link"}
 
 
+# `?starts_at__lt=2026-10-01`: a range on an indexed field, for anything
+# that asks "between these two" — the events in a month, the invoices in a
+# quarter. A field that is missing never matches a range.
+RANGES = {"lt": "<", "lte": "<=", "gt": ">", "gte": ">="}
+
+
+def _filter(key: str) -> tuple[str, str]:
+    """A filter's field and its comparison: `due` is equal, `due__gte` is at least."""
+    name, sep, suffix = key.rpartition("__")
+    if sep and suffix in RANGES:
+        return name, RANGES[suffix]
+    return key, "IS"
+
+
 def _new_id() -> str:
     return "r_" + secrets.token_hex(5)
+
+
+# -- what a listing may ask for besides filters ----------------------------------
+# `?q=` is a text search and `?previews=true` a line of each record's text.
+# Neither is a field, so neither is a filter; a backend answers them its own
+# way (a note's search reads the files), and the store answers them here.
+LIST_OPTIONS = frozenset({"q", "previews"})
+
+# The kinds a text search reads, and a preview is taken from.
+TEXT_KINDS = ("string", "text", "markdown", "email", "url", "phone")
+
+# What a datamodel can do besides the five calls, and the backend method
+# that does it. The store searches its own records; a backend has folders
+# and attachments when it has the methods. See `RecordStore.capabilities`.
+BACKEND_CAPABILITIES = {"folders": "folders", "attachments": "attach", "content": "content"}
+
+PREVIEW_CHARS = 120
+
+
+def _truthy(value: object) -> bool:
+    return str(value).lower() in ("1", "true", "yes", "on")
+
+
+def _matches(model: Datamodel, record: Record, query: str) -> bool:
+    """Does any text of *record* hold *query*? The preview says where."""
+    needle = query.casefold()
+    for f in model.fields:
+        if f.kind not in TEXT_KINDS:
+            continue
+        for line in str(record.fields.get(f.name) or "").splitlines():
+            if needle in line.casefold():
+                record.preview = line.strip()[:200]
+                return True
+    return False
+
+
+def _preview_of(model: Datamodel, record: Record) -> str:
+    """The first line of its long text — Markdown first — that says something."""
+    for kind in ("markdown", "text"):
+        for f in model.fields:
+            if f.kind != kind:
+                continue
+            for line in str(record.fields.get(f.name) or "").splitlines():
+                line = line.strip().lstrip("#").strip()
+                if line:
+                    return line[: PREVIEW_CHARS - 1] + "…" if len(line) > PREVIEW_CHARS else line
+    return ""
 
 
 # -- the store -----------------------------------------------------------------
@@ -481,11 +572,21 @@ class RecordStore:
         return row
 
     def _writable(self, conn: Connection, principal: Principal, model: Datamodel, row: sqlite3.Row) -> None:
-        """Seeing is not always changing: a space is its manager's, a message its author's."""
+        """Seeing is not always changing: a space is its manager's, a message its author's,
+        and an event its writer's or its calendar's manager's."""
         if model.space and not self._may_manage(principal, row):
             raise Refused(f"only whoever made this {model.label.lower()} may change it")
-        if model.authored and row["owner"] != principal.username:
-            raise Refused(f"only whoever wrote this {model.label.lower()} may change it")
+        if not model.authored or row["owner"] == principal.username:
+            return
+        if model.authored == "or-manager":
+            space = self._space_of(conn, model, json.loads(row["indexed"] or "{}"))
+            if space is not None and self._may_manage(principal, space):
+                return
+            raise Refused(
+                f"only whoever wrote this {model.label.lower()}, or whoever manages where it is,"
+                " may change it"
+            )
+        raise Refused(f"only whoever wrote this {model.label.lower()} may change it")
 
     def _visible_clause(self, model: Datamodel, username: str) -> tuple[str, list[object]]:
         """SQL that keeps the rows of *model* this person may see."""
@@ -617,10 +718,11 @@ class RecordStore:
         last: int | None = None,
         since: str | None = None,
     ) -> list[Record]:
-        """Every record of *model_id* the principal owns, filtered, in order.
+        """Every record of *model_id* the principal may see, filtered, in order.
 
         Filters are on indexed fields and links only: those are what the server
-        can see. Sweeps what an expire job would take first.
+        can see. `name` is equal to; `name__lt`, `__lte`, `__gt` and `__gte`
+        are a range. Sweeps what an expire job would take first.
 
         *last* keeps only the last so many, still in order — the newest page
         of a conversation. *since* keeps only what was made or changed at or
@@ -628,18 +730,38 @@ class RecordStore:
         """
         check(principal, "read", model_id)
         model = self.model(model_id)
+        where = dict(where or {})
+        # Not filters: what else the listing is asked for (see LIST_OPTIONS).
+        query = str(where.pop("q", "") or "").strip()
+        previews = _truthy(where.pop("previews", False))
         if model.backend:
-            return self._backend(model).list(principal, model, dict(where or {}))
+            return self._backend(model).list(
+                principal, model, where, q=query, previews=previews
+            )
+        records = self._list_stored(principal, model, where, last=last, since=since)
+        if query:
+            records = [r for r in records if _matches(model, r, query)]
+        elif previews:
+            for record in records:
+                record.preview = _preview_of(model, record)
+        return records
+
+    def _list_stored(
+        self, principal: Principal, model: Datamodel, where: dict, *,
+        last: int | None = None, since: str | None = None,
+    ) -> list[Record]:
+        model_id = model.id
         self.sweep(model_id, owner=None if (model.space or model.in_space) else principal.username)
         plain = _stored_indexed(model)
         clause, clause_params = self._visible_clause(model, principal.username)
         query = f"SELECT *, rowid AS seq FROM records WHERE model = ? AND {clause}"
         params: list[object] = [model.id, *clause_params]
-        for name, value in (where or {}).items():
+        for key, value in (where or {}).items():
+            name, operator = _filter(key)
             if name not in plain:
                 raise RecordError(f"{model.id} cannot be filtered by {name!r}: it is not indexed")
             coerced = _coerce(model, model.get_field(name), value)
-            query += " AND json_extract(indexed, ?) IS ?"
+            query += f" AND json_extract(indexed, ?) {operator} ?"
             params += [f'$."{name}"', coerced if not isinstance(coerced, bool) else int(coerced)]
         if since:
             # A `+` in a query string arrives as a space, if it was not escaped.
@@ -677,6 +799,59 @@ class RecordStore:
             record = self._record(conn, model, self._row(conn, principal, model, record_id), principal)
         conn.close()
         return record
+
+    # -- what a datamodel can do besides the five calls ------------------------
+    def capabilities(self, model_id: str) -> list[str]:
+        """`search` for every datamodel; `folders` and `attachments` when its backend has them.
+
+        A client reads this beside the datamodel (`GET /api/quills` puts it on
+        each model as `can`) rather than trying a call to find out.
+        """
+        model = self.model(model_id)
+        can = ["search"]
+        if model.backend:
+            backend = self.backends.get(model.backend)
+            can += [name for name, method in BACKEND_CAPABILITIES.items() if hasattr(backend, method)]
+        return can
+
+    def _capable(self, principal: Principal, model_id: str, action: str, capability: str):
+        check(principal, action, model_id)
+        model = self.model(model_id)
+        if capability not in self.capabilities(model_id):
+            raise RecordError(f"a {model.label.lower()} has no {capability}")
+        return model, self._backend(model)
+
+    def folders(self, principal: Principal, model_id: str) -> list[dict]:
+        """Every folder there is, empty ones too, as `{path, name}`, parents first."""
+        model, backend = self._capable(principal, model_id, "read", "folders")
+        return backend.folders(principal, model)
+
+    def make_folder(self, principal: Principal, model_id: str, path: str) -> dict:
+        model, backend = self._capable(principal, model_id, "write", "folders")
+        return backend.make_folder(principal, model, path)
+
+    def move_folder(self, principal: Principal, model_id: str, path: str, to: str) -> dict:
+        """Rename or move a folder, and everything in it with it."""
+        model, backend = self._capable(principal, model_id, "write", "folders")
+        return backend.move_folder(principal, model, path, to)
+
+    def delete_folder(self, principal: Principal, model_id: str, path: str) -> None:
+        """A folder and everything in it."""
+        model, backend = self._capable(principal, model_id, "write", "folders")
+        backend.delete_folder(principal, model, path)
+
+    def attach(self, principal: Principal, model_id: str, data: bytes, filename: str = "") -> dict:
+        """Keep a file beside the records: `{name, path, size, content_type}`.
+
+        `path` is what a record's Markdown writes to point at it.
+        """
+        model, backend = self._capable(principal, model_id, "write", "attachments")
+        return backend.attach(principal, model, data, filename)
+
+    def attachment(self, principal: Principal, model_id: str, name: str) -> tuple[bytes, str]:
+        """A kept file's bytes and media type."""
+        model, backend = self._capable(principal, model_id, "read", "attachments")
+        return backend.attachment(principal, model, name)
 
     def count(self, owner: str, model_id: str, *, scope: str | None = None) -> int:
         query = "SELECT COUNT(*) FROM records WHERE model = ? AND owner = ?"
@@ -1203,6 +1378,10 @@ class RecordStore:
                 ).fetchone()
             conn.close()
             if row is not None:
+                return []
+        elif self.model(model_id).backend:
+            # Kept elsewhere, so counted there: a note is a file in your folder.
+            if self.list(principal, model_id):
                 return []
         elif self.count(principal.username, model_id, scope=scope):
             return []

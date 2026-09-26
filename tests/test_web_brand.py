@@ -71,7 +71,7 @@ def test_the_old_palette_is_gone():
     for name, css in _stylesheets():
         for old in ("#4fe3d7", "#a78bfa", "#ffc857", "#7c8cf8", "#f472b6"):
             # Calendar colours are the person's choice by name, and keep theirs.
-            if name == "calendar.css" and old in ("#4fe3d7", "#a78bfa"):
+            if name == "kit_calendar.css" and old in ("#4fe3d7", "#a78bfa"):
                 continue
             assert old not in css.lower(), f"{name} still has {old}"
 
@@ -138,6 +138,6 @@ def test_the_icon_is_the_hedgehog(client):
 def test_empty_screens_may_show_the_hedgehog(client):
     assert 'url("./mascot-320.png")' in BASE
     assert client.get(f"/app/{asset_version()}/mascot-320.png").status_code == 200
-    for name in ("notes.js", "kit.js", "kit_grid.js"):
+    for name in ("kit_editor.js", "kit.js", "kit_grid.js"):
         source = (WEB / name).read_text(encoding="utf-8")
         assert 'class="empty mascot"><b>Nothing here yet</b>' in source, name

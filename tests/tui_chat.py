@@ -134,7 +134,7 @@ class FakeSpaces:
 
     def setup_quills(self) -> None:
         super().setup_quills()  # type: ignore[misc]
-        self.quill_list.append(copy.deepcopy(CHAT_QUILL))
+        # Chat itself is put in the list by FakeClient, after Files: the catalog's order.
         self.record_store.update(seed_chat())
         # When bram last looked in each space; everything after, by others, is unread.
         self.seen: dict[str, str] = {"r_general": "2026-09-19T14:03:00+00:00"}
@@ -187,7 +187,7 @@ class FakeSpaces:
                             scope: str | None = None, members: list[str] | None = None,
                             unique: bool = False) -> dict:
         if model not in CHAT_MODELS:
-            return await super().create_record(model, fields, index=index)  # type: ignore[misc]
+            return await super().create_record(model, fields, index=index, scope=scope)  # type: ignore[misc]
         definition = self._model(model)  # type: ignore[attr-defined]
         if definition.get("space"):
             people = {"bram", *(members or [])}
@@ -197,7 +197,7 @@ class FakeSpaces:
                     if same and {row["owner"], *row.get("members", [])} == people and row["scope"] == scope:
                         self.space_calls.append(("found", row["id"]))
                         return self._space_extras(copy.deepcopy(row))
-            made = await super().create_record(model, fields, index=index)  # type: ignore[misc]
+            made = await super().create_record(model, fields, index=index, scope=scope)  # type: ignore[misc]
             stored = self._find(model, made["id"])  # type: ignore[attr-defined]
             stored.update(scope=scope or "shared", members=list(members or []))
             self.space_calls.append(("made", stored["id"], scope, list(members or []), dict(fields)))
@@ -212,6 +212,8 @@ class FakeSpaces:
 
     # -- the people in a space ---------------------------------------------------
     async def add_member(self, model: str, space_id: str, username: str) -> dict:
+        if model not in CHAT_MODELS:
+            return await super().add_member(model, space_id, username)  # type: ignore[misc]
         row = self._find(model, space_id)  # type: ignore[attr-defined]
         if row["scope"] != "shared":
             raise ApiError("only a shared channel has members", status_code=400)
@@ -221,6 +223,8 @@ class FakeSpaces:
         return self._space_extras(copy.deepcopy(row))
 
     async def remove_member(self, model: str, space_id: str, username: str) -> None:
+        if model not in CHAT_MODELS:
+            return await super().remove_member(model, space_id, username)  # type: ignore[misc]
         row = self._find(model, space_id)  # type: ignore[attr-defined]
         self.space_calls.append(("remove", space_id, username))
         row["members"] = [m for m in row["members"] if m != username]
@@ -230,4 +234,4 @@ class FakeSpaces:
         self.seen[space_id] = "9999"
 
     async def people(self) -> list[dict]:
-        return [dict(p) for p in self.person_list]
+        return [dict(p) for p in self.person_list]  # the same two the base fake has

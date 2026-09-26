@@ -26,7 +26,7 @@ def code(source: str) -> str:
 
 def test_the_thread_is_its_own_file_registered_from_the_kit(client):
     assert 'import { renderThread } from "./kit_thread.js";' in KIT_JS
-    assert 'if (kit === "thread") return renderThread(at, arg);' in KIT_JS
+    assert "thread: renderThread" in KIT_JS
     app_css = (WEB / "app.css").read_text(encoding="utf-8")
     assert '@import "./kit_thread.css";' in app_css and '@import "./kit_space.css";' in app_css
     version = asset_version()

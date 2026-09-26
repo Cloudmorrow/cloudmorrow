@@ -1,9 +1,66 @@
-/* Spaces in the kit: making one, the people in it, and what it is.
+/* Spaces in the kit: making one, and who is in one (kit_space.js).
 
-   The shapes kit_space.js draws, and the calendar's own pages borrow while
-   they are still the calendar's: the scope to choose, the people to tick,
-   the facts about one, and who is in it. */
+   Rows in boxed groups, as everywhere: a person is a row, and so is the
+   way out. Nothing here is named for one kind of space. */
 
+.new-space input:not([type]) {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--ink);
+  font: inherit;
+  /* 16px or iOS zooms the page the moment the field is focused. */
+  font-size: 16px;
+}
+.new-space input::placeholder { color: var(--muted); }
+.new-space input[type="checkbox"], .new-space input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.new-space .kinds .row { align-items: flex-start; }
+.new-space .kinds input { margin-top: 15px; }
+.new-space .who-list .row { gap: 12px; }
+
+/* What is on the right of a row here is a sentence, not data. */
+.row .said, .space-people .said {
+  flex: none;
+  max-width: 62%;
+  color: var(--muted);
+  font-size: 15px;
+  text-align: right;
+}
+.space-people { margin-top: 18px; }
+.space-people .member { gap: 12px; }
+.space-people .member .main .said { font-size: 13px; margin-left: 6px; }
+.space-people .avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--card-2);
+  color: var(--accent);
+  font-family: var(--display);
+  font-weight: 600;
+}
+.space-people .take-out {
+  flex: none;
+  color: var(--bad);
+  font-size: 14px;
+  font-weight: 600;
+}
+.space-people .add-who .said { color: var(--accent); font-weight: 600; }
+
+/* A space's sheet has its people under it, not a body to grow into: the
+   editor above them is only as tall as its fields. */
+.editor.record:has(+ .space-people) { min-height: 0; cursor: auto; }
+
+/* The way to a space's own page, from a bar (a conversation's). */
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -12,28 +69,9 @@
   min-height: 44px;
   color: var(--bar-accent);
 }
-.new-space input:not([type]), .new-space input[type="text"] {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: none;
-  outline: none;
-  color: var(--ink);
-  font: inherit;
-  text-align: right;
-}
-.new-space input::placeholder { color: var(--muted); }
-.kinds .row, .who-list .row { align-items: flex-start; }
-.kinds input, .who-list input { margin-top: 15px; accent-color: var(--accent); width: 18px; height: 18px; }
-/* What each choice means is the question being asked, so it wraps rather
-   than trailing off in an ellipsis. */
-.kinds .meta, .kinds .preview { white-space: normal; overflow: visible; }
-.who-list .row { align-items: center; }
-.who-list input { margin-top: 0; }
 
-/* A person in a list: the circle with their initial, at row size. */
-.row.person .avatar,
-.members .avatar {
+/* A person to write to: the circle with their initial, at row size. */
+.row.person .avatar {
   flex: none;
   width: 34px;
   height: 34px;
@@ -46,16 +84,7 @@
   font-size: 15px;
   font-weight: 700;
 }
-.row.person .main, .row.add-who .main { min-width: 0; }
+.row.person .main { min-width: 0; }
 .row.person svg { margin-left: auto; color: var(--muted); }
-.members .muted { color: var(--muted); font-size: 13px; margin-left: 6px; }
-.members .remove-who { color: var(--bad); font-weight: 600; }
-
-/* The facts about one: a sentence on the right, not a monospaced value. */
-.facts .fact {
-  flex: none;
-  max-width: 62%;
-  color: var(--muted);
-  font-size: 15px;
-  text-align: right;
-}
+.new-space .kinds .meta, .new-space .kinds .preview { white-space: normal; overflow: visible; }
+.new-space .who-list .row { align-items: center; }

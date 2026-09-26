@@ -65,7 +65,7 @@ ORIGIN = ".origin.json"
 KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor")
 # The ones every surface draws *today*. A screen of another kind is refused at
 # install, so a Quill never lands with a tab that draws nothing somewhere.
-KIT_READY = frozenset({"list", "board", "detail", "form", "grid", "thread"})
+KIT_READY = frozenset({"list", "board", "detail", "form", "calendar", "grid", "editor", "thread"})
 
 # How a thread screen may make a space: in one of the scopes, or `direct`,
 # found-or-made between the people picked.
@@ -682,7 +682,11 @@ class QuillRegistry:
             return self.install(
                 folder,
                 models,
-                origin={"catalog": True, "repo": entry["repo"], "ref": entry.get("ref", "")},
+                origin={
+                    "catalog": True, "repo": entry["repo"], "ref": entry.get("ref", ""),
+                    # Where it stands in the catalog, which is where its tabs stand.
+                    "position": catalog.quills.index(entry),
+                },
             )
 
     def datamodels_source(self, catalog: Catalog, into: Path) -> Path | None:
@@ -693,10 +697,19 @@ class QuillRegistry:
 
     # -- telling -----------------------------------------------------------------------
     def installed(self) -> list[dict]:
-        """Every installed Quill, oldest first: the order its tabs appear in."""
-        ordered = sorted(
-            self.quills.values(), key=lambda m: (m.origin.get("installed_at", ""), m.id)
-        )
+        """Every installed Quill, in the order its tabs appear in.
+
+        The catalog's order first — Notes, then Tasks, as they stand there —
+        whenever each was installed; then every other Quill, oldest first.
+        One installed before the catalog said where (Tasks, on a server from
+        before this) goes after those that know.
+        """
+        def place(m: Manifest) -> tuple:
+            position = m.origin.get("position")
+            known = isinstance(position, int)
+            return (not known, position if known else 0, m.origin.get("installed_at", ""), m.id)
+
+        ordered = sorted(self.quills.values(), key=place)
         return [describe(m, self.datamodels, installed=m) for m in ordered]
 
     def catalogue_of_models(self) -> list[dict]:
@@ -832,6 +845,14 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
         elif kit in ("detail", "form"):
             for name in screen.get("fields", []):
                 need(model, thing, name)
+        elif kit == "calendar":
+            _check_calendar(screen, model, models, thing, need, where)
+        elif kit == "editor":
+            # A page of Markdown with a title; `path`, when bound, is a string
+            # like `folder/sub/title` whose folders are the tree beside it.
+            need(model, thing + " body", screen.get("body"), ("markdown",))
+            if screen.get("path"):
+                need(model, thing + " path", screen["path"], ("string",))
         elif kit == "grid":
             # Files: folders and tiles, in groups (the shares) picked first.
             if not model.backend:
@@ -908,6 +929,27 @@ def _check_thread(manifest: Manifest, screen: dict, model: Datamodel, models: di
                 raise QuillError(
                     f"{where}: {thing} made_as direct marks a space by {name}, which must be indexed"
                 )
+def _check_calendar(screen: dict, model: Datamodel, models: dict[str, Datamodel],
+                    thing: str, need, where: str) -> None:
+    """A calendar: two moments, whether it is all day, and the spaces it is drawn from."""
+    moments = ("datetime", "date")
+    need(model, thing + " starts", screen.get("starts"), moments)
+    need(model, thing + " ends", screen.get("ends"), moments)
+    for name in ("starts", "ends"):
+        if not model.by_name[screen[name]].indexed:
+            raise QuillError(
+                f"{where}: {thing} {name} {screen[name]!r} must be indexed, to ask for a range of days"
+            )
+    if screen.get("all_day"):
+        need(model, thing + " all_day", screen["all_day"], ("bool",))
+    need(model, thing + " space", screen.get("space"), ("link",))
+    space = models.get(model.by_name[screen["space"]].to)
+    if space is None or not space.space:
+        raise QuillError(f"{where}: {thing} space {screen['space']!r} must link to a space")
+    if screen.get("colour"):
+        need(space, thing + " colour", screen["colour"], ("string", "enum"))
+    if screen.get("subtitle"):
+        need(model, thing + " subtitle", screen["subtitle"])
 
 
 def describe(

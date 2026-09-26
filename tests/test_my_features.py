@@ -61,32 +61,35 @@ def test_an_unknown_feature_is_a_404(client, auth):
 
 # -- switching one ----------------------------------------------------------------
 def test_switching_one_off_is_remembered_and_reversible(client, auth):
-    response = switch(client, auth, "calendar", False)
+    response = switch(client, auth, "secrets", False)
     assert response.status_code == 200
     assert response.json() == {
-        "key": "calendar",
-        "label": "Calendar",
-        "description": "Your own calendar, and the ones you share",
+        "key": "secrets",
+        "label": "Secrets",
+        "description": "Vaults of keys and passwords, encrypted",
         "enabled": False,
     }
-    assert {row["key"]: row["enabled"] for row in mine(client, auth)}["calendar"] is False
-    assert switch(client, auth, "calendar", True).json()["enabled"] is True
-    assert {row["key"]: row["enabled"] for row in mine(client, auth)}["calendar"] is True
+    assert {row["key"]: row["enabled"] for row in mine(client, auth)}["secrets"] is False
+    assert switch(client, auth, "secrets", True).json()["enabled"] is True
+    assert {row["key"]: row["enabled"] for row in mine(client, auth)}["secrets"] is True
 
 
-def test_your_answer_is_yours_and_nobody_elses(client, auth, guest):
+def test_your_answer_is_yours_and_nobody_elses(notes_quill, auth, guest):
+    client = notes_quill
     switch(client, auth, "notes", False)
     assert {row["key"]: row["enabled"] for row in mine(client, guest)}["notes"] is True
 
 
-def test_it_hides_rather_than_forbids(client, auth):
+def test_it_hides_rather_than_forbids(notes_quill, auth):
     """A preference is not a feature switch: the API still answers you.
 
     Locking an account out of its own notes from the phone it just tapped a
     box on would be a mistake with no way back.
     """
-    switch(client, auth, "notes", False)
+    client = notes_quill
+    assert switch(client, auth, "notes", False).status_code == 200
     assert client.get("/api/notes/tree", headers=auth).status_code == 200
+    assert client.get("/api/records/note", headers=auth).status_code == 200
 
 
 def test_the_server_switch_still_wins(tasks_quill, auth):
@@ -137,7 +140,8 @@ def test_the_servers_own_list_is_unchanged_by_yours(client, auth):
     assert server["secrets"] is True, "your preference is not the server's setting"
 
 
-def test_only_an_administrator_throws_the_servers_switch(client, guest):
+def test_only_an_administrator_throws_the_servers_switch(notes_quill, guest):
+    client = notes_quill
     assert client.patch(
         "/api/server/features/notes", json={"enabled": False}, headers=guest
     ).status_code == 403
@@ -150,13 +154,13 @@ def test_the_store_answers_for_one_person(config, users):
     from cloudmorrow.server.features import FeatureStore
 
     store = FeatureStore(config.db_path)
-    assert store.enabled_for(ADMIN[0], "notes") is True
-    store.set_for(ADMIN[0], "notes", False)
-    assert store.enabled_for(ADMIN[0], "notes") is False
-    assert store.enabled_for(GUEST[0], "notes") is True
-    assert "notes" not in store.enabled_keys_for(ADMIN[0])
-    assert "notes" in store.enabled_keys_for(GUEST[0])
+    assert store.enabled_for(ADMIN[0], "secrets") is True
+    store.set_for(ADMIN[0], "secrets", False)
+    assert store.enabled_for(ADMIN[0], "secrets") is False
+    assert store.enabled_for(GUEST[0], "secrets") is True
+    assert "secrets" not in store.enabled_keys_for(ADMIN[0])
+    assert "secrets" in store.enabled_keys_for(GUEST[0])
 
-    store.set("notes", False, changed_by=ADMIN[0])
-    assert store.enabled_for(GUEST[0], "notes") is False
-    assert "notes" not in [row["key"] for row in store.list_for(GUEST[0])]
+    store.set("secrets", False, changed_by=ADMIN[0])
+    assert store.enabled_for(GUEST[0], "secrets") is False
+    assert "secrets" not in [row["key"] for row in store.list_for(GUEST[0])]

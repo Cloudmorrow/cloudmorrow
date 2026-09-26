@@ -1,0 +1,28 @@
+/* The kit's `calendar` (panes/kit_calendar.py): the spaces on the left, the
+   month in the middle, and the day under it. */
+
+#calendar-body {
+    height: 1fr;
+    padding: 1 0 0 0;
+}
+
+#calendar-list {
+    width: 26;
+    margin-right: 2;
+}
+
+#month-pane {
+    width: 1fr;
+}
+
+/* The month takes the top half; the day it is standing on takes the rest,
+   and both scroll on their own. Fifteen rows is a header and six weeks of
+   two-line cells, which is every month there is. */
+#month-grid {
+    height: 15;
+}
+
+#day-table {
+    height: 1fr;
+    margin-top: 1;
+}

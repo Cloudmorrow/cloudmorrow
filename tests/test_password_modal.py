@@ -90,6 +90,8 @@ async def test_a_mismatch_or_a_short_password_never_reaches_the_server(app):
         assert "not the same" in error_text(dialog)
 
         await fill(pilot, dialog, "supersecret1", "short", "short")
+        # Past the first press's animation, or this click is swallowed.
+        await pilot.pause(PRESS_ANIMATION)
         await pilot.click("#change")
         # The same button twice: a Button ignores a click while its press
         # animation is still running, and on a busy machine that is long

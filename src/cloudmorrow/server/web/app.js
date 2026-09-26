@@ -7,9 +7,7 @@
 import "./install.js";
 import "./login.js";
 import "./today.js";
-import "./notes.js";
 import "./quills.js";
-import "./calendar.js";
 import "./format.js";
 import "./features.js";
 import "./me.js";

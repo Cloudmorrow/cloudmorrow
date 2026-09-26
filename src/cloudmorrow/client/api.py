@@ -460,26 +460,6 @@ class CloudmorrowClient:
             body["unique"] = True
         return (await self._request("POST", f"/api/records/{model}", json=body)).json()
 
-    # -- the people in a space ------------------------------------------------
-    async def add_member(self, model: str, space_id: str, username: str) -> dict:
-        return (
-            await self._request(
-                "POST", f"/api/records/{model}/{space_id}/members", json={"username": username}
-            )
-        ).json()
-
-    async def remove_member(self, model: str, space_id: str, username: str) -> None:
-        """Take somebody out of a shared space; with your own name, leave it."""
-        await self._request("DELETE", f"/api/records/{model}/{space_id}/members/{username}")
-
-    async def mark_seen(self, model: str, space_id: str) -> None:
-        """You have looked in this space: what is in it is not unread any more."""
-        await self._request("POST", f"/api/records/{model}/{space_id}/seen")
-
-    async def people(self) -> list[dict]:
-        """Everybody else on the server, to share a space with or write to."""
-        return (await self._request("GET", "/api/people")).json()
-
     async def update_record(
         self, model: str, record_id: str, fields: dict, *, rev: int | None = None
     ) -> dict:
@@ -498,6 +478,59 @@ class CloudmorrowClient:
 
     async def delete_record(self, model: str, record_id: str) -> None:
         await self._request("DELETE", f"/api/records/{model}/{record_id}")
+
+    # -- the people in a space (a shared calendar, a channel) ------------------
+    async def people(self) -> list[dict]:
+        """Everybody on the server a space could be shared with."""
+        return (await self._request("GET", "/api/people")).json()
+
+    async def add_member(self, model: str, space_id: str, username: str) -> dict:
+        """Put somebody in a shared space. Returns the space, members and all."""
+        return (
+            await self._request(
+                "POST", f"/api/records/{model}/{space_id}/members", json={"username": username}
+            )
+        ).json()
+
+    async def remove_member(self, model: str, space_id: str, username: str) -> None:
+        """Take somebody out of a shared space; with your own name, leave it."""
+        await self._request("DELETE", f"/api/records/{model}/{space_id}/members/{username}")
+
+    async def mark_seen(self, model: str, space_id: str) -> None:
+        """You have looked in this space: what is in it is not unread any more."""
+        await self._request("POST", f"/api/records/{model}/{space_id}/seen")
+
+    # A datamodel's folders and attachments, where its backend keeps them
+    # (the model's `can` says so): a note's folders, and its pictures.
+    async def record_folders(self, model: str) -> list[dict]:
+        return (await self._request("GET", f"/api/records/{model}/_folders")).json()
+
+    async def make_record_folder(self, model: str, path: str) -> dict:
+        return (
+            await self._request("POST", f"/api/records/{model}/_folders", json={"path": path})
+        ).json()
+
+    async def move_record_folder(self, model: str, path: str, to: str) -> dict:
+        body = {"path": path, "to": to}
+        return (await self._request("PATCH", f"/api/records/{model}/_folders", json=body)).json()
+
+    async def delete_record_folder(self, model: str, path: str) -> None:
+        await self._request("DELETE", f"/api/records/{model}/_folders", params={"path": path})
+
+    async def attach(self, model: str, data: bytes, *, filename: str = "") -> dict:
+        """Keep a file beside *model*'s records: `{name, path, …}`, `path` for Markdown."""
+        return (
+            await self._request(
+                "POST", f"/api/records/{model}/_attachments", content=data,
+                params={"filename": filename}, timeout=UPLOAD_TIMEOUT,
+            )
+        ).json()
+
+    async def attachment(self, model: str, name: str) -> bytes:
+        response = await self._request(
+            "GET", f"/api/records/{model}/_attachments/{name}", timeout=UPLOAD_TIMEOUT
+        )
+        return response.content
 
     # The bytes beside a record, for a datamodel that keeps some: a file's.
     async def record_content(self, model: str, record_id: str) -> bytes:
@@ -674,118 +707,6 @@ class CloudmorrowClient:
         return (
             await self._request("POST", "/api/notifications/read", json={"ids": ids})
         ).json()
-
-    # -- the calendar --------------------------------------------------------
-    # A calendar is addressed by its slug; an event by its id, which is the
-    # server's and unique across every calendar, so moving one between them
-    # is a field rather than a different address.
-    async def calendars(self) -> list[dict]:
-        """Every calendar this account can see, their own at the top."""
-        return (await self._request("GET", "/api/calendar/calendars")).json()
-
-    async def calendar(self, slug: str) -> dict:
-        return (await self._request("GET", f"/api/calendar/calendars/{slug}")).json()
-
-    async def create_calendar(
-        self,
-        name: str,
-        *,
-        kind: str = "shared",
-        colour: str = "",
-        members: list[str] | None = None,
-    ) -> dict:
-        return (
-            await self._request(
-                "POST",
-                "/api/calendar/calendars",
-                json={
-                    "name": name,
-                    "kind": kind,
-                    "colour": colour,
-                    "members": members or [],
-                },
-            )
-        ).json()
-
-    async def update_calendar(
-        self, slug: str, *, name: str | None = None, colour: str | None = None
-    ) -> dict:
-        return (
-            await self._request(
-                "PATCH",
-                f"/api/calendar/calendars/{slug}",
-                json={"name": name, "colour": colour},
-            )
-        ).json()
-
-    async def calendar_people(self) -> list[dict]:
-        return (await self._request("GET", "/api/calendar/people")).json()
-
-    async def add_calendar_members(self, slug: str, usernames: list[str]) -> dict:
-        return (
-            await self._request(
-                "POST",
-                f"/api/calendar/calendars/{slug}/members",
-                json={"usernames": usernames},
-            )
-        ).json()
-
-    async def leave_calendar(self, slug: str) -> None:
-        await self._request("POST", f"/api/calendar/calendars/{slug}/leave")
-
-    async def delete_calendar(self, slug: str) -> None:
-        await self._request("DELETE", f"/api/calendar/calendars/{slug}")
-
-    async def events(
-        self, *, start: str, end: str, calendar: str | None = None
-    ) -> list[dict]:
-        """Everything in a window of days, across every calendar you can see."""
-        params: dict[str, object] = {"from": start, "to": end}
-        if calendar:
-            params["calendar"] = calendar
-        return (await self._request("GET", "/api/calendar/events", params=params)).json()
-
-    async def upcoming_events(self, *, days: int = 7, limit: int = 20) -> list[dict]:
-        return (
-            await self._request(
-                "GET", "/api/calendar/upcoming", params={"days": days, "limit": limit}
-            )
-        ).json()
-
-    async def create_event(
-        self,
-        slug: str,
-        *,
-        title: str,
-        starts_at: str,
-        ends_at: str | None = None,
-        all_day: bool = False,
-        notes: str = "",
-        location: str = "",
-    ) -> dict:
-        return (
-            await self._request(
-                "POST",
-                f"/api/calendar/calendars/{slug}/events",
-                json={
-                    "title": title,
-                    "starts_at": starts_at,
-                    "ends_at": ends_at,
-                    "all_day": all_day,
-                    "notes": notes,
-                    "location": location,
-                },
-            )
-        ).json()
-
-    async def edit_event(self, event_id: int, **fields: object) -> dict:
-        """Change an event. `calendar=` moves it to another one."""
-        return (
-            await self._request("PATCH", f"/api/calendar/events/{event_id}", json=fields)
-        ).json()
-
-    async def delete_event(self, event_id: int) -> None:
-        await self._request("DELETE", f"/api/calendar/events/{event_id}")
 
 
 def _detail(response: httpx.Response) -> Any:

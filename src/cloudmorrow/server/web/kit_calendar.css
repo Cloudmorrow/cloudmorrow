@@ -1,0 +1,297 @@
+/* The kit's `calendar`: the month, the week, the dots and the blocks.
+
+   The month and the week are the two grids in the app. Everything else
+   here is the shapes base.css already has — rows in boxed groups — because
+   an event is a row, and a calendar that invented a new shape for one
+   would only be harder to read. Nothing here is named for one Quill. */
+
+/* -- the colours a space can be -------------------------------------------- */
+/* Named, not spelled: the record says "violet", and this is the one place
+   that decides what violet looks like here. The same five names are in the
+   terminal's palette. Spelled out rather than borrowed from the brand's
+   roles, because a calendar somebody chose to make violet is violet
+   whatever the accent of the day is. */
+:root {
+  --c-cyan: #4fe3d7;
+  --c-violet: #a78bfa;
+  --c-green: var(--good);
+  --c-amber: #e0a84c;
+  --c-rose: var(--bad);
+}
+.dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--c-cyan);
+  flex: none;
+}
+.dot.c-cyan, .block.c-cyan, .chip-event.c-cyan, .swatch.c-cyan { --c: var(--c-cyan); }
+.dot.c-violet, .block.c-violet, .chip-event.c-violet, .swatch.c-violet { --c: var(--c-violet); }
+.dot.c-green, .block.c-green, .chip-event.c-green, .swatch.c-green { --c: var(--c-green); }
+.dot.c-amber, .block.c-amber, .chip-event.c-amber, .swatch.c-amber { --c: var(--c-amber); }
+.dot.c-rose, .block.c-rose, .chip-event.c-rose, .swatch.c-rose { --c: var(--c-rose); }
+.dot, .swatch { background: var(--c, var(--c-cyan)); }
+
+/* -- the bar over the grid -------------------------------------------------- */
+.month-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 10px;
+}
+.month-bar h2 {
+  flex: 1;
+  margin: 0;
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  text-align: center;
+}
+.month-bar .step {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-control);
+  color: var(--accent);
+}
+.month-bar .step:active { background: var(--card); }
+.month-bar .views { flex: none; margin: 0 0 0 12px; }
+
+/* The add row, and the space a new one goes in beside it. */
+.kit-add { gap: 8px; }
+.kit-add .kit-in {
+  flex: none;
+  max-width: 34%;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+/* -- the month ---------------------------------------------------------------- */
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+.month {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.month .cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  /* Tall enough for the number and a row of dots, and no taller: six weeks
+     of these has to leave room for the day underneath. */
+  min-height: 46px;
+  padding: 5px 0 4px;
+  border-radius: var(--radius-control);
+  background: var(--card);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.month .cell .n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 15px;
+}
+/* A day from the month either side is there to make the week whole. */
+.month .cell.away { background: transparent; }
+.month .cell.away .n { color: var(--muted); opacity: .6; }
+.month .cell.today .n { color: var(--accent); font-weight: 700; }
+.month .cell.picked .n { background: var(--fill); color: var(--fill-ink); font-weight: 700; }
+.month .cell.picked.today .n { color: var(--fill-ink); }
+.month .cell:active { background: var(--card-2); }
+.month .dots { display: flex; gap: 2px; min-height: 6px; align-items: center; }
+.month .dots .dot { width: 5px; height: 5px; }
+/* What is on that day, written out: the phone has the dots and never these. */
+.month .cell .named { display: none; }
+
+.day-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.day-label .today-link {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* -- an event in a list ------------------------------------------------------- */
+.row.event { gap: 10px; padding-right: 12px; }
+.row.event .dot { margin-top: 2px; align-self: center; }
+.row.event .main { min-width: 0; }
+.row.event .preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* -- the week: only where there is the room for one ----------------------------- */
+.week {
+  display: grid;
+  grid-template-columns: 52px repeat(7, minmax(0, 1fr));
+  gap: 0 2px;
+  margin-bottom: 16px;
+}
+.week .corner { min-height: 1px; }
+.week .whole-label {
+  align-self: center;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.week .day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 0;
+  border-radius: var(--radius-control);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.week .day-head .n { color: var(--ink); font-family: var(--display); font-size: 20px; }
+.week .day-head.today .n { color: var(--accent); }
+.week .day-head.picked { background: var(--fill); color: var(--fill-ink); }
+.week .day-head.picked .n { color: var(--fill-ink); }
+.week .whole {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 28px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--line);
+}
+.week .chip-event {
+  overflow: hidden;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border-left: 3px solid var(--c);
+  background: color-mix(in srgb, var(--c) 18%, var(--card));
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.week .hours {
+  display: grid;
+  grid-template-rows: repeat(var(--hours), var(--hour));
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.week .hours span { transform: translateY(-7px); }
+.week .col {
+  position: relative;
+  height: calc(var(--hours) * var(--hour));
+  border-radius: 0 0 var(--radius-control) var(--radius-control);
+  /* A line on each hour, drawn rather than laid out. */
+  background:
+    repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px var(--hour)),
+    var(--card);
+}
+.week .col.today { background:
+    repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px var(--hour)),
+    var(--card-2); }
+.week .block {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border-left: 3px solid var(--c);
+  background: color-mix(in srgb, var(--c) 28%, var(--card));
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.3;
+}
+.week .block .when { color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Half an hour is one line: the time, and the title beside it. */
+.week .block.short { flex-direction: row; gap: 6px; align-items: center; padding-top: 0; padding-bottom: 0; }
+.week .block.short .what { white-space: nowrap; }
+.week .block .what { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.week .now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+/* -- the record sheet: a space's colour ------------------------------------------ */
+.swatches { display: inline-flex; gap: 12px; margin-left: auto; }
+.swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+}
+.swatch.on { border-color: var(--ink); }
+.swatch:disabled { opacity: .5; }
+
+/* -- a computer: the month says what is on each day -------------------------------- */
+@media (min-width: 1180px) and (min-height: 600px) {
+  #app:has(.kit-calendar) { --column: 1120px; }
+  .month .cell { align-items: stretch; min-height: 96px; padding: 5px 6px; }
+  .month .cell .n { align-self: center; }
+  .month .cell .dots { display: none; }
+  .month .cell .named {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .month .cell .named .on {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  .month .cell .named .on .dot { width: 6px; height: 6px; }
+  .month .cell .named .on .what {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .month .cell .named .more { padding-left: 11px; color: var(--muted); font-size: 11px; text-align: left; }
+  .month .cell.away .named { opacity: .55; }
+}
+@media (hover: hover) and (pointer: fine) and (min-width: 900px) and (min-height: 600px) {
+  .month .cell:hover { background: var(--card-2); }
+  .month .cell.away:hover { background: var(--card); }
+  .month-bar .step:hover, .week .day-head:not(.picked):hover { background: var(--card); }
+  .week .block:hover, .week .chip-event:hover { filter: brightness(1.15); }
+  .swatch:hover { border-color: var(--line-bright); }
+}

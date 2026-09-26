@@ -150,6 +150,21 @@ def preview(plan: dict) -> str:
             sub = f"   <{screen['subtitle']}>" if screen.get("subtitle") else ""
             for _ in range(2):
                 lines.append(f"  {tick}<{title}>{sub}")
+        elif screen["kit"] == "calendar":
+            space = fields.get(screen.get("space", ""), {}).get("to", "space")
+            lines.append(f"  [ every {space} you can see ]   < month >   Mo Tu We Th Fr Sa Su")
+            lines.append(f"  a dot per {screen['model']} on each day from {screen['starts']} to {screen['ends']}")
+            whole = f", whole days when {screen['all_day']}" if screen.get("all_day") else ""
+            lines.append(f"  the day: <{screen['starts']}>  <{title}>  <{space}>{whole}")
+        elif screen["kit"] == "editor":
+            tree = f"▾ <folders of {screen['path']}>" if screen.get("path") else f"· <{title}>"
+            lines.append(f"  {tree:<28}│ # <{title}>")
+            page = f"· <{title}>"
+            lines.append(f"    {page:<26}│ <{screen.get('body')}, in Markdown>")
+            lines.append("  pictures go in when the datamodel keeps attachments")
+            lines.append("  opening one: the page, beside the tree")
+            lines.append("")
+            continue
         elif screen["kit"] == "thread":
             space = fields.get(screen.get("space", ""), {}).get("to", "space")
             about = f" — <{screen['about']}>" if screen.get("about") else ""

@@ -69,7 +69,9 @@ const plural = (label) => (/s$/i.test(label) ? label : label + "s");
 export async function renderThread(at, arg) {
   stop();
   const s = shape(at);
-  const [first = "", second = ""] = String(arg || "").split("/");
+  let [first = "", second = ""] = String(arg || "").split("/");
+  // The record sheet of a space goes back to `…/spaces`: here that is the list.
+  if (first === "spaces") first = "";
   const back = at.base;
   const backLabel = at.screen.label;
   const opened = (made) => { replace(`${at.base}/${encodeURIComponent(made.id)}`); renderRoute(); };

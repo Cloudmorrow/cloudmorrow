@@ -253,7 +253,9 @@ class FakeFiles:
             return self._share_record(share)
         return await super().record(model, record_id)
 
-    async def create_record(self, model: str, fields: dict, *, index: int | None = None) -> dict:
+    async def create_record(
+        self, model: str, fields: dict, *, index: int | None = None, scope: str | None = None
+    ) -> dict:
         if model == "file":
             share, folder, name = fields["share"], fields.get("folder", ""), fields["name"]
             self.file_calls.append(("mkdir", share, folder, name))
@@ -271,7 +273,7 @@ class FakeFiles:
             path = f"{folder}/{name}" if folder else name
             self.share_tree[share][path] = []
             return self._file_record(share, folder, entry)
-        return await super().create_record(model, fields, index=index)
+        return await super().create_record(model, fields, index=index, scope=scope)
 
     async def update_record(self, model: str, record_id: str, fields: dict, *, rev=None) -> dict:
         if model == "file":

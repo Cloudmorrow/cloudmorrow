@@ -7,7 +7,7 @@ the shortcuts are the accelerator.
 
 from __future__ import annotations
 
-from cloudmorrow.tui.panes.notes import NotesPane
+from cloudmorrow.tui.panes.kit_editor import EditorPane as NotesPane
 from cloudmorrow.tui.panes.secrets import SecretsPane
 from cloudmorrow.tui.widgets.note_tree import NoteTree
 from cloudmorrow.tui.widgets.sidebar import NavCard
@@ -23,7 +23,7 @@ async def test_the_workspace_opens_on_notes(app):
         assert isinstance(screen.active_pane, NotesPane)
         # Landed, and the tree is already there to be clicked.
         assert [node.data["path"] for node in screen.query_one(NoteTree).root.children] == [
-            "architecture.md"
+            "architecture"
         ]
         # Up top: whose cloud this is, and what it is — and the dev marker
         # when it is the checkout running. No vault: there is none the app is "in".
@@ -78,7 +78,9 @@ async def test_secrets_is_a_card_of_its_own(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
         # Each card carries the key that brings it here, which is why the
-        # footer does not repeat them; your cloud first, then the Quills.
+        # footer does not repeat them; the Quills first, in the catalog's
+        # order — Notes, Tasks and Files keep the keys they had built in — then
+        # what is still built in.
         cards = [
             (card.name_text, card.tag)
             for card in screen.query(NavCard)
@@ -86,11 +88,10 @@ async def test_secrets_is_a_card_of_its_own(app):
         ]
         assert cards == [
             ("Notes", "f1"),
-            ("Calendar", "f7"),
-            ("Secrets", "f3"),
             ("Tasks", "f2"),
-            ("Chat", "f4"),
             ("Files", "f5"),
+            ("Chat", "f4"),
+            ("Secrets", "f3"),
         ]
 
 
@@ -99,7 +100,9 @@ async def test_a_card_says_how_its_place_is(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
         assert screen.query_one("#nav-tasks", NavCard).status_line == "2 to do"
-        assert screen.query_one("#nav-secrets", NavCard).status_line == "keys, sealed"
+        # Secrets is the one built-in card left, so it is the one the workspace
+        # stands on until the Quills arrive — and it has been read by then.
+        assert screen.query_one("#nav-secrets", NavCard).status_line == "2 vaults, sealed"
 
 
 async def test_the_sidebar_narrows_on_a_narrow_terminal(app):
@@ -188,9 +191,9 @@ async def test_clicking_a_note_opens_it(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
         pane = screen.query_one(NotesPane)
-        await pilot.click("#note-tree", offset=(4, 2))
+        await pilot.click("#editor-tree", offset=(4, 2))
         await settle(app, pilot)
-        assert pane.current_path == "architecture.md"
+        assert pane.current_path == "architecture"
         assert pane.query_one("#editor").text.startswith("# Architecture")
 
 
@@ -199,9 +202,9 @@ async def test_picking_a_vault_leaves_the_open_note_alone(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
         pane = screen.query_one(NotesPane)
-        await pilot.click("#note-tree", offset=(4, 2))
+        await pilot.click("#editor-tree", offset=(4, 2))
         await settle(app, pilot)
-        assert pane.current_path == "architecture.md"
+        assert pane.current_path == "architecture"
 
         await pilot.click("#nav-secrets")
         await settle(app, pilot)
@@ -209,5 +212,5 @@ async def test_picking_a_vault_leaves_the_open_note_alone(app):
         await pilot.click(rows[0])
         await settle(app, pilot)
         assert screen.query_one(SecretsPane).selected_vault == "homelab"
-        assert pane.current_path == "architecture.md"
+        assert pane.current_path == "architecture"
         assert pane.query_one("#editor").text.startswith("# Architecture")

@@ -12,7 +12,7 @@ pauses rather than `settle()`.
 
 from __future__ import annotations
 
-from textual.widgets import DataTable, Input, SelectionList, Static
+from textual.widgets import Checkbox, DataTable, Input, Static
 
 from cloudmorrow.tui.panes.kit_thread import ThreadPane, render_lines
 from cloudmorrow.tui.widgets.kit_space import NewSpaceModal, PickPersonModal, space_name
@@ -157,13 +157,13 @@ async def test_making_a_space_asks_who_can_see_it_and_opens_it(app):
         assert isinstance(modal, NewSpaceModal)
         # Public first, and a public space asks nobody's name.
         assert not modal.query_one("#space-people").display
-        modal.query_one("#space-title").value = "homelab"
+        modal.query_one("#space-name").value = "homelab"
         modal.query_one("#space-field-topic").value = "the rack"
         modal.query_one("#scope-shared").value = True
         await breathe(pilot)
         assert modal.query_one("#space-people").display
-        modal.query_one("#space-members", SelectionList).select("guest")
-        modal.action_create()
+        modal.query_one("#person-guest", Checkbox).value = True
+        modal.action_save()
         await settle(app, pilot)
         made = [c for c in app.client.space_calls if c[0] == "made"][-1]
         assert made[2:] == ("shared", ["guest"], {"name": "homelab", "kind": "private", "topic": "the rack"})
@@ -178,13 +178,13 @@ async def test_a_tick_taken_back_by_going_public_is_not_sent(app):
         await pilot.press("n")
         await breathe(pilot)
         modal = app.screen
-        modal.query_one("#space-title").value = "everyone"
+        modal.query_one("#space-name").value = "everyone"
         modal.query_one("#scope-shared").value = True
         await breathe(pilot)
-        modal.query_one("#space-members", SelectionList).select("guest")
+        modal.query_one("#person-guest", Checkbox).value = True
         modal.query_one("#scope-public").value = True
         await breathe(pilot)
-        modal.action_create()
+        modal.action_save()
         await settle(app, pilot)
         made = [c for c in app.client.space_calls if c[0] == "made"][-1]
         assert made[2:4] == ("public", [])
@@ -198,7 +198,7 @@ async def test_a_space_with_no_name_is_complained_about_not_made(app):
         await pilot.press("n")
         await breathe(pilot)
         modal = app.screen
-        modal.action_create()
+        modal.action_save()
         await breathe(pilot)
         assert app.screen is modal
         assert "needs a name" in modal.query_one("#space-complaint", Static).visual.plain
@@ -293,7 +293,7 @@ async def test_the_tab_is_gone_when_the_server_has_chat_switched_off(app):
 
 
 def test_the_new_space_dialog_names_scopes_after_the_screen():
-    modal = NewSpaceModal(CHAT_MODELS["channel"], CHAT_SCREEN, [])
+    modal = NewSpaceModal(CHAT_MODELS["channel"], [], screen=CHAT_SCREEN)
     assert modal.scopes == ["public", "shared"]
     assert [f["name"] for f in modal.extra] == ["topic"], "kind is made_as's to set, not a field to type"
 

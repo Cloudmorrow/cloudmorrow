@@ -17,6 +17,8 @@ from cloudmorrow.server.quills import KIT_READY
 from cloudmorrow.server.routes.web import WEB, asset_version
 
 KIT_JS = (WEB / "kit.js").read_text(encoding="utf-8")
+# The elements that are more than rows, and spaces, each in files of their own.
+OWN_FILES = ("kit_calendar.js", "kit_calendar.css", "kit_space.js", "kit_space.css")
 KIT_CSS = (WEB / "kit.css").read_text(encoding="utf-8")
 QUILLS_JS = (WEB / "quills.js").read_text(encoding="utf-8")
 ADMIN_JS = (WEB / "quillsadmin.js").read_text(encoding="utf-8")
@@ -36,13 +38,13 @@ def test_the_kit_is_listed_and_served(client):
     assert 'import "./quillsadmin.js";' in APP_JS
     assert '@import "./kit.css";' in APP_CSS
     assert '@import "./quillsadmin.css";' in APP_CSS
-    for name in ("kit.js", "kit.css", "quills.js", "quillsadmin.js", "quillsadmin.css"):
+    for name in ("kit.js", "kit.css", "quills.js", "quillsadmin.js", "quillsadmin.css", *OWN_FILES):
         assert client.get(f"/app/{version}/{name}").status_code == 200, name
 
 
-def test_the_quill_tabs_sit_where_tasks_was():
-    """After Notes and before Calendar: the order of app.js is the order of the bar."""
-    assert APP_JS.index('"./notes.js"') < APP_JS.index('"./quills.js"') < APP_JS.index('"./calendar.js"')
+def test_the_quill_tabs_sit_where_notes_and_tasks_were():
+    """After Today: the order of app.js is the order of the bar."""
+    assert APP_JS.index('"./today.js"') < APP_JS.index('"./quills.js"')
     # They arrive after the bar is first drawn, so core.js holds their place.
     assert "const fillTabs = tabSlot();" in QUILLS_JS
     core = (WEB / "core.js").read_text(encoding="utf-8")
@@ -73,7 +75,8 @@ def test_both_addresses_are_registered():
 # -- generic -------------------------------------------------------------------
 def test_nothing_in_the_kit_is_named_for_one_quill():
     """The kit reads names out of the screen and the datamodel, never its own."""
-    for source, name in ((KIT_JS, "kit.js"), (KIT_CSS, "kit.css"), (QUILLS_JS, "quills.js")):
+    own = [((WEB / name).read_text(encoding="utf-8"), name) for name in OWN_FILES]
+    for source, name in ((KIT_JS, "kit.js"), (KIT_CSS, "kit.css"), (QUILLS_JS, "quills.js"), *own):
         code = re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.DOTALL)
         for word in ("todo", "doing", "task", "tasks", "lane-done", "new-board"):
             assert not re.search(rf"[\"'.`]{word}[\"'`\s]", code), f"{name} names {word!r}"
@@ -185,3 +188,38 @@ def test_the_install_buttons_do_not_borrow_the_install_card():
     """`.install` is the home-screen card's; a button called that grew its padding."""
     assert 'class="row primary add-quill"' in ADMIN_JS
     assert '"row primary install"' not in ADMIN_JS
+
+
+# -- the calendar, and spaces ----------------------------------------------------
+def test_the_calendar_asks_the_record_api_for_a_window_of_days():
+    """One call per window, a range on each of the screen's two moments."""
+    calendar = (WEB / "kit_calendar.js").read_text(encoding="utf-8")
+    assert 'b.starts + "__lte"' in calendar and 'b.ends + "__gte"' in calendar
+    for field in ('"starts_at"', '"ends_at"', '"all_day"', '"calendar"', '"event"'):
+        code = re.sub(r"/\*.*?\*/|//[^\n]*", "", calendar, flags=re.DOTALL)
+        assert field not in code, field
+    # Drawn by the kit, and its sheet changed by it, from its own file.
+    assert "const OWN = { calendar: renderCalendar, thread: renderThread };" in KIT_JS
+    assert "const SHEETS = { calendar: calendarSheet };" in KIT_JS
+
+
+def test_a_space_has_its_people_on_its_sheet():
+    space = (WEB / "kit_space.js").read_text(encoding="utf-8")
+    assert "/members" in space and '"/api/people"' in space
+    assert "export async function spaceSection" in space and "export function wireSpace" in space
+    assert "model.space ? await spaceSection(model, record)" in KIT_JS
+
+
+def test_today_draws_every_calendar_screen_through_the_record_api():
+    today = (WEB / "today.js").read_text(encoding="utf-8")
+    assert "/api/calendar" not in today
+    assert 'screen.kit === "calendar"' in today
+    assert "occasion(b, r, bySpace)" in today
+
+
+def test_the_old_calendar_screen_is_gone():
+    assert not (WEB / "calendar.js").exists() and not (WEB / "calendar.css").exists()
+    for path in sorted(WEB.glob("*.js")) + sorted(WEB.glob("*.css")):
+        text = path.read_text(encoding="utf-8")
+        assert "calendar.js" not in text.replace("kit_calendar.js", ""), path.name
+        assert "/api/calendar" not in text, path.name

@@ -273,7 +273,7 @@ def test_a_direct_line_is_titled_with_the_person(chat, monkeypatch):
 
 
 def test_the_people_are_everybody_but_you(chat):
-    assert chat("GET", "/api/people") == [{"username": "guest", "display_name": ""}]
+    assert chat("GET", "/api/people") == [{"username": "guest", "display_name": "guest"}]
 
 
 # -- the move from the old tables ------------------------------------------------------------

@@ -1,4 +1,4 @@
-"""The nested note list."""
+"""The nested tree of folders and pages: the kit editor's left-hand side."""
 
 from __future__ import annotations
 
@@ -66,18 +66,20 @@ class NoteTree(Tree[dict]):
     class ReloadRequested(Message):
         pass
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__("notes", data={"name": "notes", "path": "", "is_dir": True}, **kwargs)
+    def __init__(self, *, label: str = "notes", **kwargs: Any) -> None:
+        # What the top of the tree is called: the screen's own name.
+        self.root_label = label
+        super().__init__(label, data={"name": label, "path": "", "is_dir": True}, **kwargs)
         self.show_root = True
         self.guide_depth = 2
         self._expanded: set[str] = {""}
 
     # -- building ----------------------------------------------------------
     def load_tree(self, payload: dict[str, Any], *, select: str | None = None) -> None:
-        """Rebuild from an /api/notes/tree payload, preserving expansion state."""
+        """Rebuild from a tree of `{name, path, is_dir, children}`, keeping what was open."""
         self.clear()
-        self.root.data = {"name": "notes", "path": "", "is_dir": True}
-        self.root.label = Text("notes", style="bold #22d3ee")
+        self.root.data = {"name": self.root_label, "path": "", "is_dir": True}
+        self.root.label = Text(self.root_label, style="bold #22d3ee")
         self._add_children(self.root, payload.get("children", []))
         self.root.expand()
         if select:
@@ -119,7 +121,7 @@ class NoteTree(Tree[dict]):
     def selected(self) -> dict[str, Any]:
         node = self.cursor_node
         if node is None or node.data is None:
-            return {"name": "notes", "path": "", "is_dir": True}
+            return {"name": self.root_label, "path": "", "is_dir": True}
         return node.data
 
     @property

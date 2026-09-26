@@ -141,6 +141,94 @@ READING_QUILL = {
     },
 }
 
+CALENDAR_MODELS = {
+    "calendar": {
+        "id": "calendar", "version": 1, "label": "Calendar", "title": "name",
+        "scopes": ["personal", "shared", "public"], "ordered_within": [], "source": "foundation",
+        "space": True, "in_space": "",
+        "fields": [
+            {"name": "name", "kind": "string", "label": "Name", "required": True},
+            {"name": "colour", "kind": "string", "label": "Colour"},
+        ],
+    },
+    "event": {
+        "id": "event", "version": 1, "label": "Event", "title": "title",
+        "scopes": ["personal", "shared", "public"], "ordered_within": [], "source": "foundation",
+        "space": False, "in_space": "calendar", "authored": "or-manager",
+        "fields": [
+            {"name": "calendar", "kind": "link", "label": "Calendar", "required": True,
+             "indexed": True, "to": "calendar", "on_delete": "cascade"},
+            {"name": "title", "kind": "string", "label": "Title", "required": True},
+            {"name": "starts_at", "kind": "datetime", "label": "Starts at", "required": True,
+             "indexed": True},
+            {"name": "ends_at", "kind": "datetime", "label": "Ends at", "indexed": True},
+            {"name": "all_day", "kind": "bool", "label": "All day", "default": False,
+             "indexed": True},
+            {"name": "location", "kind": "string", "label": "Location"},
+            {"name": "notes", "kind": "markdown", "label": "Notes"},
+        ],
+    },
+}
+
+CALENDAR_QUILL = {
+    **{k: v for k, v in TASKS_QUILL.items() if k not in ("models", "screens", "jobs", "datasets")},
+    "id": "calendar",
+    "name": "Calendar",
+    "summary": "Your own calendar, the ones you share, and one for everybody.",
+    "icon": "calendar",
+    "uses": ["calendar", "event"],
+    "screens": [
+        {"id": "month", "kit": "calendar", "label": "Calendar", "model": "event",
+         "space": "calendar", "colour": "colour", "title": "title", "subtitle": "location",
+         "starts": "starts_at", "ends": "ends_at", "all_day": "all_day"},
+    ],
+    "jobs": [],
+    "datasets": [
+        {"id": "yours", "model": "calendar", "seed": "per-owner", "scope": "personal", "count": 1},
+        {"id": "everybody", "model": "calendar", "seed": "once", "scope": "public", "count": 1},
+    ],
+    "models": CALENDAR_MODELS,
+}
+
+# Hung on today rather than on a date in the past: the pane opens on the
+# month it is, so a fixture from last September would be an empty grid.
+TODAY = dt.date.today()
+TOMORROW = TODAY + dt.timedelta(days=1)
+
+
+def space_row(record_id: str, name: str, scope: str, colour: str, *, owner: str = "bram",
+              members: list[str] | None = None) -> dict:
+    row = record_row("calendar", record_id, 0, name=name, colour=colour)
+    row.update(scope=scope, owner=owner, members=list(members or []),
+               can_manage=owner == "bram", unread=0)
+    return row
+
+
+def calendar_records() -> dict[str, list[dict]]:
+    """bram's own, a shared one guest is in, everybody's; three things on them."""
+    def event(record_id, title, calendar, starts, ends, *, all_day=False, owner="bram", **more):
+        row = record_row("event", record_id, 0, calendar=calendar, title=title, starts_at=starts,
+                         ends_at=ends, all_day=all_day, location=more.get("location", ""), notes="")
+        row["owner"] = owner
+        return row
+
+    return {
+        "calendar": [
+            space_row("r_mine", "bram", "personal", "cyan"),
+            space_row("r_house", "Household", "shared", "violet", members=["guest"]),
+            space_row("r_all", "Everybody", "public", "green", owner="guest"),
+        ],
+        "event": [
+            event("r_dentist", "Dentist", "r_mine", f"{TODAY}T10:00", f"{TODAY}T11:00",
+                  location="High Street"),
+            event("r_bins", "Bins out", "r_house", str(TODAY), str(TODAY), all_day=True,
+                  owner="guest"),
+            event("r_boiler", "Boiler service", "r_house", f"{TOMORROW}T09:00",
+                  f"{TOMORROW}T10:00"),
+        ],
+    }
+
+
 CATALOG = {
     "categories": [
         {"id": "personal", "label": "Personal", "description": "Your own lists and plans."},
@@ -189,6 +277,18 @@ def seed_records() -> dict[str, list[dict]]:
                        body="", lane="doing", due=None, done_at=None),
         ],
     }
+
+
+def _matches(fields: dict, key: str, value: object) -> bool:
+    """A filter as the server reads it: `name` is equal, `name__gte` a range."""
+    name, _, op = key.rpartition("__")
+    if op in ("lt", "lte", "gt", "gte"):
+        have = fields.get(name)
+        if have is None:
+            return False
+        return {"lt": have < value, "lte": have <= value, "gt": have > value,
+                "gte": have >= value}[op]
+    return fields.get(key) == value
 
 
 def _after(value: str) -> dt.timedelta:
@@ -337,10 +437,8 @@ class FakeQuills:
         self.record_calls.append((model, dict(where)))
         definition = self._model(model)
         self._seed(model)
-        rows = [
-            row for row in self._rows(model)
-            if all(row["fields"].get(name) == value for name, value in where.items())
-        ]
+        rows = [row for row in self._rows(model) if all(
+            _matches(row["fields"], key, value) for key, value in where.items())]
         order = definition.get("ordered_within") or []
         rows.sort(key=lambda r: (tuple(str(r["fields"].get(n)) for n in order), r["position"]))
         return copy.deepcopy(rows)
@@ -348,7 +446,10 @@ class FakeQuills:
     async def record(self, model: str, record_id: str) -> dict:
         return copy.deepcopy(self._find(model, record_id))
 
-    async def create_record(self, model: str, fields: dict, *, index: int | None = None) -> dict:
+    async def create_record(
+        self, model: str, fields: dict, *, index: int | None = None, scope: str | None = None
+    ) -> dict:
+        self.record_calls.append((f"create:{model}", dict(fields, _scope=scope)))
         definition = self._model(model)
         values: dict = {}
         for f in definition["fields"]:
@@ -359,6 +460,8 @@ class FakeQuills:
             if f.get("required") and values[f["name"]] in (None, ""):
                 raise ApiError(f"{model}.{f['name']} is required", status_code=400)
         row = record_row(model, self._fresh_id(), 0, **values)
+        if definition.get("space"):
+            row.update(scope=scope or "shared", members=[], can_manage=True, unread=0)
         group = self._group(definition, row)
         same = [r for r in self._rows(model) if self._group(definition, r) == group]
         row["position"] = len(same) if index is None else index - 0.5
@@ -426,3 +529,24 @@ class FakeQuills:
                 rows = self._rows(other["id"])
                 for linked in [r for r in rows if r["fields"].get(f["name"]) == record_id]:
                     await self.delete_record(other["id"], linked["id"])
+
+    # -- the people in a space ----------------------------------------------------
+    async def people(self) -> list[dict]:
+        return [{"username": "guest", "display_name": "Guest"},
+                {"username": "ada", "display_name": ""}]
+
+    async def add_member(self, model: str, space_id: str, username: str) -> dict:
+        self.record_calls.append((f"add:{space_id}", {"username": username}))
+        row = self._find(model, space_id)
+        if row.get("scope") != "shared":
+            raise ApiError("only a shared one has members", status_code=400)
+        if username not in row["members"]:
+            row["members"].append(username)
+        return copy.deepcopy(row)
+
+    async def remove_member(self, model: str, space_id: str, username: str) -> None:
+        self.record_calls.append((f"remove:{space_id}", {"username": username}))
+        row = self._find(model, space_id)
+        row["members"] = [m for m in row.get("members") or [] if m != username]
+        if username == "bram":
+            self.record_store[model] = [r for r in self._rows(model) if r["id"] != space_id]

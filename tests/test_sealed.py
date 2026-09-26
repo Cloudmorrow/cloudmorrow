@@ -192,24 +192,26 @@ def test_the_api_round_trips_sealed_content(chat_quill, auth):
 
 def test_editing_part_of_an_event_keeps_the_rest_readable(client, auth):
     """An edit that leaves the title alone must not seal the sealed title again."""
-    mine = client.get("/api/calendar/calendars", headers=auth).json()[0]["slug"]
+    client.app.state.cloudmorrow.quills.install_from_catalog("calendar")
+    mine = client.get("/api/records/calendar", headers=auth).json()[0]["id"]
     made = client.post(
-        f"/api/calendar/calendars/{mine}/events",
-        json={"title": "Dentist", "starts_at": "2026-10-01T09:00", "ends_at": "2026-10-01T10:00",
-              "notes": "bring the card", "location": "town"},
+        "/api/records/event",
+        json={"fields": {"calendar": mine, "title": "Dentist", "starts_at": "2026-10-01T09:00",
+                         "ends_at": "2026-10-01T10:00", "notes": "bring the card",
+                         "location": "town"}},
         headers=auth,
     )
-    assert made.status_code in (200, 201), made.text
+    assert made.status_code == 201, made.text
     event_id = made.json()["id"]
     moved = client.patch(
-        f"/api/calendar/events/{event_id}", json={"starts_at": "2026-10-01T11:00"}, headers=auth
+        f"/api/records/event/{event_id}", json={"fields": {"starts_at": "2026-10-01T11:00"}},
+        headers=auth,
     )
     assert moved.status_code == 200, moved.text
-    assert (moved.json()["title"], moved.json()["notes"], moved.json()["location"]) == (
-        "Dentist", "bring the card", "town"
-    )
-    again = client.get(f"/api/calendar/events/{event_id}", headers=auth).json()
-    assert again["title"] == "Dentist"
+    fields = moved.json()["fields"]
+    assert (fields["title"], fields["notes"], fields["location"]) == ("Dentist", "bring the card", "town")
+    again = client.get(f"/api/records/event/{event_id}", headers=auth).json()
+    assert again["fields"]["title"] == "Dentist"
 
 
 @pytest.fixture()

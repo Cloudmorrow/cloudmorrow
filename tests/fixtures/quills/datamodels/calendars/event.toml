@@ -7,6 +7,7 @@ domain = "calendars"
 scopes = ["personal", "shared", "public"]
 title = "title"
 in_space = "calendar"
+authored = "or-manager"        # its writer, or whoever manages its calendar, may change it
 
 [fields]
 calendar = { kind = "link", to = "calendar", required = true, indexed = true, on_delete = "cascade" }

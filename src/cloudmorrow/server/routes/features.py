@@ -43,7 +43,8 @@ def require_feature(key: str) -> Callable[..., None]:
 
     def guard(state: AppState = Depends(get_state)) -> None:
         if not state.features.enabled(key):
-            label = BY_KEY[key].label if key in BY_KEY else key
+            quill = state.quills.quills.get(key)
+            label = BY_KEY[key].label if key in BY_KEY else quill.name if quill else key
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"{label} is switched off on this server",

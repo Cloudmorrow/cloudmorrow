@@ -400,7 +400,7 @@ class ThreadPane(KitPane):
         if self.api is None:
             return
         people = await self._people()
-        wanted = await self.app.push_screen_wait(NewSpaceModal(self.space_model, self.spec, people))
+        wanted = await self.app.push_screen_wait(NewSpaceModal(self.space_model, people, screen=self.spec))
         if not wanted:
             return
         try:
