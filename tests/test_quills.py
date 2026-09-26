@@ -205,7 +205,8 @@ def test_github_releases_are_fetched_as_tarballs():
 # -- the API ---------------------------------------------------------------------------
 def test_an_administrator_installs_from_the_catalog_and_the_tabs_follow(client, auth):
     catalog = client.get("/api/quills/catalog", headers=auth).json()
-    assert catalog["quills"][0]["installed_version"] is None
+    entry = {q["id"]: q for q in catalog["quills"]}
+    assert entry["tasks"]["installed_version"] is None
     plan = client.post("/api/quills/plan", headers=auth, json={"id": "tasks"}).json()
     assert [row["id"] for row in plan["data"]] == ["board", "task"]
     assert all(row["new"] for row in plan["data"])
@@ -215,10 +216,8 @@ def test_an_administrator_installs_from_the_catalog_and_the_tabs_follow(client, 
     quills = client.get("/api/quills", headers=auth).json()
     assert [(q["id"], q["enabled"]) for q in quills] == [("tasks", True)]
     assert set(quills[0]["models"]) == {"board", "task"}
-    assert (
-        client.get("/api/quills/catalog", headers=auth).json()["quills"][0]["installed_version"]
-        == "1.1.0"
-    )
+    after = {q["id"]: q for q in client.get("/api/quills/catalog", headers=auth).json()["quills"]}
+    assert after["tasks"]["installed_version"] == "1.1.0"
     # A Quill is one more feature to switch.
     mine = {row["key"] for row in client.get("/api/me/features", headers=auth).json()}
     assert "tasks" in mine
@@ -243,8 +242,9 @@ def test_a_bad_request_is_a_400_with_the_reason(client, auth):
 # -- boot ------------------------------------------------------------------------------
 def test_a_fresh_server_gets_the_foundation_quills_once(config, users, registry, tmp_path):
     db = config.db_path
-    assert install_foundation(db, registry) == ["tasks"]
+    assert install_foundation(db, registry) == ["notes", "tasks"]
     registry.uninstall("tasks")
+    registry.uninstall("notes")
     # Removed by an administrator, it stays removed.
     assert install_foundation(db, registry) == []
     assert registry.quills == {}

@@ -35,18 +35,18 @@ def test_a_type_is_well_formed():
 
 def test_secrets_are_never_the_assistants():
     assert BY_KEY["secret"].assistant is False
-    assert BY_KEY["note"].assistant is True
 
 
 def test_the_catalogue_says_who_uses_what():
     rows = {row["key"]: row for row in catalogue(USES)}
-    # An app uses what it provides, whether or not it said so.
-    assert rows["note"]["used_by"] == ["notes"]
+    # Notes are a datamodel now, served from their files by a backend, and
+    # listed at /api/datamodels with the rest.
+    assert "note" not in rows
     # A foundation type is used by whoever asked for it, and nobody by default.
     assert rows["user"]["used_by"] == ["calendar", "chat"]
     assert rows["secret"]["used_by"] == ["secrets"]
     assert rows["secret"]["foundation"] is True
-    assert rows["note"]["foundation"] is False
+    assert rows["event"]["foundation"] is False
 
 
 def test_the_types_are_on_the_api(client, auth):

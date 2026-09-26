@@ -450,6 +450,38 @@ class CloudmorrowClient:
     async def delete_record(self, model: str, record_id: str) -> None:
         await self._request("DELETE", f"/api/records/{model}/{record_id}")
 
+    # A datamodel's folders and attachments, where its backend keeps them
+    # (the model's `can` says so): a note's folders, and its pictures.
+    async def record_folders(self, model: str) -> list[dict]:
+        return (await self._request("GET", f"/api/records/{model}/_folders")).json()
+
+    async def make_record_folder(self, model: str, path: str) -> dict:
+        return (
+            await self._request("POST", f"/api/records/{model}/_folders", json={"path": path})
+        ).json()
+
+    async def move_record_folder(self, model: str, path: str, to: str) -> dict:
+        body = {"path": path, "to": to}
+        return (await self._request("PATCH", f"/api/records/{model}/_folders", json=body)).json()
+
+    async def delete_record_folder(self, model: str, path: str) -> None:
+        await self._request("DELETE", f"/api/records/{model}/_folders", params={"path": path})
+
+    async def attach(self, model: str, data: bytes, *, filename: str = "") -> dict:
+        """Keep a file beside *model*'s records: `{name, path, …}`, `path` for Markdown."""
+        return (
+            await self._request(
+                "POST", f"/api/records/{model}/_attachments", content=data,
+                params={"filename": filename}, timeout=UPLOAD_TIMEOUT,
+            )
+        ).json()
+
+    async def attachment(self, model: str, name: str) -> bytes:
+        response = await self._request(
+            "GET", f"/api/records/{model}/_attachments/{name}", timeout=UPLOAD_TIMEOUT
+        )
+        return response.content
+
     # -- fileshares --------------------------------------------------------
     async def shares(self) -> list[dict]:
         return (await self._request("GET", "/api/shares")).json()

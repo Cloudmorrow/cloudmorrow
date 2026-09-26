@@ -60,7 +60,7 @@ app.command("uninstall")(uninstall.uninstall)
 
 # What the resources used to be called, kept working but out of the help.
 app.add_typer(secret.app, name="secrets", hidden=True)
-app.add_typer(note.app, name="notes", hidden=True)
+# (Not `notes`: that is the Notes Quill's now, `cm notes list/show/add/edit`.)
 app.add_typer(agent.app, name="agents", hidden=True)
 app.add_typer(share.app, name="shares", hidden=True)
 # Where `cm <quill> ...` lands once `main` has seen it is not a command.

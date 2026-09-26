@@ -209,11 +209,16 @@ class Record:
     members: list[str] | None = None
     can_manage: bool = False
     unread: int = 0
+    # A line of what it says, when a listing was asked for one: the start of
+    # its text with `?previews=true`, the line that matched with `?q=`.
+    preview: str | None = None
 
     def to_dict(self) -> dict:
         extra: dict = {}
         if self.members is not None:
             extra = {"members": list(self.members), "can_manage": self.can_manage, "unread": self.unread}
+        if self.preview is not None:
+            extra["preview"] = self.preview
         return extra | {
             "id": self.id,
             "model": self.model,
@@ -324,6 +329,53 @@ def _stored_indexed(model: Datamodel) -> set[str]:
 
 def _new_id() -> str:
     return "r_" + secrets.token_hex(5)
+
+
+# -- what a listing may ask for besides filters ----------------------------------
+# `?q=` is a text search and `?previews=true` a line of each record's text.
+# Neither is a field, so neither is a filter; a backend answers them its own
+# way (a note's search reads the files), and the store answers them here.
+LIST_OPTIONS = frozenset({"q", "previews"})
+
+# The kinds a text search reads, and a preview is taken from.
+TEXT_KINDS = ("string", "text", "markdown", "email", "url", "phone")
+
+# What a datamodel can do besides the five calls, and the backend method
+# that does it. The store searches its own records; a backend has folders
+# and attachments when it has the methods. See `RecordStore.capabilities`.
+BACKEND_CAPABILITIES = {"folders": "folders", "attachments": "attach"}
+
+PREVIEW_CHARS = 120
+
+
+def _truthy(value: object) -> bool:
+    return str(value).lower() in ("1", "true", "yes", "on")
+
+
+def _matches(model: Datamodel, record: Record, query: str) -> bool:
+    """Does any text of *record* hold *query*? The preview says where."""
+    needle = query.casefold()
+    for f in model.fields:
+        if f.kind not in TEXT_KINDS:
+            continue
+        for line in str(record.fields.get(f.name) or "").splitlines():
+            if needle in line.casefold():
+                record.preview = line.strip()[:200]
+                return True
+    return False
+
+
+def _preview_of(model: Datamodel, record: Record) -> str:
+    """The first line of its long text — Markdown first — that says something."""
+    for kind in ("markdown", "text"):
+        for f in model.fields:
+            if f.kind != kind:
+                continue
+            for line in str(record.fields.get(f.name) or "").splitlines():
+                line = line.strip().lstrip("#").strip()
+                if line:
+                    return line[: PREVIEW_CHARS - 1] + "…" if len(line) > PREVIEW_CHARS else line
+    return ""
 
 
 # -- the store -----------------------------------------------------------------
@@ -524,14 +576,30 @@ class RecordStore:
         """
         check(principal, "read", model_id)
         model = self.model(model_id)
+        where = dict(where or {})
+        # Not filters: what else the listing is asked for (see LIST_OPTIONS).
+        query = str(where.pop("q", "") or "").strip()
+        previews = _truthy(where.pop("previews", False))
         if model.backend:
-            return self._backend(model).list(principal, model, dict(where or {}))
+            return self._backend(model).list(
+                principal, model, where, q=query, previews=previews
+            )
+        records = self._list_stored(principal, model, where)
+        if query:
+            records = [r for r in records if _matches(model, r, query)]
+        elif previews:
+            for record in records:
+                record.preview = _preview_of(model, record)
+        return records
+
+    def _list_stored(self, principal: Principal, model: Datamodel, where: dict) -> list[Record]:
+        model_id = model.id
         self.sweep(model_id, owner=None if (model.space or model.in_space) else principal.username)
         plain = _stored_indexed(model)
         clause, clause_params = self._visible_clause(model, principal.username)
         query = f"SELECT * FROM records WHERE model = ? AND {clause}"
         params: list[object] = [model.id, *clause_params]
-        for name, value in (where or {}).items():
+        for name, value in where.items():
             if name not in plain:
                 raise RecordError(f"{model.id} cannot be filtered by {name!r}: it is not indexed")
             coerced = _coerce(model, model.get_field(name), value)
@@ -553,6 +621,59 @@ class RecordStore:
             record = self._record(conn, model, self._row(conn, principal, model, record_id), principal)
         conn.close()
         return record
+
+    # -- what a datamodel can do besides the five calls ------------------------
+    def capabilities(self, model_id: str) -> list[str]:
+        """`search` for every datamodel; `folders` and `attachments` when its backend has them.
+
+        A client reads this beside the datamodel (`GET /api/quills` puts it on
+        each model as `can`) rather than trying a call to find out.
+        """
+        model = self.model(model_id)
+        can = ["search"]
+        if model.backend:
+            backend = self.backends.get(model.backend)
+            can += [name for name, method in BACKEND_CAPABILITIES.items() if hasattr(backend, method)]
+        return can
+
+    def _capable(self, principal: Principal, model_id: str, action: str, capability: str):
+        check(principal, action, model_id)
+        model = self.model(model_id)
+        if capability not in self.capabilities(model_id):
+            raise RecordError(f"a {model.label.lower()} has no {capability}")
+        return model, self._backend(model)
+
+    def folders(self, principal: Principal, model_id: str) -> list[dict]:
+        """Every folder there is, empty ones too, as `{path, name}`, parents first."""
+        model, backend = self._capable(principal, model_id, "read", "folders")
+        return backend.folders(principal, model)
+
+    def make_folder(self, principal: Principal, model_id: str, path: str) -> dict:
+        model, backend = self._capable(principal, model_id, "write", "folders")
+        return backend.make_folder(principal, model, path)
+
+    def move_folder(self, principal: Principal, model_id: str, path: str, to: str) -> dict:
+        """Rename or move a folder, and everything in it with it."""
+        model, backend = self._capable(principal, model_id, "write", "folders")
+        return backend.move_folder(principal, model, path, to)
+
+    def delete_folder(self, principal: Principal, model_id: str, path: str) -> None:
+        """A folder and everything in it."""
+        model, backend = self._capable(principal, model_id, "write", "folders")
+        backend.delete_folder(principal, model, path)
+
+    def attach(self, principal: Principal, model_id: str, data: bytes, filename: str = "") -> dict:
+        """Keep a file beside the records: `{name, path, size, content_type}`.
+
+        `path` is what a record's Markdown writes to point at it.
+        """
+        model, backend = self._capable(principal, model_id, "write", "attachments")
+        return backend.attach(principal, model, data, filename)
+
+    def attachment(self, principal: Principal, model_id: str, name: str) -> tuple[bytes, str]:
+        """A kept file's bytes and media type."""
+        model, backend = self._capable(principal, model_id, "read", "attachments")
+        return backend.attachment(principal, model, name)
 
     def count(self, owner: str, model_id: str, *, scope: str | None = None) -> int:
         query = "SELECT COUNT(*) FROM records WHERE model = ? AND owner = ?"
@@ -972,6 +1093,10 @@ class RecordStore:
                 ).fetchone()
             conn.close()
             if row is not None:
+                return []
+        elif self.model(model_id).backend:
+            # Kept elsewhere, so counted there: a note is a file in your folder.
+            if self.list(principal, model_id):
                 return []
         elif self.count(principal.username, model_id, scope=scope):
             return []

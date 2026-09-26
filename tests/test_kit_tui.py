@@ -166,11 +166,11 @@ async def test_moving_a_card_to_another_board_from_the_sheet(app):
 # -- Quill tabs ----------------------------------------------------------------
 
 
-async def test_a_quill_screen_is_a_tab_after_notes(app):
+async def test_the_quill_tabs_come_first_notes_then_tasks(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
-        assert tab_labels(screen)[0] == "Notes  f1"
-        assert tab_labels(screen)[-1] == "Tasks  f2"
+        # Notes is a Quill too: the first card, and still f1.
+        assert tab_labels(screen)[:2] == ["Notes  f1", "Tasks  f2"]
         assert screen.query_one("#nav-section-quills").display
         assert isinstance(screen.query_one("#pane-tasks"), BoardPane)
 
@@ -332,6 +332,8 @@ async def test_removing_asks_then_takes_the_tab_and_keeps_the_records(app):
 
         assert ("uninstall", "tasks") in app.client.quill_calls
         assert not screen.query("#nav-tasks")
-        assert not screen.query_one("#nav-section-quills").display
+        # Notes is still a Quill, so the section stays, with its card alone.
+        assert screen.query_one("#nav-section-quills").display
+        assert tab_labels(screen)[0] == "Notes  f1"
         assert not screen.query("#pane-tasks")
         assert len(app.client.record_store["task"]) == 3

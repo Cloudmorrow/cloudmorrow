@@ -130,7 +130,7 @@
     margin: 1 0 0 1;
 }
 
-#nav-section-cloud {
+#nav-section-quills {
     margin-top: 0;
 }
 
@@ -187,7 +187,7 @@ WorkspaceScreen.-narrow .nav-section {
     margin: 1 0 0 0;
 }
 
-WorkspaceScreen.-narrow #nav-section-cloud {
+WorkspaceScreen.-narrow #nav-section-quills {
     margin-top: 0;
 }
 

@@ -12,6 +12,7 @@ import re
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.app import CloudmorrowApp
 from cloudmorrow.tui.screens.workspace import WorkspaceScreen
+from tests.tui_notes import FakeNotes
 from tests.tui_quills import FakeQuills
 
 SECRETS = {
@@ -287,7 +288,7 @@ def _one_pixel_png() -> bytes:
 PNG_1PX = _one_pixel_png()
 
 
-class FakeClient(FakeQuills):
+class FakeClient(FakeNotes, FakeQuills):
     """Enough of the API for the workspace, with a record of what was asked.
 
     The Quills and the record store behind them are in tui_quills.py.
@@ -301,6 +302,7 @@ class FakeClient(FakeQuills):
         # so a call that wants one names it itself.
         self.vault: str | None = None
         self.setup_quills()
+        self.setup_notes()
         self.share_list: list[dict] = [share_row("media"), share_row("photos")]
         self.share_calls: list[tuple] = []
         # What is in the server shares the Browse view opens: by share, then

@@ -141,6 +141,15 @@ def preview(plan: dict) -> str:
             sub = f"   <{screen['subtitle']}>" if screen.get("subtitle") else ""
             for _ in range(2):
                 lines.append(f"  {tick}<{title}>{sub}")
+        elif screen["kit"] == "editor":
+            tree = f"▾ <folders of {screen['path']}>" if screen.get("path") else f"· <{title}>"
+            lines.append(f"  {tree:<28}│ # <{title}>")
+            page = f"· <{title}>"
+            lines.append(f"    {page:<26}│ <{screen.get('body')}, in Markdown>")
+            lines.append("  pictures go in when the datamodel keeps attachments")
+            lines.append("  opening one: the page, beside the tree")
+            lines.append("")
+            continue
         else:
             shown = screen.get("fields") or list(fields)
             lines.append("  " + ", ".join(shown))

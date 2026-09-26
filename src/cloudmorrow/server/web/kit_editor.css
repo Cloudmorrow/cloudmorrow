@@ -1,0 +1,86 @@
+/* The kit's editor: the search field, the folder tree, where a page lives,
+   and — on a computer — the list and the page side by side. The page is
+   the `.editor` base.css draws, with pictures.css's pictures in it.
+
+   Every Quill with an editor is drawn with these, so nothing here is named
+   for one. */
+
+.search {
+  position: relative;
+  margin: 0 0 18px;
+}
+.search svg {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+.search input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px 0 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--field);
+  color: var(--ink);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.search input:focus { border-color: var(--accent); }
+.search input::placeholder { color: var(--muted); }
+.search input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+
+/* Folders nest; each level steps in. */
+.row.indent-1 { padding-left: 40px; }
+.row.indent-1 + .row::before, .row + .row.indent-1::before { left: 40px; }
+.row.indent-2 { padding-left: 64px; }
+.row.indent-3 { padding-left: 88px; }
+
+/* In the list of every page, which folder a page is in. */
+.row .meta .where { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+
+/* -- side by side ------------------------------------------------------------ */
+/* Only a computer draws the split; a phone never gets `main.split`. The
+   list keeps a column of its own and scrolls on its own, so the page
+   beside it stays where it is while you look for the next one. */
+@media (min-width: 900px) and (min-height: 600px) {
+  #app:has(main.split) { --column: 1180px; }
+  main.split {
+    display: grid;
+    grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+    gap: 28px;
+    min-height: calc(100vh - var(--bar-h) - 56px);
+  }
+  main.split .side {
+    align-self: start;
+    position: sticky;
+    top: calc(var(--bar-h) + 8px);
+    max-height: calc(100vh - var(--bar-h) - 24px);
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  main.split .side .heading h1 { font-size: 26px; }
+  main.split .page {
+    min-width: 0;
+    padding-left: 28px;
+    border-left: 1px solid var(--line);
+  }
+  /* The way up to the folders, which a phone has in the bar. */
+  main.split .side-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0 2px;
+    color: var(--accent);
+    font-size: 14.5px;
+    font-weight: 600;
+  }
+  main.split .side-back svg { width: 9px; height: 14px; }
+  main.split .page > .empty { margin-top: 18vh; }
+  /* The page that is open is the one lit in the list: Sky, as current is. */
+  main.split .row.current { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+  main.split .row.current .title { color: var(--accent); }
+}

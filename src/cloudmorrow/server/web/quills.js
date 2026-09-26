@@ -9,8 +9,8 @@
      #/q/<quill>/<screen>/<group>      a board, on one of its groups
      #/r/<quill>/<screen>/<model>/<id> one record, on the record sheet
 
-   The tabs sit where this file is imported in app.js — after Notes, where
-   Tasks always was — through a slot core.js holds open for them, because
+   The tabs sit where this file is imported in app.js — after Today, where
+   Notes and Tasks always were — through a slot core.js holds open for them, because
    the answer arrives after the bar is first drawn. What the server said
    last time is kept in local storage, like the feature switches, so that
    first bar is already right rather than growing a tab a beat later. */
@@ -96,7 +96,10 @@ async function find(quillId, screenId) {
 }
 
 registerScreen("q", async (arg) => {
-  const [quillId, screenId, group = ""] = arg.split("/");
+  // The rest is the screen's own: a board's group, or an editor's folder,
+  // which may have slashes in it.
+  const [quillId, screenId, ...rest] = arg.split("/");
+  const group = rest.join("/");
   const at = await find(quillId, screenId);
   if (at) await renderKitScreen(at, group);
 });

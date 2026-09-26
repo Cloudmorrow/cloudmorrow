@@ -557,7 +557,8 @@ def test_using_a_connection_is_noted(client, auth):
 
 
 # -- features ------------------------------------------------------------------------------
-def test_a_feature_switched_off_takes_its_tools_away(client, auth):
+def test_a_feature_switched_off_takes_its_tools_away(notes_quill, auth):
+    client = notes_quill
     pytest.importorskip("cloudmorrow.server.features")
     token = connect(client)["access_token"]
     off = client.patch("/api/server/features/notes", headers=auth, json={"enabled": False})

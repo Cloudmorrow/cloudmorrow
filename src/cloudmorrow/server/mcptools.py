@@ -230,6 +230,9 @@ def list_records(state: AppState, user: User, args: dict[str, Any]) -> Any:
     where = args.get("where", {})
     if not isinstance(where, dict):
         raise ToolError("where must be an object of indexed field to value")
+    where = dict(where)
+    if args.get("q"):
+        where["q"] = _str(args, "q")
     principal = _principal(user)
     seed(state, principal, model)
     return {"records": [r.to_dict() for r in state.records.list(principal, model, where)]}
@@ -459,8 +462,10 @@ TOOLS: tuple[Tool, ...] = (
     Tool(
         "list_records",
         "List the user's records of one datamodel, in order. Filter with `where` on indexed "
-        "fields, e.g. {\"board\": \"r_…\", \"lane\": \"todo\"}.",
-        _schema({"model": _MODEL, "where": {"type": "object", "description": "Indexed field to value."}},
+        "fields, e.g. {\"board\": \"r_…\", \"lane\": \"todo\"}; search their text with `q` "
+        "(a found record's `preview` is the line that matched).",
+        _schema({"model": _MODEL, "where": {"type": "object", "description": "Indexed field to value."},
+                 "q": {"type": "string", "description": "Text to search for. Optional."}},
                 ("model",)),
         "",
         list_records,

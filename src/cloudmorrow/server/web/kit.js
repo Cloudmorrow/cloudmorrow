@@ -20,6 +20,8 @@ import {
   replace, seconds, setStatus, store, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
+// Each element beyond the first four is a file of its own, drawn from here.
+import { renderEditor, renderEditorPage } from "./kit_editor.js";
 
 const own = {
   // What a board is, for the button that opens its own sheet.
@@ -103,11 +105,12 @@ const canDrag = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
 // The kit elements this file draws. The server refuses to install a screen
 // of any other kind until every surface draws it, and a test holds this
 // list to the server's; the check below is for a server newer than the page.
-export const DRAWS = ["list", "board", "detail", "form"];
+export const DRAWS = ["list", "board", "detail", "form", "editor"];
 
 export async function renderKitScreen(at, arg) {
   const { kit } = at.screen;
   if (kit === "board") return renderBoard(at, arg);
+  if (kit === "editor") return renderEditor(at, arg);
   if (DRAWS.includes(kit)) return renderList(at);
   app.innerHTML = nav({ title: at.screen.label }) + `<main>${heading(at.screen.label)}
     <p class="empty"><b>Not on this app yet</b>This screen is a ${esc(kit)}, which this
@@ -514,6 +517,8 @@ function same(f, a, b) {
 
 export async function renderRecordSheet(at, modelId, id, arg) {
   const { quill, screen } = at;
+  // An editor's own records open on its page, not on the sheet.
+  if (screen.kit === "editor" && modelId === screen.model) return renderEditorPage(at, id, arg);
   const model = quill.models[modelId];
   let record;
   try { record = await api("GET", recordsUrl(model.id, id)); }

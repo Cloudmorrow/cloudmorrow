@@ -13,6 +13,14 @@ come from the Quill's first screen (or `--screen`) and its datamodel.
     cm tasks groups                    # the boards, for a board with groups
     cm tasks list --group Garden       # another board, by name or id
 
+An `editor` screen is pages of Markdown, found by their path:
+
+    cm notes list                      # every page, folders and all
+    cm notes show ideas/garden         # the Markdown, as it is: pipe it on
+    cm notes add ideas/garden          # from stdin, or $EDITOR
+    cm notes edit ideas/garden         # $EDITOR, or the new text from stdin
+    cm notes search tomatoes           # names and every line
+
 `main` sends a first word that is not one of the built-in commands here, so
 `cm tasks` works without the CLI knowing, when it starts, what is installed.
 """
@@ -20,17 +28,29 @@ come from the Quill's first screen (or `--screen`) and its datamodel.
 from __future__ import annotations
 
 import json
+import sys
 from typing import Annotated
 
 import typer
 from rich.markup import escape
 from rich.table import Table
 
-from cloudmorrow.cli.common import client, console, emit, fail, out, run
+from cloudmorrow.cli.common import (
+    client,
+    console,
+    edit_text,
+    emit,
+    fail,
+    out,
+    run,
+    stdin_is_a_terminal,
+)
 from cloudmorrow.client.api import ApiError, CloudmorrowClient
 from cloudmorrow.console import TITLE
 
-ACTIONS = ("list", "add", "show", "set", "move", "done", "undone", "delete", "groups")
+ACTIONS = (
+    "list", "add", "show", "set", "move", "done", "undone", "delete", "groups", "edit", "search",
+)
 
 
 def route(argv: list[str], commands: set[str]) -> list[str]:
@@ -232,6 +252,11 @@ async def _act(
     index: int | None,
     plain: bool,
 ) -> None:
+    if screen.kit == "editor":
+        await _act_editor(api, screen, action, args, plain)
+        return
+    if action in ("edit", "search"):
+        fail(f"{action} is for an editor; {screen.quill['id']} is a {screen.kit}")
     group_id, groups = await _group_id(api, screen, group)
     where = {screen.group["name"]: group_id} if group_id else {}
 
@@ -306,5 +331,115 @@ async def _act(
             console.print(
                 f"[green]Deleted[/] {escape(str(record['fields'].get(screen.title, '')))}"
             )
+    except ApiError as exc:
+        fail(str(exc))
+
+
+# -- an editor: pages of Markdown, by path ------------------------------------------------
+def _page_key(screen: Screen, record: dict) -> str:
+    """What a page is called on the command line: its path, else its title."""
+    fields = record["fields"]
+    return str(fields.get(screen.spec.get("path") or screen.title) or fields.get(screen.title) or "")
+
+
+def _find_page(screen: Screen, records: list[dict], key: str) -> dict:
+    """A page by its path, its title, or its id — whole, or the start of one."""
+    wanted = key.strip().strip("/").removesuffix(".md")
+    for test in (
+        lambda r: _page_key(screen, r) == wanted,
+        lambda r: r["id"] == key,
+        lambda r: _page_key(screen, r).casefold() == wanted.casefold(),
+        lambda r: str(r["fields"].get(screen.title, "")).casefold() == wanted.casefold(),
+    ):
+        matches = [r for r in records if test(r)]
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            fail(f"more than one page matches {key!r}: {', '.join(_page_key(screen, r) for r in matches)}")
+    fail(f"no page matches {key!r}")
+
+
+def _text(initial: str, *, what: str) -> str:
+    """The new text: what is piped in, else what $EDITOR saves."""
+    if not stdin_is_a_terminal():
+        return sys.stdin.read()
+    text = edit_text(initial)
+    if not text.strip():
+        fail(f"{what} is empty — nothing was saved")
+    return text
+
+
+async def _act_editor(
+    api: CloudmorrowClient, screen: Screen, action: str, args: list[str], plain: bool
+) -> None:
+    body = screen.spec.get("body") or "body"
+    path = screen.spec.get("path")
+    if action == "search":
+        if not args:
+            fail(f"search for what? cm {screen.quill['id']} search <text>")
+        found = await api.records(screen.model, q=" ".join(args))
+        if plain:
+            emit(json.dumps(found, indent=2) + "\n")
+            return
+        for record in found:
+            line = record.get("preview") or ""
+            out.print(f"{escape(_page_key(screen, record))}  [dim]{escape(line)}[/]")
+        if not found:
+            console.print("[dim]nothing matches[/]")
+        return
+    records = await api.records(screen.model)
+    if action == "list":
+        if plain:
+            emit(json.dumps(records, indent=2) + "\n")
+            return
+        table = Table(title=screen.spec.get("label") or screen.quill["name"], title_style=TITLE)
+        table.add_column(screen.fields[path]["label"] if path else screen.fields[screen.title].get("label", "Title"))
+        stamp = next((n for n, f in screen.fields.items() if f["kind"] == "datetime"), None)
+        if stamp:
+            table.add_column(screen.fields[stamp].get("label", stamp), style="dim")
+        for record in sorted(records, key=lambda r: _page_key(screen, r).casefold()):
+            row = [escape(_page_key(screen, record))]
+            if stamp:
+                row.append(str(record["fields"].get(stamp) or "")[:16].replace("T", " "))
+            table.add_row(*row)
+        out.print(table)
+        return
+    if not args:
+        fail(f"which page? cm {screen.quill['id']} {action} <path>")
+    try:
+        if action == "add":
+            if any(_page_key(screen, r) == args[0].strip("/") for r in records):
+                fail(f"there is already a page {args[0]!r}; edit it instead")
+            text = " ".join(args[1:]) if len(args) > 1 else _text("", what="the page")
+            fields = {(path or screen.title): args[0].strip("/"), body: text}
+            made = await api.create_record(screen.model, fields)
+            console.print(f"[green]Added[/] {escape(_page_key(screen, made))}")
+            return
+        found = await api.record(screen.model, _find_page(screen, records, args[0])["id"])
+        if action == "show":
+            emit(json.dumps(found, indent=2) + "\n" if plain else str(found["fields"].get(body) or ""))
+        elif action == "edit":
+            before = str(found["fields"].get(body) or "")
+            text = " ".join(args[1:]) if len(args) > 1 else _text(before, what="the page")
+            if text == before:
+                console.print("[dim]unchanged[/]")
+                return
+            try:
+                await api.update_record(screen.model, found["id"], {body: text}, rev=found["rev"])
+            except ApiError as exc:
+                if exc.status_code == 409:
+                    fail("it changed somewhere else while you were editing; nothing was saved")
+                raise
+            console.print(f"[green]Saved[/] {escape(_page_key(screen, found))}")
+        elif action == "delete":
+            await api.delete_record(screen.model, found["id"])
+            console.print(f"[green]Deleted[/] {escape(_page_key(screen, found))}")
+        elif action == "set":
+            changed = await api.update_record(
+                screen.model, found["id"], _pairs(args[1:], screen), rev=found["rev"]
+            )
+            console.print(f"[green]Saved[/] {escape(_page_key(screen, changed))}")
+        else:
+            fail(f"an editor has list, show, add, edit, set, delete and search, not {action}")
     except ApiError as exc:
         fail(str(exc))

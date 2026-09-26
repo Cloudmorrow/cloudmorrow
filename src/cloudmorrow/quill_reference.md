@@ -46,7 +46,7 @@ why = "to show who looks after each plant"
 
 [[screens]]                        # one tab per screen, on every surface
 id = "plants"
-kit = "list"                       # list, board, detail, form (calendar, thread, grid, editor: next)
+kit = "list"                       # list, board, detail, form, editor (calendar, thread, grid: next)
 label = "Plants"
 model = "plants.plant"
 title = "name"
@@ -131,9 +131,11 @@ leaves.
 | list | model, title; optional subtitle, tick (bool) | rows, a circle per row if tick |
 | board | model, lane (enum, in ordered_within), title; optional group (link: chips), body (markdown), done (a lane value) | lanes; cards dragged between them |
 | detail / form | model; optional fields = [...] | one record's fields, editable |
+| editor | model, title, body (markdown); optional path (a string like folder/sub/title: the folders) | a tree of folders and records beside a page of Markdown; pictures where the backend keeps attachments |
 
 Every screen opens a record sheet when a row or card is chosen: every field,
-with the widget for its kind, editable, with delete. No other UI exists, on
+with the widget for its kind, editable, with delete. An editor opens its page
+instead. No other UI exists, on
 purpose: what the kit cannot say, the kit grows to say, for every Quill at once.
 
 ## Rules

@@ -52,6 +52,9 @@ def _with_models(state: AppState, quill: dict) -> dict:
             wanted |= {f.to for f in model.fields if f.kind == "link"}
     quill["models"] = {
         model_id: state.quills.datamodels[model_id].to_dict()
+        # What the record API does for it besides the five calls: search,
+        # and folders and attachments where its backend has them.
+        | {"can": state.records.capabilities(model_id)}
         for model_id in sorted(wanted)
         if model_id in state.quills.datamodels
     }
@@ -96,7 +99,10 @@ def _resolve(state: AppState, payload: QuillSource, tmp: Path) -> tuple[Path, Pa
         entry = found.entry(payload.id)
         folder = fetch(entry["repo"], str(entry.get("ref", "")), base=found.base, into=tmp / "q")
         models = state.quills.datamodels_source(found, tmp / "m")
-        return folder, models, {"catalog": True, "repo": entry["repo"], "ref": entry.get("ref", "")}
+        return folder, models, {
+            "catalog": True, "repo": entry["repo"], "ref": entry.get("ref", ""),
+            "position": found.quills.index(entry),
+        }
     folder = fetch(payload.source, payload.ref, into=tmp / "q")
     if payload.datamodels:
         models = fetch(payload.datamodels, "", into=tmp / "m")

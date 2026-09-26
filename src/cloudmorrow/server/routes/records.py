@@ -15,8 +15,10 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
+from cloudmorrow.server.backends import AttachmentTooBig
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_current_user, get_state
 from cloudmorrow.server.records import (
@@ -115,7 +117,13 @@ def list_records(
     state: AppState = Depends(get_state),
     user: User = Depends(get_current_user),
 ) -> list[dict]:
-    """Every record of *model* you have. Query parameters filter on indexed fields."""
+    """Every record of *model* you have. Query parameters filter on indexed fields.
+
+    Two are not filters: `q` keeps the records whose text holds it (a
+    backend searches its own way), and `previews=true` puts a line of each
+    record's text on it as `preview`. With `q`, the preview is the line
+    that matched.
+    """
     switched_on(state, model)
     principal = person(user)
     try:
@@ -124,6 +132,118 @@ def list_records(
     except ERRORS as exc:
         raise _refused(exc) from exc
     return [record.to_dict() for record in records]
+
+
+# -- folders and attachments, for a datamodel whose backend has them -------------------
+# Before the record routes: `_folders` is not a record id (none starts with
+# an underscore), and the first route that matches is the one that answers.
+class FolderIn(BaseModel):
+    path: str
+
+
+class FolderMove(BaseModel):
+    path: str
+    to: str
+
+
+@router.get("/{model}/_folders")
+def list_folders(
+    model: str, state: AppState = Depends(get_state), user: User = Depends(get_current_user)
+) -> list[dict]:
+    """Every folder, empty ones too, parents before what is in them."""
+    switched_on(state, model)
+    try:
+        return state.records.folders(person(user), model)
+    except ERRORS as exc:
+        raise _refused(exc) from exc
+
+
+@router.post("/{model}/_folders", status_code=status.HTTP_201_CREATED)
+def make_folder(
+    model: str,
+    payload: FolderIn,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> dict:
+    switched_on(state, model)
+    try:
+        return state.records.make_folder(person(user), model, payload.path)
+    except ERRORS as exc:
+        raise _refused(exc) from exc
+
+
+@router.patch("/{model}/_folders")
+def move_folder(
+    model: str,
+    payload: FolderMove,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Rename a folder, or move it into another: what is in it goes along."""
+    switched_on(state, model)
+    try:
+        return state.records.move_folder(person(user), model, payload.path, payload.to)
+    except ERRORS as exc:
+        raise _refused(exc) from exc
+
+
+@router.delete("/{model}/_folders", status_code=status.HTTP_204_NO_CONTENT)
+def delete_folder(
+    model: str,
+    path: str,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> None:
+    """A folder, and everything in it."""
+    switched_on(state, model)
+    try:
+        state.records.delete_folder(person(user), model, path)
+    except ERRORS as exc:
+        raise _refused(exc) from exc
+
+
+@router.post("/{model}/_attachments", status_code=status.HTTP_201_CREATED)
+async def attach(
+    model: str,
+    request: Request,
+    filename: str = "",
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Keep a file beside the records. The body is the file, not a form around it.
+
+    Answers `{name, path, size, content_type}`; `path` is what Markdown
+    writes to show it — a note's `![alt](img/<name>)`.
+    """
+    switched_on(state, model)
+    data = await request.body()
+    try:
+        return state.records.attach(person(user), model, data, filename)
+    except AttachmentTooBig as exc:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, str(exc)) from exc
+    except ERRORS as exc:
+        raise _refused(exc) from exc
+
+
+@router.get("/{model}/_attachments/{name}")
+def attachment(
+    model: str,
+    name: str,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> Response:
+    switched_on(state, model)
+    try:
+        data, content_type = state.records.attachment(person(user), model, name)
+    except UnknownRecordError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such attachment") from exc
+    except ERRORS as exc:
+        raise _refused(exc) from exc
+    # A name is never reused for another file, so it may be kept for good.
+    return Response(
+        data, media_type=content_type,
+        headers={"Cache-Control": "private, max-age=31536000, immutable"},
+    )
 
 
 @router.post("/{model}", status_code=status.HTTP_201_CREATED)

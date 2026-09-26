@@ -1,0 +1,15 @@
+# The note everybody starts with: how the editor works, in the editor.
+[[records]]
+path = "welcome"
+body = """
+# Welcome to Cloudmorrow
+
+This is a **live** markdown editor: the line your cursor is on stays raw so you
+can edit the markers, and every other line renders as you leave it.
+
+- [ ] click a note on the left to open it
+- [ ] press `ctrl+t` on this line to tick it off
+- [x] notes are plain `.md` files on your server
+
+> Everything autosaves. `ctrl+s` if you are impatient.
+"""

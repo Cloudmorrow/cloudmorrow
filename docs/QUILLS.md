@@ -187,6 +187,8 @@ The core serves every installed datamodel at the same API:
 | call | what it does |
 | --- | --- |
 | `GET /api/records/{model}?field=value` | list, filtered on indexed fields, in order |
+| `GET /api/records/{model}?q=text` | the records whose text holds it; each found one's `preview` is the line that matched |
+| `GET /api/records/{model}?previews=true` | the list, with a line of each record's text as `preview` |
 | `POST /api/records/{model}` | create, from `{"fields": {...}}` |
 | `GET /api/records/{model}/{id}` | one record |
 | `PATCH /api/records/{model}/{id}` | change fields; send `rev` to get a 409 instead of overwriting |
@@ -261,6 +263,22 @@ A backend answers the same list, get, create, change and delete, with the
 same envelope, so a Quill, `cm <quill>` and an assistant cannot tell the
 difference. The Notes, Files and Secrets Quills carry only their screens.
 
+`q` and `previews` are not filters, and every listing takes them: the record
+store searches the text fields it unseals, and a backend searches its own
+way (notes read their files, names and every line). A backend may do two
+things more, and a datamodel says which in `can` beside it in
+`GET /api/quills` — `["search", "folders", "attachments"]` for a note:
+
+| capability | calls | what it is |
+| --- | --- | --- |
+| `folders` | `GET`, `POST {path}`, `PATCH {path, to}`, `DELETE ?path=` on `/api/records/{model}/_folders` | folders a record's path is in, which exist before anything is put in them and take everything in them when they go |
+| `attachments` | `POST` (the body is the file) and `GET …/{name}` on `/api/records/{model}/_attachments` | files kept beside the records; the answer's `path` is what Markdown writes (`![alt](img/<name>)`) |
+
+A folder is not a record: it has no fields, no rev and nothing to seal, and
+a listing of notes with folders in it would be a listing of two things. So
+it is a capability a backend declares by having the methods, and any other
+backend with folders — the fileshares — answers the same calls.
+
 ### Screens
 
 Each screen names a kit element and binds it to fields. The kit, and what
@@ -273,14 +291,18 @@ each element needs:
 | `detail` / `form` | `model`, `fields` | a sheet | a panel | a modal | `cm <quill> show`, `set` |
 | `calendar` | `model`, `starts`, `ends`, optional `all_day`, `space` (the calendars) | a day list and a month | a week and a month | a month and the day's list | `cm <quill> list --from --to`, `add` |
 | `thread` | `model`, `body`, `space` (the channels) | channels, then a conversation | both side by side | both side by side | `cm <quill> list`, `say` |
-| `editor` | `model` with a `markdown` field, optional folders from the title | a tree, then a page | both side by side | both side by side | `cm <quill> show`, `add`, `edit` |
+| `editor` | `model`, `title`, `body` (markdown), optional `path` (a string, `folder/sub/title`: the folders) | a tree, then a list, then the page | the list and the page side by side | the tree and the live editor side by side | `cm <quill> list`, `show`, `add`, `edit`, `search` |
 | `grid` | `model` of kind file | folders and tiles | the same, wider | a table | `cm <quill> list`, `get`, `put` |
 
 Every screen gets a record sheet for free: opening a card or a row shows the
-record's fields with the widget for each kind, editable, with delete.
+record's fields with the widget for each kind, editable, with delete. An
+editor opens its own page instead, and takes pictures when its datamodel has
+`attachments`.
 
 A Quill's screens become a tab, in the order of `[[screens]]`, on every
-surface. An administrator switches a Quill off for the server; a person
+surface; Quills from the catalog stand in the catalog's order (Notes, then
+Tasks), and the rest follow, oldest first. The clients open on the first tab
+there is. An administrator switches a Quill off for the server; a person
 switches its tab off for themselves — the same two switches the included
 features have always had.
 
@@ -394,9 +416,10 @@ manifest written, checked and installed in one conversation.
 | records, sealing, positions, stamps, the gate | `server/records.py` |
 | manifests, sources, install, catalog | `server/quills.py`, `server/routes/quills.py` |
 | the record API | `server/routes/records.py` |
-| jobs | `server/quilljobs.py` |
-| the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; the catalog and install sheet in `quillsadmin.js` |
-| the kit in the terminal | `tui/panes/kit.py` (list), `tui/panes/kit_board.py`, `tui/widgets/kit.py`, `tui/screens/record_sheet.py`; the catalog in `tui/panes/admin_quills.py` |
+| backends: notes served from their files, their folders and pictures | `server/backends.py` |
+| jobs, and the boot work (foundation Quills, built-ins that became Quills, old tasks) | `server/quilljobs.py` |
+| the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; `kit_editor.js`/`.css` and `pictures.js` (the editor); the catalog and install sheet in `quillsadmin.js` |
+| the kit in the terminal | `tui/panes/kit.py` (list), `tui/panes/kit_board.py`, `tui/panes/kit_editor.py` + `kit_editor.tcss` (with `widgets/editor.py`, `note_tree.py`, `picture.py`), `tui/widgets/kit.py`, `tui/screens/record_sheet.py`; the catalog in `tui/panes/admin_quills.py` |
 | the kit on the command line | `cli/quillrun.py` (`cm <quill> …`) |
 | building one | `cli/quill.py` (`cm quill new/check/dev/add`), `quill_reference.md`, `quill_template/` |
 | the kit to an assistant | `server/mcptools.py` (generic record tools) |
@@ -406,7 +429,8 @@ manifest written, checked and installed in one conversation.
 1. Tasks is the first Quill, and the proof: no task code left in the core.
 2. Services, webhooks and APIs run, with Quill tokens and the gate on them.
 3. `calendar` and `thread` in the kit; Calendar and Chat become Quills.
-4. `grid` and `editor`; Files and Notes become Quills. Secrets stays in the
+4. `grid` and `editor`; Files and Notes become Quills. (Notes is one:
+   `editor` is drawn everywhere.) Secrets stays in the
    core: it is foundation, and the one datamodel no assistant may ever reach.
 5. Shared and public scopes in the record store; named datasets.
 6. The catalog page at cloudmorrow.com, and the first Quill we did not write.

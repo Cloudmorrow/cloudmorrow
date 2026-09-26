@@ -65,7 +65,7 @@ ORIGIN = ".origin.json"
 KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor")
 # The ones every surface draws *today*. A screen of another kind is refused at
 # install, so a Quill never lands with a tab that draws nothing somewhere.
-KIT_READY = frozenset({"list", "board", "detail", "form"})
+KIT_READY = frozenset({"list", "board", "detail", "form", "editor"})
 
 JOB_ACTIONS = frozenset({"expire", "run"})
 SEED_KINDS = frozenset({"per-owner", "once"})
@@ -673,7 +673,11 @@ class QuillRegistry:
             return self.install(
                 folder,
                 models,
-                origin={"catalog": True, "repo": entry["repo"], "ref": entry.get("ref", "")},
+                origin={
+                    "catalog": True, "repo": entry["repo"], "ref": entry.get("ref", ""),
+                    # Where it stands in the catalog, which is where its tabs stand.
+                    "position": catalog.quills.index(entry),
+                },
             )
 
     def datamodels_source(self, catalog: Catalog, into: Path) -> Path | None:
@@ -684,10 +688,19 @@ class QuillRegistry:
 
     # -- telling -----------------------------------------------------------------------
     def installed(self) -> list[dict]:
-        """Every installed Quill, oldest first: the order its tabs appear in."""
-        ordered = sorted(
-            self.quills.values(), key=lambda m: (m.origin.get("installed_at", ""), m.id)
-        )
+        """Every installed Quill, in the order its tabs appear in.
+
+        The catalog's order first — Notes, then Tasks, as they stand there —
+        whenever each was installed; then every other Quill, oldest first.
+        One installed before the catalog said where (Tasks, on a server from
+        before this) goes after those that know.
+        """
+        def place(m: Manifest) -> tuple:
+            position = m.origin.get("position")
+            known = isinstance(position, int)
+            return (not known, position if known else 0, m.origin.get("installed_at", ""), m.id)
+
+        ordered = sorted(self.quills.values(), key=place)
         return [describe(m, self.datamodels, installed=m) for m in ordered]
 
     def catalogue_of_models(self) -> list[dict]:
@@ -823,6 +836,12 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
         elif kit in ("detail", "form"):
             for name in screen.get("fields", []):
                 need(model, thing, name)
+        elif kit == "editor":
+            # A page of Markdown with a title; `path`, when bound, is a string
+            # like `folder/sub/title` whose folders are the tree beside it.
+            need(model, thing + " body", screen.get("body"), ("markdown",))
+            if screen.get("path"):
+                need(model, thing + " path", screen["path"], ("string",))
     for job in manifest.jobs:
         if job["action"] == "expire":
             model = model_of(f"job {job['id']!r}", job["model"])
