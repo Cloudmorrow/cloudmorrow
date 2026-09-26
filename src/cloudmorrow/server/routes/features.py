@@ -53,6 +53,31 @@ def require_feature(key: str) -> Callable[..., None]:
     return guard
 
 
+def require_quill(key: str) -> Callable[..., None]:
+    """Refuse every call unless the Quill *key* is installed here and switched on.
+
+    For a foundation API whose Quill is how a person says they want it at
+    all: leaving Secrets out at install closes `/api/secrets`, as switching
+    the old built-in off always did, even though the vaults are the core's.
+    """
+
+    def guard(state: AppState = Depends(get_state)) -> None:
+        quill = state.quills.quills.get(key)
+        if quill is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"{key.capitalize()} is not on this server; an administrator adds it"
+                " from Administration, Quills",
+            )
+        if not state.features.enabled(key):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"{quill.name} is switched off on this server",
+            )
+
+    return guard
+
+
 @router.get("", response_model=list[FeatureOut])
 def list_features(
     state: AppState = Depends(get_state), _: User = Depends(get_current_user)

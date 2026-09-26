@@ -171,7 +171,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.include_router(features.types_router)
     app.include_router(notes.router, dependencies=[Depends(features.require_feature("notes"))])
     app.include_router(
-        secrets.router, dependencies=[Depends(features.require_feature("secrets"))]
+        secrets.router, dependencies=[Depends(features.require_quill("secrets"))]
     )
     app.include_router(records.router)
     app.include_router(records.models_router)

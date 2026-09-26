@@ -686,6 +686,12 @@ A Quill is a feature like the built-in ones: an administrator can switch it
 off for the server, and each person can hide its tab (see *Two switches on
 every feature*).
 
+Leaving a Quill out closes what it is for. Secrets is the one to know
+about: its vaults are part of the core, because `cloudmorrow secret run`
+and `.env` import and export use them, but on a server without the Secrets
+Quill (or with it switched off) `/api/secrets` answers 403 and `cm secret`
+says so. Add the Quill and they open again, with everything still in them.
+
 **Building one** needs no server to start:
 
 ```sh

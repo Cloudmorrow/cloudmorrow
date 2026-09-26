@@ -6,6 +6,12 @@ from cloudmorrow import dotenv
 from tests.conftest import ADMIN, GUEST, token_for
 
 
+@pytest.fixture(autouse=True)
+def secrets_installed(secrets_quill):
+    """Every test here talks to a server that has the Secrets Quill."""
+    return secrets_quill
+
+
 def vault_headers(auth: dict[str, str], vault: str) -> dict[str, str]:
     return {**auth, "X-Cloudmorrow-Vault": vault}
 
@@ -244,3 +250,16 @@ def test_admin_is_not_a_master_key(client, auth):
     )
     assert ADMIN[0] != GUEST[0]
     assert client.get("/api/secrets", params={"env": "local"}, headers=auth).json() == []
+
+
+def test_without_the_quill_the_vaults_are_closed(config, users):
+    from fastapi.testclient import TestClient
+
+    from cloudmorrow.server.app import create_app
+
+    bare = TestClient(create_app(config))
+    bare.app.state.cloudmorrow.quills.uninstall("secrets")  # left out at install
+    headers = {"Authorization": f"Bearer {token_for(bare, *ADMIN)}"}
+    refused = bare.get("/api/secrets", headers=headers)
+    assert refused.status_code == 403
+    assert "Administration, Quills" in refused.json()["detail"]
