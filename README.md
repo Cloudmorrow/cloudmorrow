@@ -56,6 +56,11 @@ It is free software under the [GNU AGPL v3](LICENSE).
 - **Three ways in.** A web app made for the phone (add it to the home
   screen), the same app grown up for a laptop browser, and a terminal app you
   can use with a mouse.
+- **A desktop app that mounts your shares.** The same web app in a window of
+  its own (`cloudmorrow app`, or the icon in your applications menu), with
+  the client behind it: **Mount on this computer** beside each share, the
+  folder it landed in a click away, and one sign-in shared with the terminal
+  app. Linux today; macOS and Windows are next.
 - **An assistant, if you want one.** The server speaks MCP, so Claude or any
   other MCP client can read and write your notes and every Quill's records as
   you, after you sign in and say yes — and, for an administrator, write,
@@ -182,8 +187,10 @@ cloudmorrow                  # the terminal app; `cm` is the same thing in two l
 
 It needs Python 3.11 or newer and nothing else. It installs into your home
 directory, points the command line at your server, and registers the machine
-as one of yours so it can serve shares and run backups. Every
-`cloudmorrow` command reads `RESOURCE ACTION`:
+as one of yours so it can serve shares and run backups. On a Linux computer
+with a desktop it adds the desktop app and puts it in the applications menu
+(`--no-desktop` skips that; a machine reached over ssh gets the terminal app
+alone). Every `cloudmorrow` command reads `RESOURCE ACTION`:
 
 ```
 cloudmorrow note    list | show | add | edit | search | remove
@@ -191,6 +198,7 @@ cloudmorrow secret  list | get | set | import | export | run | vaults | remove
 cloudmorrow share   list | add | mount | unmount | remove
 cloudmorrow agent   list | run | jobs
 cloudmorrow update  [server | all]
+cloudmorrow app
 cloudmorrow uninstall
 ```
 

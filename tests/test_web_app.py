@@ -147,12 +147,12 @@ def test_the_app_opens_on_today_and_me_is_in_the_corner_not_the_bar():
 
 def test_what_a_screen_makes_is_beside_its_title_not_in_the_bar():
     """The bar's corner is Me's; the pen and the plus moved down to the title."""
-    for name in ("notes.js", "kit.js", "chat.js", "kit_calendar.js", "files.js", "admin.js"):
+    for name in ("notes.js", "kit.js", "kit_grid.js", "chat.js", "kit_calendar.js", "admin.js"):
         script = (WEB / name).read_text()
         for line in script.splitlines():
             if "right:" in line and ("compose" in line or 'class="add"' in line):
                 raise AssertionError(f"{name} still puts a create button in the bar: {line.strip()}")
-    for name in ("notes.js", "kit.js", "chat.js", "kit_calendar.js", "files.js", "admin.js"):
+    for name in ("notes.js", "kit.js", "kit_grid.js", "chat.js", "kit_calendar.js", "admin.js"):
         assert "heading(" in (WEB / name).read_text(), name
     assert '.heading .compose' in (WEB / "desktop.js").read_text()
 

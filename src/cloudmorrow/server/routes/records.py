@@ -12,9 +12,12 @@ having to run in between.
 
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from cloudmorrow.server.db import User
@@ -64,6 +67,8 @@ def _refused(exc: Exception) -> HTTPException:
         return HTTPException(status.HTTP_404_NOT_FOUND, "no such record")
     if isinstance(exc, Refused):
         return HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
+    if isinstance(getattr(exc, "status", None), int):
+        return HTTPException(exc.status, str(exc))
     if isinstance(exc, RecordConflictError):
         return HTTPException(
             status.HTTP_409_CONFLICT,
@@ -207,6 +212,85 @@ def delete_record(
         state.records.delete(person(user), model, record_id)
     except ERRORS as exc:
         raise _refused(exc) from exc
+
+
+# -- content: the bytes beside a record -------------------------------------------
+# For a datamodel whose backend keeps bytes beside the fields — a file's. The
+# same three calls for any such datamodel, so the kit that shows files asks
+# for a record's bytes the way it asks for its fields.
+PRIVATE = {"Cache-Control": "private, no-cache"}
+
+
+@router.get("/{model}/{record_id}/content")
+def record_content(
+    model: str,
+    record_id: str,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> FileResponse:
+    """The record's bytes: a file, as itself."""
+    switched_on(state, model)
+    try:
+        path, media_type = state.records.content(person(user), model, record_id)
+    except ERRORS as exc:
+        raise _refused(exc) from exc
+    # Someone's files: nobody's cache but the browser's own, and asked about
+    # again next time — a cheap 304 when nothing changed.
+    return FileResponse(path, media_type=media_type, headers=PRIVATE)
+
+
+@router.get("/{model}/{record_id}/thumb")
+def record_thumb(
+    model: str,
+    record_id: str,
+    size: int = Query(default=256, ge=1, description="The long edge wanted, in pixels"),
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> FileResponse:
+    """A small copy of the record's picture, as a JPEG. A 415 for one that is not
+    a picture the server can make small, and the client shows an icon instead."""
+    switched_on(state, model)
+    try:
+        path = state.records.thumbnail(person(user), model, record_id, size)
+    except ERRORS as exc:
+        raise _refused(exc) from exc
+    return FileResponse(path, media_type="image/jpeg", headers=PRIVATE)
+
+
+@router.post("/{model}/upload", status_code=status.HTTP_201_CREATED)
+async def upload_record(
+    model: str,
+    request: Request,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """A new record from bytes: the body is the file, the query says where it
+    goes and what it is called (`?share=my-files&folder=Photos&name=cat.jpg`).
+
+    Streamed to disk first and handed over whole, so a dropped connection
+    leaves nothing behind with the file's name.
+    """
+    switched_on(state, model)
+    try:
+        if not state.records.has_content(model):
+            raise RecordError(f"{model} records are not made from bytes")
+    except ERRORS as exc:
+        raise _refused(exc) from exc
+    spool = state.config.data_dir / "uploads"
+    spool.mkdir(parents=True, exist_ok=True)
+    handle = tempfile.NamedTemporaryFile(dir=spool, prefix=".upload-", delete=False)
+    part = Path(handle.name)
+    try:
+        with handle:
+            async for chunk in request.stream():
+                handle.write(chunk)
+        try:
+            record = state.records.put(person(user), model, dict(request.query_params), part)
+        except ERRORS as exc:
+            raise _refused(exc) from exc
+    finally:
+        part.unlink(missing_ok=True)
+    return record.to_dict()
 
 
 # -- the people in a space ---------------------------------------------------------

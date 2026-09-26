@@ -243,8 +243,9 @@ def test_a_bad_request_is_a_400_with_the_reason(client, auth):
 # -- boot ------------------------------------------------------------------------------
 def test_a_fresh_server_gets_the_foundation_quills_once(config, users, registry, tmp_path):
     db = config.db_path
-    assert install_foundation(db, registry) == ["tasks", "calendar"]
+    assert install_foundation(db, registry) == ["tasks", "files", "calendar"]
     registry.uninstall("tasks")
+    registry.uninstall("files")
     registry.uninstall("calendar")
     # Removed by an administrator, they stay removed.
     assert install_foundation(db, registry) == []

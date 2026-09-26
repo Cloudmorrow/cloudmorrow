@@ -265,12 +265,28 @@ through the same record API by a **backend**:
 | datamodel | backend | lives in | also reached by |
 | --- | --- | --- | --- |
 | `note` | `notes` | Markdown files in each person's notes folder, sealed | WebDAV, the notes MCP tools, `cm note` |
-| `file` | `shares` | the fileshares and each person's drive | WebDAV, the desktop app's mounts, `cm share` |
+| `share`, `file` | `shares` | the fileshares and each person's drive | WebDAV, the desktop app's mounts, `cm share`, `/api/shares` |
 | `secret` | `vaults` | the secrets store, sealed under its own key | `cm secret run`, and never an assistant |
 
 A backend answers the same list, get, create, change and delete, with the
 same envelope, so a Quill, `cm <quill>` and an assistant cannot tell the
 difference. The Notes, Files and Secrets Quills carry only their screens.
+
+A backend may also keep **content**: bytes beside a record's fields. The
+`shares` backend does — a file's — and the record API has three more calls
+for any datamodel whose backend keeps some:
+
+| call | what it does |
+| --- | --- |
+| `GET /api/records/{model}/{id}/content` | the bytes, as themselves |
+| `GET /api/records/{model}/{id}/thumb?size=256` | a small JPEG of a picture; 415 when it is not one the server can scale |
+| `POST /api/records/{model}/upload?field=value…` | a new record from the body's bytes, the query saying where and what it is called |
+
+A share's id is its name (`my-files` for the person's own drive); a file's
+is the share and the path in it, encoded, and it is listed a folder at a
+time: `GET /api/records/file?share=my-files&folder=Photos`. Making a `file`
+record with `kind = "folder"` makes a folder; changing its `name`, `folder`
+or `path` renames or moves it inside its share.
 
 ### Screens
 
@@ -285,7 +301,7 @@ each element needs:
 | `calendar` | `model`, `starts`, `ends` (indexed datetime or date fields), `space` (a link to a space: the calendars), optional `all_day` (bool), `colour` (a field of the space: cyan, violet, green, amber, rose), `title`, `subtitle` | a month with a dot per thing, and the day's list | a week of hours or a month written in | the spaces, a month, and the day's list | `cm <quill> list --from --to`, `add "<title>" starts=… ends=…` |
 | `thread` | `model`, `body`, `space` (the channels) | channels, then a conversation | both side by side | both side by side | `cm <quill> list`, `say` |
 | `editor` | `model` with a `markdown` field, optional folders from the title | a tree, then a page | both side by side | both side by side | `cm <quill> show`, `add`, `edit` |
-| `grid` | `model` of kind file | folders and tiles | the same, wider | a table | `cm <quill> list`, `get`, `put` |
+| `grid` | `model` with content (`file`), `group` (a link: the places, picked first), `folder`, `kind` (an enum with `folder`), optional `size`, `modified`, `mime`, `group_subtitle`, `group_open` | the groups, then folders and tiles | the same, wider; drag and drop in | the groups in a table, then the folder, with the picture beside | `cm <quill> list [group] [folder]`, `get`, `put`, `add` |
 
 Every screen gets a record sheet for free: opening a card or a row shows the
 record's fields with the widget for each kind, editable, with delete.
@@ -414,8 +430,9 @@ manifest written, checked and installed in one conversation.
 | the record API | `server/routes/records.py` |
 | jobs, and the boot work (foundation Quills, old tables into records) | `server/quilljobs.py` |
 | spaces: who is told what | `server/spacenotify.py` |
-| the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; an element that is more than rows in its own `kit_<element>.js`/`.css` (`kit_calendar`), spaces in `kit_space.js`/`.css`; the catalog and install sheet in `quillsadmin.js` |
-| the kit in the terminal | `tui/panes/kit.py` (list), `tui/panes/kit_board.py`, `tui/panes/kit_calendar.py`, `tui/widgets/kit.py`, `tui/widgets/kit_space.py` (spaces), `tui/screens/record_sheet.py`; the catalog in `tui/panes/admin_quills.py` |
+| backends: notes, shares and files | `server/backends.py`; a share's files in `server/fileops.py` |
+| the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; an element that is more than rows in its own `kit_<element>.js`/`.css`: the calendar in `kit_calendar`, the grid in `kit_grid` (with `registerGridHook`, which the desktop app's mount lines come in by); spaces in `kit_space.js`/`.css`; the catalog and install sheet in `quillsadmin.js` |
+| the kit in the terminal | `tui/panes/kit.py` (list), `tui/panes/kit_board.py`, `tui/panes/kit_calendar.py`, `tui/panes/kit_grid.py` (with `register_group_extension`; the mount column and buttons for shares are `tui/sharemounts.py`), `tui/widgets/kit.py`, `tui/widgets/kit_space.py` (spaces), `tui/screens/record_sheet.py`; the catalog in `tui/panes/admin_quills.py` |
 | the kit on the command line | `cli/quillrun.py` (`cm <quill> …`) |
 | building one | `cli/quill.py` (`cm quill new/check/dev/add`), `quill_reference.md`, `quill_template/` |
 | the kit to an assistant | `server/mcptools.py` (generic record tools) |
@@ -426,7 +443,8 @@ manifest written, checked and installed in one conversation.
 2. Services, webhooks and APIs run, with Quill tokens and the gate on them.
 3. `calendar` and `thread` in the kit; Calendar and Chat become Quills.
    (Calendar is one: `calendar` is drawn on every surface.)
-4. `grid` and `editor`; Files and Notes become Quills. Secrets stays in the
+4. `grid` and `editor`; Files and Notes become Quills. (`grid` is drawn,
+   and Files is a Quill.) Secrets stays in the
    core: it is foundation, and the one datamodel no assistant may ever reach.
 5. Shared and public scopes in the record store; named datasets.
 6. The catalog page at cloudmorrow.com, and the first Quill we did not write.

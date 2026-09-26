@@ -1,12 +1,14 @@
-"""The Browse view on the Files tab: a share's folders and files, as a list
-or as thumbnails, with the picture the cursor is on beside it."""
+"""The kit's grid in the terminal, as the Files Quill draws it: the shares,
+then a share's folders and files, as a list or as thumbnails, with the
+picture the cursor is on beside it — and a folder made, a file put in,
+fetched, renamed, moved and deleted."""
 
 from __future__ import annotations
 
-from textual.widgets import DataTable, Static, Tab, Tabs
+from textual.widgets import DataTable, Static
 
-from cloudmorrow.tui.panes.browse import (
-    BrowsePane,
+from cloudmorrow.tui.panes.kit_grid import (
+    GridPane,
     Tile,
     TileGrid,
     format_date,
@@ -15,7 +17,6 @@ from cloudmorrow.tui.panes.browse import (
     sort_entries,
     type_label,
 )
-from cloudmorrow.tui.panes.files import FilesharesPane, FilesPane
 from cloudmorrow.tui.widgets.picture import Picture
 from tests.tui_harness import entry_row, settle, start
 
@@ -24,13 +25,11 @@ async def open_browse(app, pilot):
     screen = await start(app, pilot)
     await pilot.click("#nav-files")
     await settle(app, pilot)
-    await pilot.click("#files-tab-browse")
-    await settle(app, pilot)
     return screen
 
 
 def names(screen) -> list[str]:
-    table = screen.query_one("#browse-table", DataTable)
+    table = screen.query_one("#grid-table", DataTable)
     return [str(table.get_row_at(index)[0]) for index in range(table.row_count)]
 
 
@@ -86,30 +85,26 @@ def test_folders_come_first_whichever_way_the_files_are_sorted():
 
 
 # -- in the app -----------------------------------------------------------------
-async def test_browse_starts_at_the_shares_and_enter_opens_one(app):
+async def test_files_starts_at_the_shares_and_enter_opens_one(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_browse(app, pilot)
-        pane = screen.query_one(FilesPane)
-        assert [tab.label_text for tab in pane.query_one("#files-nav", Tabs).query(Tab)] == [
-            "Local backups",
-            "Fileshares",
-            "Browse",
-        ]
-        assert isinstance(pane.active_view, BrowsePane)
+        assert isinstance(screen.active_pane, GridPane)
+        # Files is a Quill card now, with the key it always had.
+        assert screen.active_pane.TAB_KEY == "f5"
         assert names(screen) == ["media", "photos"]
-        assert "Shares" in screen.query_one("#browse-crumb", Static).visual.plain
+        assert "Shares" in screen.query_one("#grid-crumb", Static).visual.plain
         # Enter on a share is its top folder: folders first, then the files
         # by name, each with when, how big and what it is.
         await pilot.press("enter")
         await settle(app, pilot)
         assert app.client.listing_calls == [("media", "")]
-        table = screen.query_one("#browse-table", DataTable)
+        table = screen.query_one("#grid-table", DataTable)
         assert [[str(c) for c in table.get_row_at(i)] for i in range(table.row_count)] == [
             ["Holiday/", format_date(1_756_800_000), "", "Folder"],
             ["readme.txt", format_date(1_756_700_000), "5 B", "TXT"],
             ["song.mp3", format_date(1_756_600_000), "4.0 MB", "MP3"],
         ]
-        assert screen.query_one("#browse-crumb", Static).visual.plain == "media"
+        assert screen.query_one("#grid-crumb", Static).visual.plain == "media"
 
 
 async def test_into_a_folder_and_back_up_to_the_shares(app):
@@ -121,7 +116,7 @@ async def test_into_a_folder_and_back_up_to_the_shares(app):
         await settle(app, pilot)
         assert app.client.listing_calls[-1] == ("media", "Holiday")
         assert names(screen) == ["beach.jpg", "dunes.png", "where.txt"]
-        assert screen.query_one("#browse-crumb", Static).visual.plain == "media / Holiday"
+        assert screen.query_one("#grid-crumb", Static).visual.plain == "media / Holiday"
         # The status bar says what the cursor is on.
         assert "beach.jpg" in status(screen) and "1.2 MB" in status(screen)
         await pilot.press("backspace")
@@ -143,13 +138,13 @@ async def test_the_picture_the_cursor_is_on_is_shown_beside_the_list(app):
         await settle(app, pilot)
         await pilot.press("enter")
         await settle(app, pilot)
-        panel = screen.query_one("#browse-picture", Picture)
+        panel = screen.query_one("#grid-picture", Picture)
         # The cursor lands on beach.jpg: fetched small, not the whole photo.
-        assert panel.display and panel.shown == "Holiday/beach.jpg"
+        assert panel.display and panel.shown == "media/Holiday/beach.jpg"
         assert app.client.share_fetches == ["thumb:media/Holiday/beach.jpg@1024"]
         await pilot.press("down")
         await settle(app, pilot)
-        assert panel.shown == "Holiday/dunes.png"
+        assert panel.shown == "media/Holiday/dunes.png"
         # A text file has no picture: the panel goes.
         await pilot.press("down")
         await settle(app, pilot)
@@ -157,7 +152,7 @@ async def test_the_picture_the_cursor_is_on_is_shown_beside_the_list(app):
         # Back up to a picture already fetched: nothing fetched again.
         await pilot.press("up")
         await settle(app, pilot)
-        assert panel.shown == "Holiday/dunes.png"
+        assert panel.shown == "media/Holiday/dunes.png"
         assert len(app.client.share_fetches) == 2
 
 
@@ -169,7 +164,7 @@ async def test_v_shows_the_folder_as_thumbnails_and_again_as_a_list(app):
         await pilot.press("v")
         await settle(app, pilot)
         grid = screen.query_one(TileGrid)
-        assert screen.query_one("#browse-views").current == "browse-grid"
+        assert screen.query_one("#grid-views").current == "grid-tiles"
         tiles = list(grid.query(Tile))
         assert [tile.entry["name"] for tile in tiles] == ["Holiday", "readme.txt", "song.mp3"]
         assert [tile.kind for tile in tiles] == ["folder", "text", "audio"]
@@ -195,11 +190,11 @@ async def test_v_shows_the_folder_as_thumbnails_and_again_as_a_list(app):
         ]
         assert [bool(tile.query(".tile-picture")) for tile in tiles] == [True, True, False]
         # The panel follows the focused tile, as it follows the list's cursor.
-        assert screen.query_one("#browse-picture", Picture).shown == "Holiday/beach.jpg"
+        assert screen.query_one("#grid-picture", Picture).shown == "media/Holiday/beach.jpg"
         # And v again is the list, at the same place.
         await pilot.press("v")
         await settle(app, pilot)
-        assert screen.query_one("#browse-views").current == "browse-table"
+        assert screen.query_one("#grid-views").current == "grid-table"
         assert names(screen) == ["beach.jpg", "dunes.png", "where.txt"]
         assert isinstance(screen.focused, DataTable)
 
@@ -227,19 +222,14 @@ async def test_s_sorts_by_the_next_thing_and_shift_s_turns_it_around(app):
         assert "Sort: Type" in screen.query_one("#do-sort").label.plain
 
 
-async def test_enter_on_a_share_in_fileshares_opens_it_in_browse(app):
+async def test_an_empty_share_opens_empty(app):
     async with app.run_test(size=(120, 34)) as pilot:
-        screen = await start(app, pilot)
-        await pilot.click("#nav-files")
-        await settle(app, pilot)
-        pane = screen.query_one(FilesPane)
-        assert isinstance(pane.active_view, FilesharesPane)
+        screen = await open_browse(app, pilot)
         await pilot.press("down")  # photos
         await pilot.press("enter")
         await settle(app, pilot)
-        assert isinstance(pane.active_view, BrowsePane)
         assert set(app.client.listing_calls) == {("photos", "")}
-        assert screen.query_one("#browse-crumb", Static).visual.plain == "photos"
+        assert screen.query_one("#grid-crumb", Static).visual.plain == "photos"
         assert "Nothing" not in status(screen)
         assert names(screen) == []
 
@@ -270,3 +260,99 @@ async def test_a_folder_that_is_gone_sends_you_back_to_the_shares(app):
         await settle(app, pilot)
         assert names(screen) == ["media", "photos"]
         assert "no such folder" in status(screen)
+
+
+# -- changing what is there -------------------------------------------------------
+async def into_holiday(app, pilot):
+    screen = await open_browse(app, pilot)
+    await pilot.press("enter")
+    await settle(app, pilot)
+    await pilot.press("enter")
+    await settle(app, pilot)
+    return screen
+
+
+async def test_ctrl_n_makes_a_folder_where_you_are(app):
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await open_browse(app, pilot)
+        await pilot.press("enter")
+        await settle(app, pilot)
+        await pilot.press("ctrl+n")
+        await pilot.pause()
+        await pilot.pause()
+        await pilot.press(*"Tax", "enter")
+        await settle(app, pilot)
+        assert app.client.file_calls == [("mkdir", "media", "", "Tax")]
+        assert names(screen)[:2] == ["Holiday/", "Tax/"]
+
+
+async def test_p_puts_a_file_from_this_machine_here(app, tmp_path):
+    local = tmp_path / "dog.jpg"
+    local.write_bytes(b"woof")
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await into_holiday(app, pilot)
+        await pilot.press("p")
+        await pilot.pause()
+        await pilot.pause()
+        await pilot.press(*str(local), "enter")
+        await settle(app, pilot)
+        assert app.client.file_calls == [("put", "media", "Holiday", "dog.jpg", b"woof")]
+        assert "dog.jpg" in names(screen)
+        assert "Put dog.jpg in media/Holiday" in status(screen)
+
+
+async def test_g_gets_a_file_onto_this_machine(app, tmp_path):
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await into_holiday(app, pilot)
+        await pilot.press("g")
+        await pilot.pause()
+        await pilot.pause()
+        field = app.screen.query_one("Input")
+        field.value = str(tmp_path)
+        await pilot.press("enter")
+        await settle(app, pilot)
+        assert (tmp_path / "beach.jpg").read_bytes()[:4] == b"\x89PNG"
+        assert "Saved beach.jpg" in status(screen)
+
+
+async def test_e_renames_shift_m_moves_and_delete_deletes(app):
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await into_holiday(app, pilot)
+        await pilot.press("e")
+        await pilot.pause()
+        await pilot.pause()
+        field = app.screen.query_one("Input")
+        field.value = "sand.jpg"
+        await pilot.press("enter")
+        await settle(app, pilot)
+        assert ("change", "f_media:Holiday/beach.jpg", {"name": "sand.jpg"}) in app.client.file_calls
+        assert names(screen) == ["dunes.png", "sand.jpg", "where.txt"]
+        await pilot.press("M")
+        await pilot.pause()
+        await pilot.pause()
+        app.screen.query_one("Input").value = "/"
+        await pilot.press("enter")
+        await settle(app, pilot)
+        # dunes.png, now at the top of the share.
+        assert ("change", "f_media:Holiday/dunes.png", {"folder": ""}) in app.client.file_calls
+        assert names(screen) == ["sand.jpg", "where.txt"]
+        await pilot.press("delete")
+        await pilot.pause()
+        await pilot.pause()
+        await pilot.press("y")
+        await settle(app, pilot)
+        assert app.client.file_calls[-1] == ("delete", "f_media:Holiday/sand.jpg")
+        assert names(screen) == ["where.txt"]
+
+
+async def test_among_the_shares_only_what_works_there_is_offered(app):
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await open_browse(app, pilot)
+        shown = [b.id for b in screen.active_pane.query(".toolbar Button") if b.display]
+        assert shown == ["do-new_group", "do-mount", "do-unmount", "do-copy_url", "do-remove",
+                         "do-open", "do-refresh"]
+        await pilot.press("enter")
+        await settle(app, pilot)
+        shown = [b.id for b in screen.active_pane.query(".toolbar Button") if b.display]
+        assert shown[:3] == ["do-put", "do-new_record", "do-rename"]
+        assert "do-mount" not in shown

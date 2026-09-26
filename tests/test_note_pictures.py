@@ -32,10 +32,10 @@ async def _read_rack(path: str) -> dict:
 async def test_a_note_with_a_picture_shows_it_beside_the_text(app):
     async with app.run_test(size=(140, 34)) as pilot:
         screen, pane = await open_rack(app, pilot)
-        panel = screen.query_one(Picture)
+        panel = screen.query_one("#pane-notes").query_one(Picture)
         assert panel.display and panel.shown == "20260901-090000-aaaaaa-front.png"
         assert app.client.fetched == ["20260901-090000-aaaaaa-front.png"]
-        assert "front" in screen.query_one("#picture-caption", Static).visual.plain
+        assert "front" in screen.query_one("#pane-notes").query_one("#picture-caption", Static).visual.plain
         # Something is drawn under the caption: the picture, however the
         # terminal can draw it.
         assert panel.query(".picture-image")
@@ -46,7 +46,7 @@ async def test_a_note_without_pictures_keeps_the_panel_away(app):
         screen = await start(app, pilot)
         screen.query_one("#pane-notes").open_note("architecture.md")
         await settle(app, pilot)
-        assert not screen.query_one(Picture).display
+        assert not screen.query_one("#pane-notes").query_one(Picture).display
 
 
 async def test_a_picture_is_fetched_once(app):
@@ -78,5 +78,5 @@ async def test_photo_uploads_a_file_and_writes_it_into_the_note(app, tmp_path):
         assert app.client.uploads == [("Rack Front.png", PNG_1PX)]
         assert editor.text.startswith("![Rack Front](img/20260917-120000-abc123-rack-front.png)\n")
         # And it is on screen straight away, without a round trip.
-        assert screen.query_one(Picture).display
+        assert screen.query_one("#pane-notes").query_one(Picture).display
         assert app.client.fetched == []

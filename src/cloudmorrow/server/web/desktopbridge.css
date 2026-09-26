@@ -1,0 +1,51 @@
+/* The desktop app's own parts: the line under each share in Files that
+   mounts it here, and This computer in Me. None of it is ever drawn
+   outside the desktop app (desktopbridge.js), so none of it can reach the
+   phone; that is why these rules need no media query.
+
+   The buttons follow the rule in base.css. Mounting is a strong choice
+   but not the one thing Files is for, so it is Cloud blue, not amber;
+   Open folder and Unmount are ghosts — a line and no fill. */
+
+.desk-button {
+  flex: none;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.desk-button.cloud {
+  background: var(--fill);
+  color: var(--fill-ink);
+  box-shadow: inset 0 -2px 0 var(--fill-pressed);
+}
+.desk-button.ghost {
+  border: 1px solid var(--line-bright);
+  color: var(--ink);
+}
+.desk-button:disabled { opacity: .5; }
+@media (hover: hover) {
+  .desk-button.cloud:hover:not(:disabled) { background: var(--fill-hover); }
+  .desk-button.ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+}
+
+/* Under its share and part of it: no rule between them, indented to the
+   share's name, and a little tighter than a row of its own. */
+.row.mount-row {
+  min-height: 0;
+  padding: 0 12px 12px 54px;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.row.mount-row::before { display: none; }
+.row.mount-row .preview { overflow: hidden; text-overflow: ellipsis; }
+.row.mount-row.on .preview { color: var(--good); }
+.mount-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* This computer: facts, with the agent's state in the status colours. */
+.computer .meta, .computer .preview { white-space: normal; overflow: visible; }
+.computer .value.good { color: var(--good); }
+.computer .value.warn { color: var(--warn); }
