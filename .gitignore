@@ -8,3 +8,6 @@ build/
 *.egg-info/
 .env
 notes-data/
+
+# Where agent sessions make their own worktrees.
+.claude/worktrees/
