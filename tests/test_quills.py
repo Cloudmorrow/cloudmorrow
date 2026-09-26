@@ -221,7 +221,7 @@ def test_an_administrator_installs_from_the_catalog_and_the_tabs_follow(client, 
     assert set(quills[0]["models"]) == {"board", "task"}
     assert (
         client.get("/api/quills/catalog", headers=auth).json()["quills"][0]["installed_version"]
-        == "1.0.0"
+        == "1.1.0"
     )
     # A Quill is one more feature to switch.
     mine = {row["key"] for row in client.get("/api/me/features", headers=auth).json()}

@@ -67,10 +67,12 @@ def test_dry_run_with_every_answer_asks_nothing():
         "--name", "The Larsens",
         "--public-url", "https://cloud.example.com/",
         "--user", "alice",
+        "--quills", "all",
         env={"CLOUDMORROW_ADMIN_PASSWORD": "longenough"},
     )
     assert result.returncode == 0, result.stderr + result.stdout
     out = result.stdout
+    assert "would choose: the standard quills all" in out
     assert "The Larsens" in out
     assert "cloud.example.com" in out
     assert "would create: the account alice" in out
@@ -102,3 +104,17 @@ def test_a_username_the_server_would_refuse_is_refused_first(bad):
     result = dry_run("--name", "Test", "--public-url", "https://cloud.test", "--user", bad)
     assert result.returncode == 1
     assert "a username is" in result.stderr
+
+
+def test_the_standard_quills_are_the_fourth_question():
+    result = dry_run("--name", "Test", "--public-url", "https://cloud.test", "--user", "alice")
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "would ask: which standard quills to have" in result.stdout
+    # And the guide at the end points at the one-line client install.
+    assert "curl -fsSL https://cloud.test/install.sh | sh" in result.stdout
+
+
+def test_the_script_installs_from_the_cloudmorrow_organisation():
+    text = INSTALLER.read_text()
+    assert 'DEFAULT_REPO="https://github.com/Cloudmorrow/cloudmorrow.git"' in text
+    assert "bramlabs-io" not in text

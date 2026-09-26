@@ -75,6 +75,11 @@ category = "personal"
 icon = "tasks"                            # a kit icon name
 publisher = "Cloudmorrow"
 license = "AGPL-3.0-or-later"
+features = [                              # what it does, for the catalog and the install sheet
+  "Boards with three lanes: To Do, Doing, Done",
+  "Subtasks as - [ ] lines in a task's Markdown",
+  "Done empties itself a week after a task is finished",
+]
 
 [uses]
 datamodels = ["board", "task"]            # foundational; installed with the Quill

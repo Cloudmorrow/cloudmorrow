@@ -323,11 +323,16 @@ class SetupRequest(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     username: str
     password: str = Field(min_length=8)
+    # The standard quills to have, by id. Left out, the server's own boot
+    # work installs the catalog's foundation quills, as before.
+    quills: list[str] | None = None
 
 
 class SetupOut(BaseModel):
     name: str
     username: str
+    # Said when a chosen quill could not be installed; empty otherwise.
+    note: str = ""
 
 
 class ServerSettingsOut(BaseModel):

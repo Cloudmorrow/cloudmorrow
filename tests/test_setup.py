@@ -38,7 +38,7 @@ def test_setup_names_the_cloud_and_makes_the_administrator(config):
             json={"name": "  The   Larsens ", "username": "alice", "password": "longenough"},
         )
         assert response.status_code == 201, response.text
-        assert response.json() == {"name": "The Larsens", "username": "alice"}
+        assert response.json() == {"name": "The Larsens", "username": "alice", "note": ""}
 
         store = UserStore(config.db_path)
         assert store.require("alice").is_admin
@@ -122,3 +122,41 @@ def test_only_an_administrator_renames_it(client):
         400,
         422,
     )
+
+
+def test_the_page_offers_the_standard_quills_and_setup_applies_the_choice(config):
+    client = fresh(config)
+    offered = client.get("/api/setup/quills").json()
+    ids = [q["id"] for q in offered["quills"]]
+    assert {"tasks", "notes", "chat", "calendar", "files", "secrets"} <= set(ids)
+    assert offered["problem"] == ""
+    made = client.post(
+        "/api/setup",
+        json={"name": "Home", "username": "alice", "password": "longenough", "quills": ["tasks", "notes"]},
+    )
+    assert made.status_code == 201, made.text
+    assert made.json()["note"] == ""
+    state = client.app.state.cloudmorrow
+    assert set(state.quills.quills) == {"tasks"}
+    assert state.features.enabled("notes") and not state.features.enabled("chat")
+    # Asked once: after the account exists, there is nothing to offer.
+    assert client.get("/api/setup/quills").status_code == 409
+
+
+def test_leaving_a_foundation_quill_out_takes_back_what_the_boot_installed(config):
+    client = fresh(config)
+    state = client.app.state.cloudmorrow
+    state.quills.install_from_catalog("tasks")  # as the boot work does, a moment before
+    made = client.post(
+        "/api/setup",
+        json={"name": "Home", "username": "alice", "password": "longenough", "quills": ["notes"]},
+    )
+    assert made.status_code == 201, made.text
+    assert state.quills.quills == {}
+
+
+def test_the_pages_wear_the_brand(config):
+    page = fresh(config).get("/setup").text
+    assert "#e0a84c" in page and "#22d3ee" not in page
+    assert "Quills to start with" in page
+    assert "__PAGE_CSS__" not in page

@@ -210,7 +210,7 @@ sealing key, starts the service, creates that account as administrator and
 gives the server an agent of its own.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bramlabs-io/cloudmorrow/main/deploy/install-server.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
 ```
 
 The questions are asked on the terminal, not stdin, so the script can arrive

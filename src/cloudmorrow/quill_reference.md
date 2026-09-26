@@ -29,6 +29,7 @@ category = "home"                  # home, personal, business, developer, …
 icon = "plants"
 publisher = "you"
 license = "MIT"
+features = ["One line per thing it does, for the catalog"]
 
 [uses]
 datamodels = ["task"]              # foundational datamodels, by id

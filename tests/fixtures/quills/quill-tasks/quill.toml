@@ -1,12 +1,19 @@
 [quill]
 id = "tasks"
 name = "Tasks"
-version = "1.0.0"
+version = "1.1.0"
 summary = "Boards with three lanes: To Do, Doing, Done."
 category = "personal"
 icon = "tasks"
 publisher = "Cloudmorrow"
 license = "AGPL-3.0-or-later"
+features = [
+  "Boards with three lanes: To Do, Doing, Done",
+  "Subtasks as - [ ] lines in a task's Markdown, counted on its card",
+  "Drag cards between lanes, or tick the circle to finish one",
+  "Done empties itself a week after a task is finished",
+  "A board for everyone the first time they open it",
+]
 
 [uses]
 datamodels = ["board", "task"]

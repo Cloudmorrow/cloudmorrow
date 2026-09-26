@@ -18,6 +18,7 @@ from cloudmorrow import __version__
 from cloudmorrow.console import TITLE
 from cloudmorrow.console import console as make_console
 from cloudmorrow.logo import banner
+from cloudmorrow.server.cli_quill import app as quill_app
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.db import (
     TYPE_HUMAN,
@@ -38,6 +39,7 @@ app = typer.Typer(help="Cloudmorrow API server.", no_args_is_help=True)
 SHUTDOWN_GRACE_SECONDS = 10
 user_app = typer.Typer(help="Manage Cloudmorrow users.", no_args_is_help=True)
 app.add_typer(user_app, name="user")
+app.add_typer(quill_app, name="quill")
 
 console = make_console()
 

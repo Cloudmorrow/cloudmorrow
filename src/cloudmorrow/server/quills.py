@@ -106,6 +106,8 @@ class Manifest:
     services: tuple[dict, ...]
     webhooks: tuple[dict, ...]
     apis: tuple[dict, ...]
+    # What it does, one line each, for the catalog and the install sheet.
+    features: tuple[str, ...] = ()
     readme: str = ""
     folder: Path | None = None
     origin: dict = field(default_factory=dict)
@@ -128,6 +130,7 @@ class Manifest:
             "name": self.name,
             "version": self.version,
             "summary": self.summary,
+            "features": list(self.features),
             "category": self.category,
             "icon": self.icon,
             "publisher": self.publisher,
@@ -329,6 +332,7 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
         name=name,
         version=version,
         summary=str(head.get("summary", "")),
+        features=_features(head, where),
         category=str(head.get("category", "")),
         icon=str(head.get("icon", "")) or quill_id,
         publisher=str(head.get("publisher", "")),
@@ -346,6 +350,13 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
         readme=readme,
         folder=folder,
     )
+
+
+def _features(head: dict, where: str) -> tuple[str, ...]:
+    features = head.get("features", [])
+    if not isinstance(features, list) or not all(isinstance(f, str) and f.strip() for f in features):
+        raise QuillError(f"{where}: features is a list of one-line sentences")
+    return tuple(f.strip() for f in features)
 
 
 def load_manifest(folder: Path) -> Manifest:

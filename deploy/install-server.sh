@@ -1,17 +1,17 @@
 #!/bin/sh
 # Install (or re-install) the Cloudmorrow server on this machine.
 #
-# One command, three questions — what your cloud is called, the address
-# people will reach it on, and who its first account (the administrator)
-# is — and it is running:
+# One command, four questions — what your cloud is called, the address
+# people will reach it on, who its first account (the administrator) is,
+# and which of the standard quills it has — and it is running:
 #
-#   curl -fsSL https://raw.githubusercontent.com/bramlabs-io/cloudmorrow/main/deploy/install-server.sh | sudo sh
+#   curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
 #
 # Or from a checkout: `sudo sh deploy/install-server.sh`. Every answer can be
 # given as a flag instead, for a script or a re-run that should ask nothing:
 #
 #   sudo sh install-server.sh --name "The Larsens" \
-#     --public-url https://cloud.example.com --user alice
+#     --public-url https://cloud.example.com --user alice --quills all
 #
 # Idempotent: run it again to move the deployment to new settings. It never
 # overwrites an existing /etc/cloudmorrow/server.toml, your notes, or the
@@ -20,7 +20,7 @@
 # any machine, or the `cloudmorrow-update` command this script installs.
 set -eu
 
-DEFAULT_REPO="https://github.com/bramlabs-io/cloudmorrow.git"
+DEFAULT_REPO="https://github.com/Cloudmorrow/cloudmorrow.git"
 REPO=""
 BRANCH="main"
 PREFIX="/opt/cloudmorrow"
@@ -37,6 +37,7 @@ ACCOUNT=""
 ACCOUNT_PASSWORD="${CLOUDMORROW_ADMIN_PASSWORD:-}"
 SSH_KEY=""
 NO_SSH_KEY=""
+QUILLS=""
 DRY_RUN=""
 
 usage() {
@@ -49,6 +50,8 @@ Options:
   --user NAME         the first account, an administrator (asked if not given;
                       its password is asked for, or read from
                       \$CLOUDMORROW_ADMIN_PASSWORD)
+  --quills LIST       standard quills to have, comma-separated, or 'all'
+                      (asked if not given; 'cloudmorrow-server quill standard' lists them)
   --repo URL          git URL to clone                  (default: this checkout's
                       origin, else $DEFAULT_REPO)
   --branch NAME       branch to deploy                  (default: $BRANCH)
@@ -70,6 +73,7 @@ while [ $# -gt 0 ]; do
 	--name) CLOUD_NAME="$2"; shift 2 ;;
 	--public-url) PUBLIC_URL="$2"; shift 2 ;;
 	--user) ACCOUNT="$2"; shift 2 ;;
+	--quills) QUILLS="$2"; shift 2 ;;
 	--repo) REPO="$2"; shift 2 ;;
 	--branch) BRANCH="$2"; shift 2 ;;
 	--prefix) PREFIX="$2"; shift 2 ;;
@@ -186,7 +190,7 @@ if [ -f "$CONFIG" ] && [ -x "$VENV/bin/cloudmorrow-server" ]; then
 fi
 
 if [ -n "$TTY" ]; then
-	printf '\n  Three questions, and your cloud is running.\n\n' >/dev/tty
+	printf '\n  Four questions, and your cloud is running. Three now, and one once\n  the software is in: which of the standard quills it should have.\n\n' >/dev/tty
 fi
 ask CLOUD_NAME "What is your cloud called?" "Cloudmorrow"
 ask PUBLIC_URL "What address will people use?" "https://$(hostname -f 2>/dev/null || hostname)"
@@ -495,6 +499,32 @@ else
 	warn "no --admin user, so nobody but root can run cloudmorrow-update"
 fi
 
+# --- the standard quills --------------------------------------------------
+# Chosen before the service first starts, because a running server reads
+# what is installed when it boots. Asked once: a re-run keeps the choice,
+# and an administrator changes it from Administration afterwards. Quills
+# from the catalog are downloaded from GitHub; one that cannot be reached is
+# said, and the rest of the install goes on.
+if [ -n "$DRY_RUN" ]; then
+	if [ -n "$QUILLS" ]; then
+		printf '   \033[2mwould choose:\033[0m the standard quills %s\n' "$QUILLS"
+	else
+		printf '   \033[2mwould ask:\033[0m which standard quills to have\n'
+	fi
+else
+	CHOOSE="--once"
+	if [ -n "$QUILLS" ]; then
+		CHOOSE="$CHOOSE --only $QUILLS"
+	elif [ -n "$TTY" ]; then
+		CHOOSE="$CHOOSE --ask"
+	fi
+	# The options are ours, and split on purpose.
+	# shellcheck disable=SC2086
+	sudo -u "$SERVICE_USER" -H env CLOUDMORROW_SERVER_CONFIG="$CONFIG" \
+		"$VENV/bin/cloudmorrow-server" quill choose $CHOOSE ||
+		warn "the standard quills were not all installed; add them later from Administration, Quills"
+fi
+
 # --- start it --------------------------------------------------------------
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
 	run systemctl daemon-reload
@@ -582,9 +612,17 @@ if [ "$EXISTING_USERS" = "0" ] && [ -z "$ACCOUNT_MADE" ] && [ -z "$DRY_RUN" ]; t
 EOF
 fi
 
+ADDRESS="${PUBLIC_URL:-http://$HOST:$PORT}"
 cat <<EOF
-  Then open ${PUBLIC_URL:-http://$HOST:$PORT}/app on a phone and sign in${ACCOUNT_MADE:+ as $ACCOUNT},
-  or ${PUBLIC_URL:-http://$HOST:$PORT} on a computer for its one-line install command.
+  Next:
+
+    1. Open $ADDRESS in a browser and sign in${ACCOUNT_MADE:+ as $ACCOUNT}.
+    2. On each computer, install the terminal app and the desktop app:
+
+         curl -fsSL $ADDRESS/install.sh | sh
+
+       The front page at $ADDRESS shows the same line, ready to copy.
+    3. On a phone, open $ADDRESS/app and add it to the home screen.
 
   Later, after a change is pushed:  cloudmorrow update server   (from any machine)
                                     cloudmorrow-update          (here)

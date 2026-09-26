@@ -29,8 +29,14 @@ def base_url(request: Request, state: AppState) -> str:
     return str(request.base_url).rstrip("/")
 
 
+def page_css() -> str:
+    """The stylesheet the server's own pages share, inlined into each."""
+    return (TEMPLATES / "page.css").read_text(encoding="utf-8")
+
+
 def _render(name: str, replacements: dict[str, str]) -> str:
     text = (TEMPLATES / name).read_text(encoding="utf-8")
+    text = text.replace("__PAGE_CSS__", page_css())
     for key, value in replacements.items():
         text = text.replace(key, value)
     return text

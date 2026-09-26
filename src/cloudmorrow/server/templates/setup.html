@@ -4,132 +4,82 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Set up __NAME__</title>
+<link rel="icon" href="/app/favicon-32.png" sizes="32x32">
 <style>
-  :root {
-    --bg: #0d0f16;
-    --panel: #12141d;
-    --line: #232838;
-    --ink: #d7dbe4;
-    --dim: #8b93a7;
-    --accent: #22d3ee;
-    --accent-soft: #7dd3fc;
-    --bad: #f87171;
-    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    padding: 3rem 1.25rem 5rem;
-    background: var(--bg);
-    color: var(--ink);
-    font: 15px/1.6 var(--mono);
-  }
-  main { max-width: 34rem; margin: 0 auto; }
-  pre.logo {
-    color: var(--accent);
-    font-size: clamp(4px, 1.42vw, 11px);
-    line-height: 1.15;
-    margin: 0 0 .5rem;
-    overflow-x: auto;
-  }
-  .tagline { color: var(--dim); font-style: italic; margin: 0 0 2.5rem; }
-  h1 { font-size: 1.3rem; margin: 0 0 .5rem; }
-  p { color: var(--dim); margin: 0 0 1.5rem; }
-  form {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-left: 2px solid var(--accent);
-    border-radius: 6px;
-    padding: 1.25rem;
-  }
-  label {
-    display: block;
-    font-size: .8rem;
-    text-transform: uppercase;
-    letter-spacing: .14em;
-    color: var(--accent);
-    margin: 1rem 0 .35rem;
-    font-weight: 600;
-  }
-  label:first-child { margin-top: 0; }
-  input {
-    width: 100%;
-    font: inherit;
-    color: var(--ink);
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    padding: .55rem .7rem;
-  }
-  input:focus { outline: none; border-color: var(--accent); }
-  small { display: block; color: var(--dim); margin-top: .3rem; font-size: .8rem; }
-  button {
-    margin-top: 1.5rem;
-    width: 100%;
-    font: inherit;
-    font-weight: 600;
-    color: var(--bg);
-    background: var(--accent);
-    border: 0;
-    border-radius: 4px;
-    padding: .7rem 1rem;
-    cursor: pointer;
-  }
-  button:hover { background: var(--accent-soft); }
-  button:disabled { opacity: .6; cursor: default; }
-  .error { color: var(--bad); min-height: 1.6em; margin: .75rem 0 0; }
-  footer {
-    margin-top: 3.5rem;
-    padding-top: 1.25rem;
-    border-top: 1px solid var(--line);
-    color: var(--dim);
-    font-size: .85rem;
-  }
-  @media (prefers-color-scheme: light) {
-    :root:not([data-theme="dark"]) {
-      --bg: #f6f7f9; --panel: #fff; --line: #dfe3ea;
-      --ink: #1a1d26; --dim: #5a6472; --accent: #0e7490; --accent-soft: #0369a1;
-      --bad: #b91c1c;
-    }
-  }
+__PAGE_CSS__
 </style>
 </head>
 <body>
 <main>
-  <pre class="logo">__LOGO__</pre>
-  <p class="tagline">own your data, choose your apps &nbsp;·&nbsp; v__VERSION__</p>
+  <header class="brand">
+    <img src="/app/mascot-320.png" alt="" width="132" height="132">
+    <p class="word">CLOUDMORROW</p>
+    <p class="name">A new cloud · v__VERSION__</p>
+  </header>
 
-  <h1>Welcome. Let's set this up.</h1>
-  <p>Two things and it is yours: a name for this cloud, and the first account,
-  which is the administrator's. Everyone else is added from the app.</p>
+  <div>
+    <h1>Welcome. Let's set this up.</h1>
+    <p>A name for this cloud, the first account, which is the administrator's,
+    and the quills it starts with. Everyone else is added from the app.</p>
+  </div>
 
-  <form id="setup" autocomplete="on">
-    <label for="name">Name your cloud</label>
-    <input id="name" name="name" value="__NAME__" maxlength="64" required autofocus>
-    <small>On the sign-in screen and under the icon on everyone's phone.</small>
+  <form id="setup" class="group" autocomplete="on">
+    <div class="field">
+      <label for="name">Name your cloud</label>
+      <input id="name" name="name" value="__NAME__" maxlength="64" required autofocus>
+      <small>On the sign-in screen and under the icon on everyone's phone.</small>
+    </div>
+    <div class="field">
+      <label for="username">Your username</label>
+      <input id="username" name="username" autocapitalize="none" autocorrect="off"
+             autocomplete="username" pattern="[a-z_][a-z0-9_\-]{0,31}" required>
+      <small>Lowercase letters, digits, <code>_</code> or <code>-</code>.</small>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="new-password"
+             minlength="8" required>
+      <small>At least eight characters. There is no reset by email: keep it somewhere safe.</small>
+    </div>
+    <div class="field">
+      <label for="repeat">Repeat the password</label>
+      <input id="repeat" name="repeat" type="password" autocomplete="new-password" required>
+    </div>
+    <fieldset class="field" id="quill-field" hidden style="border:0;margin:0;padding:0">
+      <legend class="label">Quills to start with</legend>
+      <div class="quills" id="quills"></div>
+      <small id="quill-note">All of them, unless you untick some. Add or remove any later from Administration.</small>
+    </fieldset>
 
-    <label for="username">Your username</label>
-    <input id="username" name="username" autocapitalize="none" autocorrect="off"
-           autocomplete="username" pattern="[a-z_][a-z0-9_\-]{0,31}" required>
-    <small>Lowercase letters, digits, <code>_</code> or <code>-</code>.</small>
-
-    <label for="password">Password</label>
-    <input id="password" name="password" type="password" autocomplete="new-password"
-           minlength="8" required>
-    <small>At least eight characters.</small>
-
-    <label for="repeat">Repeat the password</label>
-    <input id="repeat" name="repeat" type="password" autocomplete="new-password" required>
-
-    <button type="submit">Create my cloud</button>
+    <button class="action" type="submit">Create my cloud</button>
     <p class="error" id="error" role="alert"></p>
   </form>
 
-  <footer>Cloudmorrow __VERSION__ &nbsp;·&nbsp; free software under the AGPL</footer>
+  <footer>Cloudmorrow __VERSION__ · free software under the AGPL</footer>
 </main>
 <script>
   const form = document.getElementById("setup");
   const error = document.getElementById("error");
+  const field = document.getElementById("quill-field");
+  const list = document.getElementById("quills");
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  let offered = false;
+
+  // The standard quills, from this server's catalog. Without them the form
+  // still works: the server then starts with its foundation quills.
+  fetch("/api/setup/quills").then((r) => (r.ok ? r.json() : null)).then((data) => {
+    if (!data || !data.quills.length) return;
+    list.innerHTML = data.quills.map((q) => `
+      <label class="quill"><input type="checkbox" name="quill" value="${esc(q.id)}" checked>
+        <b>${esc(q.name)}</b><span>${esc(q.summary)}</span></label>`).join("");
+    if (data.problem) {
+      document.getElementById("quill-note").textContent =
+        "The Quill Catalog could not be reached, so only the built-in quills are here. Add the rest later from Administration.";
+    }
+    field.hidden = false;
+    offered = true;
+  }).catch(() => {});
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     error.textContent = "";
@@ -139,24 +89,29 @@
     }
     const button = form.querySelector("button");
     button.disabled = true;
+    button.textContent = "Setting up…";
+    const body = {
+      name: form.name.value.trim(),
+      username: form.username.value.trim(),
+      password: form.password.value,
+    };
+    if (offered) body.quills = [...list.querySelectorAll("input:checked")].map((i) => i.value);
     try {
       const response = await fetch("/api/setup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name.value.trim(),
-          username: form.username.value.trim(),
-          password: form.password.value,
-        }),
+        body: JSON.stringify(body),
       });
+      const made = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(typeof body.detail === "string" ? body.detail : "That did not work.");
+        throw new Error(typeof made.detail === "string" ? made.detail : "That did not work.");
       }
-      location.replace("/app");
+      if (made.note) sessionStorage.setItem("cloudmorrow.setup-note", made.note);
+      location.replace("/");
     } catch (err) {
       error.textContent = err.message;
       button.disabled = false;
+      button.textContent = "Create my cloud";
     }
   });
 </script>

@@ -38,14 +38,14 @@ SEEDED = "quills_seeded"
 LEGACY_TASKS = "legacy_tasks_moved"
 
 
-def _meta(db_path: Path, key: str) -> str | None:
+def read_meta(db_path: Path, key: str) -> str | None:
     with connect(db_path) as conn:
         row = conn.execute("SELECT value FROM schema_meta WHERE key = ?", (key,)).fetchone()
     conn.close()
     return row[0] if row else None
 
 
-def _set_meta(db_path: Path, key: str, value: str) -> None:
+def write_meta(db_path: Path, key: str, value: str) -> None:
     with connect(db_path) as conn:
         conn.execute("INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)", (key, value))
     conn.close()
@@ -65,7 +65,7 @@ def _legacy_rows(db_path: Path) -> bool:
 
 def install_foundation(db_path: Path, registry: QuillRegistry) -> list[str]:
     """The catalog's foundation Quills, on a server that has never had any."""
-    if _meta(db_path, SEEDED) or registry.quills:
+    if read_meta(db_path, SEEDED) or registry.quills:
         return []
     catalog = load_catalog(registry.catalog_location)
     installed = []
@@ -73,13 +73,13 @@ def install_foundation(db_path: Path, registry: QuillRegistry) -> list[str]:
         if entry.get("foundation") and entry["id"] not in registry.quills:
             registry.install_from_catalog(entry["id"], catalog)
             installed.append(entry["id"])
-    _set_meta(db_path, SEEDED, ",".join(installed) or "-")
+    write_meta(db_path, SEEDED, ",".join(installed) or "-")
     return installed
 
 
 def move_legacy_tasks(db_path: Path, registry: QuillRegistry, records: RecordStore) -> int:
     """Boards and tasks from the old tables into records. Returns how many moved."""
-    if _meta(db_path, LEGACY_TASKS) or not _legacy_rows(db_path):
+    if read_meta(db_path, LEGACY_TASKS) or not _legacy_rows(db_path):
         return 0
     if "tasks" not in registry.quills:
         registry.install_from_catalog("tasks")
@@ -122,7 +122,7 @@ def move_legacy_tasks(db_path: Path, registry: QuillRegistry, records: RecordSto
             )
             moved += 1
     conn.close()
-    _set_meta(db_path, LEGACY_TASKS, str(moved))
+    write_meta(db_path, LEGACY_TASKS, str(moved))
     log.info("moved %d boards and tasks into the record store", moved)
     return moved
 

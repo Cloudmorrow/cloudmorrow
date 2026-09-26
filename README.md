@@ -85,7 +85,7 @@ the plan for the rest is [docs/PLATFORM.md](docs/PLATFORM.md).
 
 ## Three ways to get one
 
-- **Your own machine.** The installer below: one command, three questions.
+- **Your own machine.** The installer below: one command, four questions.
 - **A hosted tenant.** The same server as a container, one per customer, on
   a service we run at a low monthly price. The server side is built; the
   shop is not yet.
@@ -102,12 +102,13 @@ You need a Linux machine with systemd, `git` and Python 3.11 or newer, and a
 name it can be reached by, such as `cloud.example.com`. One command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bramlabs-io/cloudmorrow/main/deploy/install-server.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
 ```
 
-It asks three questions: what your cloud is called, the address people will
-use, and a username and password for the first account, which becomes the
-administrator. Then it creates a service user, clones the code into
+It asks four questions: what your cloud is called, the address people will
+use, a username and password for the first account, which becomes the
+administrator, and which of the standard quills it should have (Notes,
+Tasks, Calendar, Chat, Files, Secrets; all of them unless you say). Then it creates a service user, clones the code into
 `/opt/cloudmorrow`, builds a virtualenv, writes the config and the systemd
 unit, generates the encryption key, starts the service and makes your
 account. Run it again any time: it keeps your config, notes, database and
@@ -117,7 +118,8 @@ Every answer can be a flag instead, for a script or a machine with no
 terminal, and `--dry-run` says what it would do without doing any of it:
 
 ```bash
-sudo sh install-server.sh --name "The Larsens" --public-url https://cloud.example.com --user alice
+sudo sh install-server.sh --name "The Larsens" --public-url https://cloud.example.com \
+  --user alice --quills all
 ```
 
 The server listens on the loopback and expects a reverse proxy in front of
@@ -132,15 +134,20 @@ cloud.example.com {
 
 An nginx example is in [deploy/nginx.conf.example](deploy/nginx.conf.example).
 
-Then open `https://cloud.example.com/app` on a phone and sign in. Use
-**Add to Home Screen** and it opens like any other app, with your cloud's
-name under the icon. `https://cloud.example.com` on a computer is the
-install page, with the one command that puts the client on it.
+Then:
+
+1. Open `https://cloud.example.com` in a browser and sign in.
+2. On each computer, install the terminal app (`cm`) and the desktop app,
+   which also mounts your fileshares, with the line that page shows:
+   `curl -fsSL https://cloud.example.com/install.sh | sh`.
+3. On a phone, open `https://cloud.example.com/app` and use **Add to Home
+   Screen**: it opens like any other app, with your cloud's name under the
+   icon.
 
 No terminal at hand? Skip the account question. A server with no accounts
 shows a setup page on its first visit instead: name the cloud, choose a
-username and password, and it is yours. That page is how a hosted tenant
-and a Pi image are set up too.
+username and password, tick the standard quills, and it is yours. That page
+is how a hosted tenant and a Pi image are set up too.
 
 Rather run it as a container? `deploy/docker/` has the image, a compose
 file and a Caddyfile:
@@ -265,7 +272,7 @@ server, so a change to the terminal app needs no deploy to try.
 ## Contributing
 
 Issues and pull requests are welcome at
-[github.com/bramlabs-io/cloudmorrow](https://github.com/bramlabs-io/cloudmorrow).
+[github.com/Cloudmorrow/cloudmorrow](https://github.com/Cloudmorrow/cloudmorrow).
 Run `pytest` and `ruff check src tests` before you push. If you add something
 that stores what a person wrote, seal it; the last section of
 [docs/ENCRYPTION.md](docs/ENCRYPTION.md) says how.
