@@ -8,6 +8,7 @@ import { featuresCard, loadFeatures, wireFeaturesCard } from "./features.js";
 import { installCard } from "./install.js";
 import { pushCard, wirePushCard } from "./push.js";
 import { adminRow, isAdmin } from "./admin.js";
+import { computerCard, wireComputerCard } from "./desktopbridge.js";
 
 
 async function renderMe() {
@@ -39,12 +40,14 @@ async function renderMe() {
       ${featuresCard()}
       <div class="group">${facts.map(([label, value]) =>
         `<div class="row"><span class="main">${esc(label)}</span><span class="value">${esc(value)}</span></div>`).join("")}</div>
+      ${computerCard()}
       ${isAdmin(me) ? adminRow() : ""}
       <div class="group"><button class="row signout">Sign out</button></div>
     </main>`;
   wireShell();
   wirePushCard(app);
   wireFeaturesCard(app);
+  wireComputerCard(app);
   app.querySelector(".signout").addEventListener("click", () => signOut("Signed out."));
 }
 

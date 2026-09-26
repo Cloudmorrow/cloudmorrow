@@ -156,6 +156,29 @@ def mount(name: str, url: str, username: str, secret: str, *, path: Path | None 
     return mounted
 
 
+def refusal(share: dict) -> str | None:
+    """Why *share*, as the server describes it, cannot be mounted from anywhere now.
+
+    The one check that is about the share rather than this machine, kept
+    here so the command line and the desktop app refuse it in the same
+    words: a machine share is only there while its machine's agent serves it.
+    """
+    if share.get("kind") == "machine" and not share.get("online"):
+        return (
+            f"{share['name']} is on {share.get('machine')}, and its agent is not serving "
+            "right now — start the agent there, or wait for its next heartbeat"
+        )
+    return None
+
+
+def mount_share(share: dict, username: str, secret: str, *, path: Path | None = None) -> Mount:
+    """Mount a share as `/api/shares/<name>` describes it, and remember where it went."""
+    why = refusal(share)
+    if why:
+        raise MountError(why)
+    return mount(share["name"], share["url"], username, secret, path=path)
+
+
 def unmount(name: str) -> Mount:
     """Unmount a share this machine mounted, and forget it."""
     mounted = lookup(name)

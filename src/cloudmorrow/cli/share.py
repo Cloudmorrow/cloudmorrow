@@ -260,18 +260,16 @@ def mount(
             share = await api.get_share(name)
         finally:
             await api.aclose()
-        if share.get("kind") == "machine" and not share.get("online"):
-            fail(
-                f"{share['name']} is on {share.get('machine')}, and its agent is not serving "
-                "right now — start the agent there, or wait for its next heartbeat"
-            )
+        # Said before rclone is offered: installing it would not help.
+        why = mounts.refusal(share)
+        if why:
+            fail(why)
         if mounts.platform() != mounts.MACOS and not rclone.installed():
             _install_rclone()
         try:
             mounted = await asyncio.to_thread(
-                mounts.mount,
-                share["name"],
-                share["url"],
+                mounts.mount_share,
+                share,
                 credentials.username,
                 credentials.access_token,
                 path=path,

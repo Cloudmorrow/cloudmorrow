@@ -336,6 +336,24 @@ def uninstall(*, home: Path | None = None, runner=_run, kind: str | None = None)
     return ServiceResult(False, "none")
 
 
+def is_active(*, runner=_run, kind: str | None = None) -> bool | None:
+    """Whether the agent service is running right now; None where it cannot be asked.
+
+    For the desktop app's "This computer", which would rather say "not
+    known" than guess on a machine with no service manager we drive.
+    """
+    kind = kind or detect_kind()
+    try:
+        if kind == "systemd":
+            result = runner(["systemctl", "--user", "is-active", "--quiet", UNIT_NAME])
+            return result.returncode == 0
+        if kind == "launchd":
+            return runner(["launchctl", "print", f"gui/{os.getuid()}/{LABEL}"]).returncode == 0
+    except OSError:
+        return None
+    return None
+
+
 def is_installed(*, home: Path | None = None, kind: str | None = None) -> bool:
     home = home or Path.home()
     kind = kind or detect_kind()

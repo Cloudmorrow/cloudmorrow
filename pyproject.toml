@@ -31,6 +31,17 @@ agent = [
     # Not here: WsgiDAV, which the agent needs only to serve a machine share,
     # and fetches into its own venv the first time it has one to serve.
 ]
+# The desktop app (`cloudmorrow app`): the web app in a window of the system's
+# own web view, with the client behind it to mount shares. pywebview drives
+# WebView2 on Windows and WKWebView on a Mac, which are already there; on
+# Linux it draws with Qt WebEngine, which comes as wheels, so no system
+# packages are needed. Installed on top of [tui,agent] where there is a desktop.
+desktop = [
+    "pywebview>=5.0",
+    "qtpy>=2.4; sys_platform == 'linux'",
+    "PyQt6>=6.6; sys_platform == 'linux'",
+    "PyQt6-WebEngine>=6.6; sys_platform == 'linux'",
+]
 server = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
