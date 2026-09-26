@@ -13,6 +13,8 @@ task board has to go on as much as a list of car services does.
 - `board` is in kit_board.py: lanes from an enum, cards you drag.
 - `calendar` is in kit_calendar.py: the spaces, a month, and the day's list;
   a space's people are widgets/kit_space.py.
+- `editor` is in kit_editor.py: a tree of folders and pages beside the live
+  Markdown editor.
 - `grid` is in kit_grid.py: groups to pick from, then folders and files, as
   a table or as tiles, with the picture beside.
 - `list` is a table of records by `title` (and `subtitle`), with a circle for
@@ -329,12 +331,13 @@ class ListPane(KitPane):
 def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     """The pane for one screen of a Quill, or None for a kit not drawn here yet.
 
-    `thread` and `editor` come next (docs/QUILLS.md); a Quill that declares
-    one simply has no tab for it in this version. Each element that is more
-    than a table is a file of its own: panes/kit_<kit>.py.
+    `thread` comes next (docs/QUILLS.md); a Quill that declares one simply
+    has no tab for it in this version. Each element that is more than a
+    table is a file of its own: panes/kit_<kit>.py.
     """
     from cloudmorrow.tui.panes.kit_board import BoardPane
     from cloudmorrow.tui.panes.kit_calendar import CalendarPane
+    from cloudmorrow.tui.panes.kit_editor import EditorPane
     from cloudmorrow.tui.panes.kit_grid import GridPane
 
     kit = screen.get("kit")
@@ -344,6 +347,8 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
         return BoardPane(quill, screen, **kwargs)
     if kit == "calendar":
         return CalendarPane(quill, screen, **kwargs)
+    if kit == "editor":
+        return EditorPane(quill, screen, **kwargs)
     if kit == "grid":
         return GridPane(quill, screen, **kwargs)
     if kit in ("list", "detail", "form"):

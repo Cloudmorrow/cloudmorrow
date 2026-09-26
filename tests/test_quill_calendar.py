@@ -134,8 +134,11 @@ def test_a_shared_calendar_is_its_peoples_and_they_are_told(cal):
     assert any("bram added you to the calendar House" in n["title"] for n in bell)
     theirs = cal("GET", "/api/records/event", who=cal.guest, params=WEEK)
     assert [e["id"] for e in theirs] == [plumber["id"]]
-    # In it, they write in it; its name and colour are its maker's.
+    # In it, they write in it; its name and colour are its maker's, and so
+    # is what somebody else wrote in it.
     event(cal, house["id"], "Boiler", "2026-10-03T08:00", "2026-10-03T09:00", who=cal.guest)
+    cal("PATCH", f"/api/records/event/{plumber['id']}", {"fields": {"title": "x"}}, who=cal.guest,
+        expect=403)
     cal("PATCH", f"/api/records/calendar/{house['id']}", {"fields": {"colour": "rose"}}, who=cal.guest,
         expect=403)
     cal("PATCH", f"/api/records/calendar/{house['id']}", {"fields": {"colour": "rose"}})
@@ -155,6 +158,41 @@ def test_an_event_moves_to_another_calendar_and_a_deleted_calendar_takes_its_eve
     assert (moved["fields"]["location"], moved["fields"]["notes"]) == ("town", "bring the card")
     cal("DELETE", f"/api/records/calendar/{house['id']}", expect=204)
     cal("GET", f"/api/records/event/{dentist['id']}", expect=404)
+
+
+def test_an_event_is_its_writers_or_its_calendars_makers_to_change(cal):
+    """Everybody in a shared calendar writes in it; only the writer, or whoever
+    manages the calendar, changes or deletes what somebody wrote."""
+    house = cal("POST", "/api/records/calendar", {"fields": {"name": "House"}, "scope": "shared"},
+                expect=201)
+    cal("POST", f"/api/records/calendar/{house['id']}/members", {"username": "guest"})
+    mine = event(cal, house["id"], "Mine", "2026-10-01T10:00", "2026-10-01T11:00")
+    theirs = event(cal, house["id"], "Theirs", "2026-10-02T10:00", "2026-10-02T11:00", who=cal.guest)
+    # The guest cannot change bram's; bram made the calendar, so may change the guest's.
+    cal("PATCH", f"/api/records/event/{mine['id']}", {"fields": {"title": "x"}}, who=cal.guest,
+        expect=403)
+    cal("DELETE", f"/api/records/event/{mine['id']}", who=cal.guest, expect=403)
+    cal("PATCH", f"/api/records/event/{theirs['id']}", {"fields": {"title": "Theirs, moved"}})
+    cal("PATCH", f"/api/records/event/{theirs['id']}", {"fields": {"title": "Back"}}, who=cal.guest)
+    cal("DELETE", f"/api/records/event/{theirs['id']}", expect=204)
+
+
+def test_authored_is_true_false_or_or_manager_and_or_manager_is_in_a_space():
+    from cloudmorrow.server.datamodels import DatamodelError, parse_datamodel
+
+    def model(authored, in_space=True):
+        head = {"id": "thing", "authored": authored}
+        fields = {"name": {"kind": "string"}}
+        if in_space:
+            head["in_space"] = "room"
+            fields["room"] = {"kind": "link", "to": "room"}
+        return parse_datamodel({"datamodel": head, "fields": fields})
+
+    assert model("or-manager").authored == "or-manager"
+    assert model(True).authored is True
+    for bad, in_space in (("sometimes", True), (1, True), ("or-manager", False)):
+        with pytest.raises(DatamodelError, match="authored"):
+            model(bad, in_space)
 
 
 def test_nobody_puts_a_thing_in_a_calendar_they_cannot_see(cal):

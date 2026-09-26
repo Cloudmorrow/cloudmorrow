@@ -156,6 +156,15 @@ def preview(plan: dict) -> str:
             lines.append(f"  a dot per {screen['model']} on each day from {screen['starts']} to {screen['ends']}")
             whole = f", whole days when {screen['all_day']}" if screen.get("all_day") else ""
             lines.append(f"  the day: <{screen['starts']}>  <{title}>  <{space}>{whole}")
+        elif screen["kit"] == "editor":
+            tree = f"▾ <folders of {screen['path']}>" if screen.get("path") else f"· <{title}>"
+            lines.append(f"  {tree:<28}│ # <{title}>")
+            page = f"· <{title}>"
+            lines.append(f"    {page:<26}│ <{screen.get('body')}, in Markdown>")
+            lines.append("  pictures go in when the datamodel keeps attachments")
+            lines.append("  opening one: the page, beside the tree")
+            lines.append("")
+            continue
         else:
             shown = screen.get("fields") or list(fields)
             lines.append("  " + ", ".join(shown))

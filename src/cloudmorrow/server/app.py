@@ -10,8 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, RedirectResponse
 
 from cloudmorrow import __version__
+from cloudmorrow.server import spacenotify
 from cloudmorrow.server.access import is_allowed, parse_rules
 from cloudmorrow.server.agents import AgentStore, JobStore
+from cloudmorrow.server.backends import NotesBackend, SharesBackend
 from cloudmorrow.server.chat import ChatStore
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.configsync import ConfigStore
@@ -25,9 +27,6 @@ from cloudmorrow.server.notifications import NotificationStore
 from cloudmorrow.server.quilljobs import Clock
 from cloudmorrow.server.quills import QuillRegistry
 from cloudmorrow.server.records import RecordStore
-from cloudmorrow.server import spacenotify
-from cloudmorrow.server.backends import NotesBackend, SharesBackend
-from cloudmorrow.server.drive import user_drive
 from cloudmorrow.server.routes import (
     agents,
     auth,

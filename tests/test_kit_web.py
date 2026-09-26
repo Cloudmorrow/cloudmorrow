@@ -42,9 +42,9 @@ def test_the_kit_is_listed_and_served(client):
         assert client.get(f"/app/{version}/{name}").status_code == 200, name
 
 
-def test_the_quill_tabs_sit_where_tasks_was():
-    """After Notes and before Chat: the order of app.js is the order of the bar."""
-    assert APP_JS.index('"./notes.js"') < APP_JS.index('"./quills.js"') < APP_JS.index('"./chat.js"')
+def test_the_quill_tabs_sit_where_notes_and_tasks_were():
+    """After Today and before Chat: the order of app.js is the order of the bar."""
+    assert APP_JS.index('"./today.js"') < APP_JS.index('"./quills.js"') < APP_JS.index('"./chat.js"')
     # They arrive after the bar is first drawn, so core.js holds their place.
     assert "const fillTabs = tabSlot();" in QUILLS_JS
     core = (WEB / "core.js").read_text(encoding="utf-8")

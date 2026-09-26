@@ -1,4 +1,9 @@
-/* Pictures in a note — shown in the note, where they are.
+/* Pictures in a page of Markdown — shown in the page, where they are.
+
+   The kit's editor draws its body with these. A picture is an attachment
+   of the page's datamodel, kept by its backend (a note's are its pictures,
+   in the notes folder): the editor hands over `ed.attachments`, the
+   address they are kept at, and without one a page has no photo button.
 
    A picture goes up as itself — the body is the file, not a form around
    it — and comes back down through fetch, because an <img src> cannot
@@ -16,11 +21,11 @@ import { ApiError, authHeaders, esc, fileStem, setStatus, toast } from "./core.j
 const photoIcon = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-8 8"/></svg>';
 const closeIcon = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m2 2 8 8M10 2l-8 8"/></svg>';
 
-async function uploadImage(file) {
+async function uploadImage(base, file) {
   const headers = { ...authHeaders(), "Content-Type": file.type || "application/octet-stream" };
   let res;
   try {
-    res = await fetch("/api/notes/img?filename=" + encodeURIComponent(file.name || ""), {
+    res = await fetch(base + "?filename=" + encodeURIComponent(file.name || ""), {
       method: "POST", headers, body: file,
     });
   } catch {
@@ -32,12 +37,14 @@ async function uploadImage(file) {
 }
 
 const imageURLs = new Map();
-async function imageURL(name) {
-  if (imageURLs.has(name)) return imageURLs.get(name);
-  const res = await fetch("/api/notes/img/" + encodeURIComponent(name), { headers: authHeaders() });
+async function imageURL(base, name) {
+  const key = base + "/" + name;
+  if (imageURLs.has(key)) return imageURLs.get(key);
+  if (!base) throw new ApiError(404, "no such image");
+  const res = await fetch(base + "/" + encodeURIComponent(name), { headers: authHeaders() });
   if (!res.ok) throw new ApiError(res.status, "no such image");
   const url = URL.createObjectURL(await res.blob());
-  imageURLs.set(name, url);
+  imageURLs.set(key, url);
   return url;
 }
 
@@ -176,7 +183,7 @@ function figureFor(ed, name, alt) {
   figure.dataset.alt = alt;
   figure.innerHTML = `<img alt="${esc(alt)}"><button class="remove" type="button" aria-label="Remove picture">${closeIcon}</button>`;
   const img = figure.querySelector("img");
-  imageURL(name)
+  imageURL(ed.attachments || "", name)
     .then((url) => { img.src = url; })
     .catch(() => { figure.classList.add("missing"); figure.insertAdjacentHTML("beforeend", `<figcaption>missing: ${esc(name)}</figcaption>`); });
   img.addEventListener("click", () => { if (img.src) openLightbox(img.src, alt); });
@@ -219,10 +226,11 @@ function removePicture(ed, figure) {
   ed.changed();
 }
 
-// Hook pictures up to a note editor that is on the page: the button, a
+// Hook pictures up to an editor that is on the page: the button, a
 // paste, or a drop each end as a picture at the caret. `box` is the
 // `.editor` element and the button is in the bar above it.
 function wirePictures(ed, box) {
+  if (!ed.attachments) return;
   const photo = document.querySelector(".nav .photo");
   const photoInput = box.querySelector(".photo-input");
   if (photo) photo.addEventListener("click", () => photoInput.click());
@@ -256,7 +264,7 @@ async function addPictures(ed, files) {
   for (const file of files) {
     setStatus(ed, "Adding photo…");
     let info;
-    try { info = await uploadImage(file); }
+    try { info = await uploadImage(ed.attachments, file); }
     catch (err) {
       setStatus(ed, "");
       toast(err.status === 413 ? "That photo is too big" : err.message);

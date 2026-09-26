@@ -155,7 +155,7 @@ src/cloudmorrow/
   tui/               Textual client
     theme.py         the Textual theme, built from that palette
     screens/         splash, login, the workspace, and settings
-    panes/           notes, chat, secrets (vaults + keys), the kit (kit_*.py),
+    panes/           the kit (kit_*.py: list, board, editor, grid, calendar), chat, secrets (vaults + keys),
                      files (local backups + fileshares), and browse: what is
                      in a share, as a list or as thumbnails
     widgets/         the vault list, the note tree, the board, the toolbar,
@@ -541,12 +541,15 @@ the top-right corner of every tab rather than a tab of its own, which is
 where a phone keeps it. What a screen makes — a note, a task, an event, a
 file — is the button beside its title.
 
-Notes is three screens, the way a phone's notes app is: **Folders**, the
-notes in one (newest first, with the first lines of each), and the note. The
-pen beside the title starts a new note in the folder you are looking at; the
-title is the file name, and the note saves itself as you type. Back out of a
-note you never wrote anything in and it is thrown away. Search looks inside
-the notes, not only at their names.
+Notes is a Quill (the first in the catalog, and its tab is where Notes
+always was), drawn by the kit's **editor**. On the phone that is three
+screens, the way a phone's notes app is: **Folders**, the notes in one
+(newest first, with the first lines of each), and the note; on a computer the
+list and the note are side by side. The pen beside the title starts a new
+note in the folder you are looking at; the title is the file name, and the
+note saves itself as you type. Back out of a note you never wrote anything in
+and it is thrown away. Search looks inside the notes, not only at their
+names.
 
 It writes the same files the TUI does. A new note starts with a `# Title`
 heading matching its file name, as the TUI's do, and the app shows that heading
@@ -645,14 +648,16 @@ that draws tabs asks the second one.
 
 ## Quills
 
-Everything beyond the foundation is a **Quill**: Tasks and Calendar today, and whatever
-the [Quill Catalog](https://github.com/Cloudmorrow/quill-catalog) has next.
+Everything beyond the foundation is a **Quill**: Notes, Tasks, Files and
+Calendar today, and whatever the
+[Quill Catalog](https://github.com/Cloudmorrow/quill-catalog) has next.
 The contract is [QUILLS.md](QUILLS.md); this is how to use them.
 
-**On a fresh server** the catalog's foundation Quills — Tasks and Calendar,
-for now — are installed at first boot, and boards and tasks, and calendars
-and events, from before each was a Quill move into the record store the first
-time the new version starts. Nothing
+**On a fresh server** the catalog's foundation Quills are installed at first
+boot. A server from before each was a Quill gets it the first time the new
+version starts: Notes if it was on (the notes themselves never move; they
+are files), Tasks with its boards and tasks moved into the record store, and
+Calendar with its calendars and events moved the same way. Nothing
 needs doing by hand. The server needs to reach GitHub for both; if it cannot,
 it says so in the log and tries again at the next start.
 
@@ -763,8 +768,12 @@ record store's rule for spaces and nothing of its own.
   looks (the `everybody` dataset). In everyone's list, anyone may put
   something in it, and nobody can leave it.
 
-**An event is a title and two moments**, plus where it is and notes. The
-kit fills in an end when none is given — an hour, or the day it is on — and
+**An event is a title and two moments**, plus where it is and notes.
+Whoever wrote it may change or delete it, and so may whoever manages the
+calendar it is on (`authored = "or-manager"` on the datamodel) — a shared
+calendar with somebody's stale event stuck on it, and only that somebody
+able to fix it, is a worse rule than this one. The kit fills in an end when
+none is given — an hour, or the day it is on — and
 moving the start on a record sheet keeps how long it is: an hour at ten,
 moved to half eleven, is an hour at half eleven.
 
@@ -1276,9 +1285,32 @@ cloudmorrow note add "verticore/deployment"
 cloudmorrow note list
 ```
 
-In the TUI, `f1` opens notes: the list on the left, the live editor on the
-right. `f6` imports a file into the selected folder and `f7` writes the open
-note back out.
+`cm note` is the command notes always had, and it stays. The Notes Quill
+has its own, `cm notes`, drawn by the kit like every Quill's — the same
+notes, found by their path:
+
+```bash
+cm notes list
+cm notes show ideas/garden          # the Markdown, as it is
+cm notes add ideas/garden           # from stdin, or $EDITOR
+cm notes edit ideas/garden
+cm notes search tomatoes            # names and every line
+```
+
+In the TUI, `f1` opens notes — the first card, and the one the workspace
+opens on: the tree on the left, with every folder, empty ones too, and the
+live editor on the right. `ctrl+o` makes a folder, `r` renames or moves what
+is selected in the tree (a folder takes what is in it along), `d` deletes it,
+`ctrl+f` searches. `f6` imports a file into the selected folder and `f7`
+writes the open note back out.
+
+Everybody with no notes at all gets one the first time they open Notes, on
+how the editor works. Notes are still the files they were — WebDAV, `cm
+note` and an assistant's notes tools reach the same ones — and the screens
+reach them through the record API as the `note` datamodel (see *Backends* in
+[QUILLS.md](QUILLS.md)). A server that had Notes before it was a Quill gets
+the Quill at its first start on the new version, unless an administrator
+had switched Notes off; the switch keeps its meaning either way.
 
 ### Pictures
 
@@ -1301,8 +1333,9 @@ is something a note shows, not a thing to find — and a copy of the notes
 tree takes the pictures with it, because they are files like everything else,
 sealed like everything else.
 
-**How they show.** The phone puts every picture the note mentions in a strip
-under the text, in the order it mentions them; tap one to see it full size.
+**How they show.** The phone and the web app put each picture where the
+note has it, between the text above and below it; tap one to see it full
+size.
 The TUI draws the picture the cursor is on — or the note's first, when the
 cursor is elsewhere — in a panel beside the editor. Where the terminal speaks
 Kitty's graphics protocol or Sixel (Kitty, Ghostty, WezTerm, foot, iTerm2)

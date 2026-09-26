@@ -46,7 +46,7 @@ why = "to show who looks after each plant"
 
 [[screens]]                        # one tab per screen, on every surface
 id = "plants"
-kit = "list"                       # list, board, detail, form, calendar, grid (thread, editor: next)
+kit = "list"                       # list, board, detail, form, calendar, grid, editor (thread: next)
 label = "Plants"
 model = "plants.plant"
 title = "name"
@@ -135,10 +135,12 @@ leaves.
 | board | model, lane (enum, in ordered_within), title; optional group (link: chips), body (markdown), done (a lane value) | lanes; cards dragged between them |
 | detail / form | model; optional fields = [...] | one record's fields, editable |
 | calendar | model, starts, ends (indexed datetime/date), space (a link to a space datamodel); optional all_day (bool), colour (a field of the space), subtitle | every space's things at once: a month, a week, the day's list; the spaces and their people |
+| editor | model, title, body (markdown); optional path (a string like folder/sub/title: the folders) | a tree of folders and records beside a page of Markdown; pictures where the backend keeps attachments |
 | grid | a model with bytes beside its fields (the foundational `file`); group (link: the places, picked first), folder (string), kind (an enum with "folder"); optional size, modified, mime, group_subtitle and group_open (fields of the group's model) | the groups, then folders and tiles with pictures; put in, get, new folder, rename, move, delete |
 
 Every screen opens a record sheet when a row or card is chosen: every field,
-with the widget for its kind, editable, with delete. No other UI exists, on
+with the widget for its kind, editable, with delete. An editor opens its page
+instead. No other UI exists, on
 purpose: what the kit cannot say, the kit grows to say, for every Quill at once.
 
 ## Rules

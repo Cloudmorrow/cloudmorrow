@@ -30,9 +30,10 @@ It is free software under the [GNU AGPL v3](LICENSE).
 
 - **Notes.** Markdown files in folders, with pictures. Written on the phone,
   in the terminal, or by piping a file in. Each note is a real file on the
-  server, so a copy of the folder is a backup.
+  server, so a copy of the folder is a backup. Notes is a
+  [Quill](docs/QUILLS.md) too, [in a repository of its own](https://github.com/Cloudmorrow/quill-notes).
 - **Tasks.** Boards with three lanes: ToDo, Doing, Done. Drag a card, tick a
-  subtask. Done cleans itself out after a week. Tasks is the first
+  subtask. Done cleans itself out after a week. A
   [Quill](docs/QUILLS.md), [in a repository of its own](https://github.com/Cloudmorrow/quill-tasks).
 - **Quills.** Everything beyond the foundation is a Quill: a package from the
   [Quill Catalog](https://github.com/Cloudmorrow/quill-catalog), shelved by

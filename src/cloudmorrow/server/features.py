@@ -1,8 +1,8 @@
 """Which parts of Cloudmorrow this server offers, and which of them you want.
 
-A feature is one whole area of the app — Notes, Tasks, Calendar, Chat,
-Secrets, and every Quill — and there are two switches on each, which are not the same
-kind of thing:
+A feature is one whole area of the app — Calendar, Chat, Secrets, and
+every installed Quill (Notes, Tasks, Files) — and there are two switches on
+each, which are not the same kind of thing:
 
 * **The server's**, an administrator's to throw. Off means off everywhere:
   the tab goes from every client, for everybody, and the API answers 403 to
@@ -70,7 +70,6 @@ class Feature:
 
 
 FEATURES: tuple[Feature, ...] = (
-    Feature("notes", "Notes", "Markdown notes, in the app and on the phone", ("note",)),
     Feature("secrets", "Secrets", "Vaults of keys and passwords, encrypted", ("secret",)),
     Feature(
         "chat",

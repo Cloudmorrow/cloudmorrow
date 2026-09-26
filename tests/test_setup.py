@@ -137,7 +137,7 @@ def test_the_page_offers_the_standard_quills_and_setup_applies_the_choice(config
     assert made.status_code == 201, made.text
     assert made.json()["note"] == ""
     state = client.app.state.cloudmorrow
-    assert set(state.quills.quills) == {"tasks"}
+    assert set(state.quills.quills) == {"tasks", "notes"}
     assert state.features.enabled("notes") and not state.features.enabled("chat")
     # Asked once: after the account exists, there is nothing to offer.
     assert client.get("/api/setup/quills").status_code == 409
@@ -147,12 +147,13 @@ def test_leaving_a_foundation_quill_out_takes_back_what_the_boot_installed(confi
     client = fresh(config)
     state = client.app.state.cloudmorrow
     state.quills.install_from_catalog("tasks")  # as the boot work does, a moment before
+    state.quills.install_from_catalog("notes")
     made = client.post(
         "/api/setup",
         json={"name": "Home", "username": "alice", "password": "longenough", "quills": ["notes"]},
     )
     assert made.status_code == 201, made.text
-    assert state.quills.quills == {}
+    assert set(state.quills.quills) == {"notes"}
 
 
 def test_the_pages_wear_the_brand(config):

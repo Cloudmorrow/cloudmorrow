@@ -1,0 +1,40 @@
+[quill]
+id = "notes"
+name = "Notes"
+version = "1.0.0"
+summary = "Markdown notes in folders, with pictures."
+category = "personal"
+icon = "notes"
+publisher = "Cloudmorrow"
+license = "AGPL-3.0-or-later"
+features = [
+  "Notes in Markdown, in folders, saved as you type",
+  "A live editor in the terminal: the line you are on stays Markdown, the rest renders",
+  "Pictures pasted, dropped or picked into a note, shown where they are",
+  "Search every note, by its name or any line in it",
+  "Each note is a file in your notes folder, sealed, and on WebDAV and cm note as ever",
+  "A welcome note for everyone the first time they open Notes",
+]
+
+[uses]
+datamodels = ["note"]
+
+# One tab: your folders and notes beside the page you are writing. On a
+# phone the tree comes first and the page after it; on a computer and in
+# the terminal they are side by side.
+[[screens]]
+id = "notes"
+kit = "editor"
+label = "Notes"
+model = "note"
+title = "title"
+body = "body"
+path = "path"                             # folder/sub/title: the folders are the tree
+
+# The first time somebody opens Notes and has none, a note that says how
+# the editor works.
+[[datasets]]
+id = "welcome"
+model = "note"
+seed = "per-owner"
+file = "datasets/welcome.toml"

@@ -11,6 +11,15 @@ label = "Personal"
 description = "Your own lists, plans and notes."
 
 [[quills]]
+id = "notes"
+name = "Notes"
+summary = "Markdown notes in folders, with pictures."
+repo = "quill-notes"
+category = "personal"
+publisher = "Cloudmorrow"
+foundation = true
+
+[[quills]]
 id = "tasks"
 name = "Tasks"
 summary = "Boards with three lanes: To Do, Doing, Done."

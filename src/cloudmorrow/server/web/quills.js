@@ -10,8 +10,8 @@
      #/q/<quill>/<screen>/<group>/<…>  a grid, in a folder of one of them
      #/r/<quill>/<screen>/<model>/<id> one record, on the record sheet
 
-   The tabs sit where this file is imported in app.js — after Notes, where
-   Tasks always was — through a slot core.js holds open for them, because
+   The tabs sit where this file is imported in app.js — after Today, where
+   Notes and Tasks always were — through a slot core.js holds open for them, because
    the answer arrives after the bar is first drawn. What the server said
    last time is kept in local storage, like the feature switches, so that
    first bar is already right rather than growing a tab a beat later. */

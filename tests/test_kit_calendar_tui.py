@@ -300,7 +300,7 @@ async def test_it_has_the_key_the_calendar_always_had(app):
     async with app.run_test(size=(140, 40)) as pilot:
         screen = await start(app, pilot)
         # Tasks and Files first, as a server that had them gets them, and then Calendar.
-        assert screen._quill_keys == {"tasks": "f2", "files": "f5", "calendar": "f7"}
+        assert screen._quill_keys == {"notes": "f1", "tasks": "f2", "files": "f5", "calendar": "f7"}
         screen.action_quill_key("f7")
         await settle(app, pilot)
         assert screen.query_one("#panes").current == "pane-calendar"

@@ -154,7 +154,7 @@ CALENDAR_MODELS = {
     "event": {
         "id": "event", "version": 1, "label": "Event", "title": "title",
         "scopes": ["personal", "shared", "public"], "ordered_within": [], "source": "foundation",
-        "space": False, "in_space": "calendar",
+        "space": False, "in_space": "calendar", "authored": "or-manager",
         "fields": [
             {"name": "calendar", "kind": "link", "label": "Calendar", "required": True,
              "indexed": True, "to": "calendar", "on_delete": "cascade"},

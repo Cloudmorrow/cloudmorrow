@@ -230,6 +230,9 @@ def list_records(state: AppState, user: User, args: dict[str, Any]) -> Any:
     where = args.get("where", {})
     if not isinstance(where, dict):
         raise ToolError("where must be an object of indexed field to value")
+    where = dict(where)
+    if args.get("q"):
+        where["q"] = _str(args, "q")
     principal = _principal(user)
     seed(state, principal, model)
     return {"records": [r.to_dict() for r in state.records.list(principal, model, where)]}
@@ -462,8 +465,10 @@ TOOLS: tuple[Tool, ...] = (
         "fields, e.g. {\"board\": \"r_…\", \"lane\": \"todo\"}; `name__lt`, `__lte`, `__gt`, "
         "`__gte` are ranges, e.g. the events in October: {\"starts_at__lte\": "
         "\"2026-10-31T23:59\", \"ends_at__gte\": \"2026-10-01\"}. A datetime without a zone is "
-        "the wall clock; a bare date is a whole day.",
-        _schema({"model": _MODEL, "where": {"type": "object", "description": "Indexed field to value."}},
+        "the wall clock; a bare date is a whole day. Search their text with `q` "
+        "(a found record's `preview` is the line that matched).",
+        _schema({"model": _MODEL, "where": {"type": "object", "description": "Indexed field to value."},
+                 "q": {"type": "string", "description": "Text to search for. Optional."}},
                 ("model",)),
         "",
         list_records,

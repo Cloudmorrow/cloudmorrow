@@ -140,8 +140,11 @@ class Datamodel:
     space: bool = False
     # The link field naming the space a record of it is in, if it lives in one.
     in_space: str = ""
-    # Only the one who wrote a record may change or delete it: a message.
-    authored: bool = False
+    # Who may change or delete a record of it, besides the gate's own rule:
+    # True, only the one who wrote it (a message); "or-manager", its writer
+    # or whoever manages the space it is in (an event); False, anybody who
+    # may see it.
+    authored: bool | str = False
     # What happens when a record of it is written in a space.
     notify: tuple[dict, ...] = ()
     # Not in the record store: served by this backend instead.
@@ -383,10 +386,22 @@ def parse_datamodel(data: dict, *, source: str = "foundation", where: str = "") 
         source=source,
         space=space,
         in_space=in_space,
-        authored=bool(head.get("authored", False)),
+        authored=_authored(head.get("authored", False), in_space, where),
         notify=tuple(notify),
         backend=backend,
     )
+
+
+AUTHORED = (False, True, "or-manager")
+
+
+def _authored(value: object, in_space: str, where: str) -> bool | str:
+    """`authored`: false, true (its writer's alone) or "or-manager" (its writer's, or the space's manager's)."""
+    if value not in AUTHORED or isinstance(value, int) and not isinstance(value, bool):
+        raise DatamodelError(f'{where}: authored is true, false, or "or-manager"')
+    if value == "or-manager" and not in_space:
+        raise DatamodelError(f'{where}: authored = "or-manager" is for a datamodel in a space')
+    return value  # type: ignore[return-value]
 
 
 def load_datamodel(path: Path, *, source: str = "foundation") -> Datamodel:

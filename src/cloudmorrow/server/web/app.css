@@ -9,9 +9,9 @@
 @import "./base.css";
 @import "./install.css";
 @import "./today.css";
-@import "./notes.css";
 @import "./pictures.css";
 @import "./kit.css";
+@import "./kit_editor.css";
 @import "./chat.css";
 @import "./kit_calendar.css";
 @import "./kit_space.css";
