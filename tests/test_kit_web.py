@@ -178,7 +178,7 @@ def test_the_install_sheet_calls_the_endpoints_that_exist(client, auth):
     assert plan.status_code == 200
     # Everything the sheet reads is in what the server sends.
     for key in ("data", "datasets", "screens", "jobs", "services", "webhooks", "apis",
-                "surfaces", "not_running_yet", "installed_version", "readme"):
+                "surfaces", "runs_code", "runs_as", "reach", "installed_version", "readme"):
         assert key in plan.json(), key
     for key in ("how", "label", "new", "foundation"):
         assert all(key in row for row in plan.json()["data"]), key

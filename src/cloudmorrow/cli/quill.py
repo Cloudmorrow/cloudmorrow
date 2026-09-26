@@ -12,6 +12,8 @@ And for running a server:
     cm quill add fleet             # what it adds, a yes, and it is installed
     cm quill list                  # what is installed
     cm quill remove fleet          # its screens go; its records stay
+    cm quill services              # what Quills' code is doing, as whom
+    cm quill logs fleet [service]  # the last lines of a service's log
 
 `check` needs no server: it reads the foundational datamodels from the
 catalog (or `--datamodels`, a folder) and checks the Quill against them the
@@ -235,10 +237,23 @@ def print_plan(plan: dict) -> None:
             escape(dataset["id"]),
             f"{dataset['count']} {dataset['model']} ({dataset['seed']})",
         )
-    for kind in ("services", "webhooks", "apis"):
-        for item in plan[kind]:
-            table.add_row(kind[:-1], escape(item["id"]), "declared; run in a later release")
+    for service in plan["services"]:
+        always = ", kept running" if service.get("always") else ""
+        table.add_row(
+            "service", escape(service["id"]), escape(" ".join(service["command"]) + always)
+        )
+    for hook in plan["webhooks"]:
+        what = f"→ {hook['model']}" if hook.get("model") else f"→ {hook.get('forward')}"
+        table.add_row("webhook", escape(hook["id"]), escape(f"POST /hooks/{plan['id']}/{hook['path']} {what}"))
+    for api in plan["apis"]:
+        table.add_row("api", escape(api["id"]), escape(f"/api/q/{plan['id']}/… → {api['service']}"))
     console.print(table)
+    if plan.get("runs_code") or plan["webhooks"]:
+        who = plan.get("runs_as") or "the administrator who installs it"
+        reach = ", ".join(plan.get("reach") or []) or "nothing"
+        if plan.get("runs_code"):
+            console.print(f"[yellow]Runs code on this server:[/] {escape('; '.join(plan['runs_code']))}")
+        console.print(f"[yellow]It runs as {escape(who)}, and can read and write only:[/] {escape(reach)}")
 
 
 @app.command("check")
@@ -323,6 +338,74 @@ def list_installed() -> None:
         out.print(table)
 
     run(_list())
+
+
+@app.command("services")
+def services() -> None:
+    """What every Quill's code is doing on your server: its services, jobs and webhooks (admin)."""
+
+    async def _services() -> None:
+        _, api = client()
+        try:
+            rows = await api.quill_services()
+        finally:
+            await api.aclose()
+        if not rows:
+            console.print("[dim]No Quill here runs code of its own.[/]")
+            return
+        table = Table(title="quill services", title_style=TITLE)
+        for column in ("quill", "what", "state", "since", "last exit", "as"):
+            table.add_column(column)
+        colour = {"running": "green", "restarting": "yellow", "stopped": "dim"}
+        for row in rows:
+            who = row.get("runs_as") or "[red]nobody[/]"
+            for service in row["services"]:
+                state = "by its job" if service.get("scheduled") else service["state"]
+                exit_ = "" if service.get("last_exit") is None else str(service["last_exit"])
+                table.add_row(
+                    row["id"], escape(f"service {service['id']}"),
+                    f"[{colour.get(state, 'dim')}]{state}[/]", service.get("since", ""),
+                    exit_, who,
+                )
+            for job in row["jobs"]:
+                exit_ = "" if job.get("last_exit") is None else str(job["last_exit"])
+                table.add_row(
+                    row["id"], escape(f"job {job['id']} (every {job['every']})"),
+                    "[green]running[/]" if job.get("running") else "",
+                    job.get("last_started") or "never yet", exit_, who,
+                )
+        out.print(table)
+        # Whole, outside the table, so they can be copied: what a sender is given.
+        for row in rows:
+            for hook in row["webhooks"]:
+                out.print(
+                    f"webhook {row['id']}/{hook['id']}: {hook['url']}?token={hook['secret']}",
+                    markup=False, highlight=False, soft_wrap=True,
+                )
+
+    run(_services())
+
+
+@app.command("logs")
+def logs(
+    quill_id: Annotated[str, typer.Argument(help="The Quill's id.")],
+    service: Annotated[str, typer.Argument(help="One of its services; all of them if left out.")] = "",
+    lines: Annotated[int, typer.Option("--lines", "-n", help="How many of the last lines.")] = 100,
+) -> None:
+    """The last lines of a Quill's service logs (admin)."""
+
+    async def _logs() -> None:
+        _, api = client()
+        try:
+            found = await api.quill_logs(quill_id, service, lines)
+        finally:
+            await api.aclose()
+        for name, text in found.items():
+            if len(found) > 1:
+                console.print(f"[b]── {escape(name)} ──[/]")
+            out.print("\n".join(text) or "(nothing yet)", markup=False, highlight=False)
+
+    run(_logs())
 
 
 @app.command("catalog")

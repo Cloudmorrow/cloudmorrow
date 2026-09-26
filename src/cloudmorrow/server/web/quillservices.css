@@ -1,0 +1,48 @@
+/* A Quill's running code, on its sheet and under the catalog (quillservices.js).
+
+   Plain like the rest of Administration: a state is said in a chip, green
+   when it is up and the warning colour when it is falling over; the log is
+   the log, in the mono face; and no button here is amber — the sheet's one
+   amber button is Install. */
+
+.quill-chip.run-state.good { border-color: var(--good); color: var(--good); }
+.quill-chip.run-state.warn { border-color: var(--warn); color: var(--warn); }
+
+.sheet-fact code, .hook-address {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.hook-address {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.run-log {
+  margin: 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  max-height: 14em;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.row.hook { align-items: flex-start; gap: 8px; }
+.hook .main { min-width: 0; }
+.hook-buttons { flex: none; display: flex; gap: 6px; }
+.chip-button {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-bright);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.chip-button:hover { border-color: var(--accent); color: var(--accent); }

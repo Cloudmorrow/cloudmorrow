@@ -11,6 +11,7 @@ pauses rather than `settle()`, which would wait for that worker for ever.
 
 from __future__ import annotations
 
+from rich.text import Text
 from textual.widgets import Checkbox, Input, RadioSet, Select, Static
 
 from cloudmorrow.tui.panes.admin_quills import QuillSheet, QuillsView, sheet_text
@@ -299,7 +300,9 @@ def test_the_install_sheet_says_what_a_quill_adds():
     text = sheet_text(dict(READING_QUILL, installed_version=None))
     assert "introduces" in text and "reading.book" in text and "new on this server" in text
     assert "Reading" in text and "list of reading.book" in text
-    assert "Declared, not run yet by this server: service isbn-lookup" in text
+    plain = Text.from_markup(text).plain
+    assert "Runs code on this server: python services/isbn.py" in plain
+    assert "Runs as you, the administrator who installs it, and can read and write only: reading.book" in plain
 
 
 async def test_installing_shows_the_sheet_then_adds_the_tab(app):

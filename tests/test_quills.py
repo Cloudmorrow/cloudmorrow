@@ -115,7 +115,9 @@ def test_the_install_sheet_says_everything_a_quill_adds(registry, tmp_path):
     )
     assert [s["label"] for s in plan["screens"]] == ["Cars", "Services"]
     assert plan["surfaces"] == ["phone", "web", "terminal", "command line", "assistant"]
-    assert plan["not_running_yet"] == ["service dvla"]
+    # What it would run on this server, and all it could reach there.
+    assert plan["runs_code"] == ["python services/dvla.py"]
+    assert plan["reach"] == ["contact", "fleet.visit", "vehicle"]
     # Planning installs nothing.
     assert registry.quills == {} and not (tmp_path / "datamodels").exists()
 

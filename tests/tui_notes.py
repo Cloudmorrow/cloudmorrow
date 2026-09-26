@@ -64,7 +64,9 @@ NOTES_QUILL = {
     "data": [{"id": "note", "label": "Note", "how": "uses", "foundation": True, "new": False}],
     "surfaces": ["phone", "web", "terminal", "command line", "assistant"],
     "installed_version": "1.0.0",
-    "not_running_yet": [],
+    "runs_code": [],
+    "runs_as": "",
+    "reach": [],
     "enabled": True,
     "models": {"note": NOTE_MODEL},
 }

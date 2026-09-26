@@ -135,12 +135,15 @@ def plan(
 def install(
     payload: QuillSource,
     state: AppState = Depends(get_state),
-    _: User = Depends(get_admin_user),
+    admin: User = Depends(get_admin_user),
 ) -> dict:
     with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
         try:
             folder, models, origin = _resolve(state, payload, Path(tmp))
-            return state.quills.install(folder, models, origin=origin)
+            # Its code, if it has any, runs as whoever said yes.
+            return state.quills.install(
+                folder, models, origin=origin | {"installed_by": admin.username}
+            )
         except QuillError as exc:
             raise _bad(exc) from exc
 
@@ -150,7 +153,7 @@ async def upload(
     request: Request,
     plan_only: bool = False,
     state: AppState = Depends(get_state),
-    _: User = Depends(get_admin_user),
+    admin: User = Depends(get_admin_user),
 ) -> dict:
     """Install a folder somebody is working on, sent as a .tar.gz: `cm quill dev`.
 
@@ -186,7 +189,10 @@ async def upload(
         try:
             if plan_only:
                 return state.quills.plan(folder, models)
-            return state.quills.install(folder, models, origin={"catalog": False, "dev": True})
+            return state.quills.install(
+                folder, models,
+                origin={"catalog": False, "dev": True, "installed_by": admin.username},
+            )
         except QuillError as exc:
             raise _bad(exc) from exc
 

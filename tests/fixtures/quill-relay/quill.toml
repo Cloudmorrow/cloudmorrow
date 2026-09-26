@@ -1,0 +1,47 @@
+# A Quill with code, for the tests of running it (tests/test_quill_services.py):
+# a service that writes with its token and serves a few routes, a job that
+# runs another, two declarative webhooks and one that is forwarded.
+[quill]
+id = "relay"
+name = "Relay"
+version = "1.0.0"
+summary = "Pings in, pings out: a Quill that runs code, for the tests."
+category = "developer"
+icon = "relay"
+publisher = "Cloudmorrow"
+license = "AGPL-3.0-or-later"
+
+[[services]]
+id = "web"
+command = ["python", "services/web.py"]
+always = true
+
+[[services]]
+id = "tick"
+command = ["python", "services/tick.py"]
+
+[[jobs]]
+id = "tick"
+action = "run"
+service = "tick"
+every = "1h"
+
+[[webhooks]]
+id = "inbound"
+path = "inbound"
+model = "relay.ping"
+map = { text = "$.message.text", count = "$.items[1].n", source = '$["from"]' }
+
+[[webhooks]]
+id = "signed"
+model = "relay.ping"
+map = { text = "$.text" }
+signature = "X-Hub-Signature-256"
+
+[[webhooks]]
+id = "raw"
+forward = "web"
+
+[[apis]]
+id = "api"
+service = "web"

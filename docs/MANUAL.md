@@ -692,6 +692,57 @@ and `.env` import and export use them, but on a server without the Secrets
 Quill (or with it switched off) `/api/secrets` answers 403 and `cm secret`
 says so. Add the Quill and they open again, with everything still in them.
 
+### A Quill that runs code
+
+Most Quills are only data and screens. A few run a program of their own — a
+mail sync, a bridge to somebody else's service — and the install sheet says
+so before the yes, in so many words: *Runs code on this server:
+`python services/sync.py`. It runs as bram, and can read and write only:
+task, contact.* Install it only if you trust its author with that.
+
+What that means on the server:
+
+- **It runs as the administrator who installed it.** Its programs act for
+  that account: the records they read and write are that person's. (A
+  Quill installed with nobody signed in — at first boot, or with
+  `cloudmorrow-server quill add` — runs as the oldest administrator. If the
+  installer's account goes, the Quill's code stops until somebody installs
+  it again.)
+- **It reaches only what it declared.** It gets a token of its own, which
+  opens the record API for the datamodels on its sheet and nothing else —
+  not notes, not secrets, not accounts, not the MCP server — and only while
+  the Quill is installed and switched on. The token is kept only as a hash;
+  each start of the server issues a new one.
+- **It runs outside the server,** as its own process, started in the
+  Quill's folder with a bare environment (none of the server's settings or
+  keys), and kept up: restarted with a growing pause when it falls over,
+  stopped when the Quill is switched off or removed and when the server
+  stops. Its home is `<data_dir>/quill-homes/<id>`; its log is
+  `<data_dir>/logs/quills/<id>/<service>.log`, capped at a megabyte plus one
+  older file.
+- **Its webhooks** are at `https://<your server>/hooks/<quill>/<path>`, and
+  each has a secret; the sender must put it in the address (`?token=…`) or
+  the `X-Cloudmorrow-Webhook-Token` header, or sign the body with it where
+  the Quill says it may. **Its APIs** are at `/api/q/<quill>/…`, for anybody
+  signed in; the program is told who is asking, never given their token.
+
+**Watching it** is Administration → Quills: under the catalog, each service
+and whether it is running, restarting or stopped; on the Quill's own sheet,
+each service's state, last exit and the end of its log, its jobs and when
+they last ran, and each webhook's full address to copy, with a new secret
+per webhook, a new token, and restart. In the TUI it is **Running…** (`r`)
+on the selected Quill. From the command line:
+
+```sh
+cm quill services         # every Quill's code: state, since, last exit, as whom; webhook addresses
+cm quill logs fleet       # the last lines of each of its services' logs
+cm quill logs fleet sync -n 500
+```
+
+If `allowed_client_ips` is set, a Quill's own programs still reach the
+server over loopback: a request from 127.0.0.1, not through the proxy, with
+a Quill token, is let through.
+
 **Building one** needs no server to start:
 
 ```sh

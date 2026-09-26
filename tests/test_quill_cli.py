@@ -61,7 +61,8 @@ def test_the_references_own_example_is_a_quill_that_installs(tmp_path):
         "task": "extends",
         "contact": "asks for",
     }
-    assert plan["not_running_yet"] == ["service sync", "webhook inbound", "api public"]
+    assert plan["runs_code"] == ["python services/sync.py"]
+    assert [h["path"] for h in plan["webhooks"]] == ["inbound"]
 
 
 @pytest.mark.parametrize(

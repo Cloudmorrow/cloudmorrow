@@ -86,6 +86,9 @@ def serve(
     import uvicorn
 
     config = _load(config_path)
+    # Where it listens is where a Quill's services reach it (CLOUDMORROW_URL).
+    config.host = host or config.host
+    config.port = port or config.port
     config.ensure_secret_key()
     console.print(banner(subtitle="api server"))
     console.print(

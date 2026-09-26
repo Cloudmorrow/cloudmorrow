@@ -41,7 +41,7 @@ page wins, and those pages remain the reasoning behind it.
 4. **Declarative first.** A Quill with no code is the normal case: the
    datamodels carry create, change, move, tick and delete; the kit carries the
    screens; the core runs declared jobs. Code is for what cannot be declared,
-   and it runs outside the server (see *Services*).
+   and it runs outside the server (see *Webhooks, APIs and services*).
 5. **One gate.** Every read and write — by a person, a Quill's service, or an
    assistant — goes through the same check of principal, action, datamodel and
    scope.
@@ -394,7 +394,7 @@ Declared work the core runs on a schedule, as the Quill:
 | action | does |
 | --- | --- |
 | `expire` | delete records of `model` whose `field` is older than `after` |
-| `run` | start the Quill's service command once (see *Services*) |
+| `run` | start the command of the Quill's `service` once, every `every`, never twice at once (see *Webhooks, APIs and services*) |
 
 `every` is `15m`, `1h`, `1d`. An `expire` job also runs when its datamodel is
 listed, so the rule holds on a server that was asleep, and every record it
@@ -411,23 +411,113 @@ id = "imap-sync"
 command = ["python", "services/imap_sync.py"]   # started and kept running by the core
 always = true
 
+[[jobs]]
+id = "nightly"
+action = "run"             # start a service's command once, every `every`
+service = "imap-sync"
+every = "1d"
+
 [[webhooks]]
 id = "stripe"
-path = "stripe"            # POST /hooks/<quill>/stripe
+path = "stripe"            # POST /hooks/<quill>/stripe; the id when left out
 model = "payment"          # declarative: the JSON body becomes a record…
 map = { amount = "$.data.object.amount", customer = "$.data.object.customer" }
 # …or forward = "imap-sync" hands the request to a service instead
+# signature = "X-Hub-Signature-256"   # also take a GitHub-style HMAC of the body
 
 [[apis]]
 id = "public"
-service = "imap-sync"      # GET/POST /api/q/<quill>/... proxied to the service
+service = "imap-sync"      # GET/POST/… /api/q/<quill>/... proxied to the service
+# prefix = "v1"            # only /api/q/<quill>/v1/…, when a Quill has several
 ```
 
-A service is any program. The core starts it with `CLOUDMORROW_URL` and a
-`CLOUDMORROW_TOKEN` of the Quill's own, and it talks to the record API exactly
-as the clients do, through the gate, bound by the Quill's grants. The first
-release validates these tables and shows them on the install sheet; running
-them is the next step after the kit, and until then the sheet says so.
+A service is any program. The core starts it and it talks to the record API
+exactly as the clients do, over loopback HTTP, through the gate, bound by the
+Quill's grants. The server never imports a Quill's code.
+
+**How it runs** (`server/quillservices.py`). Every service of every installed
+Quill that is switched on for the server is a process of its own, started in
+the Quill's folder (`<data_dir>/quills/<id>/`) with an environment built from
+nothing:
+
+| variable | what |
+| --- | --- |
+| `CLOUDMORROW_URL` | the server on loopback, `http://127.0.0.1:<port>` |
+| `CLOUDMORROW_TOKEN` | the Quill's token |
+| `CLOUDMORROW_QUILL`, `CLOUDMORROW_SERVICE` | which Quill, which service |
+| `PORT` | a free loopback port the core picked, for a service that serves an API or a forwarded webhook |
+| `HOME` | `<data_dir>/quill-homes/<id>`, kept across updates |
+| `PATH`, `LANG`, `PYTHONUNBUFFERED` | the server's own PATH and LANG, and unbuffered output |
+
+`python` as the first word of `command` is the server's own interpreter, so
+a script needs nothing installed; the standard library is what it can count
+on. A service with `always = true` is started again when it exits, after a
+pause that doubles with each quick failure (1 s … 60 s); one without runs
+once per start of the Quill. A service a `run` job names is started only by
+the job, on its `every`, never twice at once, and the time it last ran is
+kept so a restart of the server does not run a daily job again. Output goes
+to `<data_dir>/logs/quills/<id>/<service>.log`, one megabyte and one older
+file. Switching the Quill off, removing it and stopping the server stop its
+processes: SIGTERM to the process group, SIGKILL five seconds later.
+Reinstalling restarts them on the new code.
+
+**APIs** (`/api/q/<quill>/<path>`) are for anybody signed in. The request goes
+to the service's `PORT` at `/<path>` without the caller's `Authorization` or
+cookies, with `X-Cloudmorrow-User: <username>` added (or
+`X-Cloudmorrow-Quill` when the Quill calls its own API); no `Set-Cookie`
+comes back.
+
+**Webhooks** (`POST /hooks/<quill>/<path>`) are for the outside world, so not
+an account but a secret: each webhook has one the core made, which an
+administrator copies from Administration → Quills as part of its address and
+can replace. It comes back as `?token=`, as `X-Cloudmorrow-Webhook-Token`,
+or — when the webhook names a `signature` header — as an HMAC-SHA256 of the
+body under the secret, the way GitHub signs (`sha256=<hex>`). A body is at
+most a megabyte, and a webhook answers 120 calls a minute. With `model` and
+`map`, each field is a path into the JSON body — `$`, `.name`, `[n]` and
+`["odd name"]`, nothing more, because the body is somebody else's input —
+and the record is made as the Quill; a path that finds nothing leaves the
+field out. With `forward`, the request goes to the service as
+`POST /hooks/<path>` with `X-Cloudmorrow-Webhook: <id>`, the secret taken off.
+
+**The security model.**
+
+- *Who it acts for.* A Quill's code acts for one account: in this first
+  version, the administrator who installed it, recorded in its
+  `.origin.json` (`installed_by`). One installed with nobody signed in — at
+  first boot, or from `cloudmorrow-server quill add` — acts for the oldest
+  active administrator. If the installer's account is gone, or no longer an
+  administrator, the code acts for nobody and does not run until the Quill
+  is installed again. The install sheet says it: *Runs code on this server:
+  … It runs as bram, and can read and write only: …*
+- *What its token opens.* A Quill's token (`cmq_…`, `server/quilltokens.py`)
+  is kept only as a hash. It is `Principal("quill", <that account>,
+  quill=<id>, models=<used, introduced, extended, granted>)`, and the gate
+  refuses it every datamodel it did not declare. It opens the record API
+  (`get_principal`) and the Quill's own APIs; every other route asks for a
+  person's signed token, which it is not — notes, secrets, accounts,
+  shares, the MCP server all answer 401. It stops working the moment the
+  Quill is switched off or removed. Because only the hash is stored, the
+  working token lives in the server's memory and the processes'
+  environment: each start of the server issues a new one, and an
+  administrator's *new token* issues one and restarts the services.
+- *What it is given.* None of the server's environment, config path or
+  keys; a port only on loopback; its own home.
+- *What runs.* Only a Quill an administrator installed, from the copy the
+  install made. `allowed_client_ips` lets its loopback calls through
+  (from 127.0.0.1, not through the proxy, with a Quill token).
+- *What it is not.* A sandbox. The process runs as the server's own system
+  user and can do whatever that user can on the machine; the token bounds
+  what it can do *through Cloudmorrow*. Installing a Quill with code is
+  trusting its author, and the sheet says so.
+
+**Next.** A service per person, each acting for its own account and started
+when the person switches the Quill on (a mail sync for everyone, not only
+the admin); a separate system user or container per Quill, so the
+filesystem is bounded too; Stripe's signature scheme beside GitHub's; logs
+and state pushed to the admin screen instead of fetched; and a worker model
+if the server ever runs more than one process (the supervisor lives in the
+one uvicorn process today, and two would each start every service).
 
 ### Grants
 
@@ -505,11 +595,16 @@ manifest written, checked and installed in one conversation.
 | the kit on the command line | `cli/quillrun.py` (`cm <quill> …`) |
 | building one | `cli/quill.py` (`cm quill new/check/dev/add`), `quill_reference.md`, `quill_template/` |
 | the kit to an assistant | `server/mcptools.py` (generic record tools) |
+| a Quill's code: running it | `server/quillservices.py` (the supervisor, run jobs, logs), started with the app; `run` jobs asked for by the Clock in `server/quilljobs.py` |
+| a Quill's token and webhook secrets, who it runs as | `server/quilltokens.py`; `get_principal` in `server/deps.py` |
+| APIs, webhooks, and their administration | `server/routes/quillcode.py`, with `server/quillproxy.py` (to a service's port) and `server/quillhooks.py` (map paths, signatures, the rate) |
+| watching it run | web `quillservices.js`, `quillservices.css`; terminal `tui/panes/admin_quill_services.py`; `cm quill services`, `cm quill logs` |
 
 ## The order from here
 
 1. Tasks is the first Quill, and the proof: no task code left in the core.
 2. Services, webhooks and APIs run, with Quill tokens and the gate on them.
+   (They run, as the installing administrator; a service per person is next.)
 3. `calendar` and `thread` in the kit; Calendar and Chat become Quills.
    (Both are Quills: `calendar` and `thread` are drawn on every surface.)
 4. `grid` and `editor`; Files and Notes become Quills. (Both are drawn,

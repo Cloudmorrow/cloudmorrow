@@ -339,7 +339,8 @@ def quill_dev_install(state: AppState, user: User, args: dict[str, Any]) -> Any:
         folder = _write_draft(state, args, Path(tmp) / "q")
         try:
             plan = state.quills.install(
-                folder, _datamodels_for(state, Path(tmp)), origin={"catalog": False, "dev": True, "by": "assistant"}
+                folder, _datamodels_for(state, Path(tmp)), origin={"catalog": False, "dev": True, "by": "assistant",
+                        "installed_by": user.username}
             )
         except QuillError as exc:
             raise ToolError(f"not installed: {exc}") from exc

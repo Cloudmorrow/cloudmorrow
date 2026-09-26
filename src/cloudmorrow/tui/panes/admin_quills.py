@@ -6,6 +6,10 @@ rule 3): what a Quill adds is visible before it is added, so Install opens
 the install sheet — the data it uses, extends or introduces, the screens, the
 jobs, the grants it asks for and why — and nothing happens without a yes.
 
+A Quill with code of its own says on the sheet what it runs, as whom, and
+what it may reach; once installed, Running (`r`) shows what that code is
+doing — see `admin_quill_services`.
+
 Removing one takes its tabs and its jobs away, from every client. It never
 takes a record: the data is the person's, and it is there again the day the
 Quill (or another that uses the same datamodels) is installed.
@@ -16,12 +20,14 @@ it to fetch the Quills again: the tab comes or goes without a restart.
 
 from __future__ import annotations
 
+from rich.markup import escape
 from textual import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, DataTable, Label, Static
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.tui.panes.admin_quill_services import QuillServicesModal
 from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
 from cloudmorrow.tui.theme import ACCENT, FAINT, GOOD, MUTED, WARN
@@ -117,21 +123,36 @@ def sheet_text(plan: dict) -> str:
             what = f"{amount} of {dataset.get('model')}{per}"
             lines.append(f"  [b]{dataset['id']}[/] [{MUTED}]{what}[/]")
 
-    code = [
-        (kind, item)
-        for kind in ("services", "webhooks", "apis")
-        for item in plan.get(kind) or []
-    ]
-    if code:
-        lines += ["", f"[b {ACCENT}]Runs[/]"]
-        for kind, item in code:
-            lines.append(f"  [b]{item.get('id', '?')}[/] [{MUTED}]{kind[:-1]}[/]")
-    waiting = plan.get("not_running_yet") or []
-    if waiting:
-        lines.append(
-            f"  [{WARN}]Declared, not run yet by this server: {', '.join(waiting)}.[/]"
-        )
+    lines += code_lines(plan)
     return "\n".join(lines)
+
+
+def code_lines(plan: dict) -> list[str]:
+    """What the Quill runs on this server, as whom, and what it may reach there.
+
+    Said plainly because it is the one part of a Quill that is not drawn by
+    the kit: a program, started by the server, acting for an account.
+    """
+    commands = plan.get("runs_code") or []
+    hooks = plan.get("webhooks") or []
+    apis = plan.get("apis") or []
+    if not (commands or hooks or apis):
+        return []
+    quill = plan.get("id", "?")
+    lines = ["", f"[b {ACCENT}]Its own code[/]"]
+    if commands:
+        lines.append(f"  Runs code on this server: [b]{escape('; '.join(commands))}[/]")
+    for hook in hooks:
+        lines.append(
+            f"  [{MUTED}]webhook[/] {hook.get('id', '?')}  "
+            f"[{MUTED}]POST /hooks/{quill}/{hook.get('path') or hook.get('id')}[/]"
+        )
+    for api in apis:
+        lines.append(f"  [{MUTED}]api[/] {api.get('id', '?')}  [{MUTED}]/api/q/{quill}/…[/]")
+    who = plan.get("runs_as") or "you, the administrator who installs it"
+    reach = ", ".join(plan.get("reach") or []) or "nothing"
+    lines.append(f"  [{WARN}]Runs as {escape(who)}, and can read and write only: {reach}.[/]")
+    return lines
 
 
 class QuillSheet(Modal[bool]):
@@ -176,10 +197,13 @@ class QuillsView(Pane):
     BINDINGS = [
         ("i", "fire('install')", "Install"),
         ("d", "fire('remove')", "Remove"),
+        ("r", "fire('running')", "Running"),
     ]
     ACTIONS = (
         Action("install", "Install…", "i", variant="primary",
                hint="See what it adds, then install it"),
+        Action("running", "Running…", "r",
+               hint="What its code is doing: services, logs, webhook addresses"),
         Action("remove", "Remove", "d", variant="error",
                hint="Its tabs and jobs go; its records stay"),
     )
@@ -308,6 +332,27 @@ class QuillsView(Pane):
         self.status(f"Installed {done.get('name') or quill['id']} {done.get('version', '')}.")
         self._workspace_follows()
         self.reload()
+
+    # -- what its code is doing --------------------------------------------
+    def act_running(self) -> None:
+        quill = self.selected
+        if quill is None or not quill.get("installed_version"):
+            self.status("That Quill is not installed.", error=True)
+            return
+        self.running(quill)
+
+    @work(group="ui")
+    async def running(self, quill: dict) -> None:
+        try:
+            rows = await self.api.quill_services()
+        except ApiError as exc:
+            self.status(str(exc), error=True)
+            return
+        row = next((r for r in rows if r["id"] == quill["id"]), None)
+        if row is None:
+            self.status(f"{quill.get('name') or quill['id']} runs no code of its own.", note=True)
+            return
+        await self.app.push_screen_wait(QuillServicesModal(row))
 
     def act_remove(self) -> None:
         quill = self.selected

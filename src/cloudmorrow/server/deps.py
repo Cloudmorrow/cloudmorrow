@@ -18,7 +18,10 @@ from cloudmorrow.server.mcp import MCPStore
 from cloudmorrow.server.notes import NoteStore, ensure_notes_layout
 from cloudmorrow.server.notifications import NotificationStore
 from cloudmorrow.server.quills import QuillRegistry
-from cloudmorrow.server.records import RecordStore
+from cloudmorrow.server.quillservices import Supervisor
+from cloudmorrow.server.quilltokens import PREFIX as QUILL_TOKEN_PREFIX
+from cloudmorrow.server.quilltokens import QuillTokenStore, runs_as
+from cloudmorrow.server.records import Principal, RecordStore
 from cloudmorrow.server.sealed import Sealer
 from cloudmorrow.server.secrets import (
     DEFAULT_ENVIRONMENT,
@@ -65,6 +68,9 @@ class AppState:
     # The installed Quills and datamodels, and the records of every one.
     quills: QuillRegistry
     records: RecordStore
+    # A Quill's credentials, and what runs its code (quilltokens, quillservices).
+    quill_tokens: QuillTokenStore | None = None
+    services: Supervisor | None = None
 
     def cloud_name(self) -> str:
         """What this cloud is called: set from the app, else from the config."""
@@ -101,6 +107,34 @@ def get_current_user(
     if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unknown user")
     return user
+
+
+def get_principal(
+    state: AppState = Depends(get_state),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> Principal:
+    """Who is asking, where a Quill's service may ask too: the record API, a Quill's APIs.
+
+    A person's token is a person. A Quill's token (`cmq_…`) is the Quill,
+    acting for the account it runs as and reaching only the datamodels it
+    declared — and only while it is installed and switched on. Every other
+    route asks `get_current_user`, which a Quill's token never satisfies:
+    it is not a signed token, so it does not decode as one.
+    """
+    if credentials is not None and credentials.credentials.startswith(QUILL_TOKEN_PREFIX):
+        tokens = state.quill_tokens
+        quill_id = tokens.quill_for(credentials.credentials) if tokens is not None else None
+        manifest = state.quills.quills.get(quill_id or "")
+        owner = runs_as(state.users, manifest.origin) if manifest else ""
+        if manifest is None or not owner or not state.features.enabled(manifest.id):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="unknown quill token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return Principal("quill", owner, quill=manifest.id, models=manifest.models)
+    user = get_current_user(state, credentials)
+    return Principal.person(user.username, admin=user.is_admin)
 
 
 def get_admin_user(user: User = Depends(get_current_user)) -> User:

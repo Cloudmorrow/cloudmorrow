@@ -414,6 +414,30 @@ class CloudmorrowClient:
     async def uninstall_quill(self, quill_id: str) -> None:
         await self._request("DELETE", f"/api/quills/{quill_id}")
 
+    # -- a Quill's code, for an administrator --------------------------------
+    async def quill_services(self) -> list[dict]:
+        """Every Quill that runs code: services and their state, jobs, webhooks, APIs."""
+        return (await self._request("GET", "/api/quillservices")).json()
+
+    async def quill_logs(self, quill_id: str, service: str = "", lines: int = 100) -> dict:
+        params: dict = {"lines": lines}
+        if service:
+            params["service"] = service
+        return (
+            await self._request("GET", f"/api/quillservices/{quill_id}/logs", params=params)
+        ).json()
+
+    async def rotate_quill_token(self, quill_id: str) -> dict:
+        return (await self._request("POST", f"/api/quillservices/{quill_id}/token")).json()
+
+    async def restart_quill(self, quill_id: str) -> dict:
+        return (await self._request("POST", f"/api/quillservices/{quill_id}/restart")).json()
+
+    async def rotate_webhook_secret(self, quill_id: str, hook_id: str) -> dict:
+        return (
+            await self._request("POST", f"/api/quillservices/{quill_id}/webhooks/{hook_id}/secret")
+        ).json()
+
     async def datamodels(self) -> list[dict]:
         return (await self._request("GET", "/api/datamodels")).json()
 

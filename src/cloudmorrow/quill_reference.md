@@ -69,29 +69,84 @@ records = [{ name = "{owner}'s first plant" }]
 # or: file = "datasets/plants.csv"  (CSV with a header row, or TOML [[records]])
 ```
 
-Code, when declaring is not enough (validated and listed today; run by the
-core in the next release):
+Code, when declaring is not enough. The server runs it, as the administrator
+who installed the Quill, and it reaches only what the Quill declared:
 
 ```toml
-[[services]]                       # a program the core keeps running
+[[services]]                       # a program the core starts and keeps running
 id = "sync"
-command = ["python", "services/sync.py"]
-always = true
+command = ["python", "services/sync.py"]   # "python" is the server's own Python
+always = true                      # started again if it exits (with backoff)
 
-[[webhooks]]                       # POST /hooks/<quill>/<path>
+[[jobs]]                           # or: run a service now and then, never twice at once
+id = "nightly"
+action = "run"
+service = "sync"                   # a service a job names is only started by the job
+every = "1d"
+
+[[webhooks]]                       # POST /hooks/<quill>/<path>, with the webhook's secret
 id = "inbound"
 path = "inbound"
 model = "plants.plant"             # the JSON body becomes a record…
-# forward = "sync"                 # …or goes to a service
+map = { name = "$.plant.name" }    # field = a path into the body: $.a.b[0].c
+# forward = "sync"                 # …or the request goes to a service instead
+# signature = "X-Hub-Signature-256"  # also accept a GitHub-style HMAC of the body
 
-[[apis]]                           # /api/q/<quill>/… proxied to a service
+[[apis]]                           # /api/q/<quill>/… proxied to a service, for people signed in
 id = "public"
 service = "sync"
+# prefix = "v1"                    # only paths under /api/q/<quill>/v1/
 ```
 
-A service gets `CLOUDMORROW_URL` and `CLOUDMORROW_TOKEN` and uses the record
-API like any client: `GET/POST /api/records/<model>`,
-`GET/PATCH/DELETE /api/records/<model>/<id>`, `POST …/<id>/move`.
+A service is started in the Quill's folder with only these in its
+environment — nothing of the server's:
+
+| variable | what |
+| --- | --- |
+| `CLOUDMORROW_URL` | the server, on loopback |
+| `CLOUDMORROW_TOKEN` | the Quill's own token: the record API, its declared datamodels only |
+| `CLOUDMORROW_QUILL`, `CLOUDMORROW_SERVICE` | its id, and which service this is |
+| `PORT` | a free loopback port to serve on, for an API or a forwarded webhook |
+| `HOME` | a folder of its own that survives updates |
+| `PATH`, `LANG`, `PYTHONUNBUFFERED` | so programs are found and output is logged as it comes |
+
+It uses the record API like any client: `GET/POST /api/records/<model>`,
+`GET/PATCH/DELETE /api/records/<model>/<id>`, `POST …/<id>/move`. An API
+request arrives at `/<path>` with `X-Cloudmorrow-User: <who is asking>` (never
+their token); a forwarded webhook arrives as `POST /hooks/<path>` with
+`X-Cloudmorrow-Webhook: <id>`, its secret already checked. What it prints goes
+to its log (`cm quill logs <quill> <service>`). Only the standard library is
+certain to be there. A whole service, `services/sync.py`:
+
+```python
+import json, os, urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+URL, TOKEN = os.environ["CLOUDMORROW_URL"], os.environ["CLOUDMORROW_TOKEN"]
+
+def records(method, path, body=None):
+    request = urllib.request.Request(
+        URL + "/api/records/" + path, method=method,
+        data=json.dumps(body).encode() if body is not None else None,
+        headers={"Authorization": "Bearer " + TOKEN, "Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=10) as answer:
+        return json.loads(answer.read() or b"null")
+
+class Api(BaseHTTPRequestHandler):
+    def do_GET(self):                           # GET /api/q/plants/count
+        who = self.headers["X-Cloudmorrow-User"]
+        body = json.dumps({"asked_by": who, "plants": len(records("GET", "plants.plant"))})
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(body.encode())
+
+print("up", flush=True)                         # into its log
+ThreadingHTTPServer(("127.0.0.1", int(os.environ["PORT"])), Api).serve_forever()
+```
+
+The records it reads and writes are the installing administrator's; a service
+per person is not there yet.
 
 ## Datamodels you introduce
 

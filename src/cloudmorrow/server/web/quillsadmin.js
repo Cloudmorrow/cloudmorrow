@@ -10,12 +10,17 @@
 
    Installing puts its tabs in every account's bar; this window's too, at
    once. Removing takes the tabs and the jobs and never a record: the data
-   was always the people's, not the Quill's. */
+   was always the people's, not the Quill's.
+
+   A Quill with code of its own says so on the sheet in plain words — the
+   commands it runs on this server, as whom, and what it may reach — and,
+   once installed, shows what that code is doing (quillservices.js). */
 
 import {
   api, app, esc, nav, registerScreen, renderRoute, replace, store, toast, wireShell,
 } from "./core.js";
 import { refreshQuills } from "./quills.js";
+import { drawRunning, drawRunningList } from "./quillservices.js";
 
 const quillUrl = (id) => "/api/quills/" + encodeURIComponent(id);
 // The shelf for what is on no shelf: not an id a catalog category can have.
@@ -78,6 +83,7 @@ export async function drawQuills(panel) {
         (shelf.description ? `<p class="shelf-note">${esc(shelf.description)}</p>` : "") +
         `<div class="group">${here.map(catalogRow).join("")}</div>`;
     }).join("");
+  await drawRunningList(panel);
 }
 
 function catalogRow(q) {
@@ -126,11 +132,14 @@ async function renderQuill(id) {
         `v${esc(plan.version)}`, esc(plan.publisher || ""), esc(plan.license || ""),
         installed ? `<span class="quill-chip on">v${esc(installed)} installed</span>` : "",
       ].filter(Boolean).join(" · ")}</p>
-      ${sections(plan)}
+      ${sections(plan, me)}
+      ${installed ? `<div class="quill-running"></div>` : ""}
       ${verb ? `<div class="group"><button class="row primary add-quill" type="button">${esc(verb)}</button></div>` : ""}
       ${installed ? `<div class="group"><button class="row bad remove-quill" type="button">Remove ${esc(name)}</button></div>` : ""}
     </main>`;
   wireShell();
+  const running = app.querySelector(".quill-running");
+  if (running) drawRunning(running, id);
 
   const install = app.querySelector(".add-quill");
   if (install) install.addEventListener("click", async () => {
@@ -166,7 +175,7 @@ async function renderQuill(id) {
 }
 
 /** Everything the Quill contains and adds, a section each. */
-function sections(plan) {
+function sections(plan, me) {
   const out = [];
   const row = (title, note = "", right = "") => `<div class="row sheet-fact">
     <span class="main"><span class="title">${title}</span>${note ? `<span class="meta"><span class="preview">${note}</span></span>` : ""}</span>${right}</div>`;
@@ -208,10 +217,15 @@ function sections(plan) {
     ...(plan.webhooks || []).map((w) => row(`Webhook ${esc(w.id)}`, `POST /hooks/${esc(plan.id)}/${esc(w.path || w.id)}`)),
     ...(plan.apis || []).map((a) => row(`API ${esc(a.id)}`, `/api/q/${esc(plan.id)}/…`)),
   ];
-  const waiting = plan.not_running_yet || [];
-  out.push(group("Its own code", code, waiting.length
-    ? `<p class="shelf-note warn">Declared and checked, and not run yet: this server
-      does not start a Quill's own code so far. Waiting: ${esc(waiting.join(", "))}.</p>` : ""));
+  // Code is the one part of a Quill the kit does not draw: a program this
+  // server starts, acting for an account. So the yes is to that, in words.
+  const commands = plan.runs_code || [];
+  const who = plan.runs_as || (me && me.username) || "you";
+  const reach = (plan.reach || []).map(label).join(", ") || "nothing";
+  out.push(group("Its own code", code, code.length
+    ? `<p class="shelf-note warn">${commands.length
+      ? `Runs code on this server: ${esc(commands.join("; "))}. ` : ""}It runs as
+      ${esc(who)}, and can read and write only: ${esc(reach)}.</p>` : ""));
 
   if (plan.readme && plan.readme.trim()) {
     // As its author wrote it, folded: the facts above are what the yes is

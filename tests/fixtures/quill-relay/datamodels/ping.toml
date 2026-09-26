@@ -1,0 +1,12 @@
+[datamodel]
+id = "relay.ping"
+version = 1
+label = "Ping"
+description = "Something that arrived, and where from."
+scopes = ["personal"]
+title = "text"
+
+[fields]
+text = { kind = "string", required = true }
+count = { kind = "int" }
+source = { kind = "string", indexed = true }

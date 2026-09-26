@@ -15,3 +15,10 @@ When asked to change or extend it:
    them to look at it on their phone or in `cm`.
 5. Keep README.md's "What it adds" table true.
 
+Code (`[[services]]`, `run` jobs, forwarded webhooks, `[[apis]]`) is the
+last resort, for what cannot be declared: it runs on the person's server, as
+the administrator who installed it, and every line of it is theirs to trust.
+A service is a small program in `services/` that talks to the record API with
+`CLOUDMORROW_URL` and `CLOUDMORROW_TOKEN`, using the standard library; test it
+with `cm quill dev` and read what it prints with `cm quill logs <id>`.
+

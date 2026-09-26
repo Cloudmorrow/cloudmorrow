@@ -32,7 +32,9 @@ can stop the server starting. What fails is logged and tried again at the
 next boot.
 
 On the clock: every `expire` job, swept every few minutes. Reads sweep too,
-so this is only for a server nobody is looking at.
+so this is only for a server nobody is looking at. And every half minute,
+the `run` jobs whose `every` has come round, which the supervisor starts
+(`quillservices.Supervisor.run_due`) — never one still running from before.
 """
 
 from __future__ import annotations
@@ -40,6 +42,8 @@ from __future__ import annotations
 import logging
 import sqlite3
 import threading
+import time
+from collections.abc import Callable
 from pathlib import Path
 
 from cloudmorrow.server.db import connect
@@ -49,6 +53,9 @@ from cloudmorrow.server.records import RecordStore, UnknownModelError
 log = logging.getLogger("cloudmorrow.quills")
 
 SWEEP_EVERY = 10 * 60.0
+# How often the clock asks whether a `run` job is due: `every` is at least a
+# minute, so half of one is on time.
+TICK = 30.0
 
 # schema_meta keys: set once the thing is done, so it is done once.
 SEEDED = "quills_seeded"
@@ -473,10 +480,18 @@ def sweep_all(registry: QuillRegistry, records: RecordStore) -> int:
 class Clock:
     """A daemon thread that sweeps, and does the boot work first."""
 
-    def __init__(self, db_path: Path, registry: QuillRegistry, records: RecordStore) -> None:
+    def __init__(
+        self,
+        db_path: Path,
+        registry: QuillRegistry,
+        records: RecordStore,
+        on_tick: Callable[[], object] | None = None,
+    ) -> None:
         self.db_path = db_path
         self.registry = registry
         self.records = records
+        # Asked every TICK: the `run` jobs whose time has come (quillservices).
+        self.on_tick = on_tick
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -491,8 +506,18 @@ class Clock:
 
     def _run(self) -> None:
         boot(self.db_path, self.registry, self.records)
-        while not self._stop.wait(SWEEP_EVERY):
-            try:
-                sweep_all(self.registry, self.records)
-            except Exception:  # a sweep that fails is tried again next time
-                log.exception("sweep failed")
+        swept = time.monotonic()
+        while True:
+            if self.on_tick is not None:
+                try:
+                    self.on_tick()
+                except Exception:  # a job that cannot start is tried next tick
+                    log.exception("run jobs failed")
+            if self._stop.wait(TICK if self.on_tick is not None else SWEEP_EVERY):
+                return
+            if time.monotonic() - swept >= SWEEP_EVERY:
+                swept = time.monotonic()
+                try:
+                    sweep_all(self.registry, self.records)
+                except Exception:  # a sweep that fails is tried again next time
+                    log.exception("sweep failed")

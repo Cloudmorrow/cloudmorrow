@@ -88,7 +88,9 @@ TASKS_QUILL = {
     ],
     "surfaces": ["phone", "web", "terminal", "command line", "assistant"],
     "installed_version": "1.0.0",
-    "not_running_yet": [],
+    "runs_code": [],
+    "runs_as": "",
+    "reach": [],
     "enabled": True,
     "models": TASK_MODELS,
 }
@@ -112,7 +114,7 @@ READING_QUILL = {
     ],
     "jobs": [],
     "datasets": [],
-    "services": [{"id": "isbn-lookup"}],
+    "services": [{"id": "isbn-lookup", "command": ["python", "services/isbn.py"], "always": True}],
     "webhooks": [],
     "apis": [],
     "data": [
@@ -121,7 +123,9 @@ READING_QUILL = {
     ],
     "surfaces": ["phone", "web", "terminal", "command line", "assistant"],
     "installed_version": None,
-    "not_running_yet": ["service isbn-lookup"],
+    "runs_code": ["python services/isbn.py"],
+    "runs_as": "",
+    "reach": ["reading.book"],
     "enabled": True,
     "models": {
         "reading.book": {
@@ -189,7 +193,9 @@ SECRETS_QUILL = {
     "data": [{"id": "secret", "label": "Secret", "how": "uses", "foundation": True, "new": False}],
     "surfaces": ["phone", "web", "terminal", "command line"],
     "installed_version": "1.0.0",
-    "not_running_yet": [],
+    "runs_code": [],
+    "runs_as": "",
+    "reach": [],
     "enabled": True,
     "models": {"secret": SECRET_MODEL},
 }
@@ -420,6 +426,24 @@ class FakeQuills:
 
             self.feature_list.append(feature_row(id, quill["name"]))
         return await self.plan_quill(id=id)
+
+    # -- a Quill's running code: set `running` to what the server would say --
+    running: list[dict] = []
+
+    async def quill_services(self) -> list[dict]:
+        return copy.deepcopy(self.running)
+
+    async def restart_quill(self, quill_id: str) -> dict:
+        self.quill_calls.append(("restart", quill_id))
+        return {"restarted": quill_id}
+
+    async def rotate_quill_token(self, quill_id: str) -> dict:
+        self.quill_calls.append(("token", quill_id))
+        return {"token": {"issued_at": "now"}}
+
+    async def rotate_webhook_secret(self, quill_id: str, hook_id: str) -> dict:
+        self.quill_calls.append(("secret", quill_id, hook_id))
+        return {"id": hook_id, "secret": "new"}
 
     async def uninstall_quill(self, quill_id: str) -> None:
         self.quill_calls.append(("uninstall", quill_id))

@@ -126,7 +126,9 @@ FILES_QUILL = {
     ],
     "surfaces": ["phone", "web", "terminal", "command line", "assistant"],
     "installed_version": "1.0.0",
-    "not_running_yet": [],
+    "runs_code": [],
+    "runs_as": "",
+    "reach": [],
     "enabled": True,
     "models": FILES_MODELS,
 }

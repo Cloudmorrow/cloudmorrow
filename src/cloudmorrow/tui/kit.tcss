@@ -152,12 +152,12 @@
 }
 
 /* -- Administration: Quills ------------------------------------------------ */
-#quill-sheet-body {
+#quill-sheet-body, #quill-services-body {
     height: auto;
     max-height: 62vh;
     scrollbar-size-vertical: 1;
 }
 
-#quill-sheet-body Static {
+#quill-sheet-body Static, #quill-services-body Static {
     height: auto;
 }

@@ -25,6 +25,8 @@ from cloudmorrow.server.mcp import MCPStore
 from cloudmorrow.server.notifications import NotificationStore
 from cloudmorrow.server.quilljobs import Clock
 from cloudmorrow.server.quills import QuillRegistry
+from cloudmorrow.server.quillservices import Supervisor
+from cloudmorrow.server.quilltokens import QuillTokenStore
 from cloudmorrow.server.records import RecordStore
 from cloudmorrow.server.routes import (
     agents,
@@ -36,6 +38,7 @@ from cloudmorrow.server.routes import (
     notes,
     notifications,
     push,
+    quillcode,
     quills,
     records,
     secrets,
@@ -132,9 +135,18 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     # Secrets stay in their own store, sealed under the key itself; the
     # Secrets Quill draws them from here, and no assistant is ever let in.
     record_store.backends["vaults"] = VaultsBackend(app.state.cloudmorrow.secrets)
-    clock = Clock(config.db_path, quill_registry, record_store)
+    # A Quill's code: its token and webhook secrets, and the processes that
+    # run it, kept in line with what is installed and switched on.
+    state = app.state.cloudmorrow
+    state.quill_tokens = QuillTokenStore(config.db_path)
+    state.services = Supervisor(
+        config, quill_registry, user_store, state.features, state.quill_tokens
+    )
+    app.router.on_startup.append(state.services.start)
+    clock = Clock(config.db_path, quill_registry, record_store, on_tick=state.services.run_due)
     app.router.on_startup.append(clock.start)
     app.router.on_shutdown.append(clock.stop)
+    app.router.on_shutdown.append(state.services.stop)
 
     require_tls(app, config)
     allowed_clients = parse_rules(config.allowed_client_ips)
@@ -144,7 +156,15 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         async def restrict_clients(request: Request, call_next):
             """Answer only the hosts named in allowed_client_ips."""
             client = request.client.host if request.client else None
-            if not is_allowed(client, allowed_clients):
+            # A Quill's own service, on this machine, calling the record API
+            # with its token over loopback — not through the proxy — is let
+            # through whatever the list says: it never crossed a network.
+            from_a_service = (
+                client in ("127.0.0.1", "::1")
+                and "x-forwarded-for" not in request.headers
+                and request.headers.get("authorization", "").startswith("Bearer cmq_")
+            )
+            if not from_a_service and not is_allowed(client, allowed_clients):
                 return PlainTextResponse("forbidden", status_code=403)
             return await call_next(request)
 
@@ -177,6 +197,10 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.include_router(records.models_router)
     app.include_router(records.people_router)
     app.include_router(quills.router)
+    # A Quill's code: its APIs, its webhooks, and running them, for admins.
+    app.include_router(quillcode.api_router)
+    app.include_router(quillcode.hooks_router)
+    app.include_router(quillcode.admin_router)
     app.include_router(shares.router, dependencies=in_files)
     app.include_router(sharefiles.router, dependencies=in_files)
     app.include_router(agents.router)

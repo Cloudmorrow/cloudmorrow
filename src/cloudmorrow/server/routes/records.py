@@ -5,6 +5,11 @@ read, change, move and delete, the same for a task as for anything a Quill
 introduces tomorrow. Every call goes through the gate as the person signed
 in, and a record is only ever reached through its owner.
 
+A Quill's service calls the same routes with the Quill's own token, and is
+the Quill's principal here (`get_principal`): acting for the account it runs
+as, and let at only the datamodels it declared. This is the one API that
+token opens, besides the Quill's own `/api/q/<quill>/…`.
+
 Listing a datamodel is also when its per-owner datasets are seeded — your
 first board — and when its expire jobs sweep, so both hold without anything
 having to run in between.
@@ -22,7 +27,7 @@ from pydantic import BaseModel, Field
 
 from cloudmorrow.server.backends import AttachmentTooBig
 from cloudmorrow.server.db import User
-from cloudmorrow.server.deps import AppState, get_current_user, get_state
+from cloudmorrow.server.deps import AppState, get_current_user, get_principal, get_state
 from cloudmorrow.server.records import (
     Principal,
     RecordConflictError,
@@ -125,7 +130,7 @@ def list_records(
     model: str,
     request: Request,
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> list[dict]:
     """Every record of *model* you have. Query parameters filter on indexed fields.
 
@@ -137,7 +142,6 @@ def list_records(
     after it, which is how an open screen asks what it has not got.
     """
     switched_on(state, model)
-    principal = person(user)
     where = dict(request.query_params)
     last = where.pop("_last", None)
     since = where.pop("_since", None)
@@ -174,12 +178,12 @@ class FolderMove(BaseModel):
 
 @router.get("/{model}/_folders")
 def list_folders(
-    model: str, state: AppState = Depends(get_state), user: User = Depends(get_current_user)
+    model: str, state: AppState = Depends(get_state), principal: Principal = Depends(get_principal)
 ) -> list[dict]:
     """Every folder, empty ones too, parents before what is in them."""
     switched_on(state, model)
     try:
-        return state.records.folders(person(user), model)
+        return state.records.folders(principal, model)
     except ERRORS as exc:
         raise _refused(exc) from exc
 
@@ -189,11 +193,11 @@ def make_folder(
     model: str,
     payload: FolderIn,
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> dict:
     switched_on(state, model)
     try:
-        return state.records.make_folder(person(user), model, payload.path)
+        return state.records.make_folder(principal, model, payload.path)
     except ERRORS as exc:
         raise _refused(exc) from exc
 
@@ -203,12 +207,12 @@ def move_folder(
     model: str,
     payload: FolderMove,
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> dict:
     """Rename a folder, or move it into another: what is in it goes along."""
     switched_on(state, model)
     try:
-        return state.records.move_folder(person(user), model, payload.path, payload.to)
+        return state.records.move_folder(principal, model, payload.path, payload.to)
     except ERRORS as exc:
         raise _refused(exc) from exc
 
@@ -218,12 +222,12 @@ def delete_folder(
     model: str,
     path: str,
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> None:
     """A folder, and everything in it."""
     switched_on(state, model)
     try:
-        state.records.delete_folder(person(user), model, path)
+        state.records.delete_folder(principal, model, path)
     except ERRORS as exc:
         raise _refused(exc) from exc
 
@@ -234,7 +238,7 @@ async def attach(
     request: Request,
     filename: str = "",
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> dict:
     """Keep a file beside the records. The body is the file, not a form around it.
 
@@ -244,7 +248,7 @@ async def attach(
     switched_on(state, model)
     data = await request.body()
     try:
-        return state.records.attach(person(user), model, data, filename)
+        return state.records.attach(principal, model, data, filename)
     except AttachmentTooBig as exc:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, str(exc)) from exc
     except ERRORS as exc:
@@ -256,11 +260,11 @@ def attachment(
     model: str,
     name: str,
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> Response:
     switched_on(state, model)
     try:
-        data, content_type = state.records.attachment(person(user), model, name)
+        data, content_type = state.records.attachment(principal, model, name)
     except UnknownRecordError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no such attachment") from exc
     except ERRORS as exc:
@@ -278,7 +282,7 @@ def create_record(
     payload: RecordIn,
     response: Response,
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> dict:
     """Make a record. A space may be made with its people in it, or found.
 
@@ -291,7 +295,6 @@ def create_record(
     switched_on(state, model)
     for username in payload.members:
         _known(state, username)
-    principal = person(user)
     try:
         if payload.unique:
             found = state.records.find_space(
@@ -319,11 +322,11 @@ def get_record(
     model: str,
     record_id: str,
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> dict:
     switched_on(state, model)
     try:
-        return state.records.get(person(user), model, record_id).to_dict()
+        return state.records.get(principal, model, record_id).to_dict()
     except ERRORS as exc:
         raise _refused(exc) from exc
 
@@ -334,12 +337,12 @@ def change_record(
     record_id: str,
     payload: RecordChange,
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> dict:
     switched_on(state, model)
     try:
         record = state.records.update(
-            person(user), model, record_id, payload.fields, rev=payload.rev
+            principal, model, record_id, payload.fields, rev=payload.rev
         )
     except ERRORS as exc:
         raise _refused(exc) from exc
@@ -352,13 +355,13 @@ def move_record(
     record_id: str,
     payload: RecordMove,
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> dict:
     """Change the fields that say which group, and the place in it: a dragged card."""
     switched_on(state, model)
     try:
         record = state.records.move(
-            person(user), model, record_id, payload.fields, payload.index
+            principal, model, record_id, payload.fields, payload.index
         )
     except ERRORS as exc:
         raise _refused(exc) from exc
@@ -370,11 +373,11 @@ def delete_record(
     model: str,
     record_id: str,
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> None:
     switched_on(state, model)
     try:
-        state.records.delete(person(user), model, record_id)
+        state.records.delete(principal, model, record_id)
     except ERRORS as exc:
         raise _refused(exc) from exc
 
@@ -391,12 +394,12 @@ def record_content(
     model: str,
     record_id: str,
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> FileResponse:
     """The record's bytes: a file, as itself."""
     switched_on(state, model)
     try:
-        path, media_type = state.records.content(person(user), model, record_id)
+        path, media_type = state.records.content(principal, model, record_id)
     except ERRORS as exc:
         raise _refused(exc) from exc
     # Someone's files: nobody's cache but the browser's own, and asked about
@@ -410,13 +413,13 @@ def record_thumb(
     record_id: str,
     size: int = Query(default=256, ge=1, description="The long edge wanted, in pixels"),
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> FileResponse:
     """A small copy of the record's picture, as a JPEG. A 415 for one that is not
     a picture the server can make small, and the client shows an icon instead."""
     switched_on(state, model)
     try:
-        path = state.records.thumbnail(person(user), model, record_id, size)
+        path = state.records.thumbnail(principal, model, record_id, size)
     except ERRORS as exc:
         raise _refused(exc) from exc
     return FileResponse(path, media_type="image/jpeg", headers=PRIVATE)
@@ -427,7 +430,7 @@ async def upload_record(
     model: str,
     request: Request,
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> dict:
     """A new record from bytes: the body is the file, the query says where it
     goes and what it is called (`?share=my-files&folder=Photos&name=cat.jpg`).
@@ -450,7 +453,7 @@ async def upload_record(
             async for chunk in request.stream():
                 handle.write(chunk)
         try:
-            record = state.records.put(person(user), model, dict(request.query_params), part)
+            record = state.records.put(principal, model, dict(request.query_params), part)
         except ERRORS as exc:
             raise _refused(exc) from exc
     finally:
@@ -470,13 +473,13 @@ def add_member(
     record_id: str,
     payload: MemberIn,
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> dict:
     """Put somebody in a shared space. They are told; there is nothing to accept."""
     switched_on(state, model)
     _known(state, payload.username)
     try:
-        return state.records.add_member(person(user), model, record_id, payload.username).to_dict()
+        return state.records.add_member(principal, model, record_id, payload.username).to_dict()
     except ERRORS as exc:
         raise _refused(exc) from exc
 
@@ -487,12 +490,12 @@ def remove_member(
     record_id: str,
     username: str,
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> None:
     """Take somebody out of a shared space, or, with your own name, leave it."""
     switched_on(state, model)
     try:
-        state.records.remove_member(person(user), model, record_id, username)
+        state.records.remove_member(principal, model, record_id, username)
     except ERRORS as exc:
         raise _refused(exc) from exc
 
@@ -502,11 +505,11 @@ def seen(
     model: str,
     record_id: str,
     state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(get_principal),
 ) -> None:
     """You have looked in this space: what is in it is not unread any more."""
     try:
-        state.records.mark_seen(person(user), model, record_id)
+        state.records.mark_seen(principal, model, record_id)
     except ERRORS as exc:
         raise _refused(exc) from exc
 

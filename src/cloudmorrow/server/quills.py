@@ -13,9 +13,10 @@ URL, or a local path. A Quill is fetched as the tarball of its pinned ref,
 so a server needs no git; a local path is used as it is, which is how one is
 developed.
 
-Nothing here runs code from a Quill. Services, webhooks and APIs are read,
-checked and listed; running them is the next piece of the core, and the
-install sheet says so.
+Nothing here runs code from a Quill. Services, webhooks, APIs and `run`
+jobs are read, checked and listed here, and run by `quillservices` — only
+for a Quill that is installed, and as the administrator who installed it,
+whose name the install routes write into the Quill's `.origin.json`.
 
 See docs/QUILLS.md for the format.
 """
@@ -26,6 +27,7 @@ import csv
 import datetime as dt
 import io
 import json
+import logging
 import re
 import shutil
 import tarfile
@@ -45,6 +47,7 @@ from cloudmorrow.server.datamodels import (
     parse_datamodel,
     parse_duration,
 )
+from cloudmorrow.server.quillhooks import PathError, parse_path
 from cloudmorrow.server.records import NEVER_FOR_ASSISTANTS
 
 __all__ = [
@@ -76,6 +79,9 @@ JOB_ACTIONS = frozenset({"expire", "run"})
 SEED_KINDS = frozenset({"per-owner", "once"})
 
 ID_RE = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
+# A webhook's path under /hooks/<quill>/, and an API's prefix under /api/q/<quill>/.
+HOOK_PATH_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+API_PREFIX_RE = re.compile(r"^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$")
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$")
 
 # Surfaces a kit screen is drawn on, for the install sheet to say so.
@@ -305,26 +311,33 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
         if (
             not isinstance(command, list)
             or not command
-            or not all(isinstance(c, str) for c in command)
+            or not all(isinstance(c, str) and c for c in command)
         ):
             raise QuillError(f"{where}: service {service['id']!r} command is a list of strings")
+        if not isinstance(service.get("always", False), bool):
+            raise QuillError(f"{where}: service {service['id']!r} always is true or false")
     webhooks = _table_list(data, "webhooks", where)
     _ids_unique(webhooks, "webhook", where)
     apis = _table_list(data, "apis", where)
     _ids_unique(apis, "api", where)
     service_ids = {s["id"] for s in services}
+    for job in jobs:
+        if job["action"] == "run":
+            if job.get("service") not in service_ids:
+                raise QuillError(
+                    f"{where}: job {job['id']!r} runs one of its services: service = \"<id>\""
+                )
+            if not job.get("every"):
+                raise QuillError(f"{where}: job {job['id']!r} runs every so often: every = \"1h\"")
+    paths: set[str] = set()
     for hook in webhooks:
-        if not (hook.get("model") or hook.get("forward")):
-            raise QuillError(
-                f"{where}: webhook {hook['id']!r} makes a record in a model, or forwards to a service"
-            )
-        if hook.get("forward") and hook["forward"] not in service_ids:
-            raise QuillError(
-                f"{where}: webhook {hook['id']!r} forwards to a service it does not have"
-            )
+        _check_webhook(hook, service_ids, paths, where)
     for api in apis:
         if api.get("service") not in service_ids:
             raise QuillError(f"{where}: api {api['id']!r} is served by one of its services")
+        prefix = api.get("prefix", "")
+        if prefix and not (isinstance(prefix, str) and API_PREFIX_RE.match(prefix)):
+            raise QuillError(f"{where}: api {api['id']!r} prefix is a path like v1/public")
 
     readme = ""
     if folder is not None and (folder / "README.md").is_file():
@@ -353,6 +366,36 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
         readme=readme,
         folder=folder,
     )
+
+
+def _check_webhook(hook: dict, service_ids: set[str], paths: set[str], where: str) -> None:
+    """A webhook: a path, and a record made from its body or a service it goes to."""
+    thing = f"webhook {hook['id']!r}"
+    if bool(hook.get("model")) == bool(hook.get("forward")):
+        raise QuillError(
+            f"{where}: {thing} makes a record in a model, or forwards to a service, one of them"
+        )
+    if hook.get("forward") and hook["forward"] not in service_ids:
+        raise QuillError(f"{where}: {thing} forwards to a service it does not have")
+    path = hook.setdefault("path", hook["id"])
+    if not isinstance(path, str) or not HOOK_PATH_RE.match(path):
+        raise QuillError(f"{where}: {thing} path is lowercase letters, digits, - and _")
+    if path in paths:
+        raise QuillError(f"{where}: two webhooks at /hooks/{where}/{path}")
+    paths.add(path)
+    mapping = hook.get("map", {})
+    if hook.get("forward") and mapping:
+        raise QuillError(f"{where}: {thing} forwards, so it has no map")
+    if not isinstance(mapping, dict):
+        raise QuillError(f"{where}: {thing} map is a table: field = \"$.path\"")
+    for name, path_text in mapping.items():
+        try:
+            parse_path(path_text)
+        except PathError as exc:
+            raise QuillError(f"{where}: {thing} map {name}: {exc}") from exc
+    signature = hook.get("signature", "")
+    if signature and not (isinstance(signature, str) and re.match(r"^[A-Za-z0-9-]+$", signature)):
+        raise QuillError(f"{where}: {thing} signature is the name of a header")
 
 
 def _features(head: dict, where: str) -> tuple[str, ...]:
@@ -498,6 +541,9 @@ class QuillRegistry:
         self.broken: dict[str, str] = {}
         # What the last plan found to copy in: foundational datamodel -> file.
         self._pending_paths: dict[str, Path] = {}
+        # Told after every reload: what runs a Quill's code starts and stops
+        # its services by what is installed now, whoever installed it.
+        self.listeners: list = []
         self.reload()
 
     # -- reading what is there -------------------------------------------------------
@@ -532,6 +578,11 @@ class QuillRegistry:
             self.quills = quills
             self.datamodels = models
             self.broken = broken
+        for listener in list(getattr(self, "listeners", ())):
+            try:
+                listener()
+            except Exception:  # a listener's trouble is not the install's
+                logging.getLogger("cloudmorrow.quills").exception("a registry listener failed")
 
     def models(self) -> dict[str, Datamodel]:
         return self.datamodels
@@ -888,6 +939,11 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
                 raise QuillError(
                     f"{where}: job {job['id']!r} expires on {job['field']}, which must be indexed"
                 )
+    for hook in manifest.webhooks:
+        if hook.get("model"):
+            model = model_of(f"webhook {hook['id']!r}", hook["model"])
+            for name in hook.get("map", {}):
+                need(model, f"webhook {hook['id']!r} map", name)
     for dataset in manifest.datasets:
         model = model_of(f"dataset {dataset['id']!r}", dataset["model"])
         for record in dataset["records"]:
@@ -986,6 +1042,11 @@ def _check_calendar(screen: dict, model: Datamodel, models: dict[str, Datamodel]
         need(model, thing + " subtitle", screen["subtitle"])
 
 
+def runs_code(manifest: Manifest) -> list[str]:
+    """Every command a Quill would have this server run, as a person reads one."""
+    return list(dict.fromkeys(" ".join(s["command"]) for s in manifest.services))
+
+
 def describe(
     manifest: Manifest,
     models: dict[str, Datamodel],
@@ -1027,17 +1088,13 @@ def describe(
             "data": data,
             "surfaces": _surfaces(manifest),
             "installed_version": installed.version if installed else None,
-            # Declared, checked, shown — and not run yet, which the sheet says.
-            "not_running_yet": [
-                f"{kind[:-1]} {item['id']}"
-                for kind, items in (
-                    ("services", manifest.services),
-                    ("webhooks", manifest.webhooks),
-                    ("apis", manifest.apis),
-                )
-                for item in items
-            ]
-            + [f"job {j['id']}" for j in manifest.jobs if j["action"] == "run"],
+            # What it runs on this server, as whom, and what it may reach
+            # there: what an administrator says yes to (see quillservices).
+            # Who it runs as is known once it is installed; before, it is
+            # whoever says yes, and the sheet says that.
+            "runs_code": runs_code(manifest),
+            "runs_as": manifest.origin.get("installed_by", "") if installed else "",
+            "reach": sorted(manifest.models),
         }
     )
     return body
