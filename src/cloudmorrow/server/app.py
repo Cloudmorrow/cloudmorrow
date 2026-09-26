@@ -27,7 +27,8 @@ from cloudmorrow.server.quilljobs import Clock
 from cloudmorrow.server.quills import QuillRegistry
 from cloudmorrow.server.records import RecordStore
 from cloudmorrow.server import spacenotify
-from cloudmorrow.server.backends import NotesBackend, VaultsBackend
+from cloudmorrow.server.backends import NotesBackend, SharesBackend, VaultsBackend
+from cloudmorrow.server.drive import user_drive
 from cloudmorrow.server.routes import (
     agents,
     auth,
@@ -128,6 +129,13 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     record_store.backends["notes"] = NotesBackend(
         lambda username: app.state.cloudmorrow.note_store(user_store.require(username))
     )
+    record_store.backends["shares"] = SharesBackend(
+        share_store,
+        lambda username: user_drive(config, username),
+        lambda username: app.state.cloudmorrow.agents.list(username),
+        data_dir=config.data_dir,
+        base_url=lambda: config.public_url or "",
+    )
     # Secrets stay in their own store, sealed under the key itself; the
     # Secrets Quill draws them from here, and no assistant is ever let in.
     record_store.backends["vaults"] = VaultsBackend(app.state.cloudmorrow.secrets)
@@ -158,7 +166,8 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
 
     # A feature that is switched off answers 403 everywhere it lives, so the
     # guard goes on the routers rather than inside each of their endpoints.
-    # Both share routers are the Files tab.
+    # Both share routers go with the Files Quill's switch, `files`, as they
+    # went with the built-in feature of that name.
     in_files = [Depends(features.require_feature("files"))]
 
     app.include_router(auth.router)

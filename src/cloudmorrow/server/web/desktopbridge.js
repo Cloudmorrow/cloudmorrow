@@ -23,8 +23,9 @@
    words fit to show, never a thrown exception. */
 
 import {
-  esc, occupied, onSignIn, onSignOut, parseHash, route, session, signIn, signOut,
+  esc, occupied, onSignIn, onSignOut, parseHash, route, session, signIn, signOut, toast,
 } from "./core.js";
+import { registerGridHook } from "./kit_grid.js";
 
 let bridge = null;
 // The token this window holds, as the machine last heard of it — so the
@@ -77,6 +78,70 @@ onSignOut(() => {
   const token = known;
   known = null;
   call("signed_out", token);
+});
+
+// -- shares, on this computer -------------------------------------------------------------
+// Under each share in a grid of them (the Files Quill's), a line of its
+// own: where it is mounted here and the way to it, or the button that
+// mounts it. Only the desktop app draws it — a browser cannot mount
+// anything — and it is the same mount the terminal app and `cm share mount`
+// make, so all three agree on what is mounted. The grid asks every hook
+// about its groups and knows nothing of this; this knows the `share`
+// datamodel, which is the core's, and nothing of the Quill.
+// Mounting is Cloud blue: a strong choice, but not the one thing the
+// screen is for.
+function mountLine(share, mounted) {
+  const name = share.id;
+  const here = mounted[name] || {};
+  let words;
+  let buttons = "";
+  if (here.mounted) {
+    words = "Mounted at " + here.path;
+    buttons = `<button class="desk-button ghost" data-open="${esc(here.path)}">Open folder</button>` +
+      `<button class="desk-button ghost" data-unmount="${esc(name)}">Unmount</button>`;
+  } else if (share.fields.kind === "machine" && !share.fields.online) {
+    words = "Not mounted — its machine is offline";
+  } else {
+    words = "Not mounted on this computer";
+    buttons = `<button class="desk-button cloud" data-mount="${esc(name)}">Mount on this computer</button>`;
+  }
+  return `<div class="row mount-row${here.mounted ? " on" : ""}">` +
+    `<span class="main"><span class="meta"><span class="preview">${esc(words)}</span></span></span>` +
+    (buttons ? `<span class="mount-actions">${buttons}</span>` : "") + `</div>`;
+}
+
+function wireMounts(root) {
+  // One at a time: a mount waits for rclone, and a second click meanwhile
+  // would only be refused.
+  const act = (button, busy, method, done) => button.addEventListener("click", async () => {
+    for (const other of root.querySelectorAll(".mount-actions button")) other.disabled = true;
+    button.textContent = busy;
+    const answer = await call(method, button.dataset[method]);
+    toast(answer.error || done(answer), answer.error ? 6000 : 2200);
+    route();
+  });
+  for (const button of root.querySelectorAll("[data-mount]")) {
+    act(button, "Mounting…", "mount", (answer) => "Mounted at " + answer.path);
+  }
+  for (const button of root.querySelectorAll("[data-unmount]")) {
+    act(button, "Unmounting…", "unmount", () => "Unmounted");
+  }
+  for (const button of root.querySelectorAll("[data-open]")) {
+    button.addEventListener("click", async () => {
+      const answer = await call("open_folder", button.dataset.open);
+      if (answer.error) toast(answer.error, 6000);
+    });
+  }
+}
+
+registerGridHook({
+  // What this computer has mounted comes with the list, so the page is
+  // drawn once with it rather than twice.
+  async groups({ model }) {
+    if (!bridge || model.id !== "share") return null;
+    const here = await call("mounted_here");
+    return { after: (share) => mountLine(share, here.mounts || {}), wire: wireMounts };
+  },
 });
 
 // -- This computer, in Me --------------------------------------------------------------

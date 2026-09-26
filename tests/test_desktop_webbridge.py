@@ -33,17 +33,23 @@ def test_without_pywebview_it_only_listens():
     assert "document.documentElement.dataset.desktop" in script
 
 
-def test_files_draws_the_mount_buttons_only_in_the_app():
-    files = (WEB / "files.js").read_text()
-    assert 'import { call, desktop } from "./desktopbridge.js";' in files
-    assert 'desktop() ? call("mounted_here") : null' in files
-    assert 'const mountRow = here ? ' in files and ': () => "";' in files
+def test_the_shares_get_the_mount_buttons_only_in_the_app():
+    """The Files Quill draws its shares with the kit's grid; the grid asks its
+    hooks about its groups, and this is the hook — so the kit never names it."""
+    bridge = (WEB / "desktopbridge.js").read_text()
+    grid = (WEB / "kit_grid.js").read_text()
+    assert 'import { registerGridHook } from "./kit_grid.js";' in bridge
+    assert "export function registerGridHook(hook)" in grid
+    assert "desktopbridge" not in grid
+    # Nothing in the app, nothing drawn: the hook answers null without the bridge.
+    assert 'if (!bridge || model.id !== "share") return null;' in bridge
+    assert 'const here = await call("mounted_here");' in bridge
     for words in ("Mount on this computer", "Unmount", "Open folder"):
-        assert words in files
+        assert words in bridge
     # Cloud blue for the mount, ghosts for the rest: amber is the screen's one action.
-    assert 'class="desk-button cloud" data-mount=' in files
-    assert 'class="desk-button ghost" data-unmount=' in files
-    assert 'class="desk-button ghost" data-open=' in files
+    assert 'class="desk-button cloud" data-mount=' in bridge
+    assert 'class="desk-button ghost" data-unmount=' in bridge
+    assert 'class="desk-button ghost" data-open=' in bridge
 
 
 def test_me_has_this_computer_only_in_the_app():
@@ -63,8 +69,8 @@ def test_every_bridge_call_the_page_makes_is_one_the_bridge_has():
     from cloudmorrow.desktop.bridge import Bridge
 
     called = set()
-    for name in ("desktopbridge.js", "files.js", "me.js"):
+    for name in ("desktopbridge.js", "me.js"):
         called.update(re.findall(r'call\("([a-z_]+)"', (WEB / name).read_text()))
-    # files.js names mount and unmount through a variable; they are listed by hand.
+    # The mount lines name mount and unmount through a variable; they are listed by hand.
     called.update({"mount", "unmount"})
     assert called <= {name for name in dir(Bridge) if not name.startswith("_")}, called

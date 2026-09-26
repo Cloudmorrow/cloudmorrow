@@ -41,3 +41,9 @@ id = "secrets"
 label = "Secrets"
 description = "Keys and passwords in vaults and environments, sealed; never an assistant's."
 datamodels = ["secret"]
+
+[[domains]]
+id = "files"
+label = "Files"
+description = "Your own drive, your fileshares, and the files in them."
+datamodels = ["share", "file"]

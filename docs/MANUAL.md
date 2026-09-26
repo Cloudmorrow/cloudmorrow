@@ -58,8 +58,8 @@ start with the [README](../README.md); this is the page to come back to.
   mounted on whichever machine you are at: `cloudmorrow share mount media` and
   it is `~/Fileshares/media` here, or `/Volumes/media` on a Mac. Finder does
   the mounting on macOS with nothing installed; on Linux it is `rclone`.
-  Made and mounted from the **Files** tab as well. Local backups have a tab
-  beside them, with nothing in it yet.
+  Made and mounted from the **Files** tab as well, which is the Files Quill:
+  the files themselves stay where they are.
 - **Chat.** Channels and direct messages, between everyone on the server.
   Anyone can make a channel: a **public** one is everybody's, in everyone's
   list and open to write in; a **private** one is the people you pick, and
@@ -1000,8 +1000,9 @@ answered; a link to anywhere else opens in the browser.
 | `notify(title, body)` | a system notification, best effort |
 | `version()` | this client's version, and the server it talks to |
 
-**Files.** In the desktop app every share in the **Files** tab has a line
-under it: *Mounted at ~/Fileshares/media* with **Open folder** and
+**Files.** In the desktop app every share in the **Files** tab (the Files
+Quill's grid; the lines come in through the grid's hook, from
+`desktopbridge.js`) has a line under it: *Mounted at ~/Fileshares/media* with **Open folder** and
 **Unmount**, or **Mount on this computer**. It is the same mount the terminal
 app and `cloudmorrow share mount` make — recorded in the same `mounts.json` —
 so all three agree on what is mounted. A machine share whose machine is
@@ -1348,21 +1349,51 @@ both apps. Nobody makes it and nobody removes it — it is there because the
 account is — and only its owner ever sees it. Its files are in that
 account's own tree, `<notes_dir>/<username>/files/`, beside their notes.
 
-In the web app, the **Files** tab lists My Files, then your shares. A server share opens as
-its folders and files, the way a file manager shows them — sorted by name,
-date, size or type, folders first — as a list, or as a grid of thumbnails
-(the switch beside the sort; the choice is kept). A picture opens when
-tapped, with its facts under it and a button that opens the phone's share
-sheet. The plus in the bar puts a file in the folder you are in: one chosen
-from the phone, or one its camera takes there and then. A machine share is
-listed but not opened there: its files are on that machine, so it is
-browsed from a mount.
+**The Files Quill.** What is in them is on screen through the **Files**
+Quill, a foundation Quill in the catalog: installed on a new server with
+Tasks, and at boot on a server that had Files built in (the switch keeps
+its name, `files`, and its setting). The files do not move for it — the
+core serves the drive and the shares as `share` and `file` records through
+the record API (the `shares` backend), with each file's bytes at
+`/api/records/file/<id>/content`, a small copy of a picture at `…/thumb`,
+and a new file put with `POST /api/records/file/upload`. The Quill is only
+the screen, drawn by the kit's `grid`, so the same thing is on every
+surface, and to an assistant through the generic record tools.
 
-The terminal app has the same: **Browse**, the third tab on Files, or
-enter on a share in Fileshares. The same list, the same sort (`s` is the
-next one, `S` turns it around), `v` for thumbnails, and the picture the
-cursor is on drawn beside the listing — the real picture in Kitty or a
-Sixel terminal, coloured half-cells anywhere else.
+On the phone and the web app, **Files** lists My Files, then your shares.
+One opens as its folders and files, the way a file manager shows them —
+sorted by name, date, size or type, folders first — as a list, or as tiles
+with a picture of each photo (the switch beside the sort; the choice is
+kept). A file opens when tapped: a picture shown, its facts, a button that
+opens the phone's share sheet (or saves it), and Rename, Move and Delete.
+The plus beside the title puts something in the folder you are in: a file
+chosen from the phone, one its camera takes there and then, or a new
+folder; on a computer a file dragged onto the folder or pasted goes in too.
+The “…” beside a folder's name renames, moves or deletes it. A machine
+share is listed but not opened: its files are on that machine, so it is
+browsed from a mount, and the line under it says where it is and whether
+it is online.
+
+The terminal app has the same, on the Files card: the shares, then enter
+on one for its folders and files. The same sort (`s` is the next one, `S`
+turns it around), `v` for thumbnails, and the picture the cursor is on
+drawn beside the listing — the real picture in Kitty or a Sixel terminal,
+coloured half-cells anywhere else. In a folder, `p` puts a file from this
+machine there, `g` gets the one the cursor is on, ctrl+n makes a folder,
+`e` renames, `M` moves and delete deletes.
+
+On the command line, `cm files` is the same grid:
+
+```bash
+cm files list                                  # My Files and your shares
+cm files list my-files Photos                  # a folder
+cm files get my-files Photos/cat.jpg ~/Desktop
+cm files put my-files Photos ./dog.jpg
+cm files add my-files Photos/2026              # a new folder
+cm files delete my-files Photos/old.jpg
+```
+
+`cm share` stays as it is, for making, mounting and removing shares.
 
 **Thumbnails.** The server makes them, once, with the long edge at one of
 a few sizes, and keeps them under `<data_dir>/thumbs/`. The key includes
@@ -1624,7 +1655,7 @@ for everybody or by you in Settings, since a tab follows its feature.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│ Notes  Tasks  Calendar  Chat  Secrets  Files             │
+│ Notes  Tasks  Files  Calendar  Chat  Secrets             │
 ├─────────────┬────────────────────────────────────────────┤
 │ default   3 │ verticore                                  │
 │ home      8 │ [New vault ^n] [Add a] [Reveal v] [Copy c] …│
@@ -1652,11 +1683,10 @@ looking at. **Machines** are not a tab: the agents enrol themselves at
 sign-in and get on with it, `cloudmorrow agent` lists them and their jobs,
 and what they have done is behind the bell.
 
-**Files** has two tabs of its own: **Local backups**,
-which is a placeholder until this machine's backups have something to list,
-and **Fileshares** — the shares the server holds for you, which of them is
-mounted on this machine and where, and the buttons that make, mount, unmount
-and remove one. See [Fileshares](#fileshares).
+**Files** is a Quill card (f5): My Files and your shares in a table — which
+of them is mounted on this machine and where, and the buttons that make,
+mount, unmount and remove one — and enter opens one. See
+[Fileshares](#fileshares).
 
 It is meant to be used with a mouse: the tabs, the sub-tabs, the buttons above
 each pane, the rows in every table, the vaults in the list and the notes in

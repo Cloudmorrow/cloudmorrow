@@ -6,12 +6,14 @@ rather than one per module.
 
 from __future__ import annotations
 
+import copy
 import datetime as dt
 import re
 
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.app import CloudmorrowApp
 from cloudmorrow.tui.screens.workspace import WorkspaceScreen
+from tests.tui_files import FILES_QUILL, FakeFiles
 from tests.tui_quills import FakeQuills
 
 TREE = {
@@ -254,10 +256,11 @@ def _one_pixel_png() -> bytes:
 PNG_1PX = _one_pixel_png()
 
 
-class FakeClient(FakeQuills):
+class FakeClient(FakeFiles, FakeQuills):
     """Enough of the API for the workspace, with a record of what was asked.
 
-    The Quills and the record store behind them are in tui_quills.py.
+    The Quills and the record store behind them are in tui_quills.py; the
+    Files Quill and the shares behind it in tui_files.py.
     """
 
     # What a mount signs in with.
@@ -268,6 +271,10 @@ class FakeClient(FakeQuills):
         # so a call that wants one names it itself.
         self.vault: str | None = None
         self.setup_quills()
+        # Files is a Quill, installed the way a server that had it built in
+        # gets it: after Tasks.
+        self.quill_list.append(copy.deepcopy(FILES_QUILL))
+        self.file_calls: list[tuple] = []
         self.share_list: list[dict] = [share_row("media"), share_row("photos")]
         self.share_calls: list[tuple] = []
         # What is in the server shares the Browse view opens: by share, then
