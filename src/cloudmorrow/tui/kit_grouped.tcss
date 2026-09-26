@@ -1,0 +1,96 @@
+/* The kit's list, picked through (panes/kit_grouped.py): the groups down
+   the left, the subgroup as a bar of buttons, the rows under it — laid out
+   as notes are, and as the Secrets tab always was. */
+
+.kit-grouped {
+    height: 1fr;
+}
+
+/* The list is the note tree's opposite number: same width, same rule down
+   its right, and the same line in the theme colour when it has focus. */
+.kit-group-list {
+    width: 26;
+    height: 1fr;
+    padding: 0 0;
+    background: transparent;
+    border-right: solid $line;
+    scrollbar-size-vertical: 1;
+}
+
+.kit-group-list:focus {
+    border-right: solid $primary;
+}
+
+.kit-group-list > ListItem {
+    height: 1;
+    padding: 0 1;
+    background: transparent;
+    color: $foreground;
+}
+
+.kit-group-list > ListItem:hover {
+    background: $panel;
+}
+
+.kit-group-list > ListItem.--highlight {
+    background: $panel;
+}
+
+.kit-group-list:focus > ListItem.--highlight {
+    background: $cloud 45%;
+    color: $text;
+}
+
+.kit-group-side {
+    width: 1fr;
+}
+
+.kit-group-name {
+    height: 1;
+    padding: 0 2;
+    background: transparent;
+    color: $secondary;
+    text-style: bold;
+}
+
+.kit-subgroup-bar {
+    height: 3;
+    padding: 1 2 0 2;
+}
+
+.kit-subgroup-bar Button {
+    height: 1;
+    min-width: 4;
+    margin-right: 1;
+    border: none;
+    padding: 0 2;
+    color: $muted;
+    background: transparent;
+}
+
+.kit-subgroup-bar Button:hover {
+    color: $foreground;
+    background: $line-bright;
+}
+
+/* The subgroup you are looking at: blue, because it is where you are —
+   a blue fill with white on it, as the brand has its fills. */
+.kit-subgroup-bar Button.-primary {
+    color: white;
+    background: $cloud;
+    text-style: bold;
+}
+
+.kit-subgroup-bar Button.-primary:hover {
+    background: $puff;
+}
+
+.kit-group-rows {
+    height: 1fr;
+    padding: 1 2;
+}
+
+.kit-group-empty {
+    padding: 2 2;
+    color: $muted;
+}

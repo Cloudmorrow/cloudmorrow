@@ -52,10 +52,10 @@ async def test_the_bar_shows_at_most_five_keys_with_quit_last(app):
         screen = await open_secrets(app, pilot)
         tips = screen.query_one(BottomBar).tips()
         assert len(tips) <= MAX_TIPS
-        assert tips[0] == ("n", "New vault")
+        # The vault list has focus, and `n` there names a new vault.
+        assert tips[0] == ("n", "New")
         assert tips[-1] == ("^c", "Quit")
-        # `n` and `ctrl+n` both make a vault; one tip covers them.
-        assert [what for _, what in tips].count("New vault") == 1
+        assert [what for _, what in tips].count("New") == 1
         assert "^c Quit" in screen.query_one("#shortcuts", Static).visual.plain
 
 

@@ -14,39 +14,6 @@ from cloudmorrow.tui.app import CloudmorrowApp
 from cloudmorrow.tui.screens.workspace import WorkspaceScreen
 from tests.tui_quills import FakeQuills
 
-SECRETS = {
-    ("verticore", "local"): [
-        {
-            "key": "API_URL",
-            "environment": "local",
-            "length": 21,
-            "fingerprint": "a1b2",
-            "updated_at": "2026-09-10T20:27:00",
-            "value": None,
-        }
-    ],
-    ("verticore", "production"): [
-        {
-            "key": "STRIPE_KEY",
-            "environment": "production",
-            "length": 41,
-            "fingerprint": "beef",
-            "updated_at": "2026-09-01T07:15:00",
-            "value": None,
-        }
-    ],
-    ("homelab", "local"): [
-        {
-            "key": "WIFI_PASSWORD",
-            "environment": "local",
-            "length": 12,
-            "fingerprint": "c0de",
-            "updated_at": "2026-09-05T18:00:00",
-            "value": None,
-        }
-    ],
-}
-
 TREE = {
     "name": "notes",
     "path": "",
@@ -324,7 +291,6 @@ class FakeClient(FakeQuills):
         self.share_fetches: list[str] = []
         self.uploads: list[tuple[str, bytes]] = []
         self.fetched: list[str] = []
-        self.read_keys: list[tuple[str, str]] = []
         # Machines, the config bundle and the notifications the settings
         # screen reads. A test that cares reshapes these before opening it.
         self.agent_list: list[dict] = []
@@ -446,43 +412,6 @@ class FakeClient(FakeQuills):
                 row["changed_by"] = "bram"
                 return dict(row)
         raise AssertionError(f"no such feature: {key}")
-
-    async def secret_vaults(self) -> list[dict]:
-        """Every vault that holds something, the way the server lists them."""
-        counts: dict[str, set[str]] = {}
-        totals: dict[str, int] = {}
-        for (vault, environment), secrets in SECRETS.items():
-            if secrets:
-                counts.setdefault(vault, set()).add(environment)
-                totals[vault] = totals.get(vault, 0) + len(secrets)
-        return [
-            {
-                "vault": vault,
-                "secrets": totals[vault],
-                "environments": len(environments),
-                "updated_at": "2026-09-10T20:27:00",
-            }
-            for vault, environments in sorted(counts.items())
-        ]
-
-    async def secret_environments(self, *, vault: str | None = None) -> list[dict]:
-        wanted = vault or self.vault
-        return [
-            {
-                "environment": environment,
-                "secrets": len(secrets),
-                "updated_at": "2026-09-10T20:27:00",
-            }
-            for (owner, environment), secrets in sorted(SECRETS.items())
-            if owner == wanted and secrets
-        ]
-
-    async def secrets(self, environment=None, *, reveal=False, vault=None) -> list[dict]:
-        return SECRETS.get((vault or self.vault, environment), [])
-
-    async def read_secret(self, key: str, environment: str, *, vault=None) -> dict:
-        self.read_keys.append((key, environment, vault or self.vault))
-        return {"key": key, "environment": environment, "value": "the-actual-value"}
 
     async def tree(self) -> dict:
         """One tree per user — the selected vault does not come into it."""

@@ -20,6 +20,7 @@ import {
   replace, seconds, setStatus, store, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
+import { drawsHere, renderGroupedList, secretWidget, wireSecretWidgets } from "./kit_grouped.js";
 
 const own = {
   // What a board is, for the button that opens its own sheet.
@@ -27,23 +28,23 @@ const own = {
 };
 
 // -- reading a datamodel -----------------------------------------------------------
-const recordsUrl = (model, id) =>
+export const recordsUrl = (model, id) =>
   "/api/records/" + encodeURIComponent(model) + (id ? "/" + encodeURIComponent(id) : "");
-const fieldOf = (model, name) => model.fields.find((f) => f.name === name);
-const titleField = (at, model) => (model.id === at.screen.model && at.screen.title) || model.title;
-const titleOf = (model, record, name = model.title) => String(record.fields[name] || "").trim() || "Untitled";
+export const fieldOf = (model, name) => model.fields.find((f) => f.name === name);
+export const titleField = (at, model) => (model.id === at.screen.model && at.screen.title) || model.title;
+export const titleOf = (model, record, name = model.title) => String(record.fields[name] || "").trim() || "Untitled";
 /** Where one record opens. */
 export const sheetHash = (at, model, id) =>
   `#/r/${encodeURIComponent(at.quill.id)}/${encodeURIComponent(at.screen.id)}/${encodeURIComponent(model)}/${encodeURIComponent(id)}`;
 
 // "Add a task", "Add an entry": the label is the model's, the article is ours.
-const aOr = (label) => (/^[aeiou]/i.test(label) ? "an " : "a ") + label.toLowerCase();
+export const aOr = (label) => (/^[aeiou]/i.test(label) ? "an " : "a ") + label.toLowerCase();
 
 /** The lanes of an enum field, as [value, label] pairs. */
 const lanesOf = (f) => f.values.map((value, i) => [value, (f.labels && f.labels[i]) || value]);
 
 /** A value as a line of text says it: an enum by its label, a date as a date. */
-function spoken(f, value, links = {}) {
+export function spoken(f, value, links = {}) {
   if (value === null || value === undefined || value === "") return "";
   switch (f.kind) {
     case "enum": {
@@ -83,7 +84,7 @@ function bodyMeta(body) {
 
 // A record an expire job will take says so, counted in days — the same
 // promise the job keeps, told before it is kept rather than after.
-function timeLeft(expiresAt) {
+export function timeLeft(expiresAt) {
   const at = seconds(expiresAt);
   if (!at) return "";
   const days = Math.ceil((at * 1000 - Date.now()) / 86400000);
@@ -93,7 +94,7 @@ function timeLeft(expiresAt) {
 
 // The circle on a card: empty in the first lane, full in the last, and a
 // dot in any lane between — somewhere along the way.
-const circle = (state) => `<span class="check ${state}">${state === "done" ? icons.tick : ""}</span>`;
+export const circle = (state) => `<span class="check ${state}">${state === "done" ? icons.tick : ""}</span>`;
 
 // Whether a card is worth making draggable. A phone has the circle and the
 // lane control and no way to drag anything, and `draggable` on a touch
@@ -108,6 +109,8 @@ export const DRAWS = ["list", "board", "detail", "form"];
 export async function renderKitScreen(at, arg) {
   const { kit } = at.screen;
   if (kit === "board") return renderBoard(at, arg);
+  // A list picked through by group, or with a field kept hidden: kit_grouped.js.
+  if (kit === "list" && drawsHere(at.quill.models[at.screen.model], at.screen)) return renderGroupedList(at, arg);
   if (DRAWS.includes(kit)) return renderList(at);
   app.innerHTML = nav({ title: at.screen.label }) + `<main>${heading(at.screen.label)}
     <p class="empty"><b>Not on this app yet</b>This screen is a ${esc(kit)}, which this
@@ -314,7 +317,7 @@ async function newGroup(at, groupModel) {
 }
 
 /** The add row under the title, and the pen beside it that leads there. */
-function wireAdd(create) {
+export function wireAdd(create) {
   const form = app.querySelector("form.add");
   if (!form) return;
   const input = form.querySelector("input");
@@ -403,7 +406,7 @@ async function renderList(at) {
 }
 
 /** For each link field: the linked records' titles, by id. */
-async function linkTitles(quill, fields) {
+export async function linkTitles(quill, fields) {
   const out = {};
   for (const f of fields) {
     if (f.kind !== "link" || !quill.models[f.to]) continue;
@@ -456,6 +459,7 @@ function widget(f, value, links) {
   const data = `data-field="${esc(f.name)}"`;
   const label = `aria-label="${esc(f.label)}"`;
   if (f.stamp) return `<span class="value" ${data} data-readonly>${esc(spoken(f, value) || "—")}</span>`;
+  if (f.secret) return secretWidget(f, value);
   switch (WIDGET[f.kind]) {
     case "switch":
       return `<input type="checkbox" class="switch" ${data} ${label}${value ? " checked" : ""}>`;
@@ -527,6 +531,8 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   const title = titleField(at, model);
   const wanted = onScreen && screen.fields && screen.fields.length ? new Set([title, ...screen.fields]) : null;
   const fields = model.fields.filter((f) => f.name !== title && (!wanted || wanted.has(f.name)));
+  // In the order the screen names them, when it does.
+  if (wanted) fields.sort((a, b) => screen.fields.indexOf(a.name) - screen.fields.indexOf(b.name));
   const links = await linkTitles(quill, fields.filter((f) => f.kind === "link"));
 
   // Back to where it came from: a card to its board, a board to itself.
@@ -535,7 +541,14 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   let backLabel = screen.label;
   if (groupField && record.fields[groupField.name]) {
     parent = `${at.base}/${encodeURIComponent(record.fields[groupField.name])}`;
-    backLabel = (links[groupField.name] || {})[record.fields[groupField.name]] || backLabel;
+    backLabel = (links[groupField.name] || {})[record.fields[groupField.name]] ||
+      (groupField.kind === "link" ? backLabel : String(record.fields[groupField.name]));
+    // A list's second level, when it has one: back to exactly where it was.
+    const sub = screen.subgroup ? fieldOf(model, screen.subgroup) : null;
+    if (sub && record.fields[sub.name]) {
+      parent += `/${encodeURIComponent(record.fields[sub.name])}`;
+      if (sub.kind !== "link") backLabel = String(record.fields[sub.name]);
+    }
   } else if (!onScreen) {
     parent = `${at.base}/${encodeURIComponent(record.id)}`;
     backLabel = titleOf(model, record);
@@ -609,7 +622,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
     else ed.timer = setTimeout(() => saveSheet(ed), SAVE_DELAY);
   };
   for (const el of box.querySelectorAll("input[data-field], textarea[data-field], select[data-field]")) {
-    const typed = el.tagName === "TEXTAREA" || ["text", "email", "tel", "url", "number"].includes(el.type);
+    const typed = el.tagName === "TEXTAREA" || ["text", "email", "tel", "url", "number", "password"].includes(el.type);
     if (typed) el.addEventListener("input", () => { if (el.tagName === "TEXTAREA") grow(); changed(); });
     else el.addEventListener("change", () => changed(true));
   }
@@ -636,7 +649,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   });
   // While something is being typed, the bar's corner is the way to stop.
   const typing = (el) => el && (el.tagName === "TEXTAREA" || el === titleEl ||
-    (el.tagName === "INPUT" && ["text", "email", "tel", "url", "number"].includes(el.type)));
+    (el.tagName === "INPUT" && ["text", "email", "tel", "url", "number", "password"].includes(el.type)));
   box.addEventListener("focusin", (event) => {
     if (typing(event.target)) { done.hidden = false; del.hidden = true; }
   });
@@ -647,6 +660,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
     if (ed.dirty) { clearTimeout(ed.timer); saveSheet(ed); }
   });
   done.addEventListener("click", () => document.activeElement && document.activeElement.blur());
+  wireSecretWidgets(box);
 
   del.addEventListener("click", async () => {
     // What goes with it, said before rather than found out after.
@@ -677,7 +691,7 @@ function changes(ed) {
     let value = read(f, el);
     // A record with no title keeps the one it had.
     if (f.name === ed.title && !String(value || "").trim()) continue;
-    if (f.kind === "string" && typeof value === "string") value = value.trim();
+    if (f.kind === "string" && !f.secret && typeof value === "string") value = value.trim();
     if (!same(f, value, ed.record.fields[f.name])) out[f.name] = value;
   }
   return out;

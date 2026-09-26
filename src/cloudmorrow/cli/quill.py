@@ -137,14 +137,23 @@ def preview(plan: dict) -> str:
             if screen.get("done"):
                 lines.append(f"  the circle moves a card to {screen['done']}, and back")
         elif screen["kit"] == "list":
+            for level in ("group", "subgroup"):
+                if screen.get(level):
+                    name = screen[level]
+                    lines.append(f"  [ <{name}> ] [ <{name}> ] [ + New {name} ]")
             tick = "◯ " if screen.get("tick") else ""
-            sub = f"   <{screen['subtitle']}>" if screen.get("subtitle") else ""
+            sub = ""
+            if screen.get("subtitle"):
+                hidden = fields.get(screen["subtitle"], {}).get("secret")
+                sub = "   •••••••• (revealed on asking)" if hidden else f"   <{screen['subtitle']}>"
             for _ in range(2):
                 lines.append(f"  {tick}<{title}>{sub}")
         else:
             shown = screen.get("fields") or list(fields)
             lines.append("  " + ", ".join(shown))
         editable = [name for name, f in fields.items() if not f.get("stamp")]
+        if screen.get("fields"):
+            editable = [name for name in screen["fields"] if name in fields]
         lines.append(f"  opening one: a sheet with {', '.join(editable)}")
         lines.append("")
     return "\n".join(lines)

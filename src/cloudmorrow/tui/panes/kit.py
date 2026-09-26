@@ -12,7 +12,8 @@ task board has to go on as much as a list of car services does.
 
 - `board` is in kit_board.py: lanes from an enum, cards you drag.
 - `list` is a table of records by `title` (and `subtitle`), with a circle for
-  the `tick` field that space fills in.
+  the `tick` field that space fills in. With a `group` (and `subgroup`), or a
+  `secret` field to keep hidden, it is kit_grouped.py's instead.
 - `detail` and `form` are the same table without the circle: the record
   sheet is the point of them, and enter or a click opens it, showing the
   screen's `fields` when it names them.
@@ -97,7 +98,15 @@ class KitPane(Pane):
         Called from a worker: it waits for the sheet to be answered.
         """
         choices = await link_choices(self.api, self.models, self.model)
-        only = self.spec.get("fields") if self.spec.get("kit") in ("detail", "form") else None
+        # A screen that names its fields shows those on the sheet, in that order.
+        only = self.spec.get("fields") or None
+        if record is not None and any(f.get("secret") for f in self.model.get("fields", [])):
+            # A listing never carries a secret field; the record itself does.
+            try:
+                record = await self.api.record(self.model_id, record["id"])
+            except ApiError as exc:
+                await self.signed_out(exc)
+                return None
         return await self.app.push_screen_wait(
             RecordSheet(
                 self.api,
@@ -329,12 +338,15 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     Quill that declares one simply has no tab for it in this version.
     """
     from cloudmorrow.tui.panes.kit_board import BoardPane
+    from cloudmorrow.tui.panes.kit_grouped import GroupedListPane, draws_here
 
     kit = screen.get("kit")
     if screen.get("model") not in (quill.get("models") or {}):
         return None
     if kit == "board":
         return BoardPane(quill, screen, **kwargs)
+    if kit == "list" and draws_here(quill["models"][screen["model"]], screen):
+        return GroupedListPane(quill, screen, **kwargs)
     if kit in ("list", "detail", "form"):
         return ListPane(quill, screen, **kwargs)
     return None

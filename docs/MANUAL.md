@@ -156,7 +156,7 @@ src/cloudmorrow/
   tui/               Textual client
     theme.py         the Textual theme, built from that palette
     screens/         splash, login, the workspace, and settings
-    panes/           notes, tasks, calendar, chat, secrets (vaults + keys),
+    panes/           notes, calendar, chat, the kit (Quills' screens),
                      files (local backups + fileshares), and browse: what is
                      in a share, as a list or as thumbnails
     widgets/         the vault list, the note tree, the board, the toolbar,
@@ -200,8 +200,10 @@ for the TUI — for the hundredth time in a day. An update never overwrites a
 
 No invented syntax, no arrows. Data goes to stdout, status goes to stderr,
 and `-v`/`-e` are overrides on commands that have a sensible default without
-them. The old plural names (`cloudmorrow secrets list`) still
-work, quietly, so old muscle memory and old scripts do not break.
+them. The old plural names (`cloudmorrow notes list`) still
+work, quietly, so old muscle memory and old scripts do not break — except
+`cloudmorrow secrets`, which is the Secrets Quill's now (`cm secrets list`,
+through the kit); `cloudmorrow secret` is as it always was.
 
 ## Server, on the home box
 
@@ -1116,6 +1118,21 @@ environment you asked for is empty and others are not, the answer says which.
 Vaults are the same shape, and a vault exists exactly as long as it holds
 something: there is nothing to create and nothing to delete but the secrets.
 
+**Secrets is a Quill.** The store, `/api/secrets` and everything above are
+the foundation and work without it; the Secrets Quill (installed on a fresh
+server, and at boot on one that had Secrets built in) is the screens, and it
+brings Secrets to the phone and the web app for the first time. It draws a
+kit `list` of the `secret` datamodel, picked through by vault and then
+environment, served by the core's `vaults` backend from this same store.
+Everywhere, a value is dots until you ask: the eye on a row (or `v` in the
+terminal) fetches that one secret and shows it, the copy button (`c`) copies
+it without showing it, and the record sheet has the value in a password box
+with the same eye (`ctrl+r` in the terminal). `cm secrets list -g work/production`
+and `cm secrets show KEY --reveal` are the same screen on the command line.
+Importing and exporting `.env` files and `secret run` stay here, in
+`cm secret`: they read and write files on your machine. No assistant ever
+reaches a secret — the `secret` datamodel is refused to every MCP tool.
+
 In the TUI, `f3` opens **Secrets**: your vaults down the left, and for the
 one picked, its environments across the top and that environment's keys
 below. See [The TUI](#the-tui).
@@ -1625,9 +1642,10 @@ and how many secrets it holds at the end of the row. A vault you have just
 named is a row before it holds anything, so there is somewhere to stand while
 you add the first key.
 
-**Picking a vault names it on the secrets calls, and nowhere else.** There
-is no selected vault in the top bar, nothing else changes with it, and the
-CLI's own default vault is left alone.
+**Picking a vault shows it in the pane, and nowhere else.** There is no
+selected vault in the top bar, nothing else changes with it, and the CLI's
+own default vault is left alone. (The pane is the kit's grouped list, so the
+same layout draws any Quill's list with a `group` and `subgroup`.)
 
 **Notes are not.** They are yours, and they stay put whichever vault you are
 looking at. **Machines** are not a tab: the agents enrol themselves at
@@ -1671,18 +1689,20 @@ In secrets — the vault list:
 
 | key | action |
 | --- | --- |
-| `n` / `ctrl+n` | new vault |
+| `n` | new vault |
 
 In secrets — the keys:
 
 | key | action |
 | --- | --- |
-| `a` | add a secret, or replace one |
+| `ctrl+n` | add a secret in the vault and environment on screen |
+| `enter` | open it: key, value (hidden; `ctrl+r` shows it), vault, environment |
 | `v` | reveal the selected value, or hide it again |
 | `c` | copy it to the clipboard without showing it |
-| `d` | delete it |
-| `i` / `x` | import a `.env` / export one |
+| `del` | delete it |
 | `e` | work in another environment |
+
+Importing and exporting `.env` files are `cm secret import` and `export`.
 
 In files:
 

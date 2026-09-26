@@ -170,7 +170,8 @@ async def test_a_quill_screen_is_a_tab_after_notes(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
         assert tab_labels(screen)[0] == "Notes  f1"
-        assert tab_labels(screen)[-1] == "Tasks  f2"
+        # Tasks, then Secrets, each with the key it had when it was built in.
+        assert tab_labels(screen)[-2:] == ["Tasks  f2", "Secrets  f3"]
         assert screen.query_one("#nav-section-quills").display
         assert isinstance(screen.query_one("#pane-tasks"), BoardPane)
 
@@ -215,7 +216,7 @@ async def open_reading(app, pilot):
     screen = await start(app, pilot)
     await pilot.click("#nav-reading")
     await settle(app, pilot)
-    return screen, screen.query_one(ListPane)
+    return screen, screen.query_one("#pane-reading", ListPane)
 
 
 async def test_a_list_screen_is_a_table_with_a_circle(app):
@@ -332,6 +333,7 @@ async def test_removing_asks_then_takes_the_tab_and_keeps_the_records(app):
 
         assert ("uninstall", "tasks") in app.client.quill_calls
         assert not screen.query("#nav-tasks")
-        assert not screen.query_one("#nav-section-quills").display
+        # Secrets is still a Quill, so the section stays for it.
+        assert screen.query_one("#nav-section-quills").display
         assert not screen.query("#pane-tasks")
         assert len(app.client.record_store["task"]) == 3

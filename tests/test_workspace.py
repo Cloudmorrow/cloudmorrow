@@ -7,11 +7,11 @@ the shortcuts are the accelerator.
 
 from __future__ import annotations
 
+from cloudmorrow.tui.panes.kit_grouped import MASK, GroupedListPane
 from cloudmorrow.tui.panes.notes import NotesPane
-from cloudmorrow.tui.panes.secrets import SecretsPane
+from cloudmorrow.tui.widgets.group_list import GroupList
 from cloudmorrow.tui.widgets.note_tree import NoteTree
 from cloudmorrow.tui.widgets.sidebar import NavCard
-from cloudmorrow.tui.widgets.vault_list import VaultList
 from tests.tui_harness import PRESS_ANIMATION, open_secrets, settle, start
 
 
@@ -61,12 +61,11 @@ async def test_clicking_a_tab_switches_pane(app):
         await pilot.click("#nav-secrets")
         await settle(app, pilot)
         assert screen.query_one("#panes").current == "pane-secrets"
-        assert isinstance(screen.active_pane, SecretsPane)
-        listing = screen.query_one(VaultList)
-        # Every vault that holds something, alphabetically, and the one the
-        # config names is the one picked.
-        assert [row.vault for row in listing.query("VaultRow")] == ["homelab", "verticore"]
-        assert screen.query_one(SecretsPane).selected_vault == "verticore"
+        assert isinstance(screen.active_pane, GroupedListPane)
+        listing = screen.query_one(GroupList)
+        # Every vault that holds something, alphabetically, the first picked.
+        assert [row.value for row in listing.query("GroupRow")] == ["homelab", "verticore"]
+        assert screen.query_one(GroupedListPane).chosen == ["homelab", "local"]
 
         await pilot.click("#nav-notes")
         await settle(app, pilot)
@@ -84,13 +83,14 @@ async def test_secrets_is_a_card_of_its_own(app):
             for card in screen.query(NavCard)
             if card.display and not card.has_class("admin-card")
         ]
+        # Secrets is a Quill now, and keeps the key it had when it was built in.
         assert cards == [
             ("Notes", "f1"),
             ("Calendar", "f7"),
             ("Chat", "f6"),
-            ("Secrets", "f3"),
             ("Files", "f5"),
             ("Tasks", "f2"),
+            ("Secrets", "f3"),
         ]
 
 
@@ -99,7 +99,7 @@ async def test_a_card_says_how_its_place_is(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
         assert screen.query_one("#nav-tasks", NavCard).status_line == "2 to do"
-        assert screen.query_one("#nav-secrets", NavCard).status_line == "keys, sealed"
+        assert screen.query_one("#nav-secrets", NavCard).status_line == "2 vaults, 3 secrets"
 
 
 async def test_the_sidebar_narrows_on_a_narrow_terminal(app):
@@ -126,62 +126,68 @@ async def test_clicking_a_vault_moves_nothing_but_the_pane(app):
     """Picking one shows it here. It is not a mode the app goes into."""
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_secrets(app, pilot)
-        pane = screen.query_one(SecretsPane)
-        rows = list(screen.query("VaultRow"))
-        await pilot.click(rows[0])  # homelab
+        pane = screen.query_one(GroupedListPane)
+        rows = list(screen.query("GroupRow"))
+        await pilot.click(rows[1])  # verticore
         await settle(app, pilot)
-        assert pane.selected_vault == "homelab"
-        assert screen.query_one("#vault-name").visual.plain.strip() == "homelab"
-        assert [secret["key"] for secret in pane._secrets] == ["WIFI_PASSWORD"]
+        assert pane.chosen == ["verticore", "local"]
+        assert screen.query_one("#kit-group-name").visual.plain.strip() == "verticore · local"
+        assert [r["fields"]["key"] for r in pane.records] == ["API_URL"]
         # Nothing outside the pane heard about it: no scope on the client,
         # the CLI's own default left exactly as it was, nothing up top.
         assert app.client.vault is None
         assert app.client_config.vault == "verticore"
-        assert "homelab" not in screen.query_one("#topbar-left").visual.plain
+        assert "verticore ·" not in screen.query_one("#topbar-left").visual.plain
 
 
 async def test_a_new_vault_is_a_row_before_it_holds_anything(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_secrets(app, pilot)
-        pane = screen.query_one(SecretsPane)
-        pane.select("work")
+        pane = screen.query_one(GroupedListPane)
+        pane.stand(0, "work")
         await settle(app, pilot)
-        assert pane.selected_vault == "work"
-        assert [row.vault for row in screen.query("VaultRow")] == ["homelab", "verticore", "work"]
-        assert pane._secrets == []
-        assert "work · local" in screen.query_one("#secret-empty").visual.plain
+        assert pane.chosen == ["work", "local"]
+        assert [row.value for row in screen.query("GroupRow")] == ["homelab", "verticore", "work"]
+        assert pane.records == []
+        assert "work · local" in screen.query_one("#kit-group-empty").visual.plain
 
 
 async def test_clicking_an_environment_shows_that_environment(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_secrets(app, pilot)
-        pane = screen.query_one(SecretsPane)
-        assert pane.environment == "local"
-
-        await pilot.click("#env-production")
+        pane = screen.query_one(GroupedListPane)
+        pane.stand(0, "verticore")
         await settle(app, pilot)
-        assert pane.environment == "production"
-        assert [secret["key"] for secret in pane._secrets] == ["STRIPE_KEY"]
+        assert pane.chosen[1] == "local"
+
+        await pilot.click("#sub-production")
+        await settle(app, pilot)
+        assert pane.chosen == ["verticore", "production"]
+        assert [r["fields"]["key"] for r in pane.records] == ["STRIPE_KEY"]
 
 
 async def test_a_value_is_only_fetched_when_it_is_asked_for(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_secrets(app, pilot)
-        pane = screen.query_one(SecretsPane)
-        # Listing a whole environment reads no values at all.
-        assert app.client.read_keys == []
+        pane = screen.query_one(GroupedListPane)
+        table = pane.query_one("#kit-table")
+        # Listing a whole vault reads no values at all, and shows none.
+        assert app.client.record_reads == []
+        assert MASK in str(table.get_row_at(0)[1])
 
         await pilot.click("#do-reveal")
         await settle(app, pilot)
-        assert app.client.read_keys == [("API_URL", "local", "verticore")]
-        assert pane._revealed == {"API_URL": "the-actual-value"}
+        assert app.client.record_reads == [("secret", "s_wifi")]
+        assert pane.revealed == {"s_wifi": "hunter2"}
+        assert "hunter2" in str(table.get_row_at(0)[1])
 
         # Revealing again puts it away, without another round trip.
         await settle(app, pilot, delay=PRESS_ANIMATION)
         await pilot.click("#do-reveal")
         await settle(app, pilot)
-        assert pane._revealed == {}
-        assert len(app.client.read_keys) == 1
+        assert pane.revealed == {}
+        assert MASK in str(table.get_row_at(0)[1])
+        assert len(app.client.record_reads) == 1
 
 
 async def test_clicking_a_note_opens_it(app):
@@ -205,9 +211,9 @@ async def test_picking_a_vault_leaves_the_open_note_alone(app):
 
         await pilot.click("#nav-secrets")
         await settle(app, pilot)
-        rows = list(screen.query("VaultRow"))
-        await pilot.click(rows[0])
+        rows = list(screen.query("GroupRow"))
+        await pilot.click(rows[1])
         await settle(app, pilot)
-        assert screen.query_one(SecretsPane).selected_vault == "homelab"
+        assert screen.query_one(GroupedListPane).chosen[0] == "verticore"
         assert pane.current_path == "architecture.md"
         assert pane.query_one("#editor").text.startswith("# Architecture")

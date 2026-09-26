@@ -1,0 +1,33 @@
+[quill]
+id = "secrets"
+name = "Secrets"
+version = "1.0.0"
+summary = "Keys and passwords in vaults and environments, sealed, and never shown until you ask."
+category = "developer"
+icon = "secrets"
+publisher = "Cloudmorrow"
+license = "AGPL-3.0-or-later"
+features = [
+  "Vaults, and environments inside each: local, production, whatever you call them",
+  "Values hidden until you reveal one, on the phone, the web app and the terminal",
+  "Add, change, move and delete a secret from any of them",
+  "Import and export .env files, and cm secret run, stay on the command line (cm secret)",
+  "Never an assistant's: no MCP tool reaches a secret, whatever you allow",
+]
+
+[uses]
+datamodels = ["secret"]
+
+# One tab: your vaults, then the environments of the one you picked, then
+# its keys. A value is never in the list; it is fetched when you reveal it.
+# In the terminal the vaults are a list down the left, as they always were.
+[[screens]]
+id = "vaults"
+kit = "list"
+label = "Secrets"
+model = "secret"
+title = "key"
+subtitle = "value"
+group = "vault"
+subgroup = "environment"
+fields = ["key", "value", "vault", "environment"]

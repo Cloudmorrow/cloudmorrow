@@ -54,7 +54,6 @@ from cloudmorrow.tui.panes.chat import ChatPane
 from cloudmorrow.tui.panes.files import FilesPane
 from cloudmorrow.tui.panes.kit import pane_for, screen_key
 from cloudmorrow.tui.panes.notes import NotesPane
-from cloudmorrow.tui.panes.secrets import SecretsPane
 from cloudmorrow.tui.screens.modals import PasswordModal
 from cloudmorrow.tui.screens.notifications import (
     NOTIFICATIONS,
@@ -70,12 +69,14 @@ from cloudmorrow.tui.widgets.logstrip import LogStrip
 from cloudmorrow.tui.widgets.sidebar import NavCard, SectionLabel
 
 PANES: tuple[type[Pane], ...] = (
-    NotesPane, CalendarPane, ChatPane, SecretsPane, FilesPane,
+    NotesPane, CalendarPane, ChatPane, FilesPane,
 )
 
 # The function keys no built-in card has, handed to Quill cards in the order
-# they appear. f2 was Tasks' before Tasks was a Quill, and still is.
-QUILL_KEYS: tuple[str, ...] = ("f2", "f4", "f10", "f11", "f12")
+# they appear. f2 was Tasks' before Tasks was a Quill, and still is; f3 was
+# Secrets', and is kept for it the same way.
+QUILL_KEYS: tuple[str, ...] = ("f2", "f4", "f10", "f11", "f12", "f3")
+KEPT_KEYS: dict[str, str] = {"tasks": "f2", "secrets": "f3"}
 
 # How often the bell asks the server whether anything happened.
 BELL_POLL = 60.0
@@ -85,7 +86,6 @@ FEATURE_OF: dict[str, str] = {
     "notes": "notes",
     "calendar": "calendar",
     "chat": "chat",
-    "secrets": "secrets",
     "files": "files",
 }
 
@@ -329,7 +329,13 @@ class WorkspaceScreen(Screen):
         if key in self._quill_keys:
             return self._quill_keys[key]
         taken = set(self._quill_keys.values())
-        free = next((k for k in QUILL_KEYS if k not in taken), "")
+        kept = KEPT_KEYS.get(key)
+        if kept and kept not in taken:
+            free = kept
+        else:
+            spare = [k for k in QUILL_KEYS if k not in taken]
+            # A key kept for a Quill that was built in goes to another only when nothing else is left.
+            free = next((k for k in spare if k not in KEPT_KEYS.values()), spare[0] if spare else "")
         if free:
             self._quill_keys[key] = free
         return free

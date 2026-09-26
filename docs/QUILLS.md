@@ -138,6 +138,12 @@ done_at = { kind = "datetime", indexed = true, stamp = { field = "lane", value =
 `date`, `datetime`, `enum`, `email`, `phone`, `url`, `link`, `json`. Each kind
 has a widget on every surface; adding a kind means adding all of them.
 
+**`secret = true`** on a string or text field keeps it out of every
+listing — the record store and every backend send it as null there — and
+every surface draws it hidden until asked: dots and an eye on a row, a
+password box on the sheet, `--reveal` on the command line. Reading the one
+record is how its value is fetched. A secret field is never indexed.
+
 **Indexed** fields are kept plain so the server can filter and sort by them.
 Everything else is sealed at rest under the server's key, bound to the
 datamodel, the owner and the record, so nothing can be moved by editing the
@@ -268,7 +274,7 @@ each element needs:
 
 | kit | binds | on the phone | on the full web app | in the terminal | on the command line |
 | --- | --- | --- | --- | --- | --- |
-| `list` | `model`, `title`, optional `subtitle`, `tick` (a bool field), `group` (a link: sections) | a list with a circle per row | the same, wider | a table | `cm <quill> list`, `add`, `done` |
+| `list` | `model`, `title`, optional `subtitle`, `tick` (a bool field), `fields` (the sheet's), `group` and `subgroup` (a link, an enum or an indexed string: picked through) | chips for the group and subgroup, a list with a circle per row | the same, wider | the groups down the left, the subgroup as buttons, a table | `cm <quill> list [-g group/subgroup]`, `add`, `done` |
 | `board` | `model`, `lane` (enum), `title`, optional `group` (link), `body`, `done` | lanes stacked | lanes as columns, drag and drop | lanes as columns, drag and keys | `cm <quill> list`, `add`, `move` |
 | `detail` / `form` | `model`, `fields` | a sheet | a panel | a modal | `cm <quill> show`, `set` |
 | `calendar` | `model`, `starts`, `ends`, optional `all_day`, `space` (the calendars) | a day list and a month | a week and a month | a month and the day's list | `cm <quill> list --from --to`, `add` |
@@ -395,8 +401,9 @@ manifest written, checked and installed in one conversation.
 | manifests, sources, install, catalog | `server/quills.py`, `server/routes/quills.py` |
 | the record API | `server/routes/records.py` |
 | jobs | `server/quilljobs.py` |
-| the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; the catalog and install sheet in `quillsadmin.js` |
-| the kit in the terminal | `tui/panes/kit.py` (list), `tui/panes/kit_board.py`, `tui/widgets/kit.py`, `tui/screens/record_sheet.py`; the catalog in `tui/panes/admin_quills.py` |
+| the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; a grouped list and hidden fields in `kit_grouped.js`/`.css`; the catalog and install sheet in `quillsadmin.js` |
+| the kit in the terminal | `tui/panes/kit.py` (list), `tui/panes/kit_grouped.py` (a grouped list, hidden fields) with `tui/widgets/group_list.py`, `tui/panes/kit_board.py`, `tui/widgets/kit.py`, `tui/screens/record_sheet.py`; the catalog in `tui/panes/admin_quills.py` |
+| backends (notes, secrets) | `server/backends.py` |
 | the kit on the command line | `cli/quillrun.py` (`cm <quill> …`) |
 | building one | `cli/quill.py` (`cm quill new/check/dev/add`), `quill_reference.md`, `quill_template/` |
 | the kit to an assistant | `server/mcptools.py` (generic record tools) |
@@ -406,7 +413,8 @@ manifest written, checked and installed in one conversation.
 1. Tasks is the first Quill, and the proof: no task code left in the core.
 2. Services, webhooks and APIs run, with Quill tokens and the gate on them.
 3. `calendar` and `thread` in the kit; Calendar and Chat become Quills.
-4. `grid` and `editor`; Files and Notes become Quills. Secrets stays in the
-   core: it is foundation, and the one datamodel no assistant may ever reach.
+4. `grid` and `editor`; Files and Notes become Quills. Secrets is a Quill
+   already — a grouped `list` of the `secret` datamodel — while its store stays
+   foundation, and it is the one datamodel no assistant may ever reach.
 5. Shared and public scopes in the record store; named datasets.
 6. The catalog page at cloudmorrow.com, and the first Quill we did not write.

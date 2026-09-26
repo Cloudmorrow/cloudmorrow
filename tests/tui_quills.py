@@ -141,6 +141,62 @@ READING_QUILL = {
     },
 }
 
+SECRET_MODEL = {
+    "id": "secret",
+    "version": 1,
+    "label": "Secret",
+    "description": "A key and its value, in a vault and an environment.",
+    "domain": "secrets",
+    "scopes": ["personal"],
+    "title": "key",
+    "ordered_within": [],
+    "source": "foundation",
+    "backend": "vaults",
+    "fields": [
+        {"name": "vault", "kind": "string", "label": "Vault", "required": True, "indexed": True,
+         "default": "default"},
+        {"name": "environment", "kind": "string", "label": "Environment", "required": True,
+         "indexed": True, "default": "local"},
+        {"name": "key", "kind": "string", "label": "Key", "required": True, "indexed": True},
+        {"name": "value", "kind": "string", "label": "Value", "secret": True},
+        {"name": "length", "kind": "int", "label": "Length", "indexed": True},
+    ],
+}
+
+SECRETS_QUILL = {
+    "id": "secrets",
+    "name": "Secrets",
+    "version": "1.0.0",
+    "summary": "Keys and passwords in vaults and environments, sealed.",
+    "category": "developer",
+    "icon": "secrets",
+    "publisher": "Cloudmorrow",
+    "license": "AGPL-3.0-or-later",
+    "uses": ["secret"],
+    "extends": {},
+    "introduces": [],
+    "grants": [],
+    "screens": [
+        {"id": "vaults", "kit": "list", "label": "Secrets", "model": "secret", "title": "key",
+         "subtitle": "value", "group": "vault", "subgroup": "environment",
+         "fields": ["key", "value", "vault", "environment"]},
+    ],
+    "jobs": [],
+    "datasets": [],
+    "services": [],
+    "webhooks": [],
+    "apis": [],
+    "data": [{"id": "secret", "label": "Secret", "how": "uses", "foundation": True, "new": False}],
+    "surfaces": ["phone", "web", "terminal", "command line"],
+    "installed_version": "1.0.0",
+    "not_running_yet": [],
+    "enabled": True,
+    "models": {"secret": SECRET_MODEL},
+}
+
+# What the server's vaults backend holds; a listing sends every value as null.
+SECRET_VALUES = {"s_api": "https://api.example.org", "s_stripe": "sk_live_abc", "s_wifi": "hunter2"}
+
 CATALOG = {
     "categories": [
         {"id": "personal", "label": "Personal", "description": "Your own lists and plans."},
@@ -149,6 +205,9 @@ CATALOG = {
     "quills": [
         {"id": "tasks", "name": "Tasks", "summary": TASKS_QUILL["summary"], "repo": "quill-tasks",
          "category": "personal", "publisher": "Cloudmorrow", "foundation": True},
+        {"id": "secrets", "name": "Secrets", "summary": SECRETS_QUILL["summary"],
+         "repo": "quill-secrets", "category": "developer", "publisher": "Cloudmorrow",
+         "foundation": True},
         {"id": "reading", "name": "Reading", "summary": READING_QUILL["summary"],
          "repo": "quill-reading", "category": "home", "publisher": "Somebody Else"},
     ],
@@ -188,6 +247,15 @@ def seed_records() -> dict[str, list[dict]]:
             record_row("task", "r_task3", 0, board="r_homelab", title="Swap the switch",
                        body="", lane="doing", due=None, done_at=None),
         ],
+        # Two vaults, one with two environments: the shape the Secrets tab always had.
+        "secret": [
+            record_row("secret", "s_api", 0, vault="verticore", environment="local", key="API_URL",
+                       value=SECRET_VALUES["s_api"], length=23),
+            record_row("secret", "s_stripe", 0, vault="verticore", environment="production",
+                       key="STRIPE_KEY", value=SECRET_VALUES["s_stripe"], length=11),
+            record_row("secret", "s_wifi", 0, vault="homelab", environment="local",
+                       key="WIFI_PASSWORD", value=SECRET_VALUES["s_wifi"], length=7),
+        ],
     }
 
 
@@ -201,13 +269,16 @@ class FakeQuills:
     """Installed Quills, the catalog, and the record store — mixed into FakeClient."""
 
     def setup_quills(self) -> None:
-        self.quill_list: list[dict] = [copy.deepcopy(TASKS_QUILL)]
+        # Tasks, and Secrets, which every server that had it built in now has.
+        self.quill_list: list[dict] = [copy.deepcopy(TASKS_QUILL), copy.deepcopy(SECRETS_QUILL)]
         self.catalog: dict = copy.deepcopy(CATALOG)
         self.record_store: dict[str, list[dict]] = seed_records()
         # What was asked of the store, for tests to read back.
         self.record_calls: list[tuple[str, dict]] = []
         self.moves: list[tuple[str, dict, int | None]] = []
         self.quill_calls: list[tuple[str, str]] = []
+        # Every record read on its own, so a test can see a value was asked for.
+        self.record_reads: list[tuple[str, str]] = []
         self._next_id = 100
 
     # -- the Quills ------------------------------------------------------------
@@ -225,7 +296,7 @@ class FakeQuills:
         }
 
     def _published(self, quill_id: str) -> dict:
-        for quill in (TASKS_QUILL, READING_QUILL):
+        for quill in (TASKS_QUILL, READING_QUILL, SECRETS_QUILL):
             if quill["id"] == quill_id:
                 return copy.deepcopy(quill)
         raise ApiError(f"{quill_id} is not in the catalog", status_code=400)
@@ -343,9 +414,16 @@ class FakeQuills:
         ]
         order = definition.get("ordered_within") or []
         rows.sort(key=lambda r: (tuple(str(r["fields"].get(n)) for n in order), r["position"]))
-        return copy.deepcopy(rows)
+        rows = copy.deepcopy(rows)
+        # A secret field is never in a listing, as the server promises.
+        for f in definition["fields"]:
+            if f.get("secret"):
+                for row in rows:
+                    row["fields"][f["name"]] = None
+        return rows
 
     async def record(self, model: str, record_id: str) -> dict:
+        self.record_reads.append((model, record_id))
         return copy.deepcopy(self._find(model, record_id))
 
     async def create_record(self, model: str, fields: dict, *, index: int | None = None) -> dict:

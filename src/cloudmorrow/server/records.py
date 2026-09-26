@@ -260,7 +260,7 @@ def _coerce(model: Datamodel, f: Field, value: object) -> object:
         if not isinstance(value, str | int | float):
             raise RecordError(f"{where} is text")
         text = str(value)
-        if kind == "string":
+        if kind == "string" and not f.secret:
             text = text.strip()
         return text
     if kind == "email":
@@ -542,6 +542,12 @@ class RecordStore:
             rows = conn.execute(query, params).fetchall()
             records = [self._record(conn, model, row, principal) for row in rows]
         conn.close()
+        # A secret field is never in a listing: reading the one record is
+        # how it is asked for (see backends.py for the store that has one).
+        hidden = [f.name for f in model.fields if f.secret]
+        for record in records:
+            for name in hidden:
+                record.fields[name] = None
         return records
 
     def get(self, principal: Principal, model_id: str, record_id: str) -> Record:

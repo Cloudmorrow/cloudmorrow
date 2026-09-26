@@ -7,6 +7,7 @@
 
      #/q/<quill>/<screen>              a screen: the board, the list
      #/q/<quill>/<screen>/<group>      a board, on one of its groups
+     #/q/<quill>/<screen>/<g>/<sub>    a list, on a group and a subgroup
      #/r/<quill>/<screen>/<model>/<id> one record, on the record sheet
 
    The tabs sit where this file is imported in app.js — after Notes, where
@@ -96,9 +97,10 @@ async function find(quillId, screenId) {
 }
 
 registerScreen("q", async (arg) => {
-  const [quillId, screenId, group = ""] = arg.split("/");
+  // The rest is where on the screen: a board's group, a list's group and subgroup.
+  const [quillId, screenId, ...group] = arg.split("/");
   const at = await find(quillId, screenId);
-  if (at) await renderKitScreen(at, group);
+  if (at) await renderKitScreen(at, group.join("/"));
 });
 
 registerScreen("r", async (arg) => {

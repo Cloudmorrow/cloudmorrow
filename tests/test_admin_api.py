@@ -90,7 +90,7 @@ def test_an_account_from_before_roles_existed_keeps_its_rights(config, tmp_path)
 
 
 # -- features --------------------------------------------------------------
-def test_every_feature_is_on_to_begin_with(tasks_quill, auth):
+def test_every_feature_is_on_to_begin_with(tasks_quill, secrets_quill, auth):
     client = tasks_quill
     listed = client.get("/api/server/features", headers=auth).json()
     # The catalogue grows with the app; these four are the ones with tabs.
@@ -118,8 +118,9 @@ def test_a_switched_off_feature_closes_its_api(tasks_quill, auth):
     assert client.get("/api/records/board", headers=auth).status_code == 200
 
 
-def test_secrets_are_a_feature_of_their_own(client, auth):
+def test_secrets_are_a_feature_of_their_own(secrets_quill, auth):
     """Switching Secrets off closes every secrets call, vaults included."""
+    client = secrets_quill
     client.patch("/api/server/features/secrets", headers=auth, json={"enabled": False})
     assert client.get("/api/secrets", headers=auth).status_code == 403
     assert client.get("/api/secrets/vaults", headers=auth).status_code == 403

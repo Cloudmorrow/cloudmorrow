@@ -44,7 +44,8 @@ def test_the_catalogue_says_who_uses_what():
     assert rows["note"]["used_by"] == ["notes"]
     # A foundation type is used by whoever asked for it, and nobody by default.
     assert rows["user"]["used_by"] == ["calendar", "chat"]
-    assert rows["secret"]["used_by"] == ["secrets"]
+    # Secrets is a Quill now: the installed Quills say so, on the features list.
+    assert rows["secret"]["used_by"] == []
     assert rows["secret"]["foundation"] is True
     assert rows["note"]["foundation"] is False
 
@@ -68,7 +69,7 @@ def test_the_types_are_on_the_api(client, auth):
     assert client.get("/api/types", headers=guest).status_code == 200
 
 
-def test_the_apps_say_which_types_they_use(tasks_quill, auth):
+def test_the_apps_say_which_types_they_use(tasks_quill, secrets_quill, auth):
     listed = {row["key"]: row for row in tasks_quill.get("/api/server/features", headers=auth).json()}
     assert listed["tasks"]["types"] == ["board", "task"]
     assert listed["secrets"]["types"] == ["secret"]

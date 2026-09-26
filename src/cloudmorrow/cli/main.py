@@ -62,7 +62,7 @@ app.command("uninstall")(uninstall.uninstall)
 app.command("app")(desktop.app_command)
 
 # What the resources used to be called, kept working but out of the help.
-app.add_typer(secret.app, name="secrets", hidden=True)
+# Not `secrets`: that is the Secrets Quill's now, `cm secrets list` through the kit.
 app.add_typer(note.app, name="notes", hidden=True)
 app.add_typer(agent.app, name="agents", hidden=True)
 app.add_typer(share.app, name="shares", hidden=True)

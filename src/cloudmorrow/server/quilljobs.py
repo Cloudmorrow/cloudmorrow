@@ -9,6 +9,10 @@ At boot:
 * Boards and tasks from before Tasks was a Quill move into the record store,
   under the `board` and `task` datamodels, keeping their titles, bodies,
   lanes, order and times. The old tables stay where they are, untouched.
+* A server from before Secrets was a Quill gets the Secrets Quill, once,
+  so the tab it always had is still there. The secrets stay in their own
+  store; the Quill only draws them. An administrator who had switched
+  Secrets off still has it off: the switch has the same key.
 
 Both reach the network for the catalog, so both run on a thread and neither
 can stop the server starting. What fails is logged and tried again at the
@@ -36,6 +40,7 @@ SWEEP_EVERY = 10 * 60.0
 # schema_meta keys: set once the thing is done, so it is done once.
 SEEDED = "quills_seeded"
 LEGACY_TASKS = "legacy_tasks_moved"
+SECRETS_QUILL = "secrets_quill_installed"
 
 
 def read_meta(db_path: Path, key: str) -> str | None:
@@ -127,6 +132,23 @@ def move_legacy_tasks(db_path: Path, registry: QuillRegistry, records: RecordSto
     return moved
 
 
+def install_secrets_quill(db_path: Path, registry: QuillRegistry) -> bool:
+    """The Secrets Quill, on a server that had Secrets built in. True when it was installed.
+
+    Once: after that, and on a server whose installer chose (`standard.choose`
+    marks it), whether Secrets is installed is the administrator's business.
+    """
+    if read_meta(db_path, SECRETS_QUILL):
+        return False
+    installed = False
+    if "secrets" not in registry.quills:
+        registry.install_from_catalog("secrets")
+        installed = True
+        log.info("installed the Secrets Quill: Secrets was built in until now")
+    write_meta(db_path, SECRETS_QUILL, "installed" if installed else "there")
+    return installed
+
+
 def boot(db_path: Path, registry: QuillRegistry, records: RecordStore) -> None:
     """The boot work, in order. Each step logs its own failure and lets the next run."""
     try:
@@ -137,6 +159,10 @@ def boot(db_path: Path, registry: QuillRegistry, records: RecordStore) -> None:
         move_legacy_tasks(db_path, registry, records)
     except (QuillError, UnknownModelError) as exc:
         log.warning("could not move the old tasks into records yet: %s", exc)
+    try:
+        install_secrets_quill(db_path, registry)
+    except QuillError as exc:
+        log.warning("could not install the Secrets Quill yet: %s", exc)
 
 
 def sweep_all(registry: QuillRegistry, records: RecordStore) -> int:

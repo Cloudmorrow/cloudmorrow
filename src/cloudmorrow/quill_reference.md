@@ -122,13 +122,14 @@ email, phone, url, link, json. `indexed` fields are plain on disk so the server
 can filter and sort by them; everything else is encrypted at rest. Links are
 record ids and are always indexed. `on_delete` is `cascade` or `clear`.
 `stamp` sets a datetime when another field takes a value and clears it when it
-leaves.
+leaves. `secret = true` on a string or text field keeps it out of every listing
+and has every surface draw it hidden until asked for.
 
 ## The kit
 
 | kit | needs | draws |
 | --- | --- | --- |
-| list | model, title; optional subtitle, tick (bool) | rows, a circle per row if tick |
+| list | model, title; optional subtitle, tick (bool), fields (the sheet's), group and subgroup (link, enum or indexed string) | rows, a circle per row if tick; chips (phone, web) or a list and buttons (terminal) to pick the group and subgroup |
 | board | model, lane (enum, in ordered_within), title; optional group (link: chips), body (markdown), done (a lane value) | lanes; cards dragged between them |
 | detail / form | model; optional fields = [...] | one record's fields, editable |
 

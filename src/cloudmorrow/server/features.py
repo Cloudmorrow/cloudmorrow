@@ -71,7 +71,6 @@ class Feature:
 
 FEATURES: tuple[Feature, ...] = (
     Feature("notes", "Notes", "Markdown notes, in the app and on the phone", ("note",)),
-    Feature("secrets", "Secrets", "Vaults of keys and passwords, encrypted", ("secret",)),
     Feature("files", "Files", "Fileshares, and what is in them", ("file", "share", "machine")),
     Feature(
         "chat",

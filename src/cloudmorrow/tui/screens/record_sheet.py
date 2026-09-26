@@ -19,7 +19,8 @@ the web:
     link                     a drop-down of the linked datamodel's records
 
 A stamped field is the server's to set — a task's "Done" moment follows its
-lane — so it is shown and never typed into.
+lane — so it is shown and never typed into. A `secret` field is a password
+box: dots until ctrl+r shows what is in it, and hides it again.
 
 The sheet talks to the server itself, the way the password dialog does, so a
 conflict is said here with the sheet still open: a save carries the record's
@@ -129,6 +130,7 @@ class RecordSheet(Modal[dict | str | None]):
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
         ("ctrl+s", "save", "Save"),
+        ("ctrl+r", "reveal", "Show hidden"),
     ]
 
     def __init__(
@@ -188,7 +190,8 @@ class RecordSheet(Modal[dict | str | None]):
             yield Label(self.heading, classes="modal-title", id="sheet-heading")
             with VerticalScroll(id="sheet-fields"):
                 for field in self.fields:
-                    long = field.get("kind") in LONG_KINDS and not read_only(field)
+                    long = (field.get("kind") in LONG_KINDS and not read_only(field)
+                            and not field.get("secret"))
                     with Horizontal(classes="sheet-row" + (" -long" if long else "")):
                         label = field_label(field)
                         if field.get("required") and not read_only(field):
@@ -213,6 +216,15 @@ class RecordSheet(Modal[dict | str | None]):
         if read_only(field):
             note = shown(field, value)
             return Static(f"{note}  [{MUTED}]set by the server[/]", id=wid, classes="sheet-fixed")
+        if field.get("secret"):
+            return Input(
+                str(value) if value not in (None, "") else "",
+                placeholder="hidden · ctrl+r shows it",
+                password=True,
+                id=wid,
+                classes="sheet-secret",
+                compact=True,
+            )
         if kind == "markdown":
             return LiveMarkdownEditor(str(value or ""), id=wid, classes="sheet-markdown")
         if kind in ("text", "json"):
@@ -322,6 +334,9 @@ class RecordSheet(Modal[dict | str | None]):
             return options[index][0] if 0 <= index < len(options) else None
         if isinstance(widget, Select):
             return None if widget.is_blank() else widget.value
+        if isinstance(widget, Input) and field.get("secret"):
+            # Exactly as typed: a password's spaces are part of it.
+            return widget.value
         if isinstance(widget, Input):
             text = widget.value.strip()
             if not text:
@@ -503,6 +518,11 @@ class RecordSheet(Modal[dict | str | None]):
 
     def action_cancel(self) -> None:
         self.dismiss(None)
+
+    def action_reveal(self) -> None:
+        """ctrl+r: what a secret field holds, on screen — or off it again."""
+        for box in self.query(".sheet-secret").results(Input):
+            box.password = not box.password
 
     # The arrows move between fields, as in every dialog here — except in
     # the ones that use them themselves.

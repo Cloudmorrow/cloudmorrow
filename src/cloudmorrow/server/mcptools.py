@@ -202,7 +202,7 @@ def _model(state: AppState, args: dict[str, Any]) -> str:
     """The datamodel asked for, if it is installed and some Quill using it is on."""
     model = _str(args, "model", required=True).strip()
     if model not in state.quills.datamodels:
-        known = ", ".join(sorted(state.quills.datamodels)) or "none"
+        known = ", ".join(sorted(set(state.quills.datamodels) - NEVER_FOR_ASSISTANTS)) or "none"
         raise ToolError(f"no datamodel {model!r}; there are: {known}")
     users = state.quills.users_of(model)
     if users and not any(_enabled(state, quill) for quill in users):

@@ -1,0 +1,61 @@
+/* The list, picked through (kit_grouped.js): a second row of chips for
+   the subgroup, the eye and the copy button on a row whose field is
+   hidden, and the same eye on the record sheet. Nothing here is named for
+   one Quill. */
+
+/* The subgroup sits under the group, smaller, so the two rows read as a
+   place and a place inside it rather than two choices of the same weight. */
+.chips.sub { margin-top: -6px; gap: 6px; }
+.chips.sub .chip { padding: 4px 10px; font-size: 14px; }
+.chips.sub .chip.active {
+  background: color-mix(in srgb, var(--accent) 16%, var(--card));
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+/* A row without a circle keeps a row's own left edge. */
+.row.card.grouped.no-tick { padding-left: 16px; }
+.row.card.grouped.no-tick + .row.card.grouped.no-tick::before { left: 16px; }
+.row.card.grouped .reveal,
+.row.card.grouped .copy {
+  flex: none;
+  width: 40px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.row.card.grouped .reveal[aria-pressed="true"] { color: var(--accent); }
+.row.card.grouped .reveal:hover,
+.row.card.grouped .copy:hover { color: var(--ink); }
+/* Hidden is dots, spaced as the dots of a password box are. */
+.row .meta .preview.mask { letter-spacing: 2px; }
+/* Shown is the value exactly, in the face made for telling 0 from O. */
+.row .meta .preview.shown { font-family: var(--mono); font-size: 13px; color: var(--ink); }
+
+/* -- on the record sheet ------------------------------------------------------- */
+.record .field .secret-field { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; }
+.record .field .secret-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 16px;
+  text-align: right;
+}
+.record .field .secret-field input::placeholder { color: var(--muted); font-family: inherit; }
+.record .field .secret-field .reveal {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  margin-right: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.record .field .secret-field .reveal[aria-pressed="true"] { color: var(--accent); }

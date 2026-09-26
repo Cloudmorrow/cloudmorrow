@@ -93,6 +93,9 @@ class Field:
     stamp_value: str = ""
     # Which Quill added it, for an extension field; empty for a standard one.
     added_by: str = ""
+    # Hidden until asked for: never in a listing, drawn masked with a way to
+    # reveal it on every surface. A string or text field.
+    secret: bool = False
 
     def label_for(self, value: str) -> str:
         """An enum value as a person reads it."""
@@ -119,6 +122,8 @@ class Field:
             row["stamp"] = {"field": self.stamp_field, "value": self.stamp_value}
         if self.added_by:
             row["added_by"] = self.added_by
+        if self.secret:
+            row["secret"] = True
         return row
 
 
@@ -247,6 +252,7 @@ def _field(where: str, name: str, spec: object) -> Field:
         "on_delete",
         "stamp",
         "description",
+        "secret",
     }
     unknown = set(spec) - known
     if unknown:
@@ -274,6 +280,11 @@ def _field(where: str, name: str, spec: object) -> Field:
     stamp = spec.get("stamp") or {}
     if stamp and (kind != "datetime" or set(stamp) != {"field", "value"}):
         raise DatamodelError(f"{where}: {name!r} stamp is {{ field, value }} on a datetime")
+    secret = spec.get("secret", False)
+    if not isinstance(secret, bool):
+        raise DatamodelError(f"{where}: {name!r} secret is true or false")
+    if secret and (kind not in ("string", "text") or spec.get("indexed")):
+        raise DatamodelError(f"{where}: {name!r} is secret, so it is a string or text, never indexed")
     default = spec.get("default")
     if kind == "enum" and default is not None and str(default) not in values:
         raise DatamodelError(f"{where}: {name!r} default {default!r} is not one of its values")
@@ -290,6 +301,7 @@ def _field(where: str, name: str, spec: object) -> Field:
         on_delete=on_delete,
         stamp_field=str(stamp.get("field", "")),
         stamp_value=str(stamp.get("value", "")),
+        secret=secret,
     )
 
 

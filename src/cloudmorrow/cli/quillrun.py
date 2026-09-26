@@ -12,6 +12,8 @@ come from the Quill's first screen (or `--screen`) and its datamodel.
     cm tasks delete 8f2c
     cm tasks groups                    # the boards, for a board with groups
     cm tasks list --group Garden       # another board, by name or id
+    cm secrets list -g work/production # a list's group and subgroup, by value
+    cm secrets show API_KEY --reveal   # a secret field is dots until asked for
 
 `main` sends a first word that is not one of the built-in commands here, so
 `cm tasks` works without the CLI knowing, when it starts, what is installed.
@@ -31,6 +33,9 @@ from cloudmorrow.client.api import ApiError, CloudmorrowClient
 from cloudmorrow.console import TITLE
 
 ACTIONS = ("list", "add", "show", "set", "move", "done", "undone", "delete", "groups")
+
+# What a secret field says until it is asked for.
+MASK = "••••••••"
 
 
 def route(argv: list[str], commands: set[str]) -> list[str]:
@@ -58,7 +63,20 @@ class Screen:
 
     @property
     def group(self) -> dict | None:
-        return self.fields.get(self.spec.get("group", "")) if self.spec.get("group") else None
+        """A board's group, or a list's: a link, whose records are the groups."""
+        field = self.fields.get(self.spec.get("group", "")) if self.spec.get("group") else None
+        return field if field and field.get("kind") == "link" else None
+
+    @property
+    def levels(self) -> list[dict]:
+        """A list's group and subgroup when they are values, not links: picked by value."""
+        if self.kit != "list" or self.group is not None:
+            return []
+        return [self.fields[self.spec[n]] for n in ("group", "subgroup")
+                if self.spec.get(n) in self.fields]
+
+    def secret(self, name: str) -> bool:
+        return bool(self.fields.get(name, {}).get("secret"))
 
     def group_title(self, record: dict) -> str:
         target = self.models[self.group["to"]]
@@ -104,7 +122,7 @@ def _pairs(values: list[str], screen: Screen) -> dict:
 def _find(records: list[dict], key: str, title: str) -> dict:
     """A record by its id, the start of its id (with or without `r_`), or its exact title."""
     wanted = key if key.startswith("r_") else f"r_{key}"
-    matches = [r for r in records if r["id"].startswith(wanted)]
+    matches = [r for r in records if r["id"].startswith(key) or r["id"].startswith(wanted)]
     if not matches:
         matches = [
             r for r in records if str(r["fields"].get(title, "")).casefold() == key.casefold()
@@ -154,12 +172,15 @@ def _show_board(screen: Screen, records: list[dict], heading: str) -> None:
     out.print(table)
 
 
-def _show_list(screen: Screen, records: list[dict], heading: str) -> None:
+def _show_list(screen: Screen, records: list[dict], heading: str, shown_levels=()) -> None:
     table = Table(title=heading, title_style=TITLE)
     tick = screen.spec.get("tick")
     if tick:
         table.add_column("")
     table.add_column("id", style="dim")
+    # The levels not picked with --group are columns, so every row says where it is.
+    for level in shown_levels:
+        table.add_column(level.get("label", level["name"]), style="dim")
     table.add_column(screen.fields[screen.title].get("label", screen.title))
     subtitle = screen.spec.get("subtitle")
     if subtitle:
@@ -168,14 +189,24 @@ def _show_list(screen: Screen, records: list[dict], heading: str) -> None:
         row = []
         if tick:
             row.append("●" if record["fields"].get(tick) else "○")
-        row += [record["id"][2:6], escape(str(record["fields"].get(screen.title, "")))]
+        row.append(_short(record["id"]))
+        row += [escape(str(record["fields"].get(level["name"]) or "")) for level in shown_levels]
+        row.append(escape(str(record["fields"].get(screen.title, ""))))
         if subtitle:
-            row.append(escape(str(record["fields"].get(subtitle) or "")))
+            if screen.secret(subtitle):
+                row.append(f"[dim]{MASK}[/]")
+            else:
+                row.append(escape(str(record["fields"].get(subtitle) or "")))
         table.add_row(*row)
     out.print(table)
 
 
-def _show_record(screen: Screen, record: dict) -> None:
+def _short(record_id: str) -> str:
+    """Enough of an id to pick a record by: a record store id's first four after `r_`."""
+    return record_id[2:6] if record_id.startswith("r_") else record_id[:10]
+
+
+def _show_record(screen: Screen, record: dict, *, reveal: bool = False) -> None:
     table = Table(
         title=f"{screen.models[screen.model]['label']} {record['id']}",
         title_style=TITLE,
@@ -187,6 +218,9 @@ def _show_record(screen: Screen, record: dict) -> None:
         value = record["fields"].get(name)
         if field["kind"] == "enum" and value in field.get("values", []):
             value = (field.get("labels") or field["values"])[field["values"].index(value)]
+        if field.get("secret") and not reveal:
+            table.add_row(field.get("label", name), f"[dim]{MASK}  (--reveal shows it)[/]")
+            continue
         table.add_row(field.get("label", name), escape("" if value is None else str(value)))
     table.add_row("rev", str(record["rev"]))
     out.print(table)
@@ -206,6 +240,9 @@ def main(
         int | None, typer.Option("--index", help="Where in the lane, 0 for the top.")
     ] = None,
     plain: Annotated[bool, typer.Option("--plain", help="JSON, for scripts.")] = False,
+    reveal: Annotated[
+        bool, typer.Option("--reveal", help="show: include a hidden field's value.")
+    ] = False,
 ) -> None:
     """Run ACTION on an installed Quill."""
     args = list(args or [])
@@ -216,7 +253,7 @@ def main(
         _, api = client()
         try:
             screen = _screen(await api.quills(), quill, screen_id)
-            await _act(api, screen, action, args, group, index, plain)
+            await _act(api, screen, action, args, group, index, plain, reveal)
         finally:
             await api.aclose()
 
@@ -231,9 +268,28 @@ async def _act(
     group: str,
     index: int | None,
     plain: bool,
+    reveal: bool = False,
 ) -> None:
     group_id, groups = await _group_id(api, screen, group)
     where = {screen.group["name"]: group_id} if group_id else {}
+    # A list picked by value: --group work, or work/production for the subgroup too.
+    picked = [part for part in group.split("/") if part] if screen.levels else []
+    if len(picked) > len(screen.levels):
+        fail(f"--group is at most {'/'.join(f['name'] for f in screen.levels)}")
+    where.update({field["name"]: value for field, value in zip(screen.levels, picked, strict=False)})
+
+    if action == "groups" and screen.levels:
+        found = await api.records(screen.model, **where)
+        counts: dict[str, int] = {}
+        for record in found:
+            place = "/".join(str(record["fields"].get(f["name"])) for f in screen.levels)
+            counts[place] = counts.get(place, 0) + 1
+        if plain:
+            emit(json.dumps(counts, indent=2) + "\n")
+            return
+        for place, count in sorted(counts.items()):
+            out.print(f"{escape(place)}  [dim]{count}[/]")
+        return
 
     if action == "groups":
         if screen.group is None:
@@ -253,10 +309,12 @@ async def _act(
         heading = screen.spec.get("label") or screen.quill["name"]
         if group_id:
             heading += f" · {screen.group_title(next(g for g in groups if g['id'] == group_id))}"
+        if picked:
+            heading += " · " + " · ".join(picked)
         if screen.kit == "board":
             _show_board(screen, records, heading)
         else:
-            _show_list(screen, records, heading)
+            _show_list(screen, records, heading, screen.levels[len(picked):])
         return
 
     if action == "add":
@@ -273,10 +331,13 @@ async def _act(
     rest = args[1:]
     try:
         if action == "show":
+            if reveal:
+                # A listing never carries a hidden field; the record itself does.
+                record = await api.record(screen.model, record["id"])
             if plain:
                 emit(json.dumps(record, indent=2) + "\n")
             else:
-                _show_record(screen, record)
+                _show_record(screen, record, reveal=reveal)
         elif action == "set":
             changed = await api.update_record(
                 screen.model, record["id"], _pairs(rest, screen), rev=record["rev"]

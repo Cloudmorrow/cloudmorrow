@@ -10,11 +10,25 @@ id = "personal"
 label = "Personal"
 description = "Your own lists, plans and notes."
 
+[[categories]]
+id = "developer"
+label = "Developer"
+description = "For people who build things: machines, secrets, pipelines."
+
 [[quills]]
 id = "tasks"
 name = "Tasks"
 summary = "Boards with three lanes: To Do, Doing, Done."
 repo = "quill-tasks"
 category = "personal"
+publisher = "Cloudmorrow"
+foundation = true
+
+[[quills]]
+id = "secrets"
+name = "Secrets"
+summary = "Keys and passwords in vaults and environments, sealed, and never shown until you ask."
+repo = "quill-secrets"
+category = "developer"
 publisher = "Cloudmorrow"
 foundation = true

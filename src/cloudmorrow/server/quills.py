@@ -45,6 +45,7 @@ from cloudmorrow.server.datamodels import (
     parse_datamodel,
     parse_duration,
 )
+from cloudmorrow.server.records import NEVER_FOR_ASSISTANTS
 
 __all__ = [
     "KIT",
@@ -820,6 +821,9 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
                 need(model, thing + " tick", screen["tick"], ("bool",))
             if screen.get("subtitle"):
                 need(model, thing + " subtitle", screen["subtitle"])
+            _check_list_groups(where, thing, model, screen, need)
+            for name in screen.get("fields", []):
+                need(model, thing, name)
         elif kit in ("detail", "form"):
             for name in screen.get("fields", []):
                 need(model, thing, name)
@@ -836,6 +840,36 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
         for record in dataset["records"]:
             for name in record:
                 need(model, f"dataset {dataset['id']!r}", name)
+
+
+def _check_list_groups(where: str, thing: str, model: Datamodel, screen: dict, need) -> None:
+    """A list's `group` and `subgroup`: the two levels it is picked through.
+
+    Each is a field whose values sort the records — a link (the linked
+    records are the choices), an enum (its values are) or an indexed string
+    (the values the records have are, and a new one is a name typed in).
+    """
+    for level in ("group", "subgroup"):
+        name = screen.get(level)
+        if not name:
+            continue
+        need(model, f"{thing} {level}", name, ("link", "enum", "string"))
+        field = model.by_name[name]
+        if field.kind != "link" and not field.indexed:
+            raise QuillError(f"{where}: {thing} {level} {name!r} must be indexed, to be picked by")
+    if screen.get("subgroup") and not screen.get("group"):
+        raise QuillError(f"{where}: {thing} has a subgroup, so it needs a group above it")
+    if screen.get("subgroup") and screen.get("subgroup") == screen.get("group"):
+        raise QuillError(f"{where}: {thing} group and subgroup are two different fields")
+
+
+def _surfaces(manifest: Manifest) -> list[str]:
+    """Where its screens are drawn: everywhere, but to an assistant only what one may reach."""
+    if not manifest.screens:
+        return []
+    if all(screen["model"] in NEVER_FOR_ASSISTANTS for screen in manifest.screens):
+        return [s for s in SURFACES if s != "assistant"]
+    return list(SURFACES)
 
 
 def describe(
@@ -877,7 +911,7 @@ def describe(
         {
             "readme": manifest.readme,
             "data": data,
-            "surfaces": list(SURFACES) if manifest.screens else [],
+            "surfaces": _surfaces(manifest),
             "installed_version": installed.version if installed else None,
             # Declared, checked, shown — and not run yet, which the sheet says.
             "not_running_yet": [
