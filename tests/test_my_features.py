@@ -117,7 +117,7 @@ def test_what_you_switch_off_you_are_not_counted_for(client, auth, guest):
 
 
 def test_an_account_that_goes_takes_its_answers_with_it(client, auth, guest):
-    switch(client, guest, "files", False)
+    switch(client, guest, "secrets", False)
     assert client.delete(f"/api/users/{GUEST[0]}", headers=auth).status_code == 204
     made = client.post(
         "/api/users",
@@ -131,11 +131,11 @@ def test_an_account_that_goes_takes_its_answers_with_it(client, auth, guest):
 
 # -- the two lists are different things ---------------------------------------------
 def test_the_servers_own_list_is_unchanged_by_yours(client, auth):
-    switch(client, auth, "files", False)
+    switch(client, auth, "secrets", False)
     server = {row["key"]: row["enabled"] for row in client.get(
         "/api/server/features", headers=auth
     ).json()}
-    assert server["files"] is True, "your preference is not the server's setting"
+    assert server["secrets"] is True, "your preference is not the server's setting"
 
 
 def test_only_an_administrator_throws_the_servers_switch(notes_quill, guest):

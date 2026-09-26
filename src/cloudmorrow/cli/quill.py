@@ -136,6 +136,15 @@ def preview(plan: dict) -> str:
                 lines.append(f"  cards show progress of `- [ ]` lines in {screen['body']}")
             if screen.get("done"):
                 lines.append(f"  the circle moves a card to {screen['done']}, and back")
+        elif screen["kit"] == "grid":
+            target = fields.get(screen.get("group", ""), {}).get("to", "group")
+            about = f"   <{screen['group_subtitle']}>" if screen.get("group_subtitle") else ""
+            lines.append(f"  first the {target}s: <{target}>{about}")
+            lines.append(f"  then its folders (<{screen.get('folder')}>), and the rest as a list or tiles:")
+            lines.append(f"  ▰ <{title}>/   ▣ <{title}>   ▣ <{title}>")
+            lines.append("  put in, get, new folder, rename, move, delete; a picture shown")
+            lines.append("")
+            continue
         elif screen["kit"] == "list":
             tick = "◯ " if screen.get("tick") else ""
             sub = f"   <{screen['subtitle']}>" if screen.get("subtitle") else ""

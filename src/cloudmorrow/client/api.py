@@ -482,6 +482,33 @@ class CloudmorrowClient:
         )
         return response.content
 
+    # The bytes beside a record, for a datamodel that keeps some: a file's.
+    async def record_content(self, model: str, record_id: str) -> bytes:
+        response = await self._request(
+            "GET", f"/api/records/{model}/{record_id}/content", timeout=UPLOAD_TIMEOUT
+        )
+        return response.content
+
+    async def record_thumb(self, model: str, record_id: str, *, size: int = 256) -> bytes:
+        """A JPEG with its long edge at *size* or so; a 415 when the server
+        cannot make one of that record's bytes."""
+        response = await self._request(
+            "GET", f"/api/records/{model}/{record_id}/thumb", params={"size": size}
+        )
+        return response.content
+
+    async def upload_record(self, model: str, fields: dict, data: bytes) -> dict:
+        """A new record from bytes: *fields* say where it goes and what it is called."""
+        response = await self._request(
+            "POST",
+            f"/api/records/{model}/upload",
+            params={k: str(v) for k, v in fields.items()},
+            content=data,
+            headers_extra={"Content-Type": "application/octet-stream"},
+            timeout=UPLOAD_TIMEOUT,
+        )
+        return response.json()
+
     # -- fileshares --------------------------------------------------------
     async def shares(self) -> list[dict]:
         return (await self._request("GET", "/api/shares")).json()

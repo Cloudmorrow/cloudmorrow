@@ -299,6 +299,7 @@ const screens = new Map();   // name in the hash → async (arg, extra) => rende
 const tabList = [];          // [{name, label, icon, href(active), feature}] as registered, or a slot
 const shellHooks = [];       // run after every screen is put on the page
 const signOutHooks = [];     // run when the session ends, to drop what was loaded
+const signInHooks = [];      // run with the server's answer when a session starts
 let home = "login";          // the screen an empty hash means, once signed in
 let homeFeature = "";        // the feature that screen belongs to, if it is one
 
@@ -316,6 +317,7 @@ export function tabSlot() {
 const allTabs = () => tabList.flatMap((t) => t.tabs || [t]);
 export function onShell(fn) { shellHooks.push(fn); }
 export function onSignOut(fn) { signOutHooks.push(fn); }
+export function onSignIn(fn) { signInHooks.push(fn); }
 export function setHome(name, feature = "") { home = name; homeFeature = feature; }
 
 // -- which features this account has -----------------------------------------------
@@ -412,6 +414,7 @@ export function signIn(data) {
   session.user = data.user.username;
   store.set("token", session.token);
   store.set("user", session.user);
+  for (const fn of signInHooks) fn(data);
   forgetHistory();
   replace(homeHash());
   route();

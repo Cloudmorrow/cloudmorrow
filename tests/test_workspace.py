@@ -79,7 +79,7 @@ async def test_secrets_is_a_card_of_its_own(app):
         screen = await start(app, pilot)
         # Each card carries the key that brings it here, which is why the
         # footer does not repeat them; the Quills first, in the catalog's
-        # order — Notes and Tasks keep the keys they had built in — then
+        # order — Notes, Tasks and Files keep the keys they had built in — then
         # what is still built in.
         cards = [
             (card.name_text, card.tag)
@@ -89,10 +89,10 @@ async def test_secrets_is_a_card_of_its_own(app):
         assert cards == [
             ("Notes", "f1"),
             ("Tasks", "f2"),
+            ("Files", "f5"),
             ("Calendar", "f7"),
             ("Chat", "f6"),
             ("Secrets", "f3"),
-            ("Files", "f5"),
         ]
 
 

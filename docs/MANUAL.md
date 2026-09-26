@@ -58,8 +58,8 @@ start with the [README](../README.md); this is the page to come back to.
   mounted on whichever machine you are at: `cloudmorrow share mount media` and
   it is `~/Fileshares/media` here, or `/Volumes/media` on a Mac. Finder does
   the mounting on macOS with nothing installed; on Linux it is `rclone`.
-  Made and mounted from the **Files** tab as well. Local backups have a tab
-  beside them, with nothing in it yet.
+  Made and mounted from the **Files** tab as well, which is the Files Quill:
+  the files themselves stay where they are.
 - **Chat.** Channels and direct messages, between everyone on the server.
   Anyone can make a channel: a **public** one is everybody's, in everyone's
   list and open to write in; a **private** one is the people you pick, and
@@ -151,6 +151,8 @@ src/cloudmorrow/
   agent/             the local agent: config, tasks, poll loop
     omarchy.py       what "my Omarchy config" means on disk, read and written
     sync.py          claim, adopt, push, pull — one pass per poll
+  desktop/           the desktop app: the web app in a pywebview window, and the
+                     bridge that lets it mount shares here (`cloudmorrow app`)
   tui/               Textual client
     theme.py         the Textual theme, built from that palette
     screens/         splash, login, the workspace, and settings
@@ -954,7 +956,95 @@ and `cloudmorrow-agent` links, and last the venv under
 `~/.local/share/cloudmorrow`. It lists all of that and asks first; `--yes`
 skips the question. Nothing on the server is deleted except the agent record
 — your notes, projects and secrets are the server's. From a development
-checkout it leaves the checkout and its venv alone.
+checkout it leaves the checkout and its venv alone. The desktop app's entry
+in the applications menu goes with it.
+
+## The desktop app
+
+The client is two things on a computer: the terminal app, and a window with
+the web app in it that also does what a browser tab is not allowed to —
+mount a share on this computer, open the folder it landed in, say whether
+this machine's agent is running.
+
+```bash
+cloudmorrow app                       # open it (or click Cloudmorrow in the menu)
+cloudmorrow app --dry-run             # what it would open, and whether it could
+cloudmorrow app --print-url           # just the address
+cloudmorrow app --install-launcher    # put it in the applications menu
+```
+
+**It is the web app.** The window loads the signed-in server's `/app`, the
+same page a phone and a browser get, so a deploy reaches it the moment it
+reaches them and there is no second interface to keep level. The window is
+the system's own web view, driven by [pywebview](https://pywebview.flowrl.com):
+WebView2 on Windows, WKWebView on a Mac, and on Linux Qt WebEngine — which
+comes as wheels, so nothing is asked of the distribution. It runs in the
+client's own Python, in `cloudmorrow/desktop/`, and the window is titled with
+the cloud's name and wears the hedgehog.
+
+**What the page may ask.** Beside the page pywebview puts one object,
+`window.pywebview.api` — `desktop/bridge.py` — and `server/web/desktopbridge.js`
+finds it. A phone and a browser have no such object, and there the file does
+nothing at all, so none of what follows is ever drawn anywhere else. Every
+method is the command line's own code, called rather than copied — mounting
+is `client/mounts.py`, a missing rclone is `client/rclone.py`, the agent is
+`agent/setup.py` — and every answer is plain JSON: a refusal comes back as
+`{"error": …}` in the same words `cloudmorrow share mount` would print, never
+as an exception. Only a page from the cloud the window was opened on is
+answered; a link to anywhere else opens in the browser.
+
+| method | what it does |
+| --- | --- |
+| `platform()` | which system, the host name, the name the agent goes by, whether a share can be mounted here and with what |
+| `shares()` | the server's shares, each with whether and where it is mounted on this machine |
+| `mounted_here()` | the same, from `mounts.json` alone — quick, no server |
+| `mount(name)` / `unmount(name)` | as `cloudmorrow share mount` / `unmount`, signed in the same way |
+| `open_folder(path)` | Finder, Explorer, or `xdg-open` |
+| `agent_status()` | enrolled or not, and whether the service is running |
+| `notify(title, body)` | a system notification, best effort |
+| `version()` | this client's version, and the server it talks to |
+
+**Files.** In the desktop app every share in the **Files** tab (the Files
+Quill's grid; the lines come in through the grid's hook, from
+`desktopbridge.js`) has a line under it: *Mounted at ~/Fileshares/media* with **Open folder** and
+**Unmount**, or **Mount on this computer**. It is the same mount the terminal
+app and `cloudmorrow share mount` make — recorded in the same `mounts.json` —
+so all three agree on what is mounted. A machine share whose machine is
+offline says so and offers nothing. On Linux the mount is rclone's; if rclone
+is missing the answer is the one command that installs it, since the window
+has no terminal for sudo to ask its password in. **Me** gets a **This
+computer** group: the machine's name, whether its agent is running, what
+mounts shares here, and the desktop app's version.
+
+**One sign-in.** The token in `credentials.json` is the machine's, and the
+window shares it. When the window opens, the page asks for the stored token
+and takes it, so someone who ran `cloudmorrow login` is not asked again. A
+sign-in in the window is written back, so the terminal app is signed in by
+it — and, as `cloudmorrow login` does, a machine with no agent yet is
+enrolled. Signing out in the window, or its token running out, clears the
+stored one too, but only if it is still the window's: a sign-in the terminal
+app made since is left alone. At start the stored one always wins, being the
+most recent from either side. The page's own storage — which sort a folder
+was left in — is kept in `desktop/` beside the client config.
+
+**Installing it.** It is the `desktop` extra: `pywebview`, and on Linux
+`qtpy`, `PyQt6` and `PyQt6-WebEngine`. `/install.sh` adds it on Linux when
+it runs in a graphical session (`WAYLAND_DISPLAY` or `DISPLAY` set), without
+`--force-reinstall`, so running the installer again does not fetch Qt again,
+and then `cloudmorrow app --install-launcher` writes
+`~/.local/share/applications/cloudmorrow.desktop` and the hedgehog into
+`~/.local/share/icons`. A machine reached over ssh, a server and a root
+install get the terminal app alone, as before; `--no-desktop` says the same
+on purpose. `cloudmorrow update` keeps the extra where it was installed.
+
+**Not yet.** macOS: the extra installs as it is, and `cloudmorrow app` works
+from a terminal, but there is no `.app` bundle in `~/Applications` to click.
+Windows: the installer is a shell script and does not run there, mounting has
+no branch for it yet (`net use` on the WebDAV URL, or rclone with WinFsp),
+and there is no Start-menu shortcut or toast notification. Each is a marked
+`TODO` in `desktop/launcher.py`, `desktop/system.py` or the installer, where
+it will go. Push notifications are the browser's, and a desktop web view
+does not deliver them; `notify()` is there for when the app sends its own.
 
 ## Secrets
 
@@ -1272,21 +1362,51 @@ both apps. Nobody makes it and nobody removes it — it is there because the
 account is — and only its owner ever sees it. Its files are in that
 account's own tree, `<notes_dir>/<username>/files/`, beside their notes.
 
-In the web app, the **Files** tab lists My Files, then your shares. A server share opens as
-its folders and files, the way a file manager shows them — sorted by name,
-date, size or type, folders first — as a list, or as a grid of thumbnails
-(the switch beside the sort; the choice is kept). A picture opens when
-tapped, with its facts under it and a button that opens the phone's share
-sheet. The plus in the bar puts a file in the folder you are in: one chosen
-from the phone, or one its camera takes there and then. A machine share is
-listed but not opened there: its files are on that machine, so it is
-browsed from a mount.
+**The Files Quill.** What is in them is on screen through the **Files**
+Quill, a foundation Quill in the catalog: installed on a new server with
+Tasks, and at boot on a server that had Files built in (the switch keeps
+its name, `files`, and its setting). The files do not move for it — the
+core serves the drive and the shares as `share` and `file` records through
+the record API (the `shares` backend), with each file's bytes at
+`/api/records/file/<id>/content`, a small copy of a picture at `…/thumb`,
+and a new file put with `POST /api/records/file/upload`. The Quill is only
+the screen, drawn by the kit's `grid`, so the same thing is on every
+surface, and to an assistant through the generic record tools.
 
-The terminal app has the same: **Browse**, the third tab on Files, or
-enter on a share in Fileshares. The same list, the same sort (`s` is the
-next one, `S` turns it around), `v` for thumbnails, and the picture the
-cursor is on drawn beside the listing — the real picture in Kitty or a
-Sixel terminal, coloured half-cells anywhere else.
+On the phone and the web app, **Files** lists My Files, then your shares.
+One opens as its folders and files, the way a file manager shows them —
+sorted by name, date, size or type, folders first — as a list, or as tiles
+with a picture of each photo (the switch beside the sort; the choice is
+kept). A file opens when tapped: a picture shown, its facts, a button that
+opens the phone's share sheet (or saves it), and Rename, Move and Delete.
+The plus beside the title puts something in the folder you are in: a file
+chosen from the phone, one its camera takes there and then, or a new
+folder; on a computer a file dragged onto the folder or pasted goes in too.
+The “…” beside a folder's name renames, moves or deletes it. A machine
+share is listed but not opened: its files are on that machine, so it is
+browsed from a mount, and the line under it says where it is and whether
+it is online.
+
+The terminal app has the same, on the Files card: the shares, then enter
+on one for its folders and files. The same sort (`s` is the next one, `S`
+turns it around), `v` for thumbnails, and the picture the cursor is on
+drawn beside the listing — the real picture in Kitty or a Sixel terminal,
+coloured half-cells anywhere else. In a folder, `p` puts a file from this
+machine there, `g` gets the one the cursor is on, ctrl+n makes a folder,
+`e` renames, `M` moves and delete deletes.
+
+On the command line, `cm files` is the same grid:
+
+```bash
+cm files list                                  # My Files and your shares
+cm files list my-files Photos                  # a folder
+cm files get my-files Photos/cat.jpg ~/Desktop
+cm files put my-files Photos ./dog.jpg
+cm files add my-files Photos/2026              # a new folder
+cm files delete my-files Photos/old.jpg
+```
+
+`cm share` stays as it is, for making, mounting and removing shares.
 
 **Thumbnails.** The server makes them, once, with the long edge at one of
 a few sizes, and keeps them under `<data_dir>/thumbs/`. The key includes
@@ -1360,7 +1480,9 @@ username and password.
 What was mounted, and where, is written to `mounts.json` beside the client
 config — per machine, since the same share is at a different path on each —
 which is how the Files tab says "mounted at …" and `share unmount` knows what
-to undo. A mount does not survive a reboot; run `share mount` again.
+to undo. A mount does not survive a reboot; run `share mount` again. In
+[the desktop app](#the-desktop-app) the same mount is a button on each share
+in the Files tab.
 
 ## The local agent
 
@@ -1546,7 +1668,7 @@ for everybody or by you in Settings, since a tab follows its feature.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│ Notes  Tasks  Calendar  Chat  Secrets  Files             │
+│ Notes  Tasks  Files  Calendar  Chat  Secrets             │
 ├─────────────┬────────────────────────────────────────────┤
 │ default   3 │ verticore                                  │
 │ home      8 │ [New vault ^n] [Add a] [Reveal v] [Copy c] …│
@@ -1573,11 +1695,10 @@ looking at. **Machines** are not a tab: the agents enrol themselves at
 sign-in and get on with it, `cloudmorrow agent` lists them and their jobs,
 and what they have done is behind the bell.
 
-**Files** has two tabs of its own: **Local backups**,
-which is a placeholder until this machine's backups have something to list,
-and **Fileshares** — the shares the server holds for you, which of them is
-mounted on this machine and where, and the buttons that make, mount, unmount
-and remove one. See [Fileshares](#fileshares).
+**Files** is a Quill card (f5): My Files and your shares in a table — which
+of them is mounted on this machine and where, and the buttons that make,
+mount, unmount and remove one — and enter opens one. See
+[Fileshares](#fileshares).
 
 It is meant to be used with a mouse: the tabs, the sub-tabs, the buttons above
 each pane, the rows in every table, the vaults in the list and the notes in

@@ -242,9 +242,9 @@ def test_a_bad_request_is_a_400_with_the_reason(client, auth):
 # -- boot ------------------------------------------------------------------------------
 def test_a_fresh_server_gets_the_foundation_quills_once(config, users, registry, tmp_path):
     db = config.db_path
-    assert install_foundation(db, registry) == ["notes", "tasks"]
-    registry.uninstall("tasks")
-    registry.uninstall("notes")
+    assert install_foundation(db, registry) == ["notes", "tasks", "files"]
+    for quill in ("notes", "tasks", "files"):
+        registry.uninstall(quill)
     # Removed by an administrator, it stays removed.
     assert install_foundation(db, registry) == []
     assert registry.quills == {}

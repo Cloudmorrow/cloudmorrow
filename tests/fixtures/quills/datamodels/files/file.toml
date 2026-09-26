@@ -1,0 +1,21 @@
+[datamodel]
+id = "file"
+version = 1
+label = "File"
+description = "A file or a folder in a share or in My Files: a real file on disk, reached over WebDAV and the desktop app's mounts as well."
+domain = "files"
+scopes = ["personal"]
+title = "name"
+# Files stay files, where they are; the core serves them as records, and
+# their bytes (and a small copy of a picture) beside the record.
+backend = "shares"
+
+[fields]
+share = { kind = "link", to = "share", required = true, indexed = true }
+path = { kind = "string", required = true, indexed = true, label = "Path", description = "Where it is in the share, folders and all" }
+folder = { kind = "string", indexed = true, description = "The folder it is in; empty at the top of the share" }
+name = { kind = "string", required = true, indexed = true }
+kind = { kind = "enum", values = ["file", "folder"], labels = ["File", "Folder"], default = "file", indexed = true }
+size = { kind = "int", indexed = true, description = "In bytes; 0 for a folder" }
+modified = { kind = "datetime", indexed = true }
+mime = { kind = "string", indexed = true, label = "Type", description = "A guess from the name; empty when there is none" }

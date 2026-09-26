@@ -65,7 +65,7 @@ ORIGIN = ".origin.json"
 KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor")
 # The ones every surface draws *today*. A screen of another kind is refused at
 # install, so a Quill never lands with a tab that draws nothing somewhere.
-KIT_READY = frozenset({"list", "board", "detail", "form", "editor"})
+KIT_READY = frozenset({"list", "board", "detail", "form", "grid", "editor"})
 
 JOB_ACTIONS = frozenset({"expire", "run"})
 SEED_KINDS = frozenset({"per-owner", "once"})
@@ -631,7 +631,12 @@ class QuillRegistry:
                 json.dumps(
                     {
                         **(origin or {}),
-                        "installed_at": dt.datetime.now(tz=dt.UTC).isoformat(timespec="seconds"),
+                        # To the microsecond: Quills installed together at
+                        # boot keep the order they were installed in, which
+                        # is the order of their tabs.
+                        "installed_at": dt.datetime.now(tz=dt.UTC).isoformat(
+                            timespec="microseconds"
+                        ),
                     }
                 ),
                 encoding="utf-8",
@@ -842,6 +847,27 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
             need(model, thing + " body", screen.get("body"), ("markdown",))
             if screen.get("path"):
                 need(model, thing + " path", screen["path"], ("string",))
+        elif kit == "grid":
+            # Files: folders and tiles, in groups (the shares) picked first.
+            if not model.backend:
+                raise QuillError(
+                    f"{where}: {thing} is a grid, which shows files; {model.id} keeps no bytes"
+                )
+            need(model, thing + " group", screen.get("group"), ("link",))
+            need(model, thing + " folder", screen.get("folder"), ("string",))
+            need(model, thing + " kind", screen.get("kind"), ("enum",))
+            if "folder" not in model.by_name[screen["kind"]].values:
+                raise QuillError(f"{where}: {thing} kind {screen['kind']!r} has no value 'folder'")
+            for binding, kinds in (("size", ("int",)), ("modified", ("datetime", "date")),
+                                   ("mime", ("string",))):
+                if screen.get(binding):
+                    need(model, f"{thing} {binding}", screen[binding], kinds)
+            group_model = models.get(model.by_name[screen["group"]].to)
+            if group_model is not None:
+                if screen.get("group_subtitle"):
+                    need(group_model, thing + " group_subtitle", screen["group_subtitle"])
+                if screen.get("group_open"):
+                    need(group_model, thing + " group_open", screen["group_open"], ("bool",))
     for job in manifest.jobs:
         if job["action"] == "expire":
             model = model_of(f"job {job['id']!r}", job["model"])

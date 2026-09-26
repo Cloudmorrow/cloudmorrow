@@ -3,10 +3,10 @@
 Two kinds, one list, because a person choosing does not care which is which:
 
 * **Catalog quills** marked `foundation = true` in the Quill Catalog —
-  Notes and Tasks today. Choosing one installs it; leaving one out
+  Notes, Tasks and Files today. Choosing one installs it; leaving one out
   installs nothing.
 * **Built-in features** that are still part of the core while the kit
-  grows to draw them — Calendar, Chat, Files, Secrets. Choosing one
+  grows to draw them — Calendar, Chat, Secrets. Choosing one
   leaves it on; leaving one out switches it off for the server, which an
   administrator can undo from Administration. As each moves into a repo of
   its own it leaves `features.FEATURES` and turns up in the catalog, and
@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from cloudmorrow.server.config import ServerConfig
 from cloudmorrow.server.features import FEATURES, FeatureStore
 from cloudmorrow.server.quilljobs import (
+    FILES_QUILL,
     MOVED_BUILTINS,
     SEEDED,
     adopted_key,
@@ -114,6 +115,8 @@ def choose(
     # boot work is not to install it after it was left out.
     for quill_id in MOVED_BUILTINS:
         write_meta(config.db_path, adopted_key(quill_id), "chosen")
+    # Files was built in once; a server choosing now has chosen about it too.
+    write_meta(config.db_path, FILES_QUILL, "chosen")
     for option in options:
         if option.kind != "quill":
             continue

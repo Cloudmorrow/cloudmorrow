@@ -169,8 +169,9 @@ async def test_moving_a_card_to_another_board_from_the_sheet(app):
 async def test_the_quill_tabs_come_first_notes_then_tasks(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
-        # Notes is a Quill too: the first card, and still f1.
-        assert tab_labels(screen)[:2] == ["Notes  f1", "Tasks  f2"]
+        assert tab_labels(screen)[0] == "Notes  f1"
+        # Then Tasks and Files: the catalog's order, each with its old key.
+        assert tab_labels(screen)[1:3] == ["Tasks  f2", "Files  f5"]
         assert screen.query_one("#nav-section-quills").display
         assert isinstance(screen.query_one("#pane-tasks"), BoardPane)
 
@@ -320,6 +321,8 @@ async def test_installing_shows_the_sheet_then_adds_the_tab(app):
 
 
 async def test_removing_asks_then_takes_the_tab_and_keeps_the_records(app):
+    # Tasks alone, so taking it away leaves no Quills at all.
+    app.client.quill_list = [q for q in app.client.quill_list if q["id"] != "files"]
     async with app.run_test(size=(120, 34)) as pilot:
         screen, view = await open_quills(app, pilot)
         table = view.query_one("#admin-quill-table")

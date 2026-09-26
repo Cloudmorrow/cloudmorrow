@@ -23,6 +23,7 @@ import typer
 from cloudmorrow.agent.setup import ensure_agent, stop_agent
 from cloudmorrow.cli import (
     agent,
+    desktop,
     dev,
     note,
     quill,
@@ -57,6 +58,8 @@ app.add_typer(update.app, name="update")
 app.add_typer(quill.app, name="quill")
 # The way out: `cloudmorrow uninstall`, in its own file beside the way in.
 app.command("uninstall")(uninstall.uninstall)
+# The desktop app: the web app in a window, with this computer behind it.
+app.command("app")(desktop.app_command)
 
 # What the resources used to be called, kept working but out of the help.
 app.add_typer(secret.app, name="secrets", hidden=True)

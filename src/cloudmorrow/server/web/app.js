@@ -11,13 +11,13 @@ import "./quills.js";
 import "./chat.js";
 import "./calendar.js";
 import "./format.js";
-import "./files.js";
 import "./features.js";
 import "./me.js";
 import "./admin.js";
 import "./quillsadmin.js";
 import "./push.js";
 import "./desktop.js";
+import "./desktopbridge.js";
 import "./fresh.js";
 import { start } from "./core.js";
 

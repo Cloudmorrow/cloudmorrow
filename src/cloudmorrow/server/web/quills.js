@@ -7,6 +7,7 @@
 
      #/q/<quill>/<screen>              a screen: the board, the list
      #/q/<quill>/<screen>/<group>      a board, on one of its groups
+     #/q/<quill>/<screen>/<group>/<…>  a grid, in a folder of one of them
      #/r/<quill>/<screen>/<model>/<id> one record, on the record sheet
 
    The tabs sit where this file is imported in app.js — after Today, where
@@ -96,12 +97,11 @@ async function find(quillId, screenId) {
 }
 
 registerScreen("q", async (arg) => {
-  // The rest is the screen's own: a board's group, or an editor's folder,
-  // which may have slashes in it.
+  // Whatever follows the screen is the kit's: a board's group, a grid's
+  // group and the folder in it.
   const [quillId, screenId, ...rest] = arg.split("/");
-  const group = rest.join("/");
   const at = await find(quillId, screenId);
-  if (at) await renderKitScreen(at, group);
+  if (at) await renderKitScreen(at, rest.join("/"));
 });
 
 registerScreen("r", async (arg) => {

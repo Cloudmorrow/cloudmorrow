@@ -21,9 +21,9 @@ panel for the place you are on; a strip of what happened along the bottom;
 the keys on the last line.
 
 Down the left: QUILLS, a card for every screen of every Quill this server
-has installed, in the catalog's order (Notes, then Tasks), drawn from the kit
+has installed, in the catalog's order (Notes, Tasks, Files), drawn from the kit
 by tui/panes/kit.py — then YOUR CLOUD, what is still built in: your days,
-the chat, your secrets, your files. The Quills are asked for after sign-in
+the chat, your secrets. The Quills are asked for after sign-in
 rather than built in, so installing one in Administration puts its card here
 without a restart, and the workspace opens on the first card there is:
 Notes, where it is installed. An administrator has a
@@ -50,11 +50,13 @@ from textual.widgets import Button, ContentSwitcher, Static
 
 from cloudmorrow.cli import dev
 from cloudmorrow.client.api import ApiError
+
+# Shares on this machine: mounted here or not, on any grid of shares.
+from cloudmorrow.tui import sharemounts  # noqa: F401
 from cloudmorrow.tui.panes.admin import AdminPanel
 from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.panes.calendar import CalendarPane
 from cloudmorrow.tui.panes.chat import ChatPane
-from cloudmorrow.tui.panes.files import FilesPane
 from cloudmorrow.tui.panes.kit import pane_for, screen_key
 from cloudmorrow.tui.panes.secrets import SecretsPane
 from cloudmorrow.tui.screens.modals import PasswordModal
@@ -72,13 +74,13 @@ from cloudmorrow.tui.widgets.logstrip import LogStrip
 from cloudmorrow.tui.widgets.sidebar import NavCard, SectionLabel
 
 PANES: tuple[type[Pane], ...] = (
-    CalendarPane, ChatPane, SecretsPane, FilesPane,
+    CalendarPane, ChatPane, SecretsPane,
 )
 
 # The function keys no built-in card has, handed to Quill cards in the order
-# they appear — which is the catalog's: f1 was Notes' and f2 Tasks' before
-# either was a Quill, and still are.
-QUILL_KEYS: tuple[str, ...] = ("f1", "f2", "f4", "f10", "f11", "f12")
+# they appear — which is the catalog's: f1 was Notes', f2 Tasks' and f5
+# Files' before each was a Quill, and still are.
+QUILL_KEYS: tuple[str, ...] = ("f1", "f2", "f5", "f4", "f10", "f11", "f12")
 
 # How often the bell asks the server whether anything happened.
 BELL_POLL = 60.0
@@ -88,7 +90,6 @@ FEATURE_OF: dict[str, str] = {
     "calendar": "calendar",
     "chat": "chat",
     "secrets": "secrets",
-    "files": "files",
 }
 
 # Below this many columns the sidebar narrows, and its cards become one line.

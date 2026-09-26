@@ -94,7 +94,7 @@ def test_every_feature_is_on_to_begin_with(tasks_quill, notes_quill, auth):
     client = tasks_quill
     listed = client.get("/api/server/features", headers=auth).json()
     # The catalogue grows with the app; these four are the ones with tabs.
-    assert {"notes", "tasks", "secrets", "files"} <= {row["key"] for row in listed}
+    assert {"notes", "tasks", "secrets"} <= {row["key"] for row in listed}
     assert all(row["enabled"] for row in listed)
     assert all(row["label"] and row["changed_by"] == "" for row in listed)
 

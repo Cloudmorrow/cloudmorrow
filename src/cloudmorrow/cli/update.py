@@ -21,6 +21,7 @@ from cloudmorrow.cli import progress
 from cloudmorrow.cli.common import client, console, fail, run
 from cloudmorrow.client.api import ApiError, CloudmorrowClient, client_from_credentials
 from cloudmorrow.client.config import ClientConfig, StoredCredentials
+from cloudmorrow.desktop import extra as desktop_extra
 from cloudmorrow.links import link_new_commands
 from cloudmorrow.palette import GOOD, MUTED, SECOND, WARN
 
@@ -127,6 +128,17 @@ def _update_client(*, check: bool, agent: bool, force: bool) -> None:
         if completed.returncode != 0:
             detail = (completed.stderr or completed.stdout or "").strip()
             fail(f"pip could not install {package}:\n{detail}")
+        if desktop_extra.installed():
+            # The desktop app was added here, so keep it: whatever a new
+            # release needs for it, without reinstalling Qt every time,
+            # which is what --force-reinstall on the whole extra would do.
+            activity.step("keeping the desktop app")
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--quiet",
+                 desktop_extra.with_extra(release["package"])],
+                capture_output=True,
+                text=True,
+            )
         if agent:
             activity.step("restarting the agent")
             restarted = agent_service.restart()
