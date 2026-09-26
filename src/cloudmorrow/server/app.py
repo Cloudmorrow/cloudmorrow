@@ -20,9 +20,12 @@ from cloudmorrow.server.dav import MOUNT_PATH, CredentialCheck, build_dav_app
 from cloudmorrow.server.db import UserStore
 from cloudmorrow.server.deps import AppState
 from cloudmorrow.server.drive import user_drive
-from cloudmorrow.server.features import FeatureStore
+from cloudmorrow.server.features import Feature, FeatureStore
 from cloudmorrow.server.mcp import MCPStore
 from cloudmorrow.server.notifications import NotificationStore
+from cloudmorrow.server.quilljobs import Clock
+from cloudmorrow.server.quills import QuillRegistry
+from cloudmorrow.server.records import RecordStore
 from cloudmorrow.server.routes import (
     agents,
     auth,
@@ -35,11 +38,12 @@ from cloudmorrow.server.routes import (
     notes,
     notifications,
     push,
+    quills,
+    records,
     secrets,
     setup,
     sharefiles,
     shares,
-    tasks,
     today,
     users,
     web,
@@ -51,7 +55,6 @@ from cloudmorrow.server.sealed import seal_tree, use_key
 from cloudmorrow.server.secrets import SecretStore
 from cloudmorrow.server.settings import SettingsStore
 from cloudmorrow.server.shares import ShareStore
-from cloudmorrow.server.tasks import TaskStore
 from cloudmorrow.server.today import Weather
 from cloudmorrow.server.transport import install as require_tls
 from cloudmorrow.server.update import deployed_commit
@@ -79,16 +82,25 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     # one Shares folder, so there is one place to look.
     share_store.relocate()
     credential_check = CredentialCheck(user_store, config.ensure_secret_key())
+    # What is installed, and the one table every Quill's records live in.
+    quill_registry = QuillRegistry(config.quills_dir, config.datamodels_dir, config.quill_catalog)
+    record_store = RecordStore(config.db_path, quill_registry.models, quill_registry.expiries)
     app.state.cloudmorrow = AppState(
         config=config,
         users=user_store,
         agents=AgentStore(config.db_path),
         jobs=JobStore(config.db_path),
         secrets=SecretStore(config.db_path, sealer.master),
-        tasks=TaskStore(config.db_path),
         config_sync=ConfigStore(config.db_path),
         notifications=NotificationStore(config.db_path),
-        features=FeatureStore(config.db_path),
+        # Each installed Quill is one more thing to switch, at both levels.
+        features=FeatureStore(
+            config.db_path,
+            lambda: (
+                Feature(q.id, q.name, q.summary, tuple(sorted(q.models)))
+                for q in quill_registry.quills.values()
+            ),
+        ),
         chat=ChatStore(config.db_path),
         calendar=CalendarStore(config.db_path),
         push=PushStore(
@@ -102,7 +114,15 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         credential_check=credential_check,
         sealer=sealer,
         settings=SettingsStore(config.db_path),
+        quills=quill_registry,
+        records=record_store,
     )
+    # The foundation Quills on a fresh server, old tasks into records, and
+    # the sweeps: on a thread, once the server is up, so none of it can
+    # keep it from starting.
+    clock = Clock(config.db_path, quill_registry, record_store)
+    app.router.on_startup.append(clock.start)
+    app.router.on_shutdown.append(clock.stop)
 
     require_tls(app, config)
     allowed_clients = parse_rules(config.allowed_client_ips)
@@ -140,7 +160,9 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.include_router(
         secrets.router, dependencies=[Depends(features.require_feature("secrets"))]
     )
-    app.include_router(tasks.router, dependencies=[Depends(features.require_feature("tasks"))])
+    app.include_router(records.router)
+    app.include_router(records.models_router)
+    app.include_router(quills.router)
     app.include_router(shares.router, dependencies=in_files)
     app.include_router(sharefiles.router, dependencies=in_files)
     app.include_router(agents.router)

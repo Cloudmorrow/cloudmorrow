@@ -1,0 +1,163 @@
+/* The kit in the terminal: Quill screens, the record sheet, and the Quills
+   section of Administration. Everything else is in cloudmorrow.tcss. */
+
+/* -- board ---------------------------------------------------------------- */
+/* The groups, as a strip of tabs: which ones you have, without a click. The
+   strip's own underline is the rule under it; a border here would be two. */
+#board-bar {
+    height: 2;
+    padding: 0;
+    background: transparent;
+}
+
+#board-nav {
+    width: 1fr;
+    height: 2;
+    background: transparent;
+}
+
+#board-nav Tab {
+    padding: 0 2;
+}
+
+#lanes {
+    height: 1fr;
+}
+
+.lane {
+    width: 1fr;
+    border-right: solid $line;
+}
+
+.lane:last-of-type {
+    border-right: none;
+}
+
+/* The lane a held card would land in, so a drop is never a guess. */
+.lane.-drop-target {
+    background: $panel;
+}
+
+.lane-head {
+    height: 1;
+    padding: 0 1;
+    background: transparent;
+}
+
+.lane-body {
+    height: 1fr;
+    padding: 1 1;
+    scrollbar-size-vertical: 1;
+}
+
+.record-card {
+    height: auto;
+    padding: 0 1;
+    margin-bottom: 1;
+    background: $surface;
+    border-left: solid $line;
+}
+
+.record-card:hover {
+    border-left: solid $secondary;
+}
+
+.record-card:focus {
+    background: $panel;
+    border-left: solid $primary;
+}
+
+/* Held, and on its way somewhere. */
+.record-card.-dragging {
+    background: $panel;
+    border-left: solid $primary;
+    text-style: bold;
+}
+
+/* -- list ----------------------------------------------------------------- */
+#kit-table {
+    height: 1fr;
+    margin-top: 1;
+}
+
+/* -- the record sheet ----------------------------------------------------- */
+#record-sheet {
+    max-height: 90%;
+}
+
+#sheet-fields {
+    height: auto;
+    max-height: 62vh;
+    scrollbar-size-vertical: 1;
+}
+
+.sheet-row {
+    height: auto;
+    margin-bottom: 1;
+}
+
+.sheet-label {
+    width: 12;
+    color: $muted;
+}
+
+.sheet-row Input, .sheet-row Select, .sheet-row .sheet-fixed {
+    width: 1fr;
+}
+
+.sheet-row Input {
+    background: $surface;
+}
+
+.sheet-row Input:focus {
+    background: $panel;
+}
+
+.sheet-fixed {
+    height: auto;
+}
+
+.sheet-row .sheet-radios {
+    width: 1fr;
+    height: auto;
+    layout: horizontal;
+    background: transparent;
+}
+
+.sheet-radios RadioButton {
+    width: auto;
+    margin-right: 2;
+    background: transparent;
+}
+
+.sheet-row Checkbox {
+    background: transparent;
+}
+
+.sheet-row .sheet-markdown {
+    width: 1fr;
+    height: 10;
+    border: solid $line;
+    background: $background;
+}
+
+.sheet-row .sheet-text {
+    width: 1fr;
+    height: 5;
+    background: $background;
+}
+
+#sheet-complaint {
+    margin: 0;
+}
+
+/* -- Administration: Quills ------------------------------------------------ */
+#quill-sheet-body {
+    height: auto;
+    max-height: 62vh;
+    scrollbar-size-vertical: 1;
+}
+
+#quill-sheet-body Static {
+    height: auto;
+}

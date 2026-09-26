@@ -1,6 +1,7 @@
-/* Cloudmorrow — cool blues on near-black, with a cyan accent.
-   Colours come from the registered theme, so $primary and friends are the
-   palette in theme.py. */
+/* Cloudmorrow — the panes' own furniture. The frame around them (header,
+   sidebar, panel, log, buttons, tables, dialogs) is in chrome.tcss, and the
+   kit's in kit.tcss. Colours come from the registered theme, so $primary
+   (Sky), $action (Lens) and friends are the palette in theme.py. */
 
 Screen {
     background: $background;
@@ -35,7 +36,7 @@ LoginScreen, SplashScreen {
     width: 100%;
     height: auto;
     box-sizing: border-box;
-    border: round $primary;
+    border: round $line-bright;
     padding: 1 2;
     background: $surface;
 }
@@ -53,139 +54,6 @@ LoginScreen, SplashScreen {
     height: auto;
 }
 
-/* -- the workspace frame ------------------------------------------------- */
-#topbar {
-    height: 1;
-    background: $surface;
-}
-
-#topbar-left {
-    width: 1fr;
-}
-
-#topbar-right {
-    width: auto;
-    height: 1;
-    align-horizontal: right;
-}
-
-/* Buttons that have to live on a one-line bar: no border, no padding but the
-   space either side of the label. The account is one of them: click your
-   name to change your password. */
-#topbar #open-admin, #topbar #open-settings, #topbar #open-notifications,
-#topbar #topbar-account {
-    height: 1;
-    min-width: 0;
-    width: auto;
-    margin: 0 1 0 0;
-    padding: 0 1;
-    border: none;
-    background: $surface;
-    color: $muted;
-    text-style: none;
-}
-
-#topbar #open-admin:hover, #topbar #open-settings:hover,
-#topbar #open-notifications:hover, #topbar #topbar-account:hover {
-    background: $panel;
-    color: $primary;
-}
-
-#topbar #open-admin:focus, #topbar #open-settings:focus,
-#topbar #open-notifications:focus, #topbar #topbar-account:focus {
-    color: $primary;
-    text-style: bold;
-}
-
-/* The bell is the last thing on the line, so it keeps no right margin. */
-#topbar #open-notifications {
-    margin: 0;
-}
-
-/* Something to read: the bell says so rather than leaving it to the count. */
-#topbar #open-notifications.has-unread {
-    color: $warning;
-    text-style: bold;
-}
-
-#main {
-    height: 1fr;
-}
-
-/* -- tabs ---------------------------------------------------------------- */
-Tabs {
-    height: 2;
-    background: $background;
-}
-
-Tab {
-    padding: 0 2;
-    color: $muted;
-    background: transparent;
-}
-
-Tab:hover {
-    color: $foreground;
-    background: $panel;
-}
-
-Tab.-active, Tabs:focus Tab.-active {
-    color: $primary;
-    background: transparent;
-    text-style: bold;
-}
-
-Underline > .underline--bar {
-    color: $primary;
-    background: $line;
-}
-
-Tabs > #tabs-list {
-    min-height: 2;
-}
-
-#panes {
-    height: 1fr;
-    background: $background;
-}
-
-/* -- a pane's toolbar ---------------------------------------------------- */
-.toolbar {
-    height: 3;
-    padding: 1 1 0 2;
-    background: $background;
-}
-
-.toolbar Button {
-    height: 1;
-    min-width: 6;
-    margin-right: 2;
-    border: none;
-    padding: 0 1;
-    color: $muted;
-    background: $panel;
-}
-
-.toolbar Button:hover {
-    color: $foreground;
-    background: $line-bright;
-}
-
-.toolbar Button.-primary {
-    color: $primary;
-    background: $primary 15%;
-}
-
-.toolbar Button.-primary:hover {
-    color: $background;
-    background: $primary;
-}
-
-.toolbar Button.-error:hover {
-    color: $background;
-    background: $error;
-}
-
 /* -- secrets: the vaults on the left, the picked vault's keys on the right -- */
 #secrets-body {
     height: 1fr;
@@ -194,10 +62,10 @@ Tabs > #tabs-list {
 /* The list is the note tree's opposite number: same width, same rule down
    its right, and the same line in the theme colour when it has focus. */
 #vault-list {
-    width: 32;
+    width: 26;
     height: 1fr;
-    padding: 1 0;
-    background: $surface;
+    padding: 0 0;
+    background: transparent;
     border-right: solid $line;
     scrollbar-size-vertical: 1;
 }
@@ -222,7 +90,8 @@ Tabs > #tabs-list {
 }
 
 #vault-list:focus > ListItem.--highlight {
-    background: $primary 20%;
+    background: $cloud 45%;
+    color: $text;
 }
 
 #secret-detail {
@@ -232,8 +101,9 @@ Tabs > #tabs-list {
 #vault-name {
     height: 1;
     padding: 0 2;
-    background: $surface;
+    background: transparent;
     color: $secondary;
+    text-style: bold;
 }
 
 /* -- secrets ------------------------------------------------------------- */
@@ -249,7 +119,7 @@ Tabs > #tabs-list {
     border: none;
     padding: 0 2;
     color: $muted;
-    background: $panel;
+    background: transparent;
 }
 
 .env-bar Button:hover {
@@ -257,10 +127,16 @@ Tabs > #tabs-list {
     background: $line-bright;
 }
 
+/* The environment you are looking at: blue, because it is where you are —
+   a blue fill with white on it, as the brand has its fills. */
 .env-bar Button.-primary {
-    color: $background;
-    background: $primary;
+    color: white;
+    background: $cloud;
     text-style: bold;
+}
+
+.env-bar Button.-primary:hover {
+    background: $puff;
 }
 
 #secret-body {
@@ -279,8 +155,8 @@ Tabs > #tabs-list {
 }
 
 #note-tree {
-    width: 32;
-    background: $surface;
+    width: 26;
+    background: transparent;
     border-right: solid $line;
     padding: 1 1;
     scrollbar-size-vertical: 1;
@@ -297,8 +173,9 @@ Tabs > #tabs-list {
 #note-path {
     height: 1;
     padding: 0 2;
-    background: $surface;
+    background: transparent;
     color: $secondary;
+    text-style: bold;
 }
 
 #editor {
@@ -316,7 +193,7 @@ Tabs > #tabs-list {
     width: 40%;
     height: 1fr;
     padding: 1 2;
-    background: $surface;
+    background: transparent;
     border-left: solid $line;
 }
 
@@ -336,97 +213,14 @@ Tabs > #tabs-list {
     background: $background;
 }
 
-/* -- tasks --------------------------------------------------------------- */
-/* The boards, as a strip of tabs: which ones you have, without a click. The
-   strip's own underline is the rule under it; a border here would be two. */
-#board-bar {
-    height: 2;
-    padding: 0 1;
-    background: $surface;
-}
-
-#board-nav {
-    width: 1fr;
-    height: 2;
-    background: $surface;
-}
-
-#board-nav Tab {
-    padding: 0 2;
-}
-
-#lanes {
-    height: 1fr;
-}
-
-.lane {
-    width: 1fr;
-    border-right: solid $line;
-}
-
-.lane:last-of-type {
-    border-right: none;
-}
-
-/* The lane a held card would land in, so a drop is never a guess. */
-.lane.-drop-target {
-    background: $panel;
-}
-
-.lane-head {
-    height: 1;
-    padding: 0 2;
-    background: $surface;
-}
-
-.lane-body {
-    height: 1fr;
-    padding: 1 1;
-    scrollbar-size-vertical: 1;
-}
-
-.task-card {
-    height: auto;
-    padding: 0 1;
-    margin-bottom: 1;
-    background: $surface;
-    border-left: solid $line;
-}
-
-.task-card:hover {
-    border-left: solid $secondary;
-}
-
-.task-card:focus {
-    background: $panel;
-    border-left: solid $primary;
-}
-
-/* Held, and on its way somewhere. */
-.task-card.-dragging {
-    background: $panel;
-    border-left: solid $primary;
-    text-style: bold;
-}
-
-#task-modal #task-body {
-    height: 14;
-    border: solid $line;
-    background: $background;
-}
-
-#task-modal #task-title {
-    margin-bottom: 1;
-}
-
 /* -- chat ---------------------------------------------------------------- */
 #chat-body {
     height: 1fr;
-    padding: 1 2;
+    padding: 1 0 0 0;
 }
 
 #channel-pane {
-    width: 32;
+    width: 24;
     margin-right: 2;
 }
 
@@ -509,11 +303,11 @@ Tabs > #tabs-list {
 /* -- the calendar -------------------------------------------------------- */
 #calendar-body {
     height: 1fr;
-    padding: 1 2;
+    padding: 1 0 0 0;
 }
 
 #calendar-list {
-    width: 30;
+    width: 24;
     margin-right: 2;
 }
 
@@ -630,74 +424,6 @@ Tabs > #tabs-list {
     color: $muted;
 }
 
-/* -- tables -------------------------------------------------------------- */
-DataTable {
-    height: 1fr;
-    background: $surface;
-    border: round $line;
-    scrollbar-size: 1 1;
-}
-
-DataTable:focus {
-    border: round $primary;
-}
-
-DataTable > .datatable--header {
-    background: $panel;
-    color: $muted;
-    text-style: none;
-}
-
-DataTable > .datatable--cursor {
-    background: $primary 25%;
-    color: $foreground;
-}
-
-DataTable > .datatable--hover {
-    background: $panel;
-}
-
-/* -- modals -------------------------------------------------------------- */
-ModalScreen {
-    align: center middle;
-    background: $background 70%;
-}
-
-.modal {
-    width: 62;
-    height: auto;
-    box-sizing: border-box;
-    padding: 1 2;
-    border: round $primary;
-    background: $surface;
-}
-
-.modal-wide {
-    width: 82;
-}
-
-.modal-title {
-    text-style: bold;
-    color: $primary;
-    margin-bottom: 1;
-}
-
-.modal-detail {
-    height: auto;
-    color: $muted;
-    margin: 1 0;
-}
-
-.modal-buttons {
-    height: auto;
-    margin-top: 1;
-    align-horizontal: right;
-}
-
-.modal-buttons Button {
-    margin-left: 2;
-}
-
 /* The three password fields sit one under the other, and the error under them. */
 #password-modal Input {
     margin-bottom: 1;
@@ -784,66 +510,6 @@ ModalScreen {
     margin-bottom: 1;
 }
 
-
-/* -- administration ------------------------------------------------------ */
-/* The menu is lit while its panel is the thing on screen, so the top bar
-   says where you are. */
-#topbar #open-admin.-open {
-    color: $primary;
-    background: $primary 15%;
-    text-style: bold;
-}
-
-#workspace-view, #admin-view {
-    height: 1fr;
-}
-
-#admin-head {
-    height: 1;
-    background: $surface;
-    padding: 0 0 0 2;
-}
-
-#admin-title {
-    width: 1fr;
-    height: 1;
-}
-
-#admin-head #admin-back {
-    height: 1;
-    min-width: 0;
-    width: auto;
-    margin: 0 1 0 0;
-    padding: 0 1;
-    border: none;
-    background: $surface;
-    color: $muted;
-}
-
-#admin-head #admin-back:hover {
-    background: $panel;
-    color: $primary;
-}
-
-/* The panel's own strip, quieter than the one the workspace wears. */
-#admin-nav {
-    height: 2;
-    padding: 0 1;
-}
-
-#admin-nav Tab {
-    padding: 0 2;
-}
-
-#admin-views {
-    height: 1fr;
-}
-
-#admin-user-table {
-    height: 1fr;
-    padding: 0 2;
-    background: $background;
-}
 
 #admin-features-note {
     height: auto;

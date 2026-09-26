@@ -1,0 +1,310 @@
+"""`cloudmorrow <quill> ACTION` — every installed Quill, on the command line.
+
+The command-line surface of the kit. Nobody writes it per Quill: the words
+come from the Quill's first screen (or `--screen`) and its datamodel.
+
+    cm tasks list                      # the board, lane by lane
+    cm tasks add "Repot the fig"       # into the first lane
+    cm tasks move 8f2c doing           # a record by the start of its id
+    cm tasks done 8f2c
+    cm tasks show 8f2c
+    cm tasks set 8f2c due=2026-10-01
+    cm tasks delete 8f2c
+    cm tasks groups                    # the boards, for a board with groups
+    cm tasks list --group Garden       # another board, by name or id
+
+`main` sends a first word that is not one of the built-in commands here, so
+`cm tasks` works without the CLI knowing, when it starts, what is installed.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Annotated
+
+import typer
+from rich.markup import escape
+from rich.table import Table
+
+from cloudmorrow.cli.common import client, console, emit, fail, out, run
+from cloudmorrow.client.api import ApiError, CloudmorrowClient
+from cloudmorrow.console import TITLE
+
+ACTIONS = ("list", "add", "show", "set", "move", "done", "undone", "delete", "groups")
+
+
+def route(argv: list[str], commands: set[str]) -> list[str]:
+    """`tasks list` → `run-quill tasks list`, when `tasks` is not a command of ours."""
+    if argv and not argv[0].startswith("-") and argv[0] not in commands:
+        return ["run-quill", *argv]
+    return argv
+
+
+class Screen:
+    """One Quill screen and the datamodels it needs, with the questions a command asks."""
+
+    def __init__(self, quill: dict, screen: dict) -> None:
+        self.quill = quill
+        self.spec = screen
+        self.models = quill["models"]
+        self.model = screen["model"]
+        self.fields = {f["name"]: f for f in self.models[self.model]["fields"]}
+        self.title = screen.get("title") or self.models[self.model]["title"]
+        self.kit = screen["kit"]
+
+    @property
+    def lane(self) -> dict | None:
+        return self.fields.get(self.spec.get("lane", "")) if self.kit == "board" else None
+
+    @property
+    def group(self) -> dict | None:
+        return self.fields.get(self.spec.get("group", "")) if self.spec.get("group") else None
+
+    def group_title(self, record: dict) -> str:
+        target = self.models[self.group["to"]]
+        return str(record["fields"].get(target["title"], record["id"]))
+
+
+def _screen(quills: list[dict], quill_id: str, screen_id: str) -> Screen:
+    quill = next((q for q in quills if q["id"] == quill_id), None)
+    if quill is None:
+        names = ", ".join(sorted(q["id"] for q in quills)) or "none"
+        fail(f"'{quill_id}' is not a command, nor an installed Quill (installed: {names})")
+    if not quill["screens"]:
+        fail(f"{quill_id} has no screens")
+    screen = quill["screens"][0]
+    if screen_id:
+        screen = next((s for s in quill["screens"] if s["id"] == screen_id), None)
+        if screen is None:
+            fail(
+                f"{quill_id} has no screen {screen_id!r}: {', '.join(s['id'] for s in quill['screens'])}"
+            )
+    return Screen(quill, screen)
+
+
+def _pairs(values: list[str], screen: Screen) -> dict:
+    fields: dict = {}
+    for pair in values:
+        name, sep, value = pair.partition("=")
+        if not sep:
+            fail(f"{pair!r}: set fields as name=value")
+        if name not in screen.fields:
+            fail(f"{screen.model} has no field {name!r}: {', '.join(screen.fields)}")
+        kind = screen.fields[name]["kind"]
+        if kind == "json":
+            try:
+                fields[name] = json.loads(value)
+            except ValueError:
+                fail(f"{name} is JSON")
+        else:
+            fields[name] = value
+    return fields
+
+
+def _find(records: list[dict], key: str, title: str) -> dict:
+    """A record by its id, the start of its id (with or without `r_`), or its exact title."""
+    wanted = key if key.startswith("r_") else f"r_{key}"
+    matches = [r for r in records if r["id"].startswith(wanted)]
+    if not matches:
+        matches = [
+            r for r in records if str(r["fields"].get(title, "")).casefold() == key.casefold()
+        ]
+    if len(matches) != 1:
+        fail(f"{'no record' if not matches else 'more than one record'} matches {key!r}")
+    return matches[0]
+
+
+async def _group_id(
+    api: CloudmorrowClient, screen: Screen, wanted: str
+) -> tuple[str | None, list[dict]]:
+    """The group a board command is about: named, or the first there is."""
+    if screen.group is None:
+        return None, []
+    groups = await api.records(screen.group["to"])
+    if not groups:
+        fail(f"there is no {screen.group['to']} yet")
+    if not wanted:
+        return groups[0]["id"], groups
+    return _find(groups, wanted, screen.models[screen.group["to"]]["title"])["id"], groups
+
+
+def _show_board(screen: Screen, records: list[dict], heading: str) -> None:
+    lane = screen.lane
+    labels = dict(zip(lane["values"], lane.get("labels") or lane["values"], strict=True))
+    table = Table(title=heading, title_style=TITLE)
+    for value in lane["values"]:
+        table.add_column(labels[value])
+    columns = [
+        [r for r in records if r["fields"].get(lane["name"]) == value] for value in lane["values"]
+    ]
+    for row in range(max((len(c) for c in columns), default=0)):
+        cells = []
+        for column in columns:
+            if row < len(column):
+                record = column[row]
+                left = ""
+                if record.get("expires_at"):
+                    left = f" [dim](goes {record['expires_at'][:10]})[/]"
+                cells.append(
+                    f"{escape(str(record['fields'].get(screen.title, '')))} [dim]{record['id'][2:6]}[/]{left}"
+                )
+            else:
+                cells.append("")
+        table.add_row(*cells)
+    out.print(table)
+
+
+def _show_list(screen: Screen, records: list[dict], heading: str) -> None:
+    table = Table(title=heading, title_style=TITLE)
+    tick = screen.spec.get("tick")
+    if tick:
+        table.add_column("")
+    table.add_column("id", style="dim")
+    table.add_column(screen.fields[screen.title].get("label", screen.title))
+    subtitle = screen.spec.get("subtitle")
+    if subtitle:
+        table.add_column(screen.fields[subtitle].get("label", subtitle))
+    for record in records:
+        row = []
+        if tick:
+            row.append("●" if record["fields"].get(tick) else "○")
+        row += [record["id"][2:6], escape(str(record["fields"].get(screen.title, "")))]
+        if subtitle:
+            row.append(escape(str(record["fields"].get(subtitle) or "")))
+        table.add_row(*row)
+    out.print(table)
+
+
+def _show_record(screen: Screen, record: dict) -> None:
+    table = Table(
+        title=f"{screen.models[screen.model]['label']} {record['id']}",
+        title_style=TITLE,
+        show_header=False,
+    )
+    table.add_column("field", style="dim")
+    table.add_column("value")
+    for name, field in screen.fields.items():
+        value = record["fields"].get(name)
+        if field["kind"] == "enum" and value in field.get("values", []):
+            value = (field.get("labels") or field["values"])[field["values"].index(value)]
+        table.add_row(field.get("label", name), escape("" if value is None else str(value)))
+    table.add_row("rev", str(record["rev"]))
+    out.print(table)
+
+
+def main(
+    quill: Annotated[str, typer.Argument(help="The Quill's id.")],
+    action: Annotated[str, typer.Argument(help=" | ".join(ACTIONS))] = "list",
+    args: Annotated[list[str] | None, typer.Argument(help="What the action needs.")] = None,
+    screen_id: Annotated[
+        str, typer.Option("--screen", help="Another of the Quill's screens.")
+    ] = "",
+    group: Annotated[
+        str, typer.Option("--group", "-g", help="Which board (or other group), by name or id.")
+    ] = "",
+    index: Annotated[
+        int | None, typer.Option("--index", help="Where in the lane, 0 for the top.")
+    ] = None,
+    plain: Annotated[bool, typer.Option("--plain", help="JSON, for scripts.")] = False,
+) -> None:
+    """Run ACTION on an installed Quill."""
+    args = list(args or [])
+    if action not in ACTIONS:
+        fail(f"{action!r}: the actions are {', '.join(ACTIONS)}")
+
+    async def _run() -> None:
+        _, api = client()
+        try:
+            screen = _screen(await api.quills(), quill, screen_id)
+            await _act(api, screen, action, args, group, index, plain)
+        finally:
+            await api.aclose()
+
+    run(_run())
+
+
+async def _act(
+    api: CloudmorrowClient,
+    screen: Screen,
+    action: str,
+    args: list[str],
+    group: str,
+    index: int | None,
+    plain: bool,
+) -> None:
+    group_id, groups = await _group_id(api, screen, group)
+    where = {screen.group["name"]: group_id} if group_id else {}
+
+    if action == "groups":
+        if screen.group is None:
+            fail(f"{screen.quill['id']} has no groups")
+        if plain:
+            emit(json.dumps(groups, indent=2) + "\n")
+            return
+        for record in groups:
+            out.print(f"{record['id'][2:6]}  {escape(screen.group_title(record))}")
+        return
+
+    records = await api.records(screen.model, **where)
+    if action == "list":
+        if plain:
+            emit(json.dumps(records, indent=2) + "\n")
+            return
+        heading = screen.spec.get("label") or screen.quill["name"]
+        if group_id:
+            heading += f" · {screen.group_title(next(g for g in groups if g['id'] == group_id))}"
+        if screen.kit == "board":
+            _show_board(screen, records, heading)
+        else:
+            _show_list(screen, records, heading)
+        return
+
+    if action == "add":
+        if not args:
+            fail(f'add what? cm {screen.quill["id"]} add "<{screen.title}>" [name=value …]')
+        fields = {screen.title: args[0], **_pairs(args[1:], screen), **where}
+        made = await api.create_record(screen.model, fields, index=index)
+        console.print(f"[green]Added[/] {escape(args[0])} [dim]{made['id'][2:6]}[/]")
+        return
+
+    if not args:
+        fail(f"which one? cm {screen.quill['id']} {action} <id>")
+    record = _find(records if records else await api.records(screen.model), args[0], screen.title)
+    rest = args[1:]
+    try:
+        if action == "show":
+            if plain:
+                emit(json.dumps(record, indent=2) + "\n")
+            else:
+                _show_record(screen, record)
+        elif action == "set":
+            changed = await api.update_record(
+                screen.model, record["id"], _pairs(rest, screen), rev=record["rev"]
+            )
+            console.print(f"[green]Saved[/] {escape(str(changed['fields'].get(screen.title, '')))}")
+        elif action == "move":
+            if screen.lane is None or not rest:
+                fail(
+                    f"move takes a lane: {', '.join(screen.lane['values']) if screen.lane else 'this is not a board'}"
+                )
+            await api.move_record(screen.model, record["id"], {screen.lane["name"]: rest[0]}, index)
+            console.print(f"[green]Moved[/] to {rest[0]}")
+        elif action in ("done", "undone"):
+            if screen.lane is not None:
+                target = screen.spec.get("done") or screen.lane["values"][-1]
+                lane = target if action == "done" else screen.lane["values"][0]
+                await api.move_record(screen.model, record["id"], {screen.lane["name"]: lane}, None)
+            elif screen.spec.get("tick"):
+                await api.update_record(
+                    screen.model, record["id"], {screen.spec["tick"]: action == "done"}
+                )
+            else:
+                fail(f"{screen.quill['id']} has nothing to tick")
+            console.print(f"[green]{'Done' if action == 'done' else 'Not done'}[/]")
+        elif action == "delete":
+            await api.delete_record(screen.model, record["id"])
+            console.print(
+                f"[green]Deleted[/] {escape(str(record['fields'].get(screen.title, '')))}"
+            )
+    except ApiError as exc:
+        fail(str(exc))

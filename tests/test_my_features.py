@@ -45,7 +45,8 @@ def test_everything_is_on_for_a_fresh_account(client, auth):
     assert all(row["label"] and row["description"] for row in listed)
 
 
-def test_a_feature_the_server_has_off_is_not_offered_at_all(client, auth):
+def test_a_feature_the_server_has_off_is_not_offered_at_all(tasks_quill, auth):
+    client = tasks_quill
     server_switch(client, auth, "tasks", False)
     listed = mine(client, auth)
     assert "tasks" not in [row["key"] for row in listed]
@@ -88,10 +89,11 @@ def test_it_hides_rather_than_forbids(client, auth):
     assert client.get("/api/notes/tree", headers=auth).status_code == 200
 
 
-def test_the_server_switch_still_wins(client, auth):
+def test_the_server_switch_still_wins(tasks_quill, auth):
+    client = tasks_quill
     switch(client, auth, "tasks", True)
     server_switch(client, auth, "tasks", False)
-    assert client.get("/api/boards", headers=auth).status_code == 403
+    assert client.get("/api/records/board", headers=auth).status_code == 403
     assert "tasks" not in [row["key"] for row in mine(client, auth)]
     # And it comes back as the account left it, not as the server found it.
     server_switch(client, auth, "tasks", True)

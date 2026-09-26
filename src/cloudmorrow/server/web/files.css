@@ -15,6 +15,7 @@
   overflow: hidden;
 }
 .sort button {
+  font-family: var(--display);
   flex: 1;
   display: inline-flex;
   align-items: center;
@@ -26,7 +27,7 @@
   color: var(--muted);
 }
 .sort button + button { border-left: 1px solid var(--line); }
-.sort button.active { background: var(--accent); color: var(--accent-ink); }
+.sort button.active { background: var(--fill); color: var(--fill-ink); }
 
 /* List, or thumbnails: two icons, the one in use filled like a sort. */
 .view-switch {
@@ -38,6 +39,7 @@
   overflow: hidden;
 }
 .view-switch button {
+  font-family: var(--display);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -46,7 +48,7 @@
   color: var(--muted);
 }
 .view-switch button + button { border-left: 1px solid var(--line); }
-.view-switch button.active { background: var(--accent); color: var(--accent-ink); }
+.view-switch button.active { background: var(--fill); color: var(--fill-ink); }
 
 /* -- the grid ----------------------------------------------------------- */
 /* Square tiles, as many across as fit; a picture fills its tile, anything

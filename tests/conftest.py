@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -8,8 +10,6 @@ from cloudmorrow.server.app import create_app
 from cloudmorrow.server.config import ServerConfig
 from cloudmorrow.server.db import UserStore
 from cloudmorrow.server.security import hash_password
-from cloudmorrow.tui.app import CloudmorrowApp
-from tests.tui_harness import FakeClient
 
 ADMIN = ("bram", "supersecret1")
 GUEST = ("guest", "guestsecret1")
@@ -29,6 +29,10 @@ def isolated_client_config(tmp_path_factory, monkeypatch):
     )
 
 
+# A local copy of the Quill Catalog, so no test reaches the network.
+QUILL_CATALOG = Path(__file__).parent / "fixtures" / "quills"
+
+
 @pytest.fixture()
 def config(tmp_path) -> ServerConfig:
     return ServerConfig(
@@ -36,6 +40,7 @@ def config(tmp_path) -> ServerConfig:
         data_dir=tmp_path / "data",
         secret_key="test-signing-key-that-is-long-enough-for-hs256",
         token_ttl_hours=1,
+        quill_catalog=str(QUILL_CATALOG),
     )
 
 
@@ -65,11 +70,22 @@ def auth(client) -> dict[str, str]:
 
 
 @pytest.fixture()
-def app(tmp_path, monkeypatch) -> CloudmorrowApp:
+def app(tmp_path, monkeypatch):
     """The real app with a fake server, and no stored session to resume."""
+    # Imported here, so a server test does not load the terminal app.
+    from cloudmorrow.tui.app import CloudmorrowApp
+    from tests.tui_harness import FakeClient
+
     monkeypatch.setenv("CLOUDMORROW_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.setattr(CloudmorrowApp, "_resume_session", lambda self: None)
     instance = CloudmorrowApp(ClientConfig(api_url="http://test.invalid", vault="verticore"))
     instance.client = FakeClient()
     instance.username = "bram"
     return instance
+
+
+@pytest.fixture()
+def tasks_quill(client) -> TestClient:
+    """The client, with the Tasks Quill installed from the local catalog."""
+    client.app.state.cloudmorrow.quills.install_from_catalog("tasks")
+    return client

@@ -1,0 +1,25 @@
+# A Quill for Cloudmorrow. Everything it is, is declared here: the data it
+# uses, the screens it shows, the jobs it runs. The screens are drawn on the
+# phone, the web app and the terminal by Cloudmorrow itself — there is no UI
+# code to write. See CLAUDE.md for the whole format, and run `cm quill check`.
+
+[quill]
+id = "{{id}}"
+name = "{{name}}"
+version = "0.1.0"
+summary = "{{summary}}"
+category = "personal"          # personal, home, business, developer
+icon = "{{id}}"
+publisher = ""
+license = "MIT"
+
+[uses]
+datamodels = []                # foundational datamodels: task, contact, vehicle, …
+
+[[screens]]
+id = "items"
+kit = "list"
+label = "{{name}}"
+model = "{{id}}.item"
+title = "name"
+tick = "done"

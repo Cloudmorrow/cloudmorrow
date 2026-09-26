@@ -1,0 +1,12 @@
+[datamodel]
+id = "calendar"
+version = 1
+label = "Calendar"
+description = "Your own, one you share, or everybody's."
+domain = "calendars"
+scopes = ["personal", "shared", "public"]
+title = "name"
+
+[fields]
+name = { kind = "string", required = true }
+colour = { kind = "string" }

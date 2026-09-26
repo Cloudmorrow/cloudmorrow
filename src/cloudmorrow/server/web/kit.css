@@ -1,0 +1,239 @@
+/* The kit: the chips across a board, the add row, the circle on a card,
+   the lanes, and the record sheet's widgets — one per field kind.
+
+   Every Quill is drawn with these, so nothing here is named for one. */
+
+.chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 0 -16px 14px;
+  padding: 0 16px;
+  scrollbar-width: none;
+}
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+/* A chosen thing is a filled accent, not an outlined one. */
+.chip.active { border-color: transparent; background: var(--fill); color: var(--fill-ink); }
+/* The way to another group looks like a group, but is drawn rather than filled. */
+.chip.new-group { border: 1px dashed var(--line-bright); }
+
+.add {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 16px;
+  margin: 0 0 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.add:focus-within { border-color: var(--accent); }
+.add input {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  border: 0;
+  background: none;
+  outline: none;
+}
+.add input::placeholder { color: var(--muted); }
+.add .check { opacity: .5; }
+
+/* -- the circle ------------------------------------------------------------ */
+/* Empty at the start, a dot along the way, full at the end. */
+.check {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius);
+  border: 2px solid var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fill-ink);
+}
+.check.part { border-color: var(--accent); }
+.check.part::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.check.done { background: var(--fill); border-color: var(--fill); }
+
+.row.card { padding: 0 12px 0 4px; gap: 4px; }
+.row.card .tick {
+  flex: none;
+  width: 44px;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.row.card .main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 52px;
+  padding: 10px 0;
+}
+.row.card + .row.card::before { left: 48px; }
+.row.card.is-done .title { color: var(--muted); font-weight: 500; text-decoration: line-through; }
+/* A record an expire job will take says so, and it is the one thing on
+   the line in the warning colour. */
+.row .meta .date.expires { color: var(--warn); opacity: 1; }
+.kit-list .row svg { flex: none; color: var(--muted); }
+
+/* -- an enum: a row of buttons, one lit ------------------------------------- */
+.segments {
+  display: flex;
+  margin: 0 0 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.segments button {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.segments button + button { border-left: 1px solid var(--line); }
+.segments button.active { background: var(--fill); color: var(--fill-ink); }
+
+/* -- the lanes ------------------------------------------------------------ */
+/* On the phone a lane is a plain block around what was already there, so
+   the lanes stack exactly as they would loose in the listing. Two things
+   have to be said to keep that true: a lane with nothing in it is not
+   there at all, and the first lane that does have something keeps the
+   four pixels a listing's first group label has — `:first-child` cannot
+   see through the wrapper. */
+.lane-empty { display: none; }
+.listing .board .lane:not(.lane-empty) .group-label { margin-top: 4px; }
+.listing .board .lane:not(.lane-empty) ~ .lane .group-label { margin-top: 22px; }
+.group.nothing {
+  padding: 14px 16px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Side by side once there is room for them: the board the TUI draws, a
+   column a lane, however many lanes the enum has. */
+@media (min-width: 1180px) and (min-height: 600px) {
+  .board {
+    display: grid;
+    grid-template-columns: repeat(var(--lanes, 3), minmax(0, 1fr));
+    gap: 0 18px;
+    align-items: start;
+  }
+  .lane { min-width: 0; }
+  .lane-empty { display: block; }
+  /* A card in a lane is a fraction as wide as a row across the page, so a
+     long title wraps rather than being cut after four words. */
+  .lane .row.card .title { white-space: normal; overflow-wrap: anywhere; }
+  /* Every lane starts on the same line, whether or not the one before it
+     had anything in it. */
+  .listing .board .lane .group-label,
+  .listing .board .lane:not(.lane-empty) ~ .lane .group-label { margin-top: 4px; }
+  /* A lane is somewhere to drop a card, so it keeps a floor under the
+     last one rather than ending where its cards do. */
+  .lane { min-height: 120px; }
+  .row.card.dragging { opacity: .4; }
+  .lane.over .group {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 7%, var(--card));
+  }
+  .lane.over .group.nothing { border-style: dashed; }
+}
+
+/* -- the record sheet --------------------------------------------------------- */
+.record .group-label:first-of-type { margin-top: 4px; }
+.record .fields { margin-bottom: 16px; }
+.record .field { align-items: center; }
+.record .field .main { flex: none; min-width: 5.5em; max-width: 45%; color: var(--muted); font-size: 15px; }
+.record .field input:not([type="checkbox"]),
+.record .field select {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--ink);
+  font: inherit;
+  /* 16px or iOS zooms the page the moment it is focused. */
+  font-size: 16px;
+  text-align: right;
+}
+.record .field select { text-align-last: right; cursor: pointer; }
+.record .field select option { color: var(--ink); background: var(--card); }
+.record .field input::placeholder { color: var(--muted); }
+.record .field input[type="date"],
+.record .field input[type="datetime-local"] { color-scheme: dark light; }
+/* Set by the server, so read here and never typed: said the way the
+   inputs beside it are, not in the monospace me.css gives a `.value`. */
+.record .field .value { flex: 1; min-width: 0; max-width: none; text-align: right; color: var(--muted); font: inherit; font-size: 16px; }
+.record .field:focus-within { background: var(--card-2); }
+
+/* A bool is a switch: on is the accent, off is the line colour. */
+.switch {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  margin-left: auto;
+  position: relative;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--line-bright);
+  cursor: pointer;
+  transition: background .15s;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ink);
+  transition: transform .15s;
+}
+.switch:checked { background: var(--fill); }
+.switch:checked::after { transform: translateX(18px); background: var(--fill-ink); }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* A long field that is not the body: a box of its own under its name. */
+.record textarea.long {
+  display: block;
+  width: 100%;
+  min-height: 4.8em;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink);
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.record textarea.long:focus { border-color: var(--accent); }
+.editor .stamp .expires { color: var(--warn); }
+
+/* Chips and the enum's buttons are set like the rest of the controls: in
+   the semi-condensed face the guide gives labels and buttons. */
+.chip, .segments button { font-family: var(--display); font-size: 15px; }

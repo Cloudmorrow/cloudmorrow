@@ -1,4 +1,4 @@
-"""The web app: notes and tasks on a phone, or in any browser, at `/app`.
+"""The web app: notes and every Quill on a phone, or in any browser, at `/app`.
 
 The API already speaks bearer tokens, so the browser needs nothing the TUI
 does not have — it signs in at `/api/auth/login`, keeps the token in local
@@ -34,6 +34,8 @@ MEDIA_TYPES = {
     ".js": "text/javascript; charset=utf-8",
     ".webmanifest": "application/manifest+json",
     ".png": "image/png",
+    # The type, vendored with its licence: Barlow, as the brand guide sets it.
+    ".woff2": "font/woff2",
 }
 
 router = APIRouter(tags=["web"])

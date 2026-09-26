@@ -24,7 +24,7 @@ from tests.tui_harness import TODAY, TOMORROW, settle, start
 
 async def open_calendar(app, pilot):
     screen = await start(app, pilot)
-    await pilot.click("#tab-calendar")
+    await pilot.click("#nav-calendar")
     await settle(app, pilot)
     return screen, screen.query_one(CalendarPane)
 
@@ -377,4 +377,4 @@ async def test_the_tab_is_gone_when_the_server_has_the_calendar_switched_off(app
             row["enabled"] = False
     async with app.run_test(size=(140, 40)) as pilot:
         screen = await start(app, pilot)
-        assert screen.query_one("#tab-calendar").display is False
+        assert screen.query_one("#nav-calendar").display is False

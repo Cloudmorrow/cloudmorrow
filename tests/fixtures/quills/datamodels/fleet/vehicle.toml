@@ -1,0 +1,18 @@
+[datamodel]
+id = "vehicle"
+version = 1
+label = "Vehicle"
+description = "A car, a van, a bike: something with a registration that is driven and serviced."
+domain = "fleet"
+scopes = ["personal", "shared"]
+title = "name"
+
+[fields]
+name = { kind = "string", required = true }
+registration = { kind = "string", indexed = true }
+make = { kind = "string", indexed = true }
+model = { kind = "string" }
+year = { kind = "int", indexed = true }
+vin = { kind = "string" }
+fuel = { kind = "enum", values = ["petrol", "diesel", "electric", "hybrid", "other"], labels = ["Petrol", "Diesel", "Electric", "Hybrid", "Other"], indexed = true }
+notes = { kind = "markdown" }

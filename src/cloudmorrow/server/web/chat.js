@@ -88,7 +88,7 @@ async function renderList(arg) {
       <div class="listing">${
         showing.length
           ? `<div class="group">${showing.map(channelRow).join("")}</div>`
-          : `<p class="empty"><b>${which === "direct" ? "No messages yet" : "No channels yet"}</b>${
+          : `<p class="empty mascot"><b>${which === "direct" ? "No messages yet" : "No channels yet"}</b>${
               which === "direct" ? "Tap the pencil to write to somebody." : "Tap the pencil to make one."
             }</p>`
       }</div>

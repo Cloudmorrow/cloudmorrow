@@ -88,6 +88,9 @@ SEALED: dict[int, tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...]] = {
         ("jobs", ("owner",), ("payload", "result")),
         ("push_subscriptions", ("username",), ("p256dh", "auth")),
     ),
+    # The record store, where every Quill's data lives. Born sealed, so the
+    # migration finds nothing to do; listed so a new key re-seals it.
+    2: (("records", ("model", "owner", "id"), ("body",)),),
 }
 SEALED_VERSION = max(SEALED)
 

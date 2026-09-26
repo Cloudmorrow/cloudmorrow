@@ -1,0 +1,44 @@
+[quill]
+id = "tasks"
+name = "Tasks"
+version = "1.0.0"
+summary = "Boards with three lanes: To Do, Doing, Done."
+category = "personal"
+icon = "tasks"
+publisher = "Cloudmorrow"
+license = "AGPL-3.0-or-later"
+
+[uses]
+datamodels = ["board", "task"]
+
+# One tab: your boards as chips across the top, the three lanes below.
+# On a phone the lanes stack and the circle on a card finishes it; on a
+# computer and in the terminal they are columns you drag cards between.
+[[screens]]
+id = "board"
+kit = "board"
+label = "Tasks"
+model = "task"
+group = "board"
+lane = "lane"
+title = "title"
+body = "body"
+done = "done"
+
+# Done is a lane you pass through, not one that fills up: a week after a
+# task is finished, it goes.
+[[jobs]]
+id = "sweep_done"
+action = "expire"
+model = "task"
+field = "done_at"
+after = "7d"
+every = "1h"
+
+# There is never no board: the first time you open Tasks you get one named
+# after you, to rename, fill or delete.
+[[datasets]]
+id = "first_board"
+model = "board"
+seed = "per-owner"
+records = [{ title = "{owner}'s tasks" }]

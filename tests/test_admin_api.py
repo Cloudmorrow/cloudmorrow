@@ -90,7 +90,8 @@ def test_an_account_from_before_roles_existed_keeps_its_rights(config, tmp_path)
 
 
 # -- features --------------------------------------------------------------
-def test_every_feature_is_on_to_begin_with(client, auth):
+def test_every_feature_is_on_to_begin_with(tasks_quill, auth):
+    client = tasks_quill
     listed = client.get("/api/server/features", headers=auth).json()
     # The catalogue grows with the app; these four are the ones with tabs.
     assert {"notes", "tasks", "secrets", "files"} <= {row["key"] for row in listed}
@@ -98,22 +99,23 @@ def test_every_feature_is_on_to_begin_with(client, auth):
     assert all(row["label"] and row["changed_by"] == "" for row in listed)
 
 
-def test_a_switched_off_feature_closes_its_api(client, auth):
-    assert client.get("/api/boards", headers=auth).status_code == 200
+def test_a_switched_off_feature_closes_its_api(tasks_quill, auth):
+    client = tasks_quill
+    assert client.get("/api/records/board", headers=auth).status_code == 200
     switched = client.patch(
         "/api/server/features/tasks", headers=auth, json={"enabled": False}
     )
     assert switched.status_code == 200
     assert switched.json()["changed_by"] == ADMIN[0]
 
-    refused = client.get("/api/boards", headers=auth)
+    refused = client.get("/api/records/board", headers=auth)
     assert refused.status_code == 403
     assert refused.json()["detail"] == "Tasks is switched off on this server"
     # The rest of the server is untouched.
     assert client.get("/api/notes/tree", headers=auth).status_code == 200
 
     client.patch("/api/server/features/tasks", headers=auth, json={"enabled": True})
-    assert client.get("/api/boards", headers=auth).status_code == 200
+    assert client.get("/api/records/board", headers=auth).status_code == 200
 
 
 def test_secrets_are_a_feature_of_their_own(client, auth):

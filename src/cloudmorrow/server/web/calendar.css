@@ -8,12 +8,14 @@
 /* -- the colours a calendar can be ---------------------------------------- */
 /* Named, not spelled: the server stores "violet", and this is the one place
    that decides what violet looks like. The same five names are in the
-   terminal app's own palette. */
+   terminal app's own palette. Spelled out here rather than borrowed from
+   the brand's roles, because a calendar somebody chose to make violet is
+   violet whatever the accent of the day is. */
 :root {
-  --c-cyan: var(--accent);
-  --c-violet: var(--second);
+  --c-cyan: #4fe3d7;
+  --c-violet: #a78bfa;
   --c-green: var(--good);
-  --c-amber: var(--warn);
+  --c-amber: #e0a84c;
   --c-rose: var(--bad);
 }
 .dot {
@@ -21,7 +23,7 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--c-cyan);
   flex: none;
 }
 .c-cyan { background: var(--c-cyan); }
@@ -102,8 +104,8 @@
 .month .cell.away { background: transparent; }
 .month .cell.away .n { color: var(--muted); opacity: .6; }
 .month .cell.today .n { color: var(--accent); font-weight: 700; }
-.month .cell.picked .n { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
-.month .cell.picked.today .n { color: var(--accent-ink); }
+.month .cell.picked .n { background: var(--fill); color: var(--fill-ink); font-weight: 700; }
+.month .cell.picked.today .n { color: var(--fill-ink); }
 .month .cell:active { background: var(--card-2); }
 
 .month .dots {
@@ -257,7 +259,7 @@
   height: 28px;
   border-radius: 50%;
   border: 2px solid transparent;
-  background: var(--accent);
+  background: var(--c-cyan);
 }
 .swatch.on { border-color: var(--ink); }
 .swatch.c-cyan { background: var(--c-cyan); }

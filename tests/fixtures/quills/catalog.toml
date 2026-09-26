@@ -1,0 +1,20 @@
+# A local copy of the Quill Catalog for the tests: the same Quills and
+# datamodels as Cloudmorrow/quill-catalog, from folders beside this file, so
+# no test reaches the network. Keep in step with the repositories.
+
+[datamodels]
+repo = "datamodels"
+
+[[categories]]
+id = "personal"
+label = "Personal"
+description = "Your own lists, plans and notes."
+
+[[quills]]
+id = "tasks"
+name = "Tasks"
+summary = "Boards with three lanes: To Do, Doing, Done."
+repo = "quill-tasks"
+category = "personal"
+publisher = "Cloudmorrow"
+foundation = true

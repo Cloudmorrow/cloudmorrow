@@ -21,7 +21,18 @@ from typing import Annotated
 import typer
 
 from cloudmorrow.agent.setup import ensure_agent, stop_agent
-from cloudmorrow.cli import agent, dev, note, secret, settings, share, uninstall, update
+from cloudmorrow.cli import (
+    agent,
+    dev,
+    note,
+    quill,
+    quillrun,
+    secret,
+    settings,
+    share,
+    uninstall,
+    update,
+)
 from cloudmorrow.cli.common import client, console, run
 from cloudmorrow.client.api import CloudmorrowClient
 from cloudmorrow.client.config import (
@@ -43,6 +54,7 @@ app.add_typer(agent.app, name="agent")
 app.add_typer(share.app, name="share")
 app.add_typer(settings.app, name="config")
 app.add_typer(update.app, name="update")
+app.add_typer(quill.app, name="quill")
 # The way out: `cloudmorrow uninstall`, in its own file beside the way in.
 app.command("uninstall")(uninstall.uninstall)
 
@@ -51,6 +63,8 @@ app.add_typer(secret.app, name="secrets", hidden=True)
 app.add_typer(note.app, name="notes", hidden=True)
 app.add_typer(agent.app, name="agents", hidden=True)
 app.add_typer(share.app, name="shares", hidden=True)
+# Where `cm <quill> ...` lands once `main` has seen it is not a command.
+app.command("run-quill", hidden=True, context_settings={"allow_interspersed_args": True})(quillrun.main)
 
 
 @app.callback(invoke_without_command=True)
@@ -170,7 +184,15 @@ def main() -> None:
     # The update that brings a new command is run by the old code, so the
     # new code links its own commands the first time it runs.
     ensure_commands_linked()
+    # `cm tasks list`: a word that is not a command is an installed Quill's.
+    sys.argv[1:] = quillrun.route(sys.argv[1:], _command_names())
     app()
+
+
+def _command_names() -> set[str]:
+    names = {info.name for info in app.registered_groups} | {"--help", "-h"}
+    names |= {info.name or info.callback.__name__ for info in app.registered_commands}
+    return {name for name in names if name}
 
 
 if __name__ == "__main__":

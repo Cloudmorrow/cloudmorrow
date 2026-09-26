@@ -31,7 +31,7 @@ let asked = false;
 let handed = store.get("features.off") || "";
 
 /** Redraw the bar at the bottom in place, keeping the tab you are on. */
-function redrawTabs() {
+export function redrawTabs() {
   const bar = document.querySelector(".tabs");
   if (!bar) return;
   const active = bar.querySelector(".tab.active");
@@ -69,7 +69,7 @@ export function featuresCard() {
   // does not — Projects, today. The switch is still yours to throw, so the
   // row says where it lands rather than being left out or lying.
   const here = new Set(gatedFeatures());
-  return `<p class="group-label">What your apps show you</p>
+  return `<p class="group-label">What your cloud shows you</p>
     <div class="group features-card">${features.map((feature) => {
       const where = here.has(feature.key) ? "" : " · only in the terminal app";
       return `

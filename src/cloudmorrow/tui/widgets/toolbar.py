@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.message import Message
@@ -42,8 +43,12 @@ class Toolbar(Horizontal):
 
     def compose(self) -> ComposeResult:
         for action in self.actions:
+            label = Text(action.label)
+            if action.key:
+                # The key is there to be learnt, not read every time: dimmer.
+                label.append(f" {action.key}", style="dim")
             button = Button(
-                f"{action.label}  {action.key}" if action.key else action.label,
+                label,
                 id=f"do-{action.id}",
                 variant=action.variant,
                 compact=True,

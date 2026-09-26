@@ -84,13 +84,18 @@ class CloudmorrowClient:
         return headers
 
     async def _request(
-        self, method: str, url: str, *, vault: str | None = None, **kwargs: Any
+        self,
+        method: str,
+        url: str,
+        *,
+        vault: str | None = None,
+        headers_extra: dict[str, str] | None = None,
+        **kwargs: Any,
     ) -> httpx.Response:
         """One call. *vault* names the vault for this call alone."""
+        headers = {**self._headers(vault), **(headers_extra or {})}
         try:
-            response = await self._client.request(
-                method, url, headers=self._headers(vault), **kwargs
-            )
+            response = await self._client.request(method, url, headers=headers, **kwargs)
         except httpx.HTTPError as exc:
             raise ApiError(f"cannot reach {self.config.api_url}: {exc}") from exc
         if response.status_code == 401:
@@ -381,59 +386,69 @@ class CloudmorrowClient:
     async def delete_vault(self, vault: str) -> dict:
         return (await self._request("DELETE", f"/api/secrets/vault/{vault}")).json()
 
-    # -- boards and tasks --------------------------------------------------
-    async def boards(self) -> list[dict]:
-        return (await self._request("GET", "/api/boards")).json()
+    # -- Quills, and the records of every datamodel -------------------------
+    async def quills(self) -> list[dict]:
+        """Every installed Quill, with its screens and its datamodels in full."""
+        return (await self._request("GET", "/api/quills")).json()
 
-    async def create_board(self, title: str) -> dict:
-        return (await self._request("POST", "/api/boards", json={"title": title})).json()
+    async def quill_catalog(self) -> dict:
+        return (await self._request("GET", "/api/quills/catalog")).json()
 
-    async def rename_board(self, slug: str, title: str) -> dict:
-        return (
-            await self._request("PATCH", f"/api/boards/{slug}", json={"title": title})
-        ).json()
+    async def plan_quill(self, *, id: str = "", source: str = "", ref: str = "") -> dict:
+        """What installing a Quill would add, without installing it."""
+        body = {"id": id, "source": source, "ref": ref}
+        return (await self._request("POST", "/api/quills/plan", json=body)).json()
 
-    async def delete_board(self, slug: str) -> None:
-        await self._request("DELETE", f"/api/boards/{slug}")
+    async def install_quill(self, *, id: str = "", source: str = "", ref: str = "") -> dict:
+        body = {"id": id, "source": source, "ref": ref}
+        return (await self._request("POST", "/api/quills", json=body)).json()
 
-    async def tasks(self, board: str) -> list[dict]:
-        """Every task on a board. Reading one is what sweeps its Done lane."""
-        return (await self._request("GET", f"/api/boards/{board}/tasks")).json()
+    async def upload_quill(self, data: bytes, *, plan_only: bool = False) -> dict:
+        """Install a Quill from a .tar.gz of its folder — or, with plan_only, only say what it adds."""
+        response = await self._request(
+            "POST", "/api/quills/upload", params={"plan_only": str(plan_only).lower()},
+            content=data, headers_extra={"Content-Type": "application/gzip"},
+        )
+        return response.json()
 
-    async def create_task(self, board: str, title: str, *, body: str = "") -> dict:
-        return (
-            await self._request(
-                "POST", f"/api/boards/{board}/tasks", json={"title": title, "body": body}
-            )
-        ).json()
+    async def uninstall_quill(self, quill_id: str) -> None:
+        await self._request("DELETE", f"/api/quills/{quill_id}")
 
-    async def edit_task(
-        self, board: str, task_id: int, *, title: str | None = None, body: str | None = None
+    async def datamodels(self) -> list[dict]:
+        return (await self._request("GET", "/api/datamodels")).json()
+
+    async def records(self, model: str, **where: object) -> list[dict]:
+        """Every record of *model* you have, filtered on indexed fields, in order."""
+        params = {k: ("true" if v is True else "false" if v is False else v) for k, v in where.items()}
+        return (await self._request("GET", f"/api/records/{model}", params=params)).json()
+
+    async def record(self, model: str, record_id: str) -> dict:
+        return (await self._request("GET", f"/api/records/{model}/{record_id}")).json()
+
+    async def create_record(self, model: str, fields: dict, *, index: int | None = None) -> dict:
+        body: dict = {"fields": fields}
+        if index is not None:
+            body["index"] = index
+        return (await self._request("POST", f"/api/records/{model}", json=body)).json()
+
+    async def update_record(
+        self, model: str, record_id: str, fields: dict, *, rev: int | None = None
     ) -> dict:
-        payload = {
-            key: value
-            for key, value in (("title", title), ("body", body))
-            if value is not None
-        }
-        return (
-            await self._request(
-                "PATCH", f"/api/boards/{board}/tasks/{task_id}", json=payload
-            )
-        ).json()
+        body: dict = {"fields": fields}
+        if rev is not None:
+            body["rev"] = rev
+        return (await self._request("PATCH", f"/api/records/{model}/{record_id}", json=body)).json()
 
-    async def move_task(
-        self, board: str, task_id: int, lane: str, index: int | None = None
+    async def move_record(
+        self, model: str, record_id: str, fields: dict, index: int | None = None
     ) -> dict:
+        body = {"fields": fields, "index": index}
         return (
-            await self._request(
-                "POST",
-                f"/api/boards/{board}/tasks/{task_id}/move",
-                json={"lane": lane, "index": index},
-            )
+            await self._request("POST", f"/api/records/{model}/{record_id}/move", json=body)
         ).json()
 
-    async def delete_task(self, board: str, task_id: int) -> None:
-        await self._request("DELETE", f"/api/boards/{board}/tasks/{task_id}")
+    async def delete_record(self, model: str, record_id: str) -> None:
+        await self._request("DELETE", f"/api/records/{model}/{record_id}")
 
     # -- fileshares --------------------------------------------------------
     async def shares(self) -> list[dict]:

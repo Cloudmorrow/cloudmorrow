@@ -229,6 +229,7 @@ class BrowsePane(Pane):
     """A share's folders and files, as a list or a grid, with the picture beside."""
 
     TAB_LABEL = "Browse"
+    HEAD = False
     BINDINGS = [
         ("backspace", "fire('up')", "Up"),
         ("v", "fire('toggle_view')", "List or thumbnails"),
@@ -318,7 +319,7 @@ class BrowsePane(Pane):
             yield Picture(id="browse-picture")
 
     def on_mount(self) -> None:
-        self.query_one("#browse-table", DataTable).add_columns("name", "modified", "size", "type")
+        self.query_one("#browse-table", DataTable).add_columns("NAME", "MODIFIED", "SIZE", "TYPE")
 
     def on_show(self) -> None:
         self.reload()

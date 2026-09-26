@@ -1,11 +1,11 @@
 /* /brand — the stylesheet for the proposal page, and nothing else.
 
-   It shares nothing with base.css on purpose: this page argues for a look
-   the app does not have yet, so it cannot be built out of the look the app
-   has. Note that not one colour below is a literal — every painted surface
-   reads a custom property that brand.js sets from the theme it is showing.
-   The only hard-coded colours are the shell's, at the top, which is neutral
-   so that it does not take sides between the three. */
+   It shares nothing with base.css on purpose: it shows the look from its
+   definition in brand.js rather than borrowing it from the app, so the two
+   can be compared. Not one colour below is a literal — every painted
+   surface reads a custom property that brand.js sets from the theme. The
+   only hard-coded colours are the shell's, at the top, which is neutral so
+   that it frames the look without joining in. */
 
 :root {
   --shell: #0c0d11;
@@ -160,7 +160,7 @@ figcaption {
   color: var(--muted);
   font-size: 12px;
 }
-.m-pill.on { border-color: transparent; background: var(--accent); color: var(--accent-ink); font-weight: 650; }
+.m-pill.on { border-color: transparent; background: var(--fill); color: var(--fill-ink); font-weight: 650; }
 .m-tabs { display: flex; background: var(--bar); padding: 9px 0 13px; }
 .m-tab {
   flex: 1;
@@ -305,7 +305,7 @@ figcaption {
   font: 600 12px/1 var(--mono);
   cursor: pointer;
 }
-.codetabs button[aria-selected="true"] { color: var(--accent-ink); background: var(--accent); border-color: transparent; }
+.codetabs button[aria-selected="true"] { color: var(--fill-ink); background: var(--fill); border-color: transparent; }
 .codetabs .copy { margin-left: auto; color: var(--accent); }
 .panel.code pre {
   margin: 12px 0 0;

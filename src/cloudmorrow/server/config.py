@@ -15,6 +15,10 @@ DEFAULT_CONFIG_PATHS = (
 
 ENV_PREFIX = "CLOUDMORROW_"
 
+DEFAULT_QUILL_CATALOG = (
+    "https://raw.githubusercontent.com/Cloudmorrow/quill-catalog/main/catalog.toml"
+)
+
 
 @dataclass(slots=True)
 class ServerConfig:
@@ -76,6 +80,9 @@ class ServerConfig:
     # ("Copenhagen", "Aarhus, Denmark") or "latitude,longitude". Empty and
     # the page says nothing about the weather; nothing else minds.
     weather_place: str = ""
+    # Where the Quill Catalog is read from: a URL to its catalog.toml, or a
+    # local path to one (or to a checkout of the catalog repository).
+    quill_catalog: str = DEFAULT_QUILL_CATALOG
     config_path: Path | None = None
 
     @property
@@ -98,6 +105,16 @@ class ServerConfig:
         """The key web pushes are signed with. Lose it and every phone
         subscribed under it has to be asked again — nothing else breaks."""
         return self.data_dir / "vapid.key"
+
+    @property
+    def quills_dir(self) -> Path:
+        """Installed Quills, one folder each, as their release shipped them."""
+        return self.data_dir / "quills"
+
+    @property
+    def datamodels_dir(self) -> Path:
+        """The foundational datamodels this server has records of, or may."""
+        return self.data_dir / "datamodels"
 
     @property
     def dist_dir(self) -> Path:
@@ -213,6 +230,7 @@ def load_config(path: Path | None = None) -> ServerConfig:
             "allow_api_update",
             "service_name",
             "weather_place",
+            "quill_catalog",
         ):
             if key in section:
                 value = section[key]
@@ -244,6 +262,7 @@ def load_config(path: Path | None = None) -> ServerConfig:
         "ALLOW_API_UPDATE": ("allow_api_update", _env_bool),
         "SERVICE_NAME": ("service_name", str),
         "WEATHER_PLACE": ("weather_place", str),
+        "QUILL_CATALOG": ("quill_catalog", str),
     }
     for env_suffix, (attr, caster) in env_map.items():
         raw = os.environ.get(ENV_PREFIX + env_suffix)

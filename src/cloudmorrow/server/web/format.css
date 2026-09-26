@@ -48,8 +48,8 @@
 }
 .format button:active {
   border-color: transparent;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--fill-pressed);
+  color: var(--fill-ink);
 }
 /* Each mark wears what it does. */
 .format [data-format="bold"] span { font-weight: 800; }

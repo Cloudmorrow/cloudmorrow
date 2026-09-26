@@ -1,0 +1,11 @@
+[datamodel]
+id = "board"
+version = 1
+label = "Board"
+description = "A set of tasks, each in one of three lanes."
+domain = "tasks"
+scopes = ["personal"]
+title = "title"
+
+[fields]
+title = { kind = "string", required = true }

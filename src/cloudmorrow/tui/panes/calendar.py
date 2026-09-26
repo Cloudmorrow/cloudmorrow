@@ -344,6 +344,7 @@ class CalendarPane(Pane):
 
     TAB_LABEL = "Calendar"
     TAB_KEY = "f7"
+    SUMMARY = "your days"
     BINDINGS = [
         ("n", "fire('event')", "New event"),
         ("e", "fire('edit')", "Edit event"),
@@ -391,11 +392,20 @@ class CalendarPane(Pane):
                 yield DataTable(id="day-table", cursor_type="row", show_header=False)
 
     def on_mount(self) -> None:
-        self.query_one("#calendar-table", DataTable).add_columns("calendar", "who")
+        self.query_one("#calendar-table", DataTable).add_columns("CALENDAR", "WHO")
         grid = self.query_one("#month-grid", DataTable)
         for weekday in WEEKDAYS:
             grid.add_column(weekday, width=9)
         self.query_one("#day-table", DataTable).add_column("event")
+
+    def card_status(self) -> tuple[str, str] | None:
+        if not self._calendars:
+            return None
+        today = dt.date.today().isoformat()
+        count = sum(1 for event in self._events if event["starts_at"][:10] == today)
+        if not count:
+            return "ok", "nothing today"
+        return "news", f"{count} today"
 
     def on_show(self) -> None:
         self.reload()

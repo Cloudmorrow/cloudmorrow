@@ -1,7 +1,6 @@
-"""The bar along the bottom: what is going on, and what you can press.
+"""The line along the bottom: the keys you can press.
 
-Status on the left — the pane's detail and the latest message — and on the
-right, at most five of the keys that work right now, most specific first:
+At most five of the keys that work right now, most specific first:
 the focused widget's, then its pane's, then the screen's. Quit is always the
 last of them. A notice, like the one that asks for ctrl+c a second time,
 takes the left side over until it is cleared.
@@ -68,7 +67,9 @@ class BottomBar(Horizontal):
         self._redraw_left()
 
     def _redraw_left(self) -> None:
-        shown = f"[{WARN}]{self.notice}[/]" if self.notice else self._text
+        # Only the notice: what the app says in passing is in the log above,
+        # and saying it here as well would be saying it twice.
+        shown = f"[{WARN}]{self.notice}[/]" if self.notice else ""
         self.query_one("#statusbar", Static).update(shown)
 
     # -- the right side ----------------------------------------------------

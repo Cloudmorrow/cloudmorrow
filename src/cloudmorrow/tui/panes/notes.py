@@ -48,6 +48,7 @@ class NotesPane(Pane):
 
     TAB_LABEL = "Notes"
     TAB_KEY = "f1"
+    SUMMARY = "yours, in Markdown"
     BINDINGS = [
         ("ctrl+s", "fire('save')", "Save"),
         ("ctrl+n", "fire('new_note')", "New note"),
@@ -86,6 +87,11 @@ class NotesPane(Pane):
                     yield LiveMarkdownEditor(id="editor")
                     yield Picture(id="picture")
 
+    def card_status(self) -> tuple[str, str] | None:
+        if not self.current_path:
+            return None
+        return "news", f"open: {self.current_path.rsplit('/', 1)[-1]}"
+
     def on_show(self) -> None:
         self.reload()
 
@@ -110,7 +116,7 @@ class NotesPane(Pane):
             self._seeded = True
             self.seed_welcome_note()
             return
-        self.status("" if not empty else "No notes here yet — New note starts one.")
+        self.status("" if not empty else "No notes here yet — New note starts one.", note=True)
 
     @work(group="ui")
     async def seed_welcome_note(self) -> None:
@@ -118,7 +124,7 @@ class NotesPane(Pane):
         try:
             note = await self.api.create_note("welcome.md", WELCOME)
         except ApiError:
-            self.status("No notes here yet — New note starts one.")
+            self.status("No notes here yet — New note starts one.", note=True)
             return
         self.reload(select=note["path"])
         self.open_note(note["path"])

@@ -17,7 +17,7 @@ from tests.tui_harness import settle, start
 
 async def open_chat(app, pilot):
     screen = await start(app, pilot)
-    await pilot.click("#tab-chat")
+    await pilot.click("#nav-chat")
     await settle(app, pilot)
     return screen, screen.query_one(ChatPane)
 
@@ -297,4 +297,4 @@ async def test_the_tab_is_gone_when_the_server_has_chat_switched_off(app):
             row["enabled"] = False
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
-        assert screen.query_one("#tab-chat").display is False
+        assert screen.query_one("#nav-chat").display is False

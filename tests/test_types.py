@@ -41,7 +41,7 @@ def test_secrets_are_never_the_assistants():
 def test_the_catalogue_says_who_uses_what():
     rows = {row["key"]: row for row in catalogue(USES)}
     # An app uses what it provides, whether or not it said so.
-    assert rows["task"]["used_by"] == ["tasks"]
+    assert rows["note"]["used_by"] == ["notes"]
     # A foundation type is used by whoever asked for it, and nobody by default.
     assert rows["user"]["used_by"] == ["calendar", "chat"]
     assert rows["secret"]["used_by"] == ["secrets"]
@@ -55,18 +55,20 @@ def test_the_types_are_on_the_api(client, auth):
     by_key = {row["key"]: row for row in listed}
     assert list(by_key)[:2] == ["user", "secret"]
     assert by_key["secret"]["sealed"] == ["value"]
-    assert by_key["task"]["fields"][0] == {
-        "name": "board",
+    assert by_key["event"]["fields"][0] == {
+        "name": "calendar",
         "kind": "ref",
         "description": "",
-        "ref": "board",
+        "ref": "calendar",
     }
+    # Boards and tasks are datamodels in the record store now, not here.
+    assert "task" not in by_key
     # Anybody signed in may read it: it is what this server is.
     guest = {"Authorization": f"Bearer {token_for(client, *GUEST)}"}
     assert client.get("/api/types", headers=guest).status_code == 200
 
 
-def test_the_apps_say_which_types_they_use(client, auth):
-    listed = {row["key"]: row for row in client.get("/api/server/features", headers=auth).json()}
+def test_the_apps_say_which_types_they_use(tasks_quill, auth):
+    listed = {row["key"]: row for row in tasks_quill.get("/api/server/features", headers=auth).json()}
     assert listed["tasks"]["types"] == ["board", "task"]
     assert listed["secrets"]["types"] == ["secret"]

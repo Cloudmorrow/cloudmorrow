@@ -13,12 +13,12 @@ from cloudmorrow.tui.app import CloudmorrowApp
 from cloudmorrow.tui.panes.files import FilesharesPane, FilesPane, LocalBackupsPane
 from cloudmorrow.tui.screens.install import InstallRcloneModal
 from cloudmorrow.tui.screens.modals import NoticeModal
-from tests.tui_harness import agent_row, settle, start
+from tests.tui_harness import agent_row, said, settle, start
 
 
 async def open_files(app, pilot):
     screen = await start(app, pilot)
-    await pilot.click("#tab-files")
+    await pilot.click("#nav-files")
     await settle(app, pilot)
     return screen
 
@@ -43,8 +43,8 @@ async def test_files_opens_on_fileshares_with_backups_beside_it(app):
         # Landed on the one that does something, with the shares already listed.
         assert isinstance(pane.active_view, FilesharesPane)
         assert [row[0] for row in rows(screen)] == ["media", "photos"]
-        # The selected share's address is in the status bar, for any other client.
-        status = screen.query_one("#statusbar", Static).visual.plain
+        # The selected share's address is in the panel's header, for any other client.
+        status = pane.query_one(".pane-read", Static).visual.plain
         assert "https://test.invalid/dav/media/" in status
 
 
@@ -92,7 +92,7 @@ async def test_mount_asks_where_and_mounts_as_you(app, monkeypatch):
             )
         ]
         assert str(Path.home() / "Fileshares" / "media") in rows(screen)[0][2]
-        assert "mounted at" in screen.query_one("#statusbar", Static).visual.plain
+        assert "mounted at" in said(screen)
 
 
 async def test_on_a_mac_there_is_nothing_to_ask(app, monkeypatch):
@@ -109,7 +109,7 @@ async def test_on_a_mac_there_is_nothing_to_ask(app, monkeypatch):
         await pilot.click("#pane-files #do-mount")
         await settle(app, pilot)
         assert calls == [("media", None)]
-        assert "/Volumes/media" in screen.query_one("#statusbar", Static).visual.plain
+        assert "/Volumes/media" in said(screen)
 
 
 async def test_a_mount_that_fails_says_why_in_a_dialog(app, monkeypatch):
@@ -129,7 +129,7 @@ async def test_a_mount_that_fails_says_why_in_a_dialog(app, monkeypatch):
         assert isinstance(dialog, NoticeModal)
         assert dialog.query_one("#notice-text", Static).visual.plain == reason
         # The bar has the short version, for after the dialog is closed.
-        assert "Could not mount media" in screen.query_one("#statusbar", Static).visual.plain
+        assert "Could not mount media" in said(screen)
         await pilot.press("enter")
         await settle(app, pilot)
         assert app.screen is screen
@@ -186,7 +186,7 @@ async def test_without_rclone_mount_offers_to_install_it_and_then_mounts(app, mo
         assert not isinstance(app.screen, InstallRcloneModal) and app.screen is not screen
         await pilot.press("enter")
         await settle(app, pilot)
-        assert "mounted at" in screen.query_one("#statusbar", Static).visual.plain
+        assert "mounted at" in said(screen)
 
 
 async def test_declining_the_install_mounts_nothing(app, monkeypatch):
@@ -383,7 +383,7 @@ async def test_a_machine_with_no_agent_cannot_share_and_says_so(app):
         await pilot.click("#pane-files #do-new_share")
         await settle(app, pilot)
         assert app.screen is screen
-        assert "no agent" in screen.query_one("#statusbar", Static).visual.plain
+        assert "no agent" in said(screen)
         assert app.client.share_calls == []
 
 

@@ -5,12 +5,13 @@
    here. Order matters only in that base comes first, so a feature's rule
    wins a tie with a shared one. */
 
+@import "./fonts.css";
 @import "./base.css";
 @import "./install.css";
 @import "./today.css";
 @import "./notes.css";
 @import "./pictures.css";
-@import "./tasks.css";
+@import "./kit.css";
 @import "./chat.css";
 @import "./calendar.css";
 @import "./format.css";
@@ -18,4 +19,5 @@
 @import "./features.css";
 @import "./me.css";
 @import "./admin.css";
+@import "./quillsadmin.css";
 @import "./desktop.css";

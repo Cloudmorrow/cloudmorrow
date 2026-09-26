@@ -1,0 +1,17 @@
+# Working on this Quill
+
+This repository is a Cloudmorrow **Quill**: a package that adds data and
+screens to somebody's own cloud. It has no UI code and must never get any —
+Cloudmorrow draws its screens from a fixed kit on every surface.
+
+When asked to change or extend it:
+
+1. Read `quill.toml` and `datamodels/`, and the reference below.
+2. Make the change in the manifest (and datamodel files). Prefer extending a
+   foundational datamodel over introducing a new one.
+3. Run `cm quill check` and fix everything it says, until it passes. It also
+   prints what each screen will look like; read that.
+4. If the person has a server, run `cm quill dev` to install it there and ask
+   them to look at it on their phone or in `cm`.
+5. Keep README.md's "What it adds" table true.
+

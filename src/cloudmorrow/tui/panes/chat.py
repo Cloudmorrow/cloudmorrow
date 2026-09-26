@@ -115,6 +115,7 @@ class ChatPane(Pane):
 
     TAB_LABEL = "Chat"
     TAB_KEY = "f6"
+    SUMMARY = "talk with people here"
     BINDINGS = [
         ("n", "fire('channel')", "New channel"),
         ("m", "fire('direct')", "Message"),
@@ -155,8 +156,17 @@ class ChatPane(Pane):
                 yield Input(placeholder="Write a message…", id="chat-input")
 
     def on_mount(self) -> None:
-        self.query_one("#channel-table", DataTable).add_columns("channel", "new")
+        self.query_one("#channel-table", DataTable).add_columns("CHANNEL", "NEW")
         self._timer = self.set_interval(POLL_SECONDS, self.catch_up, pause=True)
+
+    def card_status(self) -> tuple[str, str] | None:
+        if not self._channels:
+            return None
+        waiting = sum(channel.get("unread") or 0 for channel in self._channels)
+        if waiting:
+            return "news", f"{waiting} unread"
+        count = len(self._channels)
+        return "ok", f"{count} channel{'' if count == 1 else 's'}, all read"
 
     def on_show(self) -> None:
         self.reload()
@@ -206,7 +216,7 @@ class ChatPane(Pane):
                 f"[{MUTED}]New channel asks whether everybody is in it or only the "
                 f"people you pick; Message writes to one person.[/]"
             )
-            self.status("No channels yet — press n to make one.")
+            self.status("No channels yet — press n to make one.", note=True)
             return
         # Stay where you were when the list is only being refreshed, and
         # fall to the first channel when where you were has gone.

@@ -1,0 +1,16 @@
+[datamodel]
+id = "organisation"
+version = 1
+label = "Organisation"
+description = "A company, a club, an institution: somebody you deal with that is not one person."
+domain = "crm"
+scopes = ["personal", "shared"]
+title = "name"
+
+[fields]
+name = { kind = "string", required = true }
+website = { kind = "url" }
+email = { kind = "email" }
+phone = { kind = "phone" }
+address = { kind = "text" }
+notes = { kind = "markdown" }

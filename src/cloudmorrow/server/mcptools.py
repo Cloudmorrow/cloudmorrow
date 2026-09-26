@@ -14,11 +14,14 @@ person can always paste a value in themselves.
 from __future__ import annotations
 
 import json
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from cloudmorrow.paths import UnsafePathError
+from cloudmorrow.quill_reference import quill_reference
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState
 from cloudmorrow.server.notes import (
@@ -28,7 +31,14 @@ from cloudmorrow.server.notes import (
     NoteNotFoundError,
     NoteStore,
 )
-from cloudmorrow.server.tasks import LANES
+from cloudmorrow.server.quills import QuillError, load_catalog
+from cloudmorrow.server.records import (
+    NEVER_FOR_ASSISTANTS,
+    Principal,
+    RecordConflictError,
+    Refused,
+)
+from cloudmorrow.server.routes.records import seed
 
 Handler = Callable[[AppState, User, dict[str, Any]], Any]
 
@@ -183,83 +193,138 @@ def create_folder(state: AppState, user: User, args: dict[str, Any]) -> Any:
     return {"path": path, "is_dir": True}
 
 
-# -- tasks -------------------------------------------------------------------
-def list_boards(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    return {"boards": [board.to_dict() for board in state.tasks.boards(user.username)]}
+# -- records, of any installed datamodel ---------------------------------------
+def _principal(user: User) -> Principal:
+    return Principal.assistant(user.username)
 
 
-def create_board(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    board = state.tasks.create_board(
-        user.username, _str(args, "title", required=True), slug=_str(args, "slug")
-    )
-    return board.to_dict()
+def _model(state: AppState, args: dict[str, Any]) -> str:
+    """The datamodel asked for, if it is installed and some Quill using it is on."""
+    model = _str(args, "model", required=True).strip()
+    if model not in state.quills.datamodels:
+        known = ", ".join(sorted(state.quills.datamodels)) or "none"
+        raise ToolError(f"no datamodel {model!r}; there are: {known}")
+    users = state.quills.users_of(model)
+    if users and not any(_enabled(state, quill) for quill in users):
+        raise ToolError(f"{model} belongs to Quills that are switched off on this server")
+    return model
 
 
-def _board_slug(state: AppState, user: User, args: dict[str, Any]) -> str:
-    """The board asked for, or the only one there is."""
-    slug = _str(args, "board").strip().lower()
-    if slug:
-        return slug
-    boards = state.tasks.boards(user.username)
-    if len(boards) == 1:
-        return boards[0].slug
-    names = ", ".join(f"{b.slug} ({b.title})" for b in boards)
-    raise ToolError(f"say which board: {names}")
+def _fields(args: dict[str, Any]) -> dict[str, Any]:
+    fields = args.get("fields", {})
+    if not isinstance(fields, dict):
+        raise ToolError("fields must be an object of field name to value")
+    return fields
 
 
-def list_tasks(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    slug = _str(args, "board").strip().lower()
-    boards = state.tasks.boards(user.username)
-    if slug:
-        boards = [b for b in boards if b.slug == slug]
-        if not boards:
-            raise ToolError(f"no such board: {slug}")
+def list_datamodels(state: AppState, user: User, args: dict[str, Any]) -> Any:
     return {
-        "boards": [
-            {
-                **board.to_dict(),
-                "tasks": [task.to_dict() for task in state.tasks.tasks(user.username, board.slug)],
-            }
-            for board in boards
+        "datamodels": [
+            row for row in state.quills.catalogue_of_models() if row["id"] not in NEVER_FOR_ASSISTANTS
         ]
     }
 
 
-def create_task(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    task = state.tasks.create_task(
-        user.username,
-        _board_slug(state, user, args),
-        _str(args, "title", required=True),
-        body=_str(args, "body"),
-        lane=_str(args, "lane", default="todo") or "todo",
-    )
-    return task.to_dict()
+def list_records(state: AppState, user: User, args: dict[str, Any]) -> Any:
+    model = _model(state, args)
+    where = args.get("where", {})
+    if not isinstance(where, dict):
+        raise ToolError("where must be an object of indexed field to value")
+    principal = _principal(user)
+    seed(state, principal, model)
+    return {"records": [r.to_dict() for r in state.records.list(principal, model, where)]}
 
 
-def update_task(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    task_id = _int(args, "id", required=True)
-    title = args.get("title")
-    body = args.get("body")
-    if title is not None and not isinstance(title, str):
-        raise ToolError("title must be a string")
-    if body is not None and not isinstance(body, str):
-        raise ToolError("body must be a string")
-    return state.tasks.edit_task(user.username, task_id, title=title, body=body).to_dict()
+def get_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
+    return state.records.get(_principal(user), _model(state, args), _str(args, "id", required=True)).to_dict()
 
 
-def move_task(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    task_id = _int(args, "id", required=True)
-    return state.tasks.move_task(
-        user.username, task_id, _str(args, "lane", required=True), _int(args, "index")
+def create_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
+    return state.records.create(
+        _principal(user), _model(state, args), _fields(args), index=_int(args, "index")
     ).to_dict()
 
 
-def delete_task(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    task_id = _int(args, "id", required=True)
-    task = state.tasks.require_task(user.username, task_id)
-    state.tasks.delete_task(user.username, task_id)
-    return {"id": task.id, "title": task.title, "deleted": True}
+def update_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
+    return state.records.update(
+        _principal(user), _model(state, args), _str(args, "id", required=True), _fields(args),
+        rev=_int(args, "rev"),
+    ).to_dict()
 
+
+def move_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
+    return state.records.move(
+        _principal(user), _model(state, args), _str(args, "id", required=True), _fields(args),
+        _int(args, "index"),
+    ).to_dict()
+
+
+def delete_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
+    model = _model(state, args)
+    record_id = _str(args, "id", required=True)
+    gone = state.records.delete(_principal(user), model, record_id)
+    return {"id": record_id, "deleted": gone}
+
+
+# -- building Quills, for an administrator's assistant -------------------------
+def _admin(user: User) -> None:
+    if not user.is_admin:
+        raise ToolError("only an administrator's assistant may build Quills")
+
+
+def quill_schema(state: AppState, user: User, args: dict[str, Any]) -> Any:
+    return {
+        "reference": quill_reference(),
+        "datamodels": state.quills.catalogue_of_models(),
+        "installed": sorted(state.quills.quills),
+    }
+
+
+def _write_draft(state: AppState, args: dict[str, Any], folder: Path) -> Path:
+    manifest = _str(args, "manifest", required=True)
+    extra = args.get("datamodels", {})
+    if not isinstance(extra, dict) or not all(isinstance(v, str) for v in extra.values()):
+        raise ToolError("datamodels is an object of file name to TOML text")
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "quill.toml").write_text(manifest, encoding="utf-8")
+    if extra:
+        (folder / "datamodels").mkdir(exist_ok=True)
+        for name, text in extra.items():
+            stem = Path(name).stem
+            if not stem.replace("_", "").replace(".", "").isalnum():
+                raise ToolError(f"{name!r} is not a datamodel file name")
+            (folder / "datamodels" / f"{stem}.toml").write_text(text, encoding="utf-8")
+    return folder
+
+
+def _datamodels_for(state: AppState, tmp: Path) -> Path | None:
+    try:
+        return state.quills.datamodels_source(load_catalog(state.config.quill_catalog), tmp / "m")
+    except QuillError:
+        return None
+
+
+def quill_check(state: AppState, user: User, args: dict[str, Any]) -> Any:
+    _admin(user)
+    with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
+        folder = _write_draft(state, args, Path(tmp) / "q")
+        try:
+            return {"ok": True, "adds": state.quills.plan(folder, _datamodels_for(state, Path(tmp)))}
+        except QuillError as exc:
+            raise ToolError(f"not yet: {exc}") from exc
+
+
+def quill_dev_install(state: AppState, user: User, args: dict[str, Any]) -> Any:
+    _admin(user)
+    with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
+        folder = _write_draft(state, args, Path(tmp) / "q")
+        try:
+            plan = state.quills.install(
+                folder, _datamodels_for(state, Path(tmp)), origin={"catalog": False, "dev": True, "by": "assistant"}
+            )
+        except QuillError as exc:
+            raise ToolError(f"not installed: {exc}") from exc
+    return {"installed": plan["id"], "version": plan["version"], "adds": plan}
 
 
 # -- the catalogue ------------------------------------------------------------
@@ -267,12 +332,14 @@ _PATH = {
     "type": "string",
     "description": "Path under the notes root, e.g. 'ideas/garden.md'. The .md suffix is optional.",
 }
-_BOARD = {
-    "type": "string",
-    "description": "The board's id (slug). May be left out when there is only one board.",
+_MODEL = {"type": "string", "description": "A datamodel id from list_datamodels, e.g. 'task'."}
+_RECORD_ID = {"type": "string", "description": "The record's id, e.g. 'r_1a2b3c4d5e'."}
+_FIELDS = {"type": "object", "description": "Field name to value, as list_datamodels describes them."}
+_MANIFEST = {"type": "string", "description": "The quill.toml, as TOML text."}
+_DATAMODELS = {
+    "type": "object",
+    "description": "Datamodels the Quill introduces: file name to TOML text. Optional.",
 }
-_TASK_ID = {"type": "integer", "description": "The task's id, from list_tasks."}
-_LANE = {"type": "string", "enum": list(LANES), "description": "todo, doing or done."}
 
 TOOLS: tuple[Tool, ...] = (
     Tool(
@@ -374,101 +441,104 @@ TOOLS: tuple[Tool, ...] = (
         create_folder,
     ),
     Tool(
-        "list_boards",
-        "List the user's task boards. Every board has three lanes: todo, doing and done.",
+        "list_datamodels",
+        "List the kinds of data on this server (tasks, boards, and whatever Quills added), "
+        "with their fields, which are indexed (filterable), and which Quills use each.",
         _schema({}),
-        "tasks",
-        list_boards,
+        "",
+        list_datamodels,
     ),
     Tool(
-        "create_board",
-        "Make a new task board.",
-        _schema(
-            {
-                "title": {"type": "string", "description": "What the board is called."},
-                "slug": {
-                    "type": "string",
-                    "description": "An id for it. Made from the title when left out.",
-                },
-            },
-            ("title",),
-        ),
-        "tasks",
-        create_board,
+        "list_records",
+        "List the user's records of one datamodel, in order. Filter with `where` on indexed "
+        "fields, e.g. {\"board\": \"r_…\", \"lane\": \"todo\"}.",
+        _schema({"model": _MODEL, "where": {"type": "object", "description": "Indexed field to value."}},
+                ("model",)),
+        "",
+        list_records,
     ),
     Tool(
-        "list_tasks",
-        "List tasks, with their lane and id, on one board or on every board.",
-        _schema({"board": _BOARD}),
-        "tasks",
-        list_tasks,
+        "get_record",
+        "Read one record: its fields and its rev.",
+        _schema({"model": _MODEL, "id": _RECORD_ID}, ("model", "id")),
+        "",
+        get_record,
     ),
     Tool(
-        "create_task",
-        "Add a task to a board. New tasks start in the todo lane unless told otherwise.",
-        _schema(
-            {
-                "title": {"type": "string", "description": "One line: what is to be done."},
-                "board": _BOARD,
-                "body": {"type": "string", "description": "Details, in Markdown. Optional."},
-                "lane": _LANE,
-            },
-            ("title",),
-        ),
-        "tasks",
-        create_task,
+        "create_record",
+        "Make a record of a datamodel from its fields. Links are record ids.",
+        _schema({"model": _MODEL, "fields": _FIELDS,
+                 "index": {"type": "integer", "description": "Place in its group; the end when left out."}},
+                ("model", "fields")),
+        "",
+        create_record,
     ),
     Tool(
-        "update_task",
-        "Change a task's title or body. To change its lane, use move_task.",
-        _schema(
-            {
-                "id": _TASK_ID,
-                "title": {"type": "string", "description": "The new title."},
-                "body": {"type": "string", "description": "The new body."},
-            },
-            ("id",),
-        ),
-        "tasks",
-        update_task,
+        "update_record",
+        "Change some fields of a record. Pass the rev you read so a change made elsewhere "
+        "is not overwritten.",
+        _schema({"model": _MODEL, "id": _RECORD_ID, "fields": _FIELDS,
+                 "rev": {"type": "integer", "description": "The rev from get_record. Optional."}},
+                ("model", "id", "fields")),
+        "",
+        update_record,
     ),
     Tool(
-        "move_task",
-        "Move a task to a lane: todo, doing or done. Done tasks are swept away after a week.",
-        _schema(
-            {
-                "id": _TASK_ID,
-                "lane": _LANE,
-                "index": {
-                    "type": "integer",
-                    "description": "Position within the lane, 0 for the top. Bottom when left out.",
-                },
-            },
-            ("id", "lane"),
-        ),
-        "tasks",
-        move_task,
+        "move_record",
+        "Move a record to another group (a task to another lane: {\"lane\": \"done\"}) and/or "
+        "to a place in it. Done tasks are swept away after a week.",
+        _schema({"model": _MODEL, "id": _RECORD_ID, "fields": _FIELDS,
+                 "index": {"type": "integer", "description": "0 for the top; the end when left out."}},
+                ("model", "id")),
+        "",
+        move_record,
     ),
     Tool(
-        "delete_task",
-        "Delete a task for good. Moving it to done is usually what is wanted instead.",
-        _schema({"id": _TASK_ID}, ("id",)),
-        "tasks",
-        delete_task,
+        "delete_record",
+        "Delete a record for good, and what cascades from it (a board takes its tasks).",
+        _schema({"model": _MODEL, "id": _RECORD_ID}, ("model", "id")),
+        "",
+        delete_record,
+    ),
+    Tool(
+        "quill_schema",
+        "For building a Quill (a Cloudmorrow app): the manifest format, the screen kit, "
+        "field kinds, and the datamodels already on this server. Read this first.",
+        _schema({}),
+        "",
+        quill_schema,
+    ),
+    Tool(
+        "quill_check",
+        "Check a Quill manifest (and any datamodels it introduces) without installing it, "
+        "and say everything it would add. Administrators only.",
+        _schema({"manifest": _MANIFEST, "datamodels": _DATAMODELS}, ("manifest",)),
+        "",
+        quill_check,
+    ),
+    Tool(
+        "quill_dev_install",
+        "Install a Quill from a manifest on this server, as a development Quill: it is on the "
+        "phone, the web app and the terminal at once. Installing again replaces it. "
+        "Administrators only; check it first.",
+        _schema({"manifest": _MANIFEST, "datamodels": _DATAMODELS}, ("manifest",)),
+        "",
+        quill_dev_install,
     ),
 )
 
 BY_NAME: dict[str, Tool] = {tool.name: tool for tool in TOOLS}
 
 INSTRUCTIONS = (
-    "Cloudmorrow is the user's own cloud: Markdown notes in folders and task "
-    "boards with todo/doing/done lanes. Everything here "
-    "is the signed-in user's own data. Read before you overwrite, and prefer "
-    "append_to_note and move_task over rewriting or deleting."
+    "Cloudmorrow is the user's own cloud: Markdown notes in folders, and records of "
+    "datamodels the installed Quills use — task boards with todo/doing/done lanes, and "
+    "whatever else is installed (list_datamodels says). Everything here is the signed-in "
+    "user's own data. Read before you overwrite, and prefer append_to_note and "
+    "move_record over rewriting or deleting. To build a new Quill, read quill_schema first."
 )
 
 
-FEATURE_LABELS = {"notes": "Notes", "tasks": "Tasks"}
+FEATURE_LABELS = {"notes": "Notes"}
 
 
 def _enabled(state: AppState, feature: str) -> bool:
@@ -511,6 +581,12 @@ def call(state: AppState, user: User, name: str, arguments: Any) -> dict[str, An
         return _error(f"no such note or folder: {exc}")
     except NoteExistsError as exc:
         return _error(f"already there: {exc}")
+    except RecordConflictError as exc:
+        return _error(
+            f"the record changed since it was read; its rev is now {exc.current.rev}. Read it again."
+        )
+    except Refused as exc:
+        return _error(f"not allowed: {exc}")
     except (LookupError, ValueError, FileExistsError, UnsafePathError) as exc:
         return _error(str(exc) or exc.__class__.__name__)
     text = result if isinstance(result, str) else json.dumps(result, indent=2, ensure_ascii=False)

@@ -7,7 +7,7 @@ import { CLOUD_NAME, VERSION, api, app, esc, registerScreen, session, signIn, wo
 function renderLogin(message = "", bad = false) {
   app.innerHTML = `
     <form class="login" autocomplete="on">
-      <div class="brand">${wordmark()}</div>
+      <div class="brand"><span class="hedgehog" aria-hidden="true"></span>${wordmark()}</div>
       <h1>${esc(CLOUD_NAME === "Cloudmorrow" ? "Sign in" : CLOUD_NAME)}</h1>
       <div class="fields">
         <input name="username" placeholder="Username" autocapitalize="none" autocorrect="off" autocomplete="username" required value="${esc(session.user)}">

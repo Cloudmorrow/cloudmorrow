@@ -45,6 +45,7 @@ class LocalBackupsPane(Pane):
     """Where this machine's backups will be listed. Nothing to list yet."""
 
     TAB_LABEL = "Local backups"
+    HEAD = False
 
     def content(self) -> ComposeResult:
         yield Static(
@@ -61,6 +62,7 @@ class FilesharesPane(Pane):
     """Your shares in a table, and what this machine has done with them."""
 
     TAB_LABEL = "Fileshares"
+    HEAD = False
     BINDINGS = [
         ("ctrl+n", "fire('new_share')", "New share"),
         ("b", "fire('browse')", "Browse"),
@@ -89,7 +91,7 @@ class FilesharesPane(Pane):
 
     def on_mount(self) -> None:
         self.query_one("#share-table", DataTable).add_columns(
-            "share", "where", "mounted here", "directory", "about"
+            "SHARE", "WHERE", "MOUNTED HERE", "DIRECTORY", "ABOUT"
         )
 
     def on_show(self) -> None:
@@ -115,7 +117,10 @@ class FilesharesPane(Pane):
             return
         self.draw()
         if not self.shares:
-            self.status("No shares yet — New share serves a directory from one of your machines.")
+            self.status(
+                "No shares yet — New share serves a directory from one of your machines.",
+                note=True,
+            )
         else:
             self.status()
 
@@ -189,6 +194,7 @@ class FilesharesPane(Pane):
             self.status(
                 f"{share['name']} is on {share.get('machine') or 'a machine'} — "
                 "mount it to browse it.",
+                note=True,
             )
             return
         files = next((node for node in self.ancestors if isinstance(node, FilesPane)), None)
@@ -300,7 +306,7 @@ class FilesharesPane(Pane):
             if answer is None:
                 return
             path = Path(answer).expanduser()
-        self.status(f"mounting {share['name']}…")
+        self.status(f"mounting {share['name']}…", note=True)
         try:
             mounted = await asyncio.to_thread(
                 mounts.mount, share["name"], share["url"], username, token, path=path
@@ -325,7 +331,7 @@ class FilesharesPane(Pane):
         wanted = await self.app.push_screen_wait(InstallRcloneModal(command))
         if not wanted or command is None:
             return False
-        self.status("installing rclone…")
+        self.status("installing rclone…", note=True)
         try:
             with self.app.suspend():
                 found = rclone.install()
@@ -430,6 +436,7 @@ class FilesPane(Pane):
 
     TAB_LABEL = "Files"
     TAB_KEY = "f5"
+    SUMMARY = "backups and shares"
     BINDINGS = [
         ("1", "show_view('local-backups')", "Local backups"),
         ("2", "show_view('fileshares')", "Fileshares"),
@@ -492,6 +499,13 @@ class FilesPane(Pane):
         if view is not None:
             view.reload()
         self.focus_view()
+
+    def card_status(self) -> tuple[str, str] | None:
+        shares = self.query_one(FilesharesPane).shares
+        if not shares:
+            return None
+        count = len(shares)
+        return "ok", f"{count} share{'' if count == 1 else 's'}"
 
     def on_show(self) -> None:
         self.reload()

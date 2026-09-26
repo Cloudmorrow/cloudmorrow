@@ -360,7 +360,7 @@ def test_the_tools_are_listed_with_schemas(client):
     token = connect(client)["access_token"]
     tools = rpc(client, token, "tools/list").json()["result"]["tools"]
     by_name = {tool["name"]: tool for tool in tools}
-    assert {"create_note", "read_note", "create_task", "move_task"} <= set(by_name)
+    assert {"create_note", "read_note", "create_record", "move_record", "quill_schema"} <= set(by_name)
     assert by_name["create_note"]["inputSchema"]["required"] == ["path"]
     assert by_name["create_note"]["description"]
 
@@ -396,30 +396,86 @@ def test_writing_over_a_changed_note_is_refused(client, auth):
     assert "changed since it was read" in stale["content"][0]["text"]
 
 
-def test_an_assistant_adds_a_task_to_the_only_board(client, auth):
+def test_an_assistant_adds_a_task_through_the_record_tools(tasks_quill, auth):
+    client = tasks_quill
     token = connect(client)["access_token"]
-    created = call(client, token, "create_task", title="Water the beans")["structuredContent"]
-    assert created["lane"] == "todo"
-    boards = client.get("/api/boards", headers=auth).json()
-    assert len(boards) == 1
-    listed = client.get(f"/api/boards/{boards[0]['slug']}/tasks", headers=auth).json()
-    assert [task["title"] for task in listed] == ["Water the beans"]
-    moved = call(client, token, "move_task", id=created["id"], lane="done")["structuredContent"]
-    assert moved["lane"] == "done"
-    everything = call(client, token, "list_tasks")["structuredContent"]
-    assert everything["boards"][0]["tasks"][0]["lane"] == "done"
+    models = call(client, token, "list_datamodels")["structuredContent"]["datamodels"]
+    assert {m["id"] for m in models} == {"board", "task"}
+    boards = call(client, token, "list_records", model="board")["structuredContent"]["records"]
+    assert len(boards) == 1  # the first board, seeded for the assistant as for the app
+    created = call(
+        client, token, "create_record", model="task",
+        fields={"board": boards[0]["id"], "title": "Water the beans"},
+    )["structuredContent"]
+    assert created["fields"]["lane"] == "todo" and created["written_by"] == "assistant"
+    listed = client.get("/api/records/task", headers=auth).json()
+    assert [t["fields"]["title"] for t in listed] == ["Water the beans"]
+    moved = call(client, token, "move_record", model="task", id=created["id"], fields={"lane": "done"})
+    assert moved["structuredContent"]["fields"]["lane"] == "done"
+    todo = call(client, token, "list_records", model="task", where={"lane": "todo"})
+    assert todo["structuredContent"]["records"] == []
+    stale = call(client, token, "update_record", model="task", id=created["id"], fields={"title": "x"}, rev=1)
+    assert stale["isError"] is True and "changed since it was read" in stale["content"][0]["text"]
 
 
-def test_with_two_boards_the_assistant_has_to_say_which(client):
-    token = connect(client)["access_token"]
-    call(client, token, "list_boards")
-    call(client, token, "create_board", title="Garden")
-    refused = call(client, token, "create_task", title="Dig")
+def test_a_datamodel_that_is_not_there_is_named_with_the_ones_that_are(tasks_quill):
+    token = connect(tasks_quill)["access_token"]
+    refused = call(tasks_quill, token, "list_records", model="spaceship")
     assert refused["isError"] is True
-    assert "say which board" in refused["content"][0]["text"]
-    assert "garden" in refused["content"][0]["text"]
-    fine = call(client, token, "create_task", title="Dig", board="garden")
-    assert fine["structuredContent"]["board"] == "garden"
+    assert "board, task" in refused["content"][0]["text"]
+
+
+PLANTS = """
+[quill]
+id = "plants"
+name = "Plants"
+version = "0.1.0"
+summary = "Your plants."
+category = "home"
+
+[[screens]]
+id = "plants"
+kit = "list"
+label = "Plants"
+model = "plants.plant"
+title = "name"
+tick = "healthy"
+"""
+
+PLANT = """
+[datamodel]
+id = "plants.plant"
+label = "Plant"
+title = "name"
+
+[fields]
+name = { kind = "string", required = true }
+healthy = { kind = "bool", default = true, indexed = true }
+"""
+
+
+def test_an_administrators_assistant_builds_a_quill_in_a_conversation(client, auth):
+    token = connect(client)["access_token"]
+    schema = call(client, token, "quill_schema")["structuredContent"]
+    assert "quill.toml" in schema["reference"]
+    broken = call(client, token, "quill_check", manifest=PLANTS)
+    assert broken["isError"] is True and "plants.plant" in broken["content"][0]["text"]
+    checked = call(client, token, "quill_check", manifest=PLANTS, datamodels={"plant.toml": PLANT})
+    assert checked["structuredContent"]["ok"] is True
+    adds = checked["structuredContent"]["adds"]["data"]
+    assert adds == [{"id": "plants.plant", "label": "Plant", "how": "introduces", "foundation": False, "new": True}]
+    installed = call(client, token, "quill_dev_install", manifest=PLANTS, datamodels={"plant.toml": PLANT})
+    assert installed["structuredContent"]["installed"] == "plants"
+    # It is on the server, for the person, at once.
+    made = client.post("/api/records/plants.plant", headers=auth, json={"fields": {"name": "Fig"}})
+    assert made.status_code == 201 and made.json()["fields"]["healthy"] is True
+    assert [q["id"] for q in client.get("/api/quills", headers=auth).json()] == ["plants"]
+
+
+def test_only_an_administrators_assistant_may_install(client):
+    token = connect(client, GUEST)["access_token"]
+    refused = call(client, token, "quill_dev_install", manifest=PLANTS, datamodels={"plant.toml": PLANT})
+    assert refused["isError"] is True and "administrator" in refused["content"][0]["text"]
 
 
 def test_a_tool_that_cannot_do_it_says_so_without_a_protocol_error(client):
@@ -508,7 +564,7 @@ def test_a_feature_switched_off_takes_its_tools_away(client, auth):
     assert off.status_code == 200, off.text
     names = {t["name"] for t in rpc(client, token, "tools/list").json()["result"]["tools"]}
     assert "create_note" not in names
-    assert "create_task" in names
+    assert "create_record" in names
     refused = call(client, token, "create_note", path="x", content="")
     assert refused["isError"] is True
     assert "switched off" in refused["content"][0]["text"]

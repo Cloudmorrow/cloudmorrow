@@ -22,7 +22,7 @@ from tests.tui_harness import entry_row, settle, start
 
 async def open_browse(app, pilot):
     screen = await start(app, pilot)
-    await pilot.click("#tab-files")
+    await pilot.click("#nav-files")
     await settle(app, pilot)
     await pilot.click("#files-tab-browse")
     await settle(app, pilot)
@@ -35,7 +35,12 @@ def names(screen) -> list[str]:
 
 
 def status(screen) -> str:
-    return screen.query_one("#statusbar", Static).visual.plain
+    """The bottom line, and the right of the panel's header, where the pane
+    says what the row you are on is."""
+    from tests.tui_harness import said
+
+    head = screen.active_pane.query_one(".pane-read", Static).visual.plain
+    return f"{said(screen)}  {head}"
 
 
 # -- the pieces on their own ----------------------------------------------------
@@ -225,7 +230,7 @@ async def test_s_sorts_by_the_next_thing_and_shift_s_turns_it_around(app):
 async def test_enter_on_a_share_in_fileshares_opens_it_in_browse(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
-        await pilot.click("#tab-files")
+        await pilot.click("#nav-files")
         await settle(app, pilot)
         pane = screen.query_one(FilesPane)
         assert isinstance(pane.active_view, FilesharesPane)

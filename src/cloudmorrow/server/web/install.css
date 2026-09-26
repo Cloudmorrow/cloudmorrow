@@ -30,6 +30,7 @@
   color: var(--accent);
   font-size: 15px;
 }
-.install .actions button.strong { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+/* Cloud blue, not amber: the card is beside a screen that has its own one action. */
+.install .actions button.strong { background: var(--fill); color: var(--fill-ink); box-shadow: inset 0 -2px 0 var(--fill-pressed); font-weight: 600; }
 
 .install, .install .actions button { border-radius: var(--radius); }

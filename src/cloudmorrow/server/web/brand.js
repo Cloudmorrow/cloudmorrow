@@ -1,11 +1,18 @@
-/* /brand — three ways Cloudmorrow could look, painted rather than described.
+/* /brand — the look Cloudmorrow wears, painted rather than described.
+
+   It began as three proposals side by side. The brand guide (in the
+   cloudmorrow-web repository: brand/index.html and brand/tokens.css) chose
+   between them: CATHODE's glass, with the blue of the cloud and the amber
+   of the hedgehog in place of its cyan and violet. What is left here is
+   that one look, as the app, the CLI and the terminal app have it. The
+   other two are in the history.
 
    The page is deliberately standalone: it imports nothing from core.js and
-   needs no sign-in, so it can be opened on a phone, shown to somebody, and
-   thrown away without touching the app. Each theme is one entry in THEMES
-   below; everything on the page — swatches, mockups, contrast figures, the
-   palette.py and CSS to paste — is generated from that entry, so there is
-   no second copy of a colour anywhere to drift out of step.
+   needs no sign-in, so it can be opened on a phone and shown to somebody
+   without touching the app. The look is one entry in THEMES below, and
+   everything on the page — swatches, mockups, contrast figures, the
+   palette.py and CSS it matches — is generated from that entry, so there
+   is no second copy of a colour here to drift out of step.
 
    The idea being tested: pixels for the marks, real type for the words. The
    wordmark and the headings are drawn dot by dot from a 5x7 font, because
@@ -255,88 +262,49 @@ const ratio = (a, b) => contrast(a, b).toFixed(1) + ":1";
 // AA is 4.5 for body text, 3.0 for large text and UI shapes.
 const grade = (a, b) => (contrast(a, b) >= 4.5 ? "pass" : contrast(a, b) >= 3 ? "large" : "fail");
 
-// -- the three -----------------------------------------------------------------------
-// Twelve slots, because that is exactly what palette.py already names and
-// what the Textual theme is built from. A theme that cannot fill all twelve
+// -- the look --------------------------------------------------------------------------
+// The slots palette.py names, because that is what the Textual theme and the
+// CLI are built from. A theme that cannot fill every one of them
 // is a mood board, not a theme.
 const THEMES = [
   {
-    key: "cathode",
-    name: "CATHODE",
-    lede: "A colour monitor at two in the morning. Blue-black glass, phosphor " +
-      "cyan for the thing you are on, and a gradient that runs cyan through " +
-      "indigo into magenta across the banner, the ramp and the tabs.",
-    why: "The retro is in the glow, not in the shapes — so nothing has to be " +
-      "hard to read to earn it. Cyan and violet sit far apart in hue, which " +
-      "keeps “the current thing” and “a link” from ever being confused. The " +
-      "wordmark is the one place that arc is walked back: 154° of hue across " +
-      "a dense field of dots on a dark ground is what makes a logo hard to " +
-      "look at, so it gets 59° at half the chroma instead.",
+    key: "cloud",
+    name: "CLOUD",
+    lede: "The app's own blue-black glass, with the two colours of the logo: " +
+      "the blue of the cloud the hedgehog sits on, and the amber of the " +
+      "hedgehog. Blue is the platform — links, the tab you are on, the chosen " +
+      "thing. Amber is the person — the one action on a screen, and names.",
+    why: "The neutrals carry nine tenths of every screen and did not change. " +
+      "Sky and Lens sit far apart in hue, so the current thing and the thing " +
+      "that is yours are never confused, and warn moved from yellow to orange " +
+      "so that it can never be taken for amber. Cloud is too dark to read as " +
+      "text on Ink, so it is only ever a fill, with white on it.",
     colors: {
-      INK: "#14171f", SURFACE: "#1f242e", PANEL: "#272d39",
+      NIGHT: "#0b0d12", INK: "#14171f", SURFACE: "#1f242e", PANEL: "#272d39",
       LINE: "#333a48", LINE_BRIGHT: "#4a5364",
-      TEXT: "#dfe5f0", MUTED: "#99a1b3",
-      ACCENT: "#4fe3d7", SECOND: "#a78bfa",
-      GOOD: "#5ce89b", WARN: "#ffc857", BAD: "#ff6b81",
+      TEXT: "#dfe5f0", MUTED: "#99a1b3", FAINT: "#667085",
+      DEEP: "#0a3f75", CLOUD: "#1c70b1", PUFF: "#3685bd", SKY: "#5aa6e0",
+      LENS: "#e0a84c", ACTION: "#e0a84c", ACTION_INK: "#14171f",
+      GOOD: "#5ce89b", WARN: "#ff9f5a", BAD: "#ff6b81",
+      ACCENT: "#5aa6e0", SECOND: "#e0a84c",
     },
-    gradient: ["#4fe3d7", "#7c8cf8", "#f472b6"],
-    // Untouched: on the banner's hairlines and the ramp it is the best thing
-    // here. It is only the dense fields it cannot be trusted with.
-    markGradient: ["#3fbdb4", "#4886c9", "#6d74c6"],
-    barGradient: ["#4fe3d7", "#7c8cf8", "#f472b6"],
-    markStyle: "gradient",
-    bar: { bg: "#1c212b", ink: "#dfe5f0", muted: "#99a1b3", accent: "#4fe3d7", bad: "#ff6b81" },
-    onAccent: "#0e1117",
+    // The cloud from its shadow to the sky, for the banner and the ramp.
+    gradient: ["#0a3f75", "#1c70b1", "#5aa6e0"],
+    // The same run started a step in, for a dense field of dots: Deep on
+    // Ink is a colour you have to be told is there.
+    markGradient: ["#1c70b1", "#3685bd", "#5aa6e0"],
+    barGradient: ["#1c70b1", "#3685bd", "#5aa6e0"],
+    // The app draws its wordmark in Sky, flat, as the guide asks.
+    markStyle: "flat",
+    bar: { bg: "#1c212b", ink: "#dfe5f0", muted: "#99a1b3", accent: "#5aa6e0", bad: "#ff6b81" },
+    onAccent: "#14171f",
+    // Blue as a fill: white on Cloud, lit to Puff, pressed to Deep.
+    fill: { bg: "#1c70b1", ink: "#ffffff", hover: "#3685bd", pressed: "#0a3f75" },
+    // Amber as a fill: the one action, Ink on Lens, its bottom edge Fur.
+    action: { bg: "#e0a84c", ink: "#14171f", edge: "#c18635" },
     scheme: "dark",
     radius: "14px",
-  },
-  {
-    key: "amber",
-    name: "AMBER DECK",
-    lede: "The warm one. An amber phosphor terminal bolted to a 1970s hi-fi: " +
-      "tobacco-dark panels, an orange accent, and one cold teal so that names " +
-      "and links have somewhere to stand.",
-    why: "Warm palettes usually fall apart at the status colours, because " +
-      "amber, gold and red all crowd together. This one spends its cold end " +
-      "on SECOND and keeps WARN a pale gold, well clear of the orange accent.",
-    colors: {
-      INK: "#151009", SURFACE: "#1e1810", PANEL: "#281f16",
-      LINE: "#3c3022", LINE_BRIGHT: "#5c4a33",
-      TEXT: "#f2e6d4", MUTED: "#a99781",
-      ACCENT: "#ff8a3d", SECOND: "#5bc8b8",
-      GOOD: "#8fd96b", WARN: "#f2c14e", BAD: "#ff5a5a",
-    },
-    gradient: ["#f2c14e", "#ff8a3d", "#e0457b"],
-    barGradient: ["#f2c14e", "#ff8a3d", "#e0457b"],
-    markStyle: "gradient",
-    bar: { bg: "#0d0904", ink: "#f2e6d4", muted: "#a99781", accent: "#ff8a3d", bad: "#ff5a5a" },
-    onAccent: "#0d0904",
-    scheme: "dark",
-    radius: "16px",
-  },
-  {
-    key: "riso",
-    name: "RISO",
-    lede: "Daylight. Warm paper and near-black ink, with the two overprinted " +
-      "inks of a risograph — a red that is almost orange, a flat process blue " +
-      "— and a sun-to-violet gradient for the marks.",
-    why: "It keeps the bright page you already have but drops the grey-green " +
-      "cast, and it is the only one of the three that survives being read " +
-      "outdoors. The bar stays ink-dark, so the frame round the page is intact.",
-    colors: {
-      INK: "#f5efe3", SURFACE: "#fffaf0", PANEL: "#eae2d2",
-      LINE: "#d9cdb6", LINE_BRIGHT: "#b9a889",
-      TEXT: "#1e1b18", MUTED: "#756c60",
-      ACCENT: "#c03522", SECOND: "#2f5fb8",
-      GOOD: "#2e7d4f", WARN: "#a86a06", BAD: "#b8231f",
-    },
-    gradient: ["#f5a623", "#e2513a", "#7b3fa0"],
-    barGradient: ["#ffc25c", "#ff7f5c", "#c08ce0"],
-    markStyle: "gradient",
-    bar: { bg: "#26221d", ink: "#f5efe3", muted: "#a89e92", accent: "#f5a623", bad: "#ff8f7a" },
-    onAccent: "#fffaf0",
-    scheme: "light",
-    radius: "16px",
+    radiusControl: "10px",
   },
 ];
 
@@ -407,16 +375,21 @@ function terminalMock() {
     </figure>`;
 }
 
-// -- what you paste ---------------------------------------------------------------------
-// The whole point of the page: pick one, and these two blocks are the change.
-// Generated from the theme, so what you copy is what you saw.
-const SLOTS = ["INK", "SURFACE", "PANEL", "LINE", "LINE_BRIGHT", "TEXT", "MUTED",
-  "ACCENT", "SECOND", "GOOD", "WARN", "BAD"];
+// -- where it is ----------------------------------------------------------------------
+// The two places the look is declared, as this page would write them. Generated
+// from the theme, and held to palette.py and base.css by tests/test_brand_page.py,
+// so what is shown is what the app has.
+const SLOTS = ["NIGHT", "INK", "SURFACE", "PANEL", "LINE", "LINE_BRIGHT", "TEXT", "MUTED",
+  "FAINT", "DEEP", "CLOUD", "PUFF", "SKY", "LENS", "ACTION", "ACTION_INK",
+  "GOOD", "WARN", "BAD", "ACCENT", "SECOND"];
 const SLOT_NOTES = {
-  INK: "the page", SURFACE: "panels on it", PANEL: "panels on those",
+  NIGHT: "behind the logo", INK: "the page", SURFACE: "panels on it", PANEL: "panels on those",
   LINE: "borders", LINE_BRIGHT: "borders that want noticing", TEXT: "",
-  MUTED: "", ACCENT: "the brand, and the current thing", SECOND: "names and links",
-  GOOD: "", WARN: "", BAD: "",
+  MUTED: "second text", FAINT: "labels, times", DEEP: "cloud in shadow: pressed",
+  CLOUD: "the blue fill, white on it", PUFF: "cloud, lit: hover", SKY: "blue as text: where you are",
+  LENS: "the one action, and names", ACTION: "", ACTION_INK: "text on the action",
+  GOOD: "", WARN: "orange, never amber", BAD: "",
+  ACCENT: "the old name for Sky", SECOND: "the old name for Lens",
 };
 
 function pythonFor(t) {
@@ -435,13 +408,22 @@ function pythonFor(t) {
   return `# src/cloudmorrow/palette.py — ${t.name.toLowerCase()}\n\n` + lines.join("\n") + gradients;
 }
 
+// A theme without a fill or an action of its own fills with its accent.
+const fillOf = (t) => t.fill ||
+  { bg: t.colors.ACCENT, ink: t.onAccent, hover: t.colors.ACCENT, pressed: t.colors.ACCENT };
+const actionOf = (t) => t.action || { bg: t.colors.ACCENT, ink: t.onAccent, edge: t.colors.ACCENT };
+
 function cssFor(t) {
   const c = t.colors;
   return `/* src/cloudmorrow/server/web/base.css — ${t.name.toLowerCase()} */\n:root {\n` +
     `  --bg: ${c.INK};\n  --card: ${c.SURFACE};\n  --card-2: ${c.PANEL};\n` +
     `  --line: ${c.LINE};\n  --line-bright: ${c.LINE_BRIGHT};\n` +
     `  --ink: ${c.TEXT};\n  --muted: ${c.MUTED};\n` +
-    `  --accent: ${c.ACCENT};\n  --accent-ink: ${t.onAccent};\n  --second: ${c.SECOND};\n` +
+    `  --accent: ${c.ACCENT};\n  --accent-ink: ${t.onAccent};\n` +
+    `  --fill: ${fillOf(t).bg};\n  --fill-ink: ${fillOf(t).ink};\n` +
+    `  --fill-hover: ${fillOf(t).hover};\n  --fill-pressed: ${fillOf(t).pressed};\n` +
+    `  --action: ${actionOf(t).bg};\n  --action-ink: ${actionOf(t).ink};\n` +
+    `  --action-edge: ${actionOf(t).edge};\n  --second: ${c.SECOND};\n` +
     `  --field: ${c.PANEL};\n` +
     `  --good: ${c.GOOD};\n  --warn: ${c.WARN};\n  --bad: ${c.BAD};\n` +
     `  --bar: ${t.bar.bg};\n  --bar-ink: ${t.bar.ink};\n` +
@@ -450,7 +432,8 @@ function cssFor(t) {
     `  --brand: linear-gradient(100deg, ${t.gradient.join(", ")});\n` +
     `  --brand-mark: linear-gradient(100deg, ${markStops(t).join(", ")});\n` +
     `  --brand-bar: linear-gradient(100deg, ${t.barGradient.join(", ")});\n` +
-    `  --radius: ${t.radius};\n  color-scheme: ${t.scheme};\n}\n`;
+    `  --radius: ${t.radius};\n  --radius-control: ${t.radiusControl || t.radius};\n` +
+    `  color-scheme: ${t.scheme};\n}\n`;
 }
 
 // -- putting a theme on the page -----------------------------------------------------
@@ -472,6 +455,9 @@ function readouts(t) {
     ["MUTED on INK", c.MUTED, c.INK],
     ["ACCENT on INK", c.ACCENT, c.INK],
     ["SECOND on SURFACE", c.SECOND, c.SURFACE],
+    ["white on the blue fill", fillOf(t).ink, fillOf(t).bg],
+    ["ink on the action", actionOf(t).ink, actionOf(t).bg],
+    ["WARN on INK", c.WARN, c.INK],
     ["BAD on INK", c.BAD, c.INK],
   ];
   return pairs.map(([label, a, b]) =>
@@ -489,6 +475,7 @@ function section(t) {
     "--line": c.LINE, "--line-bright": c.LINE_BRIGHT,
     "--text": c.TEXT, "--muted": c.MUTED,
     "--accent": c.ACCENT, "--accent-ink": t.onAccent, "--second": c.SECOND,
+    "--fill": fillOf(t).bg, "--fill-ink": fillOf(t).ink,
     "--good": c.GOOD, "--warn": c.WARN, "--bad": c.BAD,
     "--bar": t.bar.bg, "--bar-ink": t.bar.ink,
     "--bar-muted": t.bar.muted, "--bar-accent": t.bar.accent,
@@ -521,11 +508,10 @@ function section(t) {
 
       <div class="panel">
         <h3>The mark</h3>
-        <p class="note">The gradient runs everywhere it did before — across the banner
-          above, the ramp, the tabs. It is only the wordmark that gets a quieter fill,
-          because a wordmark is a dense field of dots rather than a few hairlines, and a
-          wide hue arc across one on a dark ground never lets the eye settle. Three ways
-          to fill it:</p>
+        <p class="note">The app's own 5×7 dot letters. In the app they are Sky, flat,
+          which is what the guide asks for anywhere the mark is small or sits in a bar;
+          the gradient is the cloud's, from shadow to sky, for the banner and the ramp.
+          Three ways to fill it:</p>
         <div class="mark-row">${Object.entries(MARK_STYLES).map(([key, style]) => `
           <div class="mark-try${key === t.markStyle ? " on" : ""}">
             <div class="mark-box">${pixelWord("CLOUDMORROW", style.paint(t))}</div>
@@ -534,10 +520,11 @@ function section(t) {
       </div>
 
       <div class="panel">
-        <h3>Twelve slots</h3>
-        <p class="note">The names are the ones <code>palette.py</code> already uses, so a
-          theme is a drop-in — the TUI reads them through the Textual theme and the CLI
-          imports them directly.</p>
+        <h3>The slots</h3>
+        <p class="note">The names are the ones <code>palette.py</code> uses, so this is the
+          same palette the TUI reads through its Textual theme and the CLI imports
+          directly. ACCENT and SECOND are the old names, kept so nothing had to be
+          renamed; they are Sky and Lens.</p>
         <div class="swatches">${swatches(t)}</div>
       </div>
 
@@ -549,7 +536,7 @@ function section(t) {
           <p class="key"><b class="pass">4.5:1+</b> body text · <b class="large">3:1+</b> large text and shapes</p>
         </div>
         <div class="panel code">
-          <h3>What you paste</h3>
+          <h3>Where it is</h3>
           <div class="codetabs" role="tablist">
             <button role="tab" aria-selected="true" data-code="py">palette.py</button>
             <button role="tab" aria-selected="false" data-code="css">base.css</button>
@@ -598,7 +585,7 @@ function wireCode(root) {
 
 function build() {
   document.querySelector(".hero .mark-slot").innerHTML =
-    pixelWord("CLOUDMORROW", { stops: ["#4fc4bd", "#5f8fd0", "#8f84cc"] });
+    pixelWord("CLOUDMORROW", { color: THEMES[0].colors.SKY });
   const jump = document.querySelector(".jump");
   const main = document.querySelector("main");
   for (const t of THEMES) {

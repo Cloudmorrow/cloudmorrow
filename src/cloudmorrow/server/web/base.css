@@ -1,20 +1,29 @@
 /* The shapes every feature is built from.
 
-   CATHODE: a colour monitor at two in the morning, which is the look
-   chosen at /brand. Blue-black glass, phosphor cyan for the thing you are
-   on, violet for a name or a link — the same twelve colours the CLI and
-   the terminal app are painted from, in `cloudmorrow/palette.py`, so the
-   three of them look like one product. A bar at the top, a large title,
-   boxed groups of rows, an editor, and three tabs along the bottom. The
-   terminal touches — the cursor, the prompts, the brackets — are in
-   A feature's own shapes live in its own stylesheet, beside its script.
+   The brand guide's colours on the app's own glass. The neutrals are
+   CATHODE's, unchanged — blue-black, the same twelve the CLI and the
+   terminal app are painted from in `cloudmorrow/palette.py` — and the two
+   colours are the logo's: the blue of the cloud the hedgehog sits on, and
+   the amber of the hedgehog.
 
-   The type is the rule from /brand: pixels for the marks, real type for
-   the words. The wordmark in the bar is drawn dot by dot; everything you
-   read is set in the system's own UI face, because a note is prose and
-   prose in a monospace face is a thing to decode rather than read. What
-   is genuinely monospaced data — a version, a hash — asks for --mono by
-   name. */
+   Blue is the platform. Sky is a link, the tab you are on, the caret and
+   the focus ring; Cloud is a fill with white type on it — the thing that
+   is chosen — lit to Puff under the pointer and pressed to Deep. Amber is
+   the person. Lens fills the one action a screen is for — Save, Install,
+   Send — with Ink type on it, and nothing else on that screen is filled
+   amber; as text it marks a name, or what is yours. Status is its own
+   three, and warn is orange so it is never mistaken for amber.
+
+   A button that is filled has a bottom edge one shade darker, like the
+   shadow side of a pixel. Everything else is a ghost: a line and no fill.
+
+   The type is the rule from the guide: pixels for the marks, real type for
+   the words. The wordmark in the bar is drawn dot by dot; titles, labels
+   and buttons are set in Barlow Semi Condensed and what you read in
+   Barlow, both served from here (fonts.css). A note is the exception: it
+   is yours, it is prose, and it is set in the system's own face, which is
+   what the guide asks for where speed matters more than brand. What is
+   genuinely monospaced data — a version, a hash — asks for --mono. */
 
 :root {
   --bg: #14171f;
@@ -24,32 +33,40 @@
   --line-bright: #4a5364;
   --ink: #dfe5f0;
   --muted: #99a1b3;
-  --accent: #4fe3d7;
-  --accent-ink: #0e1117;
-  --second: #a78bfa;
+  /* Blue: Sky as text and lines, Cloud as a fill. */
+  --accent: #5aa6e0;
+  --accent-ink: #14171f;
+  --fill: #1c70b1;
+  --fill-ink: #ffffff;
+  --fill-hover: #3685bd;
+  --fill-pressed: #0a3f75;
+  /* Amber: the one action, and a name. */
+  --action: #e0a84c;
+  --action-ink: #14171f;
+  --action-edge: #c18635;
+  --second: #e0a84c;
   --field: #272d39;
   --good: #5ce89b;
-  --warn: #ffc857;
+  --warn: #ff9f5a;
   --bad: #ff6b81;
   /* The bars above and below: a step lighter than the page, so they read
      as surfaces it sits between rather than as holes in it. */
   --bar: #1c212b;
   --bar-ink: #dfe5f0;
   --bar-muted: #99a1b3;
-  --bar-accent: #4fe3d7;
+  --bar-accent: #5aa6e0;
   --bar-bad: #ff6b81;
-  /* Two gradients, because they are not interchangeable. --brand is for
-     line art and long thin shapes, where 154° of hue is a pleasure.
-     --brand-mark is the same idea at 59° and half the chroma, for the
-     wordmark and anything else that is a dense field rather than a few
-     strokes — a wide arc across one of those on a dark ground has its two
-     ends focusing at different depths, and it is genuinely hard to look
-     at. Neither belongs on a control: a selected thing is a flat fill. */
-  --brand: linear-gradient(100deg, #4fe3d7, #7c8cf8, #f472b6);
-  --brand-mark: linear-gradient(100deg, #3fbdb4, #4886c9, #6d74c6);
+  /* The cloud from its shadow to its lit side. For line art and banners,
+     never a control: a chosen thing is a flat fill. --brand-mark is the
+     same run for a dense field of dots, which is where the wordmark is. */
+  --brand: linear-gradient(100deg, #0a3f75, #1c70b1, #5aa6e0);
+  --brand-mark: linear-gradient(100deg, #1c70b1, #3685bd, #5aa6e0);
   --radius: 14px;
-  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Inter,
-          system-ui, sans-serif;
+  --radius-control: 10px;
+  --system: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Inter,
+            system-ui, sans-serif;
+  --sans: "Barlow", var(--system);
+  --display: "Barlow Semi Condensed", "Barlow", "Arial Narrow", var(--system);
   --mono: ui-monospace, "JetBrains Mono", "Fira Code", "Cascadia Mono", SFMono-Regular,
           "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
   --top: env(safe-area-inset-top, 0px);
@@ -139,15 +156,17 @@ svg { display: block; }
   color: var(--bar-accent);
   font-size: 16px;
 }
-/* The one button on the bar that is the point of the screen: a filled
-   pill, the way a selected thing is filled everywhere else. */
+/* The one button on the bar that is the point of the screen — Done, Save —
+   so it is the screen's amber, the one fill of it there is. */
 .nav button.strong {
   align-self: center;
   min-height: 32px;
   padding: 0 14px;
   border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--action);
+  color: var(--action-ink);
+  box-shadow: inset 0 -2px 0 var(--action-edge);
+  font-family: var(--display);
   font-weight: 600;
 }
 .nav button.danger { color: var(--bar-bad); }
@@ -167,10 +186,11 @@ main {
   padding: 0 16px calc(72px + var(--bottom));
 }
 h1.large {
-  font-size: 30px;
-  line-height: 1.2;
+  font-family: var(--display);
+  font-size: 32px;
+  line-height: 1.15;
   font-weight: 700;
-  letter-spacing: -.02em;
+  letter-spacing: -.005em;
   margin: 6px 0 14px;
   overflow-wrap: anywhere;
 }
@@ -192,6 +212,7 @@ h1.large {
 }
 .group-label {
   margin: 22px 0 8px 4px;
+  font-family: var(--display);
   font-weight: 600;
   font-size: 13px;
   text-transform: uppercase;
@@ -252,7 +273,18 @@ h1.large {
   text-align: center;
   color: var(--muted);
 }
-.empty b { color: var(--ink); font-weight: 600; display: block; margin-bottom: 4px; }
+.empty b { color: var(--ink); font-family: var(--display); font-size: 19px; font-weight: 600; display: block; margin-bottom: 4px; }
+/* The hedgehog, where a screen would otherwise be blank: the one place the
+   guide lets it sit in the app. The words beside it still say what to do. */
+.empty.mascot { padding-top: 28px; }
+.empty.mascot::before {
+  content: "";
+  display: block;
+  width: 150px;
+  aspect-ratio: 320 / 259;
+  margin: 0 auto 14px;
+  background: url("./mascot-320.png") center / contain no-repeat;
+}
 
 /* -- the tabs at the bottom --------------------------------------------- */
 .tabs {
@@ -276,9 +308,10 @@ h1.large {
   justify-content: center;
   gap: 2px;
   color: var(--bar-muted);
-  font-size: 11px;
+  font-family: var(--display);
+  font-size: 12px;
   font-weight: 500;
-  letter-spacing: .01em;
+  letter-spacing: .02em;
 }
 .tab .pixel-icon { width: 22px; height: 22px; }
 .tab.active { color: var(--bar-accent); font-weight: 600; }
@@ -292,10 +325,11 @@ h1.large {
   background: none;
   outline: none;
   padding: 4px 0;
-  font-size: 25px;
-  line-height: 1.25;
+  font-family: var(--display);
+  font-size: 27px;
+  line-height: 1.2;
   font-weight: 700;
-  letter-spacing: -.02em;
+  letter-spacing: -.005em;
 }
 .editor .title::placeholder { color: var(--muted); font-weight: 600; }
 .editor .stamp {
@@ -318,6 +352,7 @@ h1.large {
   padding: 0;
   resize: none;
   overflow: hidden;
+  font-family: var(--system);
   font-size: 17px;
   line-height: 1.6;
 }
@@ -335,8 +370,17 @@ h1.large {
   padding: calc(var(--top) + 24px) 16px calc(var(--bottom) + 24px);
 }
 .login .brand { margin: 0 0 12px; }
+/* The hedgehog on its cloud, above the name: the one screen everybody
+   sees first, and the splash the guide gives the sitting pose. */
+.login .brand .hedgehog {
+  display: block;
+  width: 132px;
+  aspect-ratio: 320 / 259;
+  margin: 0 0 14px -6px;
+  background: url("./mascot-320.png") left center / contain no-repeat;
+}
 .login .brand .wordmark { width: min(100%, 280px); }
-.login h1 { font-size: 28px; letter-spacing: -.02em; margin: 0 0 24px; }
+.login h1 { font-family: var(--display); font-size: 30px; letter-spacing: -.005em; margin: 0 0 24px; }
 .login .fields {
   background: var(--card);
   border: 1px solid var(--line);
@@ -363,15 +407,19 @@ h1.large {
   width: 100%;
   height: 50px;
   border-radius: var(--radius);
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--action);
+  color: var(--action-ink);
+  box-shadow: inset 0 -3px 0 var(--action-edge);
+  font-family: var(--display);
+  font-size: 17px;
   font-weight: 600;
 }
+.login .submit:active { filter: brightness(.94); }
 .login .submit:disabled { opacity: .6; }
 .login .error { color: var(--muted); font-size: 15px; margin: 0 0 12px; min-height: 1.3em; }
 .login .error.bad { color: var(--bad); }
 .login .foot { margin-top: 32px; font-size: 12px; color: var(--muted); text-align: center; }
-.login .foot a { color: var(--second); }
+.login .foot a { color: var(--accent); }
 
 /* -- the toast ----------------------------------------------------------- */
 #toast {

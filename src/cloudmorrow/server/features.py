@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import datetime as dt
 import sqlite3
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -70,7 +71,6 @@ class Feature:
 
 FEATURES: tuple[Feature, ...] = (
     Feature("notes", "Notes", "Markdown notes, in the app and on the phone", ("note",)),
-    Feature("tasks", "Tasks", "Boards, and the three lanes on each", ("board", "task")),
     Feature("secrets", "Secrets", "Vaults of keys and passwords, encrypted", ("secret",)),
     Feature("files", "Files", "Fileshares, and what is in them", ("file", "share", "machine")),
     Feature(
@@ -106,14 +106,24 @@ def _now() -> str:
 class FeatureStore:
     """What is switched on, and the switching of it."""
 
-    def __init__(self, db_path: Path) -> None:
+    def __init__(self, db_path: Path, quills: Callable[[], Iterable[Feature]] | None = None) -> None:
         self.db_path = db_path
+        # The installed Quills, each one more thing to switch. Asked on every
+        # call, because installing one changes the answer.
+        self._quills = quills or (lambda: ())
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.executescript(TABLE)
 
     def _connect(self) -> sqlite3.Connection:
         return connect(self.db_path)
+
+    def catalogue(self) -> tuple[Feature, ...]:
+        """The built-in features, then every installed Quill."""
+        return FEATURES + tuple(self._quills())
+
+    def known(self, key: str) -> bool:
+        return any(feature.key == key for feature in self.catalogue())
 
     def _switched(self) -> dict[str, sqlite3.Row]:
         with self._connect() as conn:
@@ -122,7 +132,7 @@ class FeatureStore:
 
     def enabled(self, key: str) -> bool:
         """Is *key* on? An unknown key is not a feature, so it is not off."""
-        if key not in BY_KEY:
+        if not self.known(key):
             return True
         row = self._switched().get(key)
         return True if row is None else bool(row["enabled"])
@@ -131,7 +141,7 @@ class FeatureStore:
         switched = self._switched()
         return [
             key
-            for key in FEATURE_KEYS
+            for key in (feature.key for feature in self.catalogue())
             if key not in switched or bool(switched[key]["enabled"])
         ]
 
@@ -139,7 +149,7 @@ class FeatureStore:
         """Every feature there is, in catalogue order, with its state."""
         switched = self._switched()
         listed = []
-        for feature in FEATURES:
+        for feature in self.catalogue():
             row = switched.get(feature.key)
             listed.append(
                 {
@@ -155,7 +165,7 @@ class FeatureStore:
         return listed
 
     def set(self, key: str, enabled: bool, *, changed_by: str = "") -> dict:
-        if key not in BY_KEY:
+        if not self.known(key):
             raise UnknownFeatureError(key)
         with self._connect() as conn:
             conn.execute(
@@ -214,7 +224,7 @@ class FeatureStore:
 
     def set_for(self, username: str, key: str, enabled: bool) -> dict:
         """Switch a feature for one person. Unknown, or off here, is unknown."""
-        if key not in BY_KEY or not self.enabled(key):
+        if not self.known(key) or not self.enabled(key):
             raise UnknownFeatureError(key)
         with self._connect() as conn:
             conn.execute(

@@ -260,7 +260,7 @@ async function renderFolder(arg) {
     if (watcher) { watcher.disconnect(); watcher = null; }
     const entries = sortEntries(listing.entries, choice);
     if (!entries.length) {
-      listingEl.innerHTML = `<p class="empty"><b>Nothing here</b>This folder is empty.</p>`;
+      listingEl.innerHTML = `<p class="empty mascot"><b>Nothing here yet</b>This folder is empty. Add a file with the plus.</p>`;
     } else if (view === "grid") {
       listingEl.innerHTML = `<div class="tiles">${entries.map(tile).join("")}</div>`;
       watcher = watchTiles(share, listingEl);

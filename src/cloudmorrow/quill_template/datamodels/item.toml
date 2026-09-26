@@ -1,0 +1,17 @@
+# A datamodel this Quill introduces. Its id starts with the Quill's.
+# Before adding one, look at the foundational datamodels (`cm quill check`
+# lists them): extend one of those rather than inventing a second kind of
+# contact, task or vehicle.
+
+[datamodel]
+id = "{{id}}.item"
+version = 1
+label = "Item"
+description = "One thing in {{name}}."
+scopes = ["personal"]
+title = "name"
+
+[fields]
+name = { kind = "string", required = true }
+done = { kind = "bool", default = false, indexed = true }
+notes = { kind = "markdown" }

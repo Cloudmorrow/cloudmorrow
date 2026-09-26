@@ -7,10 +7,10 @@ the sections are clicks, and switching a feature off is a click on its box.
 from __future__ import annotations
 
 from rich.text import Text
-from textual.widgets import Button, Checkbox, DataTable, Input, RadioButton, Static
+from textual.widgets import Checkbox, DataTable, Input, RadioButton, Static
 
 from cloudmorrow.tui.panes.admin import AdminPanel
-from tests.tui_harness import settle, start, user_row
+from tests.tui_harness import said, settle, start, user_row
 
 
 def rows(screen) -> list[list[str]]:
@@ -34,9 +34,9 @@ async def open_dialog(app, pilot, button: str) -> None:
 
 
 async def open_admin(app, pilot):
-    """Start, then click the menu on the top bar."""
+    """Start, then click Users under ADMINISTRATION in the sidebar."""
     screen = await start(app, pilot)
-    await pilot.click("#open-admin")
+    await pilot.click("#nav-admin-users")
     await settle(app, pilot)
     return screen
 
@@ -44,10 +44,12 @@ async def open_admin(app, pilot):
 async def test_an_admin_has_the_menu_and_a_user_does_not(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
-        assert screen.query_one("#open-admin", Button).display
-        # And it sits left of Settings, where the sentence says it does.
-        bar = [button.id for button in screen.query("#topbar-right Button")]
-        assert bar.index("open-admin") < bar.index("open-settings")
+        assert screen.query_one("#nav-section-admin").display
+        assert [card.name_text for card in screen.query(".admin-card") if card.display] == [
+            "Users",
+            "Features",
+            "Quills",
+        ]
 
 
 async def test_a_plain_user_never_sees_it(app):
@@ -57,7 +59,8 @@ async def test_a_plain_user_never_sees_it(app):
     app.client.me = member
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
-        assert not screen.query_one("#open-admin", Button).display
+        assert not screen.query_one("#nav-section-admin").display
+        assert not any(card.display for card in screen.query(".admin-card"))
         # And f9 does nothing for them.
         await pilot.press("f9")
         await settle(app, pilot)
@@ -70,12 +73,25 @@ async def test_the_panel_replaces_the_interface_and_comes_back(app):
         screen = await open_admin(app, pilot)
         assert screen.admin_showing
         assert not screen.query_one("#workspace-view").display
-        assert screen.query_one("#open-admin", Button).has_class("-open")
-        await pilot.click("#admin-back")
+        assert screen.query_one("#nav-admin-users").active
+        # A card for one of your places is the way back.
+        await pilot.click("#nav-notes")
         await settle(app, pilot)
         assert not screen.admin_showing
         assert screen.query_one("#workspace-view").display
-        assert not screen.query_one("#open-admin", Button).has_class("-open")
+        assert not screen.query_one("#nav-admin-users").active
+        assert screen.query_one("#nav-notes").active
+
+
+async def test_f9_goes_in_and_comes_back_out(app):
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await start(app, pilot)
+        await pilot.press("f9")
+        await settle(app, pilot)
+        assert screen.admin_showing
+        await pilot.press("f9")
+        await settle(app, pilot)
+        assert not screen.admin_showing
 
 
 async def test_f9_opens_it_and_shuts_it(app):
@@ -159,14 +175,14 @@ async def test_editing_an_account_keeps_the_password_when_the_box_is_empty(app):
 async def test_features_switch_a_tab_off_everywhere(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_admin(app, pilot)
-        await pilot.click("#admin-tab-features")
+        await pilot.click("#nav-admin-features")
         await settle(app, pilot)
         await pilot.click("#feature-tasks")
         await settle(app, pilot)
         assert app.client.feature_calls == [("tasks", False)]
         # The strip behind the panel lost the tab, without a restart.
-        assert screen.query_one("#nav").query_one("#tab-tasks").display is False
-        assert screen.query_one("#nav").query_one("#tab-notes").display is True
+        assert screen.query_one("#nav-tasks").display is False
+        assert screen.query_one("#nav-notes").display is True
 
 
 async def test_a_switched_off_feature_is_gone_on_the_next_start(app):
@@ -176,7 +192,7 @@ async def test_a_switched_off_feature_is_gone_on_the_next_start(app):
             row["enabled"] = False
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
-        assert screen.query_one("#nav").query_one("#tab-files").display is False
+        assert screen.query_one("#nav-files").display is False
         # And its key does nothing rather than showing an empty pane.
         await pilot.press("f5")
         await settle(app, pilot)
@@ -212,10 +228,10 @@ async def test_a_feature_the_server_refuses_to_switch_says_so(app):
     app.client.set_feature = refuse
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_admin(app, pilot)
-        await pilot.click("#admin-tab-features")
+        await pilot.click("#nav-admin-features")
         await settle(app, pilot)
         await pilot.click("#feature-notes")
         await settle(app, pilot)
-        assert "admin only" in screen.query_one("#statusbar", Static).visual.plain
+        assert "admin only" in said(screen)
         # And the box goes back to what the server really thinks.
         assert screen.query_one("#feature-notes", Checkbox).value is True

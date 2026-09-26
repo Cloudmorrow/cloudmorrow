@@ -1,0 +1,495 @@
+/* The frame: header, sidebar, the one panel, the log, the keys — and the
+   things every pane uses the same way: buttons, tables, tabs, dialogs.
+
+   The rules, from the brand guide: neutrals for everything that is not a
+   signal; Sky (blue) for where you are — the card you are on, the row you
+   are on, focus; Lens (amber) for the one primary action in a view, with
+   ink on it; orange for "have a look", pink for "went wrong". Borders are
+   rounded and quiet, $line, and light up Sky when they are yours. */
+
+/* -- the header --------------------------------------------------------- */
+#topbar {
+    height: 4;
+    margin: 1 1 0 1;
+}
+
+#topbar-mark {
+    width: auto;
+    height: 4;
+    margin-right: 3;
+}
+
+#topbar-compact {
+    display: none;
+    width: auto;
+    height: 1;
+    margin-right: 2;
+}
+
+#topbar-info {
+    width: 1fr;
+    height: 4;
+    padding-top: 0;
+}
+
+#topbar-left {
+    height: 1;
+    margin-bottom: 1;
+}
+
+.topbar-row {
+    height: 1;
+    width: 1fr;
+}
+
+#topbar-health {
+    width: auto;
+    height: 1;
+    margin-right: 2;
+}
+
+/* Buttons that live on a line of text: no border, no fill, a space either
+   side of the label. Click your name to change your password. */
+#topbar Button {
+    height: 1;
+    min-width: 0;
+    width: auto;
+    margin: 0 2 0 0;
+    padding: 0;
+    content-align: left middle;
+    border: none;
+    background: transparent;
+    color: $muted;
+    text-style: none;
+}
+
+#topbar #topbar-account {
+    color: $lens;
+}
+
+#topbar Button:hover {
+    background: transparent;
+    color: $primary;
+    text-style: underline;
+}
+
+#topbar Button:focus {
+    color: $primary;
+    text-style: bold;
+}
+
+/* Something to read: the bell says so rather than leaving it to the count. */
+#topbar #open-notifications.has-unread {
+    color: $warning;
+    text-style: bold;
+}
+
+/* Too narrow for the mark: one line, a small mark, the rest along it. */
+#topbar.-compact {
+    height: 1;
+    margin: 0 1;
+}
+
+#topbar.-compact #topbar-mark {
+    display: none;
+}
+
+#topbar.-compact #topbar-compact {
+    display: block;
+}
+
+#topbar.-compact #topbar-info {
+    layout: horizontal;
+    height: 1;
+}
+
+#topbar.-compact #topbar-left {
+    display: none;
+}
+
+#topbar.-compact .topbar-row {
+    width: auto;
+}
+
+/* -- the body: sidebar and panel --------------------------------------- */
+#body {
+    height: 1fr;
+    margin: 1 1 0 1;
+}
+
+#sidebar {
+    width: 28;
+    height: 1fr;
+    margin-right: 1;
+    background: transparent;
+    scrollbar-size-vertical: 0;
+}
+
+.nav-section {
+    height: 1;
+    margin: 1 0 0 1;
+}
+
+#nav-section-cloud {
+    margin-top: 0;
+}
+
+/* A card: its name on a rounded top border, and one line under it with a
+   dot for how it is and the key at the end. Two rows, no bottom edge. */
+.nav-card {
+    height: 2;
+    padding: 0 1;
+    border: none;
+    border-top: round $line;
+    border-left: round $line;
+    border-title-color: $muted;
+    border-title-style: bold;
+    border-title-align: left;
+    background: transparent;
+    margin-bottom: 0;
+}
+
+.nav-card:hover {
+    border-top: round $cloud;
+    border-left: round $cloud;
+    border-title-color: $text;
+}
+
+.nav-card.-active {
+    border-top: round $primary;
+    border-left: round $primary;
+    border-title-color: $primary;
+}
+
+/* Administration: the server, not your things — one line each. */
+.nav-card.-small, .nav-card.-line {
+    height: 1;
+    border: none;
+    padding: 0 0 0 1;
+}
+
+.nav-card.-small:hover, .nav-card.-line:hover {
+    border: none;
+    background: $surface;
+}
+
+.nav-card.-small.-active, .nav-card.-line.-active {
+    border: none;
+    background: $cloud 25%;
+}
+
+/* Narrow: the sidebar is a list of names. */
+WorkspaceScreen.-narrow #sidebar {
+    width: 18;
+}
+
+WorkspaceScreen.-narrow .nav-section {
+    margin: 1 0 0 0;
+}
+
+WorkspaceScreen.-narrow #nav-section-cloud {
+    margin-top: 0;
+}
+
+/* The panel: one rounded border round whatever you are on. */
+#main {
+    height: 1fr;
+    border: round $line;
+    padding: 0 1;
+    background: transparent;
+}
+
+#workspace-view, #admin-view, #panes, #admin-views {
+    height: 1fr;
+    background: transparent;
+}
+
+#nothing-showing {
+    height: 1fr;
+    padding: 2 3;
+}
+
+/* A pane's first line: its name, a few words, and what it counts. */
+.pane-head {
+    height: 1;
+}
+
+.pane-name {
+    width: 1fr;
+    height: 1;
+}
+
+.pane-read {
+    width: auto;
+    height: 1;
+    color: $faint;
+}
+
+/* -- the log, and the keys -------------------------------------------- */
+#log {
+    height: 4;
+    margin: 0 1;
+    padding: 0 1;
+    border: round $line;
+    border-title-color: $faint;
+    border-title-style: bold;
+    background: transparent;
+}
+
+#log.-tall {
+    height: 5;
+}
+
+#log:hover {
+    border: round $line-bright;
+}
+
+BottomBar {
+    background: transparent;
+    padding: 0 2;
+}
+
+/* -- buttons ------------------------------------------------------------- */
+/* Everything is a quiet button — a label, lit on hover — except the one
+   primary action in a view, which is the amber fill with ink on it. */
+Button {
+    background: $panel;
+    color: $text;
+    border: none;
+    border-top: none;
+    border-bottom: none;
+    text-style: none;
+    height: 3;
+    padding: 1 2;
+}
+
+Button:hover {
+    background: $line-bright;
+    color: $text;
+    border: none;
+}
+
+Button:focus {
+    text-style: bold;
+    background-tint: transparent;
+}
+
+Button.-active {
+    background: $line;
+    border: none;
+    tint: transparent;
+}
+
+Button.-primary {
+    background: $action;
+    color: $action-ink;
+    text-style: bold;
+}
+
+Button.-primary:hover {
+    background: #eebd6c;
+    color: $action-ink;
+}
+
+Button.-primary:focus {
+    text-style: bold underline;
+}
+
+Button.-error {
+    background: transparent;
+    color: $error;
+    border: round $error 60%;
+    padding: 0 2;
+}
+
+Button.-error:hover {
+    background: $error;
+    color: $background;
+    border: round $error;
+}
+
+/* A pane's row of buttons, under its header line. */
+.toolbar {
+    height: 3;
+    padding: 1 0 1 0;
+    background: transparent;
+}
+
+.toolbar Button {
+    height: 1;
+    min-width: 6;
+    margin-right: 1;
+    border: none;
+    padding: 0 1;
+    color: $muted;
+    background: transparent;
+}
+
+.toolbar Button:hover {
+    color: $text;
+    background: $panel;
+    border: none;
+}
+
+.toolbar Button.-primary {
+    color: $action-ink;
+    background: $action;
+    text-style: bold;
+}
+
+.toolbar Button.-primary:hover {
+    color: $action-ink;
+    background: #eebd6c;
+}
+
+.toolbar Button.-error {
+    color: $error;
+    background: transparent;
+    border: none;
+    padding: 0 1;
+}
+
+.toolbar Button.-error:hover {
+    color: $background;
+    background: $error;
+    border: none;
+}
+
+/* -- tabs inside a pane (the board's groups, Files' views) --------------- */
+Tabs {
+    height: 2;
+    background: transparent;
+}
+
+Tab {
+    padding: 0 2;
+    color: $muted;
+    background: transparent;
+}
+
+Tab:hover {
+    color: $foreground;
+    background: $surface;
+}
+
+Tab.-active, Tabs:focus Tab.-active {
+    color: $primary;
+    background: transparent;
+    text-style: bold;
+}
+
+Underline > .underline--bar {
+    color: $primary;
+    background: $line;
+}
+
+Tabs > #tabs-list {
+    min-height: 2;
+}
+
+/* -- tables: no box, headers in faint capitals ------------------------- */
+DataTable {
+    height: 1fr;
+    background: transparent;
+    border: none;
+    scrollbar-size: 0 1;
+}
+
+DataTable:focus {
+    border: none;
+}
+
+DataTable > .datatable--header {
+    background: transparent;
+    color: $faint;
+    text-style: bold;
+}
+
+DataTable > .datatable--header-hover {
+    background: transparent;
+}
+
+DataTable > .datatable--cursor {
+    background: $surface;
+    color: $foreground;
+}
+
+DataTable:focus > .datatable--cursor {
+    background: $cloud 45%;
+    color: $text;
+}
+
+DataTable > .datatable--hover {
+    background: $surface;
+}
+
+DataTable > .datatable--even-row {
+    background: transparent;
+}
+
+DataTable > .datatable--odd-row {
+    background: transparent;
+}
+
+/* -- dialogs -------------------------------------------------------------- */
+ModalScreen {
+    align: center middle;
+    background: $night 75%;
+}
+
+.modal {
+    width: 62;
+    height: auto;
+    box-sizing: border-box;
+    padding: 1 2;
+    border: round $line-bright;
+    background: $background;
+}
+
+.modal-wide {
+    width: 82;
+}
+
+.modal-title {
+    text-style: bold;
+    color: $primary;
+    margin-bottom: 1;
+}
+
+.modal-detail {
+    height: auto;
+    color: $muted;
+    margin: 1 0;
+}
+
+.modal-buttons {
+    height: auto;
+    margin-top: 1;
+    align-horizontal: right;
+}
+
+.modal-buttons Button {
+    margin-left: 2;
+    height: 1;
+    min-width: 8;
+    padding: 0 2;
+    border: none;
+}
+
+.modal-buttons Button.-error {
+    border: none;
+    padding: 0 2;
+}
+
+/* -- administration ------------------------------------------------------ */
+#admin-user-table, #admin-quill-table {
+    height: 1fr;
+    padding: 0;
+    background: transparent;
+}
+
+#admin-quills-note {
+    height: auto;
+    padding: 0;
+    margin-bottom: 1;
+}

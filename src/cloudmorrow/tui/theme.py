@@ -3,6 +3,11 @@
 Textual resolves `$primary` and friends in CSS from the registered theme; the
 same hex values are re-exported here as plain strings for the places that
 build rich markup by hand.
+
+`$primary` is Sky — where you are: focus, selection, the card you are on.
+The one primary action on a screen is not `$primary` but `$action`, amber,
+because the brand keeps blue for the platform and amber for the person (see
+cloudmorrow.palette).
 """
 
 from __future__ import annotations
@@ -13,14 +18,23 @@ from textual.theme import Theme
 # line can be the same colour as the app without dragging the app in with it.
 from cloudmorrow.palette import (
     ACCENT,
+    ACTION,
+    ACTION_INK,
     BAD,
+    CLOUD,
+    DEEP,
+    FAINT,
     GOOD,
     INK,
+    LENS,
     LINE,
     LINE_BRIGHT,
     MUTED,
+    NIGHT,
     PANEL,
+    PUFF,
     SECOND,
+    SKY,
     SURFACE,
     TEXT,
     WARN,
@@ -28,15 +42,24 @@ from cloudmorrow.palette import (
 
 __all__ = [
     "ACCENT",
+    "ACTION",
+    "ACTION_INK",
     "BAD",
+    "CLOUD",
     "CLOUDMORROW_THEME",
+    "DEEP",
+    "FAINT",
     "GOOD",
     "INK",
+    "LENS",
     "LINE",
     "LINE_BRIGHT",
     "MUTED",
+    "NIGHT",
     "PANEL",
+    "PUFF",
     "SECOND",
+    "SKY",
     "SURFACE",
     "TEXT",
     "WARN",
@@ -44,9 +67,9 @@ __all__ = [
 
 CLOUDMORROW_THEME = Theme(
     name="cloudmorrow",
-    primary=ACCENT,
-    secondary=SECOND,
-    accent=ACCENT,
+    primary=SKY,
+    secondary=LENS,
+    accent=SKY,
     foreground=TEXT,
     background=INK,
     surface=SURFACE,
@@ -59,13 +82,24 @@ CLOUDMORROW_THEME = Theme(
         "line": LINE,
         "line-bright": LINE_BRIGHT,
         "muted": MUTED,
+        "faint": FAINT,
+        "night": NIGHT,
+        "sky": SKY,
+        "cloud": CLOUD,
+        "puff": PUFF,
+        "deep": DEEP,
+        "lens": LENS,
+        "action": ACTION,
+        "action-ink": ACTION_INK,
         "block-cursor-text-style": "none",
-        "footer-key-foreground": ACCENT,
+        "footer-key-foreground": SKY,
         "footer-description-foreground": MUTED,
-        "border": LINE,
+        "border": SKY,
+        "border-blurred": SURFACE,
         "scrollbar": LINE,
         "scrollbar-hover": LINE_BRIGHT,
-        "scrollbar-active": ACCENT,
-        "input-selection-background": f"{ACCENT} 35%",
+        "scrollbar-active": SKY,
+        "input-selection-background": f"{CLOUD} 60%",
+        "input-cursor-background": SKY,
     },
 )

@@ -32,7 +32,15 @@ It is free software under the [GNU AGPL v3](LICENSE).
   in the terminal, or by piping a file in. Each note is a real file on the
   server, so a copy of the folder is a backup.
 - **Tasks.** Boards with three lanes: ToDo, Doing, Done. Drag a card, tick a
-  subtask. Done cleans itself out after a week.
+  subtask. Done cleans itself out after a week. Tasks is the first
+  [Quill](docs/QUILLS.md), [in a repository of its own](https://github.com/Cloudmorrow/quill-tasks).
+- **Quills.** Everything beyond the foundation is a Quill: a package from the
+  [Quill Catalog](https://github.com/Cloudmorrow/quill-catalog), shelved by
+  category, that shows you what data it uses, extends and introduces before
+  you say yes. A Quill has no UI code: its screens come from one kit, so each
+  one is on the phone, in the browser, in the terminal, on the command line
+  (`cm tasks list`) and to your assistant at once. Build your own with
+  `cm quill new`, or ask your assistant to.
 - **Calendar.** One of your own, plus the ones you share with the people on
   your server. Every calendar you can see is drawn at once, so nobody
   double-books the meeting room or the car.
@@ -49,8 +57,10 @@ It is free software under the [GNU AGPL v3](LICENSE).
   screen), the same app grown up for a laptop browser, and a terminal app you
   can use with a mouse.
 - **An assistant, if you want one.** The server speaks MCP, so Claude or any
-  other MCP client can read and write your notes and tasks as you, after you
-  sign in and say yes. Secrets are never on that list.
+  other MCP client can read and write your notes and every Quill's records as
+  you, after you sign in and say yes — and, for an administrator, write,
+  check and install a new Quill in the conversation. Secrets are never on
+  that list.
 - **Encrypted at rest.** Notes, messages, events, tasks, secrets and pictures
   are ciphertext on disk, under one key the server holds. You sign in with a
   password and never handle a key. See [docs/ENCRYPTION.md](docs/ENCRYPTION.md).
@@ -69,7 +79,8 @@ a reading log or the budget you fetch from the store at cloudmorrow.com,
 tweak, or build yourself by dragging in the data elements it needs and
 describing the rest to an assistant, and it turns up on the phone, in the
 browser, in the terminal and as tools an assistant can use. The concept
-is [Concept.md](Concept.md); the data model is [docs/DATA.md](docs/DATA.md);
+is [Concept.md](Concept.md); how software is packaged, found and built is
+[docs/QUILLS.md](docs/QUILLS.md); the data model is [docs/DATA.md](docs/DATA.md);
 the plan for the rest is [docs/PLATFORM.md](docs/PLATFORM.md).
 
 ## Three ways to get one

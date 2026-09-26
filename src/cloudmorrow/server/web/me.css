@@ -6,8 +6,8 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--fill);
+  color: var(--fill-ink);
   font-size: 26px;
   font-weight: 700;
   display: flex;

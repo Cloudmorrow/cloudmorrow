@@ -7,11 +7,10 @@ the shortcuts are the accelerator.
 
 from __future__ import annotations
 
-from textual.widgets import Tab, Tabs
-
 from cloudmorrow.tui.panes.notes import NotesPane
 from cloudmorrow.tui.panes.secrets import SecretsPane
 from cloudmorrow.tui.widgets.note_tree import NoteTree
+from cloudmorrow.tui.widgets.sidebar import NavCard
 from cloudmorrow.tui.widgets.vault_list import VaultList
 from tests.tui_harness import PRESS_ANIMATION, open_secrets, settle, start
 
@@ -26,11 +25,14 @@ async def test_the_workspace_opens_on_notes(app):
         assert [node.data["path"] for node in screen.query_one(NoteTree).root.children] == [
             "architecture.md"
         ]
-        # Nothing up top but the name — and the dev marker when it is the
-        # checkout running. No vault: there is none the app is "in".
+        # Up top: whose cloud this is, and what it is — and the dev marker
+        # when it is the checkout running. No vault: there is none the app is "in".
         top = screen.query_one("#topbar-left").visual.plain
-        assert top.strip().startswith("◈ cloudmorrow")
+        # A `dev` badge follows when the checkout is what runs.
+        assert top.strip().startswith("BRAM'S CLOUD · cloudmorrow")
         assert "verticore" not in top
+        # And the Notes card is the one lit.
+        assert screen.query_one("#nav-notes", NavCard).active
 
 
 async def test_the_top_bar_says_when_it_is_the_checkout_running(app, monkeypatch):
@@ -56,7 +58,7 @@ async def test_the_top_bar_says_nothing_when_it_is_the_installed_one(app, monkey
 async def test_clicking_a_tab_switches_pane(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
-        await pilot.click("#tab-secrets")
+        await pilot.click("#nav-secrets")
         await settle(app, pilot)
         assert screen.query_one("#panes").current == "pane-secrets"
         assert isinstance(screen.active_pane, SecretsPane)
@@ -66,25 +68,58 @@ async def test_clicking_a_tab_switches_pane(app):
         assert [row.vault for row in listing.query("VaultRow")] == ["homelab", "verticore"]
         assert screen.query_one(SecretsPane).selected_vault == "verticore"
 
-        await pilot.click("#tab-notes")
+        await pilot.click("#nav-notes")
         await settle(app, pilot)
         assert isinstance(screen.active_pane, NotesPane)
 
 
-async def test_secrets_is_a_tab_of_its_own(app):
-    """A secret is yours, so it is reached the way notes are: from the strip."""
+async def test_secrets_is_a_card_of_its_own(app):
+    """A secret is yours, so it is reached the way notes are: from the sidebar."""
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
-        # Each tab carries the key that brings it here, which is why the
-        # footer no longer repeats them.
-        assert [tab.label_text for tab in screen.query_one("#nav", Tabs).query(Tab)] == [
-            "Notes  f1",
-            "Tasks  f2",
-            "Calendar  f7",
-            "Chat  f6",
-            "Secrets  f3",
-            "Files  f5",
+        # Each card carries the key that brings it here, which is why the
+        # footer does not repeat them; your cloud first, then the Quills.
+        cards = [
+            (card.name_text, card.tag)
+            for card in screen.query(NavCard)
+            if card.display and not card.has_class("admin-card")
         ]
+        assert cards == [
+            ("Notes", "f1"),
+            ("Calendar", "f7"),
+            ("Chat", "f6"),
+            ("Secrets", "f3"),
+            ("Files", "f5"),
+            ("Tasks", "f2"),
+        ]
+
+
+async def test_a_card_says_how_its_place_is(app):
+    """The Quill's card counts its first lane; a built-in says what it is until loaded."""
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await start(app, pilot)
+        assert screen.query_one("#nav-tasks", NavCard).status_line == "2 to do"
+        assert screen.query_one("#nav-secrets", NavCard).status_line == "keys, sealed"
+
+
+async def test_the_sidebar_narrows_on_a_narrow_terminal(app):
+    async with app.run_test(size=(84, 30)) as pilot:
+        screen = await start(app, pilot)
+        assert screen.has_class("-narrow")
+        assert screen.query_one("#nav-notes", NavCard).has_class("-line")
+
+
+async def test_what_is_said_goes_in_the_log_with_the_time(app):
+    from cloudmorrow.tui.widgets.logstrip import LogStrip
+
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await start(app, pilot)
+        screen.set_status("saved it")
+        await pilot.pause()
+        log = screen.query_one(LogStrip)
+        assert [line.text for line in log.lines][-1] == "saved it"
+        # And the machines' notifications are in there too.
+        assert "omarchy config changed on desktop" in [line.text for line in log.lines]
 
 
 async def test_clicking_a_vault_moves_nothing_but_the_pane(app):
@@ -168,7 +203,7 @@ async def test_picking_a_vault_leaves_the_open_note_alone(app):
         await settle(app, pilot)
         assert pane.current_path == "architecture.md"
 
-        await pilot.click("#tab-secrets")
+        await pilot.click("#nav-secrets")
         await settle(app, pilot)
         rows = list(screen.query("VaultRow"))
         await pilot.click(rows[0])

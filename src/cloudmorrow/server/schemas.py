@@ -418,56 +418,6 @@ class ShareFoldersOut(BaseModel):
     folders: list[str]
 
 
-class BoardOut(BaseModel):
-    slug: str
-    title: str
-    created_at: str = ""
-    updated_at: str = ""
-
-
-class BoardCreate(BaseModel):
-    title: str
-    # The board's id in the API. Derived from the title when omitted.
-    slug: str | None = None
-
-
-class BoardUpdate(BaseModel):
-    title: str
-
-
-class TaskOut(BaseModel):
-    id: int
-    board: str
-    title: str
-    # Markdown: the detail, and the `- [ ]` lines that are its subtasks.
-    body: str = ""
-    lane: str = "todo"
-    position: int = 0
-    created_at: str = ""
-    updated_at: str = ""
-    # When it entered Done, and so when its week starts running out.
-    done_at: str | None = None
-
-
-class TaskCreate(BaseModel):
-    title: str
-    body: str = ""
-    lane: str = "todo"
-
-
-class TaskUpdate(BaseModel):
-    """Editing the text. Moving a task between lanes is its own request."""
-
-    title: str | None = None
-    body: str | None = None
-
-
-class TaskMove(BaseModel):
-    lane: str
-    # Where in the lane it lands. Appended when omitted.
-    index: int | None = None
-
-
 class ConfigFileIn(BaseModel):
     """One file in a bundle, as a machine sends it."""
 

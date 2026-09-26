@@ -1,0 +1,17 @@
+[datamodel]
+id = "event"
+version = 1
+label = "Event"
+description = "A title and two moments, on a calendar. Times are wall-clock times."
+domain = "calendars"
+scopes = ["personal", "shared", "public"]
+title = "title"
+
+[fields]
+calendar = { kind = "link", to = "calendar", required = true, indexed = true, on_delete = "cascade" }
+title = { kind = "string", required = true }
+starts_at = { kind = "datetime", required = true, indexed = true }
+ends_at = { kind = "datetime", indexed = true }
+all_day = { kind = "bool", default = false, indexed = true }
+location = { kind = "string" }
+notes = { kind = "markdown" }

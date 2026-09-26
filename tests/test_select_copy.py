@@ -5,7 +5,7 @@ from __future__ import annotations
 from textual.widgets import Static
 
 from cloudmorrow.tui.widgets.editor import LiveMarkdownEditor
-from tests.tui_harness import settle, start
+from tests.tui_harness import said, settle, start
 
 
 async def sweep(pilot, selector: str, start: tuple[int, int], end: tuple[int, int]) -> None:
@@ -19,7 +19,7 @@ async def sweep(pilot, selector: str, start: tuple[int, int], end: tuple[int, in
 async def test_selecting_text_with_the_mouse_copies_it(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
-        await pilot.click("#tab-files")
+        await pilot.click("#nav-files")
         await settle(app, pilot)
         await pilot.click("#files-tab-local-backups")
         await settle(app, pilot)
@@ -32,7 +32,7 @@ async def test_selecting_text_with_the_mouse_copies_it(app):
         assert app._clipboard == "Local backups"
         # And the status bar says so — nothing else needs pressing, and
         # nothing pops up: a notification is what a machine sends.
-        assert "Copied" in screen.query_one("#statusbar", Static).visual.plain
+        assert "Copied" in said(screen)
         assert not app._notifications
 
 
@@ -54,10 +54,10 @@ async def test_selecting_in_the_editor_copies_the_source(app):
 async def test_a_click_alone_copies_nothing(app):
     async with app.run_test(size=(120, 34)) as pilot:
         await start(app, pilot)
-        await pilot.click("#tab-files")
+        await pilot.click("#nav-files")
         await settle(app, pilot)
         await pilot.click("#files-tab-local-backups")
         await settle(app, pilot)
         await sweep(pilot, "#backups-placeholder", (3, 2), (3, 2))
         assert app._clipboard == ""
-        assert "Copied" not in app.screen.query_one("#statusbar", Static).visual.plain
+        assert "Copied" not in said(app.screen)

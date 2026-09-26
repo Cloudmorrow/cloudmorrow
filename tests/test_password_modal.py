@@ -5,7 +5,7 @@ from __future__ import annotations
 from textual.widgets import Button, Input, Static
 
 from cloudmorrow.tui.screens.modals import PasswordModal
-from tests.tui_harness import PRESS_ANIMATION, settle, start
+from tests.tui_harness import PRESS_ANIMATION, said, settle, start
 
 
 async def open_it(app, pilot) -> PasswordModal:
@@ -47,7 +47,7 @@ async def test_a_new_password_reaches_the_server_and_the_dialog_closes(app):
         assert app.client.password_calls == [("supersecret1", "evenmoresecret2")]
         assert app.client.password == "evenmoresecret2"
         # Said in the status bar, not popped up: a notification is something else.
-        assert "Password changed" in app.screen.query_one("#statusbar", Static).visual.plain
+        assert "Password changed" in said(app.screen)
         assert not app._notifications
 
 

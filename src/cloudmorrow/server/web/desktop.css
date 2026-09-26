@@ -135,9 +135,9 @@
 
   /* A thumb wants a big target; a pointer would rather see more at once. */
   .row { min-height: 46px; }
-  .row.task .tick, .row.task .main { min-height: 46px; }
+  .row.card .tick, .row.card .main { min-height: 46px; }
 
-  /* The boards run along the top rather than off the side: they all fit,
+  /* A board's groups run along the top rather than off the side: they all fit,
      and there is nothing to swipe with. */
   .chips {
     flex-wrap: wrap;
@@ -181,12 +181,14 @@
   .tile:hover .thumb { border-color: var(--line-bright); background: var(--card-2); }
   .month .cell:hover { background: var(--card-2); }
   .month .cell.away:hover { background: var(--card); }
-  .chip:hover, .sort button:hover, .sides button:hover, .lanes button:hover { color: var(--ink); }
+  .chip:hover, .sort button:hover, .sides button:hover, .segments button:hover { color: var(--ink); }
   .chip.active:hover, .sort button.active:hover,
-  .sides button.active:hover, .lanes button.active:hover { color: var(--accent-ink); }
+  .sides button.active:hover, .segments button.active:hover { color: var(--fill-ink); }
   .swatch:hover { border-color: var(--line-bright); }
   .month-bar .step:hover, .month-bar .calendars-link:hover { background: var(--card); }
   .composer button:hover, .nav button.strong:hover, .login .submit:hover { filter: brightness(1.08); }
+  /* A Cloud fill that is a button is lit to Puff, as the cloud is. */
+  .push-card button:hover, .install .actions button.strong:hover { background: var(--fill-hover); }
 }
 
 /* -- the screens that want more than a column ------------------------------ */
@@ -197,7 +199,7 @@
      own business; this is only the room for it. */
   #app:has(.month) { --column: 1080px; }
   .month .cell { min-height: 92px; }
-  /* Three lanes want three columns' worth: a card cut off after four
+  /* Lanes want a column's worth each: a card cut off after four
      words is not a card you can read the board from. */
   #app:has(.board) { --column: 1120px; }
   /* Thumbnails at the size a picture is worth looking at. */

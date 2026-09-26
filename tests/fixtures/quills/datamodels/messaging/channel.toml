@@ -1,0 +1,13 @@
+[datamodel]
+id = "channel"
+version = 1
+label = "Channel"
+description = "A room people talk in: public, private, or between two people."
+domain = "messaging"
+scopes = ["shared", "public"]
+title = "name"
+
+[fields]
+name = { kind = "string", required = true }
+kind = { kind = "enum", values = ["public", "private", "direct"], labels = ["Public", "Private", "Direct"], default = "public", indexed = true }
+topic = { kind = "text" }

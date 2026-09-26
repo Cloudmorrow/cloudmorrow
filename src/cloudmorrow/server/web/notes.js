@@ -115,7 +115,7 @@ function renderList(folder, all) {
     if (!items.length && !subs.length) {
       listing.innerHTML = searching
         ? `<p class="empty">No notes match.</p>`
-        : `<p class="empty"><b>No notes here yet</b>Tap the pen to write one.</p>`;
+        : `<p class="empty mascot"><b>Nothing here yet</b>Write your first note with the pen, and it will show up here.</p>`;
       return;
     }
     const folderRows = subs.map((f) => `<a class="row has-icon" href="#/list/${encodePath(f.path)}">

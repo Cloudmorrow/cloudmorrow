@@ -278,8 +278,10 @@ export function pixelArt(rows, className = "pixel-icon") {
   });
   return `<svg class="${className}" viewBox="0 0 8 8" fill="currentColor" aria-hidden="true">${dots}</svg>`;
 }
+/** The named icon, or nothing when there is no such name — a Quill names
+    its own, and one this app has not drawn yet falls back to the caller's. */
 export function pixelIcon(name) {
-  return pixelArt(PIXELS[name]);
+  return PIXELS[name] ? pixelArt(PIXELS[name]) : "";
 }
 
 // The icons more than one feature uses. A feature keeps its own beside it.
@@ -294,7 +296,7 @@ export const icons = {
 
 // -- what the features register ---------------------------------------------------
 const screens = new Map();   // name in the hash → async (arg, extra) => renders it
-const tabList = [];          // [{name, label, icon, href(active), feature}] as registered
+const tabList = [];          // [{name, label, icon, href(active), feature}] as registered, or a slot
 const shellHooks = [];       // run after every screen is put on the page
 const signOutHooks = [];     // run when the session ends, to drop what was loaded
 let home = "login";          // the screen an empty hash means, once signed in
@@ -303,6 +305,15 @@ let homeFeature = "";        // the feature that screen belongs to, if it is one
 export function registerScreen(name, render) { screens.set(name, render); }
 /** A tab. `feature` names the feature it belongs to; without one it is always there. */
 export function registerTab(tab) { tabList.push(tab); }
+/** A place in the tab order for tabs that arrive later — the Quills, which
+    only the server knows. Held where it is called, so the order of app.js
+    is still the order of the bar; returns the function that fills it. */
+export function tabSlot() {
+  const slot = { tabs: [] };
+  tabList.push(slot);
+  return (tabs) => { slot.tabs = tabs; };
+}
+const allTabs = () => tabList.flatMap((t) => t.tabs || [t]);
 export function onShell(fn) { shellHooks.push(fn); }
 export function onSignOut(fn) { signOutHooks.push(fn); }
 export function setHome(name, feature = "") { home = name; homeFeature = feature; }
@@ -319,13 +330,13 @@ let featuresOff = new Set((store.get("features.off") || "").split(",").filter(Bo
 
 export const featureOff = (name) => !!name && featuresOff.has(name);
 /** The feature keys the tabs are gated on — what the server is asked about. */
-export const gatedFeatures = () => [...new Set(tabList.map((t) => t.feature).filter(Boolean))];
+export const gatedFeatures = () => [...new Set(allTabs().map((t) => t.feature).filter(Boolean))];
 export function setFeaturesOff(keys) {
   featuresOff = new Set(keys);
   store.set("features.off", [...featuresOff].join(",") || null);
 }
 
-const shownTabs = () => tabList.filter((t) => !featureOff(t.feature));
+const shownTabs = () => allTabs().filter((t) => !featureOff(t.feature));
 
 /** Where an empty hash goes. Not into a tab this account has switched off. */
 export function homeHash() {

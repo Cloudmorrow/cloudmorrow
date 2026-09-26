@@ -1,0 +1,17 @@
+[datamodel]
+id = "contact"
+version = 1
+label = "Contact"
+description = "A person you know: how to reach them, and how you know them."
+domain = "crm"
+scopes = ["personal", "shared"]
+title = "name"
+
+[fields]
+name = { kind = "string", required = true }
+email = { kind = "email" }
+phone = { kind = "phone" }
+organisation = { kind = "link", to = "organisation", on_delete = "clear" }
+birthday = { kind = "date" }
+address = { kind = "text" }
+notes = { kind = "markdown" }

@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Cloudmorrow — three looks</title>
-<meta name="description" content="Three colour themes for Cloudmorrow, for the app, the CLI and the TUI.">
+<title>Cloudmorrow — the look</title>
+<meta name="description" content="The look Cloudmorrow wears: the colours, the marks and the icons, for the app, the CLI and the TUI.">
 <meta name="theme-color" content="#0c0d11">
 <meta name="robots" content="noindex">
-<link rel="icon" href="/app/icon-180.png" type="image/png">
+<link rel="icon" href="/app/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="stylesheet" href="/app/__ASSET_VERSION__/brand.css">
 </head>
 <body>
@@ -16,10 +16,11 @@
   <div class="wrap">
     <div class="mark-slot"></div>
     <p class="tagline">own your data, choose your apps</p>
-    <p class="blurb">Three ways the whole thing could look — the app on the phone, the
-      <code>cloudmorrow</code> command, and the terminal app, all out of one set of twelve
-      colours. <b>Pixels for the marks, real type for the words:</b> the wordmark and the
-      headings below are drawn dot by dot, and everything you actually read is not.</p>
+    <p class="blurb">The look the app, the <code>cloudmorrow</code> command and the terminal
+      app share, from the brand guide: the app's blue-black glass, the blue of the cloud for
+      the platform and the amber of the hedgehog for you. <b>Pixels for the marks, real type
+      for the words:</b> the wordmark and the headings below are drawn dot by dot, and
+      everything you actually read is not.</p>
     <nav class="jump"></nav>
   </div>
 </header>
@@ -28,19 +29,16 @@
 
 <footer class="outro">
   <div class="wrap">
-    <h3>If you pick one</h3>
+    <h3>Where it lives</h3>
     <ol>
-      <li>Paste the <code>palette.py</code> block over <code>src/cloudmorrow/palette.py</code>.
-        The Textual theme in <code>tui/theme.py</code> and every CLI status line already read
-        from it, so both change at once.</li>
-      <li>Paste the <code>base.css</code> block over the <code>:root</code> in
-        <code>src/cloudmorrow/server/web/base.css</code>, and raise <code>--radius</code> —
-        that one value is most of what makes the app look square today.</li>
-      <li>The new <code>GRADIENT</code> tuple is for <code>logo.py</code>: tint the block
-        letters across it a character at a time instead of the two flat tones it uses now.</li>
-      <li>The 5×7 font that draws the marks lives in <code>brand.js</code> for the moment.
-        If a theme wins, it moves into <code>core.js</code> beside the eleven letters that are
-        already there, and the headings on the phone can be drawn with it too.</li>
+      <li><code>src/cloudmorrow/palette.py</code> for the CLI and the terminal app: the
+        Textual theme in <code>tui/theme.py</code> and every CLI status line read from it.</li>
+      <li>The <code>:root</code> of <code>src/cloudmorrow/server/web/base.css</code> for the
+        phone and the full web app, with the rules for what is blue and what is amber
+        written above it.</li>
+      <li>The brand guide itself, with the logo, the hedgehog, the voice and the website,
+        is in the cloudmorrow-web repository: <code>brand/index.html</code> and
+        <code>brand/tokens.css</code>.</li>
     </ol>
   </div>
 </footer>

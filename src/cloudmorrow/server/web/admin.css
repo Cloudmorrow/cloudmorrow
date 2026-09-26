@@ -21,7 +21,7 @@
   color: var(--muted);
 }
 .seg button + button { border-left: 1px solid var(--line); }
-.seg button.active { background: var(--accent); color: var(--accent-ink); }
+.seg button.active { background: var(--fill); color: var(--fill-ink); }
 
 .panel .note {
   margin: 0 4px 14px;
@@ -40,8 +40,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--fill);
+  color: var(--fill-ink);
   font-size: 15px;
   font-weight: 700;
 }
@@ -111,11 +111,19 @@
 .account input::placeholder { color: var(--muted); }
 .account .value { min-width: 0; }
 
+/* The one amber on the screen: what the form is for. */
 .row.primary {
   justify-content: center;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--action);
+  color: var(--action-ink);
+  box-shadow: inset 0 -3px 0 var(--action-edge);
+  font-family: var(--display);
+  font-size: 17px;
   font-weight: 600;
 }
+.row.primary:active { background: var(--action); filter: brightness(.94); }
 .row.primary:disabled { opacity: .5; }
 .row.bad { justify-content: center; color: var(--bad); font-weight: 600; }
+
+/* The switch and the chips are labels: the guide's semi-condensed face. */
+.seg button, .role-chip { font-family: var(--display); }

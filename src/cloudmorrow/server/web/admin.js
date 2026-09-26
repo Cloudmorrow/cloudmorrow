@@ -11,15 +11,17 @@
    guard — every call under here is admin-only at the server, and the screen
    would be empty without it.
 
-   Two screens. The panel, which is both sections under a switch, and one
+   Two screens. The panel, which is the sections under a switch, and one
    account's page, which is the same form whether it is a new account or one
-   that already exists. */
+   that already exists. The third section, the Quills, is a file of its own
+   (quillsadmin.js), with its install sheet. */
 
 import {
   api, app, esc, formatDate, heading, icons, nav, onSignOut, registerScreen, renderRoute,
   replace, seconds, store, toast, wireShell,
 } from "./core.js";
 import { loadFeatures } from "./features.js";
+import { drawQuills } from "./quillsadmin.js";
 
 // What the server stores, and what it is called on screen. The same words
 // the terminal app uses, so a role means one thing across the two.
@@ -64,14 +66,15 @@ export const isAdmin = (who) => Boolean(who && who.is_admin);
 export function adminRow() {
   return `<div class="group"><a class="row admin-link" href="#/admin">
     <span class="main"><span class="title">Administration</span>
-    <span class="meta"><span class="preview">The accounts, and what this server offers</span></span></span>
+    <span class="meta"><span class="preview">The accounts, what this server offers, and its Quills</span></span></span>
     ${icons.chevronRight}</a></div>`;
 }
 
 // -- the panel ------------------------------------------------------------------------
 async function renderAdmin() {
   if (!(await requireAdmin())) return;
-  const which = store.get("admin.side") === "features" ? "features" : "users";
+  const side = store.get("admin.side");
+  const which = side === "features" || side === "quills" ? side : "users";
   app.innerHTML = nav({ back: "#/me", backLabel: "Me", title: "Administration" }) + `
     <main>
       ${heading("Administration", which === "users"
@@ -80,6 +83,7 @@ async function renderAdmin() {
       <div class="seg">
         <button data-side="users"${which === "users" ? ' class="active"' : ""}>Users</button>
         <button data-side="features"${which === "features" ? ' class="active"' : ""}>Features</button>
+        <button data-side="quills"${which === "quills" ? ' class="active"' : ""}>Quills</button>
       </div>
       <div class="panel"><p class="empty"><b>…</b></p></div>
     </main>`;
@@ -96,7 +100,8 @@ async function renderAdmin() {
 
   const panel = app.querySelector(".panel");
   if (which === "users") await drawUsers(panel);
-  else await drawFeatures(panel);
+  else if (which === "features") await drawFeatures(panel);
+  else await drawQuills(panel);
 }
 
 // -- the accounts -----------------------------------------------------------------------

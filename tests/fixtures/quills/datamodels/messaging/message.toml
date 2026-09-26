@@ -1,0 +1,13 @@
+[datamodel]
+id = "message"
+version = 1
+label = "Message"
+description = "What somebody said in a channel."
+domain = "messaging"
+scopes = ["shared", "public"]
+title = "body"
+
+[fields]
+channel = { kind = "link", to = "channel", required = true, indexed = true, on_delete = "cascade" }
+body = { kind = "text", required = true }
+sent_at = { kind = "datetime", indexed = true }

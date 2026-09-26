@@ -1,4 +1,4 @@
-"""The /brand page: the look, proposed — three themes for the app and the terminal."""
+"""The /brand page: the look the app, the CLI and the TUI share, from the brand guide."""
 
 from __future__ import annotations
 
@@ -57,6 +57,15 @@ def test_every_theme_fills_every_palette_slot():
         assert named == set(slots), f"missing {set(slots) - named}"
 
 
+def test_the_look_shown_is_the_palette_in_use():
+    """The page shows the look the app has, so its values are palette.py's own."""
+    from cloudmorrow import palette
+
+    block = re.search(r"colors: \{(.*?)\},\n", BRAND_JS, re.S).group(1)
+    for slot, value in re.findall(r"(\w+): \"(#[0-9a-f]{6})\"", block):
+        assert value == getattr(palette, slot).lower(), slot
+
+
 def test_the_marks_use_a_font_that_can_spell_every_theme_name():
     """The pixel font is drawn by hand, so a missing glyph is a silent hole."""
     glyphs = set(re.findall(r'^  ("?)([A-Z0-9.\-/\'!?])\1: \[', BRAND_JS, re.M))
@@ -94,11 +103,11 @@ def test_the_css_block_is_a_drop_in_for_base_css():
     base = (WEB / "base.css").read_text(encoding="utf-8")
     root = base.split(":root {", 1)[1].split("}", 1)[0]
     declared = set(re.findall(r"^\s*(--[a-z0-9-]+):", root, re.M))
-    # Not these: the type stack, the phone's own safe areas, and the gap the
+    # Not these: the type stacks, the phone's own safe areas, and the gap the
     # bar keeps above itself to clear what iOS paints over the top of a Home
     # Screen app. None of them is a thing a palette has an opinion about.
     # Anything else added to :root has to be answered for by every theme.
-    declared -= {"--sans", "--mono", "--top", "--bottom", "--bar-top"}
+    declared -= {"--sans", "--system", "--display", "--mono", "--top", "--bottom", "--bar-top"}
     body = BRAND_JS.split("function cssFor", 1)[1].split("\n}", 1)[0]
     emitted = set(re.findall(r"(--[a-z0-9-]+):", body))
     assert declared <= emitted, f"themes say nothing about {sorted(declared - emitted)}"
@@ -132,8 +141,12 @@ def test_the_icons_are_the_ones_the_app_draws():
 
 def test_every_tab_is_drawn_with_one_of_them():
     """No tab is left on the line art the pixel set replaced."""
-    for name in ("today.js", "notes.js", "tasks.js"):
+    for name in ("today.js", "notes.js"):
         source = (WEB / name).read_text(encoding="utf-8")
         tab = re.search(r"registerTab\(\{[^}]*\}\)", source, re.S)
         assert tab, name
         assert "pixelIcon(" in tab.group(0), f"{name} still registers a tab with an <svg>"
+    # A Quill's tabs are drawn with the icon it names, and with pixels of
+    # the same grid when it names one the set does not have.
+    quills = (WEB / "quills.js").read_text(encoding="utf-8")
+    assert "icon: pixelIcon(quill.icon) || pixelArt(QUILL_GLYPH)," in quills

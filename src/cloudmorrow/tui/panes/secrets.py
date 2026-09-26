@@ -66,6 +66,7 @@ class SecretsPane(Pane):
 
     TAB_LABEL = "Secrets"
     TAB_KEY = "f3"
+    SUMMARY = "keys, sealed"
     BINDINGS = [
         ("ctrl+n", "fire('new_vault')", "New vault"),
         ("a", "fire('add')", "Add / edit"),
@@ -110,9 +111,15 @@ class SecretsPane(Pane):
 
     def on_mount(self) -> None:
         table = self.query_one("#secret-table", DataTable)
-        table.add_columns("key", "value", "len", "updated")
+        table.add_columns("KEY", "VALUE", "LEN", "UPDATED")
         self.environment = self.app.client_config.environment or "local"
         self.selected_vault = self.app.client_config.vault or DEFAULT_VAULT
+
+    def card_status(self) -> tuple[str, str] | None:
+        if not self._vaults:
+            return None
+        count = len(self._vaults)
+        return "ok", f"{count} vault{'' if count == 1 else 's'}, sealed"
 
     def on_show(self) -> None:
         self.reload()

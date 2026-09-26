@@ -1,0 +1,17 @@
+[datamodel]
+id = "task"
+version = 1
+label = "Task"
+description = "One thing to do, on a board, in a lane. Its body is Markdown; subtasks are `- [ ]` lines."
+domain = "tasks"
+scopes = ["personal"]
+title = "title"
+ordered_within = ["board", "lane"]
+
+[fields]
+board = { kind = "link", to = "board", required = true, indexed = true, on_delete = "cascade" }
+title = { kind = "string", required = true }
+body = { kind = "markdown", default = "" }
+lane = { kind = "enum", values = ["todo", "doing", "done"], labels = ["To Do", "Doing", "Done"], default = "todo", indexed = true }
+due = { kind = "date", indexed = true }
+done_at = { kind = "datetime", indexed = true, label = "Done", stamp = { field = "lane", value = "done" } }

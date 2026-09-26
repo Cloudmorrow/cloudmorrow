@@ -16,6 +16,7 @@
   overflow: hidden;
 }
 .sides button {
+  font-family: var(--display);
   flex: 1;
   display: inline-flex;
   align-items: center;
@@ -27,8 +28,8 @@
   color: var(--muted);
 }
 .sides button + button { border-left: 1px solid var(--line); }
-.sides button.active { background: var(--accent); color: var(--accent-ink); }
-.sides button.active .unread { background: var(--accent-ink); color: var(--accent); }
+.sides button.active { background: var(--fill); color: var(--fill-ink); }
+.sides button.active .unread { background: var(--fill-ink); color: var(--fill); }
 
 /* -- the list ------------------------------------------------------------ */
 .unread {
@@ -39,8 +40,8 @@
   height: 20px;
   padding: 0 6px;
   border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--fill);
+  color: var(--fill-ink);
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -71,8 +72,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--fill);
+  color: var(--fill-ink);
   font-size: 15px;
   font-weight: 700;
 }
@@ -172,9 +173,9 @@ main.thread {
 .block .bubble + .bubble { border-top-left-radius: 6px; }
 .block.mine .bubble + .bubble { border-top-left-radius: 16px; border-top-right-radius: 6px; }
 .block.mine .bubble {
-  background: var(--accent);
+  background: var(--fill);
   border-color: transparent;
-  color: var(--accent-ink);
+  color: var(--fill-ink);
 }
 .bubble .edited { margin-left: 7px; font-size: 11px; opacity: .6; }
 
@@ -240,8 +241,10 @@ main.thread {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-ink);
+  /* Sending is what a thread is for: its one amber. */
+  background: var(--action);
+  color: var(--action-ink);
+  box-shadow: inset 0 -2px 0 var(--action-edge);
 }
 .composer button:disabled { opacity: .4; }
 
@@ -276,8 +279,11 @@ main.thread {
 .who-list input { margin-top: 0; }
 .row.primary {
   justify-content: center;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--action);
+  color: var(--action-ink);
+  box-shadow: inset 0 -3px 0 var(--action-edge);
+  font-family: var(--display);
+  font-size: 17px;
   font-weight: 600;
 }
 .row.bad { justify-content: center; color: var(--bad); font-weight: 600; }
@@ -306,8 +312,10 @@ main.thread {
   min-height: 32px;
   padding: 0 14px;
   border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-ink);
+  /* A second strong choice on Me, beside whatever is amber: Cloud blue. */
+  background: var(--fill);
+  color: var(--fill-ink);
+  box-shadow: inset 0 -2px 0 var(--fill-pressed);
   font-size: 14px;
   font-weight: 600;
 }

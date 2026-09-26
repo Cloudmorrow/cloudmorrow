@@ -12,6 +12,7 @@ import re
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.app import CloudmorrowApp
 from cloudmorrow.tui.screens.workspace import WorkspaceScreen
+from tests.tui_quills import FakeQuills
 
 SECRETS = {
     ("verticore", "local"): [
@@ -248,26 +249,6 @@ EVENTS = [
 ]
 
 
-BOARDS = [
-    {"slug": "home-lab", "title": "Home Lab", "created_at": "", "updated_at": ""},
-    {"slug": "errands", "title": "Errands", "created_at": "", "updated_at": ""},
-]
-
-
-def task(task_id: int, title: str, lane: str, position: int, **extra) -> dict:
-    return {
-        "id": task_id,
-        "board": "home-lab",
-        "title": title,
-        "body": extra.get("body", ""),
-        "lane": lane,
-        "position": position,
-        "created_at": "2026-09-01T09:00:00",
-        "updated_at": "2026-09-01T09:00:00",
-        "done_at": extra.get("done_at"),
-    }
-
-
 def share_row(name: str, **extra) -> dict:
     return {
         "name": name,
@@ -306,8 +287,11 @@ def _one_pixel_png() -> bytes:
 PNG_1PX = _one_pixel_png()
 
 
-class FakeClient:
-    """Enough of the API for the workspace, with a record of what was asked."""
+class FakeClient(FakeQuills):
+    """Enough of the API for the workspace, with a record of what was asked.
+
+    The Quills and the record store behind them are in tui_quills.py.
+    """
 
     # What a mount signs in with.
     token = "test-token"
@@ -316,6 +300,7 @@ class FakeClient:
         # None, the way a TUI session leaves it: the app is not in a vault,
         # so a call that wants one names it itself.
         self.vault: str | None = None
+        self.setup_quills()
         self.share_list: list[dict] = [share_row("media"), share_row("photos")]
         self.share_calls: list[tuple] = []
         # What is in the server shares the Browse view opens: by share, then
@@ -340,13 +325,6 @@ class FakeClient:
         self.uploads: list[tuple[str, bytes]] = []
         self.fetched: list[str] = []
         self.read_keys: list[tuple[str, str]] = []
-        self.board_tasks: list[dict] = [
-            task(1, "Wire the rack", "todo", 0, body="- [ ] label\n- [x] shelf\n"),
-            task(2, "Repaint", "todo", 1),
-            task(3, "Swap the switch", "doing", 0),
-        ]
-        self.moves: list[tuple[int, str, int | None]] = []
-        self.asked_for: list[str] = []
         # Machines, the config bundle and the notifications the settings
         # screen reads. A test that cares reshapes these before opening it.
         self.agent_list: list[dict] = []
@@ -529,35 +507,6 @@ class FakeClient:
     async def image(self, name: str) -> bytes:
         self.fetched.append(name)
         return PNG_1PX
-
-    async def boards(self) -> list[dict]:
-        return BOARDS
-
-    async def tasks(self, board: str) -> list[dict]:
-        # Only the first board has anything on it, so a test can tell which one
-        # the lanes were filled from.
-        self.asked_for.append(board)
-        return list(self.board_tasks) if board == "home-lab" else []
-
-    async def move_task(self, board: str, task_id: int, lane: str, index=None) -> dict:
-        self.moves.append((task_id, lane, index))
-        for row in self.board_tasks:
-            if row["id"] == task_id:
-                row["lane"] = lane
-                return row
-        raise AssertionError(f"no such task: {task_id}")
-
-    async def create_task(self, board: str, title: str, *, body: str = "") -> dict:
-        fresh = task(max(row["id"] for row in self.board_tasks) + 1, title, "todo", 99, body=body)
-        self.board_tasks.append(fresh)
-        return fresh
-
-    async def edit_task(self, board: str, task_id: int, *, title=None, body=None) -> dict:
-        for row in self.board_tasks:
-            if row["id"] == task_id:
-                row.update({k: v for k, v in (("title", title), ("body", body)) if v is not None})
-                return row
-        raise AssertionError(f"no such task: {task_id}")
 
     async def shares(self) -> list[dict]:
         return list(self.share_list)
@@ -801,8 +750,22 @@ async def start(app: CloudmorrowApp, pilot) -> WorkspaceScreen:
 async def open_secrets(app: CloudmorrowApp, pilot) -> WorkspaceScreen:
     """Start, then click over to Secrets — the app lands on Notes."""
     screen = await start(app, pilot)
-    await pilot.click("#tab-secrets")
+    await pilot.click("#nav-secrets")
     await settle(app, pilot)
     return screen
 
 
+
+
+def said(screen) -> str:
+    """Everything the workspace has said: the log along the bottom, and the
+    note at the right of the pane on show — where a message lands, once."""
+    from cloudmorrow.tui.widgets.logstrip import LogStrip
+
+    lines = [line.text for line in screen.query_one(LogStrip).lines]
+    pane = screen.active_pane
+    if screen.admin_showing:
+        pane = screen.query_one("#admin-view").active_view
+    if pane is not None and pane.note:
+        lines.append(pane.note)
+    return "\n".join(lines)

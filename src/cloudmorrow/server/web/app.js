@@ -1,4 +1,4 @@
-/* Cloudmorrow on the phone: the same notes and tasks the TUI shows.
+/* Cloudmorrow on the phone: the same notes and Quills the TUI shows.
 
    This file is only the list of features. Each is a file of its own that
    registers its screens and its tab with core.js; the order here is the
@@ -8,7 +8,7 @@ import "./install.js";
 import "./login.js";
 import "./today.js";
 import "./notes.js";
-import "./tasks.js";
+import "./quills.js";
 import "./chat.js";
 import "./calendar.js";
 import "./format.js";
@@ -16,6 +16,7 @@ import "./files.js";
 import "./features.js";
 import "./me.js";
 import "./admin.js";
+import "./quillsadmin.js";
 import "./push.js";
 import "./desktop.js";
 import "./fresh.js";

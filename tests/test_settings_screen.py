@@ -171,15 +171,15 @@ async def test_unticking_one_tells_the_server_and_takes_its_tab(app):
         await pilot.press("escape")
         await settle(app, pilot)
         workspace = app.screen
-        assert workspace.query_one("#tab-chat").display is False
-        assert workspace.query_one("#tab-notes").display is True
+        assert workspace.query_one("#nav-chat").display is False
+        assert workspace.query_one("#nav-notes").display is True
 
 
 async def test_ticking_one_back_on_brings_the_tab_back(app):
     app.client.features_off = {"chat"}
     async with app.run_test(size=(120, 40)) as pilot:
         workspace = await start(app, pilot)
-        assert workspace.query_one("#tab-chat").display is False
+        assert workspace.query_one("#nav-chat").display is False
 
         await pilot.click("#open-settings")
         await settle(app, pilot)
@@ -188,7 +188,7 @@ async def test_ticking_one_back_on_brings_the_tab_back(app):
         await pilot.press("escape")
         await settle(app, pilot)
         assert app.client.my_feature_calls == [("chat", True)]
-        assert app.screen.query_one("#tab-chat").display is True
+        assert app.screen.query_one("#nav-chat").display is True
 
 
 async def test_with_everything_off_the_workspace_says_so(app):

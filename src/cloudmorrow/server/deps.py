@@ -19,6 +19,8 @@ from cloudmorrow.server.features import FeatureStore
 from cloudmorrow.server.mcp import MCPStore
 from cloudmorrow.server.notes import NoteStore, ensure_notes_layout
 from cloudmorrow.server.notifications import NotificationStore
+from cloudmorrow.server.quills import QuillRegistry
+from cloudmorrow.server.records import RecordStore
 from cloudmorrow.server.sealed import Sealer
 from cloudmorrow.server.secrets import (
     DEFAULT_ENVIRONMENT,
@@ -31,7 +33,6 @@ from cloudmorrow.server.secrets import (
 from cloudmorrow.server.security import TokenError, decode_access_token
 from cloudmorrow.server.settings import SettingsStore
 from cloudmorrow.server.shares import ShareStore
-from cloudmorrow.server.tasks import TaskStore
 from cloudmorrow.server.today import Weather
 from cloudmorrow.server.webpush import PushStore
 
@@ -45,7 +46,6 @@ class AppState:
     agents: AgentStore
     jobs: JobStore
     secrets: SecretStore
-    tasks: TaskStore
     config_sync: ConfigStore
     notifications: NotificationStore
     features: FeatureStore
@@ -70,6 +70,9 @@ class AppState:
     sealer: Sealer
     # What somebody told the server about itself from the app: its name.
     settings: SettingsStore
+    # The installed Quills and datamodels, and the records of every one.
+    quills: QuillRegistry
+    records: RecordStore
 
     def cloud_name(self) -> str:
         """What this cloud is called: set from the app, else from the config."""

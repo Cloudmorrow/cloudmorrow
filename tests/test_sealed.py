@@ -15,9 +15,10 @@ from cloudmorrow.server.crypto import SealError, load_or_create_key
 from cloudmorrow.server.db import connect
 from cloudmorrow.server.notes import NoteStore
 from cloudmorrow.server.notifications import NotificationStore
+from cloudmorrow.server.quills import QuillRegistry
+from cloudmorrow.server.records import Principal, RecordStore
 from cloudmorrow.server.sealed import FILE_MAGIC, Sealer, rotate, seal_tree, use_key
-from cloudmorrow.server.tasks import TaskStore
-from tests.conftest import ADMIN, token_for
+from tests.conftest import ADMIN, QUILL_CATALOG, token_for
 
 
 def raw(db_path: Path, sql: str, *args: object) -> list[tuple]:
@@ -28,22 +29,17 @@ def raw(db_path: Path, sql: str, *args: object) -> list[tuple]:
         conn.close()
 
 
-def test_a_task_is_ciphertext_in_the_database_and_text_through_the_store(tmp_path):
-    store = TaskStore(tmp_path / "cm.db")
-    board = store.create_board("bram", "Home Lab")
-    task = store.create_task("bram", board.slug, "Fix the NAS", body="It beeps.")
-    rows = raw(tmp_path / "cm.db", "SELECT title, body FROM tasks")
-    assert rows[0][0].startswith("s1:") and "Fix the NAS" not in rows[0][0]
-    assert rows[0][1].startswith("s1:") and "beeps" not in rows[0][1]
-    assert store.require_task("bram", task.id).body == "It beeps."
-    assert [b.title for b in store.boards("bram")] == ["Home Lab"]
-
-
-def test_boards_still_come_out_alphabetical(tmp_path):
-    store = TaskStore(tmp_path / "cm.db")
-    for title in ("zebra", "Apple", "mango"):
-        store.create_board("bram", title)
-    assert [b.title for b in store.boards("bram")] == ["Apple", "mango", "zebra"]
+def test_a_record_is_ciphertext_in_the_database_and_text_through_the_store(tmp_path):
+    registry = QuillRegistry(tmp_path / "quills", tmp_path / "datamodels", str(QUILL_CATALOG))
+    registry.install_from_catalog("tasks")
+    store = RecordStore(tmp_path / "cm.db", registry.models, registry.expiries)
+    bram = Principal.person("bram")
+    board = store.create(bram, "board", {"title": "Home Lab"})
+    task = store.create(bram, "task", {"board": board.id, "title": "Fix the NAS", "body": "It beeps."})
+    body = raw(tmp_path / "cm.db", "SELECT body FROM records WHERE id = ?", task.id)[0][0]
+    assert body.startswith("s1:") and "Fix the NAS" not in body and "beeps" not in body
+    assert store.get(bram, "task", task.id).fields["body"] == "It beeps."
+    assert [b.fields["title"] for b in store.list(bram, "board")] == ["Home Lab"]
 
 
 def test_a_value_moved_to_another_row_does_not_open(tmp_path):

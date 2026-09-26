@@ -31,7 +31,10 @@ SPLASH_DWELL = 0.5
 class CloudmorrowApp(App):
     """Your notes, your tasks, your secrets, your machines, your files."""
 
-    CSS_PATH = "cloudmorrow.tcss"
+    # The panes' own furniture; the frame round them and the controls every
+    # pane shares; and the kit — Quill screens, the record sheet, the Quills
+    # admin. Later sheets win, so the frame's rules hold over the panes'.
+    CSS_PATH = ["cloudmorrow.tcss", "chrome.tcss", "kit.tcss"]
     TITLE = "Cloudmorrow"
     SUB_TITLE = "your own cloud"
     # Textual's own extras — the command palette on ctrl+p and quit on
@@ -105,10 +108,10 @@ class CloudmorrowApp(App):
             self.say("Copied to the clipboard.")
 
     def say(self, message: str = "", *, error: bool = False) -> None:
-        """Put a line in the status bar along the bottom.
+        """Put a line in the log along the bottom, with the time.
 
-        Everything the app has to say in passing goes there — copied, saved,
-        changed — and nothing is a toast. A notification is something else: a
+        Everything that happens goes there — copied, saved, changed — and
+        nothing is a toast. A notification is something else: a
         thing a machine sent, kept behind the bell. The bar is on the
         workspace, which may be under a dialog; a message from the dialog
         lands there and is read when the dialog closes.

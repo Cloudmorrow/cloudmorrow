@@ -11,7 +11,7 @@ from cloudmorrow.server import today
 from cloudmorrow.server.app import create_app
 from cloudmorrow.server.config import ServerConfig
 from cloudmorrow.server.today import QUOTES, Weather, WeatherError, quote_for
-from tests.conftest import token_for, ADMIN
+from tests.conftest import ADMIN, token_for
 
 GEOCODE = {
     "results": [{"name": "Copenhagen", "country": "Denmark", "latitude": 55.68, "longitude": 12.57}]

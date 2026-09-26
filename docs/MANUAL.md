@@ -641,6 +641,54 @@ switchable by an administrator; `/api/me/features` is the same catalogue
 narrowed to you, with your answer on each, and yours to switch. A client
 that draws tabs asks the second one.
 
+## Quills
+
+Everything beyond the foundation is a **Quill**: Tasks today, and whatever
+the [Quill Catalog](https://github.com/Cloudmorrow/quill-catalog) has next.
+The contract is [QUILLS.md](QUILLS.md); this is how to use them.
+
+**On a fresh server** the catalog's foundation Quills — Tasks, for now — are
+installed at first boot, and boards and tasks from before Tasks was a Quill
+move into the record store the first time the new version starts. Nothing
+needs doing by hand. The server needs to reach GitHub for both; if it cannot,
+it says so in the log and tries again at the next start.
+
+**Adding one** is Administration → Quills on the phone or in the browser, the
+Quills section of the TUI's Administration panel, or:
+
+```sh
+cm quill catalog          # what there is, by category
+cm quill add tasks        # what it adds — datamodels, screens, jobs — then a yes
+cm quill list
+cm quill remove tasks     # its tabs and jobs go; your records stay
+```
+
+**Using one** is its tab, on every client, and the command line:
+
+```sh
+cm tasks list             # the board, lane by lane
+cm tasks add "Repot the fig" due=2026-10-01
+cm tasks done fig         # by the start of its id, or its title
+cm tasks move 8f2c doing
+cm tasks groups           # the boards
+```
+
+A Quill is a feature like the built-in ones: an administrator can switch it
+off for the server, and each person can hide its tab (see *Two switches on
+every feature*).
+
+**Building one** needs no server to start:
+
+```sh
+cm quill new plants       # a folder with quill.toml, a datamodel, CLAUDE.md and a CI check
+cd quill-plants
+cm quill check            # against the foundational datamodels, with a preview of each screen
+cm quill dev              # on your own server, on every device, now
+```
+
+`quill_catalog` in the server config says where the catalog is read from —
+the GitHub URL by default, or a local folder.
+
 ## Chat
 
 Everything else in Cloudmorrow is one person's. Chat is the exception, and it
@@ -1622,11 +1670,15 @@ All note paths are relative to the calling user's notes root.
 | `DELETE` | `/api/secrets/environment/{env}` | drop a whole environment |
 | `DELETE` | `/api/secrets/vault/{vault}` | drop a whole vault |
 | `GET` | `/api/types` | every kind of data there is: fields, scopes, what is sealed, who uses it |
-| `GET`/`POST` | `/api/boards` | your task boards |
-| `PATCH`/`DELETE` | `/api/boards/{slug}` | rename a board, or delete it and its tasks |
-| `GET`/`POST` | `/api/boards/{slug}/tasks` | the board's tasks; reading sweeps old Done ones |
-| `PATCH`/`DELETE` | `/api/boards/{slug}/tasks/{id}` | edit a task's text, or delete it |
-| `POST` | `/api/boards/{slug}/tasks/{id}/move` | `{lane, index}` — what dragging a card does |
+| `GET` | `/api/quills` | the installed Quills, each with its screens and its datamodels in full |
+| `GET` | `/api/quills/catalog` | the Quill Catalog, with what is installed |
+| `POST` | `/api/quills/plan` | `{id}` or `{source, ref}` — what installing would add (administrators) |
+| `POST`/`DELETE` | `/api/quills`, `/api/quills/{id}` | install, or remove; records are kept (administrators) |
+| `POST` | `/api/quills/upload` | a `.tar.gz` of a Quill's folder, as a development Quill — `cm quill dev` |
+| `GET` | `/api/datamodels` | every datamodel on the server, with its fields and the Quills that use it |
+| `GET`/`POST` | `/api/records/{model}` | your records of a datamodel (`?field=value` filters on indexed fields); make one |
+| `GET`/`PATCH`/`DELETE` | `/api/records/{model}/{id}` | one record; send `rev` with a change to get a 409 rather than overwrite |
+| `POST` | `/api/records/{model}/{id}/move` | `{fields, index}` — another lane or group, and a place in it |
 | `GET`/`POST` | `/api/shares` | your fileshares; a share carries its `url` |
 | `GET`/`DELETE` | `/api/shares/{name}` | one share; `?remove_files=true` deletes a directory the server made |
 | `*` | `/dav/{name}/…` | the share itself, as WebDAV — Basic auth with your password or token |

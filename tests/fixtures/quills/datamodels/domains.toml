@@ -1,0 +1,31 @@
+# The domains: foundational datamodels that belong together, chosen together at install.
+
+[[domains]]
+id = "tasks"
+label = "Tasks"
+description = "Boards and the tasks on them."
+datamodels = ["board", "task"]
+
+[[domains]]
+id = "crm"
+label = "Customers (CRM)"
+description = "The people and organisations you deal with."
+datamodels = ["contact", "organisation"]
+
+[[domains]]
+id = "fleet"
+label = "Fleet"
+description = "Cars, vans and bikes: what you drive and keep on the road."
+datamodels = ["vehicle"]
+
+[[domains]]
+id = "calendars"
+label = "Calendars"
+description = "Calendars and the events on them."
+datamodels = ["calendar", "event"]
+
+[[domains]]
+id = "messaging"
+label = "Messaging"
+description = "Channels and the messages in them."
+datamodels = ["channel", "message"]

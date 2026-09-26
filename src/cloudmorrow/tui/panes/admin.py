@@ -6,7 +6,7 @@ server offers at all. It is one menu on the top bar, and only administrators
 see it; opening it puts the whole interface aside, because administering a
 server is not a sixth tab of your own stuff.
 
-Two sections so far:
+Three sections so far:
 
 - **Users.** Every account, with its role and its type. The role is what it
   may do — **Administrator**, **User**, or **DashboardDisplayer**, which may
@@ -17,6 +17,8 @@ Two sections so far:
 - **Features.** Notes, Tasks, Projects, Files. Switching one off takes its tab
   out of every client and closes its API — off here is off everywhere, not a
   hidden button.
+- **Quills.** The catalog by category: install one after reading what it
+  adds, or remove one, keeping its records. In admin_quills.py.
 """
 
 from __future__ import annotations
@@ -35,11 +37,10 @@ from textual.widgets import (
     RadioButton,
     RadioSet,
     Static,
-    Tab,
-    Tabs,
 )
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.tui.panes.admin_quills import QuillsView
 from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
 from cloudmorrow.tui.theme import ACCENT, BAD, MUTED, SECOND, WARN
@@ -201,6 +202,7 @@ class UsersView(Pane):
     """Every account on the server, and what it may do."""
 
     TAB_LABEL = "Users"
+    SUMMARY = "who may sign in, and what they may do"
     BINDINGS = [
         ("n", "fire('new')", "New user"),
         ("e", "fire('edit')", "Edit"),
@@ -221,7 +223,7 @@ class UsersView(Pane):
 
     def on_mount(self) -> None:
         self.query_one("#admin-user-table", DataTable).add_columns(
-            "account", "name", "role", "type", "signs in", "since"
+            "ACCOUNT", "NAME", "ROLE", "TYPE", "SIGNS IN", "SINCE"
         )
 
     def on_show(self) -> None:
@@ -252,7 +254,7 @@ class UsersView(Pane):
             table.add_row(*self._row(user))
         if self._users:
             table.move_cursor(row=min(max(row, 0), len(self._users) - 1))
-        self.status(f"{len(self._users)} accounts")
+        self.status(f"{len(self._users)} accounts", note=True)
 
     @staticmethod
     def _row(user: dict) -> tuple[str, ...]:
@@ -365,6 +367,7 @@ class FeaturesView(Pane):
     """What this server offers. A tick box each, and off means off."""
 
     TAB_LABEL = "Features"
+    SUMMARY = "what this server offers"
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -455,41 +458,36 @@ class FeaturesView(Pane):
 
 
 class AdminPanel(Vertical):
-    """The whole administration interface: a strip of sections, and one of them."""
+    """The whole administration interface: one of its sections at a time.
+
+    Which one is chosen from the ADMINISTRATION cards in the sidebar; the
+    panel itself is only the switcher behind them.
+    """
 
     class Closed(Message):
         """Back to the workspace."""
 
-    VIEWS: tuple[type[Pane], ...] = (UsersView, FeaturesView)
+    VIEWS: tuple[type[Pane], ...] = (UsersView, FeaturesView, QuillsView)
 
     def compose(self) -> ComposeResult:
-        with Horizontal(id="admin-head"):
-            yield Static(
-                f"[b {ACCENT}]Administration[/]  [{MUTED}]this server[/]", id="admin-title"
-            )
-            back = Button("← Back  f9", id="admin-back", compact=True, flat=True)
-            back.tooltip = "Back to your notes, tasks and secrets"
-            yield back
-        yield Tabs(
-            *(Tab(view.TAB_LABEL, id=self._tab_id(view)) for view in self.VIEWS),
-            active="admin-tab-users",
-            id="admin-nav",
-        )
         with ContentSwitcher(id="admin-views", initial="admin-view-users"):
             for view in self.VIEWS:
                 yield view(id=self._view_id(view))
 
     @staticmethod
-    def _key(view: type[Pane]) -> str:
+    def key(view: type[Pane]) -> str:
         return view.TAB_LABEL.lower()
 
     @classmethod
-    def _tab_id(cls, view: type[Pane]) -> str:
-        return f"admin-tab-{cls._key(view)}"
-
-    @classmethod
     def _view_id(cls, view: type[Pane]) -> str:
-        return f"admin-view-{cls._key(view)}"
+        return f"admin-view-{cls.key(view)}"
+
+    @property
+    def current(self) -> str:
+        """The section showing: users, features or quills."""
+        return (self.query_one("#admin-views", ContentSwitcher).current or "")[
+            len("admin-view-") :
+        ]
 
     @property
     def active_view(self) -> Pane | None:
@@ -497,25 +495,14 @@ class AdminPanel(Vertical):
         current = switcher.current
         return switcher.query_one(f"#{current}", Pane) if current else None
 
+    def show_view(self, key: str) -> None:
+        switcher = self.query_one("#admin-views", ContentSwitcher)
+        if switcher.current != f"admin-view-{key}":
+            switcher.current = f"admin-view-{key}"
+        else:
+            self.reload()
+
     def reload(self) -> None:
         view = self.active_view
         if view is not None:
             view.reload()
-
-    def on_tabs_tab_activated(self, event: Tabs.TabActivated) -> None:
-        """This panel's own strip. The workspace's tabs are not ours."""
-        event.stop()
-        if event.tab is None or not (event.tab.id or "").startswith("admin-tab-"):
-            return
-        self.query_one("#admin-views", ContentSwitcher).current = (
-            f"admin-view-{event.tab.id[len('admin-tab-') :]}"
-        )
-        # What the last section had to say is not about this one.
-        setter = getattr(self.screen, "set_status", None)
-        if callable(setter):
-            setter()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "admin-back":
-            event.stop()
-            self.post_message(self.Closed())
