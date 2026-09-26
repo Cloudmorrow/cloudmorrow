@@ -89,3 +89,10 @@ def tasks_quill(client) -> TestClient:
     """The client, with the Tasks Quill installed from the local catalog."""
     client.app.state.cloudmorrow.quills.install_from_catalog("tasks")
     return client
+
+
+@pytest.fixture()
+def chat_quill(client) -> TestClient:
+    """The client, with the Chat Quill installed from the local catalog."""
+    client.app.state.cloudmorrow.quills.install_from_catalog("chat")
+    return client

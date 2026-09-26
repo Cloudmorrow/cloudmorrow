@@ -1,0 +1,49 @@
+[quill]
+id = "chat"
+name = "Chat"
+version = "1.0.0"
+summary = "Channels, direct messages, and the count on the icon."
+category = "home"
+icon = "chat"
+publisher = "Cloudmorrow"
+license = "AGPL-3.0-or-later"
+features = [
+  "Public channels everybody is in, and nobody leaves",
+  "Private channels for the people you add; they are told, and can leave",
+  "Direct messages between two people, found or started from either side",
+  "#general for everybody, the first time anybody opens Chat",
+  "Unread counts per channel, and on the app's icon",
+  "A push to everybody else in the channel when somebody writes",
+]
+
+[uses]
+datamodels = ["channel", "message"]
+
+# One tab: the channels and the people you write to on one side, the
+# conversation on the other — side by side on a computer and in the
+# terminal, one then the other on a phone.
+[[screens]]
+id = "chat"
+kit = "thread"
+label = "Chat"
+model = "message"
+space = "channel"                  # the link that puts a message in its channel
+body = "body"
+about = "topic"                    # said under the channel's name
+
+# How a channel is made. A public one is everybody's and a private one is
+# the people added to it; a direct one is found-or-made between you and the
+# person you pick, and is called after them.
+[screens.made_as]
+public = { kind = "public" }
+shared = { kind = "private" }
+direct = { kind = "direct" }
+
+# There is always somewhere to say something: #general, made once for the
+# whole server the first time anybody opens Chat.
+[[datasets]]
+id = "general"
+model = "channel"
+seed = "once"
+scope = "public"
+records = [{ name = "general", kind = "public", topic = "Everybody on this server" }]

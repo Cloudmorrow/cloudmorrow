@@ -38,6 +38,7 @@ plain one left on disk by an older version reads as itself until
 from __future__ import annotations
 
 import base64
+import json
 import os
 import sqlite3
 import threading
@@ -248,6 +249,44 @@ def _sealed_version(conn: sqlite3.Connection) -> int:
     return int(row[0]) if row else 0
 
 
+def _record_scopes(row: sqlite3.Row) -> list[tuple]:
+    """What a record's body may be sealed to: its owner, or the space it is in.
+
+    A record in a space (a message in a channel) is sealed to the space, and
+    which of its links is the space is the datamodel's to say — which this
+    module does not read. So each link it has is tried; a wrong one fails to
+    open rather than opening as something else, and the right one is kept.
+    """
+    scopes = [(row["model"], row["owner"], row["id"])]
+    try:
+        indexed = json.loads(row["indexed"] or "{}")
+    except ValueError:
+        indexed = {}
+    for value in indexed.values():
+        if isinstance(value, str) and value.startswith("r_"):
+            scopes.append((row["model"], "space", value, row["id"]))
+    return scopes
+
+
+def _rotate_records(conn: sqlite3.Connection, old: Sealer, new: Sealer) -> int:
+    rows = 0
+    for row in conn.execute("SELECT rowid, id, model, owner, indexed, body FROM records").fetchall():
+        for scope in _record_scopes(row):
+            try:
+                text = old.unseal("records", "body", scope, row["body"])
+            except SealError:
+                continue
+            conn.execute(
+                "UPDATE records SET body = ? WHERE rowid = ?",
+                (new.seal("records", "body", scope, text), row["rowid"]),
+            )
+            rows += 1
+            break
+        else:
+            raise SealError(f"cannot open record {row['id']} with the old key")
+    return rows
+
+
 def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
     return (
         conn.execute(
@@ -320,6 +359,9 @@ def rotate(db_path: Path, note_roots: Iterable[Path], old: Sealer, new: Sealer) 
         for version in sorted(SEALED):
             for table, scope_cols, columns in SEALED[version]:
                 if not _table_exists(conn, table):
+                    continue
+                if table == "records":
+                    rows += _rotate_records(conn, old, new)
                     continue
                 select = ", ".join(("rowid", *scope_cols, *columns))
                 assignments = ", ".join(f"{column} = ?" for column in columns)

@@ -209,11 +209,19 @@ class Record:
     members: list[str] | None = None
     can_manage: bool = False
     unread: int = 0
+    # The newest thing written in it that counts as unread: who, when, and
+    # its title — what a list of conversations shows under each one.
+    last: dict | None = None
 
     def to_dict(self) -> dict:
         extra: dict = {}
         if self.members is not None:
-            extra = {"members": list(self.members), "can_manage": self.can_manage, "unread": self.unread}
+            extra = {
+                "members": list(self.members),
+                "can_manage": self.can_manage,
+                "unread": self.unread,
+                "last": dict(self.last) if self.last else None,
+            }
         return extra | {
             "id": self.id,
             "model": self.model,
@@ -413,6 +421,7 @@ class RecordStore:
             if asker is not None:
                 record.can_manage = self._may_manage(asker, row)
                 record.unread = self._unread(conn, model, row["id"], asker.username)
+                record.last = self._latest(conn, model, row["id"])
         return record
 
     # -- who may see what --------------------------------------------------------
@@ -494,33 +503,128 @@ class RecordStore:
             )
         return "owner = ?", [username]
 
+    def _unread_children(self, space_model: Datamodel) -> list[Datamodel]:
+        """The datamodels written in this kind of space that count as unread."""
+        return [
+            child
+            for child in self._models().values()
+            if child.in_space
+            and child.get_field(child.in_space).to == space_model.id
+            and any(rule.get("unread") for rule in child.notify)
+        ]
+
+    def _seen_since(self, conn: Connection, space_id: str, username: str) -> tuple[str, str]:
+        """Since when what is written in a space is news to this person, as (op, stamp).
+
+        After they last looked; else from when they were put in it; else, for
+        a public space they have never opened, from when their account was
+        made — somebody who arrives today does not open to a year of unread.
+        A stamp is to the second, so what is written the second somebody is
+        added still reaches them, and what they looked at that second is read.
+        """
+        seen = conn.execute(
+            "SELECT seen_at FROM record_seen WHERE space_id = ? AND username = ?",
+            (space_id, username),
+        ).fetchone()
+        if seen:
+            return ">", str(seen["seen_at"])
+        joined = conn.execute(
+            "SELECT joined_at FROM record_members WHERE space_id = ? AND username = ?",
+            (space_id, username),
+        ).fetchone()
+        if joined:
+            return ">=", str(joined["joined_at"])
+        try:
+            # The accounts live in the same database; a store made on its own,
+            # as a test makes one, has no such table and counts from the start.
+            account = conn.execute(
+                "SELECT created_at FROM users WHERE username = ?", (username,)
+            ).fetchone()
+        except sqlite3.OperationalError:
+            account = None
+        return ">=", str(account["created_at"]) if account else ""
+
     def _unread(self, conn: Connection, space_model: Datamodel, space_id: str, username: str) -> int:
         """Things written in a space since this person last looked, by others."""
+        children = self._unread_children(space_model)
+        if not children:
+            return 0
+        op, since = self._seen_since(conn, space_id, username)
         count = 0
-        for child in self._models().values():
-            if child.in_space and child.get_field(child.in_space).to == space_model.id and any(
-                rule.get("unread") for rule in child.notify
-            ):
-                seen = conn.execute(
-                    "SELECT seen_at FROM record_seen WHERE space_id = ? AND username = ?",
-                    (space_id, username),
-                ).fetchone()
-                row = conn.execute(
-                    "SELECT COUNT(*) FROM records WHERE model = ? AND owner != ?"
-                    f" AND json_extract(indexed, '$.\"{child.in_space}\"') = ? AND created_at > ?",
-                    (child.id, username, space_id, seen["seen_at"] if seen else ""),
-                ).fetchone()
-                count += int(row[0])
+        for child in children:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM records WHERE model = ? AND owner != ?"
+                f" AND json_extract(indexed, '$.\"{child.in_space}\"') = ? AND created_at {op} ?",
+                (child.id, username, space_id, since),
+            ).fetchone()
+            count += int(row[0])
         return count
+
+    def _latest(self, conn: Connection, space_model: Datamodel, space_id: str) -> dict | None:
+        """The newest thing written in a space, of a kind that counts as unread."""
+        newest: tuple[sqlite3.Row, Datamodel] | None = None
+        for child in self._unread_children(space_model):
+            row = conn.execute(
+                "SELECT * FROM records WHERE model = ?"
+                f" AND json_extract(indexed, '$.\"{child.in_space}\"') = ?"
+                " ORDER BY created_at DESC, rowid DESC LIMIT 1",
+                (child.id, space_id),
+            ).fetchone()
+            if row is not None and (newest is None or row["created_at"] > newest[0]["created_at"]):
+                newest = (row, child)
+        if newest is None:
+            return None
+        row, child = newest
+        fields = self._record(conn, child, row).fields
+        return {
+            "id": row["id"],
+            "model": child.id,
+            "owner": row["owner"],
+            "created_at": row["created_at"],
+            "title": str(fields.get(child.title) or ""),
+        }
+
+    def unread_total(self, principal: Principal, models: Iterable[str] | None = None) -> int:
+        """Everything waiting for one person, across every space they can see.
+
+        The number on the phone's icon: things, not spaces, so "3" means
+        three things to read. *models* narrows it to some space datamodels —
+        the ones whose Quill this person has switched on.
+        """
+        wanted = set(models) if models is not None else None
+        total = 0
+        with connect(self.db_path) as conn:
+            for model in self._models().values():
+                if not model.space or model.backend or (wanted is not None and model.id not in wanted):
+                    continue
+                if not self._unread_children(model):
+                    continue
+                clause, params = self._visible_clause(model, principal.username)
+                for row in conn.execute(
+                    f"SELECT id FROM records WHERE model = ? AND {clause}", [model.id, *params]
+                ).fetchall():
+                    total += self._unread(conn, model, row["id"], principal.username)
+        conn.close()
+        return total
 
     # -- reading ---------------------------------------------------------------
     def list(
-        self, principal: Principal, model_id: str, where: dict[str, object] | None = None
+        self,
+        principal: Principal,
+        model_id: str,
+        where: dict[str, object] | None = None,
+        *,
+        last: int | None = None,
+        since: str | None = None,
     ) -> list[Record]:
         """Every record of *model_id* the principal owns, filtered, in order.
 
         Filters are on indexed fields and links only: those are what the server
         can see. Sweeps what an expire job would take first.
+
+        *last* keeps only the last so many, still in order — the newest page
+        of a conversation. *since* keeps only what was made or changed at or
+        after that moment — what an open screen has not got yet.
         """
         check(principal, "read", model_id)
         model = self.model(model_id)
@@ -529,7 +633,7 @@ class RecordStore:
         self.sweep(model_id, owner=None if (model.space or model.in_space) else principal.username)
         plain = _stored_indexed(model)
         clause, clause_params = self._visible_clause(model, principal.username)
-        query = f"SELECT * FROM records WHERE model = ? AND {clause}"
+        query = f"SELECT *, rowid AS seq FROM records WHERE model = ? AND {clause}"
         params: list[object] = [model.id, *clause_params]
         for name, value in (where or {}).items():
             if name not in plain:
@@ -537,7 +641,27 @@ class RecordStore:
             coerced = _coerce(model, model.get_field(name), value)
             query += " AND json_extract(indexed, ?) IS ?"
             params += [f'$."{name}"', coerced if not isinstance(coerced, bool) else int(coerced)]
-        query += " ORDER BY position, created_at, id"
+        if since:
+            # A `+` in a query string arrives as a space, if it was not escaped.
+            moment = _parse_moment(since.strip().replace(" ", "+"))
+            if moment is None:
+                raise RecordError("since is a date and time, ISO 8601")
+            # At or after: a second is the stamp's grain, so the caller gets
+            # what it already had that second again, and keeps it once by id.
+            query += " AND updated_at >= ?"
+            params.append(_stamp(moment))
+        # Ties go to whichever was written first: two lines said in the same
+        # second read in the order they were said.
+        if last is not None:
+            if last < 1:
+                raise RecordError("last is a whole number above nothing")
+            # The newest *last* of them, then turned back the right way round.
+            query = (
+                f"SELECT * FROM ({query} ORDER BY position DESC, created_at DESC, seq DESC"
+                f" LIMIT {int(last)}) ORDER BY position, created_at, seq"
+            )
+        else:
+            query += " ORDER BY position, created_at, seq"
         with connect(self.db_path) as conn:
             rows = conn.execute(query, params).fetchall()
             records = [self._record(conn, model, row, principal) for row in rows]
@@ -751,7 +875,15 @@ class RecordStore:
         *,
         index: int | None = None,
         scope: str | None = None,
+        members: Iterable[str] = (),
+        announce: bool = True,
     ) -> Record:
+        """Make a record. For a shared space, *members* are put in it at once.
+
+        Each of them is told, as being added later tells them — unless
+        *announce* is off, for a space found-or-made between people, where the
+        first thing written in it is the news.
+        """
         check(principal, "write", model_id)
         model = self.model(model_id)
         if model.backend:
@@ -760,6 +892,9 @@ class RecordStore:
         record_id = _new_id()
         now = _stamp()
         scope = self._scope_for(model, scope)
+        people = [who for who in dict.fromkeys(str(m).strip() for m in members) if who and who != owner]
+        if people and (not model.space or scope != "shared"):
+            raise RecordError(f"only a shared {model.label.lower()} has members")
         with connect(self.db_path) as conn:
             fields = self._clean(conn, model, principal, incoming, current=None)
             indexed, body = self._write_row(conn, model, owner, record_id, fields)
@@ -775,14 +910,78 @@ class RecordStore:
                 self._renumber(
                     conn, model, owner, self._group(model, fields), moved=record_id, insert_at=index
                 )
+            for username in people:
+                conn.execute(
+                    "INSERT OR IGNORE INTO record_members (space_id, username, added_by, joined_at)"
+                    " VALUES (?, ?, ?, ?)",
+                    (record_id, username, owner, now),
+                )
             self._log(conn, principal, model.id, record_id, "created", 1)
             recipients = self._recipients(conn, model, fields, owner) if model.notify else []
+            if model.in_space and any(rule.get("unread") for rule in model.notify):
+                # Writing in a space is looking at it: what was above your
+                # line is not news to you, and neither is your line.
+                conn.execute(
+                    "INSERT INTO record_seen (space_id, username, seen_at) VALUES (?, ?, ?)"
+                    " ON CONFLICT(space_id, username) DO UPDATE SET seen_at = excluded.seen_at",
+                    (fields.get(model.in_space), owner, now),
+                )
         conn.close()
         made = self.get(principal, model.id, record_id)
         for rule in model.notify:
             for hook in self.on_notify:
                 hook(made, rule, recipients)
+        if announce:
+            for username in people:
+                for hook in self.on_member_added:
+                    hook(made, username, owner)
         return made
+
+    def find_space(
+        self,
+        principal: Principal,
+        model_id: str,
+        incoming: dict,
+        *,
+        scope: str | None = None,
+        members: Iterable[str] = (),
+    ) -> Record | None:
+        """The space of *model_id* with exactly these people in it, and these fields.
+
+        What "write to somebody" finds before it makes anything: the one
+        conversation between two people, from either side. The people are the
+        asker and *members*; the fields are compared on what the server can
+        see — the indexed ones among *incoming*.
+        """
+        check(principal, "read", model_id)
+        model = self.model(model_id)
+        if not model.space or model.backend:
+            raise RecordError(f"a {model.label.lower()} is not a space")
+        scope = self._scope_for(model, scope)
+        people = {principal.username, *(str(m).strip() for m in members if str(m).strip())}
+        plain = _stored_indexed(model)
+        wanted = {
+            name: _coerce(model, model.get_field(name), value)
+            for name, value in incoming.items()
+            if name in plain and name in model.by_name
+        }
+        clause, params = self._visible_clause(model, principal.username)
+        with connect(self.db_path) as conn:
+            rows = conn.execute(
+                f"SELECT * FROM records WHERE model = ? AND scope = ? AND {clause}"
+                " ORDER BY created_at, rowid",
+                [model.id, scope, *params],
+            ).fetchall()
+            found = None
+            for row in rows:
+                indexed = json.loads(row["indexed"] or "{}")
+                if any(indexed.get(name) != value for name, value in wanted.items()):
+                    continue
+                if {row["owner"], *self._members(conn, row["id"])} == people:
+                    found = row["id"]
+                    break
+        conn.close()
+        return self.get(principal, model.id, found) if found else None
 
     def _scope_for(self, model: Datamodel, asked: str | None) -> str:
         """A space's scope is chosen when it is made; everything else is personal."""
@@ -1003,6 +1202,16 @@ class RecordStore:
         with connect(self.db_path) as conn:
             conn.execute("DELETE FROM records WHERE owner = ?", (owner,))
             conn.execute("DELETE FROM record_changes WHERE owner = ?", (owner,))
+        conn.close()
+
+    def import_seen(self, space_id: str, username: str, seen_at: str) -> None:
+        """When somebody last looked in a space, as it was elsewhere. For migrations."""
+        with connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT INTO record_seen (space_id, username, seen_at) VALUES (?, ?, ?)"
+                " ON CONFLICT(space_id, username) DO UPDATE SET seen_at = excluded.seen_at",
+                (space_id, username, seen_at),
+            )
         conn.close()
 
     def import_row(

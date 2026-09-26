@@ -12,6 +12,7 @@ import re
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.app import CloudmorrowApp
 from cloudmorrow.tui.screens.workspace import WorkspaceScreen
+from tests.tui_chat import FakeSpaces
 from tests.tui_quills import FakeQuills
 
 SECRETS = {
@@ -142,53 +143,6 @@ FEATURES = [
 ]
 
 
-CHANNELS = [
-    {
-        "slug": "general",
-        "name": "general",
-        "topic": "everything else",
-        "kind": "public",
-        "created_by": "bram",
-        "created_at": "2026-09-01T09:00:00",
-        "updated_at": "2026-09-19T14:03:00",
-        "members": ["bram", "guest"],
-        "other": "",
-        "member": True,
-        "unread": 0,
-        "last_read": 2,
-        "last_message": None,
-    },
-    {
-        "slug": "dm-bram-guest",
-        "name": "guest",
-        "topic": "",
-        "kind": "direct",
-        "created_by": "guest",
-        "created_at": "2026-09-18T08:00:00",
-        "updated_at": "2026-09-18T08:30:00",
-        "members": ["bram", "guest"],
-        "other": "guest",
-        "member": True,
-        "unread": 2,
-        "last_read": 0,
-        "last_message": None,
-    },
-]
-
-MESSAGES = {
-    "general": [
-        {"id": 1, "author": "bram", "body": "the fans are loud again",
-         "created_at": "2026-09-19T14:02:00", "edited_at": None},
-        {"id": 2, "author": "guest", "body": "I turned the fan curve down",
-         "created_at": "2026-09-19T14:03:00", "edited_at": None},
-    ],
-    "dm-bram-guest": [
-        {"id": 3, "author": "guest", "body": "are you up",
-         "created_at": "2026-09-18T08:30:00", "edited_at": None},
-    ],
-}
-
-
 # The calendar, hung on today rather than on a date in the past: the pane
 # opens on the month it is, so a fixture from last September would leave
 # every one of these tests looking at an empty grid.
@@ -287,10 +241,11 @@ def _one_pixel_png() -> bytes:
 PNG_1PX = _one_pixel_png()
 
 
-class FakeClient(FakeQuills):
+class FakeClient(FakeSpaces, FakeQuills):
     """Enough of the API for the workspace, with a record of what was asked.
 
-    The Quills and the record store behind them are in tui_quills.py.
+    The Quills and the record store behind them are in tui_quills.py, and
+    the spaces in that store — Chat's channels — in tui_chat.py.
     """
 
     # What a mount signs in with.
@@ -344,15 +299,6 @@ class FakeClient(FakeQuills):
         self.bundle: dict = dict(BUNDLE)
         self.notes: list[dict] = [dict(note) for note in NOTIFICATIONS]
         self.sync_calls: list[tuple[int, list[str]]] = []
-        # Chat: the channels the pane lists, what is in them, and
-        # what it was asked to do to them.
-        self.channel_list: list[dict] = [dict(row) for row in CHANNELS]
-        self.channel_messages: dict[str, list[dict]] = {
-            slug: [dict(m) for m in rows] for slug, rows in MESSAGES.items()
-        }
-        self.sent_messages: list[tuple[str, str]] = []
-        self.read_marks: list[tuple[str, int | None]] = []
-        self.channel_calls: list[tuple] = []
         # The calendar: what it lists, and what it was asked to change.
         self.calendar_list: list[dict] = [dict(row) for row in CALENDARS]
         self.event_list: list[dict] = [dict(row) for row in EVENTS]
@@ -578,77 +524,6 @@ class FakeClient(FakeQuills):
         for note in self.notes:
             note["unread"] = False
         return {"marked": len(self.notes), "unread": 0}
-
-    # -- chat ---------------------------------------------------------------
-    async def channels(self) -> list[dict]:
-        return [dict(row) for row in self.channel_list]
-
-    async def messages(
-        self, slug: str, *, limit: int = 50, before: int | None = None,
-        after: int | None = None,
-    ) -> list[dict]:
-        rows = [dict(m) for m in self.channel_messages.get(slug, [])]
-        if after is not None:
-            rows = [m for m in rows if m["id"] > after]
-        return rows[-limit:]
-
-    async def send_message(self, slug: str, body: str) -> dict:
-        sent = {
-            "id": 100 + len(self.sent_messages),
-            "author": "bram",
-            "body": body,
-            "created_at": "2026-09-19T15:00:00",
-            "edited_at": None,
-        }
-        self.sent_messages.append((slug, body))
-        self.channel_messages.setdefault(slug, []).append(sent)
-        return sent
-
-    async def mark_channel_read(self, slug: str, upto: int | None = None) -> dict:
-        self.read_marks.append((slug, upto))
-        for channel in self.channel_list:
-            if channel["slug"] == slug:
-                channel["unread"] = 0
-        return {"last_read": upto or 0, "unread": 0, "total": 0}
-
-    async def chat_unread(self) -> dict:
-        waiting = {c["slug"]: c["unread"] for c in self.channel_list if c["unread"]}
-        return {"channels": waiting, "total": sum(waiting.values())}
-
-    async def create_channel(self, name, *, kind="private", topic="", members=None) -> dict:
-        made = dict(
-            CHANNELS[0], slug=name.strip().lower().replace(" ", "-"), name=name.strip(),
-            kind=kind, topic=topic, unread=0, members=["bram", *(members or [])],
-        )
-        self.channel_calls.append(("create", made["slug"], kind, list(members or [])))
-        self.channel_list.append(made)
-        self.channel_messages[made["slug"]] = []
-        return made
-
-    async def direct_channel(self, username: str) -> dict:
-        slug = "dm-" + "-".join(sorted(("bram", username)))
-        self.channel_calls.append(("direct", slug, username))
-        found = next((c for c in self.channel_list if c["slug"] == slug), None)
-        if found:
-            return found
-        made = dict(CHANNELS[1], slug=slug, name=username, other=username, unread=0)
-        self.channel_list.append(made)
-        self.channel_messages[slug] = []
-        return made
-
-    async def chat_people(self) -> list[dict]:
-        return [
-            {"username": "guest", "display_name": "Guest"},
-            {"username": "ada", "display_name": ""},
-        ]
-
-    async def add_channel_members(self, slug: str, usernames: list[str]) -> dict:
-        self.channel_calls.append(("add", slug, usernames))
-        return {"added": usernames, "members": ["bram", *usernames]}
-
-    async def leave_channel(self, slug: str) -> None:
-        self.channel_calls.append(("leave", slug, None))
-        self.channel_list = [c for c in self.channel_list if c["slug"] != slug]
 
     # -- the calendar --------------------------------------------------------
     async def calendars(self) -> list[dict]:

@@ -87,10 +87,10 @@ async def test_secrets_is_a_card_of_its_own(app):
         assert cards == [
             ("Notes", "f1"),
             ("Calendar", "f7"),
-            ("Chat", "f6"),
             ("Secrets", "f3"),
             ("Files", "f5"),
             ("Tasks", "f2"),
+            ("Chat", "f4"),
         ]
 
 

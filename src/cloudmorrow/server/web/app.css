@@ -12,7 +12,8 @@
 @import "./notes.css";
 @import "./pictures.css";
 @import "./kit.css";
-@import "./chat.css";
+@import "./kit_thread.css";
+@import "./kit_space.css";
 @import "./calendar.css";
 @import "./format.css";
 @import "./files.css";

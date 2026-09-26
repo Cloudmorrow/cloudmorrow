@@ -232,7 +232,8 @@ def list_records(state: AppState, user: User, args: dict[str, Any]) -> Any:
         raise ToolError("where must be an object of indexed field to value")
     principal = _principal(user)
     seed(state, principal, model)
-    return {"records": [r.to_dict() for r in state.records.list(principal, model, where)]}
+    listed = state.records.list(principal, model, where, last=_int(args, "last"))
+    return {"records": [r.to_dict() for r in listed]}
 
 
 def get_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
@@ -240,8 +241,15 @@ def get_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
 
 
 def create_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
+    members = args.get("members") or []
+    if not isinstance(members, list) or not all(isinstance(m, str) for m in members):
+        raise ToolError("members is a list of usernames")
+    for username in members:
+        if state.users.get(username) is None:
+            raise ToolError(f"no such account: {username}")
     return state.records.create(
-        _principal(user), _model(state, args), _fields(args), index=_int(args, "index")
+        _principal(user), _model(state, args), _fields(args), index=_int(args, "index"),
+        scope=_str(args, "scope") or None, members=members,
     ).to_dict()
 
 
@@ -460,7 +468,8 @@ TOOLS: tuple[Tool, ...] = (
         "list_records",
         "List the user's records of one datamodel, in order. Filter with `where` on indexed "
         "fields, e.g. {\"board\": \"r_…\", \"lane\": \"todo\"}.",
-        _schema({"model": _MODEL, "where": {"type": "object", "description": "Indexed field to value."}},
+        _schema({"model": _MODEL, "where": {"type": "object", "description": "Indexed field to value."},
+                 "last": {"type": "integer", "description": "Only the newest this many, e.g. of a conversation."}},
                 ("model",)),
         "",
         list_records,
@@ -474,9 +483,13 @@ TOOLS: tuple[Tool, ...] = (
     ),
     Tool(
         "create_record",
-        "Make a record of a datamodel from its fields. Links are record ids.",
+        "Make a record of a datamodel from its fields. Links are record ids. A space (a channel, "
+        "a calendar) takes a scope, and a shared one the people in it besides you.",
         _schema({"model": _MODEL, "fields": _FIELDS,
-                 "index": {"type": "integer", "description": "Place in its group; the end when left out."}},
+                 "index": {"type": "integer", "description": "Place in its group; the end when left out."},
+                 "scope": {"type": "string", "description": "For a space: personal, shared or public."},
+                 "members": {"type": "array", "items": {"type": "string"},
+                             "description": "For a shared space: usernames to put in it."}},
                 ("model", "fields")),
         "",
         create_record,

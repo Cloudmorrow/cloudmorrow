@@ -9,7 +9,6 @@ import "./login.js";
 import "./today.js";
 import "./notes.js";
 import "./quills.js";
-import "./chat.js";
 import "./calendar.js";
 import "./format.js";
 import "./files.js";

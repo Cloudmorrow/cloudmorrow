@@ -314,68 +314,8 @@ def test_devices_are_not_shared_between_accounts(client, auth):
 
 
 # -- the number on the icon -------------------------------------------------------------
-def test_the_badge_is_messages_plus_notifications(client, auth):
-    guest = {"Authorization": f"Bearer {token_for(client, *GUEST)}"}
-    client.post("/api/chat/channels", json={"name": "General", "kind": "public"}, headers=auth)
-    client.post("/api/chat/channels/general/messages", json={"body": "one"}, headers=auth)
-    client.post("/api/chat/channels/general/messages", json={"body": "two"}, headers=auth)
-    # And one notification, from being added to something.
-    client.post("/api/chat/channels", json={"name": "Club"}, headers=auth)
-    client.post(
-        "/api/chat/channels/club/members", json={"usernames": [GUEST[0]]}, headers=auth
-    )
-
-    # Two messages, and two notifications: the public channel appearing, and
-    # being added to the private one.
-    badge = client.get("/api/push/badge", headers=guest).json()
-    assert badge == {"messages": 2, "notifications": 2, "badge": 4}
-
-    client.post("/api/chat/channels/general/read", json={}, headers=guest)
-    client.post("/api/notifications/read", json={}, headers=guest)
-    assert client.get("/api/push/badge", headers=guest).json()["badge"] == 0
-
-
-def test_the_badge_ignores_chat_when_chat_is_switched_off(client, auth):
-    client.post("/api/chat/channels", json={"name": "General", "kind": "public"}, headers=auth)
-    client.patch("/api/server/features/chat", json={"enabled": False}, headers=auth)
-    assert client.get("/api/push/badge", headers=auth).json()["messages"] == 0
-
-
-def test_a_new_message_pushes_everybody_else(client, auth, monkeypatch):
-    # The guest never signs in here: a public channel is everybody's because
-    # the accounts exist, not because they have been anywhere.
-    client.post("/api/chat/channels", json={"name": "General", "kind": "public"}, headers=auth)
-
-    pushed = []
-    monkeypatch.setattr(
-        PushStore, "send", lambda self, who, payload: pushed.append((who, payload)) or 1
-    )
-    client.post("/api/chat/channels/general/messages", json={"body": "hello"}, headers=auth)
-
-    assert len(pushed) == 1, "the author does not push themselves"
-    who, payload = pushed[0]
-    assert who == [GUEST[0]]
-    assert payload["title"] == "#General"
-    assert payload["body"] == "bram: hello"
-    assert payload["url"] == "#/chat/general"
-    assert payload["tag"] == "chat-general", "one notification per channel, replaced"
-    # One message, plus the notification that the channel appeared at all.
-    assert payload["badge"] == 2
-
-
-def test_a_direct_message_is_titled_with_the_person(client, auth, monkeypatch):
-    client.post("/api/chat/direct", json={"username": GUEST[0]}, headers=auth)
-    pushed = []
-    monkeypatch.setattr(
-        PushStore, "send", lambda self, who, payload: pushed.append(payload) or 1
-    )
-    client.post(
-        f"/api/chat/channels/dm-bram-{GUEST[0]}/messages",
-        json={"body": "are you up"},
-        headers=auth,
-    )
-    assert pushed[0]["title"] == "bram"
-    assert pushed[0]["body"] == "are you up", "no name repeated in front of it"
+# What the badge counts, and what a line in a channel pushes, is Chat's to
+# prove now that Chat is a Quill: tests/test_quill_chat.py.
 
 
 def test_the_test_push_goes_to_yourself(client, auth, monkeypatch):

@@ -216,29 +216,6 @@ TYPES: tuple[DataType, ...] = (
         ),
         sealed=("title", "notes", "location"),
     ),
-    DataType(
-        "channel",
-        "Channel",
-        "A public room, a private one, or the line between two people.",
-        "chat",
-        ("shared", "public"),
-        (_f("slug", "string"), _f("name", "string"), _f("kind", "string"), _f("topic", "string")),
-        sealed=("topic",),
-    ),
-    DataType(
-        "message",
-        "Message",
-        "What somebody said in a channel.",
-        "chat",
-        ("shared", "public"),
-        (
-            _f("channel", "ref", ref="channel"),
-            _f("author", "ref", ref="user"),
-            _f("body", "text"),
-            _f("sent_at", "datetime"),
-        ),
-        sealed=("body",),
-    ),
 )
 
 BY_KEY: dict[str, DataType] = {t.key: t for t in TYPES}

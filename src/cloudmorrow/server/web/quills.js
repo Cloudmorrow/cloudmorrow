@@ -7,6 +7,7 @@
 
      #/q/<quill>/<screen>              a screen: the board, the list
      #/q/<quill>/<screen>/<group>      a board, on one of its groups
+     #/q/<quill>/<screen>/<id>/…       a thread, on one space (and what is below it)
      #/r/<quill>/<screen>/<model>/<id> one record, on the record sheet
 
    The tabs sit where this file is imported in app.js — after Notes, where
@@ -21,6 +22,7 @@ import {
 } from "./core.js";
 import { loadFeatures, redrawTabs } from "./features.js";
 import { renderKitScreen, renderRecordSheet } from "./kit.js";
+import { markThreadTabs } from "./kit_thread.js";
 
 // A quill, for a Quill whose icon names nothing this app draws yet: the
 // nib down at the left, the feather up to the right.
@@ -96,9 +98,11 @@ async function find(quillId, screenId) {
 }
 
 registerScreen("q", async (arg) => {
-  const [quillId, screenId, group = ""] = arg.split("/");
+  // Everything after the screen is the screen's own: a board's group, a
+  // thread's space and what is below it.
+  const [quillId, screenId, ...rest] = arg.split("/");
   const at = await find(quillId, screenId);
-  if (at) await renderKitScreen(at, group);
+  if (at) await renderKitScreen(at, rest.join("/"));
 });
 
 registerScreen("r", async (arg) => {
@@ -110,7 +114,12 @@ registerScreen("r", async (arg) => {
 });
 
 // -- keeping up -------------------------------------------------------------------
-onShell(() => { if (session.token && !loaded) loadQuills(); });
+onShell(() => {
+  if (session.token && !loaded) loadQuills();
+  // A thread's tab carries a pip when something is unread.
+  markThreadTabs(quills.flatMap((quill) => quill.screens
+    .filter((screen) => screen.kit === "thread").map((screen) => tabName(quill, screen))));
+});
 onSignOut(() => {
   loaded = null;
   store.set("quills", null);

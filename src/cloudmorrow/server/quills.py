@@ -65,7 +65,11 @@ ORIGIN = ".origin.json"
 KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor")
 # The ones every surface draws *today*. A screen of another kind is refused at
 # install, so a Quill never lands with a tab that draws nothing somewhere.
-KIT_READY = frozenset({"list", "board", "detail", "form"})
+KIT_READY = frozenset({"list", "board", "detail", "form", "thread"})
+
+# How a thread screen may make a space: in one of the scopes, or `direct`,
+# found-or-made between the people picked.
+MADE_AS = ("personal", "shared", "public", "direct")
 
 JOB_ACTIONS = frozenset({"expire", "run"})
 SEED_KINDS = frozenset({"per-owner", "once"})
@@ -823,6 +827,8 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
         elif kit in ("detail", "form"):
             for name in screen.get("fields", []):
                 need(model, thing, name)
+        elif kit == "thread":
+            _check_thread(manifest, screen, model, models, need)
     for job in manifest.jobs:
         if job["action"] == "expire":
             model = model_of(f"job {job['id']!r}", job["model"])
@@ -836,6 +842,46 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
         for record in dataset["records"]:
             for name in record:
                 need(model, f"dataset {dataset['id']!r}", name)
+
+
+def _check_thread(manifest: Manifest, screen: dict, model: Datamodel, models: dict, need) -> None:
+    """A thread: things written (`body`) in a space (`space`), and how spaces are made.
+
+    `space` is the link field that puts a record in its space, `about` a field
+    of the space shown under its name, and `made_as` the fields a space gets
+    for how it is made: `public`, `shared` or `personal` — its scope — or
+    `direct`, a shared space found-or-made between the people picked, named
+    for whoever else is in it.
+    """
+    where = manifest.id
+    thing = f"screen {screen['id']!r}"
+    need(model, thing + " space", screen.get("space"), ("link",))
+    if model.in_space != screen["space"]:
+        raise QuillError(f"{where}: {thing} space {screen['space']!r} is not what {model.id} is in")
+    need(model, thing + " body", screen.get("body"), ("text", "markdown", "string"))
+    space_model = models[model.by_name[screen["space"]].to]
+    if screen.get("about"):
+        need(space_model, thing + " about", screen["about"])
+    made_as = screen.get("made_as") or {}
+    if not isinstance(made_as, dict):
+        raise QuillError(f"{where}: {thing} made_as is a table of how a space is made")
+    for how, fields in made_as.items():
+        if how not in MADE_AS:
+            raise QuillError(f"{where}: {thing} made_as {how!r} is one of {', '.join(MADE_AS)}")
+        scope = "shared" if how == "direct" else how
+        if scope not in space_model.scopes:
+            raise QuillError(f"{where}: {thing} made_as {how}, but a {space_model.id} is never {scope}")
+        if not isinstance(fields, dict):
+            raise QuillError(f"{where}: {thing} made_as {how} is the fields it sets")
+        for name, value in fields.items():
+            need(space_model, f"{thing} made_as {how}", name)
+            f = space_model.by_name[name]
+            if f.kind == "enum" and value not in f.values:
+                raise QuillError(f"{where}: {thing} made_as {how}: {value!r} is not a value of {name}")
+            if how == "direct" and not f.indexed:
+                raise QuillError(
+                    f"{where}: {thing} made_as direct marks a space by {name}, which must be indexed"
+                )
 
 
 def describe(

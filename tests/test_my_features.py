@@ -61,17 +61,17 @@ def test_an_unknown_feature_is_a_404(client, auth):
 
 # -- switching one ----------------------------------------------------------------
 def test_switching_one_off_is_remembered_and_reversible(client, auth):
-    response = switch(client, auth, "chat", False)
+    response = switch(client, auth, "calendar", False)
     assert response.status_code == 200
     assert response.json() == {
-        "key": "chat",
-        "label": "Chat",
-        "description": "Channels, direct messages, and the count on the icon",
+        "key": "calendar",
+        "label": "Calendar",
+        "description": "Your own calendar, and the ones you share",
         "enabled": False,
     }
-    assert {row["key"]: row["enabled"] for row in mine(client, auth)}["chat"] is False
-    assert switch(client, auth, "chat", True).json()["enabled"] is True
-    assert {row["key"]: row["enabled"] for row in mine(client, auth)}["chat"] is True
+    assert {row["key"]: row["enabled"] for row in mine(client, auth)}["calendar"] is False
+    assert switch(client, auth, "calendar", True).json()["enabled"] is True
+    assert {row["key"]: row["enabled"] for row in mine(client, auth)}["calendar"] is True
 
 
 def test_your_answer_is_yours_and_nobody_elses(client, auth, guest):
@@ -100,11 +100,13 @@ def test_the_server_switch_still_wins(tasks_quill, auth):
     assert {row["key"]: row["enabled"] for row in mine(client, auth)}["tasks"] is True
 
 
-def test_what_you_switch_off_you_are_not_counted_for(client, auth, guest):
+def test_what_you_switch_off_you_are_not_counted_for(chat_quill, auth, guest):
     """The badge is one person's, so it follows that person's switches."""
-    client.post("/api/chat/channels", json={"name": "General", "kind": "public"}, headers=auth)
+    client = chat_quill
+    general = client.get("/api/records/channel", headers=auth).json()[0]
     client.post(
-        "/api/chat/channels/general/messages", json={"body": "morning"}, headers=guest
+        "/api/records/message", json={"fields": {"channel": general["id"], "body": "morning"}},
+        headers=guest,
     )
     assert client.get("/api/push/badge", headers=auth).json()["messages"] == 1
     switch(client, auth, "chat", False)

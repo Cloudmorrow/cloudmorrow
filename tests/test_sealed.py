@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 from cloudmorrow.server import sealed
-from cloudmorrow.server.chat import ChatStore
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.crypto import SealError, load_or_create_key
 from cloudmorrow.server.db import connect
@@ -143,9 +142,13 @@ def test_rotating_the_key_reseals_everything(tmp_path, config, users):
     db = config.db_path
     old_path = tmp_path / "old.key"
     old = use_key(db, old_path)
-    chat = ChatStore(db)
-    chat.create("bram", name="homelab", kind="public", topic="the rack")
-    chat.post("bram", "homelab", "hello there")
+    registry = QuillRegistry(tmp_path / "quills", tmp_path / "models", str(QUILL_CATALOG))
+    registry.install_from_catalog("chat")
+    store = RecordStore(db, registry.models, registry.expiries)
+    bram = Principal.person("bram")
+    room = store.create(bram, "channel", {"name": "homelab", "kind": "public", "topic": "the rack"},
+                        scope="public")
+    store.create(bram, "message", {"channel": room.id, "body": "hello there"})
     notes = NoteStore(tmp_path / "notes", old)
     notes.write("plan", "rotate me\n")
     notes.save_image(b"\x89PNG\r\n\x1a\n" + b"\x00" * 16)
@@ -156,32 +159,35 @@ def test_rotating_the_key_reseals_everything(tmp_path, config, users):
 
     # The old sealer cannot open a row any more; the new one can.
     with pytest.raises(SealError):
-        chat.messages("bram", "homelab")
+        store.list(bram, "message")
     sealed._keys.clear()
     sealed._sealers.clear()
     old_path.write_bytes(b"")  # not read again: the new key is registered below
     sealed._keys[db.resolve()] = new.master
-    assert chat.messages("bram", "homelab")[0]["body"] == "hello there"
+    assert store.list(bram, "message")[0].fields["body"] == "hello there"
+    assert store.get(bram, "channel", room.id).fields["topic"] == "the rack"
     assert NoteStore(notes.root, new).read("plan").content == "rotate me\n"
     with pytest.raises(SealError):
         NoteStore(notes.root, old).read("plan")
 
 
-def test_the_api_round_trips_sealed_content(client, auth):
+def test_the_api_round_trips_sealed_content(chat_quill, auth):
     """Through the API nothing looks different: what you post is what you get."""
+    client = chat_quill
     made = client.post(
-        "/api/chat/channels", json={"name": "ops", "kind": "public", "topic": "on call"},
+        "/api/records/channel",
+        json={"fields": {"name": "ops", "kind": "public", "topic": "on call"}, "scope": "public"},
         headers=auth,
     )
-    assert made.status_code in (200, 201), made.text
-    slug = made.json()["slug"]
+    assert made.status_code == 201, made.text
+    room = made.json()["id"]
     posted = client.post(
-        f"/api/chat/channels/{slug}/messages", json={"body": "the pager"}, headers=auth
+        "/api/records/message", json={"fields": {"channel": room, "body": "the pager"}}, headers=auth
     )
-    assert posted.status_code in (200, 201), posted.text
-    listed = client.get(f"/api/chat/channels/{slug}/messages", headers=auth).json()
-    assert [m["body"] for m in listed] == ["the pager"]
-    assert client.get(f"/api/chat/channels/{slug}", headers=auth).json()["topic"] == "on call"
+    assert posted.status_code == 201, posted.text
+    listed = client.get(f"/api/records/message?channel={room}", headers=auth).json()
+    assert [m["fields"]["body"] for m in listed] == ["the pager"]
+    assert client.get(f"/api/records/channel/{room}", headers=auth).json()["fields"]["topic"] == "on call"
 
 
 def test_editing_part_of_an_event_keeps_the_rest_readable(client, auth):

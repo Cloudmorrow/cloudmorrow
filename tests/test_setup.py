@@ -137,8 +137,8 @@ def test_the_page_offers_the_standard_quills_and_setup_applies_the_choice(config
     assert made.status_code == 201, made.text
     assert made.json()["note"] == ""
     state = client.app.state.cloudmorrow
-    assert set(state.quills.quills) == {"tasks"}
-    assert state.features.enabled("notes") and not state.features.enabled("chat")
+    assert set(state.quills.quills) == {"tasks"}, "chat is a catalog quill now: left out, not installed"
+    assert state.features.enabled("notes") and not state.features.enabled("calendar")
     # Asked once: after the account exists, there is nothing to offer.
     assert client.get("/api/setup/quills").status_code == 409
 

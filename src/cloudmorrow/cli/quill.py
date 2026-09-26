@@ -141,6 +141,15 @@ def preview(plan: dict) -> str:
             sub = f"   <{screen['subtitle']}>" if screen.get("subtitle") else ""
             for _ in range(2):
                 lines.append(f"  {tick}<{title}>{sub}")
+        elif screen["kit"] == "thread":
+            space = fields.get(screen.get("space", ""), {}).get("to", "space")
+            about = f" — <{screen['about']}>" if screen.get("about") else ""
+            lines.append(f"  # <{space}> (unread)   │ # <{space}>{about}")
+            lines.append(f"  # <{space}>            │ <who>  <when>")
+            lines.append(f"                        │   <{screen.get('body', title)}>")
+            lines.append(f"                        │ [ write in <{space}>… ]")
+            made = ", ".join(screen.get("made_as") or {}) or "shared"
+            lines.append(f"  a new {space} is made as: {made}")
         else:
             shown = screen.get("fields") or list(fields)
             lines.append("  " + ", ".join(shown))

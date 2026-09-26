@@ -3,9 +3,9 @@
 Two kinds, one list, because a person choosing does not care which is which:
 
 * **Catalog quills** marked `foundation = true` in the Quill Catalog —
-  Tasks today. Choosing one installs it; leaving one out installs nothing.
+  Tasks and Chat today. Choosing one installs it; leaving one out installs nothing.
 * **Built-in features** that are still part of the core while the kit
-  grows to draw them — Notes, Calendar, Chat, Files, Secrets. Choosing one
+  grows to draw them — Notes, Calendar, Files, Secrets. Choosing one
   leaves it on; leaving one out switches it off for the server, which an
   administrator can undo from Administration. As each moves into a repo of
   its own it leaves `features.FEATURES` and turns up in the catalog, and

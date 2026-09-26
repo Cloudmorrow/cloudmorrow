@@ -19,9 +19,9 @@ plainness: a place per card down the left, each saying how it is; one rounded
 panel for the place you are on; a strip of what happened along the bottom;
 the keys on the last line.
 
-Down the left: YOUR CLOUD — notes, your days, the chat, your secrets, your
-files — then QUILLS, a card for every screen of every Quill this server has
-installed (Tasks is the first), drawn from the kit by tui/panes/kit.py. Those
+Down the left: YOUR CLOUD — notes, your days, your secrets, your files —
+then QUILLS, a card for every screen of every Quill this server has
+installed (Tasks and Chat are the first), drawn from the kit by tui/panes/kit.py. Those
 are asked for after sign-in rather than built in, so installing one in
 Administration puts its card here without a restart. An administrator has a
 third section, ADMINISTRATION, whose entries put the server's own panel —
@@ -50,7 +50,6 @@ from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.panes.admin import AdminPanel
 from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.panes.calendar import CalendarPane
-from cloudmorrow.tui.panes.chat import ChatPane
 from cloudmorrow.tui.panes.files import FilesPane
 from cloudmorrow.tui.panes.kit import pane_for, screen_key
 from cloudmorrow.tui.panes.notes import NotesPane
@@ -70,12 +69,16 @@ from cloudmorrow.tui.widgets.logstrip import LogStrip
 from cloudmorrow.tui.widgets.sidebar import NavCard, SectionLabel
 
 PANES: tuple[type[Pane], ...] = (
-    NotesPane, CalendarPane, ChatPane, SecretsPane, FilesPane,
+    NotesPane, CalendarPane, SecretsPane, FilesPane,
 )
 
 # The function keys no built-in card has, handed to Quill cards in the order
-# they appear. f2 was Tasks' before Tasks was a Quill, and still is.
+# they appear.
 QUILL_KEYS: tuple[str, ...] = ("f2", "f4", "f10", "f11", "f12")
+# A key a Quill had when it was built in, and keeps whatever order the
+# Quills arrive in: fingers remember f2 for Tasks. (Chat's f6 is not kept —
+# in Notes it was always Import as well, so it goes to the next free key.)
+KEPT_KEYS: dict[str, str] = {"tasks": "f2"}
 
 # How often the bell asks the server whether anything happened.
 BELL_POLL = 60.0
@@ -84,7 +87,6 @@ BELL_POLL = 60.0
 FEATURE_OF: dict[str, str] = {
     "notes": "notes",
     "calendar": "calendar",
-    "chat": "chat",
     "secrets": "secrets",
     "files": "files",
 }
@@ -329,7 +331,12 @@ class WorkspaceScreen(Screen):
         if key in self._quill_keys:
             return self._quill_keys[key]
         taken = set(self._quill_keys.values())
-        free = next((k for k in QUILL_KEYS if k not in taken), "")
+        kept = KEPT_KEYS.get(key)
+        if kept and kept not in taken:
+            free = kept
+        else:
+            spoken_for = set(KEPT_KEYS.values()) - {kept}
+            free = next((k for k in QUILL_KEYS if k not in taken and k not in spoken_for), "")
         if free:
             self._quill_keys[key] = free
         return free

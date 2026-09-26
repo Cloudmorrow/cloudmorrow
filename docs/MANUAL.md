@@ -60,19 +60,19 @@ start with the [README](../README.md); this is the page to come back to.
   the mounting on macOS with nothing installed; on Linux it is `rclone`.
   Made and mounted from the **Files** tab as well. Local backups have a tab
   beside them, with nothing in it yet.
-- **Chat.** Channels and direct messages, between everyone on the server.
-  Anyone can make a channel: a **public** one is everybody's, in everyone's
-  list and open to write in; a **private** one is the people you pick, and
-  they are *added* rather than invited — nobody accepts anything, they are
-  simply in it and told so. A **direct** channel is two people, and it is
-  never made from a form: ask for the one with somebody and it is there.
-  Unread is a high-water mark per person per channel, so reading on the
-  laptop is reading on the phone.
+- **Chat.** Channels and direct messages, between everyone on the server —
+  a Quill, like Tasks, offered when you install. A **public** channel is
+  everybody's, in everyone's list and open to write in; a **private** one is
+  the people you pick, and they are *added* rather than invited — nobody
+  accepts anything, they are simply in it and told so. A **direct** channel
+  is two people, and it is never made from a form: pick somebody and it is
+  there. Unread is when you last looked, per person per channel, so reading
+  on the laptop is reading on the phone.
 - **The count on the icon.** Chat is why the web app has push. An app on a
   home screen is not running most of the time, so nothing it could poll
   would keep its badge right — a real Web Push wakes a service worker,
   which shows the banner and sets the number. The badge is everything
-  waiting: unread messages plus unread notifications. See
+  waiting: what is unread in your channels plus unread notifications. See
   [Push notifications](#push-notifications).
 - **Users.** Password login, bearer tokens, per-user trees, and an admin API for
   creating more accounts. Every account has a **role** — Administrator, User,
@@ -141,7 +141,6 @@ src/cloudmorrow/
     tasks.py         boards, lanes, and the week a finished task has left
     configsync.py    the one copy of the shared config, and its revisions
     notifications.py what the machines did, kept where all of them can leave it
-    chat.py          channels, messages, and who has read how far
     calendar.py      the calendars, who shares them, and what is on them
     webpush.py       VAPID, aes128gcm, and the devices to push
     shares.py        the fileshares: a name, a directory, whose directory it is
@@ -692,52 +691,68 @@ the GitHub URL by default, or a local folder.
 ## Chat
 
 Everything else in Cloudmorrow is one person's. Chat is the exception, and it
-is the reason the server now knows how to talk to somebody who is not asking.
+is the reason the server knows how to talk to somebody who is not asking.
+
+Chat is a Quill — [`Cloudmorrow/quill-chat`](https://github.com/Cloudmorrow/quill-chat),
+in the catalog with Tasks and offered, ticked, when you install. It has no
+code: a channel is a record of the foundational `channel` datamodel (a
+*space*), a message one of `message` (in a channel, its author's), and its one
+screen is the kit's `thread`. A server that had Chat before it was a Quill
+gets the Quill at boot, switched on or off as the feature was, and its
+channels, messages and read marks move into records once; the old tables stay
+where they were.
 
 There are three kinds of channel, and the kind *is* the access rule — there
 is nothing else to check, and no permissions screen:
 
 - **Public.** Everybody is in it. It is in everyone's list, anyone may write
   in it, and nobody can leave — leaving a room everybody is in is a mute, and
-  a mute is not this. Making one tells everyone it now exists.
+  a mute is not this. `#general` is one, made once for the whole server the
+  first time anybody opens Chat.
 - **Private.** The people in it. Anyone can make one and put people in it;
   there is no invitation to accept, because an invitation you have to accept
   is a second thing to build and a second thing to forget. You are added, you
-  get a notification saying so, and you can leave. Somebody can add you back.
-- **Direct.** Two people, and it is never made from a form. Ask for the
-  channel with `ada` and it is there, whether or not it existed a moment ago;
-  `ada` asking for you names the same one. It cannot be renamed, added to or
-  left.
+  get a notification saying so, and you can leave. Its maker can take
+  somebody out, and anybody in it can add somebody.
+- **Direct.** Two people, and it is never made from a form. Pick `ada` and the
+  conversation with her is there, whether or not it existed a moment ago;
+  `ada` picking you finds the same one. It is called after the other person.
 
-Everyone can write to everyone. There is no setting for that.
+Everyone can write to everyone. There is no setting for that. A channel is
+its maker's to rename, re-topic or delete (and an administrator's); a message
+is its author's to change or take back.
 
-**Unread is a high-water mark**, not a flag on each message: your membership
-of a channel remembers the id of the last message you have read, and unread
-is everything after it. One small integer per person per channel, which is
-why reading a channel on the laptop clears it on the phone, why the mark only
-ever moves *up* (a second client scrolled back must not un-read what the
-first saw), and why answering a channel reads it — you cannot reply to
-something you have not looked at.
+**Unread** is when you last looked: everything somebody else wrote in a
+channel after that is unread, and opening the channel — on any device — moves
+it on. Writing in a channel reads it, since you cannot reply to what you have
+not looked at. Somebody added to a channel counts from when they were added,
+and a new account counts the public channels from when it was made: the
+history is there to scroll back through, but a year of it is not a badge.
 
-Somebody added to a private channel joins **at the tip**: the history is
-there to scroll back through, but a year of it is not a badge. A new account
-joins the public channels the same way.
+It is on every surface. On the phone it is the channels, then a conversation;
+on a computer both side by side. In the terminal it is the **Chat** card
+(`f4`), channels on the left and the conversation on the right, with `n` for a
+new channel, `m` to write to one person, `a` to add somebody, `e` to rename or
+delete one of yours and `l` to leave. On the command line:
 
-It is in both clients. In the terminal it is the **Chat** tab (`f6`),
-channels on the left and the conversation on the right, with `n` for a new
-channel, `m` to write to one person, `a` to add somebody and `l` to leave. On
-the phone it is a tab with a switch at the top — **Channels** and **Direct** —
-and the pencil makes whichever of those you are looking at.
+```
+cm chat list                     # the channels, with what is unread in each
+cm chat show general             # the conversation, newest at the bottom
+cm chat say ada "on my way"      # a channel by name, or the person
+```
 
-Neither client holds a socket open. A channel that is on screen asks for
-anything after the last id it has, every few seconds, and a push wakes it the
-moment something arrives — so the common case is instant, the fallback is a
-small request that usually answers with an empty list, and the server stays a
+An assistant reaches it with the generic record tools.
+
+Neither client holds a socket open. A conversation that is on screen asks for
+what changed since the newest line it has, every few seconds, and a push wakes
+it the moment something arrives — so the common case is instant, the fallback
+is a small request that usually answers with nothing, and the server stays a
 plain request-and-response thing that a phone on a train reconnects to
 without noticing.
 
-An administrator can switch the whole thing off in the Administration panel,
-like any other feature: the tab goes and the API answers 403.
+An administrator can switch it off in the Administration panel, like any
+other Quill: the tab goes and the API answers 403. Removing the Quill takes
+its tab and nothing else; the channels and messages are records, and stay.
 
 ## Calendar
 
@@ -811,8 +826,10 @@ library):
 - **RFC 8291 / 8188 (aes128gcm)** — the body, encrypted to the subscription's
   own key, so the push service carries something it cannot read.
 
-The number on the icon is **everything waiting**: unread chat messages plus
-unread notifications. It is worked out in one place (`/api/push/badge`) so
+The number on the icon is **everything waiting**: everything unread in the
+spaces you are in — a channel's messages, or whatever another Quill declares
+`unread` — plus unread notifications. It is worked out in one place
+(`/api/push/badge`) so
 the page, the service worker and the push payload cannot disagree about it.
 Each push carries the recipient's own badge, which is why a message to four
 people is four requests rather than one.
@@ -1570,7 +1587,7 @@ Anywhere:
 
 | key | action |
 | --- | --- |
-| `f1` … `f7` | notes, tasks, secrets, files, chat, calendar — `f4` is spare |
+| `f1` … `f7` | notes, tasks (`f2`), secrets, files, calendar; the other Quills take `f4`, `f10`, `f11`, `f12` in turn — Chat is `f4` |
 | `f8` | notifications: what the machines have been up to |
 | `ctrl+g` | settings: this machine, and its config sync |
 | `ctrl+r` | refresh |
@@ -1679,6 +1696,11 @@ All note paths are relative to the calling user's notes root.
 | `GET`/`POST` | `/api/records/{model}` | your records of a datamodel (`?field=value` filters on indexed fields); make one |
 | `GET`/`PATCH`/`DELETE` | `/api/records/{model}/{id}` | one record; send `rev` with a change to get a 409 rather than overwrite |
 | `POST` | `/api/records/{model}/{id}/move` | `{fields, index}` — another lane or group, and a place in it |
+| `POST` | `/api/records/{model}` with `scope`, `members`, `unique` | a space — a channel, a calendar — made public or shared, with its people; `unique` finds the one with exactly those people instead of making another |
+| `POST`/`DELETE` | `/api/records/{model}/{id}/members[/{username}]` | put somebody in a shared space; take them out, or with your own name, leave |
+| `POST` | `/api/records/{model}/{id}/seen` | you have looked in a space: what is in it is not unread |
+| `GET` | `/api/records/{model}?_last=50&_since=…` | the newest fifty, still in order; only what changed at or after a moment |
+| `GET` | `/api/people` | everybody else on the server, to share a space with or write to |
 | `GET`/`POST` | `/api/shares` | your fileshares; a share carries its `url` |
 | `GET`/`DELETE` | `/api/shares/{name}` | one share; `?remove_files=true` deletes a directory the server made |
 | `*` | `/dav/{name}/…` | the share itself, as WebDAV — Basic auth with your password or token |
@@ -1689,16 +1711,6 @@ All note paths are relative to the calling user's notes root.
 | `DELETE` | `/api/config/{bundle}` | unclaim it, so the next machine to tick the box decides |
 | `GET`/`POST` | `/api/notifications` | what the machines have been doing |
 | `POST` | `/api/notifications/read` | mark them read; omit `ids` for all of them |
-| `GET`/`POST` | `/api/chat/channels` | the channels you can see; make one |
-| `GET`/`PATCH`/`DELETE` | `/api/chat/channels/{slug}` | one channel; rename or set its topic; delete it |
-| `POST` | `/api/chat/direct` | `{username}` — the channel with one person, made if new |
-| `GET` | `/api/chat/people` | everybody there is to write to |
-| `POST` | `/api/chat/channels/{slug}/members` | `{usernames}` — put people in; they are told |
-| `POST` | `/api/chat/channels/{slug}/leave` | leave a private channel |
-| `GET`/`POST` | `/api/chat/channels/{slug}/messages` | a page of it (`?before=`, `?after=`); say something |
-| `PATCH`/`DELETE` | `/api/chat/channels/{slug}/messages/{id}` | change or remove what you said |
-| `POST` | `/api/chat/channels/{slug}/read` | move the read mark up; omit `upto` for all |
-| `GET` | `/api/chat/unread` | what is waiting, per channel and altogether |
 | `GET`/`POST` | `/api/calendar/calendars` | the calendars you can see; make one |
 | `GET`/`PATCH`/`DELETE` | `/api/calendar/calendars/{slug}` | one calendar; rename or recolour it; delete it |
 | `POST` | `/api/calendar/calendars/{slug}/members` | `{usernames}` — share it; they are told |

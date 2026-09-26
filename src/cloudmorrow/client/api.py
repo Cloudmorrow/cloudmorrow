@@ -417,19 +417,68 @@ class CloudmorrowClient:
     async def datamodels(self) -> list[dict]:
         return (await self._request("GET", "/api/datamodels")).json()
 
-    async def records(self, model: str, **where: object) -> list[dict]:
-        """Every record of *model* you have, filtered on indexed fields, in order."""
+    async def records(
+        self, model: str, *, last: int | None = None, since: str | None = None, **where: object
+    ) -> list[dict]:
+        """Every record of *model* you have, filtered on indexed fields, in order.
+
+        *last* keeps the newest so many; *since* only what changed at or after it.
+        """
         params = {k: ("true" if v is True else "false" if v is False else v) for k, v in where.items()}
+        if last is not None:
+            params["_last"] = last
+        if since:
+            params["_since"] = since
         return (await self._request("GET", f"/api/records/{model}", params=params)).json()
 
     async def record(self, model: str, record_id: str) -> dict:
         return (await self._request("GET", f"/api/records/{model}/{record_id}")).json()
 
-    async def create_record(self, model: str, fields: dict, *, index: int | None = None) -> dict:
+    async def create_record(
+        self,
+        model: str,
+        fields: dict,
+        *,
+        index: int | None = None,
+        scope: str | None = None,
+        members: list[str] | None = None,
+        unique: bool = False,
+    ) -> dict:
+        """Make a record. A space takes a scope, a shared one its people.
+
+        With *unique*, the space with exactly you and *members* in it (and
+        the same indexed fields) comes back if there is one already.
+        """
         body: dict = {"fields": fields}
         if index is not None:
             body["index"] = index
+        if scope:
+            body["scope"] = scope
+        if members:
+            body["members"] = list(members)
+        if unique:
+            body["unique"] = True
         return (await self._request("POST", f"/api/records/{model}", json=body)).json()
+
+    # -- the people in a space ------------------------------------------------
+    async def add_member(self, model: str, space_id: str, username: str) -> dict:
+        return (
+            await self._request(
+                "POST", f"/api/records/{model}/{space_id}/members", json={"username": username}
+            )
+        ).json()
+
+    async def remove_member(self, model: str, space_id: str, username: str) -> None:
+        """Take somebody out of a shared space; with your own name, leave it."""
+        await self._request("DELETE", f"/api/records/{model}/{space_id}/members/{username}")
+
+    async def mark_seen(self, model: str, space_id: str) -> None:
+        """You have looked in this space: what is in it is not unread any more."""
+        await self._request("POST", f"/api/records/{model}/{space_id}/seen")
+
+    async def people(self) -> list[dict]:
+        """Everybody else on the server, to share a space with or write to."""
+        return (await self._request("GET", "/api/people")).json()
 
     async def update_record(
         self, model: str, record_id: str, fields: dict, *, rev: int | None = None
@@ -598,101 +647,6 @@ class CloudmorrowClient:
         return (
             await self._request("POST", "/api/notifications/read", json={"ids": ids})
         ).json()
-
-    # -- chat ---------------------------------------------------------------
-    # A channel is addressed by its slug, the way a board is.
-    # Nothing here takes a username for "who is asking": the token says so,
-    # and chat is the one part of the API where that matters.
-    async def channels(self) -> list[dict]:
-        """Every channel this account can see, the ones with news first."""
-        return (await self._request("GET", "/api/chat/channels")).json()
-
-    async def channel(self, slug: str) -> dict:
-        return (await self._request("GET", f"/api/chat/channels/{slug}")).json()
-
-    async def create_channel(
-        self,
-        name: str,
-        *,
-        kind: str = "private",
-        topic: str = "",
-        members: list[str] | None = None,
-    ) -> dict:
-        return (
-            await self._request(
-                "POST",
-                "/api/chat/channels",
-                json={
-                    "name": name,
-                    "kind": kind,
-                    "topic": topic,
-                    "members": members or [],
-                },
-            )
-        ).json()
-
-    async def direct_channel(self, username: str) -> dict:
-        """The channel with one person, made on the spot if it is new."""
-        return (
-            await self._request("POST", "/api/chat/direct", json={"username": username})
-        ).json()
-
-    async def chat_people(self) -> list[dict]:
-        return (await self._request("GET", "/api/chat/people")).json()
-
-    async def add_channel_members(self, slug: str, usernames: list[str]) -> dict:
-        return (
-            await self._request(
-                "POST", f"/api/chat/channels/{slug}/members", json={"usernames": usernames}
-            )
-        ).json()
-
-    async def leave_channel(self, slug: str) -> None:
-        await self._request("POST", f"/api/chat/channels/{slug}/leave")
-
-    async def delete_channel(self, slug: str) -> None:
-        await self._request("DELETE", f"/api/chat/channels/{slug}")
-
-    async def messages(
-        self,
-        slug: str,
-        *,
-        limit: int = 50,
-        before: int | None = None,
-        after: int | None = None,
-    ) -> list[dict]:
-        """A page of a channel, oldest first.
-
-        `before` walks back through history; `after` is how a screen that is
-        already showing the channel asks for what it has not got.
-        """
-        params: dict[str, object] = {"limit": limit}
-        if before is not None:
-            params["before"] = before
-        if after is not None:
-            params["after"] = after
-        return (
-            await self._request("GET", f"/api/chat/channels/{slug}/messages", params=params)
-        ).json()
-
-    async def send_message(self, slug: str, body: str) -> dict:
-        return (
-            await self._request(
-                "POST", f"/api/chat/channels/{slug}/messages", json={"body": body}
-            )
-        ).json()
-
-    async def mark_channel_read(self, slug: str, upto: int | None = None) -> dict:
-        """Move the read mark up. It never moves down."""
-        return (
-            await self._request(
-                "POST", f"/api/chat/channels/{slug}/read", json={"upto": upto}
-            )
-        ).json()
-
-    async def chat_unread(self) -> dict:
-        """What is waiting, per channel and altogether."""
-        return (await self._request("GET", "/api/chat/unread")).json()
 
     # -- the calendar --------------------------------------------------------
     # A calendar is addressed by its slug; an event by its id, which is the

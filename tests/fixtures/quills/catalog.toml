@@ -18,3 +18,17 @@ repo = "quill-tasks"
 category = "personal"
 publisher = "Cloudmorrow"
 foundation = true
+
+[[categories]]
+id = "home"
+label = "Home"
+description = "The household: shopping, chores, the car, the plants."
+
+[[quills]]
+id = "chat"
+name = "Chat"
+summary = "Channels, direct messages, and the count on the icon."
+repo = "quill-chat"
+category = "home"
+publisher = "Cloudmorrow"
+foundation = true

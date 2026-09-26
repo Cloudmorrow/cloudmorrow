@@ -43,7 +43,7 @@ def test_the_catalogue_says_who_uses_what():
     # An app uses what it provides, whether or not it said so.
     assert rows["note"]["used_by"] == ["notes"]
     # A foundation type is used by whoever asked for it, and nobody by default.
-    assert rows["user"]["used_by"] == ["calendar", "chat"]
+    assert rows["user"]["used_by"] == ["calendar"]
     assert rows["secret"]["used_by"] == ["secrets"]
     assert rows["secret"]["foundation"] is True
     assert rows["note"]["foundation"] is False

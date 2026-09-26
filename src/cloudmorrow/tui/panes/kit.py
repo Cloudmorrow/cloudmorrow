@@ -16,6 +16,8 @@ task board has to go on as much as a list of car services does.
 - `detail` and `form` are the same table without the circle: the record
   sheet is the point of them, and enter or a click opens it, showing the
   screen's `fields` when it names them.
+- `thread` is in kit_thread.py: spaces on the left, what is said in the one
+  you are on to the right, and a line to write in.
 
 Every one of them opens a record in the record sheet, where every field has
 the widget its kind calls for.
@@ -325,10 +327,11 @@ class ListPane(KitPane):
 def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     """The pane for one screen of a Quill, or None for a kit not drawn here yet.
 
-    `calendar`, `thread`, `grid` and `editor` come next (docs/QUILLS.md); a
-    Quill that declares one simply has no tab for it in this version.
+    `calendar`, `grid` and `editor` come next (docs/QUILLS.md); a Quill that
+    declares one simply has no tab for it in this version.
     """
     from cloudmorrow.tui.panes.kit_board import BoardPane
+    from cloudmorrow.tui.panes.kit_thread import ThreadPane
 
     kit = screen.get("kit")
     if screen.get("model") not in (quill.get("models") or {}):
@@ -337,4 +340,6 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
         return BoardPane(quill, screen, **kwargs)
     if kit in ("list", "detail", "form"):
         return ListPane(quill, screen, **kwargs)
+    if kit == "thread":
+        return ThreadPane(quill, screen, **kwargs)
     return None

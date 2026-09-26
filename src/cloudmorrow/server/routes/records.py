@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
 from cloudmorrow.server.db import User
@@ -38,6 +38,11 @@ class RecordIn(BaseModel):
     index: int | None = None
     # For a space: personal, shared or public. Chosen when it is made.
     scope: str | None = None
+    # For a shared space: the people in it besides you, from the start.
+    members: list[str] = Field(default_factory=list)
+    # For a space: find the one with exactly these people in it (and these
+    # indexed fields) before making another — "write to somebody".
+    unique: bool = False
 
 
 class MemberIn(BaseModel):
@@ -115,28 +120,73 @@ def list_records(
     state: AppState = Depends(get_state),
     user: User = Depends(get_current_user),
 ) -> list[dict]:
-    """Every record of *model* you have. Query parameters filter on indexed fields."""
+    """Every record of *model* you have. Query parameters filter on indexed fields.
+
+    Two are not fields, and start with `_` so no field can be called them:
+    `_last=50` keeps the newest fifty, still in order — a conversation's
+    first page — and `_since=<ISO time>` only what was made or changed at or
+    after it, which is how an open screen asks what it has not got.
+    """
     switched_on(state, model)
     principal = person(user)
+    where = dict(request.query_params)
+    last = where.pop("_last", None)
+    since = where.pop("_since", None)
     try:
         seed(state, principal, model)
-        records = state.records.list(principal, model, dict(request.query_params))
+        records = state.records.list(
+            principal, model, where, last=_whole(last), since=since or None
+        )
     except ERRORS as exc:
         raise _refused(exc) from exc
     return [record.to_dict() for record in records]
+
+
+def _whole(value: str | None) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "_last is a whole number") from None
 
 
 @router.post("/{model}", status_code=status.HTTP_201_CREATED)
 def create_record(
     model: str,
     payload: RecordIn,
+    response: Response,
     state: AppState = Depends(get_state),
     user: User = Depends(get_current_user),
 ) -> dict:
+    """Make a record. A space may be made with its people in it, or found.
+
+    With `unique`, a space with exactly you and `members` in it, and the same
+    indexed fields, is answered (200) instead of a second one being made
+    (201): the conversation between two people is one conversation from
+    either side. Its people are not told they were added — the first thing
+    written in it tells them.
+    """
     switched_on(state, model)
+    for username in payload.members:
+        _known(state, username)
+    principal = person(user)
     try:
+        if payload.unique:
+            found = state.records.find_space(
+                principal, model, payload.fields, scope=payload.scope, members=payload.members
+            )
+            if found is not None:
+                response.status_code = status.HTTP_200_OK
+                return found.to_dict()
         record = state.records.create(
-            person(user), model, payload.fields, index=payload.index, scope=payload.scope
+            principal,
+            model,
+            payload.fields,
+            index=payload.index,
+            scope=payload.scope,
+            members=payload.members,
+            announce=not payload.unique,
         )
     except ERRORS as exc:
         raise _refused(exc) from exc

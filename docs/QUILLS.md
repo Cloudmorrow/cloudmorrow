@@ -186,8 +186,8 @@ The core serves every installed datamodel at the same API:
 
 | call | what it does |
 | --- | --- |
-| `GET /api/records/{model}?field=value` | list, filtered on indexed fields, in order |
-| `POST /api/records/{model}` | create, from `{"fields": {...}}` |
+| `GET /api/records/{model}?field=value` | list, filtered on indexed fields, in order; `_last=50` keeps the newest fifty, `_since=<time>` only what changed at or after it |
+| `POST /api/records/{model}` | create, from `{"fields": {...}}`; a space also takes `scope`, `members` and `unique` (see *Spaces*) |
 | `GET /api/records/{model}/{id}` | one record |
 | `PATCH /api/records/{model}/{id}` | change fields; send `rev` to get a 409 instead of overwriting |
 | `POST /api/records/{model}/{id}/move` | `{"fields": {"lane": "done"}, "index": 0}`: change group fields and position together |
@@ -225,9 +225,15 @@ in_space = "calendar"             # a link field: whoever may see the calendar s
 | `shared` | its owner and its members | its owner, and administrators | a member may |
 | `public` | everybody on the server | its owner, and administrators | nobody can |
 
-A space's scope is set when it is made. Members are added with
+A space's scope is set when it is made, and a shared one may be made with
+its people in it (`"members": [...]`). Members are added with
 `POST /api/records/{model}/{id}/members` and removed with `DELETE
-…/members/{username}`; being added leaves a notification. A record in a
+…/members/{username}`; being added leaves a notification. `"unique": true`
+finds the space of that datamodel with exactly you and `members` in it, and
+the same indexed fields, before making one (200 rather than 201) — the one
+conversation between two people, from either side; its people are not told
+they were added, because the first thing written in it tells them.
+`GET /api/people` is everybody else there is to share with. A record in a
 space is sealed to the space, so moving a message to another channel by
 editing the database opens as nothing.
 
@@ -272,12 +278,38 @@ each element needs:
 | `board` | `model`, `lane` (enum), `title`, optional `group` (link), `body`, `done` | lanes stacked | lanes as columns, drag and drop | lanes as columns, drag and keys | `cm <quill> list`, `add`, `move` |
 | `detail` / `form` | `model`, `fields` | a sheet | a panel | a modal | `cm <quill> show`, `set` |
 | `calendar` | `model`, `starts`, `ends`, optional `all_day`, `space` (the calendars) | a day list and a month | a week and a month | a month and the day's list | `cm <quill> list --from --to`, `add` |
-| `thread` | `model`, `body`, `space` (the channels) | channels, then a conversation | both side by side | both side by side | `cm <quill> list`, `say` |
+| `thread` | `model` (in a space), `space` (its link to the space), `body`; optional `about` (a field of the space), `made_as` | the spaces with unread, then a conversation | both side by side | both side by side | `cm <quill> list`, `show`, `say` |
 | `editor` | `model` with a `markdown` field, optional folders from the title | a tree, then a page | both side by side | both side by side | `cm <quill> show`, `add`, `edit` |
 | `grid` | `model` of kind file | folders and tiles | the same, wider | a table | `cm <quill> list`, `get`, `put` |
 
 Every screen gets a record sheet for free: opening a card or a row shows the
 record's fields with the widget for each kind, editable, with delete.
+
+A `thread` is the kit's conversation: things written (`body`) in spaces. Its
+`made_as` says what fields a space gets for how it is made — by its scope, or
+`direct`, a shared space found-or-made between you and the person you pick
+and named for them — and the kit draws around it what every space has: making
+one, the people in it, adding and taking out, leaving. Chat is:
+
+```toml
+[[screens]]
+id = "chat"
+kit = "thread"
+model = "message"
+space = "channel"
+body = "body"
+about = "topic"
+[screens.made_as]
+public = { kind = "public" }
+shared = { kind = "private" }
+direct = { kind = "direct" }
+```
+
+A conversation opens on its newest page (`?_last=100`), asks what changed
+since (`?_since=`) every few seconds and when a push arrives, and marks the
+space seen (`POST …/seen`) as it is read. The unread counts come on the
+spaces themselves (`unread`, and `last`: the newest line), and the number on
+the phone's icon adds them up across every space whose Quill is on for you.
 
 A Quill's screens become a tab, in the order of `[[screens]]`, on every
 surface. An administrator switches a Quill off for the server; a person
@@ -395,8 +427,10 @@ manifest written, checked and installed in one conversation.
 | manifests, sources, install, catalog | `server/quills.py`, `server/routes/quills.py` |
 | the record API | `server/routes/records.py` |
 | jobs | `server/quilljobs.py` |
-| the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; the catalog and install sheet in `quillsadmin.js` |
-| the kit in the terminal | `tui/panes/kit.py` (list), `tui/panes/kit_board.py`, `tui/widgets/kit.py`, `tui/screens/record_sheet.py`; the catalog in `tui/panes/admin_quills.py` |
+| the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; `kit_thread.js`/`.css` (thread), `kit_space.js`/`.css` (making a space, its people); the catalog and install sheet in `quillsadmin.js` |
+| the kit in the terminal | `tui/panes/kit.py` (list), `tui/panes/kit_board.py`, `tui/panes/kit_thread.py`, `tui/widgets/kit.py`, `tui/widgets/kit_space.py`, `tui/screens/record_sheet.py`; the catalog in `tui/panes/admin_quills.py` |
+| spaces: telling people, the badge, the people there are | `server/spacenotify.py`, `server/routes/push.py` (`badge_for`), `server/routes/people.py` |
+| moving the built-in features' old tables into records | `server/quilljobs.py` (`move_legacy_tasks`, `move_legacy_chat`) |
 | the kit on the command line | `cli/quillrun.py` (`cm <quill> …`) |
 | building one | `cli/quill.py` (`cm quill new/check/dev/add`), `quill_reference.md`, `quill_template/` |
 | the kit to an assistant | `server/mcptools.py` (generic record tools) |
@@ -406,6 +440,7 @@ manifest written, checked and installed in one conversation.
 1. Tasks is the first Quill, and the proof: no task code left in the core.
 2. Services, webhooks and APIs run, with Quill tokens and the gate on them.
 3. `calendar` and `thread` in the kit; Calendar and Chat become Quills.
+   (`thread` and Chat: done.)
 4. `grid` and `editor`; Files and Notes become Quills. Secrets stays in the
    core: it is foundation, and the one datamodel no assistant may ever reach.
 5. Shared and public scopes in the record store; named datasets.

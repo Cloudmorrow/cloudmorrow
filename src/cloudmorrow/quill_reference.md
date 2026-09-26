@@ -46,7 +46,7 @@ why = "to show who looks after each plant"
 
 [[screens]]                        # one tab per screen, on every surface
 id = "plants"
-kit = "list"                       # list, board, detail, form (calendar, thread, grid, editor: next)
+kit = "list"                       # list, board, detail, form, thread (calendar, grid, editor: next)
 label = "Plants"
 model = "plants.plant"
 title = "name"
@@ -131,6 +131,21 @@ leaves.
 | list | model, title; optional subtitle, tick (bool) | rows, a circle per row if tick |
 | board | model, lane (enum, in ordered_within), title; optional group (link: chips), body (markdown), done (a lane value) | lanes; cards dragged between them |
 | detail / form | model; optional fields = [...] | one record's fields, editable |
+| thread | model (in a space), space (its link to the space), body; optional about (a field of the space), made_as | the spaces with unread counts, then a conversation: newest at the bottom, grouped by author and day, a box to write in |
+
+A thread's `made_as` says what fields a space gets for how it is made — by
+scope, or `direct`: a shared space found-or-made between you and the person
+you pick, named for them (its fields must be indexed):
+
+```toml
+[screens.made_as]
+public = { kind = "public" }
+shared = { kind = "private" }
+direct = { kind = "direct" }
+```
+
+On the command line a thread is `cm <quill> list` (the spaces, with unread),
+`show <space>` and `say <space> "text"`.
 
 Every screen opens a record sheet when a row or card is chosen: every field,
 with the widget for its kind, editable, with delete. No other UI exists, on

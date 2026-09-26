@@ -13,7 +13,6 @@ from cloudmorrow import __version__
 from cloudmorrow.server.access import is_allowed, parse_rules
 from cloudmorrow.server.agents import AgentStore, JobStore
 from cloudmorrow.server.calendar import CalendarStore
-from cloudmorrow.server.chat import ChatStore
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.configsync import ConfigStore
 from cloudmorrow.server.dav import MOUNT_PATH, CredentialCheck, build_dav_app
@@ -32,13 +31,13 @@ from cloudmorrow.server.routes import (
     agents,
     auth,
     calendar,
-    chat,
     configsync,
     features,
     install,
     mcp,
     notes,
     notifications,
+    people,
     push,
     quills,
     records,
@@ -103,7 +102,6 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
                 for q in quill_registry.quills.values()
             ),
         ),
-        chat=ChatStore(config.db_path),
         calendar=CalendarStore(config.db_path),
         push=PushStore(
             config.db_path,
@@ -170,6 +168,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     )
     app.include_router(records.router)
     app.include_router(records.models_router)
+    app.include_router(people.router)
     app.include_router(quills.router)
     app.include_router(shares.router, dependencies=in_files)
     app.include_router(sharefiles.router, dependencies=in_files)
@@ -179,7 +178,6 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.include_router(configsync.agent_router)
     app.include_router(notifications.router)
     app.include_router(notifications.agent_router)
-    app.include_router(chat.router, dependencies=[Depends(features.require_feature("chat"))])
     app.include_router(
         calendar.router, dependencies=[Depends(features.require_feature("calendar"))]
     )
