@@ -22,6 +22,8 @@ tui = [
     "typer>=0.12",
     "platformdirs>=4.2",
     "tomli-w>=1.0",
+    # `cm login` finds clouds on the home network (client/discover.py).
+    "zeroconf>=0.131",
 ]
 agent = [
     "httpx>=0.27",
@@ -56,6 +58,9 @@ server = [
     "a2wsgi>=1.10",
     # The web app's grid of files shows pictures small; this makes them small.
     "pillow>=10.0",
+    # The box announces itself on the home network as <name>.local and
+    # _cloudmorrow._tcp (access_lan). Pure Python; no Avahi needed.
+    "zeroconf>=0.131",
 ]
 dev = [
     "pytest>=8.0",

@@ -262,4 +262,5 @@ def test_nothing_private_is_handed_to_the_page():
     assert public == {
         "platform", "version", "agent_status", "notify", "open_folder", "mounted_here",
         "shares", "mount", "unmount", "session", "signed_in", "signed_out",
+        "mesh_status", "mesh_join",
     }

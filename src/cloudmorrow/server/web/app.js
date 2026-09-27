@@ -13,6 +13,8 @@ import "./features.js";
 import "./me.js";
 import "./admin.js";
 import "./quillsadmin.js";
+import "./accessadmin.js";
+import "./pairdevice.js";
 import "./push.js";
 import "./desktop.js";
 import "./desktopbridge.js";

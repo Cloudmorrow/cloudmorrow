@@ -162,8 +162,9 @@ const agentWords = (agent) => {
 export async function wireComputerCard(root = document) {
   const slot = root.querySelector(".computer-slot");
   if (!slot) return;
-  const [where, agent, version] = await Promise.all([
+  const [where, agent, version, mesh] = await Promise.all([
     call("platform"), call("agent_status"), call("version"),
+    call("mesh_status").catch(() => ({})),
   ]);
   const [state, line, tone] = agentWords(agent);
   const mount = where.mount || {};
@@ -180,7 +181,39 @@ export async function wireComputerCard(root = document) {
     row("Agent", line, state, tone) +
     row("Mounting", mounting[1], mounting[0], mount.available ? "" : "warn") +
     row("Desktop app", version.server || "", version.version || "?") +
+    meshRow(mesh) +
     `</div>`;
+  const join = slot.querySelector(".mesh-join");
+  if (join) join.addEventListener("click", () => joinMesh(slot, join));
+}
+
+// Private access: whether this computer is on the cloud's own mesh, and the
+// way onto it when it is not. Only said when the cloud has private access.
+function meshRow(mesh) {
+  if (!mesh || !mesh.available) return "";
+  const meta = mesh.enrolled
+    ? `Reaches ${mesh.hostname} from anywhere, as ${mesh.tailscale_address || mesh.device}`
+    : "Not on the cloud's private network yet";
+  return `<div class="row"><span class="main"><span class="title">Private network</span>` +
+    `<span class="meta"><span class="preview mesh-line">${esc(meta)}</span></span></span>` +
+    (mesh.enrolled
+      ? `<span class="value good">Enrolled</span>`
+      : `<button class="desk-button cloud mesh-join" type="button">Enroll</button>`) +
+    `</div>`;
+}
+
+async function joinMesh(slot, button) {
+  const line = slot.querySelector(".mesh-line");
+  button.disabled = true;
+  button.textContent = "Enrolling…";
+  const done = await call("mesh_join").catch((err) => ({ error: String(err) }));
+  if (done.error) {
+    line.textContent = done.error;
+    button.disabled = false;
+    button.textContent = "Enroll";
+    return;
+  }
+  wireComputerCard(slot.parentNode || document);
 }
 
 // -- go -------------------------------------------------------------------------------------

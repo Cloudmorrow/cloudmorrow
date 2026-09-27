@@ -4,6 +4,12 @@
 #   curl -fsSL __BASE_URL__/install.sh | sh
 #   curl -fsSL __BASE_URL__/install.sh | sh -s -- --agent-token bce_xxx --allow-shell
 #   curl -fsSL __BASE_URL__/install.sh | sh -s -- --no-desktop
+#   curl -fsSL __BASE_URL__/install.sh | sh -s -- --private
+#
+# --private also signs you in and puts this computer on your cloud's private
+# mesh: it asks the cloud for a one-time key, installs Tailscale if it is not
+# here (asking first; --yes not to ask), and joins with the key.
+# --dry-run says what it would do, and does none of it.
 #
 set -eu
 
@@ -16,6 +22,9 @@ AGENT_NAME=""
 ALLOW_SHELL=""
 NO_AGENT=""
 NO_DESKTOP=""
+PRIVATE=""
+YES=""
+DRY_RUN=""
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -24,9 +33,12 @@ while [ $# -gt 0 ]; do
 	--allow-shell) ALLOW_SHELL="--allow-shell"; shift ;;
 	--no-agent) NO_AGENT="1"; shift ;;
 	--no-desktop) NO_DESKTOP="1"; shift ;;
+	--private) PRIVATE="1"; shift ;;
+	--yes) YES="--yes"; shift ;;
+	--dry-run) DRY_RUN="1"; shift ;;
 	--server) CLOUDMORROW_URL="$2"; shift 2 ;;
 	-h | --help)
-		sed -n '2,7p' "$0" 2>/dev/null || echo "see ${CLOUDMORROW_URL}"
+		sed -n '2,13p' "$0" 2>/dev/null || echo "see ${CLOUDMORROW_URL}"
 		exit 0
 		;;
 	*) echo "unknown option: $1" >&2; exit 2 ;;
@@ -34,7 +46,15 @@ while [ $# -gt 0 ]; do
 done
 
 say() { printf '\033[36m::\033[0m %s\n' "$*"; }
+note() { printf '\033[33mnote:\033[0m %s\n' "$*"; }
 die() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+run() {
+	if [ -n "$DRY_RUN" ]; then
+		printf '   \033[2mwould run:\033[0m %s\n' "$*"
+	else
+		"$@"
+	fi
+}
 
 # --- where to install ------------------------------------------------------
 if [ "$(id -u)" = "0" ]; then
@@ -61,23 +81,25 @@ say "using $($PYTHON -V) at $(command -v "$PYTHON")"
 
 # --- install ---------------------------------------------------------------
 say "installing into $VENV"
-mkdir -p "$PREFIX" "$BINDIR"
-[ -d "$VENV" ] || "$PYTHON" -m venv "$VENV"
-"$VENV/bin/python" -m pip install --quiet --upgrade pip
+run mkdir -p "$PREFIX" "$BINDIR"
+[ -d "$VENV" ] || run "$PYTHON" -m venv "$VENV"
+run "$VENV/bin/python" -m pip install --quiet --upgrade pip
 say "fetching $PACKAGE"
 # --force-reinstall because the version does not change between commits, so
 # plain --upgrade would decide it is already satisfied and skip the new code.
-"$VENV/bin/python" -m pip install --quiet --upgrade --force-reinstall "$PACKAGE"
+run "$VENV/bin/python" -m pip install --quiet --upgrade --force-reinstall "$PACKAGE"
 
 for tool in cloudmorrow cm cloudmorrow-agent; do
-	if [ -x "$VENV/bin/$tool" ]; then
-		ln -sf "$VENV/bin/$tool" "$BINDIR/$tool"
+	if [ -x "$VENV/bin/$tool" ] || [ -n "$DRY_RUN" ]; then
+		run ln -sf "$VENV/bin/$tool" "$BINDIR/$tool"
 		say "linked $BINDIR/$tool"
 	fi
 done
 
 # --- point the CLI at this server -----------------------------------------
-"$BINDIR/cloudmorrow" config set api_url "$CLOUDMORROW_URL" >/dev/null
+# The server this script came from. Without it, `cloudmorrow login` would
+# look on the home network and list the clouds it finds there instead.
+run "$BINDIR/cloudmorrow" config set api_url "$CLOUDMORROW_URL" >/dev/null
 say "CLI configured for $CLOUDMORROW_URL"
 
 # --- the desktop app, where there is a desktop -----------------------------
@@ -91,6 +113,8 @@ if [ -n "$NO_DESKTOP" ]; then
 	say "skipping the desktop app (--no-desktop)"
 elif [ "$(id -u)" = "0" ]; then
 	: # a root install is for every user and none of them in particular
+elif [ -n "$DRY_RUN" ]; then
+	say "would add the desktop app, if a desktop is running here"
 elif [ "$(uname -s)" = "Linux" ]; then
 	if [ -n "${WAYLAND_DISPLAY:-}" ] || [ -n "${DISPLAY:-}" ]; then
 		say "a desktop is running here: adding the desktop app (this is the big download)"
@@ -99,7 +123,7 @@ elif [ "$(uname -s)" = "Linux" ]; then
 			DESKTOP="1"
 			say "Cloudmorrow is in your applications menu"
 		else
-			printf '\033[33mnote:\033[0m the desktop app did not install; the terminal app is fine\n'
+			note "the desktop app did not install; the terminal app is fine"
 		fi
 	fi
 fi
@@ -117,12 +141,36 @@ if [ -n "$AGENT_TOKEN" ] && [ -z "$NO_AGENT" ]; then
 	set -- --server "$CLOUDMORROW_URL" --token "$AGENT_TOKEN"
 	[ -n "$AGENT_NAME" ] && set -- "$@" --name "$AGENT_NAME"
 	[ -n "$ALLOW_SHELL" ] && set -- "$@" "$ALLOW_SHELL"
-	"$BINDIR/cloudmorrow-agent" enroll "$@"
+	run "$BINDIR/cloudmorrow-agent" enroll "$@"
+fi
+
+# --- optionally, this computer on the private mesh ------------------------
+# Signed in first, because the key is asked for as you. Then `cloudmorrow
+# access join`: a key labelled with this computer's name, Tailscale (only
+# once you say yes, or --yes), and `sudo tailscale up --login-server …
+# --authkey … --hostname …`. Asked on the terminal, not stdin: through
+# `curl | sh`, stdin is this script.
+MESH=""
+if [ -n "$PRIVATE" ]; then
+	say "putting this computer on the cloud's private mesh"
+	if [ -n "$DRY_RUN" ]; then
+		run "$BINDIR/cloudmorrow" login --server "$CLOUDMORROW_URL"
+		run "$BINDIR/cloudmorrow" access join $YES
+	elif ( : </dev/tty ) 2>/dev/null; then
+		if "$BINDIR/cloudmorrow" login --server "$CLOUDMORROW_URL" </dev/tty \
+			&& "$BINDIR/cloudmorrow" access join $YES </dev/tty; then
+			MESH="1"
+		else
+			note "not on the mesh yet; when you are ready: cloudmorrow access join"
+		fi
+	else
+		note "no terminal to sign in on; afterwards: cloudmorrow login && cloudmorrow access join"
+	fi
 fi
 
 case ":$PATH:" in
 *":$BINDIR:"*) ;;
-*) printf '\033[33mnote:\033[0m add %s to your PATH\n' "$BINDIR" ;;
+*) note "add $BINDIR to your PATH" ;;
 esac
 
 cat <<EOF
@@ -132,7 +180,26 @@ cat <<EOF
     cloudmorrow login              sign in, then
     cloudmorrow                    open the notes TUI  (cm does the same, in two letters)
 
+  With no server set, \`cloudmorrow login\` lists the clouds it finds on
+  your home network. At home, it also notes where your cloud's box is, and
+  talks to it directly from then on, still checking its certificate.
+
 EOF
+
+if [ -n "$MESH" ]; then
+	cat <<EOF
+  This computer is on your cloud's private mesh: it reaches the cloud from
+  anywhere, and nobody else's device can.
+
+EOF
+elif [ -z "$PRIVATE" ]; then
+	cat <<EOF
+  If your cloud is private (reached only by enrolled devices):
+
+    cloudmorrow access join        put this computer on its mesh
+
+EOF
+fi
 
 if [ -n "$DESKTOP" ]; then
 	cat <<EOF

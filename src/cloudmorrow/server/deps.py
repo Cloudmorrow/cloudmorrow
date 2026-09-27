@@ -9,6 +9,7 @@ from typing import Annotated
 from fastapi import Depends, Header, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from cloudmorrow.server.access_ways import Access
 from cloudmorrow.server.agents import Agent, AgentStore, JobStore
 from cloudmorrow.server.config import ServerConfig
 from cloudmorrow.server.configsync import ConfigStore
@@ -71,6 +72,8 @@ class AppState:
     # A Quill's credentials, and what runs its code (quilltokens, quillservices).
     quill_tokens: QuillTokenStore | None = None
     services: Supervisor | None = None
+    # How the cloud is reached: home network, public, private (access_ways).
+    access: Access | None = None
 
     def cloud_name(self) -> str:
         """What this cloud is called: set from the app, else from the config."""

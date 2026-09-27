@@ -1,9 +1,9 @@
 #!/bin/sh
 # Install (or re-install) the Cloudmorrow server on this machine.
 #
-# One command, four questions — what your cloud is called, the address
-# people will reach it on, who its first account (the administrator) is,
-# and which of the standard quills it has — and it is running:
+# One command, four questions — what your cloud is called, how people will
+# reach it, who its first account (the administrator) is, and which of the
+# standard quills it has — and it is running:
 #
 #   curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
 #
@@ -11,7 +11,15 @@
 # given as a flag instead, for a script or a re-run that should ask nothing:
 #
 #   sudo sh install-server.sh --name "The Larsens" \
-#     --public-url https://cloud.example.com --user alice --quills all
+#     --public-name larsens --private --yes --user alice --quills all
+#
+# How people reach it is one of: the home network only (the box announces
+# itself as <name>.local); a public name, <name>.cloudmorrow.com, through the
+# relay, with no port forwarding; private, only from devices you enroll, over
+# an encrypted mesh; or public and private. A public or private name brings
+# Caddy onto this machine for the certificate, and private brings Tailscale's
+# client; both are asked about first (--yes to not ask). Your own domain and
+# reverse proxy instead: --public-url https://cloud.example.com.
 #
 # Idempotent: run it again to move the deployment to new settings. It never
 # overwrites an existing /etc/cloudmorrow/server.toml, your notes, or the
@@ -39,6 +47,16 @@ SSH_KEY=""
 NO_SSH_KEY=""
 QUILLS=""
 DRY_RUN=""
+# How people reach it: home, public, private, both — or own, for an address
+# of your own behind your own proxy (--public-url). Empty until answered.
+WAY=""
+PUBLIC_NAME=""
+WANT_PRIVATE=""
+ACCESS_CONTROL=""
+ASSUME_YES=""
+CADDY_DIR="/var/lib/cloudmorrow-caddy"
+HOST_GIVEN=""
+CHOICE=""
 
 usage() {
 	sed -n '2,20p' "$0"
@@ -46,7 +64,16 @@ usage() {
 
 Options:
   --name TEXT         what your cloud is called         (asked if not given)
-  --public-url URL    the address people reach it on    (asked if not given)
+  --public-name NAME  reach it from anywhere at NAME.cloudmorrow.com, through
+                      the relay (installs Caddy for the certificate)
+  --private           reach it only from devices you enroll, over the mesh
+                      (installs Tailscale's client); with --public-name, both
+  --home-only         the home network only: <name>.local, nothing outside
+  --public-url URL    your own address, behind your own reverse proxy,
+                      instead of a name from the relay
+  --access-control URL the control server for names and the mesh
+                      (default: https://relay.cloudmorrow.com)
+  --yes               install Caddy and Tailscale without asking
   --user NAME         the first account, an administrator (asked if not given;
                       its password is asked for, or read from
                       \$CLOUDMORROW_ADMIN_PASSWORD)
@@ -71,7 +98,12 @@ EOF
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--name) CLOUD_NAME="$2"; shift 2 ;;
-	--public-url) PUBLIC_URL="$2"; shift 2 ;;
+	--public-url) PUBLIC_URL="$2"; WAY="own"; shift 2 ;;
+	--public-name) PUBLIC_NAME="$2"; shift 2 ;;
+	--private) WANT_PRIVATE="1"; shift ;;
+	--home-only) WAY="home"; shift ;;
+	--access-control) ACCESS_CONTROL="$2"; shift 2 ;;
+	--yes | -y) ASSUME_YES="1"; shift ;;
 	--user) ACCOUNT="$2"; shift 2 ;;
 	--quills) QUILLS="$2"; shift 2 ;;
 	--repo) REPO="$2"; shift 2 ;;
@@ -79,7 +111,7 @@ while [ $# -gt 0 ]; do
 	--prefix) PREFIX="$2"; shift 2 ;;
 	--notes-dir) NOTES_DIR="$2"; shift 2 ;;
 	--data-dir) DATA_DIR="$2"; shift 2 ;;
-	--host) HOST="$2"; shift 2 ;;
+	--host) HOST="$2"; HOST_GIVEN="1"; shift 2 ;;
 	--port) PORT="$2"; shift 2 ;;
 	--service-user) SERVICE_USER="$2"; shift 2 ;;
 	--service-name) SERVICE_NAME="$2"; shift 2 ;;
@@ -193,7 +225,69 @@ if [ -n "$TTY" ]; then
 	printf '\n  Four questions, and your cloud is running. Three now, and one once\n  the software is in: which of the standard quills it should have.\n\n' >/dev/tty
 fi
 ask CLOUD_NAME "What is your cloud called?" "Cloudmorrow"
-ask PUBLIC_URL "What address will people use?" "https://$(hostname -f 2>/dev/null || hostname)"
+
+# How people reach it. The flags are the answer when given; a re-run with
+# none leaves it as the server has it (Administration -> Access changes it
+# from then on); otherwise it is the second question.
+LABEL="$(printf '%s' "${CLOUD_NAME:-Cloudmorrow}" | tr 'A-Z' 'a-z' |
+	sed -e 's/[^a-z0-9-]\{1,\}/-/g' -e 's/-\{2,\}/-/g' -e 's/^-*//' -e 's/-*$//' | cut -c1-40 | sed 's/-*$//')"
+[ "${#LABEL}" -ge 3 ] || LABEL="my-cloud"
+if [ -z "$WAY" ]; then
+	if [ -n "$PUBLIC_NAME" ] && [ -n "$WANT_PRIVATE" ]; then
+		WAY="both"
+	elif [ -n "$PUBLIC_NAME" ]; then
+		WAY="public"
+	elif [ -n "$WANT_PRIVATE" ]; then
+		WAY="private"
+	elif [ -f "$CONFIG" ]; then
+		WAY="kept"
+	fi
+fi
+CONTROL_HOST="$(printf '%s' "${ACCESS_CONTROL:-https://relay.cloudmorrow.com}" | sed -e 's|^[a-z]*://||' -e 's|[:/].*$||')"
+ZONE_GUESS="${CONTROL_HOST#*.}"
+if [ -z "$WAY" ] && [ -n "$TTY" ]; then
+	cat >/dev/tty <<EOF
+$(printf '\033[1m%s\033[0m' "How should people reach it?")
+  1  Home network only   devices on this network, at http://$LABEL.local:$PORT
+  2  A public name       anybody with the address: $LABEL.$ZONE_GUESS, through the relay
+  3  Private             only devices you enroll, from anywhere, over an encrypted mesh
+  4  Public and private  one name; the shortest way for each device
+  5  My own address      a domain of yours, behind a reverse proxy of yours
+EOF
+	ask CHOICE "Choose" "1"
+	case "$CHOICE" in
+	1) WAY="home" ;;
+	2) WAY="public" ;;
+	3) WAY="private" ;;
+	4) WAY="both" ;;
+	5) WAY="own" ;;
+	*) die "choose 1, 2, 3, 4 or 5" ;;
+	esac
+fi
+if [ -z "$WAY" ]; then
+	# Nobody to ask: the home network, which needs nothing from anywhere.
+	[ -z "$DRY_RUN" ] || printf '   \033[2mwould ask:\033[0m how people should reach it (home network, public, private, both, own address)\n'
+	WAY="home"
+fi
+case "$WAY" in
+home)
+	# Reached by its neighbours: listen beyond loopback, unless told where.
+	[ -n "$HOST_GIVEN" ] || HOST="0.0.0.0"
+	[ -n "$PUBLIC_URL" ] || PUBLIC_URL="http://$LABEL.local:$PORT"
+	;;
+public | private | both)
+	ask PUBLIC_NAME "Which name? It becomes NAME.$ZONE_GUESS" "$LABEL"
+	PUBLIC_NAME="${PUBLIC_NAME:-$LABEL}"
+	PUBLIC_NAME="$(printf '%s' "$PUBLIC_NAME" | tr 'A-Z' 'a-z')"
+	printf '%s' "$PUBLIC_NAME" | grep -Eq '^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$' ||
+		die "a name is 3 to 40 lowercase letters, digits or '-', like larsens"
+	# The real address comes back from the control server; this is the guess.
+	PUBLIC_URL="https://$PUBLIC_NAME.$ZONE_GUESS"
+	;;
+own)
+	ask PUBLIC_URL "What address will people use?" "https://$(hostname -f 2>/dev/null || hostname)"
+	;;
+esac
 if [ "$EXISTING_USERS" = "0" ]; then
 	ask ACCOUNT "Username for the first account (the administrator)" "${SUDO_USER:-admin}"
 	if [ -n "$ACCOUNT" ]; then
@@ -215,8 +309,11 @@ PUBLIC_URL="$(printf '%s' "$PUBLIC_URL" | sed 's|/*$||')"
 if [ -z "$PUBLIC_URL" ]; then
 	warn "no address given; the install page will guess from each request"
 fi
-case "$PUBLIC_URL" in
-http://*)
+case "$WAY:$PUBLIC_URL" in
+home:*)
+	say "reached on the home network only, at $PUBLIC_URL; \`cm login\` finds it there"
+	;;
+*:http://*)
 	warn "$PUBLIC_URL is plain http: every client will have to allow that"
 	warn "(cloudmorrow config set allow_insecure_http true). Put TLS in front when you can."
 	;;
@@ -370,6 +467,17 @@ run ln -sf "$VENV/bin/cloudmorrow-server" /usr/local/bin/cloudmorrow-server
 
 
 # --- configuration ---------------------------------------------------------
+case "$WAY" in
+public | private | both) CONFIG_URL="" ;;
+*) CONFIG_URL="$PUBLIC_URL" ;;
+esac
+ACCESS_LINES=""
+if [ -n "$ACCESS_CONTROL" ]; then
+	ACCESS_LINES="
+# The control server names, the relay and the mesh are asked for.
+access_control = \"$ACCESS_CONTROL\"
+"
+fi
 if [ -f "$CONFIG" ]; then
 	say "keeping the existing $CONFIG"
 else
@@ -394,8 +502,10 @@ port = $PORT
 key_file = "$KEY_FILE"
 
 # The URL clients reach this server on, baked into the install page.
-public_url = "$PUBLIC_URL"
-
+# A public or private name from the control server takes its place while
+# either is on (Administration -> Access), so it is empty for those.
+public_url = "$CONFIG_URL"
+$ACCESS_LINES
 token_ttl_hours = 720
 cors_origins = []
 EOF
@@ -447,7 +557,9 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=$NOTES_DIR $DATA_DIR $PREFIX
+# The Caddy site for the cloud's name is written into $CADDY_DIR (optional:
+# only a box with a public or private name has it).
+ReadWritePaths=$NOTES_DIR $DATA_DIR $PREFIX -$CADDY_DIR
 
 [Install]
 WantedBy=multi-user.target
@@ -525,6 +637,215 @@ else
 		warn "the standard quills were not all installed; add them later from Administration, Quills"
 fi
 
+# --- how people reach it --------------------------------------------------
+# A public or private name is claimed at the control server by the service
+# user (the token is sealed into the database), and the certificate for it
+# is Caddy's, on this machine: the relay only moves bytes it cannot read.
+# Installing Caddy and Tailscale is root's, so it happens here, asked first.
+consent() {
+	# consent "question": yes with --yes; otherwise asked on the terminal, and
+	# no without one. A dry run says what it would ask.
+	[ -z "$ASSUME_YES" ] || return 0
+	if [ -n "$DRY_RUN" ]; then
+		printf '   \033[2mwould ask:\033[0m %s\n' "$1"
+		return 0
+	fi
+	[ -n "$TTY" ] || return 1
+	printf '\033[1m%s\033[0m [Y/n]: ' "$1" >/dev/tty
+	read -r answer </dev/tty || answer=""
+	case "$answer" in n* | N*) return 1 ;; *) return 0 ;; esac
+}
+
+as_server() {
+	run sudo -u "$SERVICE_USER" -H env CLOUDMORROW_SERVER_CONFIG="$CONFIG" \
+		"$VENV/bin/cloudmorrow-server" "$@"
+}
+
+caddy_arch() {
+	case "$(uname -m)" in
+	x86_64 | amd64) echo amd64 ;;
+	aarch64 | arm64) echo arm64 ;;
+	armv7* | armhf) echo "arm&arm=7" ;;
+	armv6*) echo "arm&arm=6" ;;
+	*) uname -m ;;
+	esac
+}
+
+download_caddy() {
+	# download_caddy [module]: Caddy's own build service, with the module
+	# compiled in when one is named, and the unit Caddy ships.
+	url="https://caddyserver.com/api/download?os=linux&arch=$(caddy_arch)${1:+&p=$1}"
+	say "downloading Caddy${1:+ with $1} from caddyserver.com"
+	run curl -fsSL -o /usr/bin/caddy "$url"
+	run chmod 755 /usr/bin/caddy
+	id caddy >/dev/null 2>&1 || run useradd --system --home-dir /var/lib/caddy --create-home \
+		--shell /usr/sbin/nologin caddy
+	run mkdir -p /etc/caddy
+	write_file /etc/systemd/system/caddy.service 0644 <<EOF
+[Unit]
+Description=Caddy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=caddy
+Group=caddy
+ExecStart=/usr/bin/caddy run --environ --config /etc/caddy/Caddyfile
+ExecReload=/usr/bin/caddy reload --config /etc/caddy/Caddyfile --force
+TimeoutStopSec=5s
+LimitNOFILE=1048576
+PrivateTmp=true
+ProtectSystem=full
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+install_caddy() {
+	# The certificate by DNS, for a name nothing on the internet can reach:
+	# only a private-only cloud needs Caddy built with the acmedns module.
+	module=""
+	[ "$WAY" != "private" ] || module="github.com/caddy-dns/acmedns"
+	if command -v caddy >/dev/null 2>&1; then
+		say "caddy is here: $(caddy version 2>/dev/null | head -n 1)"
+		if [ -n "$module" ] && ! caddy list-modules 2>/dev/null | grep -q '^dns.providers.acmedns'; then
+			consent "Rebuild Caddy with the acmedns module (for the certificate of a private-only cloud)?" ||
+				{ warn "no acmedns module: a private-only cloud gets no certificate"; return 1; }
+			run caddy add-package "$module"
+		fi
+		return 0
+	fi
+	consent "Install Caddy, which gets and holds the certificate for $PUBLIC_NAME?" ||
+		{ warn "no Caddy: the name will not answer until it is installed (run this again)"; return 1; }
+	if [ -z "$module" ] && command -v apt-get >/dev/null 2>&1 &&
+		{ [ -n "$DRY_RUN" ] || apt-cache show caddy >/dev/null 2>&1; }; then
+		say "installing Caddy from the distribution"
+		run apt-get install -y caddy
+	elif [ -z "$module" ] && command -v dnf >/dev/null 2>&1; then
+		say "installing Caddy from the distribution"
+		run dnf install -y caddy
+	else
+		download_caddy "$module"
+	fi
+}
+
+wire_caddy() {
+	# The service writes its site into CADDY_DIR, which Caddy imports; the
+	# group is caddy's so the site (with an acme-dns password in it) is
+	# readable by Caddy and nobody else.
+	run mkdir -p "$CADDY_DIR"
+	run chown "$SERVICE_USER:caddy" "$CADDY_DIR"
+	run chmod 2750 "$CADDY_DIR"
+	CADDYFILE="/etc/caddy/Caddyfile"
+	if [ ! -f "$CADDYFILE" ] || grep -q '/usr/share/caddy' "$CADDYFILE"; then
+		say "writing $CADDYFILE (it imports the site Cloudmorrow keeps in $CADDY_DIR)"
+		write_file "$CADDYFILE" 0644 <<EOF
+# Written by install-server.sh. Cloudmorrow writes the site for this cloud's
+# name into $CADDY_DIR and reloads Caddy through its admin endpoint
+# (localhost:2019). Add sites of your own below; this file is not rewritten.
+import $CADDY_DIR/*.caddy
+EOF
+	elif ! grep -q "$CADDY_DIR" "$CADDYFILE"; then
+		say "adding the Cloudmorrow import to $CADDYFILE"
+		if [ -n "$DRY_RUN" ]; then
+			printf '   \033[2mwould append:\033[0m import %s/*.caddy\n' "$CADDY_DIR"
+		else
+			printf '\n# Cloudmorrow: the site for this cloud'"'"'s name.\nimport %s/*.caddy\n' "$CADDY_DIR" >>"$CADDYFILE"
+		fi
+	fi
+	if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+		run systemctl daemon-reload
+		run systemctl enable --now caddy
+		run systemctl reload-or-restart caddy
+	fi
+}
+
+install_tailscale() {
+	if command -v tailscale >/dev/null 2>&1; then
+		say "tailscale is here: $(tailscale version 2>/dev/null | head -n 1)"
+		return 0
+	fi
+	consent "Install Tailscale's client, which puts this box on your cloud's private mesh?" ||
+		{ warn "no Tailscale: private access stays off (run this again with --private)"; return 1; }
+	say "installing Tailscale's client from tailscale.com"
+	if [ -n "$DRY_RUN" ]; then
+		printf '   \033[2mwould run:\033[0m curl -fsSL https://tailscale.com/install.sh | sh\n'
+	else
+		curl -fsSL https://tailscale.com/install.sh | sh
+	fi
+}
+
+join_mesh() {
+	# The first join is root's: the box's key from the control server, then
+	# tailscale up, which makes the service tailscale's operator so it can
+	# bring the box up and down itself afterwards.
+	if [ -n "$DRY_RUN" ]; then
+		printf '   \033[2mwould run:\033[0m tailscale up --login-server <from the control server> --authkey <a one-time key> --hostname cloud --operator=%s --reset\n' "$SERVICE_USER"
+		as_server access private on
+		return 0
+	fi
+	line="$(sudo -u "$SERVICE_USER" -H env CLOUDMORROW_SERVER_CONFIG="$CONFIG" \
+		"$VENV/bin/cloudmorrow-server" access mesh-key)" || return 1
+	login="${line%% *}"
+	key="${line#* }"
+	tailscale up --login-server "$login" --authkey "$key" --hostname cloud \
+		--operator="$SERVICE_USER" --reset || return 1
+	as_server access private on
+}
+
+claim_name() {
+	public_flag="--public"
+	[ "$WAY" != "private" ] || public_flag="--no-public"
+	tries=0
+	while :; do
+		say "claiming $PUBLIC_NAME at ${ACCESS_CONTROL:-https://relay.cloudmorrow.com}"
+		if as_server access claim "$PUBLIC_NAME" "$public_flag"; then
+			return 0
+		fi
+		tries=$((tries + 1))
+		if [ -z "$TTY" ] || [ "$tries" -ge 3 ]; then
+			return 1
+		fi
+		PUBLIC_NAME=""
+		ask PUBLIC_NAME "Another name?" ""
+		[ -n "$PUBLIC_NAME" ] || return 1
+	done
+}
+
+ACCESS_NOTE=""
+case "$WAY" in
+public | private | both)
+	CADDY_OK=""
+	if install_caddy; then
+		wire_caddy
+		CADDY_OK="1"
+	fi
+	if claim_name; then
+		if [ "$WAY" != "public" ]; then
+			if install_tailscale && join_mesh; then
+				:
+			else
+				ACCESS_NOTE="private access is off: turn it on in Administration -> Access once tailscale is here"
+			fi
+		fi
+		if [ -z "$DRY_RUN" ]; then
+			CLAIMED="$(sudo -u "$SERVICE_USER" -H env CLOUDMORROW_SERVER_CONFIG="$CONFIG" \
+				"$VENV/bin/cloudmorrow-server" access status --json 2>/dev/null |
+				sed -n 's/^  "address": "\(.*\)",$/\1/p' | head -n 1)"
+			[ -z "$CLAIMED" ] || PUBLIC_URL="$CLAIMED"
+		fi
+		[ -n "$CADDY_OK" ] || ACCESS_NOTE="the name has no certificate until Caddy is installed: run this again"
+	else
+		warn "no name was claimed; the cloud is reached on the home network until one is"
+		warn "(Administration -> Access, or: sudo -u $SERVICE_USER cloudmorrow-server access claim NAME)"
+		PUBLIC_URL=""
+	fi
+	;;
+esac
+
 # --- start it --------------------------------------------------------------
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
 	run systemctl daemon-reload
@@ -590,8 +911,33 @@ if [ -n "$ACCOUNT_MADE" ]; then
 fi
 printf '\n'
 
-case "$PUBLIC_URL" in
-https://*)
+case "$WAY:$PUBLIC_URL" in
+public:https://* | private:https://* | both:https://*)
+	cat <<EOF
+  Reached as $PUBLIC_HOST ($(printf '%s' "$WAY" | sed 's/^both$/public and private/')). Caddy on this machine gets the certificate
+  the first time the name is asked for, which takes a minute.
+EOF
+	if [ "$WAY" != "public" ]; then
+		cat <<EOF
+  Enroll each device once: a computer with
+    curl -fsSL $PUBLIC_URL/install.sh | sh -s -- --private
+  and a phone with the Tailscale app and a code from Me -> Pair a device.
+EOF
+	fi
+	if [ -n "$ACCESS_NOTE" ]; then
+		warn "$ACCESS_NOTE"
+	fi
+	printf '\n'
+	;;
+home:*)
+	cat <<EOF
+  Reached on this network as $PUBLIC_HOST. From anywhere else too: a public or
+  private name in Administration -> Access, or run this again with
+  --public-name NAME or --private.
+
+EOF
+	;;
+*:https://*)
 	cat <<EOF
   Put a reverse proxy in front of it for TLS. With Caddy, this is the whole file:
 

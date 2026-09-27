@@ -97,22 +97,23 @@ the plan for the rest is [docs/PLATFORM.md](docs/PLATFORM.md).
   shop is not yet.
 - **A Raspberry Pi image.** Burn a card, plug the Pi into the router, open
   `cloudmorrow.local` on a phone and set it up from the browser. The
-  first-boot page is built; the image and the public tunnel are not yet.
+  first-boot page and the ways to reach it are built; the image is not yet.
 
 [docs/HOSTING.md](docs/HOSTING.md) has the plan for the last two, and for
 certificates and public access that just work.
 
 ## Install a server
 
-You need a Linux machine with systemd, `git` and Python 3.11 or newer, and a
-name it can be reached by, such as `cloud.example.com`. One command:
+You need a Linux machine with systemd, `git` and Python 3.11 or newer. No
+domain, no port forwarding, no certificate: those come with the answer to
+the second question. One command:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
 ```
 
-It asks four questions: what your cloud is called, the address people will
-use, a username and password for the first account, which becomes the
+It asks four questions: what your cloud is called, how people should reach
+it, a username and password for the first account, which becomes the
 administrator, and which of the standard quills it should have (Notes,
 Tasks, Calendar, Chat, Files, Secrets; all of them unless you say). Then it creates a service user, clones the code into
 `/opt/cloudmorrow`, builds a virtualenv, writes the config and the systemd
@@ -120,17 +121,34 @@ unit, generates the encryption key, starts the service and makes your
 account. Run it again any time: it keeps your config, notes, database and
 accounts, and never asks a question it already has the answer to.
 
+**How people reach it** is one of three ways, or a mix, and can be changed
+later in **Administration → Access**:
+
+| way | who reaches it | what you do |
+| --- | --- | --- |
+| **Home network** | devices on the same network | nothing: the box announces itself as `<name>.local`, and `cm login` finds it |
+| **Public** | anybody with the address; the sign-in page is the door | pick a name: `larsens.cloudmorrow.com`. The box keeps one outbound connection to the relay, so there is no port forwarding; the certificate is the box's own, and the relay only moves bytes it cannot read |
+| **Private** | only devices you enroll, from anywhere | enroll each device once: a computer with the client installer's `--private`, a phone with the Tailscale app and a code from **Me → Pair a device** |
+
+A public or private name brings Caddy onto the machine for the certificate,
+and private brings Tailscale's client; the installer asks before installing
+either. The relay and the mesh's coordination server are free software too
+([Cloudmorrow/relay](https://github.com/Cloudmorrow/relay)): run your own and
+pass `--access-control https://relay.example.org`.
+[docs/HOSTING.md](docs/HOSTING.md#reaching-your-cloud) says how it works.
+
 Every answer can be a flag instead, for a script or a machine with no
 terminal, and `--dry-run` says what it would do without doing any of it:
 
 ```bash
-sudo sh install-server.sh --name "The Larsens" --public-url https://cloud.example.com \
+sudo sh install-server.sh --name "The Larsens" --public-name larsens --private --yes \
   --user alice --quills all
 ```
 
-The server listens on the loopback and expects a reverse proxy in front of
-it for TLS. Caddy is the easy choice: it fetches and renews the certificate
-itself, and the whole config is what the installer prints at the end.
+`--home-only` is the home network alone. Have a domain and a reverse proxy
+of your own already? Give `--public-url https://cloud.example.com` instead:
+the server listens on the loopback, and the Caddy config the installer
+prints at the end is the whole of it:
 
 ```
 cloud.example.com {
@@ -140,13 +158,14 @@ cloud.example.com {
 
 An nginx example is in [deploy/nginx.conf.example](deploy/nginx.conf.example).
 
-Then:
+Then, with `larsens.cloudmorrow.com` standing for your cloud's address:
 
-1. Open `https://cloud.example.com` in a browser and sign in.
+1. Open `https://larsens.cloudmorrow.com` in a browser and sign in.
 2. On each computer, install the terminal app (`cm`) and the desktop app,
    which also mounts your fileshares, with the line that page shows:
-   `curl -fsSL https://cloud.example.com/install.sh | sh`.
-3. On a phone, open `https://cloud.example.com/app` and use **Add to Home
+   `curl -fsSL https://larsens.cloudmorrow.com/install.sh | sh`
+   (with `-s -- --private` on the end to enroll the computer in a private cloud).
+3. On a phone, open `https://larsens.cloudmorrow.com/app` and use **Add to Home
    Screen**: it opens like any other app, with your cloud's name under the
    icon.
 
@@ -168,13 +187,15 @@ and the encryption key in `/etc/cloudmorrow/cloudmorrow.key`. Every key in the
 config, the cloud's name included, is explained in
 [deploy/server.example.toml](deploy/server.example.toml).
 
-### No domain name yet?
+### Only the home network?
 
-Answer the address question with a plain `http://` address and the server
-stops insisting on TLS. Each client then has to opt in with
+Then it is plain `http://<name>.local:8787`, and the server does not insist
+on TLS. `cm login` on the same network lists the clouds it finds and sets
+that up for you; anywhere else a client opts in with
 `cloudmorrow config set allow_insecure_http true`, because talking to a
-server in the clear should be a decision rather than a default. A private
-network with its own certificates, such as Tailscale, is the better answer.
+server in the clear should be a decision rather than a default. A phone
+needs a real certificate for push and the home screen, which is what a
+public or private name gives it.
 
 ## Install on your computers
 
@@ -185,6 +206,12 @@ curl -fsSL https://cloud.example.com/install.sh | sh
 cloudmorrow login
 cloudmorrow                  # the terminal app; `cm` is the same thing in two letters
 ```
+
+On the same network as the box, `cloudmorrow login` with no server set
+lists the clouds it finds there; and a computer at home talks to a cloud
+with a public or private name at its local address, still checking the
+certificate against the real name. `--private` on the install line enrolls
+the computer in a private cloud (`cloudmorrow access join` does it later).
 
 It needs Python 3.11 or newer and nothing else. It installs into your home
 directory, points the command line at your server, and registers the machine

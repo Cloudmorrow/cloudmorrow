@@ -15,6 +15,8 @@ DEFAULT_CONFIG_PATHS = (
 
 ENV_PREFIX = "CLOUDMORROW_"
 
+DEFAULT_ACCESS_CONTROL = "https://relay.cloudmorrow.com"
+
 DEFAULT_QUILL_CATALOG = (
     "https://raw.githubusercontent.com/Cloudmorrow/quill-catalog/main/catalog.toml"
 )
@@ -83,6 +85,24 @@ class ServerConfig:
     # Where the Quill Catalog is read from: a URL to its catalog.toml, or a
     # local path to one (or to a checkout of the catalog repository).
     quill_catalog: str = DEFAULT_QUILL_CATALOG
+    # Reaching the cloud (access_lan, access_control, access_tunnel,
+    # access_mesh). Announce `<name>.local` and `_cloudmorrow._tcp` on the
+    # home network; off for a box that should stay quiet there.
+    access_lan: bool = True
+    # The control server the public name, the relay and the mesh are asked
+    # for. Anybody can run their own (the Cloudmorrow/relay repository).
+    access_control: str = DEFAULT_ACCESS_CONTROL
+    # Where a stream the relay opens is spliced to: the box's own TLS
+    # terminator (Caddy) for 443, and the same for 80, which answers the
+    # ACME challenge and redirects to https.
+    access_upstream_443: str = "127.0.0.1:443"
+    access_upstream_80: str = "127.0.0.1:80"
+    # Where the site file for the claimed name is written for Caddy to
+    # import, Caddy's admin endpoint, which reloads it, and the Caddyfile
+    # that imports it. The installer makes the directory and the import.
+    access_caddy_dir: Path = Path("/var/lib/cloudmorrow-caddy")
+    access_caddy_admin: str = "http://127.0.0.1:2019"
+    access_caddyfile: Path = Path("/etc/caddy/Caddyfile")
     config_path: Path | None = None
 
     @property
@@ -231,10 +251,24 @@ def load_config(path: Path | None = None) -> ServerConfig:
             "service_name",
             "weather_place",
             "quill_catalog",
+            "access_lan",
+            "access_control",
+            "access_upstream_443",
+            "access_upstream_80",
+            "access_caddy_dir",
+            "access_caddy_admin",
+            "access_caddyfile",
         ):
             if key in section:
                 value = section[key]
-                if key in {"notes_dir", "data_dir", "shares_dir", "key_file"}:
+                if key in {
+                    "notes_dir",
+                    "data_dir",
+                    "shares_dir",
+                    "key_file",
+                    "access_caddy_dir",
+                    "access_caddyfile",
+                }:
                     value = Path(str(value)).expanduser()
                 setattr(config, key, value)
         config.config_path = source
@@ -263,6 +297,13 @@ def load_config(path: Path | None = None) -> ServerConfig:
         "SERVICE_NAME": ("service_name", str),
         "WEATHER_PLACE": ("weather_place", str),
         "QUILL_CATALOG": ("quill_catalog", str),
+        "ACCESS_LAN": ("access_lan", _env_bool),
+        "ACCESS_CONTROL": ("access_control", str),
+        "ACCESS_UPSTREAM_443": ("access_upstream_443", str),
+        "ACCESS_UPSTREAM_80": ("access_upstream_80", str),
+        "ACCESS_CADDY_DIR": ("access_caddy_dir", lambda v: Path(v).expanduser()),
+        "ACCESS_CADDY_ADMIN": ("access_caddy_admin", str),
+        "ACCESS_CADDYFILE": ("access_caddyfile", lambda v: Path(v).expanduser()),
     }
     for env_suffix, (attr, caster) in env_map.items():
         raw = os.environ.get(ENV_PREFIX + env_suffix)

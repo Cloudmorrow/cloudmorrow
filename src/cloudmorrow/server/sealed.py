@@ -95,6 +95,10 @@ SEALED: dict[int, tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...]] = {
     # A Quill's webhook secrets (quilltokens): born sealed, listed so a new
     # key re-seals them.
     3: (("quill_webhooks", ("quill", "hook"), ("secret",)),),
+    # The cloud's credential at the control server, and the acme-dns
+    # account its certificate is renewed through (access_control): born
+    # sealed, listed so a new key re-seals them.
+    4: (("access_cloud", ("cloud_id",), ("token", "acme")),),
 }
 SEALED_VERSION = max(SEALED)
 
