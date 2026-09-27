@@ -28,6 +28,12 @@ task board has to go on as much as a list of car services does.
 
 Every one of them opens a record in the record sheet, where every field has
 the widget its kind calls for.
+
+What the person may do is the datamodels' to say (docs/CIRCLES.md): each
+comes with their `access`, and on one they may only read, a pane is the same
+screen without its writing. Its `WRITING` actions are refused — no button,
+and the key does nothing — and so are those on a space or group datamodel
+they may only read, which each pane refuses itself.
 """
 
 from __future__ import annotations
@@ -42,7 +48,7 @@ from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.screens.modals import ConfirmModal
 from cloudmorrow.tui.screens.record_sheet import RecordSheet, link_choices, shown
 from cloudmorrow.tui.theme import GOOD, MUTED
-from cloudmorrow.tui.widgets.kit import field_label, field_of, title_of
+from cloudmorrow.tui.widgets.kit import can_write, field_label, field_of, title_of
 from cloudmorrow.tui.widgets.toolbar import Action
 
 
@@ -66,6 +72,9 @@ class KitPane(Pane):
         ("ctrl+n", "fire('new_record')", "New"),
         ("delete", "fire('delete_record')", "Delete"),
     ]
+    # The actions that write the screen's own datamodel: not there for
+    # somebody who may only read it.
+    WRITING: frozenset[str] = frozenset({"new_record", "delete_record"})
 
     def __init__(self, quill: dict, screen: dict, *, tab_key: str = "", **kwargs) -> None:
         super().__init__(**kwargs)
@@ -81,11 +90,35 @@ class KitPane(Pane):
         self.records: list[dict] = []
         # Whether the records have been read once, so the card can count them.
         self.loaded = False
+        # Whether this person may write the screen's datamodel, and the
+        # actions they may not take here, whichever datamodel says so.
+        self.writes = can_write(self.model)
+        self.refused: set[str] = set() if self.writes else set(self.WRITING)
+        if not self.writes:
+            self.SUMMARY = f"{self.SUMMARY} · read only" if self.SUMMARY else "read only"
 
     @property
     def noun(self) -> str:
         """What one record is called: "task", "service visit"."""
         return str(self.model.get("label") or self.model_id).lower()
+
+    # -- what this person may do -----------------------------------------------
+    def offer(self, actions: list[Action]) -> tuple[Action, ...]:
+        """The toolbar: *actions*, less the ones refused."""
+        return tuple(action for action in actions if action.id not in self.refused)
+
+    def fire(self, name: str) -> None:
+        # A refused action does nothing, whether a button, a key or a message
+        # from a widget asked for it.
+        if name in self.refused:
+            return
+        super().fire(name)
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        """A refused action's key is not in the footer, and does nothing."""
+        if action == "fire" and parameters and parameters[0] in self.refused:
+            return False
+        return True
 
     def on_show(self) -> None:
         self.reload()
@@ -152,6 +185,7 @@ class ListPane(KitPane):
         *KitPane.BINDINGS,
         ("space", "fire('tick')", "Tick"),
     ]
+    WRITING = KitPane.WRITING | {"tick"}
 
     def __init__(self, quill: dict, screen: dict, **kwargs) -> None:
         super().__init__(quill, screen, **kwargs)
@@ -167,7 +201,7 @@ class ListPane(KitPane):
         if self.tick:
             actions.append(Action("tick", field_label(self.tick), "space"))
         actions.append(Action("delete_record", "Delete", "del"))
-        self.ACTIONS = tuple(actions)
+        self.ACTIONS = self.offer(actions)
 
     def content(self) -> ComposeResult:
         yield DataTable(id="kit-table", cursor_type="row", zebra_stripes=True)
@@ -209,9 +243,12 @@ class ListPane(KitPane):
         if self.records:
             table.move_cursor(row=min(max(row, 0), len(self.records) - 1))
             table.call_after_refresh(self._settle_widths, table)
-        self.status(
-            "" if self.records else f"Nothing here yet — New {self.noun} starts one.", note=True
-        )
+        empty = "Nothing here."
+        if self.writes:
+            empty = f"Nothing here yet — New {self.noun} starts one."
+
+        self.status("" if self.records else empty, note=True)
+
 
     @staticmethod
     def _settle_widths(table: DataTable) -> None:

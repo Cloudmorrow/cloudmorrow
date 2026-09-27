@@ -10,6 +10,7 @@ from rich.text import Text
 from textual.widgets import Checkbox, DataTable, Input, RadioButton, Static
 
 from cloudmorrow.tui.panes.admin import AdminPanel
+from tests.tui_circles import circle_row
 from tests.tui_harness import said, settle, start, user_row
 
 
@@ -47,6 +48,7 @@ async def test_an_admin_has_the_menu_and_a_user_does_not(app):
         assert screen.query_one("#nav-section-admin").display
         assert [card.name_text for card in screen.query(".admin-card") if card.display] == [
             "Users",
+            "Circles",
             "Features",
             "Quills",
         ]
@@ -235,3 +237,177 @@ async def test_a_feature_the_server_refuses_to_switch_says_so(app):
         assert "admin only" in said(screen)
         # And the box goes back to what the server really thinks.
         assert screen.query_one("#feature-notes", Checkbox).value is True
+
+
+# -- circles -----------------------------------------------------------------------
+def circle_rows(screen) -> list[list[str]]:
+    table = screen.query_one("#admin-circle-table", DataTable)
+    return [
+        [Text.from_markup(str(cell)).plain for cell in table.get_row_at(index)]
+        for index in range(table.row_count)
+    ]
+
+
+async def open_circles(app, pilot):
+    """Start, then Circles under ADMINISTRATION, with the table under the keys."""
+    screen = await start(app, pilot)
+    await pilot.click("#nav-admin-circles")
+    await settle(app, pilot)
+    screen.query_one("#admin-circle-table", DataTable).focus()
+    await pilot.pause()
+    return screen
+
+
+def with_kids(app) -> None:
+    """guest out of Members and into Kids, which may use tasks."""
+    app.client.circle_list = [
+        circle_row("Kids", {"task": "write"}, ["guest"]),
+        circle_row("Members", {"*": "write"}, ["bram"], default=True),
+    ]
+
+
+async def test_beside_each_account_are_its_circles_or_that_it_reaches_nothing(app):
+    app.client.circle_list = [circle_row("Members", {"*": "write"}, ["bram"], default=True)]
+    async with app.run_test(size=(140, 34)) as pilot:
+        screen = await open_admin(app, pilot)
+        listed = {row[0]: row[4] for row in rows(screen)}
+        assert listed == {"bram": "Members", "guest": "reaches no data"}
+
+
+async def test_circles_lists_each_with_its_people_and_its_data(app):
+    with_kids(app)
+    async with app.run_test(size=(140, 34)) as pilot:
+        screen = await open_circles(app, pilot)
+        listed = circle_rows(screen)
+        assert [row[0] for row in listed] == ["Kids", "Members"]
+        assert listed[0][2] == "guest" and listed[0][3] == "task: Write"
+        assert listed[1][1] == "yes" and listed[1][3] == "Everything: Write"
+        note = screen.query_one("#admin-circles-note", Static).visual.plain
+        assert "no circle" not in note
+
+
+async def test_somebody_in_no_circle_is_said_above_the_table(app):
+    app.client.circle_list = [circle_row("Members", {"*": "write"}, ["bram"], default=True)]
+    async with app.run_test(size=(140, 34)) as pilot:
+        screen = await open_circles(app, pilot)
+        note = screen.query_one("#admin-circles-note", Static).visual.plain
+        assert "reaching no data: guest" in note
+
+
+async def test_a_new_circle_is_a_name_and_nothing_else(app):
+    async with app.run_test(size=(140, 34)) as pilot:
+        screen = await open_circles(app, pilot)
+        await pilot.press("n")
+        await pilot.pause()
+        await pilot.pause()
+        app.screen.query_one("#prompt-input", Input).value = "Kids"
+        await pilot.press("enter")
+        await settle(app, pilot)
+        assert app.client.circle_calls == [("create", "Kids")]
+        assert [row[0] for row in circle_rows(screen)] == ["Kids", "Members"]
+
+
+async def test_data_is_set_by_domain_and_opens_to_its_datamodels(app):
+    """r on Tasks is read on board and task; enter opens it, w on task makes it write."""
+    with_kids(app)
+    async with app.run_test(size=(140, 40)) as pilot:
+        await open_circles(app, pilot)
+        await pilot.press("a")
+        await pilot.pause()
+        await pilot.pause()
+        dialog = app.screen
+        table = dialog.query_one("#rules-table", DataTable)
+        labels = [Text.from_markup(str(table.get_row_at(i)[0])).plain.strip()
+                  for i in range(table.row_count)]
+        assert labels[0] == "Everything" and "▸ Tasks" in labels
+        table.move_cursor(row=labels.index("▸ Tasks"))
+        await pilot.press("r")
+        await pilot.press("enter")
+        await pilot.pause()
+        labels = [Text.from_markup(str(table.get_row_at(i)[0])).plain.strip()
+                  for i in range(table.row_count)]
+        assert "▾ Tasks" in labels and "Task" in labels
+        table.move_cursor(row=labels.index("Task"))
+        await pilot.press("w")
+        tasks = labels.index("▾ Tasks")
+        assert "Mixed" in Text.from_markup(str(table.get_row_at(tasks)[1])).plain
+        await pilot.press("ctrl+s")
+        await settle(app, pilot)
+        assert app.client.circle_calls == [
+            ("update", "kids", {"rules": {"task": "write", "board": "read"}})
+        ]
+
+
+async def test_everything_at_nothing_takes_the_star_away(app):
+    async with app.run_test(size=(140, 40)) as pilot:
+        await open_circles(app, pilot)
+        await pilot.press("a")
+        await pilot.pause()
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.press("ctrl+s")
+        await settle(app, pilot)
+        assert app.client.circle_calls == [("update", "members", {"rules": {}})]
+
+
+async def test_people_are_ticked_in_and_out(app):
+    with_kids(app)
+    async with app.run_test(size=(140, 34)) as pilot:
+        await open_circles(app, pilot)
+        await pilot.press("p")
+        await pilot.pause()
+        await pilot.pause()
+        dialog = app.screen
+        # bram first, then guest, who is in Kids already.
+        assert dialog.query_one("#member-1", Checkbox).value
+        dialog.query_one("#member-0", Checkbox).value = True
+        dialog.query_one("#member-1", Checkbox).value = False
+        await pilot.press("ctrl+s")
+        await settle(app, pilot)
+        assert app.client.circle_calls == [("join", "kids", "bram"), ("leave", "kids", "guest")]
+
+
+async def test_default_and_delete_are_a_key_each(app):
+    with_kids(app)
+    async with app.run_test(size=(140, 34)) as pilot:
+        screen = await open_circles(app, pilot)
+        await pilot.press("t")
+        await settle(app, pilot)
+        assert circle_rows(screen)[0][1] == "yes"
+        await pilot.press("d")
+        await pilot.pause()
+        await pilot.pause()
+        await pilot.press("y")
+        await settle(app, pilot)
+        assert app.client.circle_calls == [
+            ("update", "kids", {"default": True}),
+            ("delete", "kids"),
+        ]
+        assert [row[0] for row in circle_rows(screen)] == ["Members"]
+
+
+async def test_the_install_sheet_asks_which_circles_get_the_new_data(app):
+    """Reading introduces reading.book: Kids is ticked and given it; Members has `*`."""
+    from cloudmorrow.tui.panes.admin_quills import QuillSheet
+
+    with_kids(app)
+    async with app.run_test(size=(140, 40)) as pilot:
+        screen = await start(app, pilot)
+        await pilot.click("#nav-admin-quills")
+        await settle(app, pilot)
+        table = screen.query_one("#admin-quill-table", DataTable)
+        table.focus()
+        table.move_cursor(row=3)
+        await pilot.press("i")
+        await pilot.pause()
+        await pilot.pause()
+        sheet = app.screen
+        assert isinstance(sheet, QuillSheet)
+        members = sheet.query_one("#sheet-circle-1", Checkbox)
+        assert members.value and members.disabled
+        assert "gets it anyway" in str(members.label)
+        sheet.query_one("#sheet-circle-0", Checkbox).value = True
+        await pilot.click("#install")
+        await settle(app, pilot)
+        assert ("install", "reading") in app.client.quill_calls
+        assert app.client.circle_calls == [("rule", "kids", "reading.book", "write")]

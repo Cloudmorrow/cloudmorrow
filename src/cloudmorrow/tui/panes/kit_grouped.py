@@ -19,6 +19,11 @@ without showing it. The record sheet draws it as a password box.
 
 Nothing here knows what it is drawing: a Secrets vault and environment are
 a group and a subgroup, as a customer and a project would be.
+
+On records you may only read (docs/CIRCLES.md) the levels are picked
+through as ever, rows open in a sheet that cannot save, and nothing is
+added, ticked, deleted or named; a level that is a link to a datamodel you
+may only read names no new value either. Revealing and copying are reading.
 """
 
 from __future__ import annotations
@@ -34,7 +39,7 @@ from cloudmorrow.tui.screens.modals import PromptModal
 from cloudmorrow.tui.screens.record_sheet import shown
 from cloudmorrow.tui.theme import MUTED
 from cloudmorrow.tui.widgets.group_list import GroupList
-from cloudmorrow.tui.widgets.kit import field_label, field_of, safe_id, title_of
+from cloudmorrow.tui.widgets.kit import can_write, field_label, field_of, safe_id, title_of
 from cloudmorrow.tui.widgets.toolbar import Action
 
 MASK = "••••••••"
@@ -54,7 +59,15 @@ class SubgroupBar(Horizontal):
         self.add_class("kit-subgroup-bar")
         self.values: dict[str, str] = {}
 
-    async def show(self, choices: list[tuple[str, str, int]], current: str | None, noun: str) -> None:
+    async def show(
+        self,
+        choices: list[tuple[str, str, int]],
+        current: str | None,
+        noun: str,
+        *,
+        new: bool = True,
+    ) -> None:
+
         # Awaited: removal is scheduled, and remounting the same ids before it
         # lands is a duplicate-id error.
         await self.remove_children()
@@ -70,6 +83,8 @@ class SubgroupBar(Horizontal):
             )
             button.tooltip = f"{count} in {label}"
             await self.mount(button)
+        if not new:
+            return
         add = Button("＋", id="sub-new", compact=True)
         add.tooltip = f"Another {noun}"
         await self.mount(add)
@@ -92,6 +107,12 @@ class GroupedListPane(ListPane):
             f for f in (field_of(self.model, screen.get(n)) for n in ("group", "subgroup")) if f
         ]
         self.hidden = self.subtitle if self.subtitle and self.subtitle.get("secret") else None
+        # Naming a new value is for putting a record in it; one that is a
+        # record itself is made in the datamodel the level links to.
+        for level, action in zip(self.levels, ("new_group", "new_subgroup"), strict=False):
+            linked = level.get("kind") == "link"
+            if not self.writes or (linked and not can_write(self.models.get(level.get("to")))):
+                self.refused.add(action)
         self.all: list[dict] = []
         self.chosen: list[str | None] = [None] * len(self.levels)
         self.offered: list[list[tuple[str, str, int]]] = [[] for _ in self.levels]
@@ -106,12 +127,13 @@ class GroupedListPane(ListPane):
         if self.tick:
             actions.append(Action("tick", field_label(self.tick), "space"))
         actions.append(Action("delete_record", "Delete", "del", variant="error"))
-        self.ACTIONS = tuple(actions)
+        self.ACTIONS = self.offer(actions)
 
     def content(self) -> ComposeResult:
         with Horizontal(classes="kit-grouped"):
             if self.levels:
-                yield GroupList(id="kit-group-list", classes="kit-group-list")
+                yield GroupList(id="kit-group-list", classes="kit-group-list",
+                                new="new_group" not in self.refused)
             with Vertical(classes="kit-group-side"):
                 if self.levels:
                     yield Static("", id="kit-group-name", classes="kit-group-name")
@@ -192,7 +214,8 @@ class GroupedListPane(ListPane):
         self.query_one("#kit-group-name", Static).update(f"[b]{' · '.join(names)}[/]")
         if len(self.levels) > 1:
             await self.query_one(SubgroupBar).show(
-                self.offered[1], self.chosen[1], field_label(self.levels[1]).lower()
+                self.offered[1], self.chosen[1], field_label(self.levels[1]).lower(),
+                new="new_subgroup" not in self.refused,
             )
 
     def _label_of(self, index: int) -> str:
@@ -230,7 +253,10 @@ class GroupedListPane(ListPane):
         if not self.records:
             where = " · ".join(self._label_of(i) for i in range(len(self.levels)) if self.chosen[i])
             place = f" in [/][b]{where}[/][{MUTED}]" if where else ""
-            empty.update(f"[{MUTED}]Nothing{place} yet. New {self.noun} (^n) starts one here.[/]")
+            if self.writes:
+                empty.update(f"[{MUTED}]Nothing{place} yet. New {self.noun} (^n) starts one here.[/]")
+            else:
+                empty.update(f"[{MUTED}]Nothing{place}.[/]")
             self.status("")
 
     def _row(self, record: dict) -> tuple[str, ...]:
@@ -260,7 +286,7 @@ class GroupedListPane(ListPane):
             self.stand(0, event.value)
 
     def on_group_list_new_requested(self, _: GroupList.NewRequested) -> None:
-        self.name_value(0)
+        self.fire("new_group")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         wid = event.button.id or ""
@@ -268,8 +294,9 @@ class GroupedListPane(ListPane):
             return
         event.stop()
         if wid == "sub-new":
-            self.name_value(1)
+            self.fire("new_subgroup")
             return
+
         bar = self.query_one(SubgroupBar)
         if wid in bar.values:
             self.stand(1, bar.values[wid])

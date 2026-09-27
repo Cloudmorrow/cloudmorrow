@@ -24,6 +24,10 @@ A stamped field is the server's to set — a task's "Done" moment follows its
 lane — so it is shown and never typed into. A `secret` field is a password
 box: dots until ctrl+r shows what is in it, and hides it again.
 
+A record of a datamodel you may only read (docs/CIRCLES.md) opens the same
+sheet with every field written out rather than typed into, and Close in
+place of Save and Delete.
+
 The sheet talks to the server itself, the way the password dialog does, so a
 conflict is said here with the sheet still open: a save carries the record's
 `rev`, and when somebody else got there first (409) the sheet says so and
@@ -57,6 +61,7 @@ from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
 from cloudmorrow.tui.theme import BAD, MUTED, WARN
 from cloudmorrow.tui.widgets.kit import (
+    can_write,
     enum_options,
     field_label,
     read_only,
@@ -168,6 +173,8 @@ class RecordSheet(Modal[dict | str | None]):
         label = self.model.get("label") or model_id
         self.heading = heading or (label if record else f"New {label.lower()}")
         self.fields = self._ordered(only)
+        # Whether this person may change it; when not, it is looked at.
+        self.writes = can_write(self.model)
 
     # -- which fields, in which order ------------------------------------------
     def _ordered(self, only: list[str] | None) -> list[dict]:
@@ -202,15 +209,19 @@ class RecordSheet(Modal[dict | str | None]):
             with VerticalScroll(id="sheet-fields"):
                 for field in self.fields:
                     long = (field.get("kind") in LONG_KINDS and not read_only(field)
-                            and not field.get("secret"))
+                            and not field.get("secret") and self.writes)
                     with Horizontal(classes="sheet-row" + (" -long" if long else "")):
                         label = field_label(field)
-                        if field.get("required") and not read_only(field):
+                        if field.get("required") and not read_only(field) and self.writes:
+
                             label += " *"
                         yield Static(label, classes="sheet-label")
                         yield self._widget(field)
             yield Static("", id="sheet-complaint", classes="modal-detail")
             with Horizontal(classes="modal-buttons"):
+                if not self.writes:
+                    yield Button("Close", variant="primary", id="cancel")
+                    return
                 if self.record is not None:
                     yield Button("Delete", variant="error", id="sheet-delete")
                 yield Button("Cancel", id="cancel")
@@ -227,6 +238,8 @@ class RecordSheet(Modal[dict | str | None]):
         if read_only(field):
             note = shown(field, value)
             return Static(f"{note}  [{MUTED}]set by the server[/]", id=wid, classes="sheet-fixed")
+        if not self.writes:
+            return self._looked_at(field, value, wid)
         if field.get("secret"):
             return Input(
                 str(value) if value not in (None, "") else "",
@@ -293,10 +306,37 @@ class RecordSheet(Modal[dict | str | None]):
             compact=True,
         )
 
+    def _looked_at(self, field: dict, value: Any, wid: str):
+        """A field on a record that cannot be changed here: written out.
+
+        A secret stays a password box, disabled, so ctrl+r still shows it; a
+        link says what it points at rather than its id.
+        """
+        from rich.markup import escape
+
+        if field.get("secret"):
+            return Input(
+                str(value) if value not in (None, "") else "",
+                password=True,
+                disabled=True,
+                id=wid,
+                classes="sheet-secret",
+                compact=True,
+            )
+        said = shown(field, value)
+        if field.get("kind") == "link" and value not in (None, ""):
+            said = next(
+                (label for label, key in self.choices.get(field["name"], []) if key == str(value)),
+                said,
+            )
+        if field.get("kind") == "json" and value is not None:
+            said = json.dumps(value, indent=2)
+        return Static(escape(said), id=wid, classes="sheet-fixed")
+
     def on_mount(self) -> None:
         # Where you start is where you would start typing: the title.
         for field in self.fields:
-            if read_only(field):
+            if read_only(field) or not self.writes:
                 continue
             widget = self._field_widget(field)
             if widget is not None and widget.focusable:
@@ -432,7 +472,13 @@ class RecordSheet(Modal[dict | str | None]):
         self.query_one("#sheet-complaint", Static).update(text)
 
     # -- saving ----------------------------------------------------------------
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        """Nothing to save on a record that is only looked at."""
+        return self.writes or action != "save"
+
     async def action_save(self) -> None:
+        if not self.writes:
+            return
         fields = self._collect()
         if fields is None:
             return
@@ -489,8 +535,9 @@ class RecordSheet(Modal[dict | str | None]):
             self.dismiss(None)
 
     def ask_delete(self) -> None:
-        if self.record is None:
+        if self.record is None or not self.writes:
             return
+
         name = title_of(self.record, self.model)
         cascades = [
             model.get("label") or model_id

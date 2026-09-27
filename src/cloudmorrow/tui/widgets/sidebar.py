@@ -7,7 +7,7 @@ a key takes you in. The sections:
 
 - **YOUR CLOUD** — what is built into the core: nothing now, so not drawn.
 - **QUILLS** — a card for every screen of every installed Quill.
-- **ADMINISTRATION** — for administrators: Users, Features, Quills. Smaller,
+- **ADMINISTRATION** — for administrators: Users, Circles, Features, Quills. Smaller,
   one line each, because it is the server rather than your things.
 
 A card is two rows: its name on a rounded top border, and one line under it

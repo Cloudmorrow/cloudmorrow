@@ -44,6 +44,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from cloudmorrow.server.circles import Access
 from cloudmorrow.server.datamodels import Datamodel, Field, parse_duration
 from cloudmorrow.server.db import Connection, connect
 
@@ -144,7 +145,7 @@ class Principal:
     account's. What differs is what it may reach of them.
     """
 
-    kind: str  # person, assistant, quill
+    kind: str  # person, assistant, quill; dataset for a Quill's seed
     username: str
     # For a Quill: its id, and the datamodels it declared or was granted.
     quill: str = ""
@@ -165,6 +166,10 @@ class Principal:
     def writer(self) -> str:
         return self.quill or self.kind
 
+
+# A Quill's dataset being written for somebody (`RecordStore.seed`): not a
+# person acting, so their circles do not narrow it.
+DATASET = "dataset"
 
 # Datamodels no assistant is ever let at, whatever the person allows.
 NEVER_FOR_ASSISTANTS = frozenset({"secret"})
@@ -454,9 +459,30 @@ class RecordStore:
         self.on_member_added: list[Callable[[Record, str, str], None]] = []
         # Datamodels served from elsewhere, by backend name (see backends.py).
         self.backends: dict[str, object] = {}
+        # What a person may do with each datamodel, from their circles
+        # (circles.py). None is a store with no circles: everybody everything.
+        self.access: Callable[[str], Access] | None = None
         with connect(self.db_path) as conn:
             conn.executescript(TABLE)
         conn.close()
+
+    # -- the gate ----------------------------------------------------------------
+    def _check(self, principal: Principal, action: str, model_id: str) -> None:
+        """`check`, and then the person's circles: whoever acts, it is for somebody,
+        and reaches at most what they may. A datamodel they may not read is not
+        there; one they may only read refuses writing."""
+        check(principal, action, model_id)
+        if self.access is None or principal.kind == DATASET:
+            return
+        access = self.access(principal.username)
+        if not access.may("read", model_id):
+            raise UnknownModelError(model_id)
+        if not access.may(action, model_id):
+            label = self.model(model_id).label.lower()
+            raise Refused(f"you may read {label} records here, not change them")
+
+    def readable(self, principal: Principal, model_id: str) -> bool:
+        return self.access is None or self.access(principal.username).may("read", model_id)
 
     # -- lookups ---------------------------------------------------------------
     def model(self, model_id: str) -> Datamodel:
@@ -699,6 +725,8 @@ class RecordStore:
             for model in self._models().values():
                 if not model.space or model.backend or (wanted is not None and model.id not in wanted):
                     continue
+                if not self.readable(principal, model.id):
+                    continue
                 if not self._unread_children(model):
                     continue
                 clause, params = self._visible_clause(model, principal.username)
@@ -729,7 +757,7 @@ class RecordStore:
         of a conversation. *since* keeps only what was made or changed at or
         after that moment — what an open screen has not got yet.
         """
-        check(principal, "read", model_id)
+        self._check(principal, "read", model_id)
         model = self.model(model_id)
         where = dict(where or {})
         # Not filters: what else the listing is asked for (see LIST_OPTIONS).
@@ -798,7 +826,7 @@ class RecordStore:
         return records
 
     def get(self, principal: Principal, model_id: str, record_id: str) -> Record:
-        check(principal, "read", model_id)
+        self._check(principal, "read", model_id)
         model = self.model(model_id)
         if model.backend:
             return self._backend(model).get(principal, model, record_id)
@@ -822,7 +850,7 @@ class RecordStore:
         return can
 
     def _capable(self, principal: Principal, model_id: str, action: str, capability: str):
-        check(principal, action, model_id)
+        self._check(principal, action, model_id)
         model = self.model(model_id)
         if capability not in self.capabilities(model_id):
             raise RecordError(f"a {model.label.lower()} has no {capability}")
@@ -874,7 +902,7 @@ class RecordStore:
     # -- the people in a space -----------------------------------------------------
     def add_member(self, principal: Principal, model_id: str, space_id: str, username: str) -> Record:
         """Put somebody in a shared space. Its manager's to do; no invitation to accept."""
-        check(principal, "write", model_id)
+        self._check(principal, "write", model_id)
         model = self.model(model_id)
         if not model.space:
             raise RecordError(f"a {model.label.lower()} has no members")
@@ -900,7 +928,7 @@ class RecordStore:
 
     def remove_member(self, principal: Principal, model_id: str, space_id: str, username: str) -> None:
         """Take somebody out of a shared space: its manager may, and anybody may leave."""
-        check(principal, "write", model_id)
+        self._check(principal, "write", model_id)
         model = self.model(model_id)
         with connect(self.db_path) as conn:
             row = self._row(conn, principal, model, space_id)
@@ -917,6 +945,7 @@ class RecordStore:
 
     def mark_seen(self, principal: Principal, model_id: str, space_id: str) -> None:
         """Somebody has looked in a space: what is in it is no longer news to them."""
+        self._check(principal, "read", model_id)
         model = self.model(model_id)
         with connect(self.db_path) as conn:
             self._row(conn, principal, model, space_id)
@@ -1066,7 +1095,7 @@ class RecordStore:
         *announce* is off, for a space found-or-made between people, where the
         first thing written in it is the news.
         """
-        check(principal, "write", model_id)
+        self._check(principal, "write", model_id)
         model = self.model(model_id)
         if model.backend:
             return self._backend(model).create(principal, model, dict(incoming))
@@ -1135,7 +1164,7 @@ class RecordStore:
         asker and *members*; the fields are compared on what the server can
         see — the indexed ones among *incoming*.
         """
-        check(principal, "read", model_id)
+        self._check(principal, "read", model_id)
         model = self.model(model_id)
         if not model.space or model.backend:
             raise RecordError(f"a {model.label.lower()} is not a space")
@@ -1204,7 +1233,7 @@ class RecordStore:
         A change to a field in `ordered_within` moves the record to the end of
         its new group unless *index* says where; its old group closes up.
         """
-        check(principal, "write", model_id)
+        self._check(principal, "write", model_id)
         model = self.model(model_id)
         if model.backend:
             return self._backend(model).update(principal, model, record_id, dict(incoming), rev)
@@ -1262,25 +1291,25 @@ class RecordStore:
 
     def content(self, principal: Principal, model_id: str, record_id: str):
         """(path, media type) of a record's bytes."""
-        check(principal, "read", model_id)
+        self._check(principal, "read", model_id)
         model = self.model(model_id)
         return self._content_backend(model).content(principal, model, record_id)
 
     def thumbnail(self, principal: Principal, model_id: str, record_id: str, size: int):
         """The path of a small copy of a record's picture."""
-        check(principal, "read", model_id)
+        self._check(principal, "read", model_id)
         model = self.model(model_id)
         return self._content_backend(model).thumbnail(principal, model, record_id, size)
 
     def put(self, principal: Principal, model_id: str, fields: dict, source) -> Record:
         """A new record from bytes that have arrived at *source*, and *fields* saying where."""
-        check(principal, "write", model_id)
+        self._check(principal, "write", model_id)
         model = self.model(model_id)
         return self._content_backend(model).put(principal, model, dict(fields), source)
 
     def delete(self, principal: Principal, model_id: str, record_id: str) -> int:
         """Delete a record, and follow links that cascade. Returns how many went."""
-        check(principal, "write", model_id)
+        self._check(principal, "write", model_id)
         model = self.model(model_id)
         if model.backend:
             return self._backend(model).delete(principal, model, record_id)
@@ -1392,7 +1421,9 @@ class RecordStore:
                 return []
         elif self.count(principal.username, model_id, scope=scope):
             return []
-        who = Principal("quill", principal.username, quill=writer, models=frozenset({model_id}))
+        # The Quill's dataset landing, not the person acting: it is written
+        # whatever their circles give, the way their first board always was.
+        who = Principal(DATASET, principal.username, quill=writer, models=frozenset({model_id}))
         made = []
         for fields in records:
             filled = {

@@ -66,9 +66,12 @@ class NoteTree(Tree[dict]):
     class ReloadRequested(Message):
         pass
 
-    def __init__(self, *, label: str = "notes", **kwargs: Any) -> None:
+    def __init__(self, *, label: str = "notes", writes: bool = True, **kwargs: Any) -> None:
         # What the top of the tree is called: the screen's own name.
         self.root_label = label
+        # Pages that may only be read are opened and searched, not changed:
+        # the keys that would change them are not there.
+        self.writes = writes
         super().__init__(label, data={"name": label, "path": "", "is_dir": True}, **kwargs)
         self.show_root = True
         self.guide_depth = 2
@@ -153,7 +156,11 @@ class NoteTree(Tree[dict]):
             self.post_message(self.NoteSelected(data["path"]))
 
     # -- actions -----------------------------------------------------------
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        return self.writes or action not in ("new_note", "new_folder", "rename", "delete")
+
     def action_new_note(self) -> None:
+
         self.post_message(self.NewNoteRequested(self.selected_dir))
 
     def action_new_folder(self) -> None:

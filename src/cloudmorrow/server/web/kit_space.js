@@ -23,6 +23,11 @@
      made_as = { public = { kind = "public" }, shared = { kind = "private" },
                  direct = { kind = "direct" } }
 
+   Access on the space's datamodel is managing spaces (docs/CIRCLES.md): on
+   one you may only read, nothing here makes one, adds anybody, takes them
+   out or leaves — the spaces are listed and their people shown, and that is
+   all. Writing what is in them is the other datamodel's, and not this file's.
+
    Nothing here knows what any space is for. The words come from the
    datamodel's label; the record's `scope`, `members` and `can_manage` are
    what the record API sends for every space. `at` is quills.js's place:
@@ -32,7 +37,7 @@ import {
   api, app, esc, heading, icons, nav, onSignOut, renderRoute, replace, session, tabs, toast,
   wireShell,
 } from "./core.js";
-import { sheetHash } from "./kit.js";
+import { mayWrite, sheetHash } from "./kit.js";
 
 export const recordsUrl = (model, id = "", rest = "") =>
   "/api/records/" + encodeURIComponent(model) + (id ? "/" + encodeURIComponent(id) : "") + rest;
@@ -104,11 +109,11 @@ export async function renderSpaceList(at, model, { dot = () => "", back, backLab
     ? `<p class="group-label">${label}</p><div class="group">${rows.map(row).join("")}</div>` : "");
   app.innerHTML = nav({ back, backLabel, title: plural }) + `
     <main>
-      ${heading(plural, `<a class="button compose" href="${at.base}/newspace" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</a>`)}
+      ${heading(plural, mayWrite(model) ? `<a class="button compose" href="${at.base}/newspace" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</a>` : "")}
       ${group("Yours", spaces.filter((s) => s.scope === "personal"))}
       ${group("Shared", spaces.filter((s) => s.scope === "shared"))}
       ${group("Everybody's", spaces.filter((s) => s.scope === "public"))}
-      ${spaces.length ? "" : `<p class="empty mascot"><b>None yet</b>Make one with the pen above.</p>`}
+      ${spaces.length ? "" : `<p class="empty mascot"><b>None yet</b>${mayWrite(model) ? "Make one with the pen above." : "When there is one, it will show up here."}</p>`}
     </main>` + tabs(at.tab);
   wireShell();
 }
@@ -155,6 +160,7 @@ function typedFields(model, screen) {
     is where the new one goes (its record sheet, unless it says otherwise). */
 export async function renderNewSpace(at, model, { back, backLabel, fields = async () => ({}), opened } = {}) {
   const { screen } = at;
+  if (!mayWrite(model)) return notYours(model, back || at.base);
   const [everyone, spaces] = await Promise.all([people().catch(() => []), api("GET", recordsUrl(model.id))]);
   const scopes = scopesFor(model, screen);
   const first = scopes[0] || "shared";
@@ -219,6 +225,7 @@ export async function renderNewSpace(at, model, { back, backLabel, fields = asyn
 // -- writing to somebody -------------------------------------------------------------
 /** Pick a person; the space between you and them opens, found or made. */
 export async function renderWriteTo(at, model, { back, backLabel, opened }) {
+  if (!mayWrite(model)) return notYours(model, back || at.base);
   const everyone = await people();
   app.innerHTML = nav({ back, backLabel, title: "New message" }) + `
     <main>
@@ -237,6 +244,14 @@ export async function renderWriteTo(at, model, { back, backLabel, opened }) {
       try { opened(await between(at, model, [button.dataset.who])); } catch (err) { toast(err.message); }
     });
   }
+}
+
+// An address for making one, reached by somebody who may only read them —
+// an old link, a bookmark: back where they came from, told why.
+function notYours(model, where) {
+  toast(`You can look at ${model.label.toLowerCase()}s here, not make them`);
+  replace(where);
+  return renderRoute();
 }
 
 /** The space between you and *others*: the one there is, or a new one. */
@@ -258,11 +273,13 @@ export async function between(at, model, others) {
 export async function spaceSection(model, record, { fixed = false } = {}) {
   const shared = record.scope === "shared";
   const inIt = peopleIn(record);
-  const mayAdd = shared && !fixed && (record.can_manage || inIt.includes(session.user));
+  // Who is in it is shown either way; changing it is managing spaces.
+  const writes = mayWrite(model);
+  const mayAdd = shared && !fixed && writes && (record.can_manage || inIt.includes(session.user));
   const outside = mayAdd ? (await people().catch(() => [])).filter((p) => !inIt.includes(p.username)) : [];
   const who = (name) => `<div class="row member"><span class="avatar" aria-hidden="true">${esc(name.charAt(0).toUpperCase())}</span>
       <span class="main">${esc(name)}${name === session.user ? " (you)" : ""}${name === record.owner && !fixed ? ` <span class="said">made it</span>` : ""}</span>
-      ${shared && !fixed && record.can_manage && name !== record.owner
+      ${shared && !fixed && writes && record.can_manage && name !== record.owner
         ? `<button class="take-out" type="button" data-who="${esc(name)}" aria-label="Take ${esc(name)} out">Take out</button>` : ""}</div>`;
   return `<section class="space-people">
     <p class="group-label">Who can see it</p>
@@ -273,7 +290,7 @@ export async function spaceSection(model, record, { fixed = false } = {}) {
       <div class="group">${outside.map((p) => `
         <button class="row add-who" type="button" data-who="${esc(p.username)}">
           <span class="main">${esc(personLabel(p))}</span><span class="said">Add</span></button>`).join("")}</div>` : ""}
-    ${shared && !fixed && record.owner !== session.user && inIt.includes(session.user)
+    ${shared && !fixed && writes && record.owner !== session.user && inIt.includes(session.user)
       ? `<div class="group"><button class="row bad leave" type="button">Leave this ${esc(model.label.toLowerCase())}</button></div>` : ""}
   </section>`;
 }
@@ -334,13 +351,14 @@ export async function renderSpaceAbout(at, model, id, { back, backLabel, gone })
     space.fields[f.name] !== null && space.fields[f.name] !== undefined && space.fields[f.name] !== "")
     .map((f) => [f.label, String(space.fields[f.name])]);
   const people = await spaceSection(model, space, { fixed: two });
+  const manages = space.can_manage && !two && mayWrite(model);
   app.innerHTML = nav({ back, backLabel, title: "About" }) + `
     <main>
-      ${heading(name, space.can_manage && !two ? `<a class="button edit" href="${sheetHash(at, model.id, id)}" aria-label="Edit ${esc(model.label.toLowerCase())}">${icons.compose}</a>` : "")}
+      ${heading(name, manages ? `<a class="button edit" href="${sheetHash(at, model.id, id)}" aria-label="Edit ${esc(model.label.toLowerCase())}">${icons.compose}</a>` : "")}
       ${facts.length ? `<div class="group facts">${facts.map(([label, value]) =>
         `<div class="row"><span class="main">${esc(label)}</span><span class="said">${esc(value)}</span></div>`).join("")}</div>` : ""}
       ${people}
-      ${space.can_manage && !two ? `<div class="group"><button class="row bad delete">Delete this ${esc(model.label.toLowerCase())}</button></div>` : ""}
+      ${manages ? `<div class="group"><button class="row bad delete">Delete this ${esc(model.label.toLowerCase())}</button></div>` : ""}
     </main>`;
   wireShell();
   const leftTo = () => { gone(); };

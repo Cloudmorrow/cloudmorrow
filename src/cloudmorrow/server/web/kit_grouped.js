@@ -20,7 +20,8 @@
 import { api, app, esc, go, heading, icons, nav, replace, store, tabs, toast, wireShell } from "./core.js";
 import { installCard } from "./install.js";
 import {
-  aOr, circle, fieldOf, linkTitles, recordsUrl, sheetHash, spoken, timeLeft, titleField, titleOf, wireAdd,
+  aOr, canWrite, circle, fieldOf, linkTitles, mayWrite, recordsUrl, sheetHash, spoken, timeLeft,
+  titleField, titleOf, wireAdd,
 } from "./kit.js";
 
 export const MASK = "••••••••";
@@ -85,6 +86,10 @@ export async function renderGroupedList(at, arg) {
   const tick = screen.tick ? fieldOf(model, screen.tick) : null;
   const under = screen.subtitle ? fieldOf(model, screen.subtitle) : null;
   const levels = [screen.group, screen.subgroup].map((n) => (n ? fieldOf(model, n) : null)).filter(Boolean);
+  // Read, it is a list to look through: no add row, no ticking, and no new
+  // group unless what a group is — the linked datamodel — is yours to write.
+  const writes = mayWrite(model);
+  const namesGroups = (f) => (f.kind === "link" ? canWrite(at, f.to) : writes && f.kind !== "enum");
   const asked = String(arg || "").split("/").filter(Boolean);
   const remembered = (() => { try { return JSON.parse(store.get("kit." + at.tab) || "[]"); } catch { return []; } })();
 
@@ -112,16 +117,17 @@ export async function renderGroupedList(at, arg) {
   const chipRow = (f, i) => `<div class="chips${i ? " sub" : ""}" data-level="${i}">` +
     offered[i].map(([value, label]) => `<a class="chip${value === chosen[i] ? " active" : ""}" href="${
       esc(hashFor([...chosen.slice(0, i), value]))}">${esc(label)}</a>`).join("") +
-    `<button class="chip new-group" type="button" data-level="${i}">+ New ${esc(f.label.toLowerCase())}</button></div>`;
+    (namesGroups(f) ? `<button class="chip new-group" type="button" data-level="${i}">+ New ${esc(f.label.toLowerCase())}</button>` : "") +
+    `</div>`;
   const where = chosen.filter((v) => v !== null).map((v, i) =>
     levels[i].kind === "link" ? (offered[i].find(([c]) => c === v) || [v, v])[1] : String(v));
 
   app.innerHTML = nav({ title: screen.label }) + `
     <main>
-      ${heading(screen.label, `<button class="compose" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</button>`)}
+      ${heading(screen.label, writes ? `<button class="compose" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</button>` : "")}
       ${levels.map(chipRow).join("")}
-      <form class="add">${tick ? circle("") : ""}<input placeholder="Add ${esc(aOr(model.label))}${
-        where.length ? ` to ${esc(where.join(" · "))}` : ""}" autocapitalize="off" autocomplete="off" spellcheck="false" enterkeyhint="done"></form>
+      ${writes ? `<form class="add">${tick ? circle("") : ""}<input placeholder="Add ${esc(aOr(model.label))}${
+        where.length ? ` to ${esc(where.join(" · "))}` : ""}" autocapitalize="off" autocomplete="off" spellcheck="false" enterkeyhint="done"></form>` : ""}
       <div class="install-slot">${installCard()}</div>
       <div class="listing"></div>
     </main>` + tabs(at.tab);
@@ -151,18 +157,21 @@ export async function renderGroupedList(at, arg) {
         `<button class="copy" data-id="${esc(r.id)}" aria-label="Copy ${esc(under.label.toLowerCase())}">${secretIcons.copy}</button>`
       : "";
     return `<div class="row card grouped${on ? " is-done" : ""}${tick ? "" : " no-tick"}">` +
-      (tick ? `<button class="tick" data-id="${esc(r.id)}" aria-label="${esc(tick.label)}" aria-pressed="${on}">${circle(on ? "done" : "")}</button>` : "") +
+      (tick && writes ? `<button class="tick" data-id="${esc(r.id)}" aria-label="${esc(tick.label)}" aria-pressed="${on}">${circle(on ? "done" : "")}</button>` : "") +
+      (tick && !writes ? `<span class="tick still" role="img" aria-label="${esc(on ? tick.label : `Not ${tick.label.toLowerCase()}`)}">${circle(on ? "done" : "")}</span>` : "") +
       `<a class="main" href="${sheetHash(at, model.id, r.id)}">${text}</a>${eyes}</div>`;
   };
   const show = () => {
     const rows = here();
     if (!rows.length) {
       const place = where.length ? ` in ${esc(where.join(" · "))}` : "";
-      listing.innerHTML = `<p class="empty mascot"><b>Nothing${place} yet</b>Add ${esc(aOr(model.label))} above, and it will show up here.</p>`;
+      listing.innerHTML = writes
+        ? `<p class="empty mascot"><b>Nothing${place} yet</b>Add ${esc(aOr(model.label))} above, and it will show up here.</p>`
+        : `<p class="empty mascot"><b>Nothing${place} yet</b>When there is, it will show up here.</p>`;
       return;
     }
     listing.innerHTML = `<div class="group kit-list">${rows.map(row).join("")}</div>`;
-    for (const button of listing.querySelectorAll(".tick")) button.addEventListener("click", () => flip(button.dataset.id));
+    for (const button of listing.querySelectorAll("button.tick")) button.addEventListener("click", () => flip(button.dataset.id));
     for (const button of listing.querySelectorAll(".reveal")) button.addEventListener("click", () => reveal(button.dataset.id));
     for (const button of listing.querySelectorAll(".copy")) button.addEventListener("click", () => copy(button.dataset.id));
   };

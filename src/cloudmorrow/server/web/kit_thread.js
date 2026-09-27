@@ -21,6 +21,11 @@
      #/q/<quill>/<screen>/new          make one
      #/q/<quill>/<screen>/people       write to somebody
 
+   Two datamodels, two kinds of writing (docs/CIRCLES.md): saying something
+   is the lines' datamodel's, and on one you may only read, a conversation
+   has no box to write in and your own lines are not yours to change;
+   making a space, or writing to somebody, is the spaces' datamodel's.
+
    There is no socket. An open conversation asks for what changed since the
    newest thing it has, every few seconds, and a push asks at once — for a
    household that is the whole of the real-time problem.
@@ -36,6 +41,7 @@ import {
   isBetween, madeAs, recordsUrl, renderNewSpace, renderSpaceAbout, renderWriteTo, spaceMark,
   spaceName,
 } from "./kit_space.js";
+import { mayWrite } from "./kit.js";
 
 // How often an open conversation asks for what it has not got, and how
 // much of one is read when it opens.
@@ -59,7 +65,10 @@ function shape(at) {
   const model = quill.models[screen.model];
   const link = model.fields.find((f) => f.name === screen.space);
   const spaceModel = quill.models[link.to];
-  return { model, link, spaceModel, body: screen.body || model.title };
+  return {
+    model, link, spaceModel, body: screen.body || model.title,
+    says: mayWrite(model), makes: mayWrite(spaceModel),
+  };
 }
 
 const lastKey = (at) => "thread.open." + at.tab;
@@ -135,7 +144,9 @@ function spaceGroups(at, s, spaces, active) {
   const rooms = spaces.filter((x) => !isBetween(at.screen, x));
   const two = spaces.filter((x) => isBetween(at.screen, x));
   if (!spaces.length) {
-    return `<p class="empty mascot"><b>Nothing here yet</b>Make a ${esc(s.spaceModel.label.toLowerCase())}, and it will show up here.</p>`;
+    return `<p class="empty mascot"><b>Nothing here yet</b>${s.makes
+      ? `Make a ${esc(s.spaceModel.label.toLowerCase())}, and it will show up here.`
+      : `When you are in a ${esc(s.spaceModel.label.toLowerCase())}, it will show up here.`}</p>`;
   }
   const group = (label, list) => (list.length
     ? `<p class="group-label">${esc(label)}</p><div class="group">${list.map((x) => spaceRow(at, s, x, active)).join("")}</div>` : "");
@@ -143,6 +154,7 @@ function spaceGroups(at, s, spaces, active) {
 }
 
 function headActions(at, s) {
+  if (!s.makes) return "";
   const direct = madeAs(at.screen).direct;
   return (direct ? `<a class="button write-to" href="${at.base}/people" aria-label="New message">${glyphs.people}</a>` : "") +
     `<a class="compose" href="${at.base}/new" aria-label="New ${esc(s.spaceModel.label.toLowerCase())}">${icons.compose}</a>`;
@@ -180,7 +192,7 @@ function drawSplit(at, s, spaces, open) {
   wireShell();
   if (open) return drawConversation(at, s, spaces, open, { phone: false });
   app.querySelector(".conversation").innerHTML =
-    `<p class="empty"><b>Pick one</b>Or start one with the pen.</p>`;
+    `<p class="empty"><b>Pick one</b>${s.makes ? "Or start one with the pen." : "It opens here."}</p>`;
   live = { stop: () => {}, catchUp: () => {} };
   holdUntilLeft();
 }
@@ -216,8 +228,9 @@ function dayOf(stamp) {
     year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
 }
 
-function renderLines(lines, body, me) {
-  if (!lines.length) return `<p class="empty"><b>Nothing said yet</b>Be the first.</p>`;
+// *says*: whether you may write here, and so change your own lines.
+function renderLines(lines, body, me, says = true) {
+  if (!lines.length) return `<p class="empty"><b>Nothing said yet</b>${says ? "Be the first." : ""}</p>`;
   let out = "";
   let day = "";
   let block = null;
@@ -238,8 +251,9 @@ function renderLines(lines, body, me) {
     }
     block.when = when;
     const edited = line.updated_at !== line.created_at ? '<span class="edited">edited</span>' : "";
-    block.html += `<p class="bubble${line.owner === me ? " own" : ""}" data-id="${esc(line.id)}"` +
-      `${line.owner === me ? ' tabindex="0" role="button"' : ""}>${esc(line.fields[body] ?? "")}${edited}</p>`;
+    const own = says && line.owner === me;
+    block.html += `<p class="bubble${own ? " own" : ""}" data-id="${esc(line.id)}"` +
+      `${own ? ' tabindex="0" role="button"' : ""}>${esc(line.fields[body] ?? "")}${edited}</p>`;
   }
   close();
   return out;
@@ -250,12 +264,14 @@ async function drawConversation(at, s, spaces, id, { phone }) {
   const name = spaceName(s.spaceModel, space, at.screen);
   const about = at.screen.about && !isBetween(at.screen, space) ? space.fields[at.screen.about] : "";
   const aboutHref = `${at.base}/${encodeURIComponent(id)}/about`;
+  // Read, the lines are there and the box to write in is not.
   const composer = `
-      <div class="messages" aria-live="polite"></div>
+      <div class="messages" aria-live="polite"></div>` + (s.says ? `
       <form class="composer">
         <textarea rows="1" placeholder="Message ${esc(name)}" enterkeyhint="send" autocapitalize="sentences"></textarea>
         <button type="submit" aria-label="Send">${glyphs.send}</button>
-      </form>`;
+      </form>` : `
+      <p class="composer-none">You can read what is said here, not write in it.</p>`);
   if (phone) {
     app.innerHTML = nav({
       back: at.base,
@@ -274,7 +290,7 @@ async function drawConversation(at, s, spaces, id, { phone }) {
   const root = phone ? app : app.querySelector(".conversation");
   const list = root.querySelector(".messages");
   const form = root.querySelector("form.composer");
-  const box = form.querySelector("textarea");
+  const box = form && form.querySelector("textarea");
   const me = session.user;
   const where = `${encodeURIComponent(s.link.name)}=${encodeURIComponent(id)}`;
   let lines = [];
@@ -285,10 +301,10 @@ async function drawConversation(at, s, spaces, id, { phone }) {
   const toBottom = () => { list.scrollTop = list.scrollHeight; };
   const paint = () => {
     const stuck = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
-    list.innerHTML = renderLines(state.lines, s.body, me);
+    list.innerHTML = renderLines(state.lines, s.body, me, s.says);
     if (stuck) toBottom();
   };
-  list.innerHTML = renderLines(state.lines, s.body, me);
+  list.innerHTML = renderLines(state.lines, s.body, me, s.says);
   toBottom();
   if (!phone) store.set(lastKey(at), id);
 
@@ -344,6 +360,7 @@ async function drawConversation(at, s, spaces, id, { phone }) {
   holdUntilLeft();
 
   // -- writing ------------------------------------------------------------------
+  if (!form) return;
   box.value = store.get(draftKey(at, id)) || "";
   grow(box);
   if (!phone) box.focus();
@@ -366,7 +383,7 @@ async function drawConversation(at, s, spaces, id, { phone }) {
     try {
       const sent = await api("POST", recordsUrl(s.model.id), { fields: { [s.link.name]: id, [s.body]: text } });
       merge([sent]);
-      list.innerHTML = renderLines(state.lines, s.body, me);
+      list.innerHTML = renderLines(state.lines, s.body, me, s.says);
       toBottom();
       // Beside the list, this one now leads it, with your line under its name.
       const listing = !phone && app.querySelector(".kit-thread .spaces .listing");

@@ -18,6 +18,7 @@ The whole thing is a WSGI app; `create_app` mounts it at `/dav`.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import threading
 import time
@@ -25,6 +26,7 @@ from collections.abc import Callable
 
 from wsgidav.wsgidav_app import WsgiDAVApp
 
+from cloudmorrow.server.circles import Access
 from cloudmorrow.server.db import UserStore
 from cloudmorrow.server.security import TokenError, decode_access_token, verify_password
 from cloudmorrow.server.shares import DRIVE_NAME, SERVER, Share, ShareStore
@@ -83,22 +85,73 @@ class ServerShares:
     holds.
     """
 
-    def __init__(self, shares: ShareStore, drive_for: Callable[[str], Share]) -> None:
+    def __init__(
+        self,
+        shares: ShareStore,
+        drive_for: Callable[[str], Share],
+        access: Callable[[str], Access] | None = None,
+    ) -> None:
         self._shares = shares
         self._drive_for = drive_for
+        self._access = access
+
+    def _reads_files(self, owner: str) -> bool:
+        """Files are the `file` datamodel: somebody whose circles do not give it
+        has no shares here, the way they have no Files tab."""
+        return self._access is None or self._access(owner).may("read", FILE_MODEL)
 
     def shares_for(self, owner: str) -> list[Share]:
+        if not self._reads_files(owner):
+            return []
         return [self._drive_for(owner), *self._shares.shares(owner, kind=SERVER)]
 
     def share_for(self, owner: str, name: str) -> Share | None:
+        if not self._reads_files(owner):
+            return None
         if (name or "").strip().lower() == DRIVE_NAME:
             return self._drive_for(owner)
         share = self._shares.get(owner, name)
         return share if share is not None and share.kind == SERVER else None
 
 
+# What a mount may do to somebody whose circles give only `read` on files.
+DAV_READS = frozenset({"GET", "HEAD", "OPTIONS", "PROPFIND"})
+FILE_MODEL = "file"
+
+
+def _caller(environ: dict) -> str:
+    """The username a request says it is, from its Basic credentials. Only ever
+    used to refuse, so it does not matter that WsgiDAV has not checked it yet."""
+    header = environ.get("HTTP_AUTHORIZATION", "")
+    if not header.lower().startswith("basic "):
+        return ""
+    try:
+        decoded = base64.b64decode(header[6:].strip()).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return ""
+    return decoded.partition(":")[0].strip().lower()
+
+
+def read_only_for(app, access: Callable[[str], Access]):
+    """Refuse every writing method to whoever may only read files."""
+
+    def guarded(environ: dict, start_response):
+        if environ.get("REQUEST_METHOD", "GET").upper() not in DAV_READS:
+            username = _caller(environ)
+            if username and not access(username).may("write", FILE_MODEL):
+                start_response("403 Forbidden", [("Content-Type", "text/plain")])
+                return [b"you may read files here, not change them"]
+        return app(environ, start_response)
+
+    return guarded
+
+
 def build_dav_app(
-    shares: ShareStore, check: CredentialCheck, drive_for: Callable[[str], Share]
-) -> WsgiDAVApp:
+    shares: ShareStore,
+    check: CredentialCheck,
+    drive_for: Callable[[str], Share],
+    access: Callable[[str], Access] | None = None,
+):
     """The WSGI app `create_app` mounts at `/dav`."""
-    return build_app(ServerShares(shares, drive_for), check)
+    app: WsgiDAVApp = build_app(ServerShares(shares, drive_for, access), check)
+    return read_only_for(app, access) if access is not None else app

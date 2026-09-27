@@ -12,6 +12,10 @@ unread in each, the ones made between people named for whoever else is in
 them; and the one you are on, a rule for each day, one name over each run of
 lines from one person, and a line to type in. Opening one marks it seen.
 
+Read is drawn as read (docs/CIRCLES.md): on what is said that you may only
+read there is no line to type in, and on spaces you may only read none is
+made, written to, added to, left or edited — you read what is in them.
+
 It polls. An open conversation asks for what changed since the newest thing
 it has, every few seconds, and the counts beside the others come with it —
 a socket would be a second way for the server to talk to a client, and this
@@ -31,7 +35,7 @@ from cloudmorrow.tui.panes.kit import KitPane
 from cloudmorrow.tui.screens.modals import ConfirmModal
 from cloudmorrow.tui.screens.record_sheet import RecordSheet, link_choices
 from cloudmorrow.tui.theme import ACCENT, BAD, MUTED, SECOND
-from cloudmorrow.tui.widgets.kit import field_of
+from cloudmorrow.tui.widgets.kit import can_write, field_of
 from cloudmorrow.tui.widgets.kit_space import (
     NewSpaceModal,
     PickPersonModal,
@@ -111,6 +115,9 @@ class ThreadPane(KitPane):
         ("l", "fire('leave')", "Leave"),
         ("e", "fire('edit_space')", "Edit"),
     ]
+    # Writing here is saying something; what is done to the spaces is
+    # the space datamodel's to allow.
+    WRITING = frozenset({"say"})
 
     def __init__(self, quill: dict, screen: dict, **kwargs) -> None:
         super().__init__(quill, screen, **kwargs)
@@ -120,6 +127,9 @@ class ThreadPane(KitPane):
         self.space_model: dict = self.models.get(self.space_model_id) or {"id": self.space_model_id, "fields": []}
         self.body: str = str(screen.get("body") or self.model.get("title") or "body")
         self.about: str = str(screen.get("about") or "")
+        if not can_write(self.space_model):
+            # Leaving is taking yourself out of it, which is writing it too.
+            self.refused |= {"new_record", "new_space", "write_to", "add", "leave", "edit_space"}
         noun = str(self.space_model.get("label") or "space").lower()
         actions = [
             Action("new_space", f"New {noun}", "n", variant="primary",
@@ -132,7 +142,7 @@ class ThreadPane(KitPane):
             Action("edit_space", "Edit", "e", hint=f"Rename this {noun}, or delete it"),
             Action("leave", "Leave", "l", variant="error"),
         ]
-        self.ACTIONS = tuple(actions)
+        self.ACTIONS = self.offer(actions)
         self.spaces: list[dict] = []
         self.lines: list[dict] = []
         # Which space should be showing, and which one the lines in hand
@@ -153,7 +163,8 @@ class ThreadPane(KitPane):
                 yield Static(f"[{MUTED}]pick one[/]", id="conversation-title", classes="pane-title")
                 with VerticalScroll(id="conversation-scroll"):
                     yield Static("", id="conversation-text")
-                yield Input(placeholder="Write a message…", id="thread-input")
+                if "say" not in self.refused:
+                    yield Input(placeholder="Write a message…", id="thread-input")
 
     def on_mount(self) -> None:
         self.query_one("#space-table", DataTable).add_columns(
@@ -220,6 +231,10 @@ class ThreadPane(KitPane):
             self._open = self._loaded = ""
             self.lines = []
             self.query_one("#conversation-title", Static).update(f"[{MUTED}]no {noun}s yet[/]")
+            if "new_space" in self.refused:
+                self.query_one("#conversation-text", Static).update("")
+                self.status(f"No {noun}s here.", note=True)
+                return
             self.query_one("#conversation-text", Static).update(
                 f"[{MUTED}]New {noun} asks whether everybody is in it or only the people you pick.[/]"
             )
@@ -254,7 +269,8 @@ class ThreadPane(KitPane):
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         event.stop()
-        self.query_one("#thread-input", Input).focus()
+        for box in self.query("#thread-input"):
+            box.focus()
 
     # -- one conversation --------------------------------------------------------
     @work(exclusive=True, group="thread-open")
@@ -358,7 +374,7 @@ class ThreadPane(KitPane):
             return
         event.stop()
         text = event.value.strip()
-        if not text or not self._open:
+        if not text or not self._open or "say" in self.refused:
             return
         event.input.value = ""
         self.send(self._open, text)
@@ -441,7 +457,9 @@ class ThreadPane(KitPane):
             return
         self._open = made["id"]
         self.reload()
-        self.query_one("#thread-input", Input).focus()
+        for box in self.query("#thread-input"):
+            box.focus()
+
 
     def _refuse(self, space: dict, doing: str) -> bool:
         """Say why a space cannot be added to or left, when it cannot."""

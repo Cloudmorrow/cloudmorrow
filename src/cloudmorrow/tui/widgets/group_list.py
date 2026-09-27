@@ -3,7 +3,8 @@
 A group is a row, the way a note is a leaf in a tree: its name, and how many
 records are in it to the right. Click one, or press enter on it, and its
 records open beside it. It is the kit's (tui/panes/kit_grouped.py), so it
-knows nothing of what the groups are — vaults, customers, rooms.
+knows nothing of what the groups are — vaults, customers, rooms. `n` asks
+for a new one, unless the pane says there is no making one here.
 """
 
 from __future__ import annotations
@@ -45,8 +46,10 @@ class GroupList(ListView):
     class NewRequested(Message):
         pass
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, *, new: bool = True, **kwargs: Any) -> None:
         super().__init__(**kwargs)
+        # Whether `n` asks for a new group: not where they are only read.
+        self.new = new
         # (value, label, count) for each row.
         self.groups: list[tuple[str, str, int]] = []
         self.current: str | None = None
@@ -97,5 +100,9 @@ class GroupList(ListView):
         if isinstance(event.item, GroupRow):
             self.post_message(self.Chosen(event.item.value))
 
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        return self.new or action != "new_group"
+
     def action_new_group(self) -> None:
         self.post_message(self.NewRequested())
+

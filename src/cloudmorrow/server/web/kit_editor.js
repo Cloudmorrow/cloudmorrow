@@ -11,6 +11,10 @@
    On a phone it is the tree, then a list, then the page, one screen at a
    time. On a computer the list and the page are side by side.
 
+   Pages of a datamodel you may only read (docs/CIRCLES.md) open read-only:
+   the same page, its words there to read and not to type into, and no pen,
+   no new folder, no photo and no delete.
+
    The addresses, under the screen's own (quills.js):
      #/q/<quill>/<screen>                every page, newest first
      #/q/<quill>/<screen>/~folders       the folders
@@ -25,6 +29,7 @@ import {
   toast, vacate, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
+import { mayWrite } from "./kit.js";
 import { bodyMarkup, bodyText, focusBody, mountBody, photoButton, setBody } from "./pictures.js";
 
 const own = {
@@ -62,6 +67,7 @@ function bind(at) {
     attachments: can.has("attachments") ? recordsUrl(model.id, "/_attachments") : "",
     label: screen.label || quill.name,
     noun: model.label.toLowerCase(),
+    writes: mayWrite(model),
   };
 }
 
@@ -117,7 +123,7 @@ const byNewest = (a, c) => c.modified - a.modified;
 // to draw beside a page: {title, backTo, backLabel, html, wire}.
 function listView(b, data, key, openId = "") {
   const hasFolders = !!b.path;
-  const compose = `<a class="button compose" href="${listHash(b, NEW + (key && !key.startsWith("~") ? "/" + key : ""))}" aria-label="New ${esc(b.noun)}">${icons.compose}</a>`;
+  const compose = !b.writes ? "" : `<a class="button compose" href="${listHash(b, NEW + (key && !key.startsWith("~") ? "/" + key : ""))}" aria-label="New ${esc(b.noun)}">${icons.compose}</a>`;
 
   if (key === FOLDERS) {
     const rows = data.folders.map((f) => {
@@ -127,7 +133,7 @@ function listView(b, data, key, openId = "") {
         <span class="main"><span class="title">${esc(f.name)}</span></span>
         <span class="count">${f.count}</span><span class="chevron">${icons.chevronRight}</span></a>`;
     }).join("");
-    const make = b.keepsFolders ? `<button class="new-folder" aria-label="New folder">${own.newFolder}</button>` : "";
+    const make = b.keepsFolders && b.writes ? `<button class="new-folder" aria-label="New folder">${own.newFolder}</button>` : "";
     return {
       title: "Folders",
       html: `${heading("Folders", make)}
@@ -164,7 +170,8 @@ function listView(b, data, key, openId = "") {
     if (!items.length && !subs.length) {
       listing.innerHTML = searching
         ? `<p class="empty">Nothing matches.</p>`
-        : `<p class="empty mascot"><b>Nothing here yet</b>Write your first ${esc(b.noun)} with the pen, and it will show up here.</p>`;
+        : `<p class="empty mascot"><b>Nothing here yet</b>${b.writes
+          ? `Write your first ${esc(b.noun)} with the pen, and it will show up here.` : "When there is, it will show up here."}</p>`;
       return;
     }
     const folderRows = subs.map((f) => `<a class="row has-icon" href="${listHash(b, f.path)}">
@@ -247,6 +254,11 @@ const lastList = new Map();
 /** The editor's list screens, and a page not written yet. */
 export async function renderEditor(at, arg) {
   const b = bind(at);
+  if ((arg === NEW || arg.startsWith(NEW + "/")) && !b.writes) {
+    toast(`You can read ${b.noun}s here, not write them`);
+    replace(at.base);
+    return renderRoute();
+  }
   if (arg === NEW || arg.startsWith(NEW + "/")) {
     return renderPage(b, { isNew: true, folder: arg.slice(NEW.length + 1), arg: `${at.quill.id}/${at.screen.id}/${arg}` });
   }
@@ -258,7 +270,8 @@ export async function renderEditor(at, arg) {
     app.innerHTML = nav({ title: view.title }) + `
       <main class="split">
         <section class="side">${sideBack(view)}${view.html}</section>
-        <section class="page"><p class="empty mascot"><b>Nothing open</b>Choose ${esc(aOr(b.noun))} on the left, or start one with the pen.</p></section>
+        <section class="page"><p class="empty mascot"><b>Nothing open</b>Choose ${esc(aOr(b.noun))} on the left${
+          b.writes ? ", or start one with the pen" : ""}.</p></section>
       </main>` + tabs(at.tab);
   } else {
     app.innerHTML = nav({ back: view.backTo, backLabel: view.backLabel, title: view.title }) +
@@ -333,12 +346,13 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
     ? listHash(b, ed.folder || (previousHash() === listHash(b, TOP) ? TOP : listKey))
     : listHash(b, "");
   const parentLabel = ed.folder ? baseName(ed.folder) : b.label;
-  const actions = `<button class="done strong" hidden>Done</button>` +
+  // Read-only, the page has nothing in its bar: nothing to finish, add or delete.
+  const actions = !b.writes ? "" : `<button class="done strong" hidden>Done</button>` +
     (ed.attachments ? photoButton : "") +
     `<button class="delete" aria-label="Delete ${esc(b.noun)}">${icons.trash}</button>`;
   const page = `
-      <div class="editor">
-        <input class="title" placeholder="Title" value="${esc(ed.isNew ? "" : ed.stem)}" autocapitalize="sentences" enterkeyhint="next">
+      <div class="editor${b.writes ? "" : " read-only"}">
+        <input class="title" placeholder="Title" value="${esc(ed.isNew ? "" : ed.stem)}" autocapitalize="sentences" enterkeyhint="next"${b.writes ? "" : " readonly"}>
         <p class="stamp"><span class="when">${esc(formatDate(ed.modified, { long: true }))}</span><span class="status"></span></p>
         ${bodyMarkup}
       </div>`;
@@ -371,8 +385,20 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
     ed.timer = setTimeout(() => saveEditor(ed), SAVE_DELAY);
   };
   // The body: text, with the pictures shown where they are.
+  if (!b.writes) ed.changed = () => {};
   mountBody(ed, box, ed.body);
   addEventListener("resize", ed.grow);
+  if (!b.writes) {
+    // Read-only: the words and the pictures, and nothing that changes them.
+    // pictures.js hears a paste, a drop and a backspace on the page; here
+    // they stop on the way down, before they reach it.
+    for (const area of box.querySelectorAll("textarea")) { area.readOnly = true; area.placeholder = ""; }
+    for (const button of box.querySelectorAll(".picture .remove")) button.remove();
+    for (const kind of ["paste", "drop", "dragover", "keydown"]) {
+      box.addEventListener(kind, (event) => event.stopPropagation(), true);
+    }
+    return;
+  }
   titleEl.addEventListener("input", ed.changed);
   titleEl.addEventListener("keydown", (event) => {
     if (event.key === "Enter") { event.preventDefault(); focusBody(ed); }

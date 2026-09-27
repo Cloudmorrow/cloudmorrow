@@ -19,12 +19,18 @@
    typed and drawn as it is, so ten o'clock is ten o'clock in June and in
    October; a bare date is a whole day, and the end of a whole-day thing is
    the last day it is on. A moment that does come with a zone is shown in
-   the reader's own time. */
+   the reader's own time.
+
+   Each of the two datamodels is written or only read on its own
+   (docs/CIRCLES.md): somebody with `event = write` and `calendar = read`
+   puts things on the family calendar and does not make calendars. With
+   the things themselves read-only there is no add row; they still open,
+   on a sheet that says them. */
 
 import {
   api, app, esc, heading, icons, nav, renderRoute, replace, store, tabs, toast, wireShell,
 } from "./core.js";
-import { sheetHash } from "./kit.js";
+import { mayWrite, sheetHash } from "./kit.js";
 import { renderNewSpace, renderSpaceList } from "./kit_space.js";
 
 const recordsUrl = (model, id) =>
@@ -273,14 +279,15 @@ export async function renderCalendar(at, arg) {
     ? `<div class="segments views" role="radiogroup" aria-label="View">${["week", "month"].map((v) =>
       `<button type="button" role="radio" data-view="${v}"${v === view ? ' class="active" aria-checked="true"' : ' aria-checked="false"'}>${v === "week" ? "Week" : "Month"}</button>`).join("")}</div>`
     : "";
+  const adds = mayWrite(b.model);
   const actions = `<a class="button" href="${at.base}/spaces" aria-label="${esc(b.spaceModel.label)}s">${glyphs.people}</a>` +
-    `<button class="compose" aria-label="New ${esc(b.model.label.toLowerCase())}">${icons.compose}</button>`;
+    (adds ? `<button class="compose" aria-label="New ${esc(b.model.label.toLowerCase())}">${icons.compose}</button>` : "");
   // What to type, and that a time in front of it is when: on a phone the
   // day is the one lit below, and the room is for the typing.
   const hint = wide()
     ? `Add ${aOr(b.model.label)} on ${shortDay(picked)} — “10:00 Dentist”, or a whole day`
     : `Add ${aOr(b.model.label)} — “10:00 Dentist”`;
-  const addLine = `<form class="add kit-add">
+  const addLine = !adds ? "" : `<form class="add kit-add">
       <input placeholder="${esc(hint)}" autocapitalize="sentences" enterkeyhint="done">
       ${spaceList.length > 1 ? `<select class="kit-in" aria-label="In which ${esc(b.spaceModel.label.toLowerCase())}">${spaceList.map((s) =>
         `<option value="${esc(s.id)}"${s === target ? " selected" : ""}>${esc(String(s.fields[b.spaceModel.title] || ""))}</option>`).join("")}</select>` : ""}
@@ -290,7 +297,7 @@ export async function renderCalendar(at, arg) {
       ${picked === today() ? "" : `<button class="today-link" type="button">Today</button>`}</p>
     <div class="listing">${onThatDay.length
       ? `<div class="group">${onThatDay.map((e) => eventRow(href(e), e)).join("")}</div>`
-      : `<p class="empty"><b>Nothing on</b>Add something above, and it will show up here.</p>`}</div>`;
+      : `<p class="empty"><b>Nothing on</b>${adds ? "Add something above, and it will show up here." : ""}</p>`}</div>`;
 
   app.innerHTML = nav({ title: screen.label }) + `
     <main class="kit-calendar view-${view}">
@@ -333,6 +340,7 @@ export async function renderCalendar(at, arg) {
   if (todayLink) todayLink.addEventListener("click", () => go(today()));
 
   const form = app.querySelector("form.kit-add");
+  if (!form) return;
   const input = form.querySelector("input");
   const pick = form.querySelector(".kit-in");
   if (pick) pick.addEventListener("change", () => { target = spaces.get(pick.value); store.set(remembered + ".in", pick.value); });

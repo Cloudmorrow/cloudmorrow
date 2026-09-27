@@ -338,7 +338,12 @@ class WorkspaceScreen(Screen):
             return
         wanted: dict[str, tuple[dict, dict, str]] = {}
         for quill in quills:
+            if quill.get("available") is False:
+                # Nothing in it this account may use (docs/CIRCLES.md): not
+                # theirs, so no card, the same as one switched off.
+                continue
             for screen in quill.get("screens") or []:
+
                 signature = json.dumps(
                     [quill.get("version"), quill.get("jobs"), screen, quill.get("models")],
                     sort_keys=True,

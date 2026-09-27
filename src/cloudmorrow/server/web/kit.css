@@ -232,6 +232,15 @@
   line-height: 1.5;
 }
 .record textarea.long:focus { border-color: var(--accent); }
+
+/* Read, not written (docs/CIRCLES.md): the same sheet, its fields said in
+   the ink the boxes would have, with nothing that looks like it takes typing. */
+.record.read-only .field .value { color: var(--ink); }
+.record.read-only .field:focus-within { background: none; }
+.record.read-only textarea.long:focus { border-color: var(--line); }
+.record.read-only .title, .record.read-only textarea { cursor: default; }
+/* The circle on a card for somebody who may only look: the state, still. */
+.row.card .tick.still { cursor: default; }
 .editor .stamp .expires { color: var(--warn); }
 
 /* Chips and the enum's buttons are set like the rest of the controls: in

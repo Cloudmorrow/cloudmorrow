@@ -10,6 +10,10 @@ A Quill with code of its own says on the sheet what it runs, as whom, and
 what it may reach; once installed, Running (`r`) shows what that code is
 doing — see `admin_quill_services`.
 
+A Quill that brings data new to this server asks on its sheet which circles
+get it (docs/CIRCLES.md): a tick each, and after the install every ticked
+circle may write it. A circle with `* = write` has it already, and says so.
+
 Removing one takes its tabs and its jobs away, from every client. It never
 takes a record: the data is the person's, and it is there again the day the
 Quill (or another that uses the same datamodels) is installed.
@@ -24,7 +28,7 @@ from rich.markup import escape
 from textual import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import Button, DataTable, Label, Static
+from textual.widgets import Button, Checkbox, DataTable, Label, Static
 
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.panes.admin_quill_services import QuillServicesModal
@@ -155,14 +159,32 @@ def code_lines(plan: dict) -> list[str]:
     return lines
 
 
+def new_data(plan: dict) -> list[dict]:
+    """The data a fresh install brings that no circle names yet."""
+    if plan.get("installed_version"):
+        return []
+    return [row for row in plan.get("data") or [] if row.get("new")]
+
+
+def has_everything(circle: dict) -> bool:
+    return (circle.get("rules") or {}).get("*") == "write"
+
+
 class QuillSheet(Modal[bool]):
-    """The install sheet: everything a Quill adds, and Install or Cancel."""
+    """The install sheet: everything a Quill adds, and Install or Cancel.
+
+    With *circles*, and data new to this server, a tick per circle for who
+    gets it; the ticked circles' ids are in `chosen` once it is answered.
+    """
 
     BINDINGS = [("escape", "cancel", "Cancel")]
 
-    def __init__(self, plan: dict) -> None:
+    def __init__(self, plan: dict, *, circles: list[dict] | None = None) -> None:
         super().__init__()
         self.plan = plan
+        self.fresh = new_data(plan)
+        self.circles = (circles or []) if self.fresh else []
+        self.chosen: list[str] = []
 
     def compose(self) -> ComposeResult:
         installed = self.plan.get("installed_version")
@@ -174,6 +196,24 @@ class QuillSheet(Modal[bool]):
                         classes="modal-title")
             with VerticalScroll(id="quill-sheet-body"):
                 yield Static(sheet_text(self.plan), id="quill-sheet-text")
+                if self.circles:
+                    what = ", ".join(row.get("label") or row["id"] for row in self.fresh)
+                    yield Static(
+                        f"\n[b {ACCENT}]Who gets it[/]  [{MUTED}]which circles may read and "
+                        f"write {escape(what)}; the rest do not see it until a circle is "
+                        f"given it[/]",
+                        id="sheet-circles-note",
+                    )
+                    with Vertical(id="sheet-circles"):
+                        for index, circle in enumerate(self.circles):
+                            everything = has_everything(circle)
+                            label = circle["name"] + (
+                                "  (has everything: gets it anyway)" if everything else ""
+                            )
+                            yield Checkbox(
+                                label, value=everything, disabled=everything,
+                                id=f"sheet-circle-{index}",
+                            )
             with Horizontal(classes="modal-buttons"):
                 yield Button("Cancel", id="cancel")
                 yield Button(verb, variant="primary", id="install")
@@ -183,6 +223,13 @@ class QuillSheet(Modal[bool]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         event.stop()
+        if event.button.id == "install":
+            self.chosen = [
+                circle["id"]
+                for index, circle in enumerate(self.circles)
+                if not has_everything(circle)
+                and self.query_one(f"#sheet-circle-{index}", Checkbox).value
+            ]
         self.dismiss(event.button.id == "install")
 
     def action_cancel(self) -> None:
@@ -321,7 +368,14 @@ class QuillsView(Pane):
             self.status(str(exc), error=True)
             return
         self.status("", note=True)
-        if not await self.app.push_screen_wait(QuillSheet(plan)):
+        circles: list[dict] = []
+        if new_data(plan):
+            try:
+                circles = await self.api.circles()
+            except ApiError:
+                circles = []
+        sheet = QuillSheet(plan, circles=circles)
+        if not await self.app.push_screen_wait(sheet):
             return
         self.status(f"Installing {plan.get('name') or quill['id']}…", note=True)
         try:
@@ -329,7 +383,21 @@ class QuillsView(Pane):
         except ApiError as exc:
             self.status(str(exc), error=True)
             return
-        self.status(f"Installed {done.get('name') or quill['id']} {done.get('version', '')}.")
+        given = []
+        try:
+            for circle in sheet.chosen:
+                for row in sheet.fresh:
+                    await self.api.set_circle_rule(circle, row["id"], "write")
+                given.append(circle)
+        except ApiError as exc:
+            self.status(f"Installed, but the circles were not all given it: {exc}", error=True)
+            self._workspace_follows()
+            self.reload()
+            return
+        self.status(
+            f"Installed {done.get('name') or quill['id']} {done.get('version', '')}."
+            + (f" Given to: {', '.join(given)}." if given else "")
+        )
         self._workspace_follows()
         self.reload()
 

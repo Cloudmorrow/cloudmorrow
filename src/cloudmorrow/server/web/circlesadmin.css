@@ -1,0 +1,62 @@
+/* Circles, for an administrator: the list, and one circle's form.
+
+   As plain as the accounts beside it. A circle's data is a menu per row —
+   Write, Read, Nothing — because a wrong tap here stops somebody reaching
+   their calendar, and a menu says what it is set to in words. */
+
+.panel .note.warn { color: var(--warn); }
+
+.row.circle-row { padding-right: 12px; }
+.circle-row .main { min-width: 0; }
+.circle-row .preview { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.role-chip.circle-default { flex: none; white-space: nowrap; border-color: var(--accent); color: var(--accent); }
+
+/* In the accounts list: the circles somebody is in, beside their type. */
+.user-row .circles { color: var(--ink); opacity: .8; }
+
+/* -- a circle's data ---------------------------------------------------------- */
+.circle-form .rules .row.rule-row { align-items: center; }
+.rule-row .main { min-width: 0; }
+.rule-row .preview { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rule-row select {
+  flex: none;
+  max-width: 9.5em;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--line-bright);
+  border-radius: var(--radius-control);
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  /* 16px or iOS zooms the page the moment it is focused. */
+  font-size: 16px;
+}
+.rule-row select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* A domain opens to its datamodels. The marker is drawn, not the browser's,
+   so it sits in the row like the chevrons elsewhere. */
+details.domain > summary { list-style: none; cursor: pointer; }
+details.domain > summary::-webkit-details-marker { display: none; }
+details.domain > summary .title::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+  color: var(--muted);
+}
+details.domain[open] > summary .title::before { content: "▾"; }
+details.domain .model-row { padding-left: 34px; background: var(--card-2); }
+details.domain .model-row::before { left: 34px; }
+
+/* The install sheet's ticks for who gets a Quill's new data: the same box
+   as a feature's, on the first line of its row. */
+.who-gets-it input[type="checkbox"] {
+  flex: none;
+  margin: 15px 0 0;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+/* A circle's people are one line each: the box sits in the middle of it. */
+.circle-form .choices .row { align-items: center; }
+.circle-form .choices input[type="checkbox"] { margin-top: 0; }

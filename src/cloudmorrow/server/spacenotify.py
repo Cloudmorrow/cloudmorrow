@@ -86,6 +86,10 @@ def install(state: AppState) -> None:
                 for u in state.users.list()
                 if u.username != record.owner and u.is_active and u.user_type == "human"
             ]
+        # Nobody is told what their circles do not let them read.
+        people = [p for p in people if state.records.readable(Principal.person(p), record.model)]
+        if not people:
+            return
         model = state.quills.datamodels.get(record.model)
         line = str(record.fields.get(model.title) if model else "") or "Something new"
         space_model, space_id, space = _space_of(state, record)
@@ -102,6 +106,8 @@ def install(state: AppState) -> None:
                                       tag=f"{space_model}-{space_id}"))
 
     def added(space: Record, username: str, by: str) -> None:
+        if not state.records.readable(Principal.person(username), space.model):
+            return
         model = state.quills.datamodels.get(space.model)
         name = str(space.fields.get(model.title) if model else "") or space.id
         label = model.label.lower() if model else "space"

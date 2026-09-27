@@ -6,14 +6,17 @@ server offers at all. It is one menu on the top bar, and only administrators
 see it; opening it puts the whole interface aside, because administering a
 server is not a sixth tab of your own stuff.
 
-Three sections so far:
+Four sections so far:
 
 - **Users.** Every account, with its role and its type. The role is what it
   may do — **Administrator**, **User**, or **DashboardDisplayer**, which may
   only show dashboards on a shared screen. The type is what is behind it: a
   **Human** signs in and types, an **Agent** is a program acting for someone,
   and a **SystemsUser** is the machinery itself — the screen in the hallway —
-  with nobody behind it.
+  with nobody behind it. Beside each, their circles — and, for somebody in
+  none, that they reach no data.
+- **Circles.** Who may use which data: a named set of people, and per
+  datamodel write, read or nothing. In admin_circles.py.
 - **Features.** Notes, Tasks, Projects, Files. Switching one off takes its tab
   out of every client and closes its API — off here is off everywhere, not a
   hidden button.
@@ -40,6 +43,7 @@ from textual.widgets import (
 )
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.tui.panes.admin_circles import CirclesView, circles_by_person
 from cloudmorrow.tui.panes.admin_quills import QuillsView
 from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
@@ -217,13 +221,15 @@ class UsersView(Pane):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self._users: list[dict] = []
+        # The circles each account is in; None when the server would not say.
+        self._circles: dict[str, list[str]] | None = None
 
     def content(self) -> ComposeResult:
         yield DataTable(id="admin-user-table", cursor_type="row", zebra_stripes=True)
 
     def on_mount(self) -> None:
         self.query_one("#admin-user-table", DataTable).add_columns(
-            "ACCOUNT", "NAME", "ROLE", "TYPE", "SIGNS IN", "SINCE"
+            "ACCOUNT", "NAME", "ROLE", "TYPE", "CIRCLES", "SIGNS IN", "SINCE"
         )
 
     def on_show(self) -> None:
@@ -247,17 +253,21 @@ class UsersView(Pane):
         except ApiError as exc:
             self.status(str(exc), error=True)
             return
+        try:
+            self._circles = circles_by_person(await client.circles())
+        except ApiError:
+            self._circles = None
         table = self.query_one("#admin-user-table", DataTable)
         row = table.cursor_row
         table.clear()
         for user in self._users:
-            table.add_row(*self._row(user))
+            table.add_row(*self._row(user, self._circles))
         if self._users:
             table.move_cursor(row=min(max(row, 0), len(self._users) - 1))
         self.status(f"{len(self._users)} accounts", note=True)
 
     @staticmethod
-    def _row(user: dict) -> tuple[str, ...]:
+    def _row(user: dict, circles: dict[str, list[str]] | None = None) -> tuple[str, ...]:
         role = str(user.get("role") or ("administrator" if user.get("is_admin") else "user"))
         kind = str(user.get("user_type") or "human")
         colours = {
@@ -266,11 +276,20 @@ class UsersView(Pane):
             "agent": WARN,
             "systems_user": SECOND,
         }
+        # In no circle is no data (docs/CIRCLES.md, rule 3): said as plainly
+        # as not signing in.
+        if circles is None:
+            within = f"[{MUTED}]—[/]"
+        elif circles.get(user["username"]):
+            within = ", ".join(circles[user["username"]])
+        else:
+            within = f"[{BAD}]reaches no data[/]"
         return (
             f"[b]{user['username']}[/]",
             user.get("display_name") or f"[{MUTED}]—[/]",
             f"[{colours.get(role, MUTED)}]{LABELS.get(role, role)}[/]",
             f"[{colours.get(kind, MUTED)}]{LABELS.get(kind, kind)}[/]",
+            within,
             "yes" if user.get("is_active", True) else f"[{BAD}]no[/]",
             _short(user.get("created_at")),
         )
@@ -467,7 +486,7 @@ class AdminPanel(Vertical):
     class Closed(Message):
         """Back to the workspace."""
 
-    VIEWS: tuple[type[Pane], ...] = (UsersView, FeaturesView, QuillsView)
+    VIEWS: tuple[type[Pane], ...] = (UsersView, CirclesView, FeaturesView, QuillsView)
 
     def compose(self) -> ComposeResult:
         with ContentSwitcher(id="admin-views", initial="admin-view-users"):
@@ -484,7 +503,7 @@ class AdminPanel(Vertical):
 
     @property
     def current(self) -> str:
-        """The section showing: users, features or quills."""
+        """The section showing: users, circles, features or quills."""
         return (self.query_one("#admin-views", ContentSwitcher).current or "")[
             len("admin-view-") :
         ]

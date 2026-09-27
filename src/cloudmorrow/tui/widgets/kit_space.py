@@ -11,6 +11,8 @@ spaces uses these rather than its own:
 - `SpaceModal` is a space's people: who can see it, who is in it, adding
   somebody, taking somebody out, and leaving. It talks to the server itself,
   as the record sheet does, and says what went wrong with the dialog open.
+  On a space datamodel you may only read (docs/CIRCLES.md) it is who is in
+  it, and nothing to change about that.
 - `PickPersonModal` is one person out of a list: whom to write to, whom to add.
 
 A screen may say how its spaces are made in `made_as`: scope (or `direct`, a
@@ -45,7 +47,7 @@ from textual.widgets.option_list import Option
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
 from cloudmorrow.tui.theme import BAD, MUTED, SECOND
-from cloudmorrow.tui.widgets.kit import safe_id, title_of
+from cloudmorrow.tui.widgets.kit import can_write, safe_id, title_of
 
 # What each scope is called, and means, to the person choosing it.
 SCOPE_WORDS = {
@@ -287,6 +289,8 @@ class SpaceModal(Modal[str | None]):
         self.me = me
         self.changed = False
         self.noun = str(model.get("label") or model.get("id") or "space").lower()
+        # Adding, taking out and leaving are all writing the space.
+        self.writes = can_write(model)
 
     @property
     def shared(self) -> bool:
@@ -328,18 +332,22 @@ class SpaceModal(Modal[str | None]):
             if name == owner:
                 said += f"  [{MUTED}]made it[/]"
             parts: list = [Static(said, classes="space-member-name")]
-            if self.space.get("can_manage") and name != owner:
+            if self.writes and self.space.get("can_manage") and name != owner:
                 parts.append(Button("Take out", id=f"out-{safe_id(name)}",
                                     classes="space-take-out", compact=True))
             await box.mount(Horizontal(*parts, classes="space-member"))
         outside = [p for p in self.people if p["username"] not in self.inside]
-        may_add = self.shared and (self.space.get("can_manage") or self.me in self.inside)
+        may_add = self.writes and self.shared and (
+            self.space.get("can_manage") or self.me in self.inside
+        )
         adder = self.query_one("#space-add")
         adder.display = bool(may_add and outside)
         self.query_one("#space-add-who", Select).set_options(
             [(p.get("display_name") or p["username"], p["username"]) for p in outside]
         )
-        self.query_one("#space-leave", Button).display = self.shared and owner != self.me
+        self.query_one("#space-leave", Button).display = (
+            self.writes and self.shared and owner != self.me
+        )
 
     def _say(self, message: str) -> None:
         self.query_one("#space-complaint", Static).update(f"[{BAD}]{message}[/]" if message else "")
@@ -370,6 +378,8 @@ class SpaceModal(Modal[str | None]):
                 await self.take_out(name)
 
     async def add(self) -> None:
+        if not self.writes:
+            return
         chosen = self.query_one("#space-add-who", Select)
         if chosen.is_blank():
             self._say("Pick somebody first.")
@@ -386,6 +396,8 @@ class SpaceModal(Modal[str | None]):
         await self.draw()
 
     async def take_out(self, username: str) -> None:
+        if not self.writes:
+            return
         try:
             await self.client.remove_member(self.model["id"], self.space["id"], username)
             await self._refresh()
@@ -395,8 +407,9 @@ class SpaceModal(Modal[str | None]):
         self.changed = True
 
     async def _leave(self, confirmed: bool | None) -> None:
-        if not confirmed:
+        if not confirmed or not self.writes:
             return
+
         try:
             await self.client.remove_member(self.model["id"], self.space["id"], self.me)
         except ApiError as exc:

@@ -43,6 +43,24 @@ export const titleOf = (model, record, name = model.title) => String(record.fiel
 export const sheetHash = (at, model, id) =>
   `#/r/${encodeURIComponent(at.quill.id)}/${encodeURIComponent(at.screen.id)}/${encodeURIComponent(model)}/${encodeURIComponent(id)}`;
 
+// -- what you may do here -------------------------------------------------------------
+// The server fits every Quill to whoever asks (docs/CIRCLES.md): each of its
+// datamodels comes with your `access`, "write" or "read", and one you may not
+// read is not sent at all — nor are the link fields that point at it. Read is
+// drawn as read: the same screen, with nothing on it that writes. Every kit
+// file asks here, per datamodel, rather than reading `access` itself.
+
+/** Whether you may make, change, move and delete *model*'s records. A
+    datamodel that is not there is not yours to write; one with no `access`
+    is from a server without circles, where everybody may. */
+export const mayWrite = (model) => !!model && model.access !== "read";
+/** The same, for a datamodel of the Quill on screen, by id. */
+export const canWrite = (at, modelId) => mayWrite(at.quill.models[modelId]);
+
+/** The circle on a card for somebody who may only look: the state, not a button. */
+const stillTick = (state, label) =>
+  `<span class="tick still" role="img" aria-label="${esc(label)}">${circle(state)}</span>`;
+
 // "Add a task", "Add an entry": the label is the model's, the article is ours.
 export const aOr = (label) => (/^[aeiou]/i.test(label) ? "an " : "a ") + label.toLowerCase();
 
@@ -147,6 +165,9 @@ async function renderBoard(at, arg) {
   // record of the model the group field links to.
   const groupField = screen.group ? fieldOf(model, screen.group) : null;
   const groupModel = groupField ? quill.models[groupField.to] : null;
+  // A board over records you may only read is one you look at: no adding,
+  // no ticking, no dragging. Boards of your own are the boards' model's.
+  const writes = mayWrite(model);
   const remembered = "kit." + at.tab;
   let groups = [];
   let group = null;
@@ -169,16 +190,16 @@ async function renderBoard(at, arg) {
   // is there even with one group: that last chip is what it is for then.
   const chips = !groupModel ? "" : `<div class="chips">${groups.map((g) =>
     `<a class="chip${g === group ? " active" : ""}" href="${at.base}/${encodeURIComponent(g.id)}">${esc(titleOf(groupModel, g))}</a>`).join("")}` +
-    `<button class="chip new-group" type="button">+ New ${esc(groupModel.label.toLowerCase())}</button></div>`;
+    (mayWrite(groupModel) ? `<button class="chip new-group" type="button">+ New ${esc(groupModel.label.toLowerCase())}</button>` : "") + `</div>`;
   // The group's own sheet is where it is renamed and deleted: a board is a
   // record like any other, and gets the sheet every record gets.
   const actions = (group
     ? `<a class="button" href="${sheetHash(at, groupModel.id, group.id)}" aria-label="${esc(groupModel.label)} details">${own.more}</a>`
-    : "") + `<button class="compose" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</button>`;
-  const canAdd = !groupModel || group;
+    : "") + (writes ? `<button class="compose" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</button>` : "");
+  const canAdd = (!groupModel || group) && writes;
   app.innerHTML = nav({ title: name }) + `
     <main>
-      ${heading(name, canAdd ? actions : "")}
+      ${heading(name, !groupModel || group ? actions : "")}
       ${chips}
       ${canAdd ? `<form class="add">${circle("")}<input placeholder="Add ${esc(aOr(model.label))}" autocapitalize="sentences" enterkeyhint="done"></form>` : ""}
       <div class="install-slot">${installCard()}</div>
@@ -197,18 +218,20 @@ async function renderBoard(at, arg) {
       if (total) meta += `<span class="date">${done} of ${total}</span>`;
       if (preview) meta += `<span class="preview">${esc(preview)}</span>`;
     }
-    return `<div class="row card${state === "done" ? " is-done" : ""}" data-id="${esc(r.id)}"${canDrag() ? ` draggable="true"` : ""}>
-      <button class="tick" data-id="${esc(r.id)}" aria-label="${state === "done" ? "Not done" : "Done"}">${circle(state)}</button>
+    return `<div class="row card${state === "done" ? " is-done" : ""}" data-id="${esc(r.id)}"${writes && canDrag() ? ` draggable="true"` : ""}>
+      ${writes ? `<button class="tick" data-id="${esc(r.id)}" aria-label="${state === "done" ? "Not done" : "Done"}">${circle(state)}</button>`
+        : stillTick(state, (lanes.find(([lane]) => lane === r.fields[laneField.name]) || [])[1] || "")}
       <a class="main" href="${sheetHash(at, model.id, r.id)}">
         <span class="title">${esc(titleOf(model, r, title))}</span>${meta ? `<span class="meta">${meta}</span>` : ""}</a></div>`;
   };
   const show = () => {
     if (groupModel && !group) {
-      listing.innerHTML = `<p class="empty mascot"><b>No ${esc(groupModel.label.toLowerCase())} yet</b>Start one above, and it will show up here.</p>`;
+      listing.innerHTML = `<p class="empty mascot"><b>No ${esc(groupModel.label.toLowerCase())} yet</b>${
+        mayWrite(groupModel) ? "Start one above, and it will show up here." : "When there is one, it will show up here."}</p>`;
       return;
     }
     if (!records.length) {
-      listing.innerHTML = `<p class="empty mascot"><b>Nothing here yet</b>Add ${esc(aOr(model.label))} above, and it will show up here.</p>`;
+      listing.innerHTML = emptyList(model, writes);
       return;
     }
     // Each lane is wrapped, which the phone cannot tell — a plain block
@@ -226,10 +249,10 @@ async function renderBoard(at, arg) {
           : `<div class="group nothing">Nothing here</div>`) +
         `</div>`;
     }).join("") + `</div>`;
-    for (const button of listing.querySelectorAll(".tick")) {
+    for (const button of listing.querySelectorAll("button.tick")) {
       button.addEventListener("click", () => toggle(button.dataset.id));
     }
-    wireDragging();
+    if (writes) wireDragging();
   };
 
   // The circle is the short way through the lanes: tap to finish, tap
@@ -330,6 +353,12 @@ async function newGroup(at, groupModel) {
   } catch (err) { toast(err.message); }
 }
 
+/** What an empty listing says: where the add row is, or — for somebody who
+    may only look — that there is nothing to look at yet. */
+export const emptyList = (model, writes) => (writes
+  ? `<p class="empty mascot"><b>Nothing here yet</b>Add ${esc(aOr(model.label))} above, and it will show up here.</p>`
+  : `<p class="empty mascot"><b>Nothing here yet</b>When there is, it will show up here.</p>`);
+
 /** The add row under the title, and the pen beside it that leads there. */
 export function wireAdd(create) {
   const form = app.querySelector("form.add");
@@ -364,13 +393,14 @@ async function renderList(at) {
     ? [screen.subtitle].filter(Boolean)
     : (screen.fields || []).filter((n) => n !== title).slice(0, 2);
   const underFields = under.map((n) => fieldOf(model, n)).filter(Boolean);
+  const writes = mayWrite(model);
   let records = await api("GET", recordsUrl(model.id));
   const links = await linkTitles(quill, underFields);
 
   app.innerHTML = nav({ title: screen.label }) + `
     <main>
-      ${heading(screen.label, `<button class="compose" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</button>`)}
-      <form class="add">${tick ? circle("") : ""}<input placeholder="Add ${esc(aOr(model.label))}" autocapitalize="sentences" enterkeyhint="done"></form>
+      ${heading(screen.label, writes ? `<button class="compose" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</button>` : "")}
+      ${writes ? `<form class="add">${tick ? circle("") : ""}<input placeholder="Add ${esc(aOr(model.label))}" autocapitalize="sentences" enterkeyhint="done"></form>` : ""}
       <div class="install-slot">${installCard()}</div>
       <div class="listing"></div>
     </main>` + tabs(at.tab);
@@ -388,14 +418,15 @@ async function renderList(at) {
     }
     const on = !!r.fields[tick.name];
     return `<div class="row card${on ? " is-done" : ""}">
-      <button class="tick" data-id="${esc(r.id)}" aria-label="${esc(tick.label)}" aria-pressed="${on}">${circle(on ? "done" : "")}</button>
+      ${writes ? `<button class="tick" data-id="${esc(r.id)}" aria-label="${esc(tick.label)}" aria-pressed="${on}">${circle(on ? "done" : "")}</button>`
+        : stillTick(on ? "done" : "", on ? tick.label : `Not ${tick.label.toLowerCase()}`)}
       <a class="main" href="${sheetHash(at, model.id, r.id)}">${text}</a></div>`;
   };
   const show = () => {
     listing.innerHTML = records.length
       ? `<div class="group kit-list">${records.map(row).join("")}</div>`
-      : `<p class="empty mascot"><b>Nothing here yet</b>Add ${esc(aOr(model.label))} above, and it will show up here.</p>`;
-    for (const button of listing.querySelectorAll(".tick")) {
+      : emptyList(model, writes);
+    for (const button of listing.querySelectorAll("button.tick")) {
       button.addEventListener("click", () => flip(button.dataset.id));
     }
   };
@@ -498,6 +529,13 @@ function widget(f, value, links, own = null) {
   }
 }
 
+// A field for somebody who may only read it: what it holds, said, where the
+// widget would be. A switch says yes or no, since saying nothing looks like a gap.
+function sayWidget(f, value, links) {
+  const text = f.kind === "bool" ? (value ? "Yes" : "No") : spoken(f, value, links);
+  return `<span class="value" data-field="${esc(f.name)}" data-readonly>${esc(text || "—")}</span>`;
+}
+
 // An enum is a row of buttons, one lit: the lane control a task always had.
 const segments = (f, value) =>
   `<div class="segments" role="radiogroup" aria-label="${esc(f.label)}" data-field="${esc(f.name)}">` +
@@ -560,7 +598,10 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   const wanted = onScreen && screen.fields && screen.fields.length ? new Set([title, ...screen.fields]) : null;
   // What the screen's `made_as` sets is how the space was made, not a thing to change.
   const setBy = new Set(onScreen ? [] : Object.values(screen.made_as || {}).flatMap((f) => Object.keys(f)));
-  const fields = model.fields.filter((f) => f.name !== title && !setBy.has(f.name) && (!wanted || wanted.has(f.name)));
+  // A link whose datamodel is not here — not yours to read, so the server
+  // left it out — is left off too, rather than drawn as a picker of nothing.
+  const fields = model.fields.filter((f) => f.name !== title && !setBy.has(f.name) && (!wanted || wanted.has(f.name)) &&
+    (f.kind !== "link" || !f.to || quill.models[f.to]));
   // In the order the screen names them, when it does.
   if (wanted) fields.sort((a, b) => screen.fields.indexOf(a.name) - screen.fields.indexOf(b.name));
   const links = await linkTitles(quill, fields.filter((f) => f.kind === "link"));
@@ -591,8 +632,10 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   // Back to the day it is on, rather than to wherever the screen starts.
   if (own && own.parent && onScreen) parent = own.parent(record) || parent;
   // A space is its manager's to change; everybody in it reads the same sheet.
-  const fixed = model.space && !record.can_manage;
-  const deletable = !fixed && !(model.space && record.scope === "personal");
+  // And a record of a datamodel you may only read is read: its fields said,
+  // not boxes to type in, and nothing to save or delete it with.
+  const looked = !mayWrite(model) || (model.space && !record.can_manage);
+  const deletable = !looked && !(model.space && record.scope === "personal");
   const people = model.space ? await spaceSection(model, record) : "";
 
   const ed = { model, id, record, title, fields, own, dirty: false, saving: false, pending: false, timer: null };
@@ -605,7 +648,8 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   ed.hold = hold;
   occupy(hold);
 
-  const enums = fields.filter((f) => f.kind === "enum" && !f.stamp);
+  // Read, an enum is its value said, in the rows with the rest.
+  const enums = looked ? [] : fields.filter((f) => f.kind === "enum" && !f.stamp);
   const long = fields.filter((f) => LONG.has(f.kind) && !f.stamp);
   const short = fields.filter((f) => !enums.includes(f) && !long.includes(f));
   // One long text is the body, as a task's notes were: no label, the rest
@@ -619,30 +663,30 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   const left = timeLeft(record.expires_at);
   app.innerHTML = nav({
     back: parent, backLabel, title: titleOf(model, record, title),
-    right: `<button class="done strong" hidden>Done</button>` +
+    right: (looked ? "" : `<button class="done strong" hidden>Done</button>`) +
       (deletable ? `<button class="delete" aria-label="Delete ${esc(model.label.toLowerCase())}">${icons.trash}</button>` : ""),
   }) + `
     <main>
-      <div class="editor record">
-        <input class="title" data-field="${esc(title)}" placeholder="${esc(fieldOf(model, title).label)}" value="${esc(record.fields[title] ?? "")}" autocapitalize="sentences" enterkeyhint="next">
+      <div class="editor record${looked ? " read-only" : ""}">
+        <input class="title" data-field="${esc(title)}" placeholder="${esc(fieldOf(model, title).label)}" value="${esc(record.fields[title] ?? "")}" autocapitalize="sentences" enterkeyhint="next"${looked ? " readonly" : ""}>
         <p class="stamp"><span class="when">${esc(formatDate(seconds(record.updated_at) || Date.now() / 1000, { long: true }))}</span>${
           left ? `<span class="expires"> · ${esc(left)}</span>` : ""}<span class="status"></span></p>
         ${enums.map((f) => (enums.length > 1 ? `<p class="group-label">${esc(f.label)}</p>` : "") + segments(f, record.fields[f.name])).join("")}
         ${short.length ? `<div class="group fields">${short.map((f) =>
-          `<label class="row field kind-${esc(f.kind)}"><span class="main">${esc(f.label)}</span>${widget(f, record.fields[f.name], links, own)}</label>`).join("")}</div>` : ""}
+          `<label class="row field kind-${esc(f.kind)}"><span class="main">${esc(f.label)}</span>${
+            looked && !f.secret ? sayWidget(f, record.fields[f.name], links[f.name]) : widget(f, record.fields[f.name], links, own)}</label>`).join("")}</div>` : ""}
         ${more.map((f) => `<p class="group-label">${esc(f.label)}</p>` +
-          `<textarea class="long" data-field="${esc(f.name)}" rows="3" aria-label="${esc(f.label)}">${esc(f.kind === "json" && record.fields[f.name] != null ? JSON.stringify(record.fields[f.name], null, 2) : record.fields[f.name] ?? "")}</textarea>`).join("")}
-        ${body ? `<textarea class="body" data-field="${esc(body.name)}" aria-label="${esc(body.label)}" placeholder="${esc(body.label + hint)}" rows="1">${esc(
+          `<textarea class="long" data-field="${esc(f.name)}" rows="3" aria-label="${esc(f.label)}"${looked ? " readonly" : ""}>${esc(f.kind === "json" && record.fields[f.name] != null ? JSON.stringify(record.fields[f.name], null, 2) : record.fields[f.name] ?? "")}</textarea>`).join("")}
+        ${body ? `<textarea class="body" data-field="${esc(body.name)}" aria-label="${esc(body.label)}" placeholder="${esc(looked ? "" : body.label + hint)}" rows="1"${looked ? " readonly" : ""}>${esc(
           body.kind === "json" && record.fields[body.name] != null ? JSON.stringify(record.fields[body.name], null, 2) : record.fields[body.name] ?? "")}</textarea>` : ""}
       </div>
       ${people}
     </main>`;
   wireShell();
   app.querySelector(".nav").classList.add("lined");
-  if (fixed) {
-    for (const el of app.querySelectorAll(".editor [data-field], .editor .segments button, .editor .swatch")) el.disabled = true;
-  }
-  if (own && own.wire) own.wire(app.querySelector(".editor"));
+  // A secret is still a password box with its eye, only not one to type in.
+  if (looked) for (const el of app.querySelectorAll(".editor input")) el.readOnly = true;
+  if (own && own.wire && !looked) own.wire(app.querySelector(".editor"));
   if (model.space) wireSpace(app, model, record, { left: parent });
 
   const box = app.querySelector(".editor");
@@ -659,6 +703,9 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   };
   grow();
   addEventListener("resize", grow);
+  wireSecretWidgets(box);
+  // Nothing to save: the rest of this is the writing.
+  if (looked) return;
 
   // Typing waits for a pause; a choice — a lane, a tick, a date — is a
   // decision already made, and is saved the moment it is.
@@ -708,7 +755,6 @@ export async function renderRecordSheet(at, modelId, id, arg) {
     if (ed.dirty) { clearTimeout(ed.timer); saveSheet(ed); }
   });
   done.addEventListener("click", () => document.activeElement && document.activeElement.blur());
-  wireSecretWidgets(box);
 
   if (del) del.addEventListener("click", async () => {
     // What goes with it, said before rather than found out after.

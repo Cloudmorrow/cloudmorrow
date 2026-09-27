@@ -224,6 +224,11 @@ it is a `user`, and the scopes are the three the chat and calendar already use:
 An element says which scopes it allows. Contacts cannot be public;
 messages cannot be personal (a message to yourself is a note).
 
+Which *kinds* of data each person may use at all — the children read the
+family calendar and never see the budget — is the circles' business:
+[CIRCLES.md](CIRCLES.md). A circle sets the ceiling; the scope picks the
+records beneath it.
+
 A company with departments is a server with circles. A company with
 twenty offices is twenty servers, or a tenant each, and the registry is
 what they share. Nothing here tries to be one database for a

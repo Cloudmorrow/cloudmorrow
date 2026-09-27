@@ -74,3 +74,19 @@ def test_the_calls_it_makes_are_the_generic_ones(chat_quill, auth):
 def test_sending_is_the_one_amber_and_where_you_are_is_sky():
     assert "background: var(--action);" in THREAD_CSS.split(".composer button {", 1)[1].split("}", 1)[0]
     assert ".space-row.current { background: color-mix(in srgb, var(--accent)" in THREAD_CSS
+
+
+def test_a_conversation_you_may_only_read_has_no_box_to_write_in():
+    """docs/CIRCLES.md: no composer in a thread, and your own lines not yours to change."""
+    thread = code(THREAD_JS)
+    assert "says: mayWrite(model), makes: mayWrite(spaceModel)," in thread
+    assert "(s.says ? `\n      <form class=\"composer\">" in thread
+    assert 'class="composer-none"' in thread
+    # With no composer the writing is never wired, and nothing reads a box that is not there.
+    assert 'const box = form && form.querySelector("textarea");' in thread
+    assert thread.index("if (!form) return;") < thread.index('form.addEventListener("submit"')
+    assert "const own = says && line.owner === me;" in thread
+    assert thread.count("renderLines(state.lines, s.body, me, s.says)") == 3
+    # Making a space, or writing to somebody, is the spaces' datamodel's.
+    assert 'if (!s.makes) return "";' in thread
+    assert ".composer-none {" in THREAD_CSS

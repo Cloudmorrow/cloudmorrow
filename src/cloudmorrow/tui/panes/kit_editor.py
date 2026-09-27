@@ -12,6 +12,10 @@ The editor is the one notes always had — the line the cursor is on stays
 raw source, everything else renders — and it saves as you type. A page
 changed somewhere else since it was opened is not written over: you are
 asked.
+
+Pages you may only read (docs/CIRCLES.md) open read-only: the tree, search
+and export are there, and nothing that writes — no new page or folder, no
+rename, delete, import or photo, and the editor takes no typing.
 """
 
 from __future__ import annotations
@@ -55,6 +59,10 @@ class EditorPane(KitPane):
         ("f7", "fire('export_file')", "Export"),
         ("ctrl+p", "fire('insert_image')", "Photo"),
     ]
+    WRITING = frozenset({
+        "save", "new_page", "new_folder", "rename", "delete_record", "import_file",
+        "insert_image",
+    })
 
     def __init__(self, quill: dict, screen: dict, **kwargs) -> None:
         super().__init__(quill, screen, **kwargs)
@@ -81,7 +89,7 @@ class EditorPane(KitPane):
             actions.append(
                 Action("insert_image", "Photo", "^p", hint="Put a picture from this machine in the page")
             )
-        self.ACTIONS = tuple(actions)
+        self.ACTIONS = self.offer(actions)
         # The page that is open: its id, its path in the tree, and its rev.
         self.current_id: str | None = None
         self.current_path: str | None = None
@@ -95,11 +103,13 @@ class EditorPane(KitPane):
 
     def content(self) -> ComposeResult:
         with Horizontal(id="editor-body"):
-            yield NoteTree(id="editor-tree", label=self.TAB_LABEL.lower())
+            yield NoteTree(id="editor-tree", label=self.TAB_LABEL.lower(), writes=self.writes)
             with Vertical(id="editor-pane"):
                 yield Static(f"no {self.noun} open", id="editor-path")
                 with Horizontal(id="editor-row"):
-                    yield LiveMarkdownEditor(id="editor")
+                    editor = LiveMarkdownEditor(id="editor")
+                    editor.read_only = not self.writes
+                    yield editor
                     yield Picture(id="picture")
 
     def card_status(self) -> tuple[str, str] | None:
@@ -229,7 +239,7 @@ class EditorPane(KitPane):
         self.query_one("#editor-path", Static).update(f"no {self.noun} open")
 
     def on_live_markdown_editor_changed(self, _: LiveMarkdownEditor.Changed) -> None:
-        if self.current_id is None:
+        if self.current_id is None or not self.writes:
             return
         self.dirty = True
         self.status()
@@ -240,7 +250,7 @@ class EditorPane(KitPane):
         self.update_picture()
 
     def on_live_markdown_editor_save_requested(self, _: LiveMarkdownEditor.SaveRequested) -> None:
-        self.act_save()
+        self.fire("save")
 
     def _schedule_autosave(self) -> None:
         if self._autosave_timer is not None:
@@ -266,7 +276,7 @@ class EditorPane(KitPane):
 
     async def flush(self) -> None:
         """Save anything unsaved. The workspace calls this before it moves on."""
-        if self.dirty and self.current_id:
+        if self.dirty and self.current_id and self.writes:
             await self._save()
 
     async def _save(self, *, force: bool = False) -> None:
@@ -373,7 +383,8 @@ class EditorPane(KitPane):
         self.new_page(self.query_one(NoteTree).selected_dir)
 
     def on_note_tree_new_note_requested(self, event: NoteTree.NewNoteRequested) -> None:
-        self.new_page(event.parent)
+        if "new_page" not in self.refused:
+            self.new_page(event.parent)
 
     @work(group="ui")
     async def new_page(self, parent: str) -> None:
@@ -398,7 +409,8 @@ class EditorPane(KitPane):
         self.new_folder(self.query_one(NoteTree).selected_dir)
 
     def on_note_tree_new_folder_requested(self, event: NoteTree.NewFolderRequested) -> None:
-        self.new_folder(event.parent)
+        if "new_folder" not in self.refused:
+            self.new_folder(event.parent)
 
     @work(group="ui")
     async def new_folder(self, parent: str) -> None:
@@ -422,7 +434,8 @@ class EditorPane(KitPane):
             self.rename(data["path"], data["is_dir"])
 
     def on_note_tree_rename_requested(self, event: NoteTree.RenameRequested) -> None:
-        self.rename(event.path, event.is_dir)
+        if "rename" not in self.refused:
+            self.rename(event.path, event.is_dir)
 
     @work(group="ui")
     async def rename(self, path: str, is_dir: bool) -> None:
@@ -463,7 +476,9 @@ class EditorPane(KitPane):
             self.delete(data["path"], data["is_dir"])
 
     def on_note_tree_delete_requested(self, event: NoteTree.DeleteRequested) -> None:
-        self.delete(event.path, event.is_dir)
+        if "delete_record" not in self.refused:
+            self.delete(event.path, event.is_dir)
+
 
     @work(group="ui")
     async def delete(self, path: str, is_dir: bool) -> None:

@@ -212,3 +212,29 @@ def test_cm_files_lists_gets_and_puts(screen, tmp_path, capsys):
     )
     asyncio.run(_act_grid(api, screen, "list", [], True))
     assert json.loads(capsys.readouterr().out)[0]["id"] == "my-files"
+
+
+# -- read is drawn as read (docs/CIRCLES.md) -----------------------------------------
+def test_a_folder_you_may_only_read_takes_nothing_in():
+    code = code_of(GRID_JS)
+    assert "writes: mayWrite(model)," in code
+    # No plus, no folder menu, no file inputs.
+    assert '(b.writes ? `<button class="add"' in code
+    assert "const moreButton = folder && b.writes" in code
+    assert '${b.writes ? `<input type="file" class="pick-input"' in code
+    # Dropping and pasting are wired after this, and not at all when read.
+    folder = code[code.index("async function renderFolder("):code.index("function photoName(")]
+    stop = folder.index("if (!b.writes) return;")
+    assert folder.index("openFolder = null;") < stop
+    wired_after = ('addEventListener("drop"', "openFolder = { main: mainEl",
+                   '.heading .add").addEventListener')
+    for wired in wired_after:
+        assert stop < folder.index(wired), wired
+
+
+def test_a_file_you_may_only_read_is_not_renamed_moved_or_deleted():
+    code = code_of(GRID_JS)
+    item = code[code.index("export async function renderGridItem("):]
+    assert '${b.writes ? `<div class="group item-actions">' in item
+    # Sending it on, or saving it, is reading.
+    assert 'app.querySelector(".download").addEventListener' in item

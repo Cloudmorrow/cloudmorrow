@@ -319,6 +319,10 @@ def connect(db_path: Path) -> Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
     _migrate(conn)
+    # Who may use which data (circles.py): its tables, and Members the first time.
+    from cloudmorrow.server.circles import ensure as ensure_circles
+
+    ensure_circles(conn)
     # Rows from before content was sealed. Nothing to do on a database that
     # has been through it once.
     migrate_sealing(conn, conn.sealer)
@@ -472,6 +476,12 @@ class UserStore:
                         now,
                     ),
                 )
+                # Into the default circles, so a new account has what they give.
+                conn.execute(
+                    "INSERT OR IGNORE INTO circle_members (circle_id, username)"
+                    " SELECT id, ? FROM circles WHERE is_default = 1",
+                    (username,),
+                )
         except sqlite3.IntegrityError as exc:
             raise UserExistsError(username) from exc
         return self.require(username)
@@ -517,3 +527,6 @@ class UserStore:
             )
             if cursor.rowcount == 0:
                 raise UnknownUserError(username)
+            conn.execute(
+                "DELETE FROM circle_members WHERE username = ?", (username.strip().lower(),)
+            )

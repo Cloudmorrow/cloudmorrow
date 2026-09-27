@@ -13,6 +13,7 @@ from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.app import CloudmorrowApp
 from cloudmorrow.tui.screens.workspace import WorkspaceScreen
 from tests.tui_chat import CHAT_QUILL, FakeSpaces
+from tests.tui_circles import FakeCircles
 from tests.tui_files import FILES_QUILL, FakeFiles
 from tests.tui_notes import FakeNotes
 from tests.tui_quills import SECRETS_QUILL, FakeQuills
@@ -151,12 +152,12 @@ def _one_pixel_png() -> bytes:
 PNG_1PX = _one_pixel_png()
 
 
-class FakeClient(FakeSpaces, FakeNotes, FakeFiles, FakeQuills):
+class FakeClient(FakeSpaces, FakeNotes, FakeFiles, FakeQuills, FakeCircles):
     """Enough of the API for the workspace, with a record of what was asked.
 
     The Quills and the record store behind them are in tui_quills.py; the
     Files Quill and the shares behind it in tui_files.py; the spaces in the
-    store — Chat's channels — in tui_chat.py.
+    store — Chat's channels — in tui_chat.py; the circles in tui_circles.py.
     """
 
     # What a mount signs in with.
@@ -208,6 +209,8 @@ class FakeClient(FakeSpaces, FakeNotes, FakeFiles, FakeQuills):
             user_row("guest"),
         ]
         self.user_calls: list[tuple] = []
+        # Who may use which data: tui_circles.py.
+        self.setup_circles()
         self.feature_list: list[dict] = [dict(row) for row in FEATURES]
         self.feature_calls: list[tuple[str, bool]] = []
         # What this account has switched off for itself, which is a

@@ -221,6 +221,45 @@ class CloudmorrowClient:
             await self._request("PATCH", f"/api/me/features/{key}", json={"enabled": enabled})
         ).json()
 
+    # -- circles: who may use which data (docs/CIRCLES.md) -------------------
+    # A circle is named by its id or its name; the server takes either.
+    async def circles(self) -> list[dict]:
+        """Every circle, with its rules and its people. Admin only."""
+        return (await self._request("GET", "/api/circles")).json()
+
+    async def create_circle(
+        self, name: str, *, rules: dict[str, str] | None = None, members: list[str] | None = None
+    ) -> dict:
+        body = {"name": name, "rules": rules or {}, "members": members or []}
+        return (await self._request("POST", "/api/circles", json=body)).json()
+
+    async def update_circle(self, circle: str, **fields: object) -> dict:
+        """Change one circle: name, rules (replaced whole), default."""
+        return (await self._request("PATCH", f"/api/circles/{circle}", json=fields)).json()
+
+    async def set_circle_rule(self, circle: str, model: str, access: str) -> dict:
+        """One rule of a circle, the others kept: `write`, `read` or `none`."""
+        return (
+            await self._request(
+                "PUT", f"/api/circles/{circle}/rules/{model}", json={"access": access}
+            )
+        ).json()
+
+    async def delete_circle(self, circle: str) -> None:
+        await self._request("DELETE", f"/api/circles/{circle}")
+
+    async def join_circle(self, circle: str, username: str) -> dict:
+        return (await self._request("PUT", f"/api/circles/{circle}/members/{username}")).json()
+
+    async def leave_circle(self, circle: str, username: str) -> dict:
+        return (
+            await self._request("DELETE", f"/api/circles/{circle}/members/{username}")
+        ).json()
+
+    async def my_access(self) -> dict:
+        """What you may do with each datamodel, and the circles that say so."""
+        return (await self._request("GET", "/api/me/access")).json()
+
     # -- notes -------------------------------------------------------------
     async def tree(self) -> dict:
         return (await self._request("GET", "/api/notes/tree")).json()

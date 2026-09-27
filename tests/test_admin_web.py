@@ -73,3 +73,62 @@ def test_those_endpoints_turn_an_ordinary_account_away(client):
     assert client.patch(
         "/api/server/features/notes", json={"enabled": False}, headers=guest
     ).status_code == 403
+
+
+# -- circles ---------------------------------------------------------------------
+CIRCLES_JS = (WEB / "circlesadmin.js").read_text(encoding="utf-8")
+
+
+def test_the_circles_section_is_wired_in():
+    assert 'import "./circlesadmin.js";' in (WEB / "app.js").read_text(encoding="utf-8")
+    assert '@import "./circlesadmin.css";' in (WEB / "app.css").read_text(encoding="utf-8")
+    assert 'registerScreen("admincircle"' in CIRCLES_JS
+    assert 'data-side="circles"' in ADMIN_JS and "drawCircles(panel)" in ADMIN_JS
+
+
+def test_the_access_it_offers_is_the_access_the_server_takes():
+    from cloudmorrow.server.circles import ACCESS, EVERY
+
+    listed = CIRCLES_JS.split("export const ACCESS = [", 1)[1].split("\n];", 1)[0]
+    assert re.findall(r'^\s*\["([a-z]+)"', listed, re.MULTILINE) == list(ACCESS)
+    assert f'export const EVERY = "{EVERY}";' in CIRCLES_JS
+
+
+def test_somebody_in_no_circle_is_flagged_in_the_accounts_list():
+    assert "reaches no data" in ADMIN_JS
+    assert "circlesByPerson(circles)" in ADMIN_JS
+
+
+def test_the_circle_calls_answer_an_administrator(tasks_quill, auth):
+    client = tasks_quill
+    for path in ("/api/circles", "/api/datamodels", "/api/users"):
+        assert path in CIRCLES_JS, path
+        assert client.get(path, headers=auth).status_code == 200, path
+    # What a circle's page sends on save.
+    changed = client.patch(
+        "/api/circles/members", json={"name": "Everyone", "rules": {"*": "read"}, "default": True},
+        headers=auth,
+    )
+    assert changed.status_code == 200 and changed.json()["name"] == "Everyone"
+    # An administrator in a `*` circle is sent every datamodel, each with a domain
+    # to shelve it under.
+    models = client.get("/api/datamodels", headers=auth).json()
+    assert {m["id"]: m["domain"] for m in models if m["id"] in ("task", "board")} == {
+        "task": "tasks", "board": "tasks",
+    }
+
+
+def test_the_install_sheet_gives_ticked_circles_the_new_data(client, auth):
+    """quillsadmin.js puts one rule per ticked circle and new datamodel."""
+    quills = (WEB / "quillsadmin.js").read_text(encoding="utf-8")
+    assert "/rules/" in quills and 'access: "write"' in quills
+    assert ".filter((d) => d.new)" in quills
+    plan = client.post("/api/quills/plan", json={"id": "calendar"}, headers=auth).json()
+    assert {d["id"] for d in plan["data"] if d["new"]} == {"calendar", "event"}
+    client.post("/api/circles", json={"name": "Kids"}, headers=auth)
+    for model in ("calendar", "event"):
+        put = client.put(f"/api/circles/kids/rules/{model}", json={"access": "write"}, headers=auth)
+        assert put.status_code == 200
+    assert client.get("/api/circles/kids", headers=auth).json()["rules"] == {
+        "calendar": "write", "event": "write",
+    }

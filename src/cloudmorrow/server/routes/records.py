@@ -119,10 +119,19 @@ def seed(state: AppState, principal: Principal, model: str) -> None:
 
 @models_router.get("")
 def list_datamodels(
-    state: AppState = Depends(get_state), _: User = Depends(get_current_user)
+    state: AppState = Depends(get_state), user: User = Depends(get_current_user)
 ) -> list[dict]:
-    """Every datamodel on this server, foundational first, with who uses each."""
-    return state.quills.catalogue_of_models()
+    """Every datamodel on this server you may use, foundational first, with who uses
+    each and your `access` to it. One your circles do not give is not there."""
+    rows = state.quills.catalogue_of_models()
+    if state.circles is None:
+        return rows
+    access = state.circles.access_for(user.username)
+    return [
+        row | {"access": access.level(row["id"])}
+        for row in rows
+        if access.may("read", row["id"])
+    ]
 
 
 @router.get("/{model}")

@@ -23,6 +23,7 @@ import typer
 from cloudmorrow.agent.setup import ensure_agent, stop_agent
 from cloudmorrow.cli import (
     agent,
+    circle,
     desktop,
     dev,
     note,
@@ -56,6 +57,9 @@ app.add_typer(share.app, name="share")
 app.add_typer(settings.app, name="config")
 app.add_typer(update.app, name="update")
 app.add_typer(quill.app, name="quill")
+app.add_typer(circle.app, name="circle")
+# Your own access: what your circles give you, per datamodel.
+app.command("access")(circle.access)
 # The way out: `cloudmorrow uninstall`, in its own file beside the way in.
 app.command("uninstall")(uninstall.uninstall)
 # The desktop app: the web app in a window, with this computer behind it.

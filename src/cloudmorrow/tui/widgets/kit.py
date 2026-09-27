@@ -81,6 +81,18 @@ def read_only(field: dict) -> bool:
     return bool(field.get("stamp"))
 
 
+def can_write(model: dict | None) -> bool:
+    """Whether the person may make, change and delete *model*'s records.
+
+    The server fits every Quill to whoever asks (docs/CIRCLES.md): each
+    datamodel comes with their `access`, and one they may only read is drawn
+    as read — the same screen, without its writing. A datamodel that is not
+    there at all is not theirs to write either. A server without circles
+    sends no `access`, and there everybody has everything.
+    """
+    return bool(model) and model.get("access", "write") != "read"
+
+
 # -- what a card says ----------------------------------------------------------
 
 
@@ -174,13 +186,17 @@ class RecordCard(Static, can_focus=True):
             self.record = record
             super().__init__()
 
-    def __init__(self, record: dict, *, title: str, body: str | None = None, **kwargs) -> None:
+    def __init__(
+        self, record: dict, *, title: str, body: str | None = None, movable: bool = True, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         # Not `task`: Textual's MessagePump already owns that name, for the
         # asyncio task a widget runs on.
         self.record = record
         self.title_field = title
         self.body_field = body
+        # A card on a board you may only read opens, and goes nowhere.
+        self.movable = movable
         self._pressed_at: tuple[int, int] | None = None
         self._dragging = False
         self.update(self.render_card())
@@ -227,7 +243,7 @@ class RecordCard(Static, can_focus=True):
         self.capture_mouse()
 
     def on_mouse_move(self, event: events.MouseMove) -> None:
-        if self._pressed_at is None:
+        if self._pressed_at is None or not self.movable:
             return
         start_x, start_y = self._pressed_at
         travelled = abs(int(event.screen_x) - start_x) + abs(int(event.screen_y) - start_y)
@@ -252,6 +268,10 @@ class RecordCard(Static, can_focus=True):
         self.post_message(self.Opened(self.record))
 
     # -- the keyboard ------------------------------------------------------
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        """Moving and ticking are not there on a card that cannot move."""
+        return self.movable or action not in ("shift", "tick")
+
     def action_open(self) -> None:
         self.post_message(self.Opened(self.record))
 
@@ -282,7 +302,9 @@ class Lane(Vertical):
     def body(self) -> VerticalScroll:
         return self.query_one(f"#lane-body-{self._key}", VerticalScroll)
 
-    async def show(self, records: list[dict], *, title: str, body: str | None) -> None:
+    async def show(
+        self, records: list[dict], *, title: str, body: str | None, movable: bool = True
+    ) -> None:
         """Redraw this lane's cards, in the order the server gave them.
 
         Awaited rather than fired off: removing children is deferred, and a
@@ -303,7 +325,9 @@ class Lane(Vertical):
                 record,
                 title=title,
                 body=body,
+                movable=movable,
                 id=f"card-{safe_id(record['id'])}",
+
                 classes="record-card",
             )
             for record in records

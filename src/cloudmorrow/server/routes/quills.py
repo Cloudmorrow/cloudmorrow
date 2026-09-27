@@ -7,6 +7,11 @@ those screens need, so a client renders the kit without asking twice.
 The catalog, the install sheet (`/plan`) and installing are here too.
 Anybody signed in may look; only an administrator may install or remove,
 because a Quill is part of what the server is.
+
+What a client is sent is fitted to whoever asks (docs/CIRCLES.md): each
+datamodel carries their `access`, a datamodel their circles do not give is
+left out, and so are the fields that link to it and the screens drawn over
+it. A Quill with no screens left comes `available: false`, and is not on.
 """
 
 from __future__ import annotations
@@ -19,6 +24,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
+from cloudmorrow.server.circles import NONE, Access
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_admin_user, get_current_user, get_state
 from cloudmorrow.server.quills import MANIFEST, MAX_DOWNLOAD, QuillError, fetch, load_catalog
@@ -61,6 +67,59 @@ def _with_models(state: AppState, quill: dict) -> dict:
     return quill
 
 
+# The screen's bindings that say what it is drawn within: a board's boards,
+# a calendar's calendars, a thread's channels, a list's groups.
+WITHIN = ("group", "subgroup", "space")
+
+
+def _screen_needs(screen: dict, models: dict[str, dict]) -> set[str]:
+    """Every datamodel a screen cannot be drawn without: its own, and what it is within."""
+    model = models.get(screen["model"])
+    if model is None:
+        return {screen["model"]}
+    needs = {screen["model"]}
+    by_name = {f["name"]: f for f in model["fields"]}
+    for name in (*(screen.get(key) for key in WITHIN), model.get("in_space")):
+        found = by_name.get(name) if isinstance(name, str) else None
+        if found and found["kind"] == "link" and found.get("to"):
+            needs.add(found["to"])
+    return needs
+
+
+def fitted(quill: dict, access: Access) -> dict:
+    """*quill* as *access* may use it: see the module's docstring."""
+    models = quill["models"]
+    kept = {}
+    for model_id, model in models.items():
+        level = access.level(model_id)
+        if level == NONE:
+            continue
+        kept[model_id] = model | {
+            "access": level,
+            "fields": [
+                f for f in model["fields"]
+                if f["kind"] != "link" or not f.get("to") or access.may("read", f["to"])
+            ],
+        }
+    screens = [
+        screen for screen in quill["screens"]
+        if all(needed in kept for needed in _screen_needs(screen, models))
+    ]
+    own = set(quill["uses"]) | set(quill["introduces"]) | set(quill["extends"])
+    available = bool(screens) if quill["screens"] else any(m in kept for m in own)
+    return quill | {
+        "models": kept,
+        "screens": screens,
+        "available": available,
+        "enabled": bool(quill.get("enabled", True)) and available,
+    }
+
+
+def _for(state: AppState, user: User, quill: dict) -> dict:
+    quill = _with_models(state, quill)
+    return fitted(quill, state.circles.access_for(user.username)) if state.circles else quill
+
+
 @router.get("")
 def list_quills(
     state: AppState = Depends(get_state), user: User = Depends(get_current_user)
@@ -70,7 +129,7 @@ def list_quills(
     for quill in state.quills.installed():
         quill["enabled"] = state.features.enabled_for(user.username, quill["id"])
         quill["readme"] = ""
-        rows.append(_with_models(state, quill))
+        rows.append(_for(state, user, quill))
     return rows
 
 
@@ -206,7 +265,7 @@ def get_quill(
     for quill in state.quills.installed():
         if quill["id"] == quill_id:
             quill["enabled"] = state.features.enabled_for(user.username, quill_id)
-            return _with_models(state, quill)
+            return _for(state, user, quill)
     raise HTTPException(status.HTTP_404_NOT_FOUND, f"{quill_id} is not installed")
 
 

@@ -24,12 +24,18 @@
    is somewhere this server cannot show — with its `group_subtitle` saying
    why. Something else in the app may add to the groups list (a line under
    each, and what it does) through `registerGridHook`, without this file
-   knowing what it adds. */
+   knowing what it adds.
+
+   On records you may only read (docs/CIRCLES.md) it is the same file
+   manager with nothing that writes: no plus, no dropping or pasting files
+   in, no new folder, and nothing renamed, moved or deleted. Everything
+   still opens, and is still sent on or saved. */
 
 import {
   ApiError, api, app, authHeaders, encodePath, esc, formatDate, heading, icons, nav, onSignOut,
   renderRoute, replace, route, seconds, store, tabs, toast, wireShell, back,
 } from "./core.js";
+import { mayWrite } from "./kit.js";
 
 const own = {
   place: '<svg width="22" height="20" viewBox="0 0 22 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="2" width="19" height="6" rx="1.5"/><rect x="1.5" y="12" width="19" height="6" rx="1.5"/><path d="M5 5h.01M5 15h.01" stroke-linecap="round" stroke-width="2.4"/></svg>',
@@ -84,6 +90,7 @@ function bind(at) {
     groupTitle: groupModel.title,
     groupSubtitle: screen.group_subtitle || "",
     groupOpen: screen.group_open || "",
+    writes: mayWrite(model),
   };
 }
 
@@ -276,18 +283,18 @@ async function renderFolder(at, b, group, folder) {
   const parent = folder ? folderHash(at, group, folderOf(folder)) : at.base;
   const parentLabel = folder ? (folderOf(folder) ? baseName(folderOf(folder)) : groupName) : at.screen.label;
   const title = folder ? baseName(folder) : groupName;
-  const moreButton = folder
+  const moreButton = folder && b.writes
     ? `<button class="more" aria-label="${esc(title)}: rename, move or delete">${own.more}</button>` : "";
   app.innerHTML = nav({ back: parent, backLabel: parentLabel, title }) + `
     <main>
-      ${heading(title, moreButton + `<button class="add" aria-label="Add">${own.plus}</button>`)}
+      ${heading(title, moreButton + (b.writes ? `<button class="add" aria-label="Add">${own.plus}</button>` : ""))}
       <div class="sort-row">
         <div class="sort" role="group" aria-label="Sort by"></div>
         <div class="view-switch" role="group" aria-label="Show as"></div>
       </div>
       <div class="listing"></div>
-      <input type="file" class="pick-input" multiple hidden>
-      <input type="file" class="camera-input" accept="image/*" capture="environment" hidden>
+      ${b.writes ? `<input type="file" class="pick-input" multiple hidden>
+      <input type="file" class="camera-input" accept="image/*" capture="environment" hidden>` : ""}
     </main>` + tabs(at.tab);
   wireShell();
 
@@ -335,7 +342,7 @@ async function renderFolder(at, b, group, folder) {
     if (watcher) { watcher.disconnect(); watcher = null; }
     const sorted = sortEntries(entries, choice);
     if (!sorted.length) {
-      listingEl.innerHTML = `<p class="empty mascot"><b>Nothing here yet</b>This folder is empty. Add something with the plus.</p>`;
+      listingEl.innerHTML = `<p class="empty mascot"><b>Nothing here yet</b>This folder is empty.${b.writes ? " Add something with the plus." : ""}</p>`;
     } else if (view === "grid") {
       listingEl.innerHTML = `<div class="tiles">${sorted.map(tile).join("")}</div>`;
       watcher = watchTiles(b, listingEl);
@@ -367,6 +374,9 @@ async function renderFolder(at, b, group, folder) {
     show();
   };
   const place = { b, group, folder };
+  // Nothing goes in, by any of the ways below, where nothing may be written.
+  openFolder = null;
+  if (!b.writes) return;
 
   // Adding: the plus opens a sheet with the ways in. A picker or the camera
   // ends in a file input, which has to be clicked from the tap itself for
@@ -724,11 +734,11 @@ export async function renderGridItem(at, id) {
       <h1 class="large file-name">${esc(entry.name)}</h1>
       <div class="group facts">${facts.map(([label, value]) =>
         `<div class="row"><span class="main">${esc(label)}</span><span class="value">${esc(value)}</span></div>`).join("")}</div>
-      <div class="group item-actions">
+      ${b.writes ? `<div class="group item-actions">
         <button class="row has-icon" data-do="rename"><span class="icon">${own.rename}</span><span class="main"><span class="title">Rename</span></span></button>
         <button class="row has-icon" data-do="move"><span class="icon">${own.move}</span><span class="main"><span class="title">Move to another folder</span></span></button>
         <button class="row has-icon danger" data-do="delete"><span class="icon">${icons.trash}</span><span class="main"><span class="title">Delete</span></span></button>
-      </div>
+      </div>` : ""}
     </main>`;
   wireShell();
   app.querySelector(".nav").classList.add("lined");

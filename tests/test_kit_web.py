@@ -223,3 +223,113 @@ def test_the_old_calendar_screen_is_gone():
         text = path.read_text(encoding="utf-8")
         assert "calendar.js" not in text.replace("kit_calendar.js", ""), path.name
         assert "/api/calendar" not in text, path.name
+
+
+# -- read is drawn as read (docs/CIRCLES.md) ----------------------------------------
+def _code(source: str) -> str:
+    return re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.DOTALL)
+
+
+def _function(source: str, name: str) -> str:
+    """One top-level function's text, up to the next one."""
+    start = source.index(f"function {name}(")
+    following = re.search(r"\n(?:export )?(?:async )?function \w+\(", source[start + 1:])
+    return source[start:start + 1 + following.start()] if following else source[start:]
+
+
+def test_what_may_be_written_is_asked_in_one_place():
+    """Every kit file asks kit.js, per datamodel; none reads `access` itself."""
+    assert 'export const mayWrite = (model) => !!model && model.access !== "read";' in KIT_JS
+    assert "export const canWrite = (at, modelId) => mayWrite(at.quill.models[modelId]);" in KIT_JS
+    for name in ("kit_calendar.js", "kit_editor.js", "kit_grid.js", "kit_grouped.js",
+                 "kit_space.js", "kit_thread.js"):
+        source = _code((WEB / name).read_text(encoding="utf-8"))
+        assert "mayWrite" in source or "canWrite" in source, name
+        assert ".access" not in source, name
+
+
+def test_the_access_the_kit_reads_is_the_one_the_server_sends(client, tasks_quill):
+    from tests.conftest import GUEST, token_for
+
+    circles = client.app.state.cloudmorrow.circles
+    circles.leave("members", GUEST[0])
+    circles.create("Kids", {"task": "read", "board": "read"}, [GUEST[0]])
+    guest = {"Authorization": f"Bearer {token_for(client, *GUEST)}"}
+    (tasks,) = [q for q in client.get("/api/quills", headers=guest).json() if q["id"] == "tasks"]
+    assert {m["access"] for m in tasks["models"].values()} == {"read"}
+    assert tasks["screens"], "a board you may read is still drawn"
+
+
+def test_a_board_you_may_only_read_is_one_you_look_at():
+    board = _code(_function(KIT_JS, "renderBoard"))
+    assert "const writes = mayWrite(model);" in board
+    # No add row or pen, no new board, no ticking, no dragging.
+    assert "const canAdd = (!groupModel || group) && writes;" in board
+    assert "(writes ? `<button class=\"compose\"" in board
+    assert "mayWrite(groupModel) ? `<button class=\"chip new-group\"" in board
+    assert "writes && canDrag()" in board and "if (writes) wireDragging();" in board
+    assert "${writes ? `<button class=\"tick\"" in board and "stillTick(state," in board
+    # The still circle is not a button, so nothing wires a click to it.
+    assert 'querySelectorAll("button.tick")' in board
+    assert 'class="tick still" role="img"' in KIT_JS
+
+
+def test_a_list_you_may_only_read_has_no_add_row_and_no_ticking():
+    listing = _code(_function(KIT_JS, "renderList"))
+    assert "const writes = mayWrite(model);" in listing
+    assert "${writes ? `<form class=\"add\">" in listing
+    assert "${writes ? `<button class=\"tick\"" in listing
+    assert 'querySelectorAll("button.tick")' in listing
+    grouped = _code((WEB / "kit_grouped.js").read_text(encoding="utf-8"))
+    assert "${writes ? `<form class=\"add\">" in grouped
+    assert "tick && writes ? `<button class=\"tick\"" in grouped
+    assert "namesGroups(f) ? `<button class=\"chip new-group\"" in grouped
+
+
+def test_the_sheet_of_a_record_you_may_only_read_says_it():
+    sheet = _code(_function(KIT_JS, "renderRecordSheet"))
+    assert "const looked = !mayWrite(model) || (model.space && !record.can_manage);" in sheet
+    # Said rather than typed, nothing to delete, and none of the saving wired.
+    assert "looked && !f.secret ? sayWidget(" in sheet
+    assert "const deletable = !looked &&" in sheet
+    assert '(looked ? "" : `<button class="done strong" hidden>Done</button>`)' in sheet
+    assert sheet.index("if (looked) return;") < sheet.index("const changed = ")
+    assert sheet.index("if (looked) return;") < sheet.index('del.addEventListener("click"')
+    assert ".record.read-only .field .value" in KIT_CSS
+
+
+def test_a_link_to_a_datamodel_that_is_not_there_is_left_off():
+    """A datamodel you may not read is not sent; a link to it is not a picker of nothing."""
+    sheet = _code(_function(KIT_JS, "renderRecordSheet"))
+    assert '(f.kind !== "link" || !f.to || quill.models[f.to])' in sheet
+    assert '!quill.models[f.to]) continue;' in _code(_function(KIT_JS, "linkTitles"))
+
+
+def test_a_quill_with_nothing_left_has_no_tab():
+    assert "const yours = (quill) => quill.available !== false;" in QUILLS_JS
+    assert "quills = list.filter(yours);" in QUILLS_JS
+
+
+def test_spaces_you_may_only_read_are_not_made_or_changed():
+    space = _code((WEB / "kit_space.js").read_text(encoding="utf-8"))
+    assert "if (!mayWrite(model)) return notYours(" in space
+    assert space.count("return notYours(") == 2   # making one, and writing to somebody
+    section = _code(_function(space, "spaceSection"))
+    assert "const writes = mayWrite(model);" in section
+    assert section.count("writes &&") >= 3   # adding, taking out, leaving
+    calendar = _code((WEB / "kit_calendar.js").read_text(encoding="utf-8"))
+    assert "const adds = mayWrite(b.model);" in calendar
+    assert 'const addLine = !adds ? "" :' in calendar
+    assert 'if (!form) return;' in calendar
+
+
+def test_the_editor_opens_pages_you_may_only_read_read_only():
+    editor = _code((WEB / "kit_editor.js").read_text(encoding="utf-8"))
+    assert "writes: mayWrite(model)," in editor
+    page = _code(_function(editor, "renderPage"))
+    assert 'const actions = !b.writes ? "" :' in page
+    assert '${b.writes ? "" : " readonly"}' in page
+    assert "area.readOnly = true;" in page
+    # A paste, a drop or a backspace would add or take a picture: stopped.
+    assert '["paste", "drop", "dragover", "keydown"]' in page
+    assert 'const compose = !b.writes ? "" :' in editor

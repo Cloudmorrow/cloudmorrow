@@ -16,7 +16,9 @@ with the picture drawn, since the terminal can draw one. The picture the
 cursor is on is shown beside, the way a note's picture is.
 
 In a folder: put a file in from this machine, get one onto it, make a
-folder, rename, move and delete. Something else in the terminal app may add
+folder, rename, move and delete — or, where the records may only be read
+(docs/CIRCLES.md), open, look and get, and nothing that changes what is
+there. Something else in the terminal app may add
 to the groups — a column, and actions on the group the cursor is on — with
 `register_group_extension`, without this file knowing what it adds.
 
@@ -47,7 +49,7 @@ from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.panes.kit import KitPane
 from cloudmorrow.tui.screens.modals import ConfirmModal, PromptModal
 from cloudmorrow.tui.theme import MUTED
-from cloudmorrow.tui.widgets.kit import field_of
+from cloudmorrow.tui.widgets.kit import can_write, field_of
 from cloudmorrow.tui.widgets.picture import Picture, TerminalImage
 from cloudmorrow.tui.widgets.toolbar import Action
 
@@ -358,6 +360,8 @@ class GridPane(KitPane):
         ("e", "fire('rename')", "Rename"),
         ("M", "fire('move')", "Move"),
     ]
+    # Getting a file is reading it; everything else in a folder is writing.
+    WRITING = KitPane.WRITING | {"put", "rename", "move"}
 
     DEFAULT_CSS = """
     GridPane {
@@ -424,9 +428,13 @@ class GridPane(KitPane):
         self.modified_field: str = screen.get("modified") or ""
         self.mime_field: str = screen.get("mime") or ""
         self.extensions = [ext for ext in EXTENSIONS if ext.applies(self.group_model)]
+        if not can_write(self.group_model):
+            # What an extension's other actions do is its own business; a
+            # new group is the group datamodel's to allow.
+            self.refused.add("new_group")
         extra = [action for ext in self.extensions for action in ext.actions]
         group_noun = str(self.group_model.get("label") or "group").lower()
-        self.ACTIONS = (
+        self.ACTIONS = self.offer([
             *extra,
             Action(
                 "put",
@@ -452,8 +460,9 @@ class GridPane(KitPane):
                 "sort", "Sort: Name", "s", hint="Name, date, size or type; shift-s turns it around"
             ),
             Action("refresh", "Refresh", "r"),
-        )
+        ])
         self.top_actions = AT_TOP | {a.id for a in extra}
+
         # None at the top, where the groups are; then a group and a folder in it.
         self.group: str | None = None
         self.folder = ""
@@ -814,6 +823,8 @@ class GridPane(KitPane):
 
     # -- the extensions' own keys, among the groups ---------------------------------
     def fire(self, name: str) -> None:
+        if name in self.refused:
+            return
         for ext in self.extensions:
             if any(a.id == name for a in ext.actions):
                 if self.at_top and ext.run is not None:

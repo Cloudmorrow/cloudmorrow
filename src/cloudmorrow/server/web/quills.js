@@ -47,9 +47,14 @@ const tabName = (quill, screen) => `${quill.id}.${screen.id}`;
 export const screenHash = (quill, screen) =>
   `#/q/${encodeURIComponent(quill.id)}/${encodeURIComponent(screen.id)}`;
 
+// The server has fitted each Quill to you (docs/CIRCLES.md): the screens
+// over data you may not read are gone from it, and one with nothing left
+// comes `available: false` and has no tab, like one switched off.
+const yours = (quill) => quill.available !== false;
+
 function place(list) {
-  quills = list;
-  fillTabs(list.flatMap((quill) => quill.screens.map((screen) => ({
+  quills = list.filter(yours);
+  fillTabs(quills.flatMap((quill) => quill.screens.map((screen) => ({
     name: tabName(quill, screen),
     label: screen.label || quill.name,
     icon: pixelIcon(quill.icon) || pixelArt(QUILL_GLYPH),

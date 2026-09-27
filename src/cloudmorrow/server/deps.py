@@ -10,6 +10,7 @@ from fastapi import Depends, Header, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from cloudmorrow.server.agents import Agent, AgentStore, JobStore
+from cloudmorrow.server.circles import CircleStore
 from cloudmorrow.server.config import ServerConfig
 from cloudmorrow.server.configsync import ConfigStore
 from cloudmorrow.server.db import User, UserStore
@@ -71,6 +72,8 @@ class AppState:
     # A Quill's credentials, and what runs its code (quilltokens, quillservices).
     quill_tokens: QuillTokenStore | None = None
     services: Supervisor | None = None
+    # Who may use which datamodels (circles.py). The record store asks it too.
+    circles: CircleStore | None = None
 
     def cloud_name(self) -> str:
         """What this cloud is called: set from the app, else from the config."""

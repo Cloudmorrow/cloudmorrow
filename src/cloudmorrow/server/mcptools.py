@@ -22,6 +22,7 @@ from typing import Any
 
 from cloudmorrow.paths import UnsafePathError
 from cloudmorrow.quill_reference import quill_reference
+from cloudmorrow.server.circles import Access
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState
 from cloudmorrow.server.notes import (
@@ -217,12 +218,24 @@ def _fields(args: dict[str, Any]) -> dict[str, Any]:
     return fields
 
 
+def _access(state: AppState, user: User) -> Access | None:
+    circles = getattr(state, "circles", None)
+    return circles.access_for(user.username) if circles is not None else None
+
+
 def list_datamodels(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    return {
-        "datamodels": [
-            row for row in state.quills.catalogue_of_models() if row["id"] not in NEVER_FOR_ASSISTANTS
-        ]
-    }
+    """What the person may reach, with what they may do with each: their circles decide."""
+    access = _access(state, user)
+    rows = []
+    for row in state.quills.catalogue_of_models():
+        if row["id"] in NEVER_FOR_ASSISTANTS:
+            continue
+        if access is not None:
+            if not access.may("read", row["id"]):
+                continue
+            row["access"] = access.level(row["id"])
+        rows.append(row)
+    return {"datamodels": rows}
 
 
 def list_records(state: AppState, user: User, args: dict[str, Any]) -> Any:
@@ -577,9 +590,33 @@ def _enabled(state: AppState, feature: str) -> bool:
     return switches is None or switches.enabled(feature)
 
 
-def available(state: AppState) -> list[Tool]:
-    """The tools on offer right now: those whose feature is switched on."""
-    return [tool for tool in TOOLS if _enabled(state, tool.feature)]
+# The notes tools reach the notes folder itself, not the record store, so
+# the gate is asked here: these read, the rest of them write.
+NOTE_MODEL = "note"
+READS_NOTES = frozenset({"list_notes", "read_note", "search_notes"})
+
+
+def _notes_allowed(state: AppState, user: User | None, tool: Tool) -> str:
+    """Why *user*'s circles keep them from *tool*, or "" when they do not."""
+    if tool.feature != "notes" or user is None:
+        return ""
+    access = _access(state, user)
+    if access is None:
+        return ""
+    if not access.may("read", NOTE_MODEL):
+        return "notes are not yours to reach on this server"
+    if tool.name not in READS_NOTES and not access.may("write", NOTE_MODEL):
+        return "you may read notes here, not change them"
+    return ""
+
+
+def available(state: AppState, user: User | None = None) -> list[Tool]:
+    """The tools on offer right now: those whose feature is switched on, and —
+    for *user* — that their circles let them use."""
+    return [
+        tool for tool in TOOLS
+        if _enabled(state, tool.feature) and not _notes_allowed(state, user, tool)
+    ]
 
 
 def call(state: AppState, user: User, name: str, arguments: Any) -> dict[str, Any]:
@@ -594,6 +631,9 @@ def call(state: AppState, user: User, name: str, arguments: Any) -> dict[str, An
     if not _enabled(state, tool.feature):
         label = FEATURE_LABELS.get(tool.feature, tool.feature)
         return _error(f"{label} is switched off on this server")
+    refused = _notes_allowed(state, user, tool)
+    if refused:
+        return _error(f"not allowed: {refused}")
     if arguments is None:
         arguments = {}
     if not isinstance(arguments, dict):

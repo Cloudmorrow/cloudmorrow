@@ -34,7 +34,9 @@ it. That is how one app's data becomes the next app's.
 **Access is visible.** Every app and every assistant is on one screen with
 what it may see and change, and a switch to cut it. Installing an app
 shows what it asks for, in plain words, and waits for a yes. One gate
-checks every read and write.
+checks every read and write. People are in circles — Parents, Kids, Sales
+— that say which kinds of data they may use, and an app does what the data
+lets its person do ([docs/CIRCLES.md](docs/CIRCLES.md)).
 
 **Everything is on every device.** An app is a manifest: the elements it
 uses, the access it asks for, its screens built from a small kit — list,

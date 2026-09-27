@@ -647,6 +647,41 @@ switchable by an administrator; `/api/me/features` is the same catalogue
 narrowed to you, with your answer on each, and yours to switch. A client
 that draws tabs asks the second one.
 
+## Circles: who may use which data
+
+The switches are about features. Circles are about data: a named set of
+people — Parents, Kids, Sales — and, for each kind of data, whether they
+may `write` it, `read` it, or not reach it at all. The children read the
+family calendar and never see the budget; the warehouse has the fleet and
+not the customers.
+
+A fresh server, and one upgraded from before circles, has one: **Members**,
+with everything, and everybody in it. Nothing changes until an
+administrator changes it — in Administration, Circles, on the phone or in
+the terminal app, or with `cm circle`:
+
+```
+cm circle add Kids
+cm circle rule Kids task write
+cm circle rule Kids event read
+cm circle join Kids alice
+cm circle leave Members alice
+cm access                          # what you may do, and why
+```
+
+Your access is the most any of your circles gives, and there is no deny:
+children are not given less, parents are given more. Administrators are
+in circles like everybody else. A circle never opens anybody's personal
+records — it decides which *kinds* of data you use, and who may see a record
+is still its scope.
+
+A Quill does what the data lets you do. Where you may only read, it is the
+same screen without its writing: no new, no edit, no dragging, no composer.
+A screen over data you may not reach is not there, and a Quill with nothing
+left is not on your phone. An assistant working as you, a Quill's service
+and a mounted share reach no more than you do. The whole of it, and why, is
+[CIRCLES.md](CIRCLES.md).
+
 ## Quills
 
 Everything beyond the foundation is a **Quill**: Notes, Tasks, Files and

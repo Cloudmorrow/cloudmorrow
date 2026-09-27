@@ -1,8 +1,9 @@
 /* Administration: the server itself, rather than anything in it.
 
-   The same two sections the terminal app puts behind f9 — who may sign in,
-   and which parts of Cloudmorrow this server offers at all — and the same
-   rules about them, because both ends talk to one API that decides.
+   The same sections the terminal app puts behind f9 — who may sign in,
+   which data they may use, and which parts of Cloudmorrow this server
+   offers at all — and the same rules about them, because both ends talk to
+   one API that decides.
 
    It is reached from Me rather than from a tab of its own. Administering a
    server is not a sixth kind of your own stuff, and most accounts never see
@@ -13,14 +14,15 @@
 
    Two screens. The panel, which is the sections under a switch, and one
    account's page, which is the same form whether it is a new account or one
-   that already exists. The third section, the Quills, is a file of its own
-   (quillsadmin.js), with its install sheet. */
+   that already exists. The circles (circlesadmin.js) and the Quills
+   (quillsadmin.js, with its install sheet) are files of their own. */
 
 import {
   api, app, esc, formatDate, heading, icons, nav, onSignOut, registerScreen, renderRoute,
   replace, seconds, store, toast, wireShell,
 } from "./core.js";
 import { loadFeatures } from "./features.js";
+import { circlesByPerson, drawCircles } from "./circlesadmin.js";
 import { drawQuills } from "./quillsadmin.js";
 
 // What the server stores, and what it is called on screen. The same words
@@ -66,7 +68,7 @@ export const isAdmin = (who) => Boolean(who && who.is_admin);
 export function adminRow() {
   return `<div class="group"><a class="row admin-link" href="#/admin">
     <span class="main"><span class="title">Administration</span>
-    <span class="meta"><span class="preview">The accounts, what this server offers, and its Quills</span></span></span>
+    <span class="meta"><span class="preview">The accounts, their circles, what this server offers, and its Quills</span></span></span>
     ${icons.chevronRight}</a></div>`;
 }
 
@@ -74,14 +76,17 @@ export function adminRow() {
 async function renderAdmin() {
   if (!(await requireAdmin())) return;
   const side = store.get("admin.side");
-  const which = side === "features" || side === "quills" ? side : "users";
+  const which = ["circles", "features", "quills"].includes(side) ? side : "users";
+  // The + beside the heading makes whatever this side lists.
+  const making = { users: ["#/adminuser", "New account"], circles: ["#/admincircle", "New circle"] }[which];
   app.innerHTML = nav({ back: "#/me", backLabel: "Me", title: "Administration" }) + `
     <main>
-      ${heading("Administration", which === "users"
-        ? `<button class="compose" aria-label="New account">${icons.compose}</button>`
+      ${heading("Administration", making
+        ? `<button class="compose" aria-label="${making[1]}">${icons.compose}</button>`
         : "")}
       <div class="seg">
         <button data-side="users"${which === "users" ? ' class="active"' : ""}>Users</button>
+        <button data-side="circles"${which === "circles" ? ' class="active"' : ""}>Circles</button>
         <button data-side="features"${which === "features" ? ' class="active"' : ""}>Features</button>
         <button data-side="quills"${which === "quills" ? ' class="active"' : ""}>Quills</button>
       </div>
@@ -96,23 +101,25 @@ async function renderAdmin() {
     });
   }
   const compose = app.querySelector(".heading .compose");
-  if (compose) compose.addEventListener("click", () => { location.hash = "#/adminuser"; });
+  if (compose) compose.addEventListener("click", () => { location.hash = making[0]; });
 
   const panel = app.querySelector(".panel");
   if (which === "users") await drawUsers(panel);
+  else if (which === "circles") await drawCircles(panel);
   else if (which === "features") await drawFeatures(panel);
   else await drawQuills(panel);
 }
 
 // -- the accounts -----------------------------------------------------------------------
 async function drawUsers(panel) {
-  const users = await api("GET", "/api/users");
+  const [users, circles] = await Promise.all([api("GET", "/api/users"), api("GET", "/api/circles")]);
+  const placed = circlesByPerson(circles);
   panel.innerHTML = `
     <p class="group-label">${users.length} account${users.length === 1 ? "" : "s"}</p>
-    <div class="group">${users.map(userRow).join("")}</div>`;
+    <div class="group">${users.map((user) => userRow(user, placed[user.username] || [])).join("")}</div>`;
 }
 
-function userRow(user) {
+function userRow(user, circles) {
   const role = roleOf(user);
   const name = user.display_name || user.username;
   // The chip says the role, so the line under the name does not: two copies
@@ -121,11 +128,17 @@ function userRow(user) {
   // An account that cannot sign in is the one thing here worth interrupting
   // for, so it goes first, where nothing can truncate it away.
   const barred = user.is_active ? "" : `<span class="off">no sign-in</span> · `;
+  // Their circles are what they may reach; in none, they reach nothing, and
+  // that is said as plainly as not signing in (docs/CIRCLES.md, rule 3).
+  const within = circles.length
+    ? `<span class="circles">${esc(circles.join(", "))}</span>`
+    : `<span class="off">reaches no data</span>`;
   return `<a class="row user-row" href="#/adminuser/${encodeURIComponent(user.username)}">
     <span class="avatar" aria-hidden="true">${esc(name.trim().charAt(0).toUpperCase() || "?")}</span>
     <span class="main">
       <span class="title">${esc(user.username)}</span>
-      <span class="meta"><span class="preview">${barred}${esc(bits.join(" · "))}</span></span>
+      <span class="meta"><span class="preview">${barred}${within}${
+        bits.length ? " · " + esc(bits.join(" · ")) : ""}</span></span>
     </span>
     <span class="role-chip role-${esc(role)}">${esc(LABELS[role] || role)}</span>
     ${icons.chevronRight}</a>`;

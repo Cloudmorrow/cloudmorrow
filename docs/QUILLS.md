@@ -44,7 +44,10 @@ page wins, and those pages remain the reasoning behind it.
    and it runs outside the server (see *Webhooks, APIs and services*).
 5. **One gate.** Every read and write — by a person, a Quill's service, or an
    assistant — goes through the same check of principal, action, datamodel and
-   scope.
+   scope. The person's circles are part of it: a Quill does what the data lets
+   *them* do, drawn read-only where they may only read, without the screens
+   over data they may not reach, and not at all when nothing is left
+   ([CIRCLES.md](CIRCLES.md)).
 6. **Every Quill is its own repository.** Ours live in the Cloudmorrow
    organisation as `quill-<id>`; anybody else's live wherever they like and
    join the catalog by pull request.
@@ -585,6 +588,7 @@ manifest written, checked and installed in one conversation.
 | --- | --- |
 | datamodel definitions, validation | `server/datamodels.py` |
 | records, sealing, positions, stamps, the gate | `server/records.py` |
+| circles: who may use which datamodels, and fitting a Quill to its person | `server/circles.py`, `server/routes/circles.py`, `fitted` in `server/routes/quills.py` |
 | manifests, sources, install, catalog | `server/quills.py`, `server/routes/quills.py` |
 | the record API | `server/routes/records.py` |
 | jobs, and the boot work (foundation Quills, built-ins that became Quills, old tables into records: `move_legacy_tasks`, `move_legacy_calendar`, `move_legacy_chat`) | `server/quilljobs.py` |

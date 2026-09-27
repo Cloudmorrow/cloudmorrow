@@ -14,7 +14,11 @@
 
    A Quill with code of its own says so on the sheet in plain words — the
    commands it runs on this server, as whom, and what it may reach — and,
-   once installed, shows what that code is doing (quillservices.js). */
+   once installed, shows what that code is doing (quillservices.js).
+
+   A Quill that brings data new to this server asks which circles get it
+   (docs/CIRCLES.md): a tick each, and after the install every ticked circle
+   may write it. A circle with `* = write` has it already, and says so. */
 
 import {
   api, app, esc, nav, registerScreen, renderRoute, replace, store, toast, wireShell,
@@ -121,6 +125,12 @@ async function renderQuill(id) {
   }
   const installed = plan.installed_version;
   const name = plan.name || plan.id;
+  // The data it brings that no circle names yet, and the circles to give it to.
+  const fresh = installed ? [] : (plan.data || []).filter((d) => d.new);
+  let circles = [];
+  if (fresh.length) {
+    try { circles = await api("GET", "/api/circles"); } catch { circles = []; }
+  }
   const verb = !installed ? `Install ${name}`
     : installed !== plan.version ? `Update to v${plan.version}` : "";
 
@@ -133,6 +143,7 @@ async function renderQuill(id) {
         installed ? `<span class="quill-chip on">v${esc(installed)} installed</span>` : "",
       ].filter(Boolean).join(" · ")}</p>
       ${sections(plan, me)}
+      ${whoGetsIt(fresh, circles)}
       ${installed ? `<div class="quill-running"></div>` : ""}
       ${verb ? `<div class="group"><button class="row primary add-quill" type="button">${esc(verb)}</button></div>` : ""}
       ${installed ? `<div class="group"><button class="row bad remove-quill" type="button">Remove ${esc(name)}</button></div>` : ""}
@@ -147,6 +158,13 @@ async function renderQuill(id) {
     install.textContent = "Installing…";
     try {
       await api("POST", "/api/quills", { id });
+      const ticked = [...app.querySelectorAll(".who-gets-it input:checked:not(:disabled)")];
+      for (const box of ticked) {
+        for (const d of fresh) {
+          await api("PUT", `/api/circles/${encodeURIComponent(box.value)}/rules/${encodeURIComponent(d.id)}`,
+            { access: "write" });
+        }
+      }
       // The tabs are in every account's bar from now; this one's at once.
       await refreshQuills();
       toast(`${name} is installed`);
@@ -172,6 +190,24 @@ async function renderQuill(id) {
       await backToCatalog();
     } catch (err) { toast(err.message); }
   });
+}
+
+/** A tick per circle for the data the Quill brings; a `* = write` circle is
+    ticked and fixed, because it has everything already. */
+function whoGetsIt(fresh, circles) {
+  if (!fresh.length || !circles.length) return "";
+  const what = listed(fresh.map((d) => d.label || d.id));
+  return `<p class="group-label">Who gets it</p>
+    <p class="shelf-note">Which circles may use ${esc(what)}. Ticked, they may
+      read and write it; the rest do not see it until a circle is given it.</p>
+    <div class="group choices who-gets-it">${circles.map((c) => {
+      const already = c.rules["*"] === "write";
+      return `<label class="row"><span class="main"><span class="title">${esc(c.name)}</span>
+        <span class="meta"><span class="preview">${already ? "Has everything (*): gets it anyway"
+          : esc(c.members.join(", ") || "nobody")}</span></span></span>
+        <input type="checkbox" value="${esc(c.id)}"${already ? " checked disabled" : ""}
+          aria-label="${esc(c.name)}"></label>`;
+    }).join("")}</div>`;
 }
 
 /** Everything the Quill contains and adds, a section each. */

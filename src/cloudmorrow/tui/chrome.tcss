@@ -482,14 +482,34 @@ ModalScreen {
 }
 
 /* -- administration ------------------------------------------------------ */
-#admin-user-table, #admin-quill-table {
+#admin-user-table, #admin-quill-table, #admin-circle-table {
     height: 1fr;
     padding: 0;
     background: transparent;
 }
 
-#admin-quills-note {
+#admin-quills-note, #admin-circles-note {
     height: auto;
     padding: 0;
     margin-bottom: 1;
+}
+
+/* A circle's data and its people, in their dialogs. */
+#rules-table {
+    height: auto;
+    max-height: 60vh;
+    background: transparent;
+}
+
+#people-list, #sheet-circles {
+    height: auto;
+    max-height: 50vh;
+    scrollbar-size-vertical: 1;
+}
+
+#people-list Checkbox, #sheet-circles Checkbox {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
 }

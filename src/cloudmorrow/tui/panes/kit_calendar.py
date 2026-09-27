@@ -17,6 +17,12 @@ It is all read from the screen's bindings (docs/QUILLS.md, *Screens*):
 `subtitle` what a line says. Times are the times on the wall: a moment
 without a zone is drawn exactly as it is stored, and a bare date is a whole
 day whose end is the last day it is on.
+
+Each datamodel says what may be done with it (docs/CIRCLES.md): somebody
+who may only read the things opens them in a sheet that cannot save, and
+puts nothing new on the month; somebody who may only read the spaces makes
+none, renames none, and sees who is in one without changing it — which is
+how the family calendar is somebody's to put events on but not to make.
 """
 
 from __future__ import annotations
@@ -34,7 +40,7 @@ from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.panes.kit import KitPane
 from cloudmorrow.tui.screens.record_sheet import RecordSheet, link_choices
 from cloudmorrow.tui.theme import ACCENT, BAD, GOOD, LENS, MUTED, TEXT
-from cloudmorrow.tui.widgets.kit import field_of, title_of
+from cloudmorrow.tui.widgets.kit import can_write, field_of, title_of
 from cloudmorrow.tui.widgets.kit_space import NewSpaceModal, SpaceModal, make_space, scope_said
 from cloudmorrow.tui.widgets.toolbar import Action
 
@@ -282,6 +288,8 @@ class CalendarPane(KitPane):
         }
         self.space_model_id: str = space.get("to") or ""
         self.space_model: dict = self.models.get(self.space_model_id) or {}
+        if not can_write(self.space_model):
+            self.refused |= {"new_space", "edit_space"}
         self.spaces: list[dict] = []
         self.events: list[dict] = []
         self.day = dt.date.today()
@@ -290,16 +298,17 @@ class CalendarPane(KitPane):
         self.space_id = ""
         self._grid: list[list[dt.date]] = []
         space_noun = self.space_noun
-        self.ACTIONS = (
+        self.ACTIONS = self.offer([
             Action("new_record", f"New {self.noun}", "n", variant="primary",
                    hint="On the day you are on"),
-            Action("open_record", "Edit", "e", hint=f"The {self.noun} under the cursor"),
+            Action("open_record", "Edit" if self.writes else "Open", "e",
+                   hint=f"The {self.noun} under the cursor"),
             Action("delete_record", "Delete", "del"),
             Action("new_space", f"New {space_noun}", "c", hint="Shared, or one everybody is in"),
             Action("people", "People", "p", hint=f"Who is in this {space_noun}: add, take out, leave"),
             Action("edit_space", f"Rename {space_noun}", "r", hint="Its name and its colour"),
             Action("today", "Today", "t"),
-        )
+        ])
 
     @property
     def space_noun(self) -> str:
@@ -433,8 +442,12 @@ class CalendarPane(KitPane):
         table = self.query_one("#day-table", DataTable)
         table.clear()
         if not showing:
-            table.add_row(f"[{MUTED}]Nothing on. Press n to put something here.[/]")
+            table.add_row(
+                f"[{MUTED}]Nothing on. Press n to put something here.[/]"
+                if "new_record" not in self.refused else f"[{MUTED}]Nothing on.[/]"
+            )
             return
+
         for event in showing:
             table.add_row(event_line(event, me=self.me))
 

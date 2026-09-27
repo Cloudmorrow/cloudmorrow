@@ -14,6 +14,7 @@ from cloudmorrow.server import spacenotify
 from cloudmorrow.server.access import is_allowed, parse_rules
 from cloudmorrow.server.agents import AgentStore, JobStore
 from cloudmorrow.server.backends import NotesBackend, SharesBackend, VaultsBackend
+from cloudmorrow.server.circles import CircleStore
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.configsync import ConfigStore
 from cloudmorrow.server.dav import MOUNT_PATH, CredentialCheck, build_dav_app
@@ -31,6 +32,7 @@ from cloudmorrow.server.records import RecordStore
 from cloudmorrow.server.routes import (
     agents,
     auth,
+    circles,
     configsync,
     features,
     install,
@@ -86,6 +88,9 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     # What is installed, and the one table every Quill's records live in.
     quill_registry = QuillRegistry(config.quills_dir, config.datamodels_dir, config.quill_catalog)
     record_store = RecordStore(config.db_path, quill_registry.models, quill_registry.expiries)
+    # Who may use which datamodels: asked by the gate on every read and write.
+    circle_store = CircleStore(config.db_path)
+    record_store.access = circle_store.access_for
     app.state.cloudmorrow = AppState(
         config=config,
         users=user_store,
@@ -115,6 +120,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         settings=SettingsStore(config.db_path),
         quills=quill_registry,
         records=record_store,
+        circles=circle_store,
     )
     # The foundation Quills on a fresh server, old tasks into records, and
     # the sweeps: on a thread, once the server is up, so none of it can
@@ -185,13 +191,25 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(users.router)
+    app.include_router(circles.router)
+    app.include_router(circles.mine_router)
     app.include_router(today.router)
     app.include_router(features.router)
     app.include_router(features.mine_router)
     app.include_router(features.types_router)
-    app.include_router(notes.router, dependencies=[Depends(features.require_feature("notes"))])
     app.include_router(
-        secrets.router, dependencies=[Depends(features.require_quill("secrets"))]
+        notes.router,
+        dependencies=[
+            Depends(features.require_feature("notes")),
+            Depends(circles.require_data("note")),
+        ],
+    )
+    app.include_router(
+        secrets.router,
+        dependencies=[
+            Depends(features.require_quill("secrets")),
+            Depends(circles.require_data("secret")),
+        ],
     )
     app.include_router(records.router)
     app.include_router(records.models_router)
@@ -201,8 +219,12 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.include_router(quillcode.api_router)
     app.include_router(quillcode.hooks_router)
     app.include_router(quillcode.admin_router)
-    app.include_router(shares.router, dependencies=in_files)
-    app.include_router(sharefiles.router, dependencies=in_files)
+    app.include_router(
+        shares.router, dependencies=[*in_files, Depends(circles.require_data("share"))]
+    )
+    app.include_router(
+        sharefiles.router, dependencies=[*in_files, Depends(circles.require_data("file"))]
+    )
     app.include_router(agents.router)
     app.include_router(agents.agent_router)
     app.include_router(configsync.router)
@@ -229,7 +251,12 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.mount(
         MOUNT_PATH,
         WSGIMiddleware(
-            build_dav_app(share_store, credential_check, partial(user_drive, config))
+            build_dav_app(
+                share_store,
+                credential_check,
+                partial(user_drive, config),
+                access=circle_store.access_for,
+            )
         ),
         name="dav",
     )

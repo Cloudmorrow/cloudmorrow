@@ -446,7 +446,7 @@ def handle_message(state: AppState, user: User, message: Any) -> dict[str, Any] 
         return _rpc_result(request_id, {})
     if method == "tools/list":
         return _rpc_result(
-            request_id, {"tools": [tool.to_dict() for tool in mcptools.available(state)]}
+            request_id, {"tools": [tool.to_dict() for tool in mcptools.available(state, user)]}
         )
     if method == "tools/call":
         name = params.get("name")
