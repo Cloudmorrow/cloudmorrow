@@ -40,7 +40,8 @@ from cloudmorrow.server.schemas import (
 
 # What an agent is allowed to be asked to do. The agent enforces this too, and
 # refuses anything it was not configured to allow.
-KNOWN_JOB_TYPES = {"ping", "sysinfo", "backup", "shell"}
+# `quill` runs a Quill's machine handler now: {"quill": "fleet", "machine": "import-exports"}.
+KNOWN_JOB_TYPES = {"ping", "sysinfo", "backup", "shell", "quill"}
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 agent_router = APIRouter(prefix="/api/agent", tags=["agent"])

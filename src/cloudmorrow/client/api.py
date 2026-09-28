@@ -112,7 +112,11 @@ class CloudmorrowClient:
                 )
             raise ApiError(str(detail), status_code=409, payload=detail)
         if response.status_code >= 400:
-            raise ApiError(str(_detail(response)), status_code=response.status_code)
+            detail = _detail(response)
+            # A Quill's code answers {kind, message}: the words are the message.
+            if isinstance(detail, dict) and isinstance(detail.get("message"), str):
+                raise ApiError(detail["message"], status_code=response.status_code, payload=detail)
+            raise ApiError(str(detail), status_code=response.status_code)
         return response
 
     # -- auth --------------------------------------------------------------
@@ -429,6 +433,23 @@ class CloudmorrowClient:
     async def quills(self) -> list[dict]:
         """Every installed Quill, with its screens and its datamodels in full."""
         return (await self._request("GET", "/api/quills")).json()
+
+    async def quill_view(self, quill_id: str, screen_id: str, *, record: str = "", **params: str) -> dict:
+        """A view of a Quill's, drawn for you: `{"tree": …}`, primitives (cloudmorrow.quill.ui)."""
+        query = dict(params)
+        if record:
+            query["record"] = record
+        return (
+            await self._request("GET", f"/api/quills/{quill_id}/views/{screen_id}", params=query)
+        ).json()
+
+    async def quill_action(
+        self, quill_id: str, action_id: str, *, record: str = "", fields: dict | None = None
+    ) -> list[dict]:
+        """Press a Quill's action, as you: what to do next, as effects."""
+        body = {"record": record, "fields": fields or {}}
+        response = await self._request("POST", f"/api/quills/{quill_id}/actions/{action_id}", json=body)
+        return response.json()["effects"]
 
     async def quill_catalog(self) -> dict:
         return (await self._request("GET", "/api/quills/catalog")).json()

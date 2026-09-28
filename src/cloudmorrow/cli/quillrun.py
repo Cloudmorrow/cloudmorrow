@@ -46,6 +46,15 @@ A `thread` screen is spaces and what is said in them:
     cm chat show general               # the conversation, newest at the bottom
     cm chat say general "on my way"    # a channel by name, id, or the person
 
+A Quill with code has actions of its own, each a command, and views, which
+print as text:
+
+    cm fleet actions                   # what it can do, and what each takes
+    cm fleet add-van name=Transit registration="AB 12 345"
+    cm fleet log-service Transit date=2026-09-28 km=1200   # on a record: which one first
+    cm fleet                           # its first screen; a view prints as text
+    cm fleet --screen garage --plain   # the view's tree, as JSON
+
 `main` sends a first word that is not one of the built-in commands here, so
 `cm tasks` works without the CLI knowing, when it starts, what is installed.
 """
@@ -138,21 +147,30 @@ class Screen:
         return str(record["fields"].get(target["title"], record["id"]))
 
 
-def _screen(quills: list[dict], quill_id: str, screen_id: str) -> Screen:
+def _quill(quills: list[dict], quill_id: str) -> dict:
     quill = next((q for q in quills if q["id"] == quill_id), None)
     if quill is None:
         names = ", ".join(sorted(q["id"] for q in quills)) or "none"
         fail(f"'{quill_id}' is not a command, nor an installed Quill (installed: {names})")
+    return quill
+
+
+def _screen_spec(quill: dict, screen_id: str) -> dict:
     if not quill["screens"]:
-        fail(f"{quill_id} has no screens")
+        fail(f"{quill['id']} has no screens")
     screen = quill["screens"][0]
     if screen_id:
         screen = next((s for s in quill["screens"] if s["id"] == screen_id), None)
         if screen is None:
             fail(
-                f"{quill_id} has no screen {screen_id!r}: {', '.join(s['id'] for s in quill['screens'])}"
+                f"{quill['id']} has no screen {screen_id!r}: {', '.join(s['id'] for s in quill['screens'])}"
             )
-    return Screen(quill, screen)
+    return screen
+
+
+def _screen(quills: list[dict], quill_id: str, screen_id: str) -> Screen:
+    quill = _quill(quills, quill_id)
+    return Screen(quill, _screen_spec(quill, screen_id))
 
 
 def _pairs(values: list[str], screen: Screen) -> dict:
@@ -360,7 +378,9 @@ def _show_record(screen: Screen, record: dict, *, reveal: bool = False) -> None:
 
 def main(
     quill: Annotated[str, typer.Argument(help="The Quill's id.")],
-    action: Annotated[str, typer.Argument(help=" | ".join(ACTIONS))] = "list",
+    action: Annotated[
+        str, typer.Argument(help=" | ".join(ACTIONS) + " | actions | one of the Quill's own")
+    ] = "list",
     args: Annotated[list[str] | None, typer.Argument(help="What the action needs.")] = None,
     screen_id: Annotated[
         str, typer.Option("--screen", help="Another of the Quill's screens.")
@@ -382,20 +402,168 @@ def main(
         str, typer.Option("--to", help="A calendar: the last day (a week after --from).")
     ] = "",
 ) -> None:
-    """Run ACTION on an installed Quill."""
+    """Run ACTION on an installed Quill: one of the kit's, or one the Quill declares."""
     args = list(args or [])
-    if action not in ACTIONS:
-        fail(f"{action!r}: the actions are {', '.join(ACTIONS)}")
 
     async def _run() -> None:
         _, api = client()
         try:
-            screen = _screen(await api.quills(), quill, screen_id)
-            await _act(api, screen, action, args, group, index, plain, (first, last), reveal)
+            await dispatch(
+                api, quill, action, args, screen_id=screen_id, group=group, index=index,
+                plain=plain, days=(first, last), reveal=reveal,
+            )
         finally:
             await api.aclose()
 
     run(_run())
+
+
+async def dispatch(
+    api: CloudmorrowClient,
+    quill: str,
+    action: str,
+    args: list[str],
+    *,
+    screen_id: str = "",
+    group: str = "",
+    index: int | None = None,
+    plain: bool = False,
+    days: tuple[str, str] = ("", ""),
+    reveal: bool = False,
+) -> None:
+    """One `cm <quill> …`: a Quill's own action, its view, or the kit's words for its screen."""
+    found = _quill(await api.quills(), quill)
+    declared = {a["id"]: a for a in found.get("actions", [])}
+    if action in declared:
+        await _press(api, found, declared[action], args, plain)
+        return
+    if action == "actions":
+        _list_actions(found, plain)
+        return
+    if action not in ACTIONS:
+        words = [*ACTIONS, "actions", *declared]
+        fail(f"{action!r}: {found['id']} does {', '.join(words)}")
+    spec = _screen_spec(found, screen_id)
+    if spec["kit"] == "view":
+        if action not in ("list", "show"):
+            fail(f"{spec['id']} is a view: `cm {found['id']} --screen {spec['id']}` prints it")
+        await _view(api, found, spec, args, plain)
+        return
+    screen = Screen(found, spec)
+    await _act(api, screen, action, args, group, index, plain, days, reveal)
+
+
+# -- a Quill's code: its actions and views ---------------------------------------------------
+def _labels(quill: dict) -> dict[str, str]:
+    return {a["id"]: a["label"] for a in quill.get("actions", [])}
+
+
+def _list_actions(quill: dict, plain: bool) -> None:
+    actions = quill.get("actions", [])
+    if plain:
+        emit(json.dumps(actions, indent=2) + "\n")
+        return
+    if not actions:
+        out.print(f"[dim]{escape(quill['name'])} has no actions of its own[/]")
+        return
+    for action in actions:
+        on = f" <{action['on']}>" if action.get("on") else ""
+        takes = " ".join(
+            f"{f['name']}=…" if f.get("required") else f"[{f['name']}=…]" for f in action["fields"]
+        )
+        out.print(f"[bold]{escape(action['id'])}[/]{escape(on)} {escape(takes)}  [dim]{escape(action['label'])}[/]")
+
+
+async def _view(api: CloudmorrowClient, quill: dict, screen: dict, args: list[str], plain: bool) -> None:
+    from cloudmorrow.quill.text import render
+
+    params = _plain_pairs(args)
+    record = params.pop("record", "")
+    try:
+        answer = await api.quill_view(quill["id"], screen["id"], record=record, **params)
+    except ApiError as exc:
+        fail(str(exc))
+    if plain:
+        emit(json.dumps(answer["tree"], indent=2) + "\n")
+        return
+    out.print(escape(render(answer["tree"], actions=_labels(quill)).rstrip()))
+
+
+def _plain_pairs(values: list[str]) -> dict:
+    pairs = {}
+    for pair in values:
+        name, sep, value = pair.partition("=")
+        if not sep:
+            fail(f"{pair!r}: give it as name=value")
+        pairs[name] = value
+    return pairs
+
+
+async def _press(api: CloudmorrowClient, quill: dict, action: dict, args: list[str], plain: bool) -> None:
+    """Run one of a Quill's actions: on which record first, if it is on one, then its form."""
+    record = ""
+    if action.get("on"):
+        if not args or "=" in args[0]:
+            fail(f"{action['id']} is done to a {action['on']}: cm {quill['id']} {action['id']} <which> [name=value …]")
+        model = quill["models"].get(action["on"])
+        if model is None:
+            fail(f"{action['on']} is not yours to reach here")
+        record = _find(await api.records(action["on"]), args[0], model["title"])["id"]
+        args = args[1:]
+    fields = {f["name"]: f for f in action["fields"]}
+    given: dict = {}
+    for name, value in _plain_pairs(args).items():
+        if name not in fields:
+            takes = ", ".join(fields) or "nothing"
+            fail(f"{action['id']} has no field {name!r}; it takes {takes}")
+        kind = fields[name]["kind"]
+        if kind == "json":
+            try:
+                value = json.loads(value)
+            except ValueError:
+                fail(f"{name} is JSON")
+        elif kind == "link":
+            linked = quill["models"].get(fields[name]["to"], {})
+            value = _find(await api.records(fields[name]["to"]), value, linked.get("title", "name"))["id"]
+        given[name] = value
+    if action.get("confirm") and not plain and stdin_is_a_terminal():
+        if not typer.confirm(action["confirm"]):
+            return
+    try:
+        effects = await api.quill_action(quill["id"], action["id"], record=record, fields=given)
+    except ApiError as exc:
+        fail(str(exc))
+    await _effects(api, quill, effects, record, plain)
+
+
+async def _effects(api: CloudmorrowClient, quill: dict, effects: list[dict], record: str, plain: bool) -> None:
+    if plain:
+        emit(json.dumps(effects, indent=2) + "\n")
+        return
+    for effect in effects:
+        kind = effect.get("effect")
+        if kind == "toast":
+            console.print(f"[green]{escape(effect['text'])}[/]")
+        elif kind == "error":
+            fail(effect["text"])
+        elif kind == "open":
+            console.print(f"[dim]→ {escape(effect['model'])} {escape(effect['id'])}[/]")
+        elif kind == "go":
+            console.print(f"[dim]→ cm {quill['id']} --screen {escape(effect['screen'])}[/]")
+        elif kind == "confirm":
+            if not stdin_is_a_terminal() or not typer.confirm(effect["text"]):
+                console.print("[dim]Left as it was[/]")
+                continue
+            then = next((a for a in quill.get("actions", []) if a["id"] == effect["then"]), None)
+            if then is None:
+                fail(f"{effect['then']} is not one of {quill['id']}'s actions")
+            try:
+                more = await api.quill_action(
+                    quill["id"], then["id"], record=record if then.get("on") else "", fields=effect.get("args") or {}
+                )
+            except ApiError as exc:
+                fail(str(exc))
+            await _effects(api, quill, more, record, plain)
 
 
 async def _act(

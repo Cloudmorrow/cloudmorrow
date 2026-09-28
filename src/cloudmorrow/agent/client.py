@@ -128,6 +128,27 @@ class AgentClient:
             or {}
         )
 
+    # -- a Quill's code on this machine -------------------------------------
+    def machine_quills(self) -> list[dict]:
+        """The Quills with machine handlers that are on for this machine's owner."""
+        return self._get("/api/agent/quills") or []  # type: ignore[return-value]
+
+    def quill_code(self, quill: str) -> bytes:
+        """The installed copy of a Quill, as a tarball."""
+        try:
+            response = self._client.get(f"/api/agent/quills/{quill}/code", headers=self._headers())
+        except httpx.HTTPError as exc:
+            raise AgentApiError(f"cannot reach {self.config.server_url}: {exc}") from exc
+        if response.status_code >= 400:
+            raise AgentApiError(str(_detail(response)), status_code=response.status_code)
+        return response.content
+
+    def quill_host(self, quill: str, op: str, args: dict, *, machine: str = "") -> dict:
+        """One request from a machine handler: {ok, value} or {ok: false, kind, message}."""
+        return self._post(
+            f"/api/agent/quills/{quill}/host", {"op": op, "args": args, "machine": machine}
+        ) or {}
+
     def notify(self, *, kind: str, title: str, body: str = "") -> dict:
         return self._post(
             "/api/agent/notifications", {"kind": kind, "title": title, "body": body}

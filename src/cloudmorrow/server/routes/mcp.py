@@ -450,7 +450,7 @@ def handle_message(state: AppState, user: User, message: Any) -> dict[str, Any] 
         )
     if method == "tools/call":
         name = params.get("name")
-        if not isinstance(name, str) or name not in mcptools.BY_NAME:
+        if not isinstance(name, str) or mcptools.find(state, name, user) is None:
             return _rpc_error(request_id, INVALID_PARAMS, f"unknown tool: {name!r}")
         return _rpc_result(request_id, mcptools.call(state, user, name, params.get("arguments")))
     if method in {"resources/list", "resources/templates/list"}:

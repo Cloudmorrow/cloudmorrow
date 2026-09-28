@@ -373,3 +373,147 @@ def test_a_handler_that_runs_forever_is_stopped(boxed, tmp_path):
         assert not guest.running
     finally:
         guest.stop()
+
+
+# -- to an assistant ------------------------------------------------------------------------------
+def test_every_action_is_an_assistants_tool_but_the_ones_kept_from_it(fleet):
+    from cloudmorrow.server import mcptools
+
+    client, _, _ = fleet
+    state = state_of(client)
+    admin = state.users.get(ADMIN[0])
+    tools = {t.name: t for t in mcptools.available(state, admin)}
+    assert "fleet_add_van" in tools and "fleet_log_service" in tools
+    assert "fleet_peek" not in tools  # assistant = false
+    schema = tools["fleet_log_service"].schema
+    assert schema["required"] == ["record", "date", "km"]
+    assert schema["properties"]["km"]["type"] == "integer"
+
+    made = mcptools.call(state, admin, "fleet_add_van", {"name": "Via assistant"})
+    assert not made.get("isError"), made
+    van_id = made["structuredContent"]["opened"][0]["id"]
+    logged = mcptools.call(state, admin, "fleet_log_service", {"record": van_id, "date": "2026-09-28"})
+    assert logged["isError"] and "Km is needed" in logged["content"][0]["text"]
+    with pytest.raises(KeyError):
+        mcptools.call(state, admin, "fleet_peek", {})
+
+
+# -- on the command line ------------------------------------------------------------------------
+@pytest.fixture()
+def cm(fleet, monkeypatch):
+    import asyncio
+    import io
+
+    import httpx
+    from rich.console import Console
+
+    from cloudmorrow.cli import quillrun
+    from cloudmorrow.client.api import CloudmorrowClient
+    from cloudmorrow.client.config import ClientConfig
+
+    client, _, _ = fleet
+
+    def run(*argv: str, screen: str = "", plain: bool = False) -> str:
+        screen_out = Console(file=io.StringIO(), width=200, color_system=None)
+        monkeypatch.setattr(quillrun, "out", screen_out)
+        monkeypatch.setattr(quillrun, "console", screen_out)
+        monkeypatch.setattr(quillrun, "emit", screen_out.file.write)
+        api = CloudmorrowClient(ClientConfig(api_url="http://testserver"), token=token_for(client, *ADMIN))
+        api._client = httpx.AsyncClient(transport=httpx.ASGITransport(app=client.app), base_url="http://testserver")
+
+        async def go() -> None:
+            try:
+                await quillrun.dispatch(api, "fleet", argv[0], list(argv[1:]), screen_id=screen, plain=plain)
+            finally:
+                await api.aclose()
+
+        asyncio.run(go())
+        return screen_out.file.getvalue()
+
+    return run
+
+
+def test_on_the_command_line_every_action_is_a_command_and_a_view_prints(cm, fleet):
+    import typer
+
+    listed = cm("actions")
+    assert "log-service <vehicle> date=… km=… [note=…]" in listed
+    assert "Added Transit" in cm("add-van", "name=Transit", "registration=AB 12 345")
+    assert "Logged Transit at 1200 km" in cm("log-service", "Transit", "date=2026-09-28", "km=1200")
+    state_of(fleet[0]).code.drain()
+    garage = cm("list")
+    assert "Garage" in garage and "Transit" in garage and "1200" in garage and "[Add a van]" in garage
+    assert '"ui": "stack"' in cm("list", plain=True)
+    assert "Transit" in cm("list", screen="vans")
+    with pytest.raises(typer.Exit):
+        cm("log-service", "Transit", "date=2026-09-28")  # km is needed
+    with pytest.raises(typer.Exit):
+        cm("log-service", "date=2026-09-28", "km=1")  # which van?
+
+
+# -- on a person's own machine ---------------------------------------------------------------------
+def _machine(client, tmp_path, guest=None, *, switched_on=True):
+    from cloudmorrow.agent.client import AgentClient
+    from cloudmorrow.agent.config import AgentConfig
+    from cloudmorrow.agent.quills import MachineQuills
+
+    state = state_of(client)
+    _, token = state.agents.enroll_for_user(ADMIN[0], name="laptop")
+    exports = tmp_path / "Tracker"
+    exports.mkdir(exist_ok=True)
+    (exports / "week.csv").write_text("registration,date,km\nAB 12 345,2026-09-20,1500\n", encoding="utf-8")
+    config = AgentConfig(server_url="http://testserver", agent_token=token, allow_insecure_http=True)
+    config.path = tmp_path / "agent.toml"
+    if switched_on:
+        config.quills = {"fleet": {"import-exports": {"folders": {"exports": str(exports)}}}}
+    config.save()
+    agent = AgentClient(config)
+    agent._client = client  # the TestClient is an httpx.Client
+    agent._client.headers["User-Agent"] = "cloudmorrow-agent/test"
+    return MachineQuills(config, agent, base=tmp_path / "quills", guest=guest), state
+
+
+def test_a_machine_handler_runs_only_where_it_was_switched_on(fleet, tmp_path):
+    from cloudmorrow.sandbox import InProcessGuest
+
+    client, admin, _ = fleet
+    add_van(client, admin)
+    machine, _ = _machine(client, tmp_path, InProcessGuest, switched_on=False)
+    with pytest.raises(sdk.Refused, match="not switched on"):
+        machine.run("fleet", "import-exports")
+    assert machine.tick() == []
+
+
+def test_a_machine_handler_reads_its_folder_and_writes_records_as_the_owner(fleet, tmp_path):
+    from cloudmorrow.sandbox import InProcessGuest
+
+    client, admin, _ = fleet
+    van_id = add_van(client, admin)
+    machine, state = _machine(client, tmp_path, InProcessGuest)
+    assert machine.run("fleet", "import-exports") == {"made": 1}
+    visits = client.get("/api/records/fleet.visit", headers=admin).json()
+    assert [v["fields"]["km"] for v in visits] == [1500]
+    assert visits[0]["fields"]["vehicle"] == van_id
+    # On its clock: once now, then not again before its `every`.
+    assert machine.tick() == ["fleet/import-exports"]
+    assert machine.tick() == []
+
+
+def test_a_machine_handlers_requests_are_bound_by_the_manifest_on_the_server(fleet, tmp_path):
+    client, _, _ = fleet
+    machine, _ = _machine(client, tmp_path)
+    refused = machine.client.quill_host("fleet", "records.list", {"model": "contact"})
+    assert refused["ok"] is False and refused["kind"] == "refused"
+    assert machine.client.quill_host("fleet", "run", {"command": ["ls"]})["kind"] == "refused"
+    ok = machine.client.quill_host("fleet", "records.list", {"model": "vehicle"})
+    assert ok == {"ok": True, "value": []}
+
+
+def test_in_the_sandbox_a_machine_handler_sees_only_its_folder(fleet, tmp_path, runtime, monkeypatch):
+    client, admin, _ = fleet
+    add_van(client, admin)
+    machine, _ = _machine(client, tmp_path)
+    monkeypatch.setattr(machine, "base", tmp_path / "quills")
+    (tmp_path / "quills").mkdir(exist_ok=True)
+    (tmp_path / "quills" / "sandbox").symlink_to(runtime.parent, target_is_directory=True)
+    assert machine.run("fleet", "import-exports") == {"made": 1}

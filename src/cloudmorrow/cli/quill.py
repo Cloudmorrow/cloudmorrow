@@ -4,6 +4,9 @@ The loop for building one, which is the same loop an assistant runs:
 
     cm quill new plants            # a folder to start from, with a CLAUDE.md
     cm quill check                 # the manifest against the datamodels, and a preview
+    cm quill test [--sandbox]      # its tests, against the real record store and gate
+    cm quill preview [screen]      # one of its views, drawn as text
+    cm quill dev --local           # a throwaway server here, reinstalled as you save
     cm quill dev                   # on your own server, on every device, now
 
 And for running a server:
@@ -118,6 +121,13 @@ def preview(plan: dict) -> str:
     """What each screen will draw, in text: enough to see a binding is the one you meant."""
     lines: list[str] = []
     for screen in plan["screens"]:
+        if screen["kit"] == "view":
+            about = f" of {screen['model']}" if screen.get("model") else ""
+            lines.append(f"── {screen['label'] or screen['id']} (view{about}) ──")
+            lines.append(f"  drawn by {plan.get('code') or 'its code'}: {screen['view']}()")
+            lines.append(f"  `cm quill preview {screen['id']}` draws it")
+            lines.append("")
+            continue
         model = plan["models"].get(screen["model"], {})
         fields = {f["name"]: f for f in model.get("fields", [])}
         title = screen.get("title") or model.get("title", "")
@@ -243,11 +253,31 @@ def print_plan(plan: dict) -> None:
             "service", escape(service["id"]), escape(" ".join(service["command"]) + always)
         )
     for hook in plan["webhooks"]:
-        what = f"→ {hook['model']}" if hook.get("model") else f"→ {hook.get('forward')}"
+        what = (
+            f"→ {hook['model']}" if hook.get("model")
+            else f"→ {hook['handler']}()" if hook.get("handler") else f"→ {hook.get('forward')}"
+        )
         table.add_row("webhook", escape(hook["id"]), escape(f"POST /hooks/{plan['id']}/{hook['path']} {what}"))
     for api in plan["apis"]:
-        table.add_row("api", escape(api["id"]), escape(f"/api/q/{plan['id']}/… → {api['service']}"))
+        target = f"{api['handler']}()" if api.get("handler") else api["service"]
+        table.add_row("api", escape(api["id"]), escape(f"/api/q/{plan['id']}/… → {target}"))
+    for action in plan.get("actions", []):
+        on = f" on a {action['on']}" if action.get("on") else ""
+        takes = ", ".join(f["name"] for f in action["fields"]) or "nothing"
+        table.add_row("action", escape(action["label"]), escape(f"{action['handler']}(){on}, takes {takes}"))
+    for hook in plan.get("hooks", []):
+        table.add_row("hook", escape(hook["handler"] + "()"), escape(f"when a {hook['on']} is {' or '.join(hook['when'])}"))
+    for machine in plan.get("machine", []):
+        folders = ", ".join(f"{f['name']} ({f['access']})" for f in machine["folders"]) or "no folders"
+        table.add_row("on a machine", escape(machine["id"]), escape(f"{machine['why']} — {folders}"))
     console.print(table)
+    code = plan.get("quill_code") or {}
+    if code:
+        console.print(f"[yellow]Its Python runs in a sandbox, as whoever uses it:[/] {escape(plan.get('code', ''))}")
+        for item in code.get("fetch", []):
+            console.print(f"  reaches {escape(item['host'])} — {escape(item['why'])}")
+        for item in code.get("secrets", []):
+            console.print(f"  reads your secret {escape(item['key'])} — {escape(item['why'])}")
     if plan.get("runs_code") or plan["webhooks"]:
         who = plan.get("runs_as") or "the administrator who installs it"
         reach = ", ".join(plan.get("reach") or []) or "nothing"
@@ -264,12 +294,30 @@ def check(
     ] = None,
 ) -> None:
     """Check a Quill as a server would, and preview its screens. Needs no server."""
+    from cloudmorrow.server.codespec import CodeSpecError, parse_code, scan_handlers
+
     folder = folder.resolve()
     with tempfile.TemporaryDirectory(prefix="quill-models-") as tmp:
         plan = _plan_offline(folder, _datamodels_folder(datamodels, Path(tmp)))
     print_plan(plan)
     out.print(preview(plan), markup=False, highlight=False)
-    console.print("[green]✓ it checks out[/] — next: [b]cm quill dev[/] to try it on your server")
+    if plan.get("code"):
+        # Handlers in the code that nothing names: harmless, and usually a typo.
+        try:
+            import tomllib
+
+            data = tomllib.loads((folder / "quill.toml").read_text(encoding="utf-8"))
+            spec = parse_code(data, folder, plan["id"], screens=data.get("screens", []),
+                              jobs=data.get("jobs", []), webhooks=data.get("webhooks", []), apis=data.get("apis", []))
+            have = scan_handlers(folder, plan["code"])
+        except CodeSpecError as exc:
+            fail(f"✗ {exc}")
+        for kind, names in have.items():
+            for name in sorted(names - spec.needs.get(kind, set())):
+                console.print(f"[yellow]![/] {kind} {name!r} is in {plan['code']}, and the manifest never names it")
+    has_tests = (folder / "tests").is_dir()
+    after = "[b]cm quill test[/], then " if has_tests else ""
+    console.print(f"[green]✓ it checks out[/] — next: {after}[b]cm quill dev --local[/] to try it here")
 
 
 # -- on a server -------------------------------------------------------------------
@@ -285,12 +333,90 @@ def _tarball(folder: Path) -> bytes:
     return buffer.getvalue()
 
 
-@app.command("dev")
-def dev(folder: FolderArgument = Path(".")) -> None:
-    """Install this folder on your server as a development Quill. Run again after a change."""
+# -- trying it here -------------------------------------------------------------------
+def _dev_python(folder: Path) -> str:
+    """An interpreter with Cloudmorrow's server in it: the Quill's own .venv, or this one."""
+    import subprocess
+    import sys
+
+    candidates = [folder / ".venv" / "bin" / "python", folder / ".venv" / "Scripts" / "python.exe",
+                  Path(sys.executable)]
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        probe = subprocess.run(  # noqa: S603 - our own interpreter, or the Quill's venv
+            [str(candidate), "-c", "import cloudmorrow.server.app, pytest"],
+            capture_output=True, check=False,
+        )
+        if probe.returncode == 0:
+            return str(candidate)
+    fail(
+        "no Python here has Cloudmorrow's server and pytest in it. In the Quill's folder:"
+        " `uv sync` (or `python -m venv .venv && .venv/bin/pip install -e '.[dev]'`)"
+    )
+
+
+def _in_dev_python(folder: Path, args: list[str], env: dict | None = None) -> None:
+    import os
+    import subprocess
+
+    python = _dev_python(folder)
+    code = subprocess.call([python, *args], cwd=folder, env={**os.environ, **(env or {})})  # noqa: S603
+    if code:
+        raise typer.Exit(code)
+
+
+@app.command("test")
+def test(
+    folder: FolderArgument = Path("."),
+    sandbox: Annotated[
+        bool, typer.Option("--sandbox", help="Run its code in the sandbox, as a server does.")
+    ] = False,
+    pytest_args: Annotated[list[str] | None, typer.Argument(help="More for pytest, after --.")] = None,
+) -> None:
+    """Check it, then run its tests: the real record store and gate, its code, your tests."""
     folder = folder.resolve()
     if not (folder / "quill.toml").is_file():
         fail(f"there is no quill.toml in {folder}")
+    with tempfile.TemporaryDirectory(prefix="quill-models-") as tmp:
+        _plan_offline(folder, _datamodels_folder(None, Path(tmp)))
+    console.print("[green]✓ it checks out[/]" + (" — its code runs in the sandbox" if sandbox else ""))
+    env = {"CLOUDMORROW_QUILL_SANDBOX": "1"} if sandbox else {}
+    _in_dev_python(folder, ["-m", "pytest", *(pytest_args or [])], env)
+
+
+@app.command("preview")
+def preview_view(
+    screen: Annotated[str, typer.Argument(help="One of its views; the first, left out.")] = "",
+    folder: Annotated[Path, typer.Option("--dir", help="The Quill's folder.")] = Path("."),
+    user: Annotated[str, typer.Option("--as", help="Somebody else, to see it as them.")] = "alice",
+    sandbox: Annotated[bool, typer.Option("--sandbox", help="Draw it in the sandbox.")] = False,
+) -> None:
+    """Draw one of its views as text, from a server with nothing on it but the Quill."""
+    folder = folder.resolve()
+    args = ["-m", "cloudmorrow.quill.devtools", "preview", str(folder), screen, "--as", user]
+    _in_dev_python(folder, args + (["--sandbox"] if sandbox else []))
+
+
+@app.command("dev")
+def dev(
+    folder: FolderArgument = Path("."),
+    local: Annotated[
+        bool, typer.Option("--local", help="A throwaway server on this machine instead of yours.")
+    ] = False,
+    port: Annotated[int, typer.Option("--port", help="--local: the port it listens on.")] = 8799,
+    no_sandbox: Annotated[
+        bool, typer.Option("--no-sandbox", help="--local: run its code in plain Python.")
+    ] = False,
+) -> None:
+    """Install this folder on your server as a development Quill, or run one here (--local)."""
+    folder = folder.resolve()
+    if not (folder / "quill.toml").is_file():
+        fail(f"there is no quill.toml in {folder}")
+    if local:
+        args = ["-m", "cloudmorrow.quill.devtools", "serve", str(folder), "--port", str(port)]
+        _in_dev_python(folder, args + (["--no-sandbox"] if no_sandbox else []))
+        return
 
     async def _dev() -> None:
         _, api = client()
@@ -482,3 +608,134 @@ def remove(
         console.print(f"[green]Removed[/] {quill_id}")
 
     run(_remove())
+
+
+# -- a Quill's code on this machine ----------------------------------------------------
+machine_app = typer.Typer(
+    help="A Quill's machine handlers: switch one on for this machine, with the folders it may see.",
+    no_args_is_help=True,
+)
+app.add_typer(machine_app, name="machine")
+
+
+def _agent_config():
+    from cloudmorrow.agent.config import AgentConfig
+
+    config = AgentConfig.load()
+    if not config.agent_token:
+        fail("this machine has no agent: sign in with `cloudmorrow login` first")
+    return config
+
+
+def _offers() -> list[dict]:
+    from cloudmorrow.agent.client import AgentApiError, AgentClient
+
+    config = _agent_config()
+    try:
+        with AgentClient(config) as agent:
+            return agent.machine_quills()
+    except AgentApiError as exc:
+        fail(str(exc))
+
+
+@machine_app.command("list")
+def machine_list() -> None:
+    """What the installed Quills would run on a machine, and what is on here."""
+    config = _agent_config()
+    offers = _offers()
+    if not offers:
+        console.print("[dim]No installed Quill has anything to run on a machine[/]")
+        return
+    for quill in offers:
+        for spec in quill["machine"]:
+            on = spec["id"] in (config.quills.get(quill["id"]) or {})
+            state = "[green]on here[/]" if on else "[dim]off[/]"
+            every = f" every {spec['every']}" if spec.get("every") else ""
+            console.print(f"{escape(quill['id'])} {escape(spec['id'])}{every}  {state}")
+            console.print(f"  [dim]{escape(spec['why'])}[/]")
+
+
+@machine_app.command("enable")
+def machine_enable(
+    quill_id: Annotated[str, typer.Argument(help="The Quill.")],
+    handler: Annotated[str, typer.Argument(help="Its machine handler's id.")],
+    folder: Annotated[
+        list[str] | None, typer.Option("--folder", help="name=path: a folder it asked for, and which one it is here.")
+    ] = None,
+    yes: Annotated[bool, typer.Option("--yes", help="Do not ask.")] = False,
+) -> None:
+    """Let a Quill's handler run on this machine, seeing only the folders you give it."""
+    config = _agent_config()
+    quill = next((q for q in _offers() if q["id"] == quill_id), None)
+    if quill is None:
+        fail(f"{quill_id} is not installed, is off for you, or has nothing to run on a machine")
+    spec = next((m for m in quill["machine"] if m["id"] == handler), None)
+    if spec is None:
+        fail(f"{quill_id} runs {', '.join(m['id'] for m in quill['machine'])} on a machine, not {handler}")
+    given: dict[str, str] = {}
+    for pair in folder or []:
+        name, sep, path = pair.partition("=")
+        if not sep:
+            fail(f"{pair!r}: give a folder as name=path")
+        given[name] = str(Path(path).expanduser().resolve())
+    for need in spec["folders"]:
+        if need["name"] not in given:
+            fail(f"it needs a folder called {need['name']} ({need['access']}): --folder {need['name']}=<path>")
+        if not Path(given[need["name"]]).is_dir():
+            fail(f"{given[need['name']]} is not a folder")
+    extra = set(given) - {n["name"] for n in spec["folders"]}
+    if extra:
+        fail(f"it did not ask for {', '.join(sorted(extra))}")
+    console.print(f"[bold]{escape(quill['name'])}[/] wants to run on this machine, as you ({escape(quill['owner'])}):")
+    console.print(f"  {escape(spec['why'])}")
+    if spec.get("every"):
+        console.print(f"  every {escape(spec['every'])}")
+    for need in spec["folders"]:
+        console.print(f"  {need['access']}s {escape(given[need['name']])}  [dim]({need['name']})[/]")
+    for program in spec.get("run", []):
+        allowed = program in config.quill_programs
+        console.print(f"  may start {escape(program)}" + ("" if allowed else "  [dim](not allowed here until it is in quill_programs)[/]"))
+    console.print("  [dim]In a sandbox: nothing else on this machine is within its reach.[/]")
+    if not yes and not typer.confirm("Switch it on here?"):
+        raise typer.Exit(1)
+    config.quills.setdefault(quill_id, {})[handler] = {"folders": given}
+    config.save()
+    console.print(f"[green]On[/] — the agent runs it{' every ' + spec['every'] if spec.get('every') else ' when asked'}")
+
+
+@machine_app.command("disable")
+def machine_disable(
+    quill_id: Annotated[str, typer.Argument(help="The Quill.")],
+    handler: Annotated[str, typer.Argument(help="Its machine handler's id.")],
+) -> None:
+    """Stop a Quill's handler running on this machine."""
+    config = _agent_config()
+    handlers = config.quills.get(quill_id) or {}
+    if handler not in handlers:
+        fail(f"{quill_id} {handler} is not on here")
+    del handlers[handler]
+    if not handlers:
+        config.quills.pop(quill_id, None)
+    config.save()
+    console.print("[green]Off[/] on this machine")
+
+
+@machine_app.command("run")
+def machine_run(
+    quill_id: Annotated[str, typer.Argument(help="The Quill.")],
+    handler: Annotated[str, typer.Argument(help="Its machine handler's id.")],
+) -> None:
+    """Run a handler that is on here, now, and print what it returned."""
+    import json as _json
+
+    from cloudmorrow.agent.client import AgentApiError, AgentClient
+    from cloudmorrow.agent.quills import MachineQuills
+    from cloudmorrow.quill.context import HostError
+
+    config = _agent_config()
+    try:
+        with AgentClient(config) as agent:
+            value = MachineQuills(config, agent).run(quill_id, handler)
+    except (HostError, RuntimeError, AgentApiError) as exc:
+        fail(str(exc))
+    out.print(_json.dumps(value, indent=2))

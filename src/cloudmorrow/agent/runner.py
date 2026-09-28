@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from cloudmorrow.agent.client import AgentApiError, AgentClient
 from cloudmorrow.agent.config import AgentConfig
+from cloudmorrow.agent.quills import MachineQuills
 from cloudmorrow.agent.shares import ShareHost
 from cloudmorrow.agent.sync import sync_all
 from cloudmorrow.agent.tasks import TaskError, run_task
@@ -38,6 +39,8 @@ class AgentRunner:
         self._stop = False
         # This machine's shares, served while the server lists any.
         self.shares = ShareHost(config, self.client)
+        # Quills' machine handlers switched on here (agent/quills.py).
+        self.quills = MachineQuills(config, self.client)
 
     def stop(self, *_: object) -> None:
         log.info("stopping after the current job")
@@ -56,7 +59,10 @@ class AgentRunner:
         job_id = job["id"]
         log.info("job %s: %s", job_id, job["type"])
         try:
-            result = run_task(job["type"], job.get("payload") or {}, self.config)
+            if job["type"] == "quill":
+                result = self._quill_job(job.get("payload") or {})
+            else:
+                result = run_task(job["type"], job.get("payload") or {}, self.config)
         except TaskError as exc:
             self.stats.jobs_failed += 1
             log.warning("job %s failed: %s", job_id, exc)
@@ -71,6 +77,25 @@ class AgentRunner:
         self.client.report(job_id, "done", result)
         return True
 
+    def _quill_job(self, payload: dict) -> dict:
+        """Run a Quill's machine handler now, as asked: it must be switched on here."""
+        from cloudmorrow.quill.context import HostError
+
+        try:
+            value = self.quills.run(str(payload.get("quill", "")), str(payload.get("machine", "")))
+        except (HostError, RuntimeError) as exc:
+            raise TaskError(str(exc)) from exc
+        return {"result": value}
+
+    def run_quills(self) -> None:
+        try:
+            for ran in self.quills.tick():
+                log.info("ran %s", ran)
+        except AgentApiError:
+            raise
+        except Exception:  # somebody's code must not stop the agent
+            log.exception("a Quill's machine handler failed")
+
     def tick(self) -> None:
         """One heartbeat, the config, the shares, then drain whatever work is waiting."""
         beat = self.client.heartbeat(
@@ -81,6 +106,8 @@ class AgentRunner:
         self.serve_shares(beat.get("shares") or [])
         while not self._stop and self.run_one_job():
             pass
+        if self.config.allow_quill_code:
+            self.run_quills()
 
     def serve_shares(self, shares: list[dict]) -> None:
         """Serve whatever the server says is shared from this machine.

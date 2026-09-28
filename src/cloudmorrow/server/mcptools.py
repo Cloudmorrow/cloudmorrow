@@ -610,13 +610,103 @@ def _notes_allowed(state: AppState, user: User | None, tool: Tool) -> str:
     return ""
 
 
+# -- a Quill's actions, as tools -------------------------------------------------------
+# Every action a Quill declares is a tool too, named `<quill>_<action>`, with
+# its form as the schema and, for an action on a datamodel, the record's id.
+# The code runs as an assistant's: it reaches no datamodel an assistant may
+# not, is given no secret, and an action marked `assistant = false` is not
+# offered at all.
+JSON_KIND = {
+    "bool": {"type": "boolean"}, "int": {"type": "integer"}, "decimal": {"type": "number"},
+    "json": {},
+}
+
+
+def _field_schema(spec: dict) -> dict[str, Any]:
+    schema = dict(JSON_KIND.get(spec["kind"], {"type": "string"}))
+    words = spec.get("label") or spec["name"]
+    if spec["kind"] == "enum":
+        schema["enum"] = list(spec["values"])
+    elif spec["kind"] == "date":
+        words += " (YYYY-MM-DD)"
+    elif spec["kind"] == "datetime":
+        words += " (ISO 8601; without a zone it is the wall clock)"
+    elif spec["kind"] == "link":
+        words += f" (the id of a {spec['to']} record)"
+    schema["description"] = words
+    return schema
+
+
+def action_tool_name(quill_id: str, action_id: str) -> str:
+    return f"{quill_id}_{action_id.replace('-', '_')}"
+
+
+def _action_tool(state: AppState, manifest, action: dict) -> Tool:
+    properties = {f["name"]: _field_schema(f) for f in action["fields"]}
+    required = [f["name"] for f in action["fields"] if f.get("required")]
+    if action.get("on"):
+        properties = {"record": {"type": "string", "description": f"The id of the {action['on']} to do it to."}} | properties
+        required = ["record", *required]
+    description = f"{manifest.name}: {action['label']}."
+    if action.get("description"):
+        description += " " + action["description"]
+    if action.get("on"):
+        description += f" Done to one {action['on']} record."
+
+    def handler(state: AppState, user: User, args: dict[str, Any], quill=manifest.id, act=action["id"]) -> Any:
+        from cloudmorrow.server.quillhandlers import CodeError
+
+        if state.code is None:
+            raise ToolError("this server runs no Quill code")
+        record = str(args.pop("record", "") or "")
+        try:
+            effects = state.code.action(user.username, quill, act, record=record, fields=args, via="assistant")
+        except CodeError as exc:
+            raise ToolError(exc.message) from exc
+        said = [e["text"] for e in effects if e.get("effect") in ("toast", "error")]
+        opened = [{"model": e["model"], "id": e["id"]} for e in effects if e.get("effect") == "open"]
+        return {"done": True, "said": said, "opened": opened} if (said or opened) else {"done": True}
+
+    return Tool(
+        action_tool_name(manifest.id, action["id"]),
+        description,
+        _schema(properties, tuple(required)),
+        manifest.id,
+        handler,
+    )
+
+
+def action_tools(state: AppState, user: User | None = None) -> list[Tool]:
+    quills = getattr(state, "quills", None)
+    if quills is None or getattr(state, "code", None) is None:
+        return []
+    access = _access(state, user) if user is not None else None
+    tools = []
+    for manifest in quills.quills.values():
+        if not manifest.code or not _enabled(state, manifest.id):
+            continue
+        for action in manifest.actions:
+            on = action.get("on", "")
+            if not action.get("assistant", True) or on in NEVER_FOR_ASSISTANTS:
+                continue
+            if on and access is not None and not access.may("read", on):
+                continue
+            tools.append(_action_tool(state, manifest, action))
+    return tools
+
+
+def find(state: AppState, name: str, user: User | None = None) -> Tool | None:
+    """A tool by name: one of the fixed ones, or a Quill's action."""
+    return BY_NAME.get(name) or next((t for t in action_tools(state, user) if t.name == name), None)
+
+
 def available(state: AppState, user: User | None = None) -> list[Tool]:
     """The tools on offer right now: those whose feature is switched on, and —
-    for *user* — that their circles let them use."""
+    for *user* — that their circles let them use; then every Quill's actions."""
     return [
         tool for tool in TOOLS
         if _enabled(state, tool.feature) and not _notes_allowed(state, user, tool)
-    ]
+    ] + action_tools(state, user)
 
 
 def call(state: AppState, user: User, name: str, arguments: Any) -> dict[str, Any]:
@@ -627,7 +717,9 @@ def call(state: AppState, user: User, name: str, arguments: Any) -> dict[str, An
     error. An unknown tool is, and raises KeyError for the caller to turn
     into one.
     """
-    tool = BY_NAME[name]
+    tool = find(state, name, user)
+    if tool is None:
+        raise KeyError(name)
     if not _enabled(state, tool.feature):
         label = FEATURE_LABELS.get(tool.feature, tool.feature)
         return _error(f"{label} is switched off on this server")

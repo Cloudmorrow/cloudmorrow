@@ -266,6 +266,8 @@ class HostCalls:
         }
         headers.setdefault("User-Agent", f"cloudmorrow-quill/{self.manifest.id}")
         body = base64.b64decode(args.get("body") or "") or None
+        if self.code.fetcher is not None:  # a test harness answers instead of the network
+            return self.code.fetcher(method, url, headers, body or b"")
         timeout = min(float(args.get("timeout") or FETCH_TIMEOUT), FETCH_TIMEOUT)
         opener = urllib.request.build_opener(_Redirects(self.manifest.fetch))
         request = urllib.request.Request(url, data=body, headers=headers, method=method)
@@ -291,6 +293,8 @@ class QuillCode:
         self.state = state
         self.config = state.config
         self.trusted = state.config.quill_code == "trusted"
+        # What answers ctx.fetch instead of the network, in a test (quill/testing.py).
+        self.fetcher = None
         self._guests: dict[str, tuple[str, Guest | InProcessGuest]] = {}
         self._logs: dict[str, ServiceLog] = {}
         self._lock = threading.RLock()

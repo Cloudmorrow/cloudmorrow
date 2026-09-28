@@ -74,6 +74,15 @@ class AgentConfig:
     allow_shares: bool = True
     share_port: int = 8788
     share_host: str = ""
+    # A Quill's code on this machine (docs/QUILLCODE.md): a `[[machine]]`
+    # handler runs only when it is switched on *here*, with the folders it
+    # was given here: {quill: {handler id: {"folders": {name: path}}}}.
+    # `allow_quill_code = false` is this machine's no to all of it, and a
+    # program a handler would start must be in `quill_programs` as well as
+    # in its manifest.
+    allow_quill_code: bool = True
+    quills: dict = field(default_factory=dict)
+    quill_programs: list[str] = field(default_factory=list)
 
     path: Path | None = None
 
@@ -94,6 +103,8 @@ class AgentConfig:
             caps.append("omarchy")
         if self.allow_shares:
             caps.append("shares")
+        if self.allow_quill_code:
+            caps.append("quills")
         return caps
 
     @staticmethod
@@ -127,6 +138,9 @@ class AgentConfig:
                 "allow_shares",
                 "share_port",
                 "share_host",
+                "allow_quill_code",
+                "quills",
+                "quill_programs",
             ):
                 if key in section:
                     setattr(config, key, section[key])
@@ -161,6 +175,9 @@ class AgentConfig:
                 "allow_shares": self.allow_shares,
                 "share_port": self.share_port,
                 "share_host": self.share_host,
+                "allow_quill_code": self.allow_quill_code,
+                "quills": self.quills,
+                "quill_programs": self.quill_programs,
             }
         }
         target.write_text(tomli_w.dumps(payload), encoding="utf-8")

@@ -31,6 +31,7 @@ from cloudmorrow.server.quillservices import Supervisor
 from cloudmorrow.server.quilltokens import QuillTokenStore
 from cloudmorrow.server.records import RecordStore
 from cloudmorrow.server.routes import (
+    agentquills,
     agents,
     auth,
     circles,
@@ -238,6 +239,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     )
     app.include_router(agents.router)
     app.include_router(agents.agent_router)
+    app.include_router(agentquills.router)
     app.include_router(configsync.router)
     app.include_router(configsync.agent_router)
     app.include_router(notifications.router)
