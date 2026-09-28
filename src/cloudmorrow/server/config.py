@@ -8,6 +8,8 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from cloudmorrow.privatefile import write_private
+
 DEFAULT_CONFIG_PATHS = (
     Path("/etc/cloudmorrow/server.toml"),
     Path.home() / ".config" / "cloudmorrow" / "server.toml",
@@ -184,10 +186,8 @@ class ServerConfig:
         if key_file.exists():
             self.secret_key = key_file.read_text(encoding="utf-8").strip()
             return self.secret_key
-        self.data_dir.mkdir(parents=True, exist_ok=True)
         self.secret_key = secrets.token_urlsafe(48)
-        key_file.write_text(self.secret_key + "\n", encoding="utf-8")
-        key_file.chmod(0o600)
+        write_private(key_file, self.secret_key + "\n")
         return self.secret_key
 
 

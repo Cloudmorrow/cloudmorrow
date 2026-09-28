@@ -16,6 +16,8 @@ from pathlib import Path
 import tomli_w
 from platformdirs import user_data_dir
 
+from cloudmorrow.privatefile import write_private
+
 DEFAULT_PATHS = (
     Path("/etc/cloudmorrow/agent.toml"),
     Path.home() / ".config" / "cloudmorrow" / "agent.toml",
@@ -180,8 +182,7 @@ class AgentConfig:
                 "quill_programs": self.quill_programs,
             }
         }
-        target.write_text(tomli_w.dumps(payload), encoding="utf-8")
         # The file holds the agent token.
-        target.chmod(0o600)
+        write_private(target, tomli_w.dumps(payload))
         self.path = target
         return target

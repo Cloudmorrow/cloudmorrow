@@ -48,9 +48,9 @@ from cloudmorrow.cli.common import (
     vault_for,
     warn_if_tracked,
     where,
-    write_private,
 )
 from cloudmorrow.console import TITLE
+from cloudmorrow.privatefile import write_private
 
 app = typer.Typer(
     help="Secrets: encrypted keys and passwords, in vaults.",

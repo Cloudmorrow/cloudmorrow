@@ -13,7 +13,7 @@ import subprocess
 import sys
 from collections.abc import Awaitable
 from pathlib import Path
-from typing import Annotated, Any, NoReturn, TypeVar
+from typing import Annotated, NoReturn, TypeVar
 
 import typer
 
@@ -114,16 +114,6 @@ def guard_overwrite(path: Path, force: bool) -> None:
         fail(f"{path} already exists — pass --force to overwrite it")
 
 
-def write_private(path: Path, text: str) -> None:
-    """Write a file only its owner can read, private from the moment it exists."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    handle = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(handle, "w", encoding="utf-8") as file:
-        file.write(text)
-    # A file that already existed keeps its old mode through O_CREAT.
-    os.chmod(path, 0o600)
-
-
 def would_commit(path: Path) -> bool:
     """Whether writing here puts secrets somewhere git is willing to commit."""
 
@@ -183,8 +173,3 @@ def emit(text: str) -> None:
 
 def plural(count: int, noun: str, suffix: str = "s") -> str:
     return f"{count} {noun}{'' if count == 1 else suffix}"
-
-
-def shorten(value: Any, width: int = 48) -> str:
-    text = str(value)
-    return text if len(text) <= width else text[: width - 1] + "…"

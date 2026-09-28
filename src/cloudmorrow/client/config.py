@@ -11,6 +11,8 @@ from pathlib import Path
 import tomli_w
 from platformdirs import user_config_dir
 
+from cloudmorrow.privatefile import write_private
+
 APP_NAME = "cloudmorrow"
 DEFAULT_API_URL = "https://cm.hl.bramlabs.io"
 
@@ -112,8 +114,8 @@ class StoredCredentials:
 
     def save(self) -> Path:
         path = credentials_path()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
+        write_private(
+            path,
             json.dumps(
                 {
                     "api_url": self.api_url,
@@ -123,9 +125,7 @@ class StoredCredentials:
                 },
                 indent=2,
             ),
-            encoding="utf-8",
         )
-        path.chmod(0o600)
         return path
 
 
