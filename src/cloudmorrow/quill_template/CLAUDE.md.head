@@ -1,24 +1,33 @@
 # Working on this Quill
 
-This repository is a Cloudmorrow **Quill**: a package that adds data and
-screens to somebody's own cloud. It has no UI code and must never get any —
-Cloudmorrow draws its screens from a fixed kit on every surface.
+This repository is a Cloudmorrow **Quill**: a package that adds data, screens
+and what can be done with them to somebody's own cloud. It is TOML and
+Python and nothing else: `quill.toml` declares everything the Quill is and
+does, and `quill.py` holds the code its views, actions, hooks, jobs,
+webhooks, APIs and machine handlers run. Cloudmorrow draws every screen, on
+the phone, the web app and the terminal — there is no HTML, CSS or
+JavaScript here, and there must never be.
+
+The skills in `.claude/skills/` cover each part in depth: **quill-screens**
+(kit screens and views), **quill-actions**, **quill-data**,
+**quill-automation** (hooks, jobs, webhooks, APIs, fetch, secrets),
+**quill-machine**, **quill-testing** and **quill-publish**. Use them.
 
 When asked to change or extend it:
 
-1. Read `quill.toml` and `datamodels/`, and the reference below.
-2. Make the change in the manifest (and datamodel files). Prefer extending a
-   foundational datamodel over introducing a new one.
-3. Run `cm quill check` and fix everything it says, until it passes. It also
-   prints what each screen will look like; read that.
-4. If the person has a server, run `cm quill dev` to install it there and ask
-   them to look at it on their phone or in `cm`.
-5. Keep README.md's "What it adds" table true.
+1. Read `quill.toml`, `quill.py`, `datamodels/` and the reference below.
+2. Declare first: a kit screen, a datamodel field, a declarative job or
+   webhook needs no code. Prefer extending a foundational datamodel over
+   introducing a new one.
+3. Then Python, for what cannot be declared: every handler is named in
+   `quill.toml` and registered in `quill.py` with a decorator.
+4. Write or change a test in `tests/` for it (the quill-testing skill).
+5. Run `cm quill check`, then `cm quill test`, then `cm quill test --sandbox`,
+   and fix everything they say until they pass. `cm quill preview <view>`
+   draws a view as text; read it.
+6. For the person to look at it: `cm quill dev --local` (a throwaway server
+   on this machine), or `cm quill dev` (their own server).
+7. Keep README.md's "What it adds" table true.
 
-Code (`[[services]]`, `run` jobs, forwarded webhooks, `[[apis]]`) is the
-last resort, for what cannot be declared: it runs on the person's server, as
-the administrator who installed it, and every line of it is theirs to trust.
-A service is a small program in `services/` that talks to the record API with
-`CLOUDMORROW_URL` and `CLOUDMORROW_TOKEN`, using the standard library; test it
-with `cm quill dev` and read what it prints with `cm quill logs <id>`.
+The first time, `uv sync` makes `.venv` with Cloudmorrow and pytest in it.
 

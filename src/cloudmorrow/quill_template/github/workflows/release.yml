@@ -1,0 +1,24 @@
+# A tag like v1.0.0 is a release: checked and tested once more, then
+# published, ready for its line in the Quill Catalog.
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync
+      - run: uv run cm quill check .
+      - run: uv run cm quill test . --sandbox
+      - name: Check the version is the tag's
+        run: |
+          version=$(python3 -c "import tomllib; print(tomllib.load(open('quill.toml','rb'))['quill']['version'])")
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "quill.toml says $version, the tag is $GITHUB_REF_NAME"; exit 1; }
+      - run: gh release create "$GITHUB_REF_NAME" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

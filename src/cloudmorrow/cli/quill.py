@@ -46,7 +46,7 @@ app = typer.Typer(
 
 TEMPLATE = Path(__file__).resolve().parent.parent / "quill_template"
 # Stored without their dots, so the package keeps them; restored on copy.
-DOTTED = {"gitignore": ".gitignore", "github": ".github", "gitkeep": ".gitkeep"}
+DOTTED = {"gitignore": ".gitignore", "github": ".github", "gitkeep": ".gitkeep", "claude": ".claude"}
 
 FolderArgument = Annotated[Path, typer.Argument(help="The Quill's folder.")]
 
@@ -61,7 +61,7 @@ def new(
         Path | None, typer.Option("--dir", help="Where to make it. ./quill-<id>.")
     ] = None,
 ) -> None:
-    """Start a Quill: a folder with a manifest, a datamodel, a CLAUDE.md and a check."""
+    """Start a Quill: a manifest, a datamodel, quill.py, tests, a CLAUDE.md with skills, and CI."""
     if not re.match(r"^[a-z][a-z0-9_]{1,31}$", quill_id):
         fail("an id is 2 to 32 lowercase letters, digits and _, starting with a letter")
     target = into or Path(f"quill-{quill_id}")
@@ -86,7 +86,9 @@ def new(
         (TEMPLATE / "CLAUDE.md.head").read_text(encoding="utf-8") + quill_reference(),
         encoding="utf-8",
     )
-    console.print(f"[green]Made[/] {target}/ — next: [b]cd {target} && cm quill check[/]")
+    console.print(
+        f"[green]Made[/] {target}/ — next: [b]cd {target} && uv sync && cm quill check && cm quill test[/]"
+    )
 
 
 @app.command("reference")

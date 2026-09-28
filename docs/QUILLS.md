@@ -15,22 +15,24 @@ page wins, and those pages remain the reasoning behind it.
 | word | what it is |
 | --- | --- |
 | **Core** | This repository. Accounts, sealing, the record store, the gate, the Quill runtime, the kit renderers for every surface, the CLI, the MCP server. Nothing a person would call an app. |
-| **Quill** | A software package: one repository with a `quill.toml` at its root. It declares the data it uses, the screens it shows, and the jobs, webhooks, APIs and services it runs. |
+| **Quill** | A software package: one repository with a `quill.toml` at its root, and a `quill.py` when it has code. It declares the data it uses, the screens it shows, what can be done in it, and the jobs, hooks, webhooks, APIs and services it runs. |
 | **Quill Catalog** | [`Cloudmorrow/quill-catalog`](https://github.com/Cloudmorrow/quill-catalog): one `catalog.toml` naming every published Quill, its repository, a pinned release and a category. Your server reads it; a pull request adds to it. |
 | **Category** | Where a Quill is shelved in the catalog: Home, Personal, Business, Developer, … Chosen from at install. |
 | **Datamodel** | A kind of data with standard fields: `task`, `contact`, `vehicle`. Records belong to the person, never to a Quill. |
 | **Foundational datamodel** | One of the standard datamodels in [`Cloudmorrow/datamodels`](https://github.com/Cloudmorrow/datamodels). Grouped into **domains** — Tasks, Customers (CRM), Fleet, Messaging, Calendars — which you can choose at install on their own, with or without a Quill that uses them. |
 | **Extended datamodel** | What a Quill adds: fields of its own on a foundational datamodel (`fleet.odometer` on a `vehicle`), or a new datamodel under its own name (`fleet.service_visit`). Anybody's next Quill may use either. |
 | **Dataset** | Records that come with a Quill — reference data (car makes, country codes) or a starting record (your first board) — and, later, a named collection of records a person makes and shares ("Fleet 2026"). |
-| **Kit** | The fixed vocabulary of screens every surface can draw: `list`, `board`, `detail`, `form`, `calendar`, `thread`, `grid`, `editor`. |
+| **Kit** | The fixed vocabulary of screens every surface can draw: `list`, `board`, `detail`, `form`, `calendar`, `thread`, `grid`, `editor`, and `view` — a screen a Quill's code draws from primitives. |
+| **Quill code** | The Python a manifest names — views, actions, hooks, jobs, webhooks, APIs, machine handlers — run in a sandbox, through the gate. See [QUILLCODE.md](QUILLCODE.md). |
 
 ## The rules
 
-1. **A Quill never ships its own UI.** Screens are built from the kit, so
-   every Quill is on the phone, the full web app and the terminal
-   automatically — and on the command line and to an assistant as tools.
-   There is no escape hatch. When the kit cannot say something, the kit
-   grows, and every surface grows with it.
+1. **A Quill never ships per-surface UI.** Screens are kit elements, or
+   views its code builds from primitives, so every Quill is on the phone,
+   the full web app and the terminal automatically — and on the command line
+   and to an assistant as tools. There is no escape hatch: no HTML, CSS,
+   JavaScript or Textual in a Quill. When the kit or the primitives cannot
+   say something, they grow, and every surface grows with them.
 2. **Data is the person's.** Uninstalling a Quill removes its screens and
    its jobs, never a record. Its extension fields stay on the records, read-
    only, until something else writes them or the person clears them.
@@ -38,10 +40,12 @@ page wins, and those pages remain the reasoning behind it.
    the install sheet list its datamodels (used, extended, introduced), its
    datasets, its screens, its jobs, webhooks, APIs and services, and every
    grant it asks for. Nothing installs without a yes.
-4. **Declarative first.** A Quill with no code is the normal case: the
-   datamodels carry create, change, move, tick and delete; the kit carries the
-   screens; the core runs declared jobs. Code is for what cannot be declared,
-   and it runs outside the server (see *Webhooks, APIs and services*).
+4. **Declarative first, then Python.** A Quill with no code is the normal
+   case: the datamodels carry create, change, move, tick and delete; the kit
+   carries the screens; the core runs declared jobs. Code is for what cannot
+   be declared: `quill.py`, run in a sandbox inside the server, through the
+   gate ([QUILLCODE.md](QUILLCODE.md)). A service, outside it, is the last
+   resort (see *Webhooks, APIs and services*).
 5. **One gate.** Every read and write — by a person, a Quill's service, or an
    assistant — goes through the same check of principal, action, datamodel and
    scope. The person's circles are part of it: a Quill does what the data lets
@@ -57,8 +61,12 @@ page wins, and those pages remain the reasoning behind it.
 ```
 quill-tasks/
   quill.toml          the manifest: everything below is declared here
+  quill.py            optional: its code — views, actions, hooks, jobs (QUILLCODE.md)
   README.md           what it is, for the catalog page
   CLAUDE.md           how to work on it with an assistant (from the template)
+  .claude/skills/     skills for that assistant (from the template)
+  tests/              its tests, against the harness (`cm quill test`)
+  pyproject.toml      for working on it: `uv sync` gets Cloudmorrow and pytest
   datasets/           optional: records to load, as TOML or CSV
   datamodels/         optional: datamodels this Quill introduces
   services/           optional: code for the services it runs
@@ -397,6 +405,7 @@ Declared work the core runs on a schedule, as the Quill:
 | action | does |
 | --- | --- |
 | `expire` | delete records of `model` whose `field` is older than `after` |
+| `call` | call a handler in `quill.py`, every `every`, as the installer (see [QUILLCODE.md](QUILLCODE.md)) |
 | `run` | start the command of the Quill's `service` once, every `every`, never twice at once (see *Webhooks, APIs and services*) |
 
 `every` is `15m`, `1h`, `1d`. An `expire` job also runs when its datamodel is
@@ -405,8 +414,11 @@ would take carries its `expires_at`.
 
 ### Webhooks, APIs and services
 
-These are the parts of a Quill that are code, and they run outside the server
-so the gate means something and a Raspberry Pi stays a Raspberry Pi.
+A Quill's own Python — views, actions, hooks, `call` jobs, and webhooks and
+APIs answered by a `handler` — runs in the sandbox and is
+[QUILLCODE.md](QUILLCODE.md)'s. This section is the rest: programs of their
+own, which run outside the server so the gate means something and a
+Raspberry Pi stays a Raspberry Pi.
 
 ```toml
 [[services]]
@@ -571,8 +583,10 @@ and an MCP tool, so an assistant can drive it as well as you can.
    teaches an assistant this page, the datamodels there are, and the loop below.
 2. **Check** with `cm quill check`: the manifest against the schema, every
    screen against its datamodel, and a text preview of what each surface will
-   draw. Nothing to deploy to find out it is wrong.
-3. **Try** with `cm quill dev .`: installs the folder on your own server as a
+   draw. Nothing to deploy to find out it is wrong. **Test** with `cm quill
+   test` (and `--sandbox`): its tests, against the real record store and gate,
+   on your machine ([QUILLCODE.md](QUILLCODE.md), *Testing a Quill locally*).
+3. **Try** with `cm quill dev --local` (a throwaway server here) or `cm quill dev .`: installs the folder on your own server as a
    development Quill, and reinstalls it when a file changes. It is on your
    phone and in your terminal at once.
 4. **Publish** with a release tag in your repository and a pull request adding
@@ -603,6 +617,7 @@ manifest written, checked and installed in one conversation.
 | a Quill's token and webhook secrets, who it runs as | `server/quilltokens.py`; `get_principal` in `server/deps.py` |
 | APIs, webhooks, and their administration | `server/routes/quillcode.py`, with `server/quillproxy.py` (to a service's port) and `server/quillhooks.py` (map paths, signatures, the rate) |
 | watching it run | web `quillservices.js`, `quillservices.css`; terminal `tui/panes/admin_quill_services.py`; `cm quill services`, `cm quill logs` |
+| a Quill's Python: the SDK, the sandbox, views, actions, hooks, machines, the harness | see *Where the code is* in [QUILLCODE.md](QUILLCODE.md) |
 
 ## The order from here
 
@@ -617,3 +632,6 @@ manifest written, checked and installed in one conversation.
    datamodel no assistant may ever reach.
 5. Shared and public scopes in the record store; named datasets.
 6. The catalog page at cloudmorrow.com, and the first Quill we did not write.
+7. Quill code ([QUILLCODE.md](QUILLCODE.md)): Python in a sandbox for views,
+   actions, hooks, jobs, webhooks, APIs and machine handlers; the template
+   Python and TOML with tests and skills; the standard Quills made in its shape.

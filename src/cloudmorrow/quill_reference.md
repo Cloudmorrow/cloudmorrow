@@ -1,20 +1,27 @@
 # Writing a Quill
 
 A Quill is a Cloudmorrow software package: one folder (one repository) with a
-`quill.toml` at its root. It declares data and screens; the core does the rest.
-The same Quill is drawn on the phone, the full web app and the terminal, is a
-`cm <quill>` command, and is tools for an assistant. You never write UI code.
+`quill.toml` at its root, and a `quill.py` when it has code. The manifest
+declares data, screens and what can be done; the Python does what cannot be
+declared, in a sandbox, through the same gate as everybody. The same Quill
+is drawn on the phone, the full web app and the terminal, is a `cm <quill>`
+command, and is tools for an assistant. You never write UI code: screens
+are kit elements, or views built from primitives every surface draws.
 
 ## The loop
 
 1. `cm quill check` — validate the manifest against the datamodels, and see a
    text preview of each screen. Fix what it says; it says it plainly.
-2. `cm quill dev` — install this folder on your own server as a development
-   Quill. Every surface has it at once. Run it again after a change.
-3. Tag a release (`v1.0.0`) and open a pull request on
+2. `cm quill test` — `tests/` with pytest, against the real record store and
+   gate (`cloudmorrow.quill.testing.Harness`); `--sandbox` runs `quill.py` in
+   the sandbox, as a server does.
+3. `cm quill preview <view>` draws a view as text; `cm quill dev --local` is a
+   throwaway server on this machine, reinstalled as you save; `cm quill dev`
+   installs this folder on your own server as a development Quill.
+4. Tag a release (`v1.0.0`) and open a pull request on
    `Cloudmorrow/quill-catalog` adding the Quill to `catalog.toml`.
 
-Over MCP an administrator's assistant has the same loop: `quill_schema`,
+Over MCP an administrator's assistant has the first loop: `quill_schema`,
 `quill_check`, `quill_dev_install`.
 
 ## quill.toml
@@ -69,8 +76,117 @@ records = [{ name = "{owner}'s first plant" }]
 # or: file = "datasets/plants.csv"  (CSV with a header row, or TOML [[records]])
 ```
 
-Code, when declaring is not enough. The server runs it, as the administrator
-who installed the Quill, and it reaches only what the Quill declared:
+## Code: quill.py
+
+When declaring is not enough, the manifest names Python functions, and
+`quill.py` (or a `quill/` package) has them, each registered with a
+decorator from the SDK, `cloudmorrow.quill`. The server runs them in a
+sandbox — CPython compiled to WebAssembly: no files, no sockets, no
+processes, only the standard library and the SDK — and every record they
+touch goes through the gate, as the principal the table says:
+
+| declared as | written as | runs as | returns |
+| --- | --- | --- | --- |
+| `[[screens]] view = "garage"` | `@view("garage") def garage(ctx)` | the person looking | a tree of primitives |
+| `[[actions]]` | `@action("log_service") def log_service(ctx, [record,] **fields)` | the person pressing | effects |
+| `[[hooks]] on, when, handler` | `@hook def h(ctx, change)` | whoever made the change | nothing |
+| `[[jobs]] action = "call", handler, every` | `@job def j(ctx)` | the installing administrator | nothing |
+| `[[webhooks]] handler` | `@webhook def w(ctx, request)` | the installing administrator | `respond(...)` or a dict |
+| `[[apis]] handler, prefix` | `@api def a(ctx, request)` | the installing administrator | `respond(...)` or a dict |
+| `[[machine]]` | `@machine def m(ctx)` | the machine's owner, on their machine | JSON |
+
+```toml
+[quill]
+code = "quill.py"                  # needed as soon as anything names a handler
+
+[[screens]]
+id = "garage"
+label = "Garage"
+view = "garage"                    # instead of kit = …
+model = "vehicle"                  # optional: circles fit it by this
+
+[[actions]]
+id = "log-service"                 # its button, `cm fleet log-service`, and an assistant's tool
+label = "Log a service"
+on = "vehicle"                     # optional: done to one record; the handler gets it first
+confirm = "Log it?"                # optional; tone = "primary" | "danger"; assistant = false
+[actions.fields]                   # its form, checked before the code runs
+date = { kind = "date", required = true }
+km = "int"
+
+[[hooks]]
+on = "fleet.visit"
+when = ["created"]                 # created, changed, deleted
+fields = ["km"]                    # optional: for changed, only these
+handler = "visit_logged"
+
+[[fetch]]                          # https hosts ctx.fetch may reach
+host = "api.example.com"
+why = "…"
+
+[[secrets]]                        # keys ctx.secret may read from the person's vault
+key = "TRACKER_KEY"
+why = "…"
+
+[[machine]]                        # runs on a person's machine, once they switch it on there
+id = "import"
+why = "…"
+every = "15m"
+[machine.needs]
+folders = [{ name = "exports", access = "read" }]
+```
+
+```python
+from cloudmorrow.quill import action, hook, view, ui, toast, error, open, go, confirm, respond
+
+@view("garage")
+def garage(ctx):
+    vans = ctx.records.list("vehicle")
+    return ui.stack(
+        ui.row(ui.stat("Vans", len(vans))),
+        ui.table(vans, columns=["name", ("Odometer", "fleet.odometer")], actions=["log-service"]),
+        ui.button("Add a van", action="add-van", tone="primary"),
+    )
+
+@action("log_service")
+def log_service(ctx, vehicle, date, km):
+    ctx.records.create("fleet.visit", vehicle=vehicle.id, date=date, km=km)
+    return toast(f"Logged {vehicle['name']} at {km} km")
+```
+
+`ctx`: `ctx.user` (`.username`, `.name`, `.admin`, `.circles`), `ctx.params`
+(a view's; `.record` when opened on one), `ctx.records` (`list(model, q=,
+**where)`, `get`, `create(model, fields=None, **values)`, `patch(model, id,
+fields)`, `move`, `delete` — each a `Record`: fields by `record["name"]`,
+envelope as `.id`, `.rev`, `.model`), `ctx.fetch(url, method=, headers=,
+json=)`, `ctx.secret(key)`, `ctx.now()`, `ctx.log(...)`, and on a machine
+`ctx.folder(name)` and `ctx.run([...])`. A refusal raises `Refused`,
+`NotFound`, `Invalid` or `Conflict`. `print` goes to the Quill's log
+(`cm quill logs <quill> code`).
+
+Primitives (`ui.`): `stack`, `row`, `columns`, `tabs`, `text(style=)`,
+`markdown`, `image`, `badge`, `stat`, `empty`, `divider`, `field(record,
+name, edit=)`, `form(action)`, `button(label, action= | open= | go=)`,
+`menu`, `table(records, columns=, actions=)`, `cards(records, title=, …)`,
+`lanes(records, field=, title=)`, `month(records, date=, title=)`. Every
+button runs a declared action, opens a record, or goes to a declared screen.
+
+Effects: `toast(text)`, `open(record)`, `go(screen, **params)`,
+`confirm(text, then=action, **fields)`, `error(text)`; an API or webhook
+returns `respond(json=… | text=…, status=)`.
+
+Tests: `from cloudmorrow.quill.testing import Harness`; `q = Harness(".")`;
+`q.seed(model, **fields)`, `q.act(action, record, **fields)` (→ `.ok`,
+`.toast`, `.error`, `.refused`), `q.view(screen).text()`,
+`q.as_user(name, circles=[...])`, `q.run_job`, `q.webhook`, `q.api`,
+`q.machine(id, folders=)`, `q.fetch.add(url, json=)`, `q.secret(key, value)`.
+
+## Services: a program of its own
+
+The last resort, for what the sandbox cannot do: hold a connection open,
+run all the time, use a package with C in it. The server runs it outside
+the sandbox, as the administrator who installed the Quill, and it reaches
+only what the Quill declared:
 
 ```toml
 [[services]]                       # a program the core starts and keeps running
@@ -92,7 +208,7 @@ map = { name = "$.plant.name" }    # field = a path into the body: $.a.b[0].c
 # forward = "sync"                 # …or the request goes to a service instead
 # signature = "X-Hub-Signature-256"  # also accept a GitHub-style HMAC of the body
 
-[[apis]]                           # /api/q/<quill>/… proxied to a service, for people signed in
+[[apis]]                           # /api/q/<quill>/… proxied to a service (or handler = …)
 id = "public"
 service = "sync"
 # prefix = "v1"                    # only paths under /api/q/<quill>/v1/
@@ -216,7 +332,10 @@ purpose: what the kit cannot say, the kit grows to say, for every Quill at once.
 
 ## Rules
 
-- Never ship UI code, HTML, or CSS. Use the kit.
+- Never ship UI code, HTML, CSS or JavaScript. Use the kit, or a view of primitives.
+- Declare first; Python for what cannot be declared; a service last.
+- Every handler is named in the manifest, and every button in a view runs a
+  declared action or goes to a declared screen.
 - Never invent a second kind of something that is already a datamodel; extend it.
 - Extension fields cannot be required.
 - Everything you read or write that you did not introduce is in `[uses]`,

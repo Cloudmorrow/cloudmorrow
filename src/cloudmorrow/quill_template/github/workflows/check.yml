@@ -1,5 +1,6 @@
 # Every push and pull request: the manifest checks out against the
-# foundational datamodels, and every screen binds to fields that exist.
+# foundational datamodels, and the tests pass — in plain Python, and with
+# quill.py in the sandbox, as a server runs it.
 name: check
 on: [push, pull_request]
 jobs:
@@ -7,8 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install "cloudmorrow[tui] @ git+https://github.com/Cloudmorrow/cloudmorrow"
-      - run: cm quill check .
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync
+      - run: uv run cm quill check .
+      - run: uv run cm quill test .
+      - run: uv run cm quill test . --sandbox

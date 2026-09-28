@@ -1,7 +1,8 @@
 # A Quill for Cloudmorrow. Everything it is, is declared here: the data it
-# uses, the screens it shows, the jobs it runs. The screens are drawn on the
-# phone, the web app and the terminal by Cloudmorrow itself — there is no UI
-# code to write. See CLAUDE.md for the whole format, and run `cm quill check`.
+# uses, the screens it shows, what can be done in it and the code that does
+# it. The screens are drawn on the phone, the web app and the terminal by
+# Cloudmorrow itself. See CLAUDE.md for the whole format, and run
+# `cm quill check`, then `cm quill test`.
 
 [quill]
 id = "{{id}}"
@@ -12,14 +13,38 @@ category = "personal"          # personal, home, business, developer
 icon = "{{id}}"
 publisher = ""
 license = "MIT"
+code = "quill.py"              # the Python the handlers below are in
 
 [uses]
 datamodels = []                # foundational datamodels: task, contact, vehicle, …
 
+# A view: a screen its code draws, from the primitives every surface can draw.
+[[screens]]
+id = "overview"
+label = "{{name}}"
+view = "overview"
+model = "{{id}}.item"
+
+# A kit screen: declared, no code at all.
 [[screens]]
 id = "items"
 kit = "list"
-label = "{{name}}"
+label = "Items"
 model = "{{id}}.item"
 title = "name"
 tick = "done"
+
+# Something a person can do: a button on every surface, `cm {{id}} add`,
+# and a tool for their assistant. Its form is these fields.
+[[actions]]
+id = "add"
+label = "Add an item"
+tone = "primary"
+[actions.fields]
+name = { kind = "string", required = true }
+
+[[actions]]
+id = "clear-done"
+label = "Clear what is done"
+confirm = "Delete every item that is done?"
+tone = "danger"
