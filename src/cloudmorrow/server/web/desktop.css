@@ -55,6 +55,8 @@
     gap: 2px;
     padding: 8px 12px calc(12px + var(--bottom));
     border-right: 1px solid var(--line);
+    overflow-x: hidden;
+    overflow-y: auto;
   }
   /* The wordmark sits at the head of the rail, where a program on a
      computer puts its name. */

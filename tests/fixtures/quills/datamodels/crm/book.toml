@@ -1,0 +1,14 @@
+[datamodel]
+id = "book"
+version = 1
+label = "Book"
+description = "Where a customer base is kept: the organisations, people, deals and activities one person, a team or everybody works on together."
+domain = "crm"
+scopes = ["personal", "shared", "public"]
+title = "name"
+space = true
+
+[fields]
+name = { kind = "string", required = true }
+currency = { kind = "string", label = "Currency", default = "EUR" }
+notes = { kind = "markdown" }

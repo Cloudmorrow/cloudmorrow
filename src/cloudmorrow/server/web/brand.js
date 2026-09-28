@@ -229,6 +229,18 @@ const ICONS = {
     "........",
     "XXXXXXXX",
   ],
+  // Wide at the top, narrow at the spout: a sales pipeline, what goes in
+  // and what comes out. The CRM's.
+  funnel: [
+    "XXXXXXXX",
+    "X......X",
+    ".X....X.",
+    "..X..X..",
+    "...XX...",
+    "...XX...",
+    "...XX...",
+    "........",
+  ],
 };
 
 function pixelIcon(name, extraClass = "") {

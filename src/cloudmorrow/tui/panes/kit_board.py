@@ -5,7 +5,9 @@ is a column, left to right in the order declared — the direction work
 travels. Or it names a link, and the linked records are the columns, in
 their own order — a pipeline's stages, which people add, rename and
 reorder; on a board with groups, only the ones linked to the group on
-screen, so each group has lanes of its own. A `group` (a link field) puts a strip of tabs above the board, one
+screen, so each group has lanes of its own.
+
+A `group` (a link field) puts a strip of tabs above the board, one
 per record of the linked datamodel, with a `＋` at the end that makes
 another: which ones you have is visible at a glance rather than one click
 down, and switching between them is one click rather than two. The server
@@ -215,9 +217,10 @@ class BoardPane(KitPane):
 
     async def load_lanes(self) -> None:
         """The lanes, when they are records: the group's own, in their order."""
+        group = self.group_model_id
         by = next(
             (f["name"] for f in self.lane_model.get("fields", [])
-             if f.get("kind") == "link" and self.group_model_id and f.get("to") == self.group_model_id),
+             if f.get("kind") == "link" and group and f.get("to") == group),
             None,
         )
         where = {by: self.group} if by and self.group else {}
@@ -237,7 +240,8 @@ class BoardPane(KitPane):
         box = self.query_one("#lanes", Horizontal)
         await box.remove_children()
         await box.mount_all([
-            Lane(value, label, note=self._lane_note(value), id=f"lane-{safe_id(value)}", classes="lane")
+            Lane(value, label, note=self._lane_note(value),
+                 id=f"lane-{safe_id(value)}", classes="lane")
             for value, label in lanes
         ])
 
@@ -263,10 +267,9 @@ class BoardPane(KitPane):
 
     def _said(self, record: dict) -> str:
         fields = record.get("fields") or {}
-        return "  ·  ".join(
-            text for f in self.subtitles
-            if fields.get(f["name"]) not in (None, "") and (text := self.say(f, fields[f["name"]])) != "—"
-        )
+        said = (self.say(f, fields[f["name"]]) for f in self.subtitles
+                if fields.get(f["name"]) not in (None, ""))
+        return "  ·  ".join(text for text in said if text != "—")
 
     def _lane_of(self, record: dict) -> str:
         value = (record.get("fields") or {}).get(self.lane_field)

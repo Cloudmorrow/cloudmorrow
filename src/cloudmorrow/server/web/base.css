@@ -298,9 +298,19 @@ h1.large {
   height: calc(50px + var(--bottom));
   padding: 0 0 var(--bottom);
   background: var(--bar);
+  /* More tabs than the phone is wide — a CRM's five beside the rest —
+     scroll sideways rather than squeezing their names into one word. */
+  justify-content: safe center;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
 }
+.tabs::-webkit-scrollbar { display: none; }
 .tab {
-  flex: 1 1 0;
+  flex: 1 0 auto;
+  min-width: 58px;
+  padding: 0 6px;
+  white-space: nowrap;
   max-width: 200px;
   display: flex;
   flex-direction: column;

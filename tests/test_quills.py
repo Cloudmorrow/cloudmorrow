@@ -90,7 +90,7 @@ def models_source() -> Path:
 
 def test_the_catalog_is_read_with_its_categories(registry):
     catalog = load_catalog(str(QUILL_CATALOG))
-    assert [c["id"] for c in catalog.categories] == ["personal", "home", "developer"]
+    assert [c["id"] for c in catalog.categories] == ["personal", "home", "business", "developer"]
     assert catalog.entry("tasks")["foundation"] is True
     with pytest.raises(QuillError):
         catalog.entry("nope")
@@ -126,11 +126,12 @@ def test_installing_brings_the_datamodels_and_the_links_they_need(registry, tmp_
     folder = write_quill(tmp_path / "src", FLEET, visit=VISIT)
     registry.install(folder, models_source())
     assert set(registry.quills) == {"fleet"}
-    # contact links to organisation, so both came.
+    # contact links to organisation, and both are kept in a book, so all three came.
     assert {p.stem for p in (tmp_path / "datamodels").glob("*.toml")} == {
         "vehicle",
         "contact",
         "organisation",
+        "book",
     }
     vehicle = registry.datamodels["vehicle"]
     assert vehicle.by_name["fleet.odometer"].added_by == "fleet"

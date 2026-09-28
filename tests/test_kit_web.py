@@ -293,7 +293,7 @@ def test_a_board_you_may_only_read_is_one_you_look_at():
     board = _code(_function(KIT_JS, "renderBoard"))
     assert "const writes = mayWrite(model);" in board
     # No add row or pen, no new board, no ticking, no dragging.
-    assert "const canAdd = (!groupModel || group) && writes;" in board
+    assert "const canAdd = (!groupModel || group) && writes &&" in board
     assert "(writes ? `<button class=\"compose\"" in board
     assert "mayWrite(groupModel) ? `<button class=\"chip new-group\"" in board
     assert "writes && canDrag()" in board and "if (writes) wireDragging();" in board

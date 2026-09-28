@@ -182,6 +182,12 @@ odometer = { kind = "int", indexed = true }   # stored as "fleet.odometer"
 Extension fields are namespaced by the Quill's id, are never `required`, and
 are readable by anybody who may read the record.
 
+A foundational datamodel grows by its `version`: when a Quill that needs
+it is installed with a newer one than the server has, the newer one
+replaces it. It may add fields, and may keep its records in a space
+(`contact` v2 is in a `book`); it never takes a field away, and the records
+written before keep opening — one in no space is still its owner's own.
+
 **Introducing** a datamodel is a file in the Quill's `datamodels/`, with an
 id under the Quill's name: `fleet.service_visit`. From the moment the Quill is
 installed, every other Quill may ask for it.
@@ -230,7 +236,9 @@ The core serves every installed datamodel at the same API:
 
 Scopes are `personal`, `shared` and `public`, as chat and calendar have them.
 Records of a datamodel that is not a space, and not in one, are personal:
-their owner's alone. See *Spaces* for everything shared.
+their owner's alone. So is a record of a datamodel that lives in spaces when
+its space link is left empty — a contact in no book is your own address
+book's. See *Spaces* for everything shared.
 
 ### Spaces: what more than one person shares
 
@@ -270,7 +278,15 @@ editing the database opens as nothing.
 
 A dataset can seed a space once per server (`seed = "once"`, for the
 public calendar and `#general`) or once per person (`seed = "per-owner"`,
-for everyone's own calendar).
+for everyone's own calendar). A dataset of a datamodel *in* a space can be
+seeded once in every space that has none of it (`seed = "per-space"`): the
+CRM's pipeline stages, in every book, the first time a book's stages are
+read — so a book made later gets them too, and there is never a book
+without a pipeline.
+
+A space link is `on_delete = "cascade"`: what is in a space goes with it.
+`clear` is refused, because a record sealed to a space it no longer names
+could not be opened.
 
 Being able to see a space is being able to write in it. Who may change
 or delete what is written there is the datamodel's `authored`:
@@ -346,12 +362,38 @@ each element needs:
 | kit | binds | on the phone | on the full web app | in the terminal | on the command line |
 | --- | --- | --- | --- | --- | --- |
 | `list` | `model`, `title`, optional `subtitle`, `tick` (a bool field), `fields` (the sheet's), `group` and `subgroup` (a link, an enum or an indexed string: picked through) | chips for the group and subgroup, a list with a circle per row | the same, wider | the groups down the left, the subgroup as buttons, a table | `cm <quill> list [-g group/subgroup]`, `add`, `done` |
-| `board` | `model`, `lane` (enum), `title`, optional `group` (link), `body`, `done` | lanes stacked | lanes as columns, drag and drop | lanes as columns, drag and keys | `cm <quill> list`, `add`, `move` |
+| `board` | `model`, `lane` (an enum, or a link: see below), `title`, optional `group` (link), `subtitle` (a field or a list of them), `body`, `done` | lanes stacked | lanes as columns, drag and drop | lanes as columns, drag and keys | `cm <quill> list`, `add`, `move` |
 | `detail` / `form` | `model`, `fields` | a sheet | a panel | a modal | `cm <quill> show`, `set` |
 | `calendar` | `model`, `starts`, `ends` (indexed datetime or date fields), `space` (a link to a space: the calendars), optional `all_day` (bool), `colour` (a field of the space: cyan, violet, green, amber, rose), `title`, `subtitle` | a month with a dot per thing, and the day's list | a week of hours or a month written in | the spaces, a month, and the day's list | `cm <quill> list --from --to`, `add "<title>" starts=… ends=…` |
 | `thread` | `model` (in a space), `space` (its link to the space), `body`; optional `about` (a field of the space), `made_as` | the spaces with unread, then a conversation | both side by side | both side by side | `cm <quill> list`, `show`, `say` |
 | `editor` | `model`, `title`, `body` (markdown), optional `path` (a string, `folder/sub/title`: the folders) | a tree, then a list, then the page | the list and the page side by side | the tree and the live editor side by side | `cm <quill> list`, `show`, `add`, `edit`, `search` |
 | `grid` | `model` with content (`file`), `group` (a link: the places, picked first), `folder`, `kind` (an enum with `folder`), optional `size`, `modified`, `mime`, `group_subtitle`, `group_open` | the groups, then folders and tiles | the same, wider; drag and drop in | the groups in a table, then the folder, with the picture beside | `cm <quill> list [group] [folder]`, `get`, `put`, `add` |
+
+A board's lanes are an enum's values, fixed by the datamodel — To Do,
+Doing, Done — or, when `lane` is a link, the records it links to, in their
+own order (`ordered_within`), which people add, rename, reorder and delete
+like any record: a pipeline's stages. On a board with a `group`, the lanes
+are only the records that link to the group on screen, so each book has
+its own pipeline. `done` then says what the finished lane has rather than
+naming it: `done = { outcome = "won" }`. A card whose lane is not one of
+them — none yet, or a stage since deleted — is drawn in the first. The CRM
+is:
+
+```toml
+[[screens]]
+id = "pipeline"
+kit = "board"
+model = "deal"
+group = "book"                    # the books, as chips
+lane = "stage"                    # a link: the book's stages are the lanes
+title = "title"
+subtitle = ["organisation", "value"]
+done = { outcome = "won" }
+```
+
+A record's sheet offers, for a link, only the records in the same place as
+the record — a deal's stages and organisations from its own book — by every
+other link the two datamodels share.
 
 Every screen gets a record sheet for free: opening a card or a row shows the
 record's fields with the widget for each kind, editable, with delete. An

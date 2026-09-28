@@ -1051,7 +1051,7 @@ def _check_link_lanes(where: str, thing: str, screen: dict, lane, lanes: Datamod
     if not isinstance(done, dict) or not done:
         raise QuillError(
             f"{where}: {thing} lanes are {lanes.id} records, so done says what the finished one"
-            " has: done = {{ field = value }}"
+            " has: done = { field = value }"
         )
     for name in done:
         need(lanes, thing + " done", name)

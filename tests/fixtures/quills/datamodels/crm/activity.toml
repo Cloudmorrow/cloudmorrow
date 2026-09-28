@@ -1,0 +1,21 @@
+[datamodel]
+id = "activity"
+version = 1
+label = "Activity"
+description = "A call, a meeting, an email or a to-do with a customer: when it is due, and whether it is done."
+domain = "crm"
+scopes = ["personal", "shared", "public"]
+title = "title"
+in_space = "book"
+
+[fields]
+book = { kind = "link", to = "book", indexed = true, on_delete = "cascade" }
+title = { kind = "string", required = true }
+kind = { kind = "enum", values = ["todo", "call", "meeting", "email"], labels = ["To-do", "Call", "Meeting", "Email"], default = "todo", indexed = true }
+due = { kind = "datetime", indexed = true }
+done = { kind = "bool", default = false, indexed = true }
+done_at = { kind = "datetime", label = "Done", indexed = true, stamp = { field = "done", value = "true" } }
+organisation = { kind = "link", to = "organisation", on_delete = "clear" }
+contact = { kind = "link", to = "contact", label = "Person", on_delete = "clear" }
+deal = { kind = "link", to = "deal", on_delete = "clear" }
+notes = { kind = "markdown" }

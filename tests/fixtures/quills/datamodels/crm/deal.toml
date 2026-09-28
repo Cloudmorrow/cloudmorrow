@@ -1,0 +1,23 @@
+[datamodel]
+id = "deal"
+version = 1
+label = "Deal"
+description = "Something you hope to sell to an organisation or a person: what it is worth, and which stage of the pipeline it is in."
+domain = "crm"
+scopes = ["personal", "shared", "public"]
+title = "title"
+in_space = "book"
+ordered_within = ["book", "stage"]
+
+[fields]
+book = { kind = "link", to = "book", required = true, indexed = true, on_delete = "cascade" }
+title = { kind = "string", required = true }
+stage = { kind = "link", to = "stage", indexed = true, on_delete = "clear" }
+organisation = { kind = "link", to = "organisation", on_delete = "clear" }
+contact = { kind = "link", to = "contact", label = "Person", on_delete = "clear" }
+value = { kind = "decimal", indexed = true }
+currency = { kind = "string" }
+expected_close = { kind = "date", label = "Expected to close", indexed = true }
+status = { kind = "enum", values = ["open", "won", "lost"], labels = ["Open", "Won", "Lost"], default = "open", indexed = true }
+closed_at = { kind = "datetime", label = "Closed", indexed = true }
+notes = { kind = "markdown" }

@@ -42,7 +42,9 @@ Kinds: `string`, `text`, `markdown`, `bool`, `int`, `decimal`, `date`,
 
 A datamodel with `space = true` is a container people share (a calendar, a
 channel): `scopes = ["personal", "shared", "public"]`. Things in it say
-`in_space = "<link field>"`. See CLAUDE.md, "Spaces".
+`in_space = "<link field>"`. See CLAUDE.md, "Spaces". Left empty, that
+link keeps the record out of any space: its writer's own, as a personal
+record is. A space link is `on_delete = "cascade"`, never `clear`.
 
 ## Datasets
 
@@ -54,6 +56,17 @@ id = "first-list"
 model = "shop.list"
 seed = "per-owner"          # or "once", for the whole server
 records = [{ name = "{owner}'s list" }]
+```
+
+`seed = "per-space"`, on a datamodel in a space, writes the records into
+every space that has none of them yet — each new book's pipeline stages:
+
+```toml
+[[datasets]]
+id = "pipeline"
+model = "stage"
+seed = "per-space"
+records = [{ name = "Lead" }, { name = "Won", outcome = "won" }]
 ```
 
 ## Remember

@@ -71,7 +71,8 @@ every = "1d"
 [[datasets]]                       # records that come with the Quill
 id = "first-plant"
 model = "plants.plant"
-seed = "per-owner"                 # once for each person who has none
+seed = "per-owner"                 # once for each person who has none; "once" for the
+                                   # server; "per-space" in every space with none
 records = [{ name = "{owner}'s first plant" }]
 # or: file = "datasets/plants.csv"  (CSV with a header row, or TOML [[records]])
 ```
@@ -304,7 +305,7 @@ and has every surface draw it hidden until asked for.
 | kit | needs | draws |
 | --- | --- | --- |
 | list | model, title; optional subtitle, tick (bool), fields (the sheet's), group and subgroup (link, enum or indexed string) | rows, a circle per row if tick; chips (phone, web) or a list and buttons (terminal) to pick the group and subgroup |
-| board | model, lane (enum, in ordered_within), title; optional group (link: chips), body (markdown), done (a lane value) | lanes; cards dragged between them |
+| board | model, lane (in ordered_within: an enum, or a link to the records that are the lanes — in their order, and on a board with a group only those linking to it), title; optional group (link: chips), subtitle (a field, or a list of them, under a card's title), body (markdown), done (a lane value; for record lanes what the lane has: `{ outcome = "won" }`) | lanes; cards dragged between them |
 | detail / form | model; optional fields = [...] | one record's fields, editable |
 | calendar | model, starts, ends (indexed datetime/date), space (a link to a space datamodel); optional all_day (bool), colour (a field of the space), subtitle | every space's things at once: a month, a week, the day's list; the spaces and their people |
 | editor | model, title, body (markdown); optional path (a string like folder/sub/title: the folders) | a tree of folders and records beside a page of Markdown; pictures where the backend keeps attachments |

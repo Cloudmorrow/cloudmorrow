@@ -1,0 +1,197 @@
+[quill]
+id = "crm"
+name = "CRM"
+version = "1.0.0"
+summary = "Customers for a company: organisations, people, a pipeline of deals, and what to do next."
+category = "business"
+icon = "funnel"
+publisher = "Cloudmorrow"
+license = "AGPL-3.0-or-later"
+code = "quill.py"
+features = [
+  "Organisations and the people at them, kept in a book the whole company shares",
+  "A pipeline of deals, dragged from stage to stage: Lead, Qualified, Proposal, Negotiation, Won, Lost",
+  "Stages you add, rename, reorder and weigh by the chance of winning, per book",
+  "Calls, meetings, emails and to-dos, with a due time, ticked off when done",
+  "A sales page: what is open, what it is worth weighted, what was won this month, and what is next",
+  "More books when you need them: your own, or one shared with a team",
+]
+
+[uses]
+datamodels = ["book", "organisation", "contact", "stage", "deal", "activity"]
+
+# Where an organisation is on its way to being a customer. Ours, on the
+# foundational organisation: stored as crm.status.
+[[extends]]
+model = "organisation"
+[extends.fields]
+status = { kind = "enum", values = ["lead", "prospect", "customer", "partner", "former"], labels = ["Lead", "Prospect", "Customer", "Partner", "Former customer"], default = "lead", indexed = true }
+
+# The first tab: the numbers, what is due, what is closing, and the stages.
+[[screens]]
+id = "sales"
+label = "Sales"
+view = "sales"
+model = "deal"
+
+# The pipeline: a book's deals across its stages. The stages are records,
+# so each book has its own, and the circle on a card wins it.
+[[screens]]
+id = "pipeline"
+kit = "board"
+label = "Pipeline"
+model = "deal"
+group = "book"
+lane = "stage"
+title = "title"
+subtitle = ["organisation", "value"]
+body = "notes"
+done = { outcome = "won" }
+
+[[screens]]
+id = "organisations"
+kit = "list"
+label = "Organisations"
+model = "organisation"
+group = "book"
+title = "name"
+subtitle = "crm.status"
+fields = ["crm.status", "industry", "website", "email", "phone", "address", "notes", "book"]
+
+[[screens]]
+id = "people"
+kit = "list"
+label = "People"
+model = "contact"
+group = "book"
+title = "name"
+subtitle = "organisation"
+fields = ["organisation", "role", "email", "phone", "address", "birthday", "notes", "book"]
+
+[[screens]]
+id = "activities"
+kit = "list"
+label = "Activities"
+model = "activity"
+group = "book"
+title = "title"
+subtitle = "due"
+tick = "done"
+fields = ["kind", "due", "organisation", "contact", "deal", "notes", "done_at", "book"]
+
+# One book everybody on the server shares, from the start: a company's customers.
+[[datasets]]
+id = "customers"
+model = "book"
+seed = "once"
+scope = "public"
+records = [{ name = "Customers", currency = "EUR" }]
+
+# Every book starts with a pipeline: these stages, once in each book that has none.
+[[datasets]]
+id = "pipeline"
+model = "stage"
+seed = "per-space"
+records = [
+  { name = "Lead", probability = 10 },
+  { name = "Qualified", probability = 25 },
+  { name = "Proposal", probability = 50 },
+  { name = "Negotiation", probability = 75 },
+  { name = "Won", probability = 100, outcome = "won" },
+  { name = "Lost", probability = 0, outcome = "lost" },
+]
+
+# A deal says whether it is open, won or lost, and since when, from its stage.
+[[hooks]]
+on = "deal"
+when = ["created", "changed"]
+handler = "deal_moved"
+
+# -- deals -----------------------------------------------------------------------
+[[actions]]
+id = "new-deal"
+label = "New deal"
+on = "organisation"
+tone = "primary"
+description = "A deal with this organisation, in the first stage of its book's pipeline."
+[actions.fields]
+title = { kind = "string", required = true }
+value = { kind = "decimal" }
+expected_close = { kind = "date", label = "Expected to close" }
+
+[[actions]]
+id = "won"
+label = "Won"
+on = "deal"
+tone = "primary"
+description = "Moves the deal to its book's Won stage."
+
+[[actions]]
+id = "lost"
+label = "Lost"
+on = "deal"
+tone = "danger"
+description = "Moves the deal to its book's Lost stage, with why when you know."
+[actions.fields]
+reason = { kind = "string", label = "Why" }
+
+# -- activities --------------------------------------------------------------------
+[[actions]]
+id = "follow-up"
+label = "Plan a follow-up"
+on = "deal"
+description = "A call, meeting, email or to-do about this deal."
+[actions.fields]
+title = { kind = "string", required = true }
+kind = { kind = "enum", values = ["todo", "call", "meeting", "email"], labels = ["To-do", "Call", "Meeting", "Email"], default = "call" }
+due = { kind = "datetime" }
+
+[[actions]]
+id = "follow-up-organisation"
+label = "Plan a follow-up"
+on = "organisation"
+handler = "follow_up"
+description = "A call, meeting, email or to-do with this organisation."
+[actions.fields]
+title = { kind = "string", required = true }
+kind = { kind = "enum", values = ["todo", "call", "meeting", "email"], labels = ["To-do", "Call", "Meeting", "Email"], default = "call" }
+due = { kind = "datetime" }
+
+[[actions]]
+id = "follow-up-person"
+label = "Plan a follow-up"
+on = "contact"
+handler = "follow_up"
+description = "A call, meeting, email or to-do with this person."
+[actions.fields]
+title = { kind = "string", required = true }
+kind = { kind = "enum", values = ["todo", "call", "meeting", "email"], labels = ["To-do", "Call", "Meeting", "Email"], default = "call" }
+due = { kind = "datetime" }
+
+[[actions]]
+id = "complete"
+label = "Done"
+on = "activity"
+description = "Ticks the activity off."
+
+# -- the pipeline's stages ---------------------------------------------------------
+[[actions]]
+id = "add-stage"
+label = "Add a stage"
+on = "book"
+description = "A new stage in this book's pipeline, before Won and Lost."
+[actions.fields]
+name = { kind = "string", required = true }
+probability = { kind = "int", label = "Chance of winning (%)" }
+
+[[actions]]
+id = "stage-earlier"
+label = "Move earlier"
+on = "stage"
+description = "Moves the stage one place towards the start of the pipeline."
+
+[[actions]]
+id = "stage-later"
+label = "Move later"
+on = "stage"
+description = "Moves the stage one place towards the end of the pipeline."

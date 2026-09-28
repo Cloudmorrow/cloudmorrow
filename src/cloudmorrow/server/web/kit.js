@@ -88,6 +88,9 @@ export function spoken(f, value, links = {}) {
     }
     case "datetime": return seconds(value) ? formatDate(seconds(value), { long: true }) : String(value);
     case "link": return links[value] || "";
+    // An amount reads as one: 56,000 rather than 56000.0.
+    case "decimal": return Number.isFinite(Number(value))
+      ? Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(value);
     case "json": return JSON.stringify(value);
     default: return String(value);
   }

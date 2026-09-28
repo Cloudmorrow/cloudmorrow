@@ -17,7 +17,8 @@ surface. Reach for a **view** only when no kit element says it.
 | the person needs | use |
 | --- | --- |
 | a list to tick off, grouped by something | `kit = "list"` (`tick`, `group`, `subgroup`) |
-| cards moved between columns | `kit = "board"` (`lane`, `group`) |
+| cards moved between columns | `kit = "board"` (`lane`, `group`, `subtitle`) |
+| columns people add, rename and reorder (a pipeline's stages) | `kit = "board"` with `lane` a **link** to the records that are the columns |
 | things on days | `kit = "calendar"` |
 | a conversation | `kit = "thread"` |
 | pages of Markdown in folders | `kit = "editor"` |

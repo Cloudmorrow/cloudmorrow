@@ -266,6 +266,18 @@ const PIXELS = {
     "........",
     "XXXXXXXX",
   ],
+  // Wide at the top, narrow at the spout: a sales pipeline, what goes in
+  // and what comes out. The CRM's.
+  funnel: [
+    "XXXXXXXX",
+    "X......X",
+    ".X....X.",
+    "..X..X..",
+    "...XX...",
+    "...XX...",
+    "...XX...",
+    "........",
+  ],
 };
 /** Eight-by-eight rows of `X` and `.`, drawn as the tab icons are. A
     feature with a glyph of its own — the weather — hands its rows here. */
@@ -501,6 +513,9 @@ export function wireShell() {
   const own = !!app.querySelector(".tabs");
   if (!own) app.insertAdjacentHTML("beforeend", tabs(lastTab));
   app.classList.toggle("aside-tabs", !own);
+  // Where the tabs scroll, the one you are on is in sight.
+  const active = app.querySelector(".tabs .tab.active");
+  if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest", inline: "nearest" });
   const header = app.querySelector(".nav");
   if (header && !app.querySelector("main h1")) header.classList.add("lined");
   onScroll();

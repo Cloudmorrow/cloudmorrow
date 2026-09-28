@@ -1,0 +1,16 @@
+[datamodel]
+id = "stage"
+version = 1
+label = "Stage"
+description = "One step of a book's pipeline, in order: where a deal is on its way to won or lost."
+domain = "crm"
+scopes = ["personal", "shared", "public"]
+title = "name"
+in_space = "book"
+ordered_within = ["book"]
+
+[fields]
+book = { kind = "link", to = "book", required = true, indexed = true, on_delete = "cascade" }
+name = { kind = "string", required = true }
+probability = { kind = "int", label = "Chance of winning (%)" }
+outcome = { kind = "enum", values = ["open", "won", "lost"], labels = ["Open", "Won", "Lost"], default = "open", indexed = true }
