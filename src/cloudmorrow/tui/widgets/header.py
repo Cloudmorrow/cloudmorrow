@@ -65,11 +65,6 @@ def painted_mark(word: str = "CLOUDMORROW") -> Text:
     return out
 
 
-def mark_width() -> int:
-    rows = pixelfont.rows("CLOUDMORROW")
-    return len(rows[0]) if rows else 0
-
-
 def title_line(owner: str, *, dev: bool) -> Text:
     """BRAM'S CLOUD · cloudmorrow — whose cloud, in amber, and what it is."""
     text = Text()

@@ -599,8 +599,3 @@ class LiveMarkdownEditor(ScrollView, can_focus=True):
             event.stop()
             event.prevent_default()
             self.insert_text(event.character)
-
-
-def segment_text(segments: list[Segment]) -> str:
-    """Plain text of a rendered strip — used by the tests."""
-    return "".join(segment.text for segment in segments)

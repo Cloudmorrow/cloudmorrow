@@ -94,10 +94,6 @@ class NavCard(Static, can_focus=False):
         self.tone, self.status_line = tone, text
         self.redraw()
 
-    def set_tag(self, tag: str) -> None:
-        self.tag = tag
-        self.redraw()
-
     @property
     def active(self) -> bool:
         return self.has_class("-active")

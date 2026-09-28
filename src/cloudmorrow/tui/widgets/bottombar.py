@@ -43,10 +43,6 @@ class BottomBar(Horizontal):
 
     notice: reactive[str] = reactive("", init=False)
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._text = ""
-
     def compose(self) -> ComposeResult:
         yield Static("", id="statusbar")
         yield Static("", id="shortcuts")
@@ -59,10 +55,6 @@ class BottomBar(Horizontal):
         self.redraw_tips()
 
     # -- the left side -----------------------------------------------------
-    def set_text(self, markup: str) -> None:
-        self._text = markup
-        self._redraw_left()
-
     def watch_notice(self, _: str) -> None:
         self._redraw_left()
 
