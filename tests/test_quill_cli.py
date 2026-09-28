@@ -49,7 +49,9 @@ def test_a_quill_that_does_not_check_out_says_why_and_fails(tmp_path, monkeypatc
 def test_the_references_own_example_is_a_quill_that_installs(tmp_path):
     """What an assistant is shown as the example must pass the check it is told to run."""
     blocks = re.findall(r"```toml\n(.*?)```", quill_reference(), re.DOTALL)
-    manifest, code, datamodel = blocks[0], blocks[1], blocks[2]
+    manifest = blocks[0]
+    code = next(block for block in blocks if "[[services]]" in block)
+    datamodel = next(block for block in blocks if "[datamodel]" in block)
     folder = tmp_path / "plants"
     (folder / "datamodels").mkdir(parents=True)
     (folder / "quill.toml").write_text(manifest + "\n" + code)

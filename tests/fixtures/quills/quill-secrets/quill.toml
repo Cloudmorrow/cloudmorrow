@@ -1,7 +1,7 @@
 [quill]
 id = "secrets"
 name = "Secrets"
-version = "1.0.0"
+version = "1.0.1"
 summary = "Keys and passwords in vaults and environments, sealed, and never shown until you ask."
 category = "developer"
 icon = "secrets"

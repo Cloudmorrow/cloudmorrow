@@ -48,6 +48,7 @@ __all__ = [
 
 TONES = ("neutral", "info", "good", "warn", "bad", "primary", "danger")
 TEXT_STYLES = ("body", "title", "subtitle", "muted", "small", "mono")
+GAPS = ("none", "small", "normal", "large")
 MAX_TEXT = 20_000
 MAX_NODES = 5_000
 MAX_DEPTH = 24
@@ -95,7 +96,7 @@ def _children(items) -> list[dict]:
 
 
 def stack(*children, gap: str = "normal") -> dict:
-    """Things one under another."""
+    """Things one under another; *gap* between them is none, small, normal or large."""
     return _node("stack", children=_children(children), gap=gap)
 
 
@@ -243,19 +244,24 @@ def cards(
     )
 
 
-def lanes(records, *, field: str, title: str, body: str | None = None, lanes=None) -> dict:  # noqa: A002
+def lanes(
+    records, *, field: str, title: str, body: str | None = None, lanes=None, model: str | None = None
+) -> dict:  # noqa: A002
     """Records in columns by an enum *field*; dragging a card moves it to another lane.
 
     *lanes* is the order of the columns, `[(value, label), ...]`; left out,
-    the surface takes the enum's own values and labels.
+    the surface takes the enum's own values and labels, from *model* — the
+    records' datamodel, which it knows from them unless there are none.
     """
+    rows = _records(records)
     return _node(
         "lanes",
-        records=_records(records),
+        records=rows,
         field=field,
         title=title,
         body=body,
         lanes=[{"value": str(v), "label": str(label)} for v, label in lanes] if lanes else None,
+        model=model or (rows[0]["model"] if rows else None),
     )
 
 
@@ -295,7 +301,7 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
     },
     "lanes": {
         "records": (list, True), "field": (str, True), "title": (str, True), "body": (str, False),
-        "lanes": (list, False),
+        "lanes": (list, False), "model": (str, False),
     },
     "month": {
         "records": (list, True), "date": (str, True), "title": (str, True), "ends": (str, False),
@@ -341,6 +347,8 @@ def check(tree, *, actions=None, screens=None) -> dict:
         for key in ("tone",):
             if key in node and node[key] not in TONES:
                 raise TreeError(f"{where}: tone is one of {', '.join(TONES)}")
+        if kind == "stack" and node.get("gap", "normal") not in GAPS:
+            raise TreeError(f"{where}: a stack's gap is one of {', '.join(GAPS)}")
         if kind == "text" and node.get("style", "body") not in TEXT_STYLES:
             raise TreeError(f"{where}: text style is one of {', '.join(TEXT_STYLES)}")
         if kind == "image" and node.get("src") and not node["src"].startswith("https://"):

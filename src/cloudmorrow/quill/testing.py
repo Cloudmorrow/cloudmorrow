@@ -262,7 +262,12 @@ class Harness:
         return Record(self.state.records.get(self._principal(), model, getattr(id, "id", id)).to_dict())
 
     def list(self, model: str, **where) -> list[Record]:
-        return [Record(r.to_dict()) for r in self.state.records.list(self._principal(), model, where)]
+        """Records of *model* the person may see; listing seeds its datasets, as on a server."""
+        from cloudmorrow.server.routes.records import seed
+
+        principal = self._principal()
+        seed(self.state, principal, model)
+        return [Record(r.to_dict()) for r in self.state.records.list(principal, model, where)]
 
     def change(self, model: str, id: str, fields: dict | None = None, **values) -> Record:  # noqa: A002
         record = self.state.records.update(self._principal(), model, getattr(id, "id", id), {**(fields or {}), **values})

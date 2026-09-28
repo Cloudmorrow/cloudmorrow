@@ -101,3 +101,22 @@ def test_fetch_is_answered_by_the_test_and_bound_by_the_manifest(tmp_path):
         q.fetch.add("https://api.example.com/today", json={"sky": "blue"})
         assert q.act("look", url="https://api.example.com/today").toast == "blue"
         assert q.act("look", url="https://elsewhere.example.org/").refused
+
+
+def test_two_quills_with_code_in_one_interpreter_each_run_their_own(tmp_path):
+    """In a test (and trusted mode) one Python loads one Quill after another."""
+    other = tmp_path / "quill-other"
+    other.mkdir()
+    (other / "quill.toml").write_text(
+        '[quill]\nid = "other"\nname = "Other"\nversion = "0.1.0"\ncode = "quill.py"\n'
+        '[[actions]]\nid = "hello"\nlabel = "Hello"\n',
+        encoding="utf-8",
+    )
+    (other / "quill.py").write_text(
+        "from cloudmorrow.quill import action, toast\n\n@action\ndef hello(ctx):\n    return toast('other')\n",
+        encoding="utf-8",
+    )
+    with Harness(FLEET, datamodels=DATAMODELS) as fleet, Harness(other, datamodels=DATAMODELS) as q:
+        assert q.act("hello").toast == "other"
+        assert fleet.act("add-van", name="Van").toast == "Added Van"
+        assert q.act("hello").toast == "other"

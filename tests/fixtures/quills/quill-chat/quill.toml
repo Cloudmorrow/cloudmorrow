@@ -1,7 +1,7 @@
 [quill]
 id = "chat"
 name = "Chat"
-version = "1.0.0"
+version = "1.0.1"
 summary = "Channels, direct messages, and the count on the icon."
 category = "home"
 icon = "chat"

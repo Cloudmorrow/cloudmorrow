@@ -78,6 +78,8 @@ __all__ = ["CodeError", "QuillCode"]
 log = logging.getLogger("cloudmorrow.quills")
 
 IDLE = 600.0
+# How long an action waits for the hooks its writes set off, before it answers.
+ACTION_SETTLE = 3.0
 JOB_TIMEOUT = 120.0
 HOOK_DEPTH = 3
 FETCH_TIMEOUT = 30.0
@@ -494,6 +496,9 @@ class QuillCode:
         elif record:
             raise CodeError("invalid", f"{action['label']} is not done to a record")
         effects = self.run(manifest, "action", action["handler"], principal, via=via, args=args)
+        # What its writes set off runs before the screen is drawn again, as
+        # long as that is quick: a hook that keeps a total is part of the press.
+        self.drain(timeout=ACTION_SETTLE)
         screens = {s["id"] for s in manifest.screens}
         actions = {a["id"] for a in manifest.actions}
         for effect in effects or []:

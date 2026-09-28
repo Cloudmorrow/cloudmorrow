@@ -3,8 +3,8 @@
 This repository is a Cloudmorrow **Quill**: a package that adds data, screens
 and what can be done with them to somebody's own cloud. It is TOML and
 Python and nothing else: `quill.toml` declares everything the Quill is and
-does, and `quill.py` holds the code its views, actions, hooks, jobs,
-webhooks, APIs and machine handlers run. Cloudmorrow draws every screen, on
+does, and `quill.py`, once it needs code, holds what its views, actions,
+hooks, jobs, webhooks, APIs and machine handlers run. Cloudmorrow draws every screen, on
 the phone, the web app and the terminal — there is no HTML, CSS or
 JavaScript here, and there must never be.
 

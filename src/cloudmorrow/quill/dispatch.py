@@ -58,15 +58,27 @@ def module_name(code: str) -> str:
     return code[:-3] if code.endswith(".py") else code.rstrip("/")
 
 
+# The folder of the Quill loaded last, so the next one's is not found behind it.
+_on_path: list[str] = []
+
+
 def load(folder: str | Path, code: str) -> dict[str, list[str]]:
-    """Import the Quill in *folder*; returns the handlers it registered, by kind."""
+    """Import the Quill in *folder*; returns the handlers it registered, by kind.
+
+    In the sandbox this happens once. In a test, one interpreter loads one
+    Quill after another, each with a `quill.py` of its own: the last one's
+    folder comes off the path, and its modules out of `sys.modules`, first.
+    """
     folder = str(folder)
     name = module_name(code)
     registry.clear()
     for loaded in [m for m in sys.modules if m == name or m.startswith(name + ".")]:
         del sys.modules[loaded]
-    if folder not in sys.path:
-        sys.path.insert(0, folder)
+    for earlier in _on_path:
+        while earlier in sys.path:
+            sys.path.remove(earlier)
+    _on_path[:] = [folder]
+    sys.path.insert(0, folder)
     importlib.invalidate_caches()
     importlib.import_module(name)
     return {kind: sorted(table) for kind, table in registry.HANDLERS.items()}

@@ -1,18 +1,20 @@
 [quill]
 id = "tasks"
 name = "Tasks"
-version = "1.1.0"
+version = "1.2.0"
 summary = "Boards with three lanes: To Do, Doing, Done."
 category = "personal"
 icon = "tasks"
 publisher = "Cloudmorrow"
 license = "AGPL-3.0-or-later"
+code = "quill.py"
 features = [
   "Boards with three lanes: To Do, Doing, Done",
   "Subtasks as - [ ] lines in a task's Markdown, counted on its card",
   "Drag cards between lanes, or tick the circle to finish one",
   "Done empties itself a week after a task is finished",
   "A board for everyone the first time they open it",
+  "Duplicate a task; clear a board's Done at once instead of waiting the week",
 ]
 
 [uses]
@@ -49,3 +51,19 @@ id = "first_board"
 model = "board"
 seed = "per-owner"
 records = [{ title = "{owner}'s tasks" }]
+
+# Two things the lanes cannot do by being dragged, each a button on the
+# record's sheet, `cm tasks <action>`, and a tool for your assistant.
+[[actions]]
+id = "duplicate"
+label = "Duplicate"
+on = "task"
+description = "A copy of the task, in To Do on the same board."
+
+[[actions]]
+id = "clear-done"
+label = "Clear Done now"
+on = "board"
+tone = "danger"
+confirm = "Delete every finished task on this board now?"
+description = "Deletes the board's finished tasks now, rather than a week after each was done."

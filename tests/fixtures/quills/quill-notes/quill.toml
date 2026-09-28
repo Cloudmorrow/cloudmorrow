@@ -1,12 +1,13 @@
 [quill]
 id = "notes"
 name = "Notes"
-version = "1.0.0"
+version = "1.1.0"
 summary = "Markdown notes in folders, with pictures."
 category = "personal"
 icon = "notes"
 publisher = "Cloudmorrow"
 license = "AGPL-3.0-or-later"
+code = "quill.py"
 features = [
   "Notes in Markdown, in folders, saved as you type",
   "A live editor in the terminal: the line you are on stays Markdown, the rest renders",
@@ -14,6 +15,7 @@ features = [
   "Search every note, by its name or any line in it",
   "Each note is a file in your notes folder, sealed, and on WebDAV and cm note as ever",
   "A welcome note for everyone the first time they open Notes",
+  "Add a line to the end of a note from anywhere: its sheet, cm notes, or your assistant",
 ]
 
 [uses]
@@ -38,3 +40,14 @@ id = "welcome"
 model = "note"
 seed = "per-owner"
 file = "datasets/welcome.toml"
+
+# A line at the end of a note without opening it: a list, a log, a thought
+# from the command line (`cm notes add-to-the-end ideas/garden text="…"`)
+# or from your assistant.
+[[actions]]
+id = "add-to-the-end"
+label = "Add to the end"
+on = "note"
+description = "Adds text on a new line at the end of the note, leaving the rest as it is."
+[actions.fields]
+text = { kind = "text", required = true }
