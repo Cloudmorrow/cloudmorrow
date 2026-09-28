@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from cloudmorrow.paths import UnsafePathError, normalise_rel_path, resolve_within
+from cloudmorrow.server.paths import UnsafePathError, normalise_rel_path, resolve_within
 
 
 @pytest.mark.parametrize(

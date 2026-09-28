@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from cloudmorrow.paths import UnsafePathError, normalise_rel_path
 from cloudmorrow.server.backends.base import AttachmentTooBig, decode_id, encode_id, iso_stamp
 from cloudmorrow.server.datamodels import Datamodel
 from cloudmorrow.server.notes import (
@@ -17,6 +16,7 @@ from cloudmorrow.server.notes import (
     NoteNotFoundError,
     NoteStore,
 )
+from cloudmorrow.server.paths import UnsafePathError, normalise_rel_path
 from cloudmorrow.server.records import (
     Principal,
     Record,

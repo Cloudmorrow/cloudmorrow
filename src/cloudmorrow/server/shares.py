@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from cloudmorrow.server.db import connect
-from cloudmorrow.slugs import SLUG_RE, InvalidSlugError
+from cloudmorrow.server.slugs import SLUG_RE, InvalidSlugError
 
 __all__ = [
     "DRIVE",

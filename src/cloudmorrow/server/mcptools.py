@@ -20,7 +20,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from cloudmorrow.paths import UnsafePathError
 from cloudmorrow.quill_reference import quill_reference
 from cloudmorrow.server.circles import Access
 from cloudmorrow.server.db import User
@@ -32,6 +31,7 @@ from cloudmorrow.server.notes import (
     NoteNotFoundError,
     NoteStore,
 )
+from cloudmorrow.server.paths import UnsafePathError
 from cloudmorrow.server.quills import QuillError, load_catalog
 from cloudmorrow.server.records import (
     NEVER_FOR_ASSISTANTS,
