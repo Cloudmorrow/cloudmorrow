@@ -382,6 +382,9 @@ def parse_datamodel(data: dict, *, source: str = "foundation", where: str = "") 
         link = by_name.get(in_space)
         if link is None or link.kind != "link":
             raise DatamodelError(f"{where}: in_space names {in_space!r}, which must be a link field")
+        if link.on_delete == "clear":
+            # What is in a space is sealed to it: cleared, it could not be opened.
+            raise DatamodelError(f"{where}: in_space {in_space!r} goes with its space: cascade, not clear")
     notify = []
     for rule in data.get("notify", []):
         if not isinstance(rule, dict) or rule.get("when") not in NOTIFY_WHEN or rule.get("to") != "members":

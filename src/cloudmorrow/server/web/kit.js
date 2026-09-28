@@ -4,7 +4,8 @@
    A Quill never ships a screen. It names one of these — a board, a list, a
    detail — and says which of its fields go where, and everything below is
    drawn from that and from the datamodel alone. Nothing in this file knows
-   what a task is. A board is a model with an enum for its lanes, a list is
+   what a task is. A board is a model with an enum for its lanes (or a link
+   to the records that are its lanes: a pipeline's stages), a list is
    a model with a title, and every record, of every model, opens on the
    same sheet with the widget its kind has.
 
@@ -160,10 +161,18 @@ async function renderBoard(at, arg) {
   const model = quill.models[screen.model];
   const title = titleField(at, model);
   const laneField = fieldOf(model, screen.lane);
-  const lanes = lanesOf(laneField);
-  const first = lanes[0][0];
-  const doneLane = screen.done || lanes[lanes.length - 1][0];
+  // Lanes that are records — a pipeline's stages — are read below, once the
+  // group is known; an enum's are there already.
+  const laneModel = laneField.kind === "link" ? quill.models[laneField.to] : null;
+  let lanes = laneModel ? [] : lanesOf(laneField);
+  let first = null;
+  let doneLane = null;
   const stateOf = (value) => (value === doneLane ? "done" : value === first ? "" : "part");
+  // A card whose lane is not one of these — none yet, or a stage since
+  // deleted — is drawn in the first, where it can be moved from.
+  // Said under a card's title: one field, or a few with a dot between.
+  const underFields = [].concat(screen.subtitle || []).map((n) => fieldOf(model, n)).filter(Boolean);
+  const laneOf = (r) => (lanes.some(([lane]) => lane === r.fields[laneField.name]) ? r.fields[laneField.name] : first);
 
   // The groups, when the board has them: the chips across the top, each a
   // record of the model the group field links to.
@@ -188,6 +197,17 @@ async function renderBoard(at, arg) {
   const listUrl = () => recordsUrl(model.id) +
     (group ? `?${encodeURIComponent(groupField.name)}=${encodeURIComponent(group.id)}` : "");
   let records = groupModel && !group ? [] : await api("GET", listUrl());
+  const said = await linkTitles(quill, underFields);
+  if (laneModel && (!groupModel || group)) {
+    lanes = await recordLanes(laneModel, groupModel, group);
+    const done = screen.done && typeof screen.done === "object"
+      ? lanes.find((lane) => Object.entries(screen.done).every(([k, v]) => lane[2].fields[k] === v)) : null;
+    doneLane = done ? done[0] : null;
+  }
+  if (lanes.length) {
+    first = lanes[0][0];
+    if (doneLane === null) doneLane = typeof screen.done === "string" ? screen.done : lanes[lanes.length - 1][0];
+  }
 
   const name = group ? titleOf(groupModel, group) : screen.label;
   // The groups, and on the end of them the way to start another. The row
@@ -200,7 +220,7 @@ async function renderBoard(at, arg) {
   const actions = (group
     ? `<a class="button" href="${sheetHash(at, groupModel.id, group.id)}" aria-label="${esc(groupModel.label)} details">${own.more}</a>`
     : "") + (writes ? `<button class="compose" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</button>` : "");
-  const canAdd = (!groupModel || group) && writes;
+  const canAdd = (!groupModel || group) && writes && (!laneModel || lanes.length > 0);
   app.innerHTML = nav({ title: name }) + `
     <main>
       ${heading(name, !groupModel || group ? actions : "")}
@@ -213,10 +233,12 @@ async function renderBoard(at, arg) {
   const listing = app.querySelector(".listing");
 
   const card = (r) => {
-    const state = stateOf(r.fields[laneField.name]);
+    const state = stateOf(laneOf(r));
     let meta = "";
     const left = timeLeft(r.expires_at);
     if (left) meta += `<span class="date expires">${left}</span>`;
+    const under = underFields.map((f) => spoken(f, r.fields[f.name], said[f.name])).filter(Boolean);
+    if (under.length) meta += `<span class="preview">${esc(under.join(" · "))}</span>`;
     if (screen.body) {
       const { preview, done, total } = bodyMeta(r.fields[screen.body]);
       if (total) meta += `<span class="date">${done} of ${total}</span>`;
@@ -224,7 +246,7 @@ async function renderBoard(at, arg) {
     }
     return `<div class="row card${state === "done" ? " is-done" : ""}" data-id="${esc(r.id)}"${writes && canDrag() ? ` draggable="true"` : ""}>
       ${writes ? `<button class="tick" data-id="${esc(r.id)}" aria-label="${state === "done" ? "Not done" : "Done"}">${circle(state)}</button>`
-        : stillTick(state, (lanes.find(([lane]) => lane === r.fields[laneField.name]) || [])[1] || "")}
+        : stillTick(state, (lanes.find(([lane]) => lane === laneOf(r)) || [])[1] || "")}
       <a class="main" href="${sheetHash(at, model.id, r.id)}">
         <span class="title">${esc(titleOf(model, r, title))}</span>${meta ? `<span class="meta">${meta}</span>` : ""}</a></div>`;
   };
@@ -232,6 +254,11 @@ async function renderBoard(at, arg) {
     if (groupModel && !group) {
       listing.innerHTML = `<p class="empty mascot"><b>No ${esc(groupModel.label.toLowerCase())} yet</b>${
         mayWrite(groupModel) ? "Start one above, and it will show up here." : "When there is one, it will show up here."}</p>`;
+      return;
+    }
+    if (!lanes.length) {
+      listing.innerHTML = `<p class="empty mascot"><b>No lanes yet</b>This board's lanes are ${
+        esc(laneModel.label.toLowerCase())} records, and there are none here yet.</p>`;
       return;
     }
     if (!records.length) {
@@ -244,7 +271,7 @@ async function renderBoard(at, arg) {
     // because on a board of columns an empty one is still somewhere to
     // drop a card.
     listing.innerHTML = `<div class="board" style="--lanes: ${lanes.length}">` + lanes.map(([lane, label]) => {
-      const rows = records.filter((r) => r.fields[laneField.name] === lane)
+      const rows = records.filter((r) => laneOf(r) === lane)
         .sort((a, b) => a.position - b.position);
       return `<div class="lane${rows.length ? "" : " lane-empty"}" data-lane="${esc(lane)}">` +
         `<p class="group-label">${esc(label)}</p>` +
@@ -264,7 +291,7 @@ async function renderBoard(at, arg) {
   const toggle = async (id) => {
     const record = records.find((r) => r.id === id);
     if (!record) return;
-    const to = record.fields[laneField.name] === doneLane ? first : doneLane;
+    const to = laneOf(record) === doneLane ? first : doneLane;
     try {
       const moved = await api("POST", recordsUrl(model.id, id) + "/move", { fields: { [laneField.name]: to } });
       records = records.map((r) => (r.id === id ? moved : r));
@@ -343,6 +370,15 @@ async function renderBoard(at, arg) {
   });
   const more = app.querySelector(".new-group");
   if (more) more.addEventListener("click", () => newGroup(at, groupModel));
+}
+
+/** A board's lanes when they are records: [id, title, record], in their order,
+    and — on a board with groups — only those that link to the group on screen. */
+async function recordLanes(laneModel, groupModel, group) {
+  const by = groupModel && group ? laneModel.fields.find((f) => f.kind === "link" && f.to === groupModel.id) : null;
+  const rows = await api("GET", recordsUrl(laneModel.id) +
+    (by ? `?${encodeURIComponent(by.name)}=${encodeURIComponent(group.id)}` : ""));
+  return rows.sort((a, b) => a.position - b.position).map((r) => [r.id, titleOf(laneModel, r), r]);
 }
 
 // A group wants only a name, as a folder does in Notes. The new one opens
@@ -454,16 +490,33 @@ async function renderList(at) {
   });
 }
 
-/** For each link field: the linked records' titles, by id. */
-export async function linkTitles(quill, fields) {
+/** For each link field: the linked records' titles, by id.
+
+    With the *record* they are for, a link stays inside what the record is
+    in: when the record and the linked datamodel both link to the same
+    thing — a deal and a stage, each in a book — only the linked records in
+    the record's own are offered (and whatever it points at now). */
+export async function linkTitles(quill, fields, record = null, model = null) {
   const out = {};
   for (const f of fields) {
     if (f.kind !== "link" || !quill.models[f.to]) continue;
     const target = quill.models[f.to];
-    const rows = await api("GET", recordsUrl(target.id));
+    let rows = await api("GET", recordsUrl(target.id));
+    if (record && model) {
+      rows = rows.filter((r) => r.id === record.fields[f.name] || sameHome(target, r, model, record, f));
+    }
     out[f.name] = Object.fromEntries(rows.map((r) => [r.id, titleOf(target, r)]));
   }
   return out;
+}
+
+/** Whether *linked* is where *record* is, by every other link the two share. */
+function sameHome(target, linked, model, record, through) {
+  return target.fields.every((g) => {
+    if (g.kind !== "link" || !linked.fields[g.name]) return true;
+    const mine = model.fields.find((h) => h.kind === "link" && h.to === g.to && h.name !== through.name);
+    return !mine || !record.fields[mine.name] || record.fields[mine.name] === linked.fields[g.name];
+  });
 }
 
 // -- the record sheet ------------------------------------------------------------------
@@ -608,7 +661,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
     (f.kind !== "link" || !f.to || quill.models[f.to]));
   // In the order the screen names them, when it does.
   if (wanted) fields.sort((a, b) => screen.fields.indexOf(a.name) - screen.fields.indexOf(b.name));
-  const links = await linkTitles(quill, fields.filter((f) => f.kind === "link"));
+  const links = await linkTitles(quill, fields.filter((f) => f.kind === "link"), record, model);
 
   // Back to where it came from: a card to its board, a board to itself.
   const groupField = onScreen && screen.group ? fieldOf(model, screen.group) : null;

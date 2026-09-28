@@ -336,8 +336,13 @@ wait_healthy() {
 if [ -z "$UPDATE" ] && [ -z "$DRY_RUN" ] && [ -f "$CONFIG" ] && [ -x "$VENV/bin/cloudmorrow-server" ]; then
 	if problem="$(health)"; then
 		NAME_NOW="$(config_value name)"
-		say "${NAME_NOW:-Cloudmorrow} is already installed here, running and answering on $HEALTH_URL"
+		URL_NOW="$(config_value public_url)"
+		LOCAL_NOW="${HEALTH_URL%/api/health}"
+		say "${NAME_NOW:-Cloudmorrow} is already installed here, running and answering"
 		cat <<EOF
+
+    web app    ${URL_NOW:-$LOCAL_NOW}/app
+    API        ${URL_NOW:-$LOCAL_NOW}
 
   Nothing to do. To update it anyway:
 

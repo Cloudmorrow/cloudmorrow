@@ -109,8 +109,11 @@ def person(user: User) -> Principal:
 
 
 def seed(state: AppState, principal: Principal, model: str) -> None:
-    """Write any dataset for *model* not written yet: per person, or once per server."""
+    """Write any dataset for *model* not written yet: per person, per space, or once per server."""
     for manifest, dataset in state.quills.seeds_for(model):
+        if dataset["seed"] == "per-space":
+            state.records.seed_spaces(principal, model, dataset["records"], writer=manifest.id)
+            continue
         state.records.seed(
             principal, model, dataset["records"], writer=manifest.id,
             once=dataset["seed"] == "once", scope=dataset.get("scope"),

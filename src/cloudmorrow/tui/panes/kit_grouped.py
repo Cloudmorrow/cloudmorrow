@@ -229,6 +229,7 @@ class GroupedListPane(ListPane):
             return
         try:
             self.all = await self.api.records(self.model_id)
+            await self.load_link_titles([self.subtitle])
         except ApiError as exc:
             await self.signed_out(exc)
             return

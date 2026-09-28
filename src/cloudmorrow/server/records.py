@@ -40,6 +40,7 @@ import json
 import re
 import secrets
 import sqlite3
+import threading
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -466,6 +467,8 @@ class RecordStore:
         # What a person may do with each datamodel, from their circles
         # (circles.py). None is a store with no circles: everybody everything.
         self.access: Callable[[str], Access] | None = None
+        # Seeding per space asks and then writes; two lookers at once write once.
+        self._seeding = threading.Lock()
         with connect(self.db_path) as conn:
             conn.executescript(TABLE)
         conn.close()
@@ -513,8 +516,8 @@ class RecordStore:
 
     def _seal_scope(self, model: Datamodel, owner: str, record_id: str, indexed: dict) -> tuple:
         """What a record's content is sealed to: its space, or its owner."""
-        if model.in_space:
-            return (model.id, "space", str(indexed.get(model.in_space) or ""), record_id)
+        if model.in_space and indexed.get(model.in_space):
+            return (model.id, "space", str(indexed[model.in_space]), record_id)
         return (model.id, owner, record_id)
 
     def _record(
@@ -595,8 +598,12 @@ class RecordStore:
         if model.space:
             return self._space_visible(conn, principal, row)
         if model.in_space:
-            space = self._space_of(conn, model, json.loads(row["indexed"] or "{}"))
-            return space is not None and self._space_visible(conn, principal, space)
+            indexed = json.loads(row["indexed"] or "{}")
+            if indexed.get(model.in_space):
+                space = self._space_of(conn, model, indexed)
+                return space is not None and self._space_visible(conn, principal, space)
+        # Kept out of any space, a record of a datamodel that lives in them is
+        # its writer's alone, like any personal record.
         return row["owner"] == principal.username
 
     def _row(
@@ -638,9 +645,10 @@ class RecordStore:
             return f"id IN ({spaces})", [model.id, username, username]
         if model.in_space:
             space_model = model.get_field(model.in_space).to
+            link = f"json_extract(indexed, '$.\"{model.in_space}\"')"
             return (
-                f"json_extract(indexed, '$.\"{model.in_space}\"') IN ({spaces})",
-                [space_model, username, username],
+                f"({link} IN ({spaces}) OR (COALESCE({link}, '') = '' AND owner = ?))",
+                [space_model, username, username, username],
             )
         return "owner = ?", [username]
 
@@ -1468,6 +1476,39 @@ class RecordStore:
             }
             made.append(self.create(who, model_id, filled, scope=scope))
         return made
+
+    def seed_spaces(
+        self, principal: Principal, model_id: str, records: Iterable[dict], writer: str
+    ) -> list[Record]:
+        """Write *records* into every space *principal* can see that has none of *model_id*.
+
+        A new book's stages: each space gets its own copy, owned by whoever
+        first looked, and there is never a book without them.
+        """
+        model = self.model(model_id)
+        if not model.in_space or model.backend:
+            return []
+        space_model = self.model(model.get_field(model.in_space).to)
+        clause, params = self._visible_clause(space_model, principal.username)
+        with self._seeding:
+            with connect(self.db_path) as conn:
+                empty = [
+                    row["id"]
+                    for row in conn.execute(
+                        f"SELECT id FROM records WHERE model = ? AND {clause} AND NOT EXISTS"
+                        " (SELECT 1 FROM records AS inside WHERE inside.model = ?"
+                        f" AND json_extract(inside.indexed, '$.\"{model.in_space}\"') = records.id)"
+                        " ORDER BY created_at, rowid",
+                        [space_model.id, *params, model.id],
+                    ).fetchall()
+                ]
+            conn.close()
+            who = Principal(DATASET, principal.username, quill=writer, models=frozenset({model_id}))
+            return [
+                self.create(who, model_id, {**fields, model.in_space: space_id})
+                for space_id in empty
+                for fields in records
+            ]
 
     def changes(self, owner: str, since: int = 0, limit: int = 200) -> list[dict]:
         with connect(self.db_path) as conn:

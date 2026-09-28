@@ -1,17 +1,20 @@
 [datamodel]
 id = "contact"
-version = 1
+version = 2
 label = "Contact"
-description = "A person you know: how to reach them, and how you know them."
+description = "A person you know: how to reach them, and how you know them. Kept in a book, or your own when in none."
 domain = "crm"
-scopes = ["personal", "shared"]
+scopes = ["personal", "shared", "public"]
 title = "name"
+in_space = "book"
 
 [fields]
+book = { kind = "link", to = "book", indexed = true, on_delete = "cascade" }
 name = { kind = "string", required = true }
+organisation = { kind = "link", to = "organisation", on_delete = "clear" }
+role = { kind = "string", label = "Job title" }
 email = { kind = "email" }
 phone = { kind = "phone" }
-organisation = { kind = "link", to = "organisation", on_delete = "clear" }
 birthday = { kind = "date" }
 address = { kind = "text" }
 notes = { kind = "markdown" }

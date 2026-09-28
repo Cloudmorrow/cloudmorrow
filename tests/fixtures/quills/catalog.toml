@@ -16,6 +16,11 @@ label = "Home"
 description = "The household: shopping, chores, the car, the plants."
 
 [[categories]]
+id = "business"
+label = "Business"
+description = "Customers, projects, fleets and the work around them."
+
+[[categories]]
 id = "developer"
 label = "Developer"
 description = "For people who build things: machines, secrets, pipelines."
@@ -73,3 +78,11 @@ repo = "quill-secrets"
 category = "developer"
 publisher = "Cloudmorrow"
 foundation = true
+
+[[quills]]
+id = "crm"
+name = "CRM"
+summary = "Customers for a company: organisations, people, a pipeline of deals, and what to do next."
+repo = "quill-crm"
+category = "business"
+publisher = "Cloudmorrow"

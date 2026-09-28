@@ -139,6 +139,10 @@ def preview(plan: dict) -> str:
         if screen["kit"] == "board":
             lane = fields.get(screen["lane"], {})
             labels = lane.get("labels") or lane.get("values") or []
+            if lane.get("kind") == "link":
+                # Lanes that are records: what they are called is only known on a server.
+                labels = [f"<{lane['to']} {n}>" for n in (1, 2, 3)] + ["…"]
+                lines.append(f"  the lanes are {lane['to']} records, in their order; people add more")
             if screen.get("group"):
                 target = fields[screen["group"]]["to"]
                 lines.append(f"  [ {target} ▾ ] [ {target} ] [ + New {target} ]")
@@ -148,7 +152,10 @@ def preview(plan: dict) -> str:
             lines.append("  " + " ".join(f"{card:<{width}}" for _ in labels))
             if screen.get("body"):
                 lines.append(f"  cards show progress of `- [ ]` lines in {screen['body']}")
-            if screen.get("done"):
+            if isinstance(screen.get("done"), dict):
+                said = ", ".join(f"{k} = {v!r}" for k, v in screen["done"].items())
+                lines.append(f"  the circle moves a card to the lane whose {said}, and back")
+            elif screen.get("done"):
                 lines.append(f"  the circle moves a card to {screen['done']}, and back")
         elif screen["kit"] == "grid":
             target = fields.get(screen.get("group", ""), {}).get("to", "group")
@@ -264,7 +271,7 @@ def print_plan(plan: dict) -> None:
         target = f"{api['handler']}()" if api.get("handler") else api["service"]
         table.add_row("api", escape(api["id"]), escape(f"/api/q/{plan['id']}/… → {target}"))
     for action in plan.get("actions", []):
-        on = f" on a {action['on']}" if action.get("on") else ""
+        on = f" on {'an' if action['on'][:1] in 'aeiou' else 'a'} {action['on']}" if action.get("on") else ""
         takes = ", ".join(f["name"] for f in action["fields"]) or "nothing"
         table.add_row("action", escape(action["label"]), escape(f"{action['handler']}(){on}, takes {takes}"))
     for hook in plan.get("hooks", []):

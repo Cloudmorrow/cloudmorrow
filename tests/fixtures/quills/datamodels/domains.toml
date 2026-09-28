@@ -9,8 +9,8 @@ datamodels = ["board", "task"]
 [[domains]]
 id = "crm"
 label = "Customers (CRM)"
-description = "The people and organisations you deal with."
-datamodels = ["contact", "organisation"]
+description = "The organisations and people you deal with, the deals in your pipeline, and what you do with them — kept in books you share."
+datamodels = ["book", "organisation", "contact", "stage", "deal", "activity"]
 
 [[domains]]
 id = "fleet"

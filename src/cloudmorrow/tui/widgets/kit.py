@@ -187,9 +187,12 @@ class RecordCard(Static, can_focus=True):
             super().__init__()
 
     def __init__(
-        self, record: dict, *, title: str, body: str | None = None, movable: bool = True, **kwargs
+        self, record: dict, *, title: str, body: str | None = None, movable: bool = True,
+        subtitle: str = "", **kwargs
     ) -> None:
         super().__init__(**kwargs)
+        # The screen's subtitle fields, already said: "Acme · 12000".
+        self.subtitle = subtitle
         # Not `task`: Textual's MessagePump already owns that name, for the
         # asyncio task a widget runs on.
         self.record = record
@@ -210,6 +213,8 @@ class RecordCard(Static, can_focus=True):
         text = Text()
         title = self.fields.get(self.title_field)
         text.append(str(title) if title not in (None, "") else "(untitled)", style=f"bold {TEXT}")
+        if self.subtitle:
+            text.append("\n" + self.subtitle, style=SECOND)
         body = str(self.fields.get(self.body_field) or "") if self.body_field else ""
         ticked, total = subtask_progress(body)
         meta: list[tuple[str, str]] = []
@@ -303,7 +308,8 @@ class Lane(Vertical):
         return self.query_one(f"#lane-body-{self._key}", VerticalScroll)
 
     async def show(
-        self, records: list[dict], *, title: str, body: str | None, movable: bool = True
+        self, records: list[dict], *, title: str, body: str | None, movable: bool = True,
+        said=None,
     ) -> None:
         """Redraw this lane's cards, in the order the server gave them.
 
@@ -326,6 +332,7 @@ class Lane(Vertical):
                 title=title,
                 body=body,
                 movable=movable,
+                subtitle=said(record) if said else "",
                 id=f"card-{safe_id(record['id'])}",
 
                 classes="record-card",

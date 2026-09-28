@@ -79,7 +79,7 @@ KIT_READY = frozenset(
 MADE_AS = ("personal", "shared", "public", "direct")
 
 JOB_ACTIONS = frozenset({"expire", "run", "call"})
-SEED_KINDS = frozenset({"per-owner", "once"})
+SEED_KINDS = frozenset({"per-owner", "once", "per-space"})
 
 ID_RE = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
 # A webhook's path under /hooks/<quill>/, and an API's prefix under /api/q/<quill>/.
@@ -678,18 +678,27 @@ class QuillRegistry:
     def _needed_foundation(self, manifest: Manifest, source: Path | None) -> dict[str, Datamodel]:
         """The foundational datamodels *manifest* needs that this server lacks, found in *source*."""
         introduced = {m.id for m in manifest.introduces}
+        available = _scan_datamodels(source) if source is not None else {}
+
+        def lacking(model_id: str) -> bool:
+            # Not here, or here in an older version than the one it came with:
+            # a datamodel grows (a contact kept in a book), and never loses a field.
+            here = self.foundation.get(model_id)
+            return here is None or (
+                model_id in available and available[model_id][0].version > here.version
+            )
+
         wanted = {
             m
             for m in (*manifest.uses, *manifest.extends, *(g["model"] for g in manifest.grants))
-            if m not in introduced and m not in self.foundation
+            if m not in introduced and lacking(m)
         }
         # Links from what it uses pull in their targets too: a task needs its board.
         found: dict[str, Datamodel] = {}
-        available = _scan_datamodels(source) if source is not None else {}
         queue = list(wanted)
         while queue:
             model_id = queue.pop()
-            if model_id in found or model_id in self.foundation or model_id in introduced:
+            if model_id in found or not lacking(model_id) or model_id in introduced:
                 continue
             if "." in model_id and model_id.split(".", 1)[0] in self.quills:
                 continue
@@ -919,9 +928,11 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
         kit = screen["kit"]
         need(model, thing, screen.get("title", model.title))
         if kit == "board":
-            need(model, thing + " lane", screen.get("lane"), ("enum",))
+            need(model, thing + " lane", screen.get("lane"), ("enum", "link"))
             lane = model.by_name[screen["lane"]]
-            if screen.get("done") and screen["done"] not in lane.values:
+            if lane.kind == "link":
+                _check_link_lanes(where, thing, screen, lane, model_of(thing + " lane", lane.to), need)
+            elif screen.get("done") and screen["done"] not in lane.values:
                 raise QuillError(
                     f"{where}: {thing} done lane {screen['done']!r} is not a value of {lane.name}"
                 )
@@ -929,6 +940,11 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
                 need(model, thing + " group", screen["group"], ("link",))
             if screen.get("body"):
                 need(model, thing + " body", screen["body"], ("markdown", "text"))
+            # Said under a card's title: a field, or a list of them — a deal's
+            # organisation and what it is worth.
+            subtitle = screen.get("subtitle")
+            for name in [subtitle] if isinstance(subtitle, str) else (subtitle or []):
+                need(model, thing + " subtitle", name)
             if not model.ordered or screen["lane"] not in model.ordered_within:
                 raise QuillError(
                     f"{where}: {thing} is a board, so {model.id} keeps order within its lanes"
@@ -1004,6 +1020,41 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
         for record in dataset["records"]:
             for name in record:
                 need(model, f"dataset {dataset['id']!r}", name)
+        if dataset["seed"] == "per-space":
+            # Once in every space that has none: the stages of each new book.
+            if not model.in_space:
+                raise QuillError(
+                    f"{where}: dataset {dataset['id']!r} is seeded per space, and {model.id} is in none"
+                )
+            if dataset.get("scope"):
+                raise QuillError(
+                    f"{where}: dataset {dataset['id']!r} is in a space, which has the scope"
+                )
+
+
+def _check_link_lanes(where: str, thing: str, screen: dict, lane, lanes: Datamodel, need) -> None:
+    """A board whose lanes are records: a pipeline's stages, which people add to.
+
+    The lanes are the records of the datamodel the lane field links to, in
+    their order — so that datamodel keeps one — and, on a board with groups,
+    only the ones that link to the group on screen. `done` is then not a
+    value but what the finished lane's record says: `{ outcome = "won" }`.
+    """
+    if not lanes.ordered:
+        raise QuillError(
+            f"{where}: {thing} lanes are {lanes.id} records, so {lanes.id} keeps an order"
+            " (ordered_within)"
+        )
+    done = screen.get("done")
+    if done is None:
+        return
+    if not isinstance(done, dict) or not done:
+        raise QuillError(
+            f"{where}: {thing} lanes are {lanes.id} records, so done says what the finished one"
+            " has: done = {{ field = value }}"
+        )
+    for name in done:
+        need(lanes, thing + " done", name)
 
 
 def _check_list_groups(where: str, thing: str, model: Datamodel, screen: dict, need) -> None:

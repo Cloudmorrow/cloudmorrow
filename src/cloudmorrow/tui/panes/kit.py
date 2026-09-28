@@ -98,6 +98,26 @@ class KitPane(Pane):
         self.refused: set[str] = set() if self.writes else set(self.WRITING)
         if not self.writes:
             self.SUMMARY = f"{self.SUMMARY} · read only" if self.SUMMARY else "read only"
+        # What the records a link field points at are called, by field and id.
+        self.link_titles: dict[str, dict[str, str]] = {}
+
+    async def load_link_titles(self, fields: list[dict | None]) -> None:
+        """Read the titles for *fields* that are links, so a row says "Acme", not an id."""
+        for field in fields:
+            if not field or field.get("kind") != "link" or field.get("to") not in self.models:
+                continue
+            try:
+                rows = await self.api.records(field["to"])
+            except ApiError:
+                continue
+            target = self.models[field["to"]]
+            self.link_titles[field["name"]] = {str(r["id"]): title_of(r, target) for r in rows}
+
+    def say(self, field: dict, value) -> str:
+        """A value as a row says it: a link by the title of what it points at."""
+        if field.get("kind") == "link" and value:
+            return self.link_titles.get(field["name"], {}).get(str(value), "—")
+        return shown(field, value)
 
     @property
     def noun(self) -> str:
@@ -226,6 +246,7 @@ class ListPane(KitPane):
             return
         try:
             self.records = await self.api.records(self.model_id)
+            await self.load_link_titles([self.subtitle])
         except ApiError as exc:
             await self.signed_out(exc)
             return
@@ -274,7 +295,7 @@ class ListPane(KitPane):
         ticked = self.tick and fields.get(self.tick["name"])
         cells.append(f"[{MUTED} strike]{title}[/]" if ticked else f"[b]{title}[/]")
         if self.subtitle:
-            cells.append(f"[{MUTED}]{shown(self.subtitle, fields.get(self.subtitle['name']))}[/]")
+            cells.append(f"[{MUTED}]{self.say(self.subtitle, fields.get(self.subtitle['name']))}[/]")
         return tuple(cells)
 
     def card_status(self) -> tuple[str, str] | None:

@@ -2,7 +2,10 @@
 
 The screen names an enum field as its `lane`, and each of the enum's values
 is a column, left to right in the order declared — the direction work
-travels. A `group` (a link field) puts a strip of tabs above the board, one
+travels. Or it names a link, and the linked records are the columns, in
+their own order — a pipeline's stages, which people add, rename and
+reorder; on a board with groups, only the ones linked to the group on
+screen, so each group has lanes of its own. A `group` (a link field) puts a strip of tabs above the board, one
 per record of the linked datamodel, with a `＋` at the end that makes
 another: which ones you have is visible at a glance rather than one click
 down, and switching between them is one click rather than two. The server
@@ -72,13 +75,22 @@ class BoardPane(KitPane):
         super().__init__(quill, screen, **kwargs)
         lane = field_of(self.model, screen.get("lane")) or {"name": "lane", "values": []}
         self.lane_field: str = lane["name"]
-        self.lanes: list[tuple[str, str]] = enum_options(lane)
+        # Lanes that are records are read with each group (load_lanes).
+        self.lane_model_id: str | None = lane.get("to") if lane.get("kind") == "link" else None
+        self.lane_model: dict = self.models.get(self.lane_model_id or "") or {}
+        self.lanes: list[tuple[str, str]] = [] if self.lane_model_id else enum_options(lane)
         self.lane_values = [value for value, _ in self.lanes]
         self.title_field: str = screen.get("title") or self.model.get("title") or "title"
+        # Said under a card's title: one field, or several with a dot between.
+        names = screen.get("subtitle") or []
+        self.subtitles = [f for f in (field_of(self.model, n) for n in
+                          ([names] if isinstance(names, str) else names)) if f]
         body = field_of(self.model, screen.get("body"))
         self.body_field: str | None = body["name"] if body else None
         done = screen.get("done")
-        self.done: str | None = done if done in self.lane_values else None
+        # For record lanes, `done` is what the finished lane's record says.
+        self.done_when: dict | None = done if isinstance(done, dict) else None
+        self.done: str | None = done if isinstance(done, str) and done in self.lane_values else None
         group = field_of(self.model, screen.get("group"))
         self.group_field: str | None = group["name"] if group and group.get("to") else None
         self.group_model_id: str | None = group["to"] if self.group_field else None
@@ -190,13 +202,44 @@ class BoardPane(KitPane):
             return
         where = {self.group_field: self.group} if self.group_field else {}
         try:
+            if self.lane_model_id:
+                await self.load_lanes()
             self.records = await self.api.records(self.model_id, **where)
+            await self.load_link_titles(self.subtitles)
         except ApiError as exc:
             await self.signed_out(exc)
             return
         self.loaded = True
         await self.draw_lanes()
         self.status("")
+
+    async def load_lanes(self) -> None:
+        """The lanes, when they are records: the group's own, in their order."""
+        by = next(
+            (f["name"] for f in self.lane_model.get("fields", [])
+             if f.get("kind") == "link" and self.group_model_id and f.get("to") == self.group_model_id),
+            None,
+        )
+        where = {by: self.group} if by and self.group else {}
+        rows = sorted(await self.api.records(self.lane_model_id, **where),
+                      key=lambda row: row.get("position") or 0)
+        if self.done_when:
+            self.done = next(
+                (row["id"] for row in rows
+                 if all((row.get("fields") or {}).get(k) == v for k, v in self.done_when.items())),
+                None,
+            )
+        lanes = [(row["id"], title_of(row, self.lane_model)) for row in rows]
+        if lanes == self.lanes:
+            return
+        self.lanes = lanes
+        self.lane_values = [value for value, _ in lanes]
+        box = self.query_one("#lanes", Horizontal)
+        await box.remove_children()
+        await box.mount_all([
+            Lane(value, label, note=self._lane_note(value), id=f"lane-{safe_id(value)}", classes="lane")
+            for value, label in lanes
+        ])
 
     def card_status(self) -> tuple[str, str] | None:
         """How many are in the first lane: "3 to do"."""
@@ -215,7 +258,15 @@ class BoardPane(KitPane):
                 title=self.title_field,
                 body=self.body_field,
                 movable="move" not in self.refused,
+                said=self._said,
             )
+
+    def _said(self, record: dict) -> str:
+        fields = record.get("fields") or {}
+        return "  ·  ".join(
+            text for f in self.subtitles
+            if fields.get(f["name"]) not in (None, "") and (text := self.say(f, fields[f["name"]])) != "—"
+        )
 
     def _lane_of(self, record: dict) -> str:
         value = (record.get("fields") or {}).get(self.lane_field)

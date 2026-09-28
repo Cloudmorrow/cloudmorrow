@@ -1,14 +1,17 @@
 [datamodel]
 id = "organisation"
-version = 1
+version = 2
 label = "Organisation"
-description = "A company, a club, an institution: somebody you deal with that is not one person."
+description = "A company, a club, an institution: somebody you deal with that is not one person. Kept in a book, or your own when in none."
 domain = "crm"
-scopes = ["personal", "shared"]
+scopes = ["personal", "shared", "public"]
 title = "name"
+in_space = "book"
 
 [fields]
+book = { kind = "link", to = "book", indexed = true, on_delete = "cascade" }
 name = { kind = "string", required = true }
+industry = { kind = "string", indexed = true }
 website = { kind = "url" }
 email = { kind = "email" }
 phone = { kind = "phone" }

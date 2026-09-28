@@ -224,14 +224,47 @@ async def _group_id(
     return _find(groups, wanted, screen.models[screen.group["to"]]["title"])["id"], groups
 
 
-def _show_board(screen: Screen, records: list[dict], heading: str) -> None:
+async def _lanes(api: CloudmorrowClient, screen: Screen, group_id: str | None) -> tuple[list[tuple[str, str]], str | None]:
+    """A board's lanes as (value, label), and the one `done` moves to.
+
+    An enum's values, or — when the lane is a link — the linked records, in
+    their order, and on a board with groups only the group's own.
+    """
     lane = screen.lane
-    labels = dict(zip(lane["values"], lane.get("labels") or lane["values"], strict=True))
+    done = screen.spec.get("done")
+    if lane.get("kind") != "link":
+        values = lane["values"]
+        lanes = list(zip(values, lane.get("labels") or values, strict=True))
+        return lanes, done if isinstance(done, str) else values[-1]
+    target = screen.models[lane["to"]]
+    by = next((f["name"] for f in target["fields"] if f.get("kind") == "link" and screen.group
+               and f.get("to") == screen.group["to"]), None)
+    rows = sorted(await api.records(target["id"], **({by: group_id} if by and group_id else {})),
+                  key=lambda r: r.get("position") or 0)
+    lanes = [(r["id"], str(r["fields"].get(target["title"]) or r["id"])) for r in rows]
+    finished = next((r["id"] for r in rows if isinstance(done, dict)
+                     and all(r["fields"].get(k) == v for k, v in done.items())), None)
+    return lanes, finished or (lanes[-1][0] if lanes else None)
+
+
+def _lane_named(lanes: list[tuple[str, str]], wanted: str) -> str:
+    """A lane by its value, or by what it is called: `move 3f2a Proposal`."""
+    for value, label in lanes:
+        if wanted in (value, value[2:]) or wanted.casefold() == label.casefold():
+            return value
+    fail(f"no lane {wanted!r}: {', '.join(label for _, label in lanes)}")
+
+
+def _show_board(screen: Screen, records: list[dict], heading: str, lanes: list[tuple[str, str]]) -> None:
+    lane = screen.lane
+    values = [value for value, _ in lanes]
     table = Table(title=heading, title_style=TITLE)
-    for value in lane["values"]:
-        table.add_column(labels[value])
+    for _, label in lanes:
+        table.add_column(label)
+    # A record in no lane there is — none yet, or one since deleted — is in the first.
     columns = [
-        [r for r in records if r["fields"].get(lane["name"]) == value] for value in lane["values"]
+        [r for r in records if (r["fields"].get(lane["name"]) if r["fields"].get(lane["name"]) in values
+                                else values[0]) == value] for value in values
     ]
     for row in range(max((len(c) for c in columns), default=0)):
         cells = []
@@ -248,6 +281,10 @@ def _show_board(screen: Screen, records: list[dict], heading: str) -> None:
                 cells.append("")
         table.add_row(*cells)
     out.print(table)
+
+
+def _group_of(screen: Screen, record: dict) -> str | None:
+    return record["fields"].get(screen.group["name"]) if screen.group else None
 
 
 def _show_list(screen: Screen, records: list[dict], heading: str, shown_levels=()) -> None:
@@ -644,7 +681,7 @@ async def _act(
         if picked:
             heading += " · " + " · ".join(picked)
         if screen.kit == "board":
-            _show_board(screen, records, heading)
+            _show_board(screen, records, heading, (await _lanes(api, screen, group_id))[0])
         elif screen.moments:
             _show_calendar(screen, records, spaces, f"{heading} · {start} to {end}")
         else:
@@ -659,6 +696,13 @@ async def _act(
             fields = _event_defaults(screen, fields, spaces)
         else:
             fields = {screen.title: args[0], **_pairs(args[1:], screen), **where}
+            if screen.lane is not None and screen.lane["name"] not in fields:
+                lanes, _ = await _lanes(api, screen, group_id)
+                if lanes:
+                    fields[screen.lane["name"]] = lanes[0][0]
+            elif screen.lane is not None and screen.lane.get("kind") == "link":
+                lanes, _ = await _lanes(api, screen, group_id)
+                fields[screen.lane["name"]] = _lane_named(lanes, fields[screen.lane["name"]])
         try:
             made = await api.create_record(screen.model, fields, index=index)
         except ApiError as exc:
@@ -689,16 +733,21 @@ async def _act(
             )
             console.print(f"[green]Saved[/] {escape(str(changed['fields'].get(screen.title, '')))}")
         elif action == "move":
-            if screen.lane is None or not rest:
-                fail(
-                    f"move takes a lane: {', '.join(screen.lane['values']) if screen.lane else 'this is not a board'}"
-                )
-            await api.move_record(screen.model, record["id"], {screen.lane["name"]: rest[0]}, index)
+            if screen.lane is None:
+                fail("move takes a lane: this is not a board")
+            lanes, _ = await _lanes(api, screen, _group_of(screen, record) or group_id)
+            if not rest:
+                fail(f"move takes a lane: {', '.join(label for _, label in lanes)}")
+            await api.move_record(
+                screen.model, record["id"], {screen.lane["name"]: _lane_named(lanes, rest[0])}, index
+            )
             console.print(f"[green]Moved[/] to {rest[0]}")
         elif action in ("done", "undone"):
             if screen.lane is not None:
-                target = screen.spec.get("done") or screen.lane["values"][-1]
-                lane = target if action == "done" else screen.lane["values"][0]
+                lanes, target = await _lanes(api, screen, _group_of(screen, record) or group_id)
+                if not lanes:
+                    fail("this board has no lanes yet")
+                lane = target if action == "done" else lanes[0][0]
                 await api.move_record(screen.model, record["id"], {screen.lane["name"]: lane}, None)
             elif screen.spec.get("tick"):
                 await api.update_record(
