@@ -1,12 +1,11 @@
 """First boot, from the browser.
 
 A server with nobody on it has nothing to sign in to. On a box installed by
-hand the installer asks its questions on the terminal; on a Pi image
-plugged into a router, or a tenant somebody has just bought, there is no
-terminal, and the first visit is the setup. So while the server has no
-accounts, `/`, `/install` and `/app` all land here, and one form makes the
-cloud's name, its first account, which is the administrator, and chooses
-the standard quills it starts with.
+hand the installer asks its questions on the terminal; on a tenant
+somebody has just bought there is no terminal, and the first visit is the
+setup. So while the server has no accounts, `/`, `/install` and `/app` all
+land here, and one form makes the cloud's name, its first account, which
+is the administrator, and chooses the standard quills it starts with.
 
 The moment an account exists the page is gone: `/setup` answers with a
 redirect to the app, and `/api/setup` answers 409. There is nothing to

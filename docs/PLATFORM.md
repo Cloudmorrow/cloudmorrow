@@ -301,7 +301,7 @@ somebody's mail is in their Cloudmorrow and only the mail app can see it.
 
 **Phase 6 — The assistant included.** The in-app assistant on the tenant,
 metered; bring-your-own-key on your own server. This is where the two earlier plans
-meet: [HOSTING.md](HOSTING.md) puts the tenant and the Pi in people's
+meet: [HOSTING.md](HOSTING.md) puts the tenant in people's
 hands, and this puts the builder in the app.
 
 Files and Notes stay as they are throughout; they are the files half of

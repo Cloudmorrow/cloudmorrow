@@ -98,12 +98,10 @@ introduces, and what it asks for. The store and the registry are a
 Cloudmorrow of their own: elements and apps are records, which is the
 platform hosting its own catalogue and the best test it could have.
 
-## Three ways to have one
+## Two ways to have one
 
-- **Your own machine.** One command, three questions.
-- **A Raspberry Pi image.** Burn a card, plug it in, open
-  `cloudmorrow.local` on a phone. Public access and a certificate through
-  a cloudmorrow.com tunnel that never sees your traffic.
+- **Your own machine.** One command, three questions. Public access and a
+  certificate through a relay that never sees your traffic.
 - **A tenant we host**, cheap, with the assistant included.
 
 The delivery plan is [docs/HOSTING.md](docs/HOSTING.md).

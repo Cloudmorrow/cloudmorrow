@@ -3,9 +3,9 @@ database.
 
 The config file is the operator's, and on an installed server the service
 cannot write it (`ProtectSystem=strict`). A person setting a cloud up from
-the browser — on a Pi image, or a tenant somebody bought — has no file to
-edit, so what they answer goes here, and wins over the file: the file is
-the default, this is the decision.
+the browser — a tenant somebody bought — has no file to edit, so what
+they answer goes here, and wins over the file: the file is the default,
+this is the decision.
 
 Only the name lives here for now. The table is a key/value one so the next
 thing does not need a migration.

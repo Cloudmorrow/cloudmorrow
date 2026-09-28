@@ -1,25 +1,23 @@
-# Three ways to get a Cloudmorrow
+# Two ways to get a Cloudmorrow
 
-The same server, delivered three ways: installed on a machine you already
-have, bought as a tenant on a service we run, or burnt onto an SD card and
-plugged into the router. This page says what each one is, what is built,
-what is not yet, and how the last two are meant to work, so the pieces
-being built now fit the pieces that come after.
+The same server, delivered two ways: installed on a machine you already
+have, or bought as a tenant on a service we run. This page says what each
+one is, what is built, what is not yet, and how the tenant is meant to
+work, so the pieces being built now fit the pieces that come after.
 
 | shape | what you do | status |
 | --- | --- | --- |
 | **Your own machine** | run the installer, answer three questions | built |
 | **A hosted tenant** | buy one, open the address, fill in the setup page | the server side is built; the shop and the control plane are not |
-| **A Raspberry Pi image** | burn the card, plug it in, open `cloudmorrow.local` | the first-boot page is built; the image is not; the tunnel is being built |
 
-What all three share is now in the repository, and it is what makes the
-other two possible without a terminal:
+What both share is in the repository, and it is what makes the tenant
+possible without a terminal:
 
 - **First boot in the browser.** A server with no accounts sends every
   front door — `/`, `/install`, `/app` — to `/setup`, one form that names
   the cloud and makes the administrator. The moment an account exists the
   page is gone: `/setup` redirects to the app and `/api/setup` answers 409.
-  So a tenant or a Pi can be provisioned knowing nothing about its owner;
+  So a tenant can be provisioned knowing nothing about its owner;
   whoever opens it first, owns it.
 - **A name that lives in the database.** The installer writes `name` into
   `server.toml`; the setup page and `PATCH /api/server/settings` write it
@@ -32,8 +30,8 @@ other two possible without a terminal:
 ## Your own machine
 
 [The README](../README.md#install-a-server). One command, three questions.
-This is the shape everything else is measured against: whatever the other
-two do for you, they must not need anything this one does not have.
+This is the shape everything else is measured against: whatever the tenant
+does for you, it must not need anything this one does not have.
 
 ## A hosted tenant
 
@@ -77,31 +75,6 @@ description is "encrypted against a lost disk and against other tenants,
 not against the operator". Nothing in the design stops a tenant from
 taking their two volumes and running the same image on their own hardware, which is
 the guarantee that matters.
-
-## A Raspberry Pi image
-
-**What is on the card.** Raspberry Pi OS Lite, 64-bit, with the installer
-run at image-build time and told to ask nothing:
-
-```bash
-sudo sh install-server.sh --name Cloudmorrow --public-url http://cloudmorrow.local:8787 --no-ssh-key
-```
-
-No `--user`, so no account is made. The hostname is set to `cloudmorrow`
-and Avahi is left on, which Pi OS ships, so the box answers to
-`cloudmorrow.local` on the LAN. The first person to open
-`http://cloudmorrow.local:8787` on a phone gets the setup page, and it is
-theirs. `pi-gen`, the tool the Pi OS images themselves are built with, is
-the right way to make the card; the recipe is a stage that runs the
-command above and sets the hostname. It is not written yet.
-
-**What that gives you, and what it does not.** On the LAN, everything:
-notes, tasks, calendar, chat, files, the terminal app, the assistant. What
-it does not give is the phone app *as an app*: a service worker, and with
-it push notifications and the badge, need HTTPS, and a phone away from
-home cannot reach `cloudmorrow.local` at all. Both come from the same
-thing: a public HTTPS address. That is the hard part of the image, and the
-next section.
 
 ## Reaching your cloud
 
@@ -280,7 +253,6 @@ repository and points `access_control` at it, or uses only the home network.
 | First-boot setup page and `/api/setup` | `server/routes/setup.py`, `templates/setup.html` | built |
 | The name, in the database, `GET`/`PATCH /api/server/settings` | `server/settings.py` | built |
 | The container image, compose file, Caddyfile | `deploy/docker/` | built, not yet run in CI |
-| The Pi image recipe | `deploy/pi/` | not started |
 | Home network discovery, the tunnel client, private enrolment | `server/access_*.py`, `routes/access.py`, `client/discover.py` | being built |
 | The relay, the control server, DNS, Headscale | [`Cloudmorrow/relay`](https://github.com/Cloudmorrow/relay) | being built |
 | The shop and the tenant control plane | their own repositories | not started |

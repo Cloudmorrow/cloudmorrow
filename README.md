@@ -89,18 +89,15 @@ is [Concept.md](Concept.md); how software is packaged, found and built is
 [docs/QUILLS.md](docs/QUILLS.md); the data model is [docs/DATA.md](docs/DATA.md);
 the plan for the rest is [docs/PLATFORM.md](docs/PLATFORM.md).
 
-## Three ways to get one
+## Two ways to get one
 
 - **Your own machine.** The installer below: one command, four questions.
 - **A hosted tenant.** The same server as a container, one per customer, on
   a service we run at a low monthly price. The server side is built; the
   shop is not yet.
-- **A Raspberry Pi image.** Burn a card, plug the Pi into the router, open
-  `cloudmorrow.local` on a phone and set it up from the browser. The
-  first-boot page is built; the image and the public tunnel are not yet.
 
-[docs/HOSTING.md](docs/HOSTING.md) has the plan for the last two, and for
-certificates and public access that just work.
+[docs/HOSTING.md](docs/HOSTING.md) has the plan for the hosted tenant, and
+for certificates and public access that just work.
 
 ## Install a server
 
@@ -153,7 +150,7 @@ Then:
 No terminal at hand? Skip the account question. A server with no accounts
 shows a setup page on its first visit instead: name the cloud, choose a
 username and password, tick the standard quills, and it is yours. That page
-is how a hosted tenant and a Pi image are set up too.
+is how a hosted tenant is set up too.
 
 Rather run it as a container? `deploy/docker/` has the image, a compose
 file and a Caddyfile:
@@ -273,8 +270,8 @@ server, so a change to the terminal app needs no deploy to try.
 - [docs/PLATFORM.md](docs/PLATFORM.md): the plan for Cloudmorrow as a
   platform: your data, guarded access, one kit of screens on every device,
   and apps you build by talking to an assistant.
-- [docs/HOSTING.md](docs/HOSTING.md): a hosted tenant, a Raspberry Pi
-  image, and how certificates and public access are meant to just work.
+- [docs/HOSTING.md](docs/HOSTING.md): a hosted tenant, and how
+  certificates and public access are meant to just work.
 - [deploy/](deploy): the installer, the container, the systemd unit, and
   Caddy, nginx, server and agent examples.
 

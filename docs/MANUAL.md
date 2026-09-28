@@ -280,7 +280,7 @@ config file: a running service cannot write `/etc`, and a hosted tenant
 has no file to edit. An administrator changes it later with
 `PATCH /api/server/settings` and `{"name": "…"}`; anybody signed in may
 `GET` it. [HOSTING.md](HOSTING.md) is where this leads: a tenant somebody
-bought, and a Pi image, are both "open it and fill in the setup page".
+bought is "open it and fill in the setup page".
 
 ### As a container
 
