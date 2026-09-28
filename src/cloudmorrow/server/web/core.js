@@ -42,19 +42,16 @@ export class ApiError extends Error {
   }
 }
 
-export const authHeaders = () => (session.token ? { Authorization: "Bearer " + session.token } : {});
+const authHeaders = () => (session.token ? { Authorization: "Bearer " + session.token } : {});
 
-export async function api(method, path, body, { keepalive = false } = {}) {
-  const headers = authHeaders();
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+// One request with the token on it. A server that cannot be reached is an
+// ApiError like any other, and a 401 while signed in means the session is
+// over: everything that asks the server goes through here, so each screen
+// need not know that.
+async function send(path, init) {
   let res;
   try {
-    res = await fetch(path, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      keepalive,
-    });
+    res = await fetch(path, { ...init, headers: { ...authHeaders(), ...init.headers } });
   } catch {
     throw new ApiError(0, "Could not reach the server");
   }
@@ -62,12 +59,35 @@ export async function api(method, path, body, { keepalive = false } = {}) {
     signOut("Your session ended. Sign in again.");
     throw new ApiError(401, "signed out");
   }
+  return res;
+}
+
+export async function api(method, path, body, { keepalive = false } = {}) {
+  const res = await send(path, {
+    method,
+    headers: body === undefined ? {} : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    keepalive,
+  });
   if (res.status === 204) return null;
   const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   if (!res.ok) throw new ApiError(res.status, data && data.detail !== undefined ? data.detail : data);
   return data;
+}
+
+/** The same for what is not JSON: a file going up, a picture coming down.
+    `body` goes as it is, with `type` as its Content-Type, and the Response
+    comes back for the caller to read as a blob or as JSON. A refusal says
+    what the server said, or `fail` when it said nothing; `fail` as a
+    function of the status says it in the screen's own words instead. */
+export async function apiRaw(method, path, { body, type, fail = "request failed" } = {}) {
+  const res = await send(path, { method, headers: type ? { "Content-Type": type } : {}, body });
+  if (res.ok) return res;
+  if (typeof fail === "function") throw new ApiError(res.status, fail(res.status));
+  const data = await res.json().catch(() => null);
+  throw new ApiError(res.status, data && data.detail !== undefined ? data.detail : fail);
 }
 
 export const encodePath = (path) => path.split("/").map(encodeURIComponent).join("/");

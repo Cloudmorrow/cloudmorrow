@@ -99,8 +99,9 @@ def test_the_calls_it_makes_are_the_servers():
     assert '+ "/move"' in VIEW_JS
     assert "{ fields: { [n.field]: lane.dataset.lane }, index }" in VIEW_JS
     assert "rev: v.revs.get(key) ?? record.rev" in VIEW_JS
-    # A picture comes through fetch, with the token an <img> cannot carry.
-    assert '"/thumb?size="' in VIEW_JS and "authHeaders()" in VIEW_JS
+    # A picture comes through the shell's apiRaw, with the token an <img>
+    # cannot carry.
+    assert '"/thumb?size="' in VIEW_JS and 'apiRaw("GET", ' in VIEW_JS
     # The words a refusal comes with, not "request failed".
     assert "err.detail.message" in ACTIONS_JS
 

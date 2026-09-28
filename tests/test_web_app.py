@@ -64,6 +64,23 @@ def test_every_import_names_a_file_that_is_served(client):
         assert client.get(f"/app/{version}/{name}").status_code == 200, name
 
 
+def test_only_the_shell_asks_the_server_with_the_token():
+    """A screen asks through core.js's api or apiRaw, so a session that
+    has ended signs out wherever it is noticed. The one other fetch is
+    fresh.js asking which deploy is served, which needs no token."""
+    core = (WEB / "core.js").read_text()
+    assert "authHeaders()" in core and 'res.status === 401 && session.token' in core
+    assert not re.search(r"^export const authHeaders", core, re.MULTILINE)
+    for script in WEB.glob("*.js"):
+        if script.name == "core.js":
+            continue
+        calls = re.findall(r"\bfetch\(([^,)]*)", script.read_text())
+        if script.name == "fresh.js":
+            assert calls == ['"/app/version"'], calls
+        else:
+            assert not calls, f"{script.name} fetches {calls}"
+
+
 def test_login_and_notes_addresses_lead_to_the_app(client):
     for path in ("/login", "/notes"):
         response = client.get(path, follow_redirects=False)

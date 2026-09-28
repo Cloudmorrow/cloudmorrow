@@ -32,7 +32,7 @@
    still opens, and is still sent on or saved. */
 
 import {
-  ApiError, api, app, authHeaders, encodePath, esc, formatDate, heading, icons, nav, onSignOut,
+  api, apiRaw, app, encodePath, esc, formatDate, heading, icons, nav, onSignOut,
   recordsUrl, renderRoute, replace, route, seconds, store, tabs, toast, wireShell, back,
 } from "./core.js";
 import { mayWrite } from "./kit.js";
@@ -476,19 +476,13 @@ function photoName(file) {
 }
 
 async function uploadOne({ b, group, folder }, file, name) {
-  const headers = { ...authHeaders(), "Content-Type": file.type || "application/octet-stream" };
   const query = `?${encodeURIComponent(b.group)}=${encodeURIComponent(group)}` +
     `&${encodeURIComponent(b.folder)}=${encodeURIComponent(folder)}` +
     `&${encodeURIComponent(b.title)}=${encodeURIComponent(name)}`;
-  let res;
-  try {
-    res = await fetch(recordsUrl(b.model.id) + "/upload" + query, { method: "POST", headers, body: file });
-  } catch {
-    throw new ApiError(0, "Could not reach the server");
-  }
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, data && data.detail !== undefined ? data.detail : "upload failed");
-  return data;
+  const res = await apiRaw("POST", recordsUrl(b.model.id) + "/upload" + query, {
+    body: file, type: file.type || "application/octet-stream", fail: "upload failed",
+  });
+  return res.json().catch(() => null);
 }
 
 // One after another, with the bar saying which; a failure says why and
@@ -599,13 +593,9 @@ onSignOut(() => {
 async function contentBlob(b, entry) {
   const key = entry.id + "@" + entry.rev;
   if (blobs.has(key)) return blobs.get(key);
-  let res;
-  try {
-    res = await fetch(recordsUrl(b.model.id, entry.id) + "/content", { headers: authHeaders() });
-  } catch {
-    throw new ApiError(0, "Could not reach the server");
-  }
-  if (!res.ok) throw new ApiError(res.status, res.status === 404 ? `That ${b.model.label.toLowerCase()} is gone` : "Could not fetch it");
+  const res = await apiRaw("GET", recordsUrl(b.model.id, entry.id) + "/content", {
+    fail: (status) => (status === 404 ? `That ${b.model.label.toLowerCase()} is gone` : "Could not fetch it"),
+  });
   const blob = await res.blob();
   blobs.set(key, blob);
   return blob;
@@ -626,8 +616,7 @@ const THUMB_SIZE = (window.devicePixelRatio || 1) > 2 ? 512 : 256;
 async function thumbURL(b, id, stamp) {
   const key = id + "@" + stamp;
   if (thumbURLs.has(key)) return thumbURLs.get(key);
-  const res = await fetch(recordsUrl(b.model.id, id) + "/thumb?size=" + THUMB_SIZE, { headers: authHeaders() });
-  if (!res.ok) throw new ApiError(res.status, "no thumbnail");
+  const res = await apiRaw("GET", recordsUrl(b.model.id, id) + "/thumb?size=" + THUMB_SIZE, { fail: "no thumbnail" });
   const url = URL.createObjectURL(await res.blob());
   thumbURLs.set(key, url);
   return url;
