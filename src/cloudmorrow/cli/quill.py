@@ -303,7 +303,7 @@ def check(
     ] = None,
 ) -> None:
     """Check a Quill as a server would, and preview its screens. Needs no server."""
-    from cloudmorrow.server.codespec import CodeSpecError, parse_code, scan_handlers
+    from cloudmorrow.server.quills.codespec import CodeSpecError, parse_code, scan_handlers
 
     folder = folder.resolve()
     with tempfile.TemporaryDirectory(prefix="quill-models-") as tmp:

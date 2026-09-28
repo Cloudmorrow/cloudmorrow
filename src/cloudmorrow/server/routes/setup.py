@@ -24,12 +24,12 @@ from cloudmorrow import __version__
 from cloudmorrow.logo import LOGO_LARGE
 from cloudmorrow.server.db import InvalidUsernameError, UserExistsError
 from cloudmorrow.server.deps import AppState, get_state
+from cloudmorrow.server.quills import QuillError
+from cloudmorrow.server.quills.standard import choices, choose
 from cloudmorrow.server.routes.install import TEMPLATES, page_css
 from cloudmorrow.server.schemas import SetupOut, SetupRequest
 from cloudmorrow.server.security import hash_password
 from cloudmorrow.server.settings import InvalidNameError, validate_name
-from cloudmorrow.server.standard import choices, choose
-from cloudmorrow.server.quills import QuillError
 
 router = APIRouter(tags=["setup"])
 

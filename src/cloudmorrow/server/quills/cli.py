@@ -26,8 +26,8 @@ from cloudmorrow.console import TITLE
 from cloudmorrow.console import console as make_console
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.quills import QuillError, QuillRegistry
+from cloudmorrow.server.quills.standard import choices, choose, chosen_already
 from cloudmorrow.server.sealed import use_key
-from cloudmorrow.server.standard import choices, choose, chosen_already
 
 app = typer.Typer(help="Quills on this server.", no_args_is_help=True)
 console = make_console()

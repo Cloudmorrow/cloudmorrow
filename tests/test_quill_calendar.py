@@ -15,15 +15,14 @@ from pathlib import Path
 import pytest
 
 from cloudmorrow.cli import quillrun
-from cloudmorrow.server import standard
 from cloudmorrow.server.db import connect
-from cloudmorrow.server.quilljobs import (
+from cloudmorrow.server.quills import QuillError, QuillRegistry, standard
+from cloudmorrow.server.quills.jobs import (
     LEGACY_CALENDAR,
     boot,
     move_legacy_calendar,
     read_meta,
 )
-from cloudmorrow.server.quills import QuillError, QuillRegistry
 from cloudmorrow.server.records import Principal, RecordStore
 from tests.conftest import ADMIN, GUEST, QUILL_CATALOG, token_for
 

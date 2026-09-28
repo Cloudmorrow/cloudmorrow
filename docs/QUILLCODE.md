@@ -288,7 +288,7 @@ time is stopped with its process, and the next call starts a fresh one.
 The host and the interpreter speak JSON lines over its standard input and
 output (`cloudmorrow.quill.guest`): the core sends a call, and every
 `ctx.records`, `ctx.fetch` and `ctx.secret` is a request back, which the
-core answers through the gate (`server/quillhandlers.py`, `HostCalls`).
+core answers through the gate (`server/quills/code.py`, `HostCalls`).
 What the handler prints is caught and logged.
 
 Hooks are queued as records change and run one at a time on a thread of
@@ -440,8 +440,8 @@ WebAssembly.
 | a view as text | `quill/text.py` |
 | the harness, and what `preview` and `dev --local` run | `quill/testing.py`, `quill/devtools.py` |
 | the sandbox: the runtime, a warm interpreter per Quill, the process | `sandbox.py` |
-| the manifest's code half, and finding handlers in the source | `server/codespec.py` |
-| running handlers: principals, `HostCalls`, hooks, `call` jobs, webhooks, APIs | `server/quillhandlers.py` |
+| the manifest's code half, and finding handlers in the source | `server/quills/codespec.py` |
+| running handlers: principals, `HostCalls`, hooks, `call` jobs, webhooks, APIs | `server/quills/code.py` |
 | the routes: views and actions; webhooks and APIs answered by code | `server/routes/quills.py`, `server/routes/quillcode.py` |
 | a machine's side of it, on the server and in the agent | `server/routes/agentquills.py`, `agent/quills.py`, `cm quill machine` in `cli/quill.py` |
 | actions as MCP tools | `server/mcptools.py` (`action_tools`) |

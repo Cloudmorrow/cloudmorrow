@@ -654,7 +654,7 @@ def _action_tool(state: AppState, manifest, action: dict) -> Tool:
         description += f" Done to one {action['on']} record."
 
     def handler(state: AppState, user: User, args: dict[str, Any], quill=manifest.id, act=action["id"]) -> Any:
-        from cloudmorrow.server.quillhandlers import CodeError
+        from cloudmorrow.server.quills.code import CodeError
 
         if state.code is None:
             raise ToolError("this server runs no Quill code")

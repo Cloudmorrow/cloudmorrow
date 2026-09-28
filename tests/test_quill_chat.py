@@ -16,8 +16,8 @@ import pytest
 
 from cloudmorrow.server import spacenotify
 from cloudmorrow.server.db import connect
-from cloudmorrow.server.quilljobs import LEGACY_CHAT, boot, move_legacy_chat, read_meta
 from cloudmorrow.server.quills import QuillError, QuillRegistry, load_manifest, parse_manifest
+from cloudmorrow.server.quills.jobs import LEGACY_CHAT, boot, move_legacy_chat, read_meta
 from cloudmorrow.server.records import Principal, RecordStore
 from cloudmorrow.server.webpush import PushStore
 from tests.conftest import ADMIN, GUEST, QUILL_CATALOG, token_for

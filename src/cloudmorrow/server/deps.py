@@ -19,9 +19,9 @@ from cloudmorrow.server.mcp import MCPStore
 from cloudmorrow.server.notes import NoteStore, ensure_notes_layout
 from cloudmorrow.server.notifications import NotificationStore
 from cloudmorrow.server.quills import QuillRegistry
-from cloudmorrow.server.quillservices import Supervisor
-from cloudmorrow.server.quilltokens import PREFIX as QUILL_TOKEN_PREFIX
-from cloudmorrow.server.quilltokens import QuillTokenStore, runs_as
+from cloudmorrow.server.quills.services import Supervisor
+from cloudmorrow.server.quills.tokens import PREFIX as QUILL_TOKEN_PREFIX
+from cloudmorrow.server.quills.tokens import QuillTokenStore, runs_as
 from cloudmorrow.server.records import Principal, RecordStore
 from cloudmorrow.server.sealed import Sealer
 from cloudmorrow.server.secrets import (
@@ -69,12 +69,12 @@ class AppState:
     # The installed Quills and datamodels, and the records of every one.
     quills: QuillRegistry
     records: RecordStore
-    # A Quill's credentials, and what runs its code (quilltokens, quillservices).
+    # A Quill's credentials, and what runs its code (quills.tokens, quills.services).
     quill_tokens: QuillTokenStore | None = None
     services: Supervisor | None = None
     # Who may use which datamodels (circles.py). The record store asks it too.
     circles: CircleStore | None = None
-    # What runs a Quill's Python, in its sandbox (quillhandlers.py).
+    # What runs a Quill's Python, in its sandbox (quills/code.py).
     code: object | None = None
 
     def cloud_name(self) -> str:

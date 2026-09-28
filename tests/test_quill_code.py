@@ -17,8 +17,8 @@ from fastapi.testclient import TestClient
 from cloudmorrow import sandbox
 from cloudmorrow.quill import context as sdk
 from cloudmorrow.server.app import create_app
-from cloudmorrow.server.quillhandlers import HostCalls
 from cloudmorrow.server.quills import QuillError, parse_manifest
+from cloudmorrow.server.quills.code import HostCalls
 from cloudmorrow.server.records import Principal
 from tests.conftest import ADMIN, GUEST, token_for
 

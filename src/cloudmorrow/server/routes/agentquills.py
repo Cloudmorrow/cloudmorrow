@@ -25,8 +25,8 @@ from pydantic import BaseModel
 from cloudmorrow.quill import context as sdk
 from cloudmorrow.server.agents import Agent
 from cloudmorrow.server.deps import AppState, get_current_agent, get_state
-from cloudmorrow.server.quillhandlers import HostCalls
 from cloudmorrow.server.quills import ORIGIN, Manifest
+from cloudmorrow.server.quills.code import HostCalls
 
 router = APIRouter(prefix="/api/agent/quills", tags=["agents"])
 

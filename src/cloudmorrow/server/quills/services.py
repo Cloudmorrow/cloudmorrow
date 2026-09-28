@@ -4,7 +4,7 @@ A Quill is declarative first, and code is the exception — a mail sync, a
 bridge to somebody else's API — so the core runs that code *outside* itself:
 each `[[services]]` entry is a process of its own, started here, and it
 reaches the data through the record API over loopback HTTP like any client,
-through the gate, with a token of its own (see `quilltokens`). The server
+through the gate, with a token of its own (see `quills.tokens`). The server
 never imports a Quill's code, and a Quill's code never holds anything of the
 server's but that token.
 
@@ -69,7 +69,7 @@ from cloudmorrow.server.datamodels import parse_duration
 from cloudmorrow.server.db import UserStore, connect
 from cloudmorrow.server.features import FeatureStore
 from cloudmorrow.server.quills import Manifest, QuillRegistry
-from cloudmorrow.server.quilltokens import QuillTokenStore, runs_as
+from cloudmorrow.server.quills.tokens import QuillTokenStore, runs_as
 
 __all__ = ["Supervisor"]
 

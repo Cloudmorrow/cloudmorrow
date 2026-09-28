@@ -3,7 +3,7 @@
 * `/api/q/<quill>/<path>` — a Quill's `[[apis]]`, proxied to the service
   that serves them. Open to anybody signed in, and to the Quill's own token;
   the service is told who is asking in `X-Cloudmorrow-User` and never sees
-  the person's token (see `quillproxy`).
+  the person's token (see `quills.proxy`).
 * `POST /hooks/<quill>/<path>` — a Quill's `[[webhooks]]`, for the outside
   world, so no account: the webhook's secret instead, as `?token=`,
   `X-Cloudmorrow-Webhook-Token`, or an HMAC of the body in the header the
@@ -25,12 +25,12 @@ from fastapi.responses import JSONResponse, Response
 
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_admin_user, get_principal, get_state
-from cloudmorrow.server.quillhandlers import CodeError
-from cloudmorrow.server.quillhooks import MAX_BODY as HOOK_MAX_BODY
-from cloudmorrow.server.quillhooks import RateLimit, apply_map, signature_ok
-from cloudmorrow.server.quillproxy import MAX_BODY, forward, read_body
 from cloudmorrow.server.quills import Manifest
-from cloudmorrow.server.quilltokens import runs_as
+from cloudmorrow.server.quills.code import CodeError
+from cloudmorrow.server.quills.hooks import MAX_BODY as HOOK_MAX_BODY
+from cloudmorrow.server.quills.hooks import RateLimit, apply_map, signature_ok
+from cloudmorrow.server.quills.proxy import MAX_BODY, forward, read_body
+from cloudmorrow.server.quills.tokens import runs_as
 from cloudmorrow.server.records import Principal
 from cloudmorrow.server.routes.records import ERRORS, _refused
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from types import SimpleNamespace
 
-from cloudmorrow.server.cli_quill import _ask
+from cloudmorrow.server.quills.cli import _ask
 
 OPTIONS = [
     SimpleNamespace(id="notes", name="Notes", summary="Notes."),

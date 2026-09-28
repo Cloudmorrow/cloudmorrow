@@ -18,7 +18,6 @@ from cloudmorrow import __version__
 from cloudmorrow.console import TITLE
 from cloudmorrow.console import console as make_console
 from cloudmorrow.logo import banner
-from cloudmorrow.server.cli_quill import app as quill_app
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.db import (
     TYPE_HUMAN,
@@ -28,6 +27,7 @@ from cloudmorrow.server.db import (
     UserStore,
 )
 from cloudmorrow.server.maintenance import delete_orphans, find_orphans
+from cloudmorrow.server.quills.cli import app as quill_app
 from cloudmorrow.server.sealed import Sealer, key_for, rotate, use_key
 from cloudmorrow.server.security import hash_password
 from cloudmorrow.server.update import UpdateError, build_wheel, describe, find_source_dir
@@ -331,7 +331,7 @@ def agent_install(
         account = admins[0]
 
     machine = name or socket.gethostname().split(".")[0].lower()
-    from cloudmorrow.server.quillservices import loopback_url
+    from cloudmorrow.server.quills.services import loopback_url
 
     reach = (url or cfg.public_url or loopback_url(cfg)).rstrip("/")
     try:

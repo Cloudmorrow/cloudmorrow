@@ -24,11 +24,11 @@ from cloudmorrow.server.drive import user_drive
 from cloudmorrow.server.features import Feature, FeatureStore
 from cloudmorrow.server.mcp import MCPStore
 from cloudmorrow.server.notifications import NotificationStore
-from cloudmorrow.server.quilljobs import Clock
 from cloudmorrow.server.quills import QuillRegistry
-from cloudmorrow.server.quillhandlers import QuillCode
-from cloudmorrow.server.quillservices import Supervisor
-from cloudmorrow.server.quilltokens import QuillTokenStore
+from cloudmorrow.server.quills.code import QuillCode
+from cloudmorrow.server.quills.jobs import Clock
+from cloudmorrow.server.quills.services import Supervisor
+from cloudmorrow.server.quills.tokens import QuillTokenStore
 from cloudmorrow.server.records import RecordStore
 from cloudmorrow.server.routes import (
     agentquills,
@@ -152,7 +152,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     )
     app.router.on_startup.append(state.services.start)
     # A Quill's Python: views, actions, hooks, `call` jobs, and handler
-    # webhooks and APIs, each in the Quill's sandbox (quillhandlers.py).
+    # webhooks and APIs, each in the Quill's sandbox (quills/code.py).
     state.code = QuillCode(state)
     app.router.on_startup.append(state.code.start)
 
