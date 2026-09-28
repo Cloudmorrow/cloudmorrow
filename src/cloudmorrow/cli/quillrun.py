@@ -444,13 +444,11 @@ def main(
 
     async def _run() -> None:
         _, api = client()
-        try:
+        async with api:
             await dispatch(
                 api, quill, action, args, screen_id=screen_id, group=group, index=index,
                 plain=plain, days=(first, last), reveal=reveal,
             )
-        finally:
-            await api.aclose()
 
     run(_run())
 

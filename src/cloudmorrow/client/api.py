@@ -72,6 +72,13 @@ class CloudmorrowClient:
     async def aclose(self) -> None:
         await self._client.aclose()
 
+    # `async with api:` closes the connection pool however the block ends.
+    async def __aenter__(self) -> CloudmorrowClient:
+        return self
+
+    async def __aexit__(self, *exc_info: object) -> None:
+        await self.aclose()
+
     @property
     def token(self) -> str | None:
         return self._token

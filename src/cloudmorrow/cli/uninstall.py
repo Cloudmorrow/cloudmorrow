@@ -164,16 +164,15 @@ async def forget_on_server(name: str) -> str:
         _config, api = client()
     except Exception as exc:  # no stored session, or a config that cannot be read
         return f"not signed in ({exc}); the agent record stays on the server"
-    try:
-        for agent in await api.agents():
-            if agent.get("name") == name:
-                await api.delete_agent(agent["id"])
-                return ""
-        return "no agent by that name on the server"
-    except Exception as exc:
-        return f"could not reach the server ({exc}); the agent record stays"
-    finally:
-        await api.aclose()
+    async with api:
+        try:
+            for agent in await api.agents():
+                if agent.get("name") == name:
+                    await api.delete_agent(agent["id"])
+                    return ""
+            return "no agent by that name on the server"
+        except Exception as exc:
+            return f"could not reach the server ({exc}); the agent record stays"
 
 
 def remove(found: Plan, *, forget=forget_on_server) -> list[str]:

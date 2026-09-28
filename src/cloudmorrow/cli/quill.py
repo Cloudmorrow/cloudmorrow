@@ -429,10 +429,8 @@ def dev(
 
     async def _dev() -> None:
         _, api = client()
-        try:
+        async with api:
             plan = await api.upload_quill(_tarball(folder))
-        finally:
-            await api.aclose()
         console.print(
             f"[green]Installed[/] {plan['name']} {plan['version']} — it is in `cm`, the web app and on the phone now"
         )
@@ -446,10 +444,8 @@ def list_installed() -> None:
 
     async def _list() -> None:
         _, api = client()
-        try:
+        async with api:
             quills = await api.quills()
-        finally:
-            await api.aclose()
         if not quills:
             console.print("[dim]No Quills installed. `cm quill catalog` has some.[/]")
             return
@@ -481,10 +477,8 @@ def services() -> None:
 
     async def _services() -> None:
         _, api = client()
-        try:
+        async with api:
             rows = await api.quill_services()
-        finally:
-            await api.aclose()
         if not rows:
             console.print("[dim]No Quill here runs code of its own.[/]")
             return
@@ -531,10 +525,8 @@ def logs(
 
     async def _logs() -> None:
         _, api = client()
-        try:
+        async with api:
             found = await api.quill_logs(quill_id, service, lines)
-        finally:
-            await api.aclose()
         for name, text in found.items():
             if len(found) > 1:
                 console.print(f"[b]── {escape(name)} ──[/]")
@@ -549,10 +541,8 @@ def catalog() -> None:
 
     async def _catalog() -> None:
         _, api = client()
-        try:
+        async with api:
             found = await api.quill_catalog()
-        finally:
-            await api.aclose()
         labels = {c["id"]: c["label"] for c in found["categories"]}
         table = Table(title="the quill catalog", title_style=TITLE)
         for column in ("category", "id", "name", "summary", "installed"):
@@ -585,15 +575,13 @@ def add(
 
     async def _add() -> None:
         _, api = client()
-        try:
+        async with api:
             plan = await api.plan_quill(id=quill_id, source=source, ref=ref)
             print_plan(plan)
             if not yes and not typer.confirm("Install it?", default=True):
                 console.print("[dim]Nothing installed.[/]")
                 return
             await api.install_quill(id=quill_id, source=source, ref=ref)
-        finally:
-            await api.aclose()
         console.print(f"[green]Installed[/] {plan['name']} {plan['version']}")
 
     run(_add())
@@ -610,10 +598,8 @@ def remove(
 
     async def _remove() -> None:
         _, api = client()
-        try:
+        async with api:
             await api.uninstall_quill(quill_id)
-        finally:
-            await api.aclose()
         console.print(f"[green]Removed[/] {quill_id}")
 
     run(_remove())

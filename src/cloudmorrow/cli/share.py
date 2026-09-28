@@ -63,10 +63,8 @@ def list_shares(
 
     async def _list() -> None:
         _config, api = client()
-        try:
+        async with api:
             shares = await api.shares()
-        finally:
-            await api.aclose()
         if plain:
             emit("".join(f"{share['name']}\n" for share in shares))
             return
@@ -102,10 +100,8 @@ def show(name: NameArgument) -> None:
 
     async def _show() -> None:
         _config, api = client()
-        try:
+        async with api:
             share = await api.get_share(name)
-        finally:
-            await api.aclose()
         console.print(f"[b]{share['name']}[/]  {share.get('description') or ''}")
         console.print(f"[dim]where:[/]      {_where(share)}")
         url = share["url"] or "— (the machine has not said where it serves yet)"
@@ -146,44 +142,40 @@ def add(
 
     async def _add() -> None:
         _config, api = client()
-        if server:
-            if path:
-                await api.aclose()
-                fail(
-                    "a server share is the folder of that name in the Shares folder on "
-                    "the server — there is no path to give\n"
-                    "(--path is for a share on this machine)"
+        async with api:
+            if server:
+                if path:
+                    fail(
+                        "a server share is the folder of that name in the Shares folder on "
+                        "the server — there is no path to give\n"
+                        "(--path is for a share on this machine)"
+                    )
+                kind, machine, directory = "server", None, None
+            else:
+                if not path:
+                    fail(
+                        "a share is a directory on this machine: --path DIR\n"
+                        "(an admin puts one on the server with --server)"
+                    )
+                # The machine is the one you are on — the only one whose paths
+                # you can see, where `~` means something, and where whether it
+                # can be shared at all is known before the server is asked.
+                complaint = sharing.problem(path)
+                if complaint:
+                    fail(complaint)
+                kind, machine = "machine", machine_name()
+                directory = str(sharing.resolve(path))
+            try:
+                share = await api.create_share(
+                    name, kind=kind, path=directory, machine=machine, description=description
                 )
-            kind, machine, directory = "server", None, None
-        else:
-            if not path:
-                await api.aclose()
-                fail(
-                    "a share is a directory on this machine: --path DIR\n"
-                    "(an admin puts one on the server with --server)"
-                )
-            # The machine is the one you are on — the only one whose paths
-            # you can see, where `~` means something, and where whether it
-            # can be shared at all is known before the server is asked.
-            complaint = sharing.problem(path)
-            if complaint:
-                await api.aclose()
-                fail(complaint)
-            kind, machine = "machine", machine_name()
-            directory = str(sharing.resolve(path))
-        try:
-            share = await api.create_share(
-                name, kind=kind, path=directory, machine=machine, description=description
-            )
-        except ApiError as exc:
-            if kind == "machine" and exc.status_code == 404:
-                fail(
-                    f"this machine ({machine}) has no agent, so nothing here can serve a "
-                    "share — `cloudmorrow login` enrols it"
-                )
-            raise
-        finally:
-            await api.aclose()
+            except ApiError as exc:
+                if kind == "machine" and exc.status_code == 404:
+                    fail(
+                        f"this machine ({machine}) has no agent, so nothing here can serve a "
+                        "share — `cloudmorrow login` enrols it"
+                    )
+                raise
         console.print(f"[green]Created[/] [b]{share['name']}[/] — {_where(share)}")
         if share.get("kind") == "machine" and not share.get("online"):
             console.print(
@@ -213,7 +205,7 @@ def remove(
 
     async def _remove() -> None:
         _config, api = client()
-        try:
+        async with api:
             share = await api.get_share(name)
             if not yes:
                 what = (
@@ -230,8 +222,6 @@ def remove(
                 except mounts.MountError as exc:
                     console.print(f"[yellow]{exc}[/]")
             await api.delete_share(share["name"], remove_files=files)
-        finally:
-            await api.aclose()
         console.print(f"[green]Removed[/] {share['name']}")
 
     run(_remove())
@@ -252,14 +242,11 @@ def mount(
 
     async def _mount() -> None:
         _config, api = client()
-        credentials = StoredCredentials.load()
-        if credentials is None or not api.token:
-            await api.aclose()
-            fail("not signed in — `cloudmorrow login` first")
-        try:
+        async with api:
+            credentials = StoredCredentials.load()
+            if credentials is None or not api.token:
+                fail("not signed in — `cloudmorrow login` first")
             share = await api.get_share(name)
-        finally:
-            await api.aclose()
         # Said before rclone is offered: installing it would not help.
         why = mounts.refusal(share)
         if why:
