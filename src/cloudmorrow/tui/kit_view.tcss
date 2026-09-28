@@ -1,0 +1,253 @@
+/* A Quill's own screen (panes/kit_view.py): the tree its code returned, as
+   widgets. Everything is sized to what is in it and scrolls as one; the
+   colours are the theme's, by tone. */
+
+.view-body {
+    height: 1fr;
+    padding: 1 1 0 1;
+    scrollbar-size-vertical: 1;
+}
+
+.view-failed {
+    height: auto;
+    padding: 1 0;
+}
+
+/* -- layout ----------------------------------------------------------------- */
+.view-stack, .view-column, .view-empty, .view-form, .view-table, .view-image,
+.view-cards, .view-month, .view-tabs {
+    height: auto;
+}
+
+.view-stack.-gap-small > * {
+    margin-bottom: 0;
+}
+
+.view-stack.-gap-normal > * {
+    margin-bottom: 1;
+}
+
+.view-stack.-gap-large > * {
+    margin-bottom: 2;
+}
+
+.view-row, .view-columns {
+    height: auto;
+}
+
+.view-row > * {
+    width: auto;
+    margin-right: 2;
+}
+
+.view-column {
+    width: 1fr;
+    margin-right: 2;
+}
+
+.view-tabs TabbedContent, .view-tabs ContentSwitcher, .view-tabs TabPane {
+    height: auto;
+}
+
+.view-tabs TabPane {
+    padding: 1 0 0 0;
+}
+
+/* -- content ---------------------------------------------------------------- */
+.view-text {
+    height: auto;
+    color: $foreground;
+}
+
+.view-text.-title {
+    color: $primary;
+    text-style: bold;
+}
+
+.view-text.-subtitle {
+    text-style: bold;
+}
+
+.view-text.-muted, .view-text.-small, .view-muted {
+    color: $muted;
+}
+
+.view-text.-mono {
+    color: $secondary;
+}
+
+.view-muted {
+    height: auto;
+}
+
+.view-markdown {
+    height: auto;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+}
+
+.view-image-caption {
+    height: auto;
+}
+
+.view-picture {
+    width: 40;
+    height: auto;
+    max-height: 16;
+}
+
+.view-badge {
+    width: auto;
+    height: 1;
+    background: $panel;
+    color: $foreground;
+}
+
+.view-stat {
+    width: auto;
+    min-width: 14;
+    height: auto;
+    padding: 0 2;
+    border: round $line;
+}
+
+.view-divider {
+    color: $line;
+    margin: 0;
+}
+
+/* Tones: what a badge or a stat is saying about itself. */
+.view-badge.-tone-info, .view-badge.-tone-primary { background: $primary 30%; }
+.view-badge.-tone-good { background: $success 30%; }
+.view-badge.-tone-warn { background: $warning 30%; }
+.view-badge.-tone-bad, .view-badge.-tone-danger { background: $error 30%; }
+
+.view-stat.-tone-info, .view-stat.-tone-primary { border: round $primary; }
+.view-stat.-tone-good { border: round $success; }
+.view-stat.-tone-warn { border: round $warning; }
+.view-stat.-tone-bad, .view-stat.-tone-danger { border: round $error; }
+
+/* -- what can be pressed ------------------------------------------------------ */
+Button.view-button {
+    height: 1;
+    width: auto;
+    min-width: 6;
+    padding: 0 1;
+    border: none;
+    color: $foreground;
+    background: $panel;
+}
+
+Button.view-button:hover {
+    background: $line-bright;
+}
+
+Button.view-button:focus {
+    text-style: bold underline;
+}
+
+Button.view-button.-primary {
+    color: $action-ink;
+    background: $action;
+    text-style: bold;
+}
+
+Button.view-button.-error {
+    color: $error;
+    background: transparent;
+    border: none;
+}
+
+.view-row-actions, .view-form-buttons {
+    height: auto;
+    margin-top: 1;
+}
+
+.view-row-actions Button {
+    margin-right: 1;
+}
+
+.view-form-complaint {
+    height: auto;
+}
+
+.view-menu-item {
+    width: 100%;
+    margin-bottom: 1;
+}
+
+/* -- records -------------------------------------------------------------- */
+.view-field {
+    height: auto;
+}
+
+.view-field Input, .view-field Select, .view-field .view-field-value {
+    width: 1fr;
+}
+
+.view-field-value {
+    height: auto;
+}
+
+.view-table DataTable {
+    height: auto;
+    max-height: 20;
+}
+
+.view-cards {
+    layout: grid;
+    grid-size: 3;
+    grid-rows: auto;
+    grid-gutter: 0 1;
+}
+
+.view-card {
+    height: auto;
+    padding: 0 1;
+    margin-bottom: 1;
+    background: $surface;
+    border-left: solid $line;
+}
+
+.view-card:hover {
+    border-left: solid $secondary;
+}
+
+.view-card:focus {
+    background: $panel;
+    border-left: solid $primary;
+}
+
+.view-lanes {
+    height: auto;
+}
+
+.view-lanes .lane {
+    height: auto;
+}
+
+.view-lanes .lane-body {
+    height: auto;
+    max-height: 24;
+}
+
+.view-month-head {
+    height: 1;
+}
+
+.view-month-title {
+    width: auto;
+    margin: 0 2;
+}
+
+.view-month-grid {
+    height: auto;
+    margin-top: 1;
+}
+
+.view-month-list {
+    height: auto;
+    max-height: 12;
+    margin-top: 1;
+}

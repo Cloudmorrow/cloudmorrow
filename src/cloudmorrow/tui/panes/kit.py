@@ -25,6 +25,8 @@ task board has to go on as much as a list of car services does.
   screen's `fields` when it names them.
 - `thread` is in kit_thread.py: spaces on the left, what is said in the one
   you are on to the right, and a line to write in.
+- `view` is not the kit's: the Quill's own code draws it, as a tree of
+  primitives, and kit_view.py turns the tree into widgets.
 
 Every one of them opens a record in the record sheet, where every field has
 the widget its kind calls for.
@@ -388,8 +390,12 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     from cloudmorrow.tui.panes.kit_editor import EditorPane
     from cloudmorrow.tui.panes.kit_grid import GridPane
     from cloudmorrow.tui.panes.kit_thread import ThreadPane
+    from cloudmorrow.tui.panes.kit_view import ViewPane
 
     kit = screen.get("kit")
+    if kit == "view":
+        # About no datamodel, or one the server kept it for (docs/CIRCLES.md).
+        return ViewPane(quill, screen, **kwargs)
     if screen.get("model") not in (quill.get("models") or {}):
         return None
     if kit == "board":
