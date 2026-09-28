@@ -63,10 +63,14 @@ def standard(config_path: ConfigOption = None) -> None:
         console.print(f"[yellow]The catalog could not be read, so only the built-in ones are here: {problem}[/]")
 
 
-def _ask(options: list) -> set[str]:
-    """The question, on the terminal: every one of them, unless you say otherwise."""
-    tty = open("/dev/tty", "r+", encoding="utf-8")  # noqa: SIM115 - held for the question
-    try:
+def _ask(options: list, terminal: str = "/dev/tty") -> set[str]:
+    """The question, on the terminal: every one of them, unless you say otherwise.
+
+    One handle to read and one to write: a terminal opened "r+" in text mode
+    is a buffered random-access file to Python, which wants to seek, and a
+    terminal cannot.
+    """
+    with open(terminal, encoding="utf-8") as keys, open(terminal, "w", encoding="utf-8") as tty:
         tty.write("\n  Which standard quills should your cloud have? All of them, unless you say.\n\n")
         width = max(len(o.name) for o in options)
         for number, option in enumerate(options, 1):
@@ -74,7 +78,7 @@ def _ask(options: list) -> set[str]:
         while True:
             tty.write("\n\033[1mNumbers to leave out, or Enter for all\033[0m: ")
             tty.flush()
-            answer = tty.readline().replace(",", " ").split()
+            answer = keys.readline().replace(",", " ").split()
             try:
                 out = {int(a) for a in answer}
             except ValueError:
@@ -84,8 +88,6 @@ def _ask(options: list) -> set[str]:
                 tty.write(f"Between 1 and {len(options)}, please.\n")
                 continue
             return {o.id for n, o in enumerate(options, 1) if n not in out}
-    finally:
-        tty.close()
 
 
 @app.command("choose")
