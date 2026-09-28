@@ -139,9 +139,9 @@ def available() -> bool:
 
 # -- the sandbox process -----------------------------------------------------------------
 def _module(engine, runtime: Path):
-    import wasmtime
-
     from importlib.metadata import version
+
+    import wasmtime
 
     cache = runtime / f"python-wasmtime-{version('wasmtime')}.cwasm"
     if cache.is_file():
@@ -377,7 +377,7 @@ class Guest:
 
 def answer(host: HostFunction, op: str, args: dict) -> dict:
     """A host request answered: {ok, value} or {ok: false, kind, message}."""
-    from cloudmorrow.quill.context import HostError, ERRORS
+    from cloudmorrow.quill.context import ERRORS, HostError
 
     try:
         return {"t": "reply", "ok": True, "value": host(op, args)}

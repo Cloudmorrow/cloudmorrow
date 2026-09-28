@@ -51,8 +51,8 @@ from cloudmorrow.quill import context as sdk
 from cloudmorrow.quill import ui
 from cloudmorrow.sandbox import CALL_TIMEOUT, Failed, Guest, InProcessGuest, SandboxError
 from cloudmorrow.server.codespec import action_fields
-from cloudmorrow.server.db import connect
 from cloudmorrow.server.datamodels import parse_duration
+from cloudmorrow.server.db import connect
 from cloudmorrow.server.quills import Manifest
 from cloudmorrow.server.quillservices import ServiceLog
 from cloudmorrow.server.quilltokens import runs_as

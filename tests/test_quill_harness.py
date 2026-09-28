@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from cloudmorrow.quill.testing import Harness, HandlerFailed
+from cloudmorrow.quill.testing import HandlerFailed, Harness
 from tests.conftest import QUILL_CATALOG
 
 FLEET = Path(__file__).parent / "fixtures" / "quill-fleet"
