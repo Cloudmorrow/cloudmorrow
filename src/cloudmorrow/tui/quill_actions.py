@@ -1,0 +1,485 @@
+"""A Quill's actions in the terminal: pressing one, its form, and what it asks for next.
+
+An action is declared in the Quill's manifest and runs its code on the
+server (docs/QUILLCODE.md, *Actions, on every surface*). The terminal draws
+it in three places, and all three press it here:
+
+- on the record sheet of every record of the datamodel it is `on`, whichever
+  Quill declared it (screens/record_sheet.py);
+- in a view, wherever a `button`, `form`, `empty` or `table` names it
+  (panes/kit_view.py);
+- and, for the actions that are not on a record, in the actions palette on
+  ctrl+e, from anywhere in the workspace (`QuillCommands`).
+
+Pressing one asks first when the manifest says `confirm`, then draws its
+form — the fields the manifest declares, each with the widget its kind has
+on the record sheet — unless it has none, or the button already said every
+one of them. What comes back is a list of effects, and `apply_effects` is
+the one place they are carried out, for every surface in here:
+
+    toast     a line in the corner that goes away (Textual's notify)
+    open      the record's sheet
+    go        another screen of the Quill, with its parameters
+    confirm   a question; on yes, the action `then`, with `args`, on the same record
+    error     said under the form, which stays open; a notice when there is none
+    redraw    nothing here: whoever pressed it draws again anyway
+
+The server's own words are used wherever it refuses (`{kind, message}`).
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Iterator
+from functools import partial
+from typing import Any
+
+import httpx
+from textual.app import ComposeResult
+from textual.command import DiscoveryHit, Hit, Hits, Provider
+from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.widget import Widget
+from textual.widgets import Button, Input, Label, Static
+
+from cloudmorrow.client.api import ApiError, AuthError
+from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
+from cloudmorrow.tui.screens.record_sheet import (
+    LONG_KINDS,
+    RecordSheet,
+    field_widget,
+    link_choices,
+    read_field,
+)
+from cloudmorrow.tui.theme import BAD
+from cloudmorrow.tui.widgets.kit import field_label, safe_id, title_of
+
+# A button's look for each tone an action or a view's button may have: the
+# amber primary action, the red one that cannot be taken back, and the rest.
+VARIANTS = {"primary": "primary", "danger": "error"}
+
+
+def variant_for(tone: object) -> str:
+    return VARIANTS.get(str(tone or ""), "default")
+
+
+# -- which actions there are --------------------------------------------------
+def installed(app: Any) -> list[dict]:
+    """The Quills as the server last said, fitted to this person (see the workspace)."""
+    return [q for q in (getattr(app, "quills", None) or []) if q.get("enabled", True)]
+
+
+def actions_on(quills: list[dict], model_id: str) -> list[tuple[dict, dict]]:
+    """Every (Quill, action) `on` *model_id*, in the Quills' order: the sheet's buttons."""
+    return [
+        (quill, action)
+        for quill in quills
+        for action in quill.get("actions") or []
+        if action.get("on") == model_id
+    ]
+
+
+def loose_actions(quills: list[dict]) -> list[tuple[dict, dict]]:
+    """Every (Quill, action) not on a record: the palette's."""
+    return [
+        (quill, action)
+        for quill in quills
+        for action in quill.get("actions") or []
+        if not action.get("on")
+    ]
+
+
+def find_action(quill: dict, action_id: str) -> dict | None:
+    return next((a for a in quill.get("actions") or [] if a.get("id") == action_id), None)
+
+
+def all_models(app: Any, quill: dict | None = None) -> dict:
+    """Every datamodel any installed Quill brought, *quill*'s own winning."""
+    models: dict = {}
+    for other in installed(app):
+        models.update(other.get("models") or {})
+    if quill is not None:
+        models.update(quill.get("models") or {})
+    return models
+
+
+# -- talking to the server ------------------------------------------------------
+async def _send(api: Any, method: str, url: str, **kwargs: Any) -> Any:
+    """One call on the client's own connection, with the Quill's words when it refuses.
+
+    The client says a refusal as its detail, which for Quill code is
+    `{kind, message}`; here the message is the error, and the kind is kept
+    as its payload.
+    """
+    try:
+        response = await api._client.request(method, url, headers=api._headers(), **kwargs)
+    except httpx.HTTPError as exc:
+        raise ApiError(f"cannot reach the server: {exc}") from exc
+    if response.status_code < 400:
+        return response.json()
+    try:
+        detail = response.json().get("detail")
+    except (ValueError, AttributeError):
+        detail = response.text or f"HTTP {response.status_code}"
+    if response.status_code == 401:
+        raise AuthError(str(detail), status_code=401)
+    if isinstance(detail, dict) and "message" in detail:
+        raise ApiError(str(detail["message"]), status_code=response.status_code, payload=detail)
+    raise ApiError(str(detail), status_code=response.status_code, payload=detail)
+
+
+async def fetch_view(api: Any, quill_id: str, screen_id: str, params: dict | None = None) -> dict:
+    """A view's tree, drawn for whoever is signed in: `{"quill", "screen", "tree"}`."""
+    clean = {k: str(v) for k, v in (params or {}).items() if v not in (None, "")}
+    return await _send(api, "GET", f"/api/quills/{quill_id}/views/{screen_id}", params=clean)
+
+
+async def press(
+    api: Any, quill_id: str, action_id: str, *, record: str = "", fields: dict | None = None
+) -> list[dict]:
+    """Run an action on the server, as whoever is signed in. Its effects."""
+    body: dict = {"fields": dict(fields or {})}
+    if record:
+        body["record"] = record
+    answer = await _send(api, "POST", f"/api/quills/{quill_id}/actions/{action_id}", json=body)
+    return list((answer or {}).get("effects") or [])
+
+
+def failure(effects: list[dict]) -> str | None:
+    """What an `error` effect says, if the action answered with one."""
+    for effect in effects:
+        if effect.get("effect") == "error":
+            return str(effect.get("text") or "That did not work.")
+    return None
+
+
+# -- an action's form -------------------------------------------------------------
+class FormProblem(ValueError):
+    """What is wrong with a form as filled in, and the widget it is wrong in."""
+
+    def __init__(self, message: str, widget: Widget | None) -> None:
+        super().__init__(message)
+        self.widget = widget
+
+
+class ActionFields(Vertical):
+    """An action's fields, a row each, with the record sheet's widget for each kind."""
+
+    def __init__(
+        self,
+        fields: list[dict],
+        *,
+        values: dict | None = None,
+        choices: dict[str, list[tuple[str, str]]] | None = None,
+        prefix: str = "action",
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.fields = list(fields)
+        self.values = dict(values or {})
+        self.choices = choices or {}
+        self.prefix = prefix
+        self.add_class("action-fields")
+
+    def wid(self, field: dict) -> str:
+        return f"{self.prefix}-{safe_id(field['name'])}"
+
+    def compose(self) -> ComposeResult:
+        for field in self.fields:
+            long = field.get("kind") in LONG_KINDS
+            with Horizontal(classes="sheet-row" + (" -long" if long else "")):
+                label = field_label(field) + (" *" if field.get("required") else "")
+                yield Static(label, classes="sheet-label")
+                name = field["name"]
+                value = self.values.get(name, field.get("default"))
+                yield field_widget(field, value, self.wid(field), choices=self.choices.get(name))
+
+    def first(self) -> Widget | None:
+        for field in self.fields:
+            widget = self._widget(field)
+            if widget is not None and widget.focusable:
+                return widget
+        return None
+
+    def _widget(self, field: dict) -> Widget | None:
+        try:
+            return self.query_one(f"#{self.wid(field)}")
+        except Exception:
+            return None
+
+    def collect(self) -> dict:
+        """The fields as the action wants them; FormProblem when one is wrong or missing."""
+        out: dict = {}
+        for field in self.fields:
+            widget = self._widget(field)
+            try:
+                value = read_field(widget, field)
+            except ValueError as exc:
+                raise FormProblem(str(exc), widget) from None
+            if field.get("required") and value in (None, ""):
+                raise FormProblem(f"{field_label(field)} is needed.", widget)
+            if value in (None, ""):
+                continue  # left empty: the handler's default decides
+            out[field["name"]] = value
+        return out
+
+
+class ActionModal(Modal[list | None]):
+    """An action's form as a dialog: its fields, and a button that runs it.
+
+    It presses the action itself, so an `error` it answers with is said here
+    with the form still open and still filled in. It dismisses with the
+    effects to carry out, or None when nothing ran.
+    """
+
+    BINDINGS = [
+        ("escape", "cancel", "Cancel"),
+        ("ctrl+s", "submit", "Run"),
+    ]
+
+    def __init__(
+        self,
+        api: Any,
+        quill: dict,
+        action: dict,
+        *,
+        record: dict | None = None,
+        values: dict | None = None,
+        choices: dict[str, list[tuple[str, str]]] | None = None,
+    ) -> None:
+        super().__init__()
+        self.api = api
+        self.quill = quill
+        self.action = action
+        self.record = record
+        self.values = dict(values or {})
+        self.choices = choices or {}
+
+    def compose(self) -> ComposeResult:
+        heading = str(self.action.get("label") or self.action.get("id"))
+        if self.record is not None:
+            models = self.quill.get("models") or {}
+            heading += f" · {title_of(self.record, models.get(self.record.get('model', '')))}"
+        with Vertical(classes="modal modal-wide", id="action-form"):
+            yield Label(heading, classes="modal-title")
+            if self.action.get("description"):
+                yield Static(str(self.action["description"]), classes="modal-detail", markup=False)
+            with VerticalScroll(id="action-fields"):
+                yield ActionFields(
+                    self.action.get("fields") or [],
+                    values=self.values,
+                    choices=self.choices,
+                    id="action-form-fields",
+                )
+            yield Static("", id="action-complaint", classes="modal-detail")
+            with Horizontal(classes="modal-buttons"):
+                yield Button("Cancel", id="cancel")
+                yield Button(
+                    str(self.action.get("label") or "Run"),
+                    variant=variant_for(self.action.get("tone") or "primary"),
+                    id="action-submit",
+                )
+
+    def on_mount(self) -> None:
+        first = self.query_one(ActionFields).first()
+        if first is not None:
+            first.focus()
+
+    def say(self, message: str) -> None:
+        self.query_one("#action-complaint", Static).update(
+            f"[{BAD}]{_escape(message)}[/]" if message else ""
+        )
+
+    async def action_submit(self) -> None:
+        try:
+            fields = {**self.values, **self.query_one(ActionFields).collect()}
+        except FormProblem as problem:
+            self.say(str(problem))
+            if problem.widget is not None and problem.widget.focusable:
+                problem.widget.focus()
+            return
+        self.say("")
+        try:
+            effects = await press(
+                self.api,
+                str(self.quill["id"]),
+                str(self.action["id"]),
+                record=str((self.record or {}).get("id") or ""),
+                fields=fields,
+            )
+        except AuthError:
+            self.dismiss(None)
+            await self.app.sign_out(message="Session expired — sign in again.")
+            return
+        except ApiError as exc:
+            self.say(str(exc))
+            return
+        said = failure(effects)
+        if said is not None:
+            self.say(said)
+            return
+        self.dismiss(effects)
+
+    async def on_button_pressed(self, event: Button.Pressed) -> None:
+        event.stop()
+        if event.button.id == "action-submit":
+            await self.action_submit()
+        else:
+            self.dismiss(None)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Enter moves to the next field, as on the record sheet."""
+        event.stop()
+        self.focus_next()
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+def _escape(text: object) -> str:
+    return str(text or "").replace("[", r"\[")
+
+
+# -- pressing one, and what comes of it -------------------------------------------------
+async def run_action(
+    app: Any,
+    quill: dict,
+    action: dict,
+    *,
+    record: dict | None = None,
+    values: dict | None = None,
+    ask: bool = True,
+    leave: Callable[[], None] | None = None,
+) -> bool:
+    """Press *action*, on *record* when it is on one: ask, fill in, run, carry out.
+
+    *values* fill its form (a button's `args`); when they say every field it
+    has, there is no form to fill. *leave* is called before the workspace
+    goes to another screen, so a dialog this was pressed in gets out of the
+    way. Called from a worker: it waits on the dialogs. True when it ran.
+    """
+    api = app.client
+    values = dict(values or {})
+    if ask and action.get("confirm"):
+        yes = await app.push_screen_wait(
+            ConfirmModal(str(action["confirm"]), confirm_label=str(action.get("label") or "Yes"))
+        )
+        if not yes:
+            return False
+    fields = action.get("fields") or []
+    if any(field["name"] not in values for field in fields):
+        choices = await link_choices(api, all_models(app, quill), {"fields": fields})
+        effects = await app.push_screen_wait(
+            ActionModal(api, quill, action, record=record, values=values, choices=choices)
+        )
+        if effects is None:
+            return False
+    else:
+        try:
+            effects = await press(
+                api, str(quill["id"]), str(action["id"]),
+                record=str((record or {}).get("id") or ""), fields=values,
+            )
+        except AuthError:
+            await app.sign_out(message="Session expired — sign in again.")
+            return False
+        except ApiError as exc:
+            app.notify(str(exc), title=str(action.get("label") or ""), severity="error")
+            return False
+    await apply_effects(app, quill, effects, record=record, leave=leave)
+    return True
+
+
+async def apply_effects(
+    app: Any,
+    quill: dict,
+    effects: list[dict],
+    *,
+    record: dict | None = None,
+    leave: Callable[[], None] | None = None,
+) -> None:
+    """Carry out what an action (or a confirm's `then`) answered, in order."""
+    for effect in effects:
+        kind = effect.get("effect")
+        if kind == "toast":
+            app.notify(str(effect.get("text") or ""), title=str(quill.get("name") or ""))
+        elif kind == "error":
+            app.notify(str(effect.get("text") or ""), title=str(quill.get("name") or ""),
+                       severity="error")
+        elif kind == "open":
+            model_id, record_id = str(effect.get("model") or ""), str(effect.get("id") or "")
+            await open_record(app, quill, model_id, record_id)
+        elif kind == "go":
+            if leave is not None:
+                leave()
+            screen_id = str(effect.get("screen") or "")
+            go_to(app, str(quill["id"]), screen_id, effect.get("params") or {})
+        elif kind == "confirm":
+            then = find_action(quill, str(effect.get("then") or ""))
+            if then is None:
+                app.notify(f"{quill.get('name')} has no action {effect.get('then')!r}.",
+                           severity="error")
+                continue
+            yes = await app.push_screen_wait(
+                ConfirmModal(str(effect.get("text") or ""),
+                             confirm_label=str(then.get("label") or "Yes"))
+            )
+            if yes:
+                await run_action(app, quill, then, record=record, values=effect.get("args") or {},
+                                 ask=False, leave=leave)
+        # `redraw` is what every caller does after an action anyway.
+
+
+async def open_record(app: Any, quill: dict, model_id: str, record_id: str) -> dict | str | None:
+    """The record sheet, for one record of any datamodel this person has. Waits on it."""
+    api = app.client
+    models = all_models(app, quill)
+    if model_id not in models or not record_id:
+        app.notify(f"There is no {model_id or 'record'} here to open.", severity="error")
+        return None
+    try:
+        record = await api.record(model_id, record_id)
+    except AuthError:
+        await app.sign_out(message="Session expired — sign in again.")
+        return None
+    except ApiError as exc:
+        app.notify(str(exc), severity="error")
+        return None
+    choices = await link_choices(api, models, models[model_id])
+    return await app.push_screen_wait(
+        RecordSheet(api, models, model_id, record=record, choices=choices)
+    )
+
+
+def go_to(app: Any, quill_id: str, screen_id: str, params: dict) -> None:
+    """To another screen of the Quill: the workspace knows where its pane is."""
+    for screen in reversed(app.screen_stack):
+        going = getattr(screen, "go_to", None)
+        if callable(going):
+            going(quill_id, screen_id, params)
+            return
+
+
+# -- the palette -----------------------------------------------------------------------
+class QuillCommands(Provider):
+    """ctrl+e: every action not on a record, from every Quill, found by typing."""
+
+    def _commands(self) -> Iterator[tuple[str, str, dict, dict]]:
+        for quill, action in loose_actions(installed(self.app)):
+            name = f"{quill.get('name') or quill['id']}: {action.get('label') or action['id']}"
+            yield name, str(action.get("description") or ""), quill, action
+
+    async def discover(self) -> Hits:
+        for name, help_text, quill, action in self._commands():
+            yield DiscoveryHit(name, partial(self._run, quill, action), help=help_text or None)
+
+    async def search(self, query: str) -> Hits:
+        matcher = self.matcher(query)
+        for name, help_text, quill, action in self._commands():
+            score = matcher.match(name)
+            if score > 0:
+                yield Hit(score, matcher.highlight(name), partial(self._run, quill, action),
+                          text=name, help=help_text or None)
+
+    def _run(self, quill: dict, action: dict) -> None:
+        runner = getattr(self.screen, "run_quill_action", None)
+        if callable(runner):
+            runner(quill, action)

@@ -31,6 +31,10 @@ third section, ADMINISTRATION, whose entries put the server's own panel —
 accounts, features, Quills — in place of the workspace. A feature switched
 off there loses its card here, for everybody.
 
+A Quill's actions that are not on a record (docs/QUILLCODE.md) are in the
+actions palette, ctrl+e, from anywhere here: type to find one, enter to run
+it (tui/quill_actions.py).
+
 Everything here is clickable — the cards, the rows, the buttons — and
 everything clickable also has a key. Neither way is the "real" one, so the
 key is written on the thing it works: on the card, on the Settings button,
@@ -55,6 +59,7 @@ from cloudmorrow.tui import sharemounts  # noqa: F401
 from cloudmorrow.tui.panes.admin import AdminPanel
 from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.panes.kit import pane_for, screen_key
+from cloudmorrow.tui.quill_actions import QuillCommands, loose_actions, run_action
 from cloudmorrow.tui.screens.modals import PasswordModal
 from cloudmorrow.tui.screens.notifications import (
     NOTIFICATIONS,
@@ -128,6 +133,7 @@ class WorkspaceScreen(Screen):
         Binding("f9", "administration", "Administration", show=False),
         Binding("ctrl+g", "settings", "Settings", show=False),
         Binding("f8", "notifications", "Notifications", show=False),
+        Binding("ctrl+e", "quill_actions", "Actions", show=False),
         ("ctrl+r", "refresh", "Refresh"),
     ]
 
@@ -336,6 +342,8 @@ class WorkspaceScreen(Screen):
         except ApiError:
             # Keep what is there: a Quill is not worth losing to a blip.
             return
+        # Their actions, for the record sheet and the palette.
+        self.app.quills = [q for q in quills if q.get("available") is not False]
         wanted: dict[str, tuple[dict, dict, str]] = {}
         for quill in quills:
             if quill.get("available") is False:
@@ -416,6 +424,49 @@ class WorkspaceScreen(Screen):
         self._quill_panes.pop(key, None)
         self._feature_of.pop(key, None)
         self._quill_keys.pop(key, None)
+
+    def go_to(self, quill_id: str, screen_id: str, params: dict | None = None) -> None:
+        """A Quill's `go`: to one of its screens, a view asked again with *params*."""
+        quill = next((q for q in self.app.quills if q.get("id") == quill_id), None)
+        screen = next(
+            (s for s in (quill or {}).get("screens") or [] if s.get("id") == screen_id), None
+        )
+        if quill is None or screen is None:
+            self.set_status(f"{quill_id} has no screen called {screen_id}.", error=True)
+            return
+        key = screen_key(quill, screen)
+        found = self.query(f"#pane-{key}")
+        if not found:
+            return
+        pane = found.first()
+        if hasattr(pane, "params"):
+            pane.params = dict(params or {})
+        if self.query_one("#panes", ContentSwitcher).current == f"pane-{key}":
+            pane.reload()
+        self.action_show_pane(key)
+
+    # -- a Quill's actions -------------------------------------------------
+    def action_quill_actions(self) -> None:
+        """ctrl+e: the palette of every action not on a record."""
+        from textual.command import CommandPalette
+
+        if not loose_actions([q for q in self.app.quills if q.get("enabled", True)]):
+            self.set_status("No Quill here has an action of its own.", error=True)
+            return
+        self.app.push_screen(
+            CommandPalette(providers=[QuillCommands], placeholder="Run a Quill action…")
+        )
+
+    def run_quill_action(self, quill: dict, action: dict) -> None:
+        """One chosen in the palette: run it, then draw the pane you are on again."""
+        self._run_quill_action(quill, action)
+
+    @work(group="quill-action")
+    async def _run_quill_action(self, quill: dict, action: dict) -> None:
+        if await run_action(self.app, quill, action):
+            pane = self.active_pane
+            if pane is not None and not self.admin_showing:
+                pane.reload()
 
     def action_quill_key(self, function_key: str) -> None:
         """One of the free function keys: the Quill card that holds it, if any."""

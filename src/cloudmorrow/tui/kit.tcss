@@ -161,3 +161,50 @@
 #quill-sheet-body Static, #quill-services-body Static {
     height: auto;
 }
+
+/* The Quill actions on a record (tui/quill_actions.py), under its fields. */
+#sheet-actions {
+    height: auto;
+    margin-top: 1;
+}
+
+#sheet-actions Button {
+    height: 1;
+    min-width: 6;
+    margin-right: 1;
+    padding: 0 1;
+    border: none;
+    color: $foreground;
+    background: $panel;
+}
+
+#sheet-actions Button:hover {
+    background: $line-bright;
+}
+
+#sheet-actions Button.-primary {
+    color: $action-ink;
+    background: $action;
+    text-style: bold;
+}
+
+#sheet-actions Button.-error {
+    color: $error;
+    background: transparent;
+}
+
+#action-fields {
+    height: auto;
+    max-height: 62vh;
+    scrollbar-size-vertical: 1;
+}
+
+.action-fields {
+    height: auto;
+}
+
+/* A long text in an action's form sits on the page, not in a dialog of its
+   own: it needs the input's ground to be seen as a box. */
+.action-fields .sheet-text {
+    background: $surface;
+}

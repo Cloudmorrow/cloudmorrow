@@ -28,6 +28,13 @@ A record of a datamodel you may only read (docs/CIRCLES.md) opens the same
 sheet with every field written out rather than typed into, and Close in
 place of Save and Delete.
 
+Under the fields, a button for every Quill action `on` the record's
+datamodel, whichever installed Quill declared it (docs/QUILLCODE.md,
+*Actions, on every surface*). Pressing one runs it through
+tui/quill_actions.py — its confirm, its form, its effects — and the sheet
+then shows the record as the action left it. Closing a sheet an action ran
+on answers with the record, so whatever opened it draws again.
+
 The sheet talks to the server itself, the way the password dialog does, so a
 conflict is said here with the sheet still open: a save carries the record's
 `rev`, and when somebody else got there first (409) the sheet says so and
@@ -135,6 +142,162 @@ def shown(field: dict, value: Any) -> str:
     return str(value)
 
 
+def field_widget(
+    field: dict, value: Any, wid: str, *, choices: list[tuple[str, str]] | None = None
+):
+    """The one widget that edits a field of *field*'s kind, holding *value*.
+
+    The sheet's, and the same for an action's form (tui/quill_actions.py)
+    and a view's editable `field`, so a kind is drawn one way everywhere.
+    *choices* are a link field's (title, id) pairs.
+    """
+    from cloudmorrow.tui.widgets.editor import LiveMarkdownEditor
+
+    kind = field.get("kind")
+    if field.get("secret"):
+        return Input(
+            str(value) if value not in (None, "") else "",
+            placeholder="hidden · ctrl+r shows it",
+            password=True,
+            id=wid,
+            classes="sheet-secret",
+            compact=True,
+        )
+    if kind == "markdown":
+        return LiveMarkdownEditor(str(value or ""), id=wid, classes="sheet-markdown")
+    if kind in ("text", "json"):
+        if kind == "json" and value is not None:
+            text = json.dumps(value, indent=2)
+        else:
+            text = str(value or "")
+        return TextArea(text, id=wid, classes="sheet-text", soft_wrap=True, compact=True)
+    if kind == "bool":
+        return Checkbox("", value=bool(value), id=wid, compact=True)
+    if kind == "enum":
+        options = enum_options(field)
+        if len(options) <= MAX_RADIOS:
+            current = str(value) if value is not None else ""
+            return RadioSet(
+                *(
+                    RadioButton(label, value=option == current, id=f"{wid}--{safe_id(option)}")
+                    for option, label in options
+                ),
+                id=wid,
+                classes="sheet-radios",
+                compact=True,
+            )
+        return Select(
+            [(label, option) for option, label in options],
+            value=str(value) if value is not None else Select.NULL,
+            allow_blank=not field.get("required"),
+            id=wid,
+            compact=True,
+        )
+    if kind == "link":
+        options = [(label, key) for label, key in choices or []]
+        current = str(value) if value not in (None, "") else None
+        if current is not None and current not in {key for _, key in options}:
+            # Pointing at something this account cannot list: keep it,
+            # rather than quietly moving the record elsewhere on save.
+            options.append((current, current))
+        return Select(
+            options,
+            value=current if current is not None else Select.NULL,
+            allow_blank=not field.get("required") or current is None,
+            prompt="—",
+            id=wid,
+            compact=True,
+        )
+    text = str(value) if value not in (None, "") else ""
+    if kind == "datetime" and text:
+        text = _as_local(text)
+    input_type = {"int": "integer", "decimal": "number"}.get(kind or "", "text")
+    return Input(
+        text,
+        placeholder=PLACEHOLDERS.get(kind or "", ""),
+        type=input_type,
+        id=wid,
+        compact=True,
+    )
+
+
+def read_field(widget: Any, field: dict) -> Any:
+    """What *widget*, drawn by `field_widget` for *field*, holds now, as the API wants it.
+
+    Raises ValueError with what is wrong, said the way a person would.
+    """
+    from cloudmorrow.tui.widgets.editor import LiveMarkdownEditor
+
+    kind = field.get("kind")
+    label = field_label(field)
+    if isinstance(widget, LiveMarkdownEditor):
+        return widget.text
+    if isinstance(widget, TextArea):
+        text = widget.text
+        if kind == "json":
+            if not text.strip():
+                return None
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{label} is not valid JSON: {exc.msg}.") from None
+        return text
+    if isinstance(widget, Checkbox):
+        return widget.value
+    if isinstance(widget, RadioSet):
+        pressed = widget.pressed_button
+        if pressed is None or not pressed.id:
+            return None
+        index = widget.pressed_index
+        options = enum_options(field)
+        return options[index][0] if 0 <= index < len(options) else None
+    if isinstance(widget, Select):
+        return None if widget.is_blank() else widget.value
+    if isinstance(widget, Input) and field.get("secret"):
+        # Exactly as typed: a password's spaces are part of it.
+        return widget.value
+    if isinstance(widget, Input):
+        text = widget.value.strip()
+        if not text:
+            return "" if kind in ("string", "email", "phone", "url") else None
+        if kind == "int":
+            try:
+                return int(text)
+            except ValueError:
+                raise ValueError(f"{label} is a whole number.") from None
+        if kind == "decimal":
+            try:
+                float(text)
+            except ValueError:
+                raise ValueError(f"{label} is a number.") from None
+            return text
+        if kind == "date":
+            try:
+                return dt.date.fromisoformat(text).isoformat()
+            except ValueError:
+                raise ValueError(f"{label} is a date, like 2026-09-26.") from None
+        if kind == "datetime":
+            try:
+                if len(text) == 10:
+                    # A date alone is a whole day, and stays one.
+                    return dt.date.fromisoformat(text).isoformat()
+                moment = dt.datetime.fromisoformat(text)
+            except ValueError:
+                raise ValueError(
+                    f"{label} is a date and a time, like 2026-09-26 14:30."
+                ) from None
+            if moment.tzinfo is None:
+                # Typed here with no zone: the time on the wall, as typed.
+                return moment.isoformat(timespec="minutes")
+            return moment.isoformat(timespec="seconds")
+        if kind == "email" and "@" not in text:
+            raise ValueError(f"{label} is an email address.")
+        if kind == "url" and "://" not in text:
+            raise ValueError(f"{label} is a web address, starting https://.")
+        return text
+    return None
+
+
 class RecordSheet(Modal[dict | str | None]):
     """Every field of one record, with Save, Delete and Cancel."""
 
@@ -175,6 +338,10 @@ class RecordSheet(Modal[dict | str | None]):
         self.fields = self._ordered(only)
         # Whether this person may change it; when not, it is looked at.
         self.writes = can_write(self.model)
+        # The Quill actions on this record, as (Quill, action); found when drawn.
+        self.actions: list[tuple[dict, dict]] = []
+        # Whether one of them ran, so closing says the record changed.
+        self.acted = False
 
     # -- which fields, in which order ------------------------------------------
     def _ordered(self, only: list[str] | None) -> list[dict]:
@@ -217,6 +384,21 @@ class RecordSheet(Modal[dict | str | None]):
                             label += " *"
                         yield Static(label, classes="sheet-label")
                         yield self._widget(field)
+            if self.record is not None:
+                from cloudmorrow.tui.quill_actions import actions_on, installed, variant_for
+
+                self.actions = actions_on(installed(self.app), self.model_id)
+            if self.actions:
+                with Horizontal(id="sheet-actions"):
+                    for index, (_quill, action) in enumerate(self.actions):
+                        button = Button(
+                            str(action.get("label") or action["id"]),
+                            variant=variant_for(action.get("tone")),
+                            id=f"sheet-act-{index}",
+                            compact=True,
+                        )
+                        button.tooltip = str(action.get("description") or "") or None
+                        yield button
             yield Static("", id="sheet-complaint", classes="modal-detail")
             with Horizontal(classes="modal-buttons"):
                 if not self.writes:
@@ -229,82 +411,15 @@ class RecordSheet(Modal[dict | str | None]):
 
     def _widget(self, field: dict):
         """The one widget for this field's kind, holding its value."""
-        from cloudmorrow.tui.widgets.editor import LiveMarkdownEditor
-
         name = field["name"]
         wid = f"field-{safe_id(name)}"
         value = self._value(field)
-        kind = field.get("kind")
         if read_only(field):
             note = shown(field, value)
             return Static(f"{note}  [{MUTED}]set by the server[/]", id=wid, classes="sheet-fixed")
         if not self.writes:
             return self._looked_at(field, value, wid)
-        if field.get("secret"):
-            return Input(
-                str(value) if value not in (None, "") else "",
-                placeholder="hidden · ctrl+r shows it",
-                password=True,
-                id=wid,
-                classes="sheet-secret",
-                compact=True,
-            )
-        if kind == "markdown":
-            return LiveMarkdownEditor(str(value or ""), id=wid, classes="sheet-markdown")
-        if kind in ("text", "json"):
-            if kind == "json" and value is not None:
-                text = json.dumps(value, indent=2)
-            else:
-                text = str(value or "")
-            return TextArea(text, id=wid, classes="sheet-text", soft_wrap=True, compact=True)
-        if kind == "bool":
-            return Checkbox("", value=bool(value), id=wid, compact=True)
-        if kind == "enum":
-            options = enum_options(field)
-            if len(options) <= MAX_RADIOS:
-                current = str(value) if value is not None else ""
-                return RadioSet(
-                    *(
-                        RadioButton(label, value=option == current, id=f"{wid}--{safe_id(option)}")
-                        for option, label in options
-                    ),
-                    id=wid,
-                    classes="sheet-radios",
-                    compact=True,
-                )
-            return Select(
-                [(label, option) for option, label in options],
-                value=str(value) if value is not None else Select.NULL,
-                allow_blank=not field.get("required"),
-                id=wid,
-                compact=True,
-            )
-        if kind == "link":
-            options = [(label, key) for label, key in self.choices.get(name, [])]
-            current = str(value) if value not in (None, "") else None
-            if current is not None and current not in {key for _, key in options}:
-                # Pointing at something this account cannot list: keep it,
-                # rather than quietly moving the record elsewhere on save.
-                options.append((current, current))
-            return Select(
-                options,
-                value=current if current is not None else Select.NULL,
-                allow_blank=not field.get("required") or current is None,
-                prompt="—",
-                id=wid,
-                compact=True,
-            )
-        text = str(value) if value not in (None, "") else ""
-        if kind == "datetime" and text:
-            text = _as_local(text)
-        input_type = {"int": "integer", "decimal": "number"}.get(kind or "", "text")
-        return Input(
-            text,
-            placeholder=PLACEHOLDERS.get(kind or "", ""),
-            type=input_type,
-            id=wid,
-            compact=True,
-        )
+        return field_widget(field, value, wid, choices=self.choices.get(name, []))
 
     def _looked_at(self, field: dict, value: Any, wid: str):
         """A field on a record that cannot be changed here: written out.
@@ -357,77 +472,7 @@ class RecordSheet(Modal[dict | str | None]):
 
         Raises ValueError with what is wrong, said the way a person would.
         """
-        from cloudmorrow.tui.widgets.editor import LiveMarkdownEditor
-
-        widget = self._field_widget(field)
-        kind = field.get("kind")
-        label = field_label(field)
-        if isinstance(widget, LiveMarkdownEditor):
-            return widget.text
-        if isinstance(widget, TextArea):
-            text = widget.text
-            if kind == "json":
-                if not text.strip():
-                    return None
-                try:
-                    return json.loads(text)
-                except json.JSONDecodeError as exc:
-                    raise ValueError(f"{label} is not valid JSON: {exc.msg}.") from None
-            return text
-        if isinstance(widget, Checkbox):
-            return widget.value
-        if isinstance(widget, RadioSet):
-            pressed = widget.pressed_button
-            if pressed is None or not pressed.id:
-                return None
-            index = widget.pressed_index
-            options = enum_options(field)
-            return options[index][0] if 0 <= index < len(options) else None
-        if isinstance(widget, Select):
-            return None if widget.is_blank() else widget.value
-        if isinstance(widget, Input) and field.get("secret"):
-            # Exactly as typed: a password's spaces are part of it.
-            return widget.value
-        if isinstance(widget, Input):
-            text = widget.value.strip()
-            if not text:
-                return "" if kind in ("string", "email", "phone", "url") else None
-            if kind == "int":
-                try:
-                    return int(text)
-                except ValueError:
-                    raise ValueError(f"{label} is a whole number.") from None
-            if kind == "decimal":
-                try:
-                    float(text)
-                except ValueError:
-                    raise ValueError(f"{label} is a number.") from None
-                return text
-            if kind == "date":
-                try:
-                    return dt.date.fromisoformat(text).isoformat()
-                except ValueError:
-                    raise ValueError(f"{label} is a date, like 2026-09-26.") from None
-            if kind == "datetime":
-                try:
-                    if len(text) == 10:
-                        # A date alone is a whole day, and stays one.
-                        return dt.date.fromisoformat(text).isoformat()
-                    moment = dt.datetime.fromisoformat(text)
-                except ValueError:
-                    raise ValueError(
-                        f"{label} is a date and a time, like 2026-09-26 14:30."
-                    ) from None
-                if moment.tzinfo is None:
-                    # Typed here with no zone: the time on the wall, as typed.
-                    return moment.isoformat(timespec="minutes")
-                return moment.isoformat(timespec="seconds")
-            if kind == "email" and "@" not in text:
-                raise ValueError(f"{label} is an email address.")
-            if kind == "url" and "://" not in text:
-                raise ValueError(f"{label} is a web address, starting https://.")
-            return text
-        return None
+        return read_field(self._field_widget(field), field)
 
     def _collect(self) -> dict | None:
         """The fields to send: every one on a new record, the changed on an old one."""
@@ -509,6 +554,15 @@ class RecordSheet(Modal[dict | str | None]):
         except ApiError as exc:
             self._say(f"It changed elsewhere, and could not be read again: {exc}")
             return
+        await self._show(fresh)
+        self._say(
+            "This changed somewhere else while it was open. Theirs is shown now — "
+            "make your change again and save.",
+            colour=WARN,
+        )
+
+    async def _show(self, fresh: dict) -> None:
+        """Every field's widget again, holding what *fresh* says."""
         self.record = fresh
         for field in self.fields:
             old = self._field_widget(field)
@@ -519,20 +573,44 @@ class RecordSheet(Modal[dict | str | None]):
             row = old.parent
             await old.remove()
             await row.mount(self._widget(field))
-        self._say(
-            "This changed somewhere else while it was open. Theirs is shown now — "
-            "make your change again and save.",
-            colour=WARN,
-        )
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         event.stop()
-        if event.button.id == "save":
+        button_id = event.button.id or ""
+        if button_id == "save":
             await self.action_save()
-        elif event.button.id == "sheet-delete":
+        elif button_id == "sheet-delete":
             self.ask_delete()
+        elif button_id.startswith("sheet-act-"):
+            index = int(button_id[len("sheet-act-") :])
+            if 0 <= index < len(self.actions):
+                # On the app, not the sheet: an action that goes to another
+                # screen closes the sheet first, and must outlive it.
+                self.app.run_worker(self._act(*self.actions[index]), group="sheet-action")
         else:
-            self.dismiss(None)
+            self.action_cancel()
+
+    # -- a Quill's actions on it --------------------------------------------------
+    async def _act(self, quill: dict, action: dict) -> None:
+        from cloudmorrow.tui.quill_actions import run_action
+
+        left = False
+
+        def leave() -> None:
+            nonlocal left
+            if not left and self.is_attached:
+                left = True
+                self.dismiss(self.record)
+
+        ran = await run_action(self.app, quill, action, record=self.record, leave=leave)
+        if not ran or left or self.record is None:
+            return
+        self.acted = True
+        try:
+            fresh = await self.client.record(self.model_id, self.record["id"])
+        except ApiError:
+            return  # gone, or no longer theirs: what is shown stays
+        await self._show(fresh)
 
     def ask_delete(self) -> None:
         if self.record is None or not self.writes:
@@ -580,7 +658,8 @@ class RecordSheet(Modal[dict | str | None]):
         self.run_worker(self.action_save(), group="sheet-save")
 
     def action_cancel(self) -> None:
-        self.dismiss(None)
+        # After an action the record is not what the pane has: say so.
+        self.dismiss(self.record if self.acted else None)
 
     def action_reveal(self) -> None:
         """ctrl+r: what a secret field holds, on screen — or off it again."""

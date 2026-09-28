@@ -36,7 +36,7 @@ class CloudmorrowApp(App):
     # admin. Later sheets win, so the frame's rules hold over the panes'.
     CSS_PATH = [
         "cloudmorrow.tcss", "chrome.tcss", "kit.tcss", "kit_editor.tcss", "kit_calendar.tcss",
-        "kit_space.tcss", "kit_grouped.tcss",
+        "kit_space.tcss", "kit_grouped.tcss", "kit_view.tcss",
     ]
     TITLE = "Cloudmorrow"
     SUB_TITLE = "your own cloud"
@@ -59,6 +59,9 @@ class CloudmorrowApp(App):
         self.username: str = ""
         # What the bell in the top bar is showing.
         self.unread: int = 0
+        # The Quills installed, as the server last said (fitted to this
+        # account): where the record sheet and the palette find their actions.
+        self.quills: list[dict] = []
         # Whether one ctrl+c has been pressed and the second is awaited.
         self._quit_armed = False
         # When the splash went up, so it can be held for a moment.
