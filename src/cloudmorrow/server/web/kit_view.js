@@ -483,7 +483,7 @@ function drawCards(v, n) {
 // the view names them. A card dragged to another lane is moved with the
 // same call the board makes, at once, and the view drawn again after.
 function drawLanes(v, n) {
-  const modelId = (n.records[0] && n.records[0].model) || v.at.screen.model;
+  const modelId = n.model || (n.records[0] && n.records[0].model) || v.at.screen.model;
   const model = v.at.quill.models[modelId];
   const f = model && fieldOf(model, n.field);
   const lanes = n.lanes && n.lanes.length
