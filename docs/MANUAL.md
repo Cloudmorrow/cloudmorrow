@@ -345,9 +345,10 @@ Three places, and only the first two matter for a normal setup:
   }
   ```
 
-  With the proxy on a *different* machine, the default loopback bind is
-  unreachable from it. Install with `--host <the app box's tailnet IP>` and
-  point the proxy there:
+  The server listens on every address by default, so
+  `http://<its IP>:8787` answers on the network too, and a proxy on a
+  *different* machine reaches it directly (`--host 127.0.0.1` keeps it to
+  a proxy on the same box):
 
   ```
   cm.hl.bramlabs.io {

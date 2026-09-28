@@ -31,7 +31,7 @@ NOTES_DIR="/srv/cloudmorrow/notes"
 DATA_DIR="/var/lib/cloudmorrow"
 CLOUD_NAME=""
 PUBLIC_URL=""
-HOST="127.0.0.1"
+HOST="0.0.0.0"
 PORT="8787"
 SERVICE_USER="cloudmorrow"
 SERVICE_NAME="cloudmorrow"
@@ -285,6 +285,12 @@ case "$HEALTH_HOST" in
 "" | 0.0.0.0 | ::) HEALTH_HOST="127.0.0.1" ;;
 esac
 HEALTH_URL="http://$HEALTH_HOST:${HEALTH_PORT:-8787}/api/health"
+# Where people on the network reach it: the machine's own IP when it
+# listens on every address, the bind address otherwise.
+case "$HOST" in
+"" | 0.0.0.0 | ::) LAN_HOST="$(hostname -I 2>/dev/null | awk '{print $1}')"; LAN_HOST="${LAN_HOST:-127.0.0.1}" ;;
+*) LAN_HOST="$HOST" ;;
+esac
 HAS_SYSTEMD=""
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
 	HAS_SYSTEMD="1"
@@ -789,7 +795,7 @@ ACCOUNT_PASSWORD=""
 AGENT_INSTALLED=""
 if [ -z "$DRY_RUN" ] && "$VENV/bin/cloudmorrow-server" agent-install \
 	--run-as "$SERVICE_USER" \
-	--url "${PUBLIC_URL:-http://$HOST:$PORT}" >/tmp/cloudmorrow-agent-install.$$ 2>&1; then
+	--url "${PUBLIC_URL:-http://$HEALTH_HOST:$PORT}" >/tmp/cloudmorrow-agent-install.$$ 2>&1; then
 	AGENT_INSTALLED="1"
 	say "the server has an agent of its own (cloudmorrow-agent.service)"
 	sed 's/^/   /' /tmp/cloudmorrow-agent-install.$$
@@ -805,7 +811,7 @@ cat <<EOF
 
   $CLOUD_NAME is installed.
 
-    address    ${PUBLIC_URL:-http://$HOST:$PORT}   (listening on $HOST:$PORT)
+    address    ${PUBLIC_URL:-http://$LAN_HOST:$PORT}   (listening on $HOST:$PORT)
     config     $CONFIG
     notes      $NOTES_DIR
     checkout   $SRC   ($BRANCH)
@@ -821,7 +827,7 @@ https://*)
   Put a reverse proxy in front of it for TLS. With Caddy, this is the whole file:
 
     $PUBLIC_HOST {
-        reverse_proxy $HOST:$PORT
+        reverse_proxy $HEALTH_HOST:$PORT
     }
 
 EOF
@@ -837,7 +843,7 @@ if [ "$EXISTING_USERS" = "0" ] && [ -z "$ACCOUNT_MADE" ] && [ -z "$DRY_RUN" ]; t
 EOF
 fi
 
-ADDRESS="${PUBLIC_URL:-http://$HOST:$PORT}"
+ADDRESS="${PUBLIC_URL:-http://$LAN_HOST:$PORT}"
 cat <<EOF
   Next:
 

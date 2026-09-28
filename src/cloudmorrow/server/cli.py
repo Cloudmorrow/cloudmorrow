@@ -331,7 +331,9 @@ def agent_install(
         account = admins[0]
 
     machine = name or socket.gethostname().split(".")[0].lower()
-    reach = (url or cfg.public_url or f"http://{cfg.host}:{cfg.port}").rstrip("/")
+    from cloudmorrow.server.quillservices import loopback_url
+
+    reach = (url or cfg.public_url or loopback_url(cfg)).rstrip("/")
     try:
         agent, token = AgentStore(cfg.db_path).enroll_for_user(
             account.username,

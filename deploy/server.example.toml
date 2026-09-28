@@ -23,8 +23,9 @@ per_user_dirs = true
 # the filesystem is read-only to the server.
 # shares_dir = "/srv/cloudmorrow/Shares"
 
-# Bind locally and let the reverse proxy terminate TLS.
-host = "127.0.0.1"
+# Every address, so http://<this machine's IP>:8787 answers on the network
+# as well as a reverse proxy in front. "127.0.0.1" for the proxy alone.
+host = "0.0.0.0"
 port = 8787
 
 # Refuse a request that did not come over TLS (426), and send HSTS on the

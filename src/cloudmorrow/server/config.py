@@ -37,7 +37,8 @@ class ServerConfig:
     # The Shares folder: every server share is a folder in it, whoever made
     # it. Empty puts it in the Cloudmorrow directory: `<notes_dir>/Shares`.
     shares_dir: Path | None = None
-    host: str = "127.0.0.1"
+    # Every address: the machine's own IP answers, as well as a proxy in front.
+    host: str = "0.0.0.0"
     port: int = 8787
     # Signing key for access tokens. Generated into data_dir/secret.key when empty.
     secret_key: str = ""
