@@ -27,7 +27,7 @@ from cloudmorrow.agent import service
 from cloudmorrow.agent.config import AgentConfig
 from cloudmorrow.agent.config import default_config_path as agent_config_path
 from cloudmorrow.cli import dev
-from cloudmorrow.cli.common import client, console
+from cloudmorrow.cli.common import client, console, run
 from cloudmorrow.client.config import APP_NAME, config_dir, credentials_path
 from cloudmorrow.desktop import launcher
 from cloudmorrow.links import COMMANDS
@@ -177,11 +177,9 @@ async def forget_on_server(name: str) -> str:
 
 def remove(found: Plan, *, forget=forget_on_server) -> list[str]:
     """Carry the plan out. Returns the notes worth reading afterwards."""
-    import asyncio
-
     notes: list[str] = []
     if found.agent_name:
-        note = asyncio.run(forget(found.agent_name))
+        note = run(forget(found.agent_name))
         if note:
             notes.append(note)
     if found.service:

@@ -436,6 +436,8 @@ def cm(fleet, monkeypatch):
 def test_on_the_command_line_every_action_is_a_command_and_a_view_prints(cm, fleet):
     import typer
 
+    from cloudmorrow.client.api import ApiError
+
     listed = cm("actions")
     assert "log-service <vehicle> date=… km=… [note=…]" in listed
     assert "Added Transit" in cm("add-van", "name=Transit", "registration=AB 12 345")
@@ -445,8 +447,9 @@ def test_on_the_command_line_every_action_is_a_command_and_a_view_prints(cm, fle
     assert "Garage" in garage and "Transit" in garage and "1200" in garage and "[Add a van]" in garage
     assert '"ui": "stack"' in cm("list", plain=True)
     assert "Transit" in cm("list", screen="vans")
-    with pytest.raises(typer.Exit):
-        cm("log-service", "Transit", "date=2026-09-28")  # km is needed
+    # The server's refusal, in its own words: `cm` prints it and exits 1.
+    with pytest.raises(ApiError, match="Km is needed"):
+        cm("log-service", "Transit", "date=2026-09-28")
     with pytest.raises(typer.Exit):
         cm("log-service", "date=2026-09-28", "km=1")  # which van?
 

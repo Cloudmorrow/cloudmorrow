@@ -451,7 +451,7 @@ def _require_admin(config: ClientConfig) -> None:
                 # might want to redeploy it. Let ssh have the final say.
                 return None
 
-    user = asyncio.run(_me())
+    user = run(_me())
     if user is None:
         console.print("[dim]could not check your account; ssh decides.[/]")
         return

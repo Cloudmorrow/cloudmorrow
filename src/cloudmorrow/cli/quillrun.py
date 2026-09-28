@@ -514,10 +514,7 @@ async def _view(api: CloudmorrowClient, quill: dict, screen: dict, args: list[st
 
     params = _plain_pairs(args)
     record = params.pop("record", "")
-    try:
-        answer = await api.quill_view(quill["id"], screen["id"], record=record, **params)
-    except ApiError as exc:
-        fail(str(exc))
+    answer = await api.quill_view(quill["id"], screen["id"], record=record, **params)
     if plain:
         emit(json.dumps(answer["tree"], indent=2) + "\n")
         return
@@ -564,10 +561,7 @@ async def _press(api: CloudmorrowClient, quill: dict, action: dict, args: list[s
     if action.get("confirm") and not plain and stdin_is_a_terminal():
         if not typer.confirm(action["confirm"]):
             return
-    try:
-        effects = await api.quill_action(quill["id"], action["id"], record=record, fields=given)
-    except ApiError as exc:
-        fail(str(exc))
+    effects = await api.quill_action(quill["id"], action["id"], record=record, fields=given)
     await _effects(api, quill, effects, record, plain)
 
 
@@ -592,12 +586,9 @@ async def _effects(api: CloudmorrowClient, quill: dict, effects: list[dict], rec
             then = next((a for a in quill.get("actions", []) if a["id"] == effect["then"]), None)
             if then is None:
                 fail(f"{effect['then']} is not one of {quill['id']}'s actions")
-            try:
-                more = await api.quill_action(
-                    quill["id"], then["id"], record=record if then.get("on") else "", fields=effect.get("args") or {}
-                )
-            except ApiError as exc:
-                fail(str(exc))
+            more = await api.quill_action(
+                quill["id"], then["id"], record=record if then.get("on") else "", fields=effect.get("args") or {}
+            )
             await _effects(api, quill, more, record, plain)
 
 
@@ -701,10 +692,7 @@ async def _act(
             elif screen.lane is not None and screen.lane.get("kind") == "link":
                 lanes, _ = await _lanes(api, screen, group_id)
                 fields[screen.lane["name"]] = _lane_named(lanes, fields[screen.lane["name"]])
-        try:
-            made = await api.create_record(screen.model, fields, index=index)
-        except ApiError as exc:
-            fail(str(exc))
+        made = await api.create_record(screen.model, fields, index=index)
         console.print(f"[green]Added[/] {escape(args[0])} [dim]{made['id'][2:6]}[/]")
         return
 
@@ -715,52 +703,49 @@ async def _act(
         records = await api.records(screen.model)
     record = _find(records if records else await api.records(screen.model), args[0], screen.title)
     rest = args[1:]
-    try:
-        if action == "show":
-            if reveal:
-                # A listing never carries a hidden field; the record itself does.
-                record = await api.record(screen.model, record["id"])
-            if plain:
-                emit(json.dumps(record, indent=2) + "\n")
-            else:
-                _show_record(screen, record, reveal=reveal)
-        elif action == "set":
-            changed = await api.update_record(
-                screen.model, record["id"], await _link_values(api, screen, _pairs(rest, screen)),
-                rev=record["rev"],
+    if action == "show":
+        if reveal:
+            # A listing never carries a hidden field; the record itself does.
+            record = await api.record(screen.model, record["id"])
+        if plain:
+            emit(json.dumps(record, indent=2) + "\n")
+        else:
+            _show_record(screen, record, reveal=reveal)
+    elif action == "set":
+        changed = await api.update_record(
+            screen.model, record["id"], await _link_values(api, screen, _pairs(rest, screen)),
+            rev=record["rev"],
+        )
+        console.print(f"[green]Saved[/] {escape(str(changed['fields'].get(screen.title, '')))}")
+    elif action == "move":
+        if screen.lane is None:
+            fail("move takes a lane: this is not a board")
+        lanes, _ = await _lanes(api, screen, _group_of(screen, record) or group_id)
+        if not rest:
+            fail(f"move takes a lane: {', '.join(label for _, label in lanes)}")
+        await api.move_record(
+            screen.model, record["id"], {screen.lane["name"]: _lane_named(lanes, rest[0])}, index
+        )
+        console.print(f"[green]Moved[/] to {rest[0]}")
+    elif action in ("done", "undone"):
+        if screen.lane is not None:
+            lanes, target = await _lanes(api, screen, _group_of(screen, record) or group_id)
+            if not lanes:
+                fail("this board has no lanes yet")
+            lane = target if action == "done" else lanes[0][0]
+            await api.move_record(screen.model, record["id"], {screen.lane["name"]: lane}, None)
+        elif screen.spec.get("tick"):
+            await api.update_record(
+                screen.model, record["id"], {screen.spec["tick"]: action == "done"}
             )
-            console.print(f"[green]Saved[/] {escape(str(changed['fields'].get(screen.title, '')))}")
-        elif action == "move":
-            if screen.lane is None:
-                fail("move takes a lane: this is not a board")
-            lanes, _ = await _lanes(api, screen, _group_of(screen, record) or group_id)
-            if not rest:
-                fail(f"move takes a lane: {', '.join(label for _, label in lanes)}")
-            await api.move_record(
-                screen.model, record["id"], {screen.lane["name"]: _lane_named(lanes, rest[0])}, index
-            )
-            console.print(f"[green]Moved[/] to {rest[0]}")
-        elif action in ("done", "undone"):
-            if screen.lane is not None:
-                lanes, target = await _lanes(api, screen, _group_of(screen, record) or group_id)
-                if not lanes:
-                    fail("this board has no lanes yet")
-                lane = target if action == "done" else lanes[0][0]
-                await api.move_record(screen.model, record["id"], {screen.lane["name"]: lane}, None)
-            elif screen.spec.get("tick"):
-                await api.update_record(
-                    screen.model, record["id"], {screen.spec["tick"]: action == "done"}
-                )
-            else:
-                fail(f"{screen.quill['id']} has nothing to tick")
-            console.print(f"[green]{'Done' if action == 'done' else 'Not done'}[/]")
-        elif action == "delete":
-            await api.delete_record(screen.model, record["id"])
-            console.print(
-                f"[green]Deleted[/] {escape(str(record['fields'].get(screen.title, '')))}"
-            )
-    except ApiError as exc:
-        fail(str(exc))
+        else:
+            fail(f"{screen.quill['id']} has nothing to tick")
+        console.print(f"[green]{'Done' if action == 'done' else 'Not done'}[/]")
+    elif action == "delete":
+        await api.delete_record(screen.model, record["id"])
+        console.print(
+            f"[green]Deleted[/] {escape(str(record['fields'].get(screen.title, '')))}"
+        )
 
 
 # -- an editor: pages of Markdown, by path ------------------------------------------------
@@ -834,43 +819,40 @@ async def _act_editor(
         return
     if not args:
         fail(f"which page? cm {screen.quill['id']} {action} <path>")
-    try:
-        if action == "add":
-            if any(_page_key(screen, r) == args[0].strip("/") for r in records):
-                fail(f"there is already a page {args[0]!r}; edit it instead")
-            text = " ".join(args[1:]) if len(args) > 1 else _text("", what="the page")
-            fields = {(path or screen.title): args[0].strip("/"), body: text}
-            made = await api.create_record(screen.model, fields)
-            console.print(f"[green]Added[/] {escape(_page_key(screen, made))}")
+    if action == "add":
+        if any(_page_key(screen, r) == args[0].strip("/") for r in records):
+            fail(f"there is already a page {args[0]!r}; edit it instead")
+        text = " ".join(args[1:]) if len(args) > 1 else _text("", what="the page")
+        fields = {(path or screen.title): args[0].strip("/"), body: text}
+        made = await api.create_record(screen.model, fields)
+        console.print(f"[green]Added[/] {escape(_page_key(screen, made))}")
+        return
+    found = await api.record(screen.model, _find_page(screen, records, args[0])["id"])
+    if action == "show":
+        emit(json.dumps(found, indent=2) + "\n" if plain else str(found["fields"].get(body) or ""))
+    elif action == "edit":
+        before = str(found["fields"].get(body) or "")
+        text = " ".join(args[1:]) if len(args) > 1 else _text(before, what="the page")
+        if text == before:
+            console.print("[dim]unchanged[/]")
             return
-        found = await api.record(screen.model, _find_page(screen, records, args[0])["id"])
-        if action == "show":
-            emit(json.dumps(found, indent=2) + "\n" if plain else str(found["fields"].get(body) or ""))
-        elif action == "edit":
-            before = str(found["fields"].get(body) or "")
-            text = " ".join(args[1:]) if len(args) > 1 else _text(before, what="the page")
-            if text == before:
-                console.print("[dim]unchanged[/]")
-                return
-            try:
-                await api.update_record(screen.model, found["id"], {body: text}, rev=found["rev"])
-            except ApiError as exc:
-                if exc.status_code == 409:
-                    fail("it changed somewhere else while you were editing; nothing was saved")
-                raise
-            console.print(f"[green]Saved[/] {escape(_page_key(screen, found))}")
-        elif action == "delete":
-            await api.delete_record(screen.model, found["id"])
-            console.print(f"[green]Deleted[/] {escape(_page_key(screen, found))}")
-        elif action == "set":
-            changed = await api.update_record(
-                screen.model, found["id"], _pairs(args[1:], screen), rev=found["rev"]
-            )
-            console.print(f"[green]Saved[/] {escape(_page_key(screen, changed))}")
-        else:
-            fail(f"an editor has list, show, add, edit, set, delete and search, not {action}")
-    except ApiError as exc:
-        fail(str(exc))
+        try:
+            await api.update_record(screen.model, found["id"], {body: text}, rev=found["rev"])
+        except ApiError as exc:
+            if exc.status_code == 409:
+                fail("it changed somewhere else while you were editing; nothing was saved")
+            raise
+        console.print(f"[green]Saved[/] {escape(_page_key(screen, found))}")
+    elif action == "delete":
+        await api.delete_record(screen.model, found["id"])
+        console.print(f"[green]Deleted[/] {escape(_page_key(screen, found))}")
+    elif action == "set":
+        changed = await api.update_record(
+            screen.model, found["id"], _pairs(args[1:], screen), rev=found["rev"]
+        )
+        console.print(f"[green]Saved[/] {escape(_page_key(screen, changed))}")
+    else:
+        fail(f"an editor has list, show, add, edit, set, delete and search, not {action}")
 
 
 # -- a grid: groups, folders, and the bytes of what is in them ---------------------
@@ -919,109 +901,106 @@ async def _act_grid(
 ) -> None:
     grid = _Grid(screen)
     command = f"cm {screen.quill['id']}"
-    try:
-        if action in ("list", "groups") and not args:
-            groups = await api.records(grid.group_model["id"])
-            if plain:
-                emit(json.dumps(groups, indent=2) + "\n")
-                return
-            table = Table(title=screen.spec.get("label") or screen.quill["name"], title_style=TITLE)
-            table.add_column("id", style="dim")
-            table.add_column(grid.group_model["label"])
-            if grid.subtitle:
-                table.add_column("")
-            for record in groups:
-                row = [record["id"], escape(str(record["fields"].get(grid.group_model["title"], "")))]
-                if grid.subtitle:
-                    row.append(escape(str(record["fields"].get(grid.subtitle) or "")))
-                table.add_row(*row)
-            out.print(table)
+    if action in ("list", "groups") and not args:
+        groups = await api.records(grid.group_model["id"])
+        if plain:
+            emit(json.dumps(groups, indent=2) + "\n")
             return
-        if not args:
-            fail(f"which {grid.group_model['label'].lower()}? {command} {action} <id> …")
-        group, rest = args[0], args[1:]
-        if action == "list":
-            folder = rest[0] if rest else ""
-            found = await api.records(screen.model, **grid.where(group, folder))
-            if plain:
-                emit(json.dumps(found, indent=2) + "\n")
-                return
-            table = Table(title=f"{group}/{folder.strip('/')}", title_style=TITLE)
-            for column in ("name", "size", "modified"):
-                table.add_column(column)
-            folders = [r for r in found if r["fields"].get(grid.kind) == "folder"]
-            others = [r for r in found if r["fields"].get(grid.kind) != "folder"]
-            for record in sorted(folders, key=lambda r: str(r["fields"].get(grid.name, "")).casefold()) + \
-                    sorted(others, key=lambda r: str(r["fields"].get(grid.name, "")).casefold()):
-                fields = record["fields"]
-                is_dir = fields.get(grid.kind) == "folder"
-                table.add_row(
-                    escape(str(fields.get(grid.name, ""))) + ("/" if is_dir else ""),
-                    "" if is_dir or not grid.size else _size(fields.get(grid.size)),
-                    str(fields.get(grid.modified) or "")[:16].replace("T", " ") if grid.modified else "",
-                )
-            out.print(table)
-        elif action == "get":
-            if not rest:
-                fail(f"get what? {command} get {group} <path> [out]")
-            record = await _entry(api, grid, group, rest[0])
-            data = await api.record_content(screen.model, record["id"])
-            target = rest[1] if len(rest) > 1 else str(record["fields"].get(grid.name))
-            if target == "-":
-                import sys
-
-                sys.stdout.buffer.write(data)
-                return
-            path = Path(target).expanduser()
-            if path.is_dir():
-                path = path / str(record["fields"].get(grid.name))
-            if path.exists():
-                fail(f"{path} is there already")
-            path.write_bytes(data)
-            console.print(f"[green]Saved[/] {escape(str(path))} [dim]{_size(len(data))}[/]")
-        elif action == "put":
-            if len(rest) < 2:
-                fail(f"put what, where? {command} put {group} <folder> <file> [file…]")
-            folder, files = rest[0], rest[1:]
-            for name in files:
-                source = Path(name).expanduser()
-                if not source.is_file():
-                    fail(f"there is no file at {source}")
-                made = await api.upload_record(
-                    screen.model, {**grid.where(group, folder), grid.name: source.name},
-                    source.read_bytes(),
-                )
-                console.print(f"[green]Put[/] {escape(str(made['fields'].get(grid.name)))} "
-                              f"in {escape(group)}/{escape(folder.strip('/'))}")
-        elif action == "add":
-            if not rest:
-                fail(f"add what? {command} add {group} <folder/new folder>")
-            folder, _, name = rest[0].strip("/").rpartition("/")
-            await api.create_record(
-                screen.model, {**grid.where(group, folder), grid.name: name, grid.kind: "folder"}
+        table = Table(title=screen.spec.get("label") or screen.quill["name"], title_style=TITLE)
+        table.add_column("id", style="dim")
+        table.add_column(grid.group_model["label"])
+        if grid.subtitle:
+            table.add_column("")
+        for record in groups:
+            row = [record["id"], escape(str(record["fields"].get(grid.group_model["title"], "")))]
+            if grid.subtitle:
+                row.append(escape(str(record["fields"].get(grid.subtitle) or "")))
+            table.add_row(*row)
+        out.print(table)
+        return
+    if not args:
+        fail(f"which {grid.group_model['label'].lower()}? {command} {action} <id> …")
+    group, rest = args[0], args[1:]
+    if action == "list":
+        folder = rest[0] if rest else ""
+        found = await api.records(screen.model, **grid.where(group, folder))
+        if plain:
+            emit(json.dumps(found, indent=2) + "\n")
+            return
+        table = Table(title=f"{group}/{folder.strip('/')}", title_style=TITLE)
+        for column in ("name", "size", "modified"):
+            table.add_column(column)
+        folders = [r for r in found if r["fields"].get(grid.kind) == "folder"]
+        others = [r for r in found if r["fields"].get(grid.kind) != "folder"]
+        for record in sorted(folders, key=lambda r: str(r["fields"].get(grid.name, "")).casefold()) + \
+                sorted(others, key=lambda r: str(r["fields"].get(grid.name, "")).casefold()):
+            fields = record["fields"]
+            is_dir = fields.get(grid.kind) == "folder"
+            table.add_row(
+                escape(str(fields.get(grid.name, ""))) + ("/" if is_dir else ""),
+                "" if is_dir or not grid.size else _size(fields.get(grid.size)),
+                str(fields.get(grid.modified) or "")[:16].replace("T", " ") if grid.modified else "",
             )
-            console.print(f"[green]Made[/] {escape(rest[0].strip('/'))}/")
-        elif action in ("show", "delete", "set"):
-            if not rest:
-                fail(f"which one? {command} {action} {group} <path>")
-            record = await _entry(api, grid, group, rest[0])
-            if action == "show":
-                if plain:
-                    emit(json.dumps(record, indent=2) + "\n")
-                else:
-                    _show_record(screen, record)
-            elif action == "set":
-                changed = await api.update_record(
-                    screen.model, record["id"], _pairs(rest[1:], screen), rev=record["rev"]
-                )
-                console.print(f"[green]Saved[/] {escape(str(changed['fields'].get(grid.name, '')))}")
+        out.print(table)
+    elif action == "get":
+        if not rest:
+            fail(f"get what? {command} get {group} <path> [out]")
+        record = await _entry(api, grid, group, rest[0])
+        data = await api.record_content(screen.model, record["id"])
+        target = rest[1] if len(rest) > 1 else str(record["fields"].get(grid.name))
+        if target == "-":
+            import sys
+
+            sys.stdout.buffer.write(data)
+            return
+        path = Path(target).expanduser()
+        if path.is_dir():
+            path = path / str(record["fields"].get(grid.name))
+        if path.exists():
+            fail(f"{path} is there already")
+        path.write_bytes(data)
+        console.print(f"[green]Saved[/] {escape(str(path))} [dim]{_size(len(data))}[/]")
+    elif action == "put":
+        if len(rest) < 2:
+            fail(f"put what, where? {command} put {group} <folder> <file> [file…]")
+        folder, files = rest[0], rest[1:]
+        for name in files:
+            source = Path(name).expanduser()
+            if not source.is_file():
+                fail(f"there is no file at {source}")
+            made = await api.upload_record(
+                screen.model, {**grid.where(group, folder), grid.name: source.name},
+                source.read_bytes(),
+            )
+            console.print(f"[green]Put[/] {escape(str(made['fields'].get(grid.name)))} "
+                          f"in {escape(group)}/{escape(folder.strip('/'))}")
+    elif action == "add":
+        if not rest:
+            fail(f"add what? {command} add {group} <folder/new folder>")
+        folder, _, name = rest[0].strip("/").rpartition("/")
+        await api.create_record(
+            screen.model, {**grid.where(group, folder), grid.name: name, grid.kind: "folder"}
+        )
+        console.print(f"[green]Made[/] {escape(rest[0].strip('/'))}/")
+    elif action in ("show", "delete", "set"):
+        if not rest:
+            fail(f"which one? {command} {action} {group} <path>")
+        record = await _entry(api, grid, group, rest[0])
+        if action == "show":
+            if plain:
+                emit(json.dumps(record, indent=2) + "\n")
             else:
-                await api.delete_record(screen.model, record["id"])
-                console.print(f"[green]Deleted[/] {escape(rest[0])}")
+                _show_record(screen, record)
+        elif action == "set":
+            changed = await api.update_record(
+                screen.model, record["id"], _pairs(rest[1:], screen), rev=record["rev"]
+            )
+            console.print(f"[green]Saved[/] {escape(str(changed['fields'].get(grid.name, '')))}")
         else:
-            fail(f"a {screen.kit} has list, get, put, add, show, set and delete, not {action}")
-    except ApiError as exc:
-        fail(str(exc))
+            await api.delete_record(screen.model, record["id"])
+            console.print(f"[green]Deleted[/] {escape(rest[0])}")
+    else:
+        fail(f"a {screen.kit} has list, get, put, add, show, set and delete, not {action}")
 # -- a thread: spaces, and what is said in them ------------------------------------
 def space_name(space: dict, me: str, screen: Screen) -> str:
     """What a space is called to *me*: its title, or, made between people, who else is in it."""
@@ -1105,18 +1084,15 @@ async def _thread(api: CloudmorrowClient, screen: Screen, action: str, args: lis
     if not args:
         fail(f"which one? cm {screen.quill['id']} {action} <{space_model}>")
     space = _find_space(spaces, args[0], me, screen)
-    try:
-        if action == "say":
-            text = " ".join(args[1:]).strip()
-            if not text:
-                fail(f'say what? cm {screen.quill["id"]} say {args[0]} "<words>"')
-            await api.create_record(screen.model, {link["name"]: space["id"], screen.spec["body"]: text})
-            console.print(f"[green]Said[/] in {escape(space_name(space, me, screen))}")
-            return
-        lines = await api.records(screen.model, last=PAGE, **{link["name"]: space["id"]})
-        await api.mark_seen(space_model, space["id"])
-    except ApiError as exc:
-        fail(str(exc))
+    if action == "say":
+        text = " ".join(args[1:]).strip()
+        if not text:
+            fail(f'say what? cm {screen.quill["id"]} say {args[0]} "<words>"')
+        await api.create_record(screen.model, {link["name"]: space["id"], screen.spec["body"]: text})
+        console.print(f"[green]Said[/] in {escape(space_name(space, me, screen))}")
+        return
+    lines = await api.records(screen.model, last=PAGE, **{link["name"]: space["id"]})
+    await api.mark_seen(space_model, space["id"])
     if plain:
         emit(json.dumps(lines, indent=2) + "\n")
         return
