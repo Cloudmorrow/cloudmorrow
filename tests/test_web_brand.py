@@ -80,6 +80,8 @@ def test_the_amber_fills_are_the_actions():
     """Amber fills the one action a screen is for; anything else is blue or a ghost."""
     allowed = {
         ".nav button.strong", ".login .submit", ".row.primary", ".composer button",
+        # A Quill's action: the first primary one in a view, a form's submit.
+        ".act-button.primary", ".act-button.primary:active", ".act-button.primary:hover",
     }
     for name, css in _stylesheets():
         for head, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):

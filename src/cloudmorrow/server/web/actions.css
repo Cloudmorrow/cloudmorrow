@@ -1,0 +1,124 @@
+/* A Quill's actions: the buttons, the bar under a Quill's title, the rows on
+   a record's sheet, and the form and the question that come up from them.
+
+   The sheet they come up in is the grid's (`.sheet-backdrop`, `.sheet`):
+   from the bottom on a phone, a dialog in the middle on a computer. A
+   button is a ghost — a line and no fill — unless it is the one thing its
+   view or its form is for: that one is amber, and any other that says it
+   is primary gets the blue fill a chosen thing has. */
+
+/* -- a button --------------------------------------------------------------- */
+.act-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--line-bright);
+  border-radius: var(--radius-control);
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+}
+.act-button:active { background: var(--card-2); }
+.act-button:disabled { opacity: .5; cursor: default; }
+/* The one action a view or a form is for. */
+.act-button.primary {
+  border-color: transparent;
+  background: var(--action);
+  color: var(--action-ink);
+  box-shadow: inset 0 -3px 0 var(--action-edge);
+}
+.act-button.primary:active { background: var(--action); filter: brightness(.94); }
+/* Primary, but not the first: the platform's fill. */
+.act-button.fill {
+  border-color: transparent;
+  background: var(--fill);
+  color: var(--fill-ink);
+  box-shadow: inset 0 -3px 0 var(--fill-pressed);
+}
+.act-button.fill:active { background: var(--fill-pressed); }
+.act-button.danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); }
+
+/* A smaller one, for the bar and a table's row. */
+.act-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--card);
+  color: var(--accent);
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.act-chip:active { background: var(--card-2); }
+.act-chip.danger, .act-chip.bad { color: var(--bad); }
+
+/* -- the bar under a Quill's title ------------------------------------------ */
+.act-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 16px;
+}
+
+/* -- on a record's sheet ------------------------------------------------------ */
+.act-section { margin: 20px 0 12px; }
+.act-section .act-row { color: var(--accent); }
+.act-section .act-row .title { font-weight: 600; }
+.act-section .act-row.danger { color: var(--bad); }
+.act-section .act-row .meta { white-space: normal; }
+
+/* -- the sheet an action's form or question comes up in ------------------------ */
+.act-sheet {
+  max-height: calc(100dvh - 24px - var(--top) - var(--bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.act-sheet-title {
+  margin: 0;
+  padding: 16px 16px 4px;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 600;
+}
+.act-choose .act-sheet-title { padding-bottom: 12px; border-bottom: 1px solid var(--line); font-size: 17px; text-align: center; color: var(--muted); }
+.act-description { margin: 0; padding: 0 16px 8px; color: var(--muted); font-size: 15px; }
+.act-question { margin: 0; padding: 20px 16px 8px; font-size: 17px; }
+.act-form { padding: 0 0 4px; }
+.act-form .group, .act-form .segments, .act-form .group-label, .act-form textarea.long { margin-left: 12px; margin-right: 12px; width: auto; }
+.act-form .group-label:first-of-type { margin-top: 12px; }
+.act-form > .group:first-of-type { margin-top: 12px; }
+.act-form textarea.long { display: block; width: calc(100% - 24px); }
+.act-needed { margin-left: 3px; color: var(--accent); }
+.act-error {
+  margin: 4px 16px 0;
+  color: var(--bad);
+  font-size: 15px;
+}
+.act-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 12px 12px;
+}
+.act-sheet .act-buttons .act-button { flex: 1; min-height: 46px; }
+@media (min-width: 900px) and (min-height: 600px) {
+  .act-sheet .act-buttons .act-button { flex: none; min-width: 110px; min-height: 40px; }
+  .act-form-sheet { max-width: 480px; }
+}
+
+/* What the pointer is over says so, as everywhere else. */
+@media (hover: hover) and (pointer: fine) and (min-width: 900px) and (min-height: 600px) {
+  .act-button:hover, .act-chip:hover { background: var(--card-2); }
+  .act-button.primary:hover { background: var(--action); filter: brightness(1.08); }
+  .act-button.fill:hover { background: var(--fill-hover); }
+}
