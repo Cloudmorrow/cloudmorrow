@@ -35,10 +35,7 @@ from cloudmorrow.agent.setup import machine_name
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.screens.modals import Modal
 from cloudmorrow.tui.theme import ACCENT, BAD, GOOD, MUTED, SECOND, WARN
-
-
-def _short(value: str | None, width: int = 16) -> str:
-    return (value or "—")[:width].replace("T", " ")
+from cloudmorrow.tui.words import short_stamp
 
 
 class SettingsScreen(Modal[None]):
@@ -136,7 +133,7 @@ class SettingsScreen(Modal[None]):
         # the fallback for a machine whose agent has not reported in yet.
         capable = "omarchy" in agent["capabilities"] or is_omarchy()
         dot = f"[{GOOD}]●[/]" if agent["online"] else f"[{MUTED}]○[/]"
-        seen = "online" if agent["online"] else f"last seen {_short(agent['last_seen'])}"
+        seen = "online" if agent["online"] else f"last seen {short_stamp(agent['last_seen'])}"
         if not capable:
             box.disabled = True
             line.update(
@@ -200,7 +197,7 @@ class SettingsScreen(Modal[None]):
         target.update(
             f"[{ACCENT}]revision {bundle['revision']}[/] "
             f"[{MUTED}]from[/] {bundle.get('origin') or '?'} "
-            f"[{MUTED}]at {_short(bundle.get('updated_at'), 19)}[/]\n"
+            f"[{MUTED}]at {short_stamp(bundle.get('updated_at'), 19)}[/]\n"
             f"[{MUTED}]claimed by[/] {bundle.get('claimed_by') or '?'}"
             f"[{MUTED}] · {len(bundle.get('files') or [])} files ·"
             f" kept by[/] {listed or '—'}"

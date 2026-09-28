@@ -47,7 +47,6 @@ from textual import events, work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.coordinate import Coordinate
 from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import (
@@ -95,6 +94,7 @@ from cloudmorrow.tui.widgets.kit import (
     neighbour_lane,
     read_only,
     safe_id,
+    settle_widths,
 )
 
 # Every primitive, and the method of `Drawer` that draws it. A primitive
@@ -468,7 +468,7 @@ class TableNode(Vertical):
             fields = record.get("fields") or {}
             table.add_row(*(_text(_cell(model, c["field"], fields)) for c in columns))
         table.move_cursor(row=min(self.cursor, len(self.records) - 1))
-        table.call_after_refresh(_settle_widths, table)
+        table.call_after_refresh(settle_widths, table)
 
     @property
     def selected(self) -> dict | None:
@@ -493,13 +493,6 @@ class TableNode(Vertical):
         )
         if record is not None and action is not None:
             self.post_message(ViewAct({"ui": "button", "action": action["id"], "record": record}))
-
-
-def _settle_widths(table: DataTable) -> None:
-    """The table's columns measured, once it has rows (see ListPane._settle_widths)."""
-    if table.row_count:
-        table.update_cell_at(Coordinate(0, 0), table.get_cell_at(Coordinate(0, 0)),
-                             update_width=True)
 
 
 class ViewCard(Static, can_focus=True):

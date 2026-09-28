@@ -43,6 +43,7 @@ from cloudmorrow.tui.theme import ACCENT, BAD, GOOD, LENS, MUTED, TEXT
 from cloudmorrow.tui.widgets.kit import can_write, field_of, title_of
 from cloudmorrow.tui.widgets.kit_space import NewSpaceModal, SpaceModal, make_space, scope_said
 from cloudmorrow.tui.widgets.toolbar import Action
+from cloudmorrow.tui.words import escape
 
 # The days across the top, starting on Monday, which is where a week starts.
 WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
@@ -177,11 +178,6 @@ def cell_text(day: dt.date, events: list[dict], *, shown: dt.date, today: dt.dat
     return f"{number}\n {dots}{more}"
 
 
-def _escape(text: object) -> str:
-    """Whatever somebody typed is text, not markup."""
-    return str(text or "").replace("[", r"\[")
-
-
 def event_line(event: dict, *, me: str) -> str:
     """One thing, on one line: when, what, the subtitle, and whose space.
 
@@ -190,15 +186,15 @@ def event_line(event: dict, *, me: str) -> str:
     """
     parts = [
         f"[{colour_for(event['colour'])}]●[/] [{MUTED}]{when_said(event):>13}[/]",
-        f"[{TEXT}]{_escape(event['title'])}[/]",
+        f"[{TEXT}]{escape(event['title'])}[/]",
     ]
     if event["subtitle"]:
-        parts.append(f"[{MUTED}]{_escape(event['subtitle'])}[/]")
+        parts.append(f"[{MUTED}]{escape(event['subtitle'])}[/]")
     whose = event["space_name"]
     if event["owner"] and event["owner"] != me:
         whose = f"{whose} · {event['owner']}"
     if whose:
-        parts.append(f"[{MUTED}]{_escape(whose)}[/]")
+        parts.append(f"[{MUTED}]{escape(whose)}[/]")
     return "  ".join(parts)
 
 
@@ -208,7 +204,7 @@ def space_row(space: dict, model: dict, colour: str, *, me: str) -> tuple[str, s
     who = scope_said(space)
     if space.get("scope") == "personal" and space.get("owner") != me:
         who = space.get("owner", "")
-    return f"[{dot}]●[/] {_escape(title_of(space, model))}", f"[{MUTED}]{who}[/]"
+    return f"[{dot}]●[/] {escape(title_of(space, model))}", f"[{MUTED}]{who}[/]"
 
 
 def space_order(space: dict) -> tuple:
@@ -314,10 +310,6 @@ class CalendarPane(KitPane):
     def space_noun(self) -> str:
         return str(self.space_model.get("label") or self.space_model_id or "space").lower()
 
-    @property
-    def me(self) -> str:
-        return getattr(self.app, "username", "") or ""
-
     # -- layout --------------------------------------------------------------
     def content(self) -> ComposeResult:
         with Horizontal(id="calendar-body"):
@@ -349,7 +341,7 @@ class CalendarPane(KitPane):
             return f"[{MUTED}]no {self.space_noun}s[/]"
         colour = colour_for((space.get("fields") or {}).get(self.b["colour"]))
         return (
-            f"new go in [{colour}]{_escape(title_of(space, self.space_model))}[/]  "
+            f"new go in [{colour}]{escape(title_of(space, self.space_model))}[/]  "
             f"[{MUTED}]{len(self.events)} this month[/]"
         )
 

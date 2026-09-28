@@ -50,6 +50,7 @@ from cloudmorrow.tui.screens.record_sheet import (
 )
 from cloudmorrow.tui.theme import BAD
 from cloudmorrow.tui.widgets.kit import field_label, safe_id, title_of
+from cloudmorrow.tui.words import escape
 
 # A button's look for each tone an action or a view's button may have: the
 # amber primary action, the red one that cannot be taken back, and the rest.
@@ -260,7 +261,7 @@ class ActionModal(Modal[list | None]):
 
     def say(self, message: str) -> None:
         self.query_one("#action-complaint", Static).update(
-            f"[{BAD}]{_escape(message)}[/]" if message else ""
+            f"[{BAD}]{escape(message)}[/]" if message else ""
         )
 
     async def action_submit(self) -> None:
@@ -307,10 +308,6 @@ class ActionModal(Modal[list | None]):
 
     def action_cancel(self) -> None:
         self.dismiss(None)
-
-
-def _escape(text: object) -> str:
-    return str(text or "").replace("[", r"\[")
 
 
 # -- pressing one, and what comes of it -------------------------------------------------

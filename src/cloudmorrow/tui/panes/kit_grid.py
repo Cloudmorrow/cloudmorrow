@@ -52,6 +52,7 @@ from cloudmorrow.tui.theme import MUTED
 from cloudmorrow.tui.widgets.kit import can_write, field_of
 from cloudmorrow.tui.widgets.picture import Picture, TerminalImage
 from cloudmorrow.tui.widgets.toolbar import Action
+from cloudmorrow.tui.words import plural
 
 # -- what a file is ----------------------------------------------------------------
 # The same kinds, by the same extensions, as the web app's kit_grid.js: the
@@ -712,7 +713,7 @@ class GridPane(KitPane):
             return None
         count = len(self.groups)
         noun = str(self.group_model.get("label") or "group").lower()
-        return "ok", f"{count} {noun}{'' if count == 1 else 's'}"
+        return "ok", plural(count, noun)
 
     def status_detail(self) -> str:
         entry = self.highlighted

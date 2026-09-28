@@ -32,6 +32,7 @@ from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal, PromptModal
 from cloudmorrow.tui.theme import ACCENT, BAD, FAINT, GOOD, MUTED, WARN
 from cloudmorrow.tui.widgets.toolbar import Action
+from cloudmorrow.tui.words import plural
 
 EVERY = "*"
 # What a circle gives on a datamodel, and how it is drawn.
@@ -360,7 +361,7 @@ class CirclesView(Pane):
             f"a sets a circle's data, p its people.[/]"
         )
         count = len(self._circles)
-        self.status(f"{count} circle{'' if count == 1 else 's'}", note=True)
+        self.status(plural(count, "circle"), note=True)
 
     def _pick(self) -> dict | None:
         circle = self.selected

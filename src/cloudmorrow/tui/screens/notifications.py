@@ -17,6 +17,7 @@ from textual.widgets import Button, Label, Static
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.screens.modals import Modal
 from cloudmorrow.tui.theme import ACCENT, BAD, GOOD, MUTED
+from cloudmorrow.tui.words import short_stamp
 
 # How many of the server's notifications the modal shows.
 NOTIFICATIONS = 50
@@ -37,10 +38,6 @@ def bell_label(unread: int) -> str:
     return f"{BELL}{count}  {KEY}"
 
 
-def _short(value: str | None, width: int = 16) -> str:
-    return (value or "—")[:width].replace("T", " ")
-
-
 def render(notes: list[dict]) -> str:
     """The list itself, so the bell and the modal draw it the same way."""
     if not notes:
@@ -52,7 +49,7 @@ def render(notes: list[dict]) -> str:
         mark = f"[{ACCENT}]•[/]" if note["unread"] else " "
         where = f" [{MUTED}]{note['machine']}[/]" if note["machine"] else ""
         lines.append(
-            f"{mark} [{MUTED}]{_short(note['created_at'], 16)}[/] "
+            f"{mark} [{MUTED}]{short_stamp(note['created_at'], 16)}[/] "
             f"[{colour}]{note['title']}[/]{where}"
             + (f"\n    [{MUTED}]{note['body']}[/]" if note["body"] else "")
         )

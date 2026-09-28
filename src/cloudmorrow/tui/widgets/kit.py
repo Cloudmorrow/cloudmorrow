@@ -26,8 +26,9 @@ import re
 from rich.text import Text
 from textual import events
 from textual.containers import Vertical, VerticalScroll
+from textual.coordinate import Coordinate
 from textual.message import Message
-from textual.widgets import Static
+from textual.widgets import DataTable, Static
 
 from cloudmorrow.tui.theme import ACCENT, GOOD, MUTED, SECOND, TEXT, WARN
 
@@ -368,6 +369,19 @@ def lane_under(screen, x: int, y: int) -> Lane | None:
         if isinstance(candidate, Lane):
             return candidate
     return None
+
+
+def settle_widths(table: DataTable) -> None:
+    """Draw a table again once its columns know how wide they are.
+
+    A DataTable measures new rows when it is next idle, but a frame drawn
+    before then is cached at the old widths — which, after a table that was
+    empty, is the width of the header: "Middl". Writing one cell back as it
+    was is the public way to make it draw afresh.
+    """
+    if table.row_count:
+        table.update_cell_at(Coordinate(0, 0), table.get_cell_at(Coordinate(0, 0)),
+                             update_width=True)
 
 
 def neighbour_lane(values: list[str], value: str, delta: int) -> str:

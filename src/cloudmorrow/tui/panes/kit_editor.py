@@ -41,6 +41,7 @@ from cloudmorrow.tui.widgets.editor import LiveMarkdownEditor
 from cloudmorrow.tui.widgets.note_tree import NoteTree
 from cloudmorrow.tui.widgets.picture import IMAGE_REF, Picture, image_refs
 from cloudmorrow.tui.widgets.toolbar import Action
+from cloudmorrow.tui.words import plural
 
 
 def _folder_of(path: str) -> str:
@@ -118,7 +119,7 @@ class EditorPane(KitPane):
         if not self.loaded:
             return None
         count = len(self.records)
-        return "ok", f"{count} {self.noun}{'' if count == 1 else 's'}"
+        return "ok", plural(count, self.noun)
 
     # -- what a record is called here -------------------------------------------
     def path_of(self, record: dict) -> str:

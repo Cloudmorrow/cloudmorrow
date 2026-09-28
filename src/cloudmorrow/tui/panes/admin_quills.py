@@ -36,6 +36,7 @@ from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
 from cloudmorrow.tui.theme import ACCENT, FAINT, GOOD, MUTED, WARN
 from cloudmorrow.tui.widgets.toolbar import Action
+from cloudmorrow.tui.words import plural
 
 # How the install sheet words each way a Quill can touch a datamodel.
 HOW = {
@@ -44,10 +45,6 @@ HOW = {
     "introduces": "introduces",
     "asks for": "asks to reach",
 }
-
-
-def _plural(count: int, word: str) -> str:
-    return f"{count} {word}{'' if count == 1 else 's'}"
 
 
 def sheet_text(plan: dict) -> str:
@@ -122,7 +119,7 @@ def sheet_text(plan: dict) -> str:
         lines += ["", f"[b {ACCENT}]Starts you with[/]"]
         for dataset in datasets:
             count = dataset.get("count")
-            amount = _plural(int(count), "record") if count is not None else "records"
+            amount = plural(int(count), "record") if count is not None else "records"
             per = " for each person" if dataset.get("seed") == "per-owner" else ""
             what = f"{amount} of {dataset.get('model')}{per}"
             lines.append(f"  [b]{dataset['id']}[/] [{MUTED}]{what}[/]")
@@ -318,7 +315,7 @@ class QuillsView(Pane):
             table.move_cursor(row=self._nearest(max(row, 0)))
         installed = sum(1 for q in quills if q.get("installed_version"))
         self.status(
-            f"{_plural(len(quills), 'Quill')} in the catalog, {installed} installed", note=True
+            f"{plural(len(quills), 'Quill')} in the catalog, {installed} installed", note=True
         )
 
     def _nearest(self, row: int) -> int:

@@ -45,6 +45,7 @@ from cloudmorrow.tui.widgets.kit_space import (
     space_name,
 )
 from cloudmorrow.tui.widgets.toolbar import Action
+from cloudmorrow.tui.words import escape, plural
 
 # How often an open conversation asks for what it has not got.
 POLL_SECONDS = 5.0
@@ -59,10 +60,6 @@ def _clock(stamp: str | None) -> str:
 
 def _day(stamp: str | None) -> str:
     return (stamp or "")[:10]
-
-
-def _escape(text: str) -> str:
-    return text.replace("[", r"\[")
 
 
 def render_lines(lines: list[dict], body: str, me: str) -> str:
@@ -85,12 +82,12 @@ def render_lines(lines: list[dict], body: str, me: str) -> str:
             author = str(line.get("owner") or "")
             colour = ACCENT if author == me else SECOND
             who = "you" if author == me else author
-            out.append(f"[{colour}]{_escape(who)}[/] [{MUTED}]{_clock(when)}[/]")
+            out.append(f"[{colour}]{escape(who)}[/] [{MUTED}]{_clock(when)}[/]")
         edited = f" [{MUTED}](edited)[/]" if line.get("updated_at") not in (None, when) else ""
         # Whatever somebody typed is text, not markup: square brackets in a
         # message are square brackets.
         for text in str((line.get("fields") or {}).get(body) or "").splitlines() or [""]:
-            out.append(f"  {_escape(text)}{edited}")
+            out.append(f"  {escape(text)}{edited}")
             edited = ""
     return "\n".join(out)
 
@@ -184,10 +181,6 @@ class ThreadPane(KitPane):
             self._timer.pause()
 
     @property
-    def me(self) -> str:
-        return getattr(self.app, "username", "") or ""
-
-    @property
     def space(self) -> dict | None:
         return next((s for s in self.spaces if s["id"] == self._open), None)
 
@@ -198,7 +191,7 @@ class ThreadPane(KitPane):
 
     def _row(self, space: dict) -> tuple[str, str]:
         waiting = space.get("unread") or 0
-        label = _escape(self.label(space))
+        label = escape(self.label(space))
         return (f"[{ACCENT}]{label}[/]" if waiting else label, f"[{ACCENT}]{waiting}[/]" if waiting else "")
 
     # -- the spaces ------------------------------------------------------------
@@ -289,7 +282,7 @@ class ThreadPane(KitPane):
         space = self.space or {}
         about = "" if is_between(self.spec, space) else str((space.get("fields") or {}).get(self.about) or "")
         self.query_one("#conversation-title", Static).update(
-            f"[{ACCENT}]{_escape(self.label(space))}[/]" + (f"  [{MUTED}]{_escape(about)}[/]" if about else "")
+            f"[{ACCENT}]{escape(self.label(space))}[/]" + (f"  [{MUTED}]{escape(about)}[/]" if about else "")
         )
         self._draw()
         await self._seen()
@@ -552,7 +545,7 @@ class ThreadPane(KitPane):
             return "news", f"{waiting} unread"
         count = len(self.spaces)
         noun = str(self.space_model.get("label") or "space").lower()
-        return "ok", f"{count} {noun}{'' if count == 1 else 's'}, all read"
+        return "ok", f"{plural(count, noun)}, all read"
 
     def status_detail(self) -> str:
         waiting = sum(s.get("unread") or 0 for s in self.spaces)

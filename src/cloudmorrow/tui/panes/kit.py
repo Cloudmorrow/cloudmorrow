@@ -42,7 +42,6 @@ from __future__ import annotations
 
 from textual import work
 from textual.app import ComposeResult
-from textual.coordinate import Coordinate
 from textual.widgets import DataTable
 
 from cloudmorrow.client.api import ApiError, AuthError
@@ -50,8 +49,9 @@ from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.screens.modals import ConfirmModal
 from cloudmorrow.tui.screens.record_sheet import RecordSheet, link_choices, shown
 from cloudmorrow.tui.theme import GOOD, MUTED
-from cloudmorrow.tui.widgets.kit import can_write, field_label, field_of, title_of
+from cloudmorrow.tui.widgets.kit import can_write, field_label, field_of, settle_widths, title_of
 from cloudmorrow.tui.widgets.toolbar import Action
+from cloudmorrow.tui.words import plural
 
 
 def screen_key(quill: dict, screen: dict) -> str:
@@ -118,6 +118,11 @@ class KitPane(Pane):
         if field.get("kind") == "link" and value:
             return self.link_titles.get(field["name"], {}).get(str(value), "—")
         return shown(field, value)
+
+    @property
+    def me(self) -> str:
+        """Who is signed in: whose a space or a line is, said by name."""
+        return getattr(self.app, "username", "") or ""
 
     @property
     def noun(self) -> str:
@@ -244,14 +249,20 @@ class ListPane(KitPane):
     async def reload(self) -> None:
         if self.api is None:
             return
+        if not await self._fetch():
+            return
+        self.loaded = True
+        self.draw()
+
+    async def _fetch(self) -> bool:
+        """The records again, and what their links are called. False when it failed."""
         try:
             self.records = await self.api.records(self.model_id)
             await self.load_link_titles([self.subtitle])
         except ApiError as exc:
             await self.signed_out(exc)
-            return
-        self.loaded = True
-        self.draw()
+            return False
+        return True
 
     def draw(self, *, keep: str | None = None) -> None:
         table = self.query_one("#kit-table", DataTable)
@@ -265,26 +276,12 @@ class ListPane(KitPane):
             )
         if self.records:
             table.move_cursor(row=min(max(row, 0), len(self.records) - 1))
-            table.call_after_refresh(self._settle_widths, table)
+            table.call_after_refresh(settle_widths, table)
         empty = "Nothing here."
         if self.writes:
             empty = f"Nothing here yet — New {self.noun} starts one."
 
         self.status("" if self.records else empty, note=True)
-
-
-    @staticmethod
-    def _settle_widths(table: DataTable) -> None:
-        """Draw the table again once its columns know how wide they are.
-
-        A DataTable measures new rows when it is next idle, but a frame
-        drawn before then is cached at the old widths — which, after a table
-        that was empty, is the width of the header: "Middl". Writing one cell
-        back as it was is the public way to make it draw afresh.
-        """
-        if table.row_count:
-            table.update_cell_at(Coordinate(0, 0), table.get_cell_at(Coordinate(0, 0)),
-                                 update_width=True)
 
     def _row(self, record: dict) -> tuple[str, ...]:
         fields = record.get("fields") or {}
@@ -306,11 +303,11 @@ class ListPane(KitPane):
             waiting = sum(1 for r in self.records if not (r.get("fields") or {}).get(name))
             return ("news", f"{waiting} open") if waiting else ("ok", "all done")
         count = len(self.records)
-        return "ok", f"{count} {self.noun}{'' if count == 1 else 's'}"
+        return "ok", plural(count, self.noun)
 
     def status_detail(self) -> str:
         count = len(self.records)
-        return f"[{MUTED}]{count} {self.noun}{'' if count == 1 else 's'}[/]"
+        return f"[{MUTED}]{plural(count, self.noun)}[/]"
 
     @property
     def selected(self) -> dict | None:
@@ -347,12 +344,7 @@ class ListPane(KitPane):
     async def new_record(self) -> None:
         preset = {self.tick["name"]: False} if self.tick else None
         saved = await self.open_sheet(None, preset=preset)
-        if not isinstance(saved, dict):
-            return
-        try:
-            self.records = await self.api.records(self.model_id)
-        except ApiError as exc:
-            await self.signed_out(exc)
+        if not isinstance(saved, dict) or not await self._fetch():
             return
         self.draw(keep=saved["id"])
         self.status(f"Added {title_of(saved, self.model)}.")
@@ -391,12 +383,8 @@ class ListPane(KitPane):
                 await self.signed_out(exc)
             self.reload()
             return
-        try:
-            self.records = await self.api.records(self.model_id)
-        except ApiError as exc:
-            await self.signed_out(exc)
-            return
-        self.draw(keep=record["id"])
+        if await self._fetch():
+            self.draw(keep=record["id"])
 
 
 def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
@@ -406,10 +394,10 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     table is a file of its own: panes/kit_<kit>.py.
     """
     from cloudmorrow.tui.panes.kit_board import BoardPane
-    from cloudmorrow.tui.panes.kit_grouped import GroupedListPane, draws_here
     from cloudmorrow.tui.panes.kit_calendar import CalendarPane
     from cloudmorrow.tui.panes.kit_editor import EditorPane
     from cloudmorrow.tui.panes.kit_grid import GridPane
+    from cloudmorrow.tui.panes.kit_grouped import GroupedListPane, draws_here
     from cloudmorrow.tui.panes.kit_thread import ThreadPane
     from cloudmorrow.tui.panes.kit_view import ViewPane
 

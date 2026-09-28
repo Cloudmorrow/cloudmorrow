@@ -41,6 +41,7 @@ from cloudmorrow.tui.theme import MUTED
 from cloudmorrow.tui.widgets.group_list import GroupList
 from cloudmorrow.tui.widgets.kit import can_write, field_label, field_of, safe_id, title_of
 from cloudmorrow.tui.widgets.toolbar import Action
+from cloudmorrow.tui.words import plural
 
 MASK = "••••••••"
 
@@ -273,11 +274,11 @@ class GroupedListPane(ListPane):
         if not self.loaded:
             return None
         count = len(self.all)
-        said = f"{count} {self.noun}{'' if count == 1 else 's'}"
+        said = plural(count, self.noun)
         if self.levels:
             groups = len([g for g in self.offered[0] if g[2]])
             noun = field_label(self.levels[0]).lower()
-            said = f"{groups} {noun}{'' if groups == 1 else 's'}, {said}"
+            said = f"{plural(groups, noun)}, {said}"
         return "ok", said
 
     # -- picking -------------------------------------------------------------
