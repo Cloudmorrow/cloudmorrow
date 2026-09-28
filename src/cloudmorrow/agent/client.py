@@ -6,29 +6,20 @@ import httpx
 
 from cloudmorrow import __version__
 from cloudmorrow.agent.config import AgentConfig
-from cloudmorrow.transport import InsecureUrlError, check_url
+from cloudmorrow.httpcommon import ServerError
+from cloudmorrow.httpcommon import detail as _detail
 
 TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 
 
-class AgentApiError(RuntimeError):
-    def __init__(
-        self, message: str, *, status_code: int | None = None, payload: object = None
-    ) -> None:
-        super().__init__(message)
-        self.status_code = status_code
-        # The server's own body, for the callers that act on what is in it —
-        # a stale push is told the revision it should have been working from.
-        self.payload = payload
+class AgentApiError(ServerError):
+    """What the agent's client raises: the server's refusal, or no server at all."""
 
 
 class AgentClient:
     def __init__(self, config: AgentConfig) -> None:
         self.config = config
-        try:
-            check_url(config.server_url, allow_insecure=config.allow_insecure_http)
-        except InsecureUrlError as exc:
-            raise AgentApiError(str(exc)) from exc
+        AgentApiError.refuse_insecure(config.server_url, allow_insecure=config.allow_insecure_http)
         self._client = httpx.Client(
             base_url=config.server_url,
             timeout=TIMEOUT,
@@ -62,14 +53,14 @@ class AgentClient:
                 url, json=payload, headers=self._headers(authenticated)
             )
         except httpx.HTTPError as exc:
-            raise AgentApiError(f"cannot reach {self.config.server_url}: {exc}") from exc
+            raise AgentApiError.unreachable(self.config.server_url, exc) from exc
         return self._check(response)
 
     def _get(self, url: str) -> dict | None:
         try:
             response = self._client.get(url, headers=self._headers())
         except httpx.HTTPError as exc:
-            raise AgentApiError(f"cannot reach {self.config.server_url}: {exc}") from exc
+            raise AgentApiError.unreachable(self.config.server_url, exc) from exc
         return self._check(response)
 
     def enroll(self, enrollment_token: str, name: str, hostname: str, platform: str) -> dict:
@@ -138,7 +129,7 @@ class AgentClient:
         try:
             response = self._client.get(f"/api/agent/quills/{quill}/code", headers=self._headers())
         except httpx.HTTPError as exc:
-            raise AgentApiError(f"cannot reach {self.config.server_url}: {exc}") from exc
+            raise AgentApiError.unreachable(self.config.server_url, exc) from exc
         if response.status_code >= 400:
             raise AgentApiError(str(_detail(response)), status_code=response.status_code)
         return response.content
@@ -153,13 +144,3 @@ class AgentClient:
         return self._post(
             "/api/agent/notifications", {"kind": kind, "title": title, "body": body}
         ) or {}
-
-
-def _detail(response: httpx.Response) -> object:
-    try:
-        payload = response.json()
-    except ValueError:
-        return response.text or f"HTTP {response.status_code}"
-    if isinstance(payload, dict) and "detail" in payload:
-        return payload["detail"]
-    return payload
