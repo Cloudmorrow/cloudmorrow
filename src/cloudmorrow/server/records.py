@@ -21,8 +21,8 @@ What the store does for every datamodel, so no Quill has to:
 * sweeps records an `expire` job would take, when their datamodel is read;
 * writes every change to `record_changes`, the feed sync and audit read.
 
-The gate is `check`: who is asking, what they want to do, to which datamodel.
-Then *which records*: a record of a plain datamodel is its owner's alone; a
+The gate is `check` (principal.py): who is asking, what they want to do,
+to which datamodel. Then *which records*: a record of a plain datamodel is its owner's alone; a
 record of a space (a calendar, a channel) is its owner's, its members' or
 everybody's, by its scope; a record in a space (an event, a message) is for
 whoever may see the space. Every read and write finds the row first and
@@ -37,19 +37,37 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-import re
 import secrets
 import sqlite3
 import threading
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from cloudmorrow.server.circles import Access
-from cloudmorrow.server.datamodels import Datamodel, Field, parse_duration
+from cloudmorrow.server.datamodels import Datamodel, parse_duration
 from cloudmorrow.server.db import Connection, connect
+from cloudmorrow.server.principal import (
+    DATASET,
+    NEVER_FOR_ASSISTANTS,
+    Principal,
+    Refused,
+    check,
+)
+from cloudmorrow.server.recordfields import (
+    RecordError,
+    coerce,
+    iso_stamp,
+    parse_filter,
+    parse_moment,
+    reads_as,
+    stored_indexed,
+    utc_now,
+)
 
 __all__ = [
+    "DATASET",
+    "NEVER_FOR_ASSISTANTS",
     "Principal",
     "Record",
     "RecordConflictError",
@@ -113,10 +131,6 @@ CREATE TABLE IF NOT EXISTS record_seen (
 """
 
 
-class RecordError(ValueError):
-    """What was sent does not fit the datamodel."""
-
-
 class UnknownModelError(LookupError):
     pass
 
@@ -131,67 +145,6 @@ class RecordConflictError(RuntimeError):
     def __init__(self, current: Record) -> None:
         super().__init__(f"record is at rev {current.rev}")
         self.current = current
-
-
-class Refused(PermissionError):
-    """The gate said no."""
-
-
-# -- who is asking -------------------------------------------------------------
-@dataclass(frozen=True, slots=True)
-class Principal:
-    """A person, an assistant acting as one, or a Quill acting for one.
-
-    Every principal acts for an account: the records it reaches are that
-    account's. What differs is what it may reach of them.
-    """
-
-    kind: str  # person, assistant, quill; dataset for a Quill's seed
-    username: str
-    # For a Quill: its id, and the datamodels it declared or was granted.
-    quill: str = ""
-    models: frozenset[str] = field(default_factory=frozenset)
-    # An administrator may manage any shared or public space, as on a server
-    # they are responsible for; it lets them see no personal record.
-    admin: bool = False
-
-    @classmethod
-    def person(cls, username: str, *, admin: bool = False) -> Principal:
-        return cls("person", username, admin=admin)
-
-    @classmethod
-    def assistant(cls, username: str, *, admin: bool = False) -> Principal:
-        return cls("assistant", username, admin=admin)
-
-    @property
-    def writer(self) -> str:
-        return self.quill or self.kind
-
-
-# A Quill's dataset being written for somebody (`RecordStore.seed`): not a
-# person acting, so their circles do not narrow it.
-DATASET = "dataset"
-
-# Datamodels no assistant is ever let at, whatever the person allows.
-NEVER_FOR_ASSISTANTS = frozenset({"secret"})
-
-ACTIONS = frozenset({"read", "write"})
-
-
-def check(principal: Principal, action: str, model: str) -> None:
-    """The gate. Raises Refused, or returns having said yes.
-
-    Personal scope means a principal only ever reaches its own account's
-    records, and that is enforced by the store taking the owner from the
-    principal rather than from the request. What is decided here is the
-    rest: which datamodels each kind of principal may touch at all.
-    """
-    if action not in ACTIONS:
-        raise Refused(f"no such action: {action}")
-    if principal.kind == "assistant" and model in NEVER_FOR_ASSISTANTS:
-        raise Refused(f"assistants never reach {model}")
-    if principal.kind == "quill" and model not in principal.models:
-        raise Refused(f"{principal.quill} did not ask for {model}")
 
 
 # -- the envelope --------------------------------------------------------------
@@ -246,138 +199,6 @@ class Record:
             "updated_at": self.updated_at,
             "expires_at": self.expires_at,
         }
-
-
-# -- time ----------------------------------------------------------------------
-def _now() -> dt.datetime:
-    return dt.datetime.now(tz=dt.UTC)
-
-
-def _stamp(moment: dt.datetime | None = None) -> str:
-    return (moment or _now()).isoformat(timespec="seconds")
-
-
-def _parse_moment(value: str) -> dt.datetime | None:
-    try:
-        moment = dt.datetime.fromisoformat(value)
-    except (TypeError, ValueError):
-        return None
-    return moment if moment.tzinfo else moment.replace(tzinfo=dt.UTC)
-
-
-# -- fields --------------------------------------------------------------------
-_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-
-def _coerce(model: Datamodel, f: Field, value: object) -> object:
-    """One value, made the kind its field is, or RecordError."""
-    if value is None:
-        return None
-    where = f"{model.id}.{f.name}"
-    kind = f.kind
-    if kind in ("string", "text", "markdown", "phone", "url", "link"):
-        if not isinstance(value, str | int | float):
-            raise RecordError(f"{where} is text")
-        text = str(value)
-        if kind == "string" and not f.secret:
-            text = text.strip()
-        return text
-    if kind == "email":
-        text = str(value).strip()
-        if text and not _EMAIL_RE.match(text):
-            raise RecordError(f"{where} is not an email address")
-        return text
-    if kind == "bool":
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, str) and value.lower() in ("true", "false", "1", "0", "yes", "no"):
-            return value.lower() in ("true", "1", "yes")
-        raise RecordError(f"{where} is true or false")
-    if kind == "int":
-        if isinstance(value, bool):
-            raise RecordError(f"{where} is a whole number")
-        try:
-            return int(value)  # type: ignore[arg-type]
-        except (TypeError, ValueError):
-            raise RecordError(f"{where} is a whole number") from None
-    if kind == "decimal":
-        try:
-            return str(float(value)) if not isinstance(value, str) else str(float(value.strip()))
-        except (TypeError, ValueError):
-            raise RecordError(f"{where} is a number") from None
-    if kind == "date":
-        try:
-            return dt.date.fromisoformat(str(value)).isoformat()
-        except ValueError:
-            raise RecordError(f"{where} is a date, YYYY-MM-DD") from None
-    if kind == "datetime":
-        return _wall_or_moment(where, str(value).strip())
-    if kind == "enum":
-        text = str(value).strip().lower()
-        if text not in f.values:
-            raise RecordError(f"{where} is one of {', '.join(f.values)}")
-        return text
-    if kind == "json":
-        try:
-            json.dumps(value)
-        except (TypeError, ValueError):
-            raise RecordError(f"{where} is not JSON") from None
-        return value
-    raise RecordError(f"{where}: unknown kind {kind}")  # pragma: no cover
-
-
-_BARE_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-
-
-def _wall_or_moment(where: str, text: str) -> str:
-    """A datetime field's value, kept the way it was meant.
-
-    With a zone it is a moment, and is kept with its zone. Without one it is
-    the time on the wall — "the dentist at ten" — and is kept as typed, to
-    the minute, converting nothing: that is what a calendar needs, and a
-    server guessing a zone for it would move the dentist twice a year. A
-    bare date is a whole day, and stays one. ISO sorts the way time does, so
-    all three compare as strings, which is what a range filter does.
-    """
-    if _BARE_DATE_RE.match(text):
-        try:
-            return dt.date.fromisoformat(text).isoformat()
-        except ValueError:
-            raise RecordError(f"{where} is a date, YYYY-MM-DD") from None
-    try:
-        moment = dt.datetime.fromisoformat(text)
-    except ValueError:
-        raise RecordError(f"{where} is a date and time, ISO 8601") from None
-    if moment.tzinfo is None:
-        exact = moment.second or moment.microsecond
-        return moment.isoformat(timespec="seconds" if exact else "minutes")
-    return moment.isoformat(timespec="seconds")
-
-
-def _is(value: object, target: str) -> bool:
-    """Does a field's value read as *target*? `false` is how TOML says a bool."""
-    if isinstance(value, bool):
-        return str(value).lower() == target.lower()
-    return value is not None and str(value) == target
-
-
-def _stored_indexed(model: Datamodel) -> set[str]:
-    """Links are always plain: they are what cascades and filters find by."""
-    return {f.name for f in model.fields if f.indexed or f.kind == "link"}
-
-
-# `?starts_at__lt=2026-10-01`: a range on an indexed field, for anything
-# that asks "between these two" — the events in a month, the invoices in a
-# quarter. A field that is missing never matches a range.
-RANGES = {"lt": "<", "lte": "<=", "gt": ">", "gte": ">="}
-
-
-def _filter(key: str) -> tuple[str, str]:
-    """A filter's field and its comparison: `due` is equal, `due__gte` is at least."""
-    name, sep, suffix = key.rpartition("__")
-    if sep and suffix in RANGES:
-        return name, RANGES[suffix]
-    return key, "IS"
 
 
 def _new_id() -> str:
@@ -547,9 +368,9 @@ class RecordStore:
         )
         expiry = self._expiries().get(model.id)
         if expiry:
-            since = _parse_moment(str(fields.get(expiry[0]) or ""))
+            since = parse_moment(str(fields.get(expiry[0]) or ""))
             if since is not None:
-                record.expires_at = _stamp(since + expiry[1])
+                record.expires_at = iso_stamp(since + expiry[1])
         if model.space:
             record.members = self._members(conn, row["id"])
             if asker is not None:
@@ -802,26 +623,26 @@ class RecordStore:
     ) -> list[Record]:
         model_id = model.id
         self.sweep(model_id, owner=None if (model.space or model.in_space) else principal.username)
-        plain = _stored_indexed(model)
+        plain = stored_indexed(model)
         clause, clause_params = self._visible_clause(model, principal.username)
         query = f"SELECT *, rowid AS seq FROM records WHERE model = ? AND {clause}"
         params: list[object] = [model.id, *clause_params]
         for key, value in (where or {}).items():
-            name, operator = _filter(key)
+            name, operator = parse_filter(key)
             if name not in plain:
                 raise RecordError(f"{model.id} cannot be filtered by {name!r}: it is not indexed")
-            coerced = _coerce(model, model.get_field(name), value)
+            coerced = coerce(model, model.get_field(name), value)
             query += f" AND json_extract(indexed, ?) {operator} ?"
             params += [f'$."{name}"', coerced if not isinstance(coerced, bool) else int(coerced)]
         if since:
             # A `+` in a query string arrives as a space, if it was not escaped.
-            moment = _parse_moment(since.strip().replace(" ", "+"))
+            moment = parse_moment(since.strip().replace(" ", "+"))
             if moment is None:
                 raise RecordError("since is a date and time, ISO 8601")
             # At or after: a second is the stamp's grain, so the caller gets
             # what it already had that second again, and keeps it once by id.
             query += " AND updated_at >= ?"
-            params.append(_stamp(moment))
+            params.append(iso_stamp(moment))
         # Ties go to whichever was written first: two lines said in the same
         # second read in the order they were said.
         if last is not None:
@@ -936,7 +757,7 @@ class RecordStore:
             added = conn.execute(
                 "INSERT OR IGNORE INTO record_members (space_id, username, added_by, joined_at)"
                 " VALUES (?, ?, ?, ?)",
-                (space_id, username, principal.username, _stamp()),
+                (space_id, username, principal.username, iso_stamp()),
             ).rowcount
             if username == row["owner"]:
                 added = 0
@@ -973,7 +794,7 @@ class RecordStore:
             conn.execute(
                 "INSERT INTO record_seen (space_id, username, seen_at) VALUES (?, ?, ?)"
                 " ON CONFLICT(space_id, username) DO UPDATE SET seen_at = excluded.seen_at",
-                (space_id, principal.username, _stamp()),
+                (space_id, principal.username, iso_stamp()),
             )
         conn.close()
 
@@ -996,11 +817,11 @@ class RecordStore:
             if known[name].stamp_field:
                 raise RecordError(f"{model.id}.{name} is set by the server")
         for name, value in incoming.items():
-            fields[name] = _coerce(model, known[name], value)
+            fields[name] = coerce(model, known[name], value)
         if current is None:
             for f in model.fields:
                 if fields.get(f.name) is None and f.default is not None:
-                    fields[f.name] = _coerce(model, f, f.default)
+                    fields[f.name] = coerce(model, f, f.default)
         for f in model.fields:
             value = fields.get(f.name)
             if f.required and (value is None or value == ""):
@@ -1018,16 +839,16 @@ class RecordStore:
         for f in model.fields:
             if not f.stamp_field:
                 continue
-            now_in = _is(fields.get(f.stamp_field), f.stamp_value)
-            was_in = current is not None and _is(current.get(f.stamp_field), f.stamp_value)
+            now_in = reads_as(fields.get(f.stamp_field), f.stamp_value)
+            was_in = current is not None and reads_as(current.get(f.stamp_field), f.stamp_value)
             if now_in and not (was_in and fields.get(f.name)):
-                fields[f.name] = _stamp()
+                fields[f.name] = iso_stamp()
             elif not now_in:
                 fields[f.name] = None
         return fields
 
     def _split(self, model: Datamodel, fields: dict) -> tuple[dict, dict]:
-        plain = _stored_indexed(model)
+        plain = stored_indexed(model)
         return (
             {k: v for k, v in fields.items() if k in plain},
             {k: v for k, v in fields.items() if k not in plain},
@@ -1095,7 +916,7 @@ class RecordStore:
                 rev,
                 principal.kind,
                 principal.quill or principal.username,
-                _stamp(),
+                iso_stamp(),
             ),
         )
 
@@ -1124,7 +945,7 @@ class RecordStore:
             return made
         owner = principal.username
         record_id = _new_id()
-        now = _stamp()
+        now = iso_stamp()
         scope = self._scope_for(model, scope)
         people = [who for who in dict.fromkeys(str(m).strip() for m in members) if who and who != owner]
         if people and (not model.space or scope != "shared"):
@@ -1194,9 +1015,9 @@ class RecordStore:
             raise RecordError(f"a {model.label.lower()} is not a space")
         scope = self._scope_for(model, scope)
         people = {principal.username, *(str(m).strip() for m in members if str(m).strip())}
-        plain = _stored_indexed(model)
+        plain = stored_indexed(model)
         wanted = {
-            name: _coerce(model, model.get_field(name), value)
+            name: coerce(model, model.get_field(name), value)
             for name, value in incoming.items()
             if name in plain and name in model.by_name
         }
@@ -1283,7 +1104,7 @@ class RecordStore:
             conn.execute(
                 "UPDATE records SET indexed = ?, body = ?, rev = rev + 1, position = ?,"
                 " written_by = ?, updated_at = ? WHERE id = ?",
-                (indexed, body, position, principal.writer, _stamp(), record_id),
+                (indexed, body, position, principal.writer, iso_stamp(), record_id),
             )
             if model.ordered:
                 if old_group != new_group:
@@ -1414,7 +1235,7 @@ class RecordStore:
             return 0
         field_name, after = expiry
         model = self.model(model_id)
-        cutoff = _stamp(_now() - after)
+        cutoff = iso_stamp(utc_now() - after)
         query = (
             "SELECT id, owner FROM records WHERE model = ?"
             " AND json_extract(indexed, ?) IS NOT NULL AND json_extract(indexed, ?) < ?"
