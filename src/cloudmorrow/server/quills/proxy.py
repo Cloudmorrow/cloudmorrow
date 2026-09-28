@@ -45,14 +45,16 @@ OURS = ("x-cloudmorrow-",)
 
 async def read_body(request: Request, limit: int) -> bytes:
     """The request's body, refused with a 413 past *limit* bytes."""
+    # 413 as a number, here and in the routes: Starlette renamed its constant
+    # (HTTP_413_CONTENT_TOO_LARGE), and the old name warns on a new one.
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > limit:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "the body is too big")
+        raise HTTPException(413, "the body is too big")
     chunks, size = [], 0
     async for chunk in request.stream():
         size += len(chunk)
         if size > limit:
-            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "the body is too big")
+            raise HTTPException(413, "the body is too big")
         chunks.append(chunk)
     return b"".join(chunks)
 

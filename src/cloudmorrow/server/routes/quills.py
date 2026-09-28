@@ -229,7 +229,7 @@ async def upload(
     data = await request.body()
     if len(data) > MAX_DOWNLOAD:
         raise HTTPException(
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "bigger than a Quill should be"
+            413, "bigger than a Quill should be"
         )
     with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
         root = Path(tmp) / "q"

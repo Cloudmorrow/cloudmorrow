@@ -236,7 +236,7 @@ async def attach(
     try:
         return state.records.attach(principal, model, data, filename)
     except AttachmentTooBig as exc:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, str(exc)) from exc
+        raise HTTPException(413, str(exc)) from exc
     except ERRORS as exc:
         raise http_error(exc) from exc
 

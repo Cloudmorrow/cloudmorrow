@@ -51,7 +51,7 @@ async def upload_image(
         info = store.save_image(await request.body(), filename=filename)
     except InvalidImageError as exc:
         code = (
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+            413
             if "too big" in str(exc)
             else status.HTTP_400_BAD_REQUEST
         )
