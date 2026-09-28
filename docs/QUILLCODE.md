@@ -379,7 +379,8 @@ text, from a server with nothing on it but the Quill and its datasets.
 3. **Release** with a tag (`v1.2.0`, the same as `version`). The template's
    release workflow checks, tests in the sandbox, and publishes the release.
 4. **Submit** it: a pull request on `Cloudmorrow/quill-catalog` adding its
-   `repo`, `ref` and `category`, or the form at cloudmorrow.com/publish.
+   `repo`, `ref` and `category`. cloudmorrow.com/publish lists it on the
+   site meanwhile; opening the pull request from there is still to come.
 
 Ours go the same way. Every standard Quill is a `quill-*` repository in the
 same shape as the template, released and added by the same kind of pull
