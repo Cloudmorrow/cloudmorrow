@@ -1,0 +1,89 @@
+# A Quill with code, for the tests: every kind of handler there is.
+[quill]
+id = "fleet"
+name = "Fleet"
+version = "1.0.0"
+summary = "The vans, their services, and the odometer."
+category = "business"
+code = "quill.py"
+
+[uses]
+datamodels = ["vehicle"]
+
+[[extends]]
+model = "vehicle"
+[extends.fields]
+odometer = { kind = "int", indexed = true }
+
+[[screens]]
+id = "garage"
+label = "Garage"
+view = "garage"
+model = "vehicle"
+
+[[screens]]
+id = "vans"
+kit = "list"
+label = "Vans"
+model = "vehicle"
+title = "name"
+
+[[actions]]
+id = "log-service"
+label = "Log a service"
+on = "vehicle"
+[actions.fields]
+date = { kind = "date", required = true }
+km = { kind = "int", required = true }
+note = "text"
+
+[[actions]]
+id = "add-van"
+label = "Add a van"
+tone = "primary"
+[actions.fields]
+name = { kind = "string", required = true }
+registration = "string"
+
+[[actions]]
+id = "peek"
+label = "Peek at the tracker key"
+assistant = false
+
+[[actions]]
+id = "reach-out"
+label = "Reach for something it did not ask for"
+
+[[hooks]]
+on = "fleet.visit"
+when = "created"
+handler = "visit_logged"
+
+[[jobs]]
+id = "nightly"
+action = "call"
+handler = "nightly"
+every = "1d"
+
+[[webhooks]]
+id = "tracker"
+handler = "tracker_ping"
+
+[[apis]]
+id = "summary"
+handler = "summary"
+
+[[fetch]]
+host = "api.example.com"
+why = "to read each van's odometer from the tracker"
+
+[[secrets]]
+key = "TRACKER_KEY"
+why = "to sign in to the tracker"
+
+[[machine]]
+id = "import-exports"
+why = "to read the tracker's CSV exports into your vans"
+every = "15m"
+[machine.needs]
+folders = [{ name = "exports", access = "read" }]

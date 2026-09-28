@@ -40,6 +40,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from cloudmorrow.server.codespec import CodeSpecError, check_handlers, parse_code
 from cloudmorrow.server.datamodels import (
     Datamodel,
     DatamodelError,
@@ -66,16 +67,18 @@ MANIFEST = "quill.toml"
 ORIGIN = ".origin.json"
 
 # The screens every surface draws. A Quill has these and nothing else.
-KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor")
+KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor", "view")
 # The ones every surface draws *today*. A screen of another kind is refused at
 # install, so a Quill never lands with a tab that draws nothing somewhere.
-KIT_READY = frozenset({"list", "board", "detail", "form", "calendar", "grid", "editor", "thread"})
+KIT_READY = frozenset(
+    {"list", "board", "detail", "form", "calendar", "grid", "editor", "thread", "view"}
+)
 
 # How a thread screen may make a space: in one of the scopes, or `direct`,
 # found-or-made between the people picked.
 MADE_AS = ("personal", "shared", "public", "direct")
 
-JOB_ACTIONS = frozenset({"expire", "run"})
+JOB_ACTIONS = frozenset({"expire", "run", "call"})
 SEED_KINDS = frozenset({"per-owner", "once"})
 
 ID_RE = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
@@ -118,6 +121,14 @@ class Manifest:
     apis: tuple[dict, ...]
     # What it does, one line each, for the catalog and the install sheet.
     features: tuple[str, ...] = ()
+    # Its Python, when it has some (codespec.py, docs/QUILLCODE.md).
+    code: str = ""
+    sdk: str = ""
+    actions: tuple[dict, ...] = ()
+    hooks: tuple[dict, ...] = ()
+    fetch: tuple[dict, ...] = ()
+    secrets: tuple[dict, ...] = ()
+    machine: tuple[dict, ...] = ()
     readme: str = ""
     folder: Path | None = None
     origin: dict = field(default_factory=dict)
@@ -158,6 +169,13 @@ class Manifest:
             "services": list(self.services),
             "webhooks": list(self.webhooks),
             "apis": list(self.apis),
+            "code": self.code,
+            "sdk": self.sdk,
+            "actions": list(self.actions),
+            "hooks": list(self.hooks),
+            "fetch": list(self.fetch),
+            "secrets": list(self.secrets),
+            "machine": list(self.machine),
             "origin": dict(self.origin),
         }
 
@@ -257,6 +275,15 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
 
     screens = _table_list(data, "screens", where)
     _ids_unique(screens, "screen", where)
+    jobs = _table_list(data, "jobs", where)
+    webhooks = _table_list(data, "webhooks", where)
+    apis = _table_list(data, "apis", where)
+    try:
+        code = parse_code(data, folder, where, screens=screens, jobs=jobs, webhooks=webhooks, apis=apis)
+        if folder is not None:
+            check_handlers(folder, code, where)
+    except CodeSpecError as exc:
+        raise QuillError(str(exc)) from exc
     for screen in screens:
         kit = screen.get("kit")
         if kit not in KIT:
@@ -266,10 +293,13 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
                 f"{where}: screen {screen['id']!r} is a {kit}, which the kit does not draw on every"
                 f" surface yet; today it is {', '.join(sorted(KIT_READY))}"
             )
+        if kit == "view":
+            if not str(screen.get("label", "")).strip():
+                raise QuillError(f"{where}: screen {screen['id']!r} is a view, so it says its label")
+            continue
         if not screen.get("model"):
             raise QuillError(f"{where}: screen {screen['id']!r} names a model")
 
-    jobs = _table_list(data, "jobs", where)
     _ids_unique(jobs, "job", where)
     for job in jobs:
         if job.get("action") not in JOB_ACTIONS:
@@ -316,9 +346,7 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
             raise QuillError(f"{where}: service {service['id']!r} command is a list of strings")
         if not isinstance(service.get("always", False), bool):
             raise QuillError(f"{where}: service {service['id']!r} always is true or false")
-    webhooks = _table_list(data, "webhooks", where)
     _ids_unique(webhooks, "webhook", where)
-    apis = _table_list(data, "apis", where)
     _ids_unique(apis, "api", where)
     service_ids = {s["id"] for s in services}
     for job in jobs:
@@ -333,7 +361,11 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
     for hook in webhooks:
         _check_webhook(hook, service_ids, paths, where)
     for api in apis:
-        if api.get("service") not in service_ids:
+        if bool(api.get("handler")) == bool(api.get("service")):
+            raise QuillError(
+                f"{where}: api {api['id']!r} is answered by a handler or one of its services, one of them"
+            )
+        if api.get("service") and api["service"] not in service_ids:
             raise QuillError(f"{where}: api {api['id']!r} is served by one of its services")
         prefix = api.get("prefix", "")
         if prefix and not (isinstance(prefix, str) and API_PREFIX_RE.match(prefix)):
@@ -363,6 +395,13 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
         services=tuple(services),
         webhooks=tuple(webhooks),
         apis=tuple(apis),
+        code=code.code,
+        sdk=code.sdk,
+        actions=code.actions,
+        hooks=code.hooks,
+        fetch=code.fetch,
+        secrets=code.secrets,
+        machine=code.machine,
         readme=readme,
         folder=folder,
     )
@@ -371,9 +410,10 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
 def _check_webhook(hook: dict, service_ids: set[str], paths: set[str], where: str) -> None:
     """A webhook: a path, and a record made from its body or a service it goes to."""
     thing = f"webhook {hook['id']!r}"
-    if bool(hook.get("model")) == bool(hook.get("forward")):
+    if sum(bool(hook.get(k)) for k in ("model", "forward", "handler")) != 1:
         raise QuillError(
-            f"{where}: {thing} makes a record in a model, or forwards to a service, one of them"
+            f"{where}: {thing} makes a record in a model, forwards to a service, or is answered"
+            " by a handler: one of them"
         )
     if hook.get("forward") and hook["forward"] not in service_ids:
         raise QuillError(f"{where}: {thing} forwards to a service it does not have")
@@ -384,8 +424,8 @@ def _check_webhook(hook: dict, service_ids: set[str], paths: set[str], where: st
         raise QuillError(f"{where}: two webhooks at /hooks/{where}/{path}")
     paths.add(path)
     mapping = hook.get("map", {})
-    if hook.get("forward") and mapping:
-        raise QuillError(f"{where}: {thing} forwards, so it has no map")
+    if (hook.get("forward") or hook.get("handler")) and mapping:
+        raise QuillError(f"{where}: {thing} has no map: only a webhook that makes a record maps")
     if not isinstance(mapping, dict):
         raise QuillError(f"{where}: {thing} map is a table: field = \"$.path\"")
     for name, path_text in mapping.items():
@@ -871,6 +911,10 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
 
     for screen in manifest.screens:
         thing = f"screen {screen['id']!r}"
+        if screen["kit"] == "view":
+            if screen.get("model"):
+                model_of(thing, screen["model"])
+            continue
         model = model_of(thing, screen["model"])
         kit = screen["kit"]
         need(model, thing, screen.get("title", model.title))
@@ -944,6 +988,17 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
             model = model_of(f"webhook {hook['id']!r}", hook["model"])
             for name in hook.get("map", {}):
                 need(model, f"webhook {hook['id']!r} map", name)
+    for action in manifest.actions:
+        thing = f"action {action['id']!r}"
+        if action.get("on"):
+            model_of(thing, action["on"])
+        for spec in action["fields"]:
+            if spec["kind"] == "link":
+                model_of(f"{thing} field {spec['name']!r}", spec["to"])
+    for hook in manifest.hooks:
+        model = model_of(f"hook {hook['id']!r}", hook["on"])
+        for name in hook.get("fields", []):
+            need(model, f"hook {hook['id']!r} fields", name)
     for dataset in manifest.datasets:
         model = model_of(f"dataset {dataset['id']!r}", dataset["model"])
         for record in dataset["records"]:
@@ -1047,6 +1102,31 @@ def runs_code(manifest: Manifest) -> list[str]:
     return list(dict.fromkeys(" ".join(s["command"]) for s in manifest.services))
 
 
+def code_summary(manifest: Manifest) -> dict:
+    """What its Python does, for the install sheet: nothing of it runs to find out."""
+    if not manifest.code:
+        return {}
+    return {
+        "sandboxed": True,
+        "views": [s["label"] for s in manifest.screens if s["kit"] == "view"],
+        "actions": [a["label"] for a in manifest.actions],
+        "hooks": [f"when a {h['on']} is {' or '.join(h['when'])}" for h in manifest.hooks],
+        "jobs": [f"{j['id']} every {j['every']}" for j in manifest.jobs if j["action"] == "call"],
+        "fetch": [{"host": f["host"], "why": f["why"]} for f in manifest.fetch],
+        "secrets": [{"key": s["key"], "why": s["why"]} for s in manifest.secrets],
+        "machine": [
+            {
+                "id": m["id"],
+                "why": m["why"],
+                "every": m.get("every", ""),
+                "folders": [f"{f['name']} ({f['access']})" for f in m["folders"]],
+                "run": list(m["run"]),
+            }
+            for m in manifest.machine
+        ],
+    }
+
+
 def describe(
     manifest: Manifest,
     models: dict[str, Datamodel],
@@ -1093,6 +1173,7 @@ def describe(
             # Who it runs as is known once it is installed; before, it is
             # whoever says yes, and the sheet says that.
             "runs_code": runs_code(manifest),
+            "quill_code": code_summary(manifest),
             "runs_as": manifest.origin.get("installed_by", "") if installed else "",
             "reach": sorted(manifest.models),
         }

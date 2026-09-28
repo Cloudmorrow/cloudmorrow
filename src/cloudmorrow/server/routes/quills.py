@@ -27,6 +27,7 @@ from pydantic import BaseModel
 from cloudmorrow.server.circles import NONE, Access
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_admin_user, get_current_user, get_state
+from cloudmorrow.server.quillhandlers import CodeError
 from cloudmorrow.server.quills import MANIFEST, MAX_DOWNLOAD, QuillError, fetch, load_catalog
 
 router = APIRouter(prefix="/api/quills", tags=["quills"])
@@ -74,6 +75,8 @@ WITHIN = ("group", "subgroup", "space")
 
 def _screen_needs(screen: dict, models: dict[str, dict]) -> set[str]:
     """Every datamodel a screen cannot be drawn without: its own, and what it is within."""
+    if screen.get("kit") == "view" and not screen.get("model"):
+        return set()
     model = models.get(screen["model"])
     if model is None:
         return {screen["model"]}
@@ -107,9 +110,13 @@ def fitted(quill: dict, access: Access) -> dict:
     ]
     own = set(quill["uses"]) | set(quill["introduces"]) | set(quill["extends"])
     available = bool(screens) if quill["screens"] else any(m in kept for m in own)
+    # An action on records they cannot see is not theirs to press; one they
+    # may only read is shown, and the gate says no if its code writes.
+    actions = [a for a in quill.get("actions", []) if not a.get("on") or a["on"] in kept]
     return quill | {
         "models": kept,
         "screens": screens,
+        "actions": actions,
         "available": available,
         "enabled": bool(quill.get("enabled", True)) and available,
     }
@@ -280,3 +287,61 @@ def uninstall(
         state.quills.uninstall(quill_id)
     except QuillError as exc:
         raise _bad(exc) from exc
+
+
+# -- a Quill's code, pressed and drawn -------------------------------------------------
+class ActionIn(BaseModel):
+    """An action pressed: on which record (for an action `on` a datamodel), with its form."""
+
+    record: str = ""
+    fields: dict = {}
+
+
+def _code(state: AppState):
+    if state.code is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "this server runs no Quill code")
+    return state.code
+
+
+def _failed(exc: CodeError) -> HTTPException:
+    return HTTPException(exc.status, exc.to_dict())
+
+
+@router.get("/{quill_id}/views/{screen_id}")
+def view(
+    quill_id: str,
+    screen_id: str,
+    request: Request,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """A view drawn for whoever asks: the tree of primitives its code returned.
+
+    Query parameters are the view's `ctx.params`; `record` (with `model`, if
+    the screen names none) is the record it was opened on.
+    """
+    params = dict(request.query_params)
+    record = params.pop("record", "")
+    try:
+        tree = _code(state).view(user.username, quill_id, screen_id, params, record=record)
+    except CodeError as exc:
+        raise _failed(exc) from exc
+    return {"quill": quill_id, "screen": screen_id, "tree": tree}
+
+
+@router.post("/{quill_id}/actions/{action_id}")
+def press(
+    quill_id: str,
+    action_id: str,
+    payload: ActionIn,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Run an action as whoever pressed it: what the surface does next, as effects."""
+    try:
+        effects = _code(state).action(
+            user.username, quill_id, action_id, record=payload.record, fields=payload.fields
+        )
+    except CodeError as exc:
+        raise _failed(exc) from exc
+    return {"effects": effects}

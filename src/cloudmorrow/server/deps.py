@@ -74,6 +74,8 @@ class AppState:
     services: Supervisor | None = None
     # Who may use which datamodels (circles.py). The record store asks it too.
     circles: CircleStore | None = None
+    # What runs a Quill's Python, in its sandbox (quillhandlers.py).
+    code: object | None = None
 
     def cloud_name(self) -> str:
         """What this cloud is called: set from the app, else from the config."""

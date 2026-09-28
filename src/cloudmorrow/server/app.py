@@ -26,6 +26,7 @@ from cloudmorrow.server.mcp import MCPStore
 from cloudmorrow.server.notifications import NotificationStore
 from cloudmorrow.server.quilljobs import Clock
 from cloudmorrow.server.quills import QuillRegistry
+from cloudmorrow.server.quillhandlers import QuillCode
 from cloudmorrow.server.quillservices import Supervisor
 from cloudmorrow.server.quilltokens import QuillTokenStore
 from cloudmorrow.server.records import RecordStore
@@ -149,10 +150,20 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         config, quill_registry, user_store, state.features, state.quill_tokens
     )
     app.router.on_startup.append(state.services.start)
-    clock = Clock(config.db_path, quill_registry, record_store, on_tick=state.services.run_due)
+    # A Quill's Python: views, actions, hooks, `call` jobs, and handler
+    # webhooks and APIs, each in the Quill's sandbox (quillhandlers.py).
+    state.code = QuillCode(state)
+    app.router.on_startup.append(state.code.start)
+
+    def tick() -> None:
+        state.services.run_due()
+        state.code.run_due()
+
+    clock = Clock(config.db_path, quill_registry, record_store, on_tick=tick)
     app.router.on_startup.append(clock.start)
     app.router.on_shutdown.append(clock.stop)
     app.router.on_shutdown.append(state.services.stop)
+    app.router.on_shutdown.append(state.code.stop)
 
     require_tls(app, config)
     allowed_clients = parse_rules(config.allowed_client_ips)

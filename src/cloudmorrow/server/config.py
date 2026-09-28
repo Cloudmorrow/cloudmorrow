@@ -83,6 +83,10 @@ class ServerConfig:
     # Where the Quill Catalog is read from: a URL to its catalog.toml, or a
     # local path to one (or to a checkout of the catalog repository).
     quill_catalog: str = DEFAULT_QUILL_CATALOG
+    # Where a Quill's Python runs: "sandbox" (CPython in WebAssembly, the
+    # only thing a server should use), or "trusted" — in the server's own
+    # interpreter, with no wall — for tests and `cm quill dev --local`.
+    quill_code: str = "sandbox"
     config_path: Path | None = None
 
     @property
@@ -231,6 +235,7 @@ def load_config(path: Path | None = None) -> ServerConfig:
             "service_name",
             "weather_place",
             "quill_catalog",
+            "quill_code",
         ):
             if key in section:
                 value = section[key]
@@ -263,6 +268,7 @@ def load_config(path: Path | None = None) -> ServerConfig:
         "SERVICE_NAME": ("service_name", str),
         "WEATHER_PLACE": ("weather_place", str),
         "QUILL_CATALOG": ("quill_catalog", str),
+        "QUILL_CODE": ("quill_code", str),
     }
     for env_suffix, (attr, caster) in env_map.items():
         raw = os.environ.get(ENV_PREFIX + env_suffix)

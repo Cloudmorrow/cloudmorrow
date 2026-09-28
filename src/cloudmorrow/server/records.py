@@ -457,6 +457,10 @@ class RecordStore:
         self.on_notify: list[Callable[[Record, dict, list[str]], None]] = []
         # Told when somebody is added to a space: (space, username, by).
         self.on_member_added: list[Callable[[Record, str, str], None]] = []
+        # Told after every create, change and delete that committed:
+        # (principal, action, record, fields before). What runs a Quill's
+        # hooks listens here (quillcode.py); it must be quick, and may not raise.
+        self.on_change: list[Callable[[Principal, str, Record, dict | None], None]] = []
         # Datamodels served from elsewhere, by backend name (see backends.py).
         self.backends: dict[str, object] = {}
         # What a person may do with each datamodel, from their circles
@@ -490,6 +494,15 @@ class RecordStore:
         if found is None:
             raise UnknownModelError(model_id)
         return found
+
+    def _changed(self, principal: Principal, action: str, record: Record, before: dict | None) -> None:
+        for listener in self.on_change:
+            try:
+                listener(principal, action, record, before)
+            except Exception:  # a listener's trouble is never the write's
+                import logging
+
+                logging.getLogger("cloudmorrow.records").exception("a change listener failed")
 
     def _backend(self, model: Datamodel):
         """The backend a datamodel is served by, when it is not stored here."""
@@ -1098,7 +1111,9 @@ class RecordStore:
         self._check(principal, "write", model_id)
         model = self.model(model_id)
         if model.backend:
-            return self._backend(model).create(principal, model, dict(incoming))
+            made = self._backend(model).create(principal, model, dict(incoming))
+            self._changed(principal, "created", made, None)
+            return made
         owner = principal.username
         record_id = _new_id()
         now = _stamp()
@@ -1146,6 +1161,7 @@ class RecordStore:
             for username in people:
                 for hook in self.on_member_added:
                     hook(made, username, owner)
+        self._changed(principal, "created", made, None)
         return made
 
     def find_space(
@@ -1236,7 +1252,9 @@ class RecordStore:
         self._check(principal, "write", model_id)
         model = self.model(model_id)
         if model.backend:
-            return self._backend(model).update(principal, model, record_id, dict(incoming), rev)
+            changed = self._backend(model).update(principal, model, record_id, dict(incoming), rev)
+            self._changed(principal, "changed", changed, None)
+            return changed
         with connect(self.db_path) as conn:
             # Read and write under one lock, so two writers cannot both pass
             # the revision check. Anything raised below rolls the lot back.
@@ -1267,7 +1285,9 @@ class RecordStore:
             self._log(conn, principal, model.id, record_id, action, current.rev + 1)
             conn.commit()
         conn.close()
-        return self.get(principal, model.id, record_id)
+        changed = self.get(principal, model.id, record_id)
+        self._changed(principal, "changed", changed, dict(current.fields))
+        return changed
 
     def move(
         self, principal: Principal, model_id: str, record_id: str, incoming: dict, index: int | None
@@ -1312,14 +1332,26 @@ class RecordStore:
         self._check(principal, "write", model_id)
         model = self.model(model_id)
         if model.backend:
-            return self._backend(model).delete(principal, model, record_id)
+            before = None
+            if self.on_change:
+                try:
+                    before = self._backend(model).get(principal, model, record_id)
+                except Exception:  # the delete says what is wrong, not the look before it
+                    before = None
+            gone = self._backend(model).delete(principal, model, record_id)
+            if before is not None:
+                self._changed(principal, "deleted", before, dict(before.fields))
+            return gone
         with connect(self.db_path) as conn:
             conn.execute("BEGIN IMMEDIATE")
             row = self._row(conn, principal, model, record_id)
             self._writable(conn, principal, model, row)
+            before = self._record(conn, model, row, principal) if self.on_change else None
             gone = self._delete(conn, principal, model, record_id, "deleted")
             conn.commit()
         conn.close()
+        if before is not None:
+            self._changed(principal, "deleted", before, dict(before.fields))
         return gone
 
     def _delete(

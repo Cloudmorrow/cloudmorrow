@@ -15,14 +15,17 @@
 
 from __future__ import annotations
 
+import base64
 import hmac
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
 
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_admin_user, get_principal, get_state
+from cloudmorrow.server.quillhandlers import CodeError
 from cloudmorrow.server.quillhooks import MAX_BODY as HOOK_MAX_BODY
 from cloudmorrow.server.quillhooks import RateLimit, apply_map, signature_ok
 from cloudmorrow.server.quillproxy import MAX_BODY, forward, read_body
@@ -83,8 +86,17 @@ async def quill_api(
     )
     if api is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"{manifest.name} has no API at {path}")
-    port = _port(state, manifest, api["service"])
     body = await read_body(request, MAX_BODY)
+    if api.get("handler"):
+        try:
+            answer = await run_in_threadpool(
+                _code(state).api, manifest, api, principal.username, _request(request, path, body),
+                as_quill=principal.kind == "quill",
+            )
+        except CodeError as exc:
+            raise HTTPException(exc.status, exc.to_dict()) from exc
+        return _response(answer)
+    port = _port(state, manifest, api["service"])
     who = (
         {"X-Cloudmorrow-Quill": principal.quill}
         if principal.kind == "quill"
@@ -120,6 +132,15 @@ async def webhook(
     if not hook_rate.allow(f"{quill_id}/{hook['id']}"):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many, too fast")
 
+    if hook.get("handler"):
+        request_data = _request(request, hook["path"], body, drop=("token",))
+        request_data["headers"].pop("x-cloudmorrow-webhook-token", None)
+        try:
+            answer = await run_in_threadpool(_code(state).webhook, manifest, hook, request_data)
+        except CodeError as exc:
+            raise HTTPException(exc.status, exc.to_dict()) from exc
+        return _response(answer)
+
     if hook.get("forward"):
         port = _port(state, manifest, hook["forward"])
         return await forward(
@@ -141,6 +162,39 @@ async def webhook(
     except ERRORS as exc:
         raise _refused(exc) from exc
     return JSONResponse({"id": record.id, "model": record.model}, status_code=201)
+
+
+def _code(state: AppState):
+    if state.code is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "this server runs no Quill code")
+    return state.code
+
+
+def _request(request: Request, path: str, body: bytes, drop: tuple[str, ...] = ()) -> dict:
+    """A request, as a handler's `Request` gets it: never the caller's credentials."""
+    headers = {
+        k.lower(): v for k, v in request.headers.items()
+        if k.lower() not in ("authorization", "cookie", "host", "content-length")
+    }
+    return {
+        "method": request.method,
+        "path": path,
+        "query": {k: v for k, v in request.query_params.items() if k not in drop},
+        "headers": headers,
+        "body": base64.b64encode(body or b"").decode("ascii"),
+    }
+
+
+def _response(answer: dict) -> Response:
+    headers = {
+        k: v for k, v in (answer.get("headers") or {}).items()
+        if k.lower() not in ("set-cookie", "content-length", "transfer-encoding")
+    }
+    return Response(
+        content=str(answer.get("body", "")).encode("utf-8"),
+        status_code=int(answer.get("status", 200)),
+        headers=headers,
+    )
 
 
 # -- administration ---------------------------------------------------------------------
@@ -181,11 +235,16 @@ def logs(
     manifest = state.quills.quills.get(quill_id)
     if manifest is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"{quill_id} is not installed")
-    names = [s["id"] for s in manifest.services]
+    names = [s["id"] for s in manifest.services] + (["code"] if manifest.code else [])
     if service and service not in names:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"{quill_id} has no service {service}")
     supervisor = _supervisor(state)
-    return {name: supervisor.tail(quill_id, name, lines) for name in ([service] if service else names)}
+    return {
+        # "code" is its Python's log: what its handlers printed, and what failed.
+        name: state.code.tail(quill_id, lines) if name == "code" and state.code else
+        supervisor.tail(quill_id, name, lines)
+        for name in ([service] if service else names)
+    }
 
 
 @admin_router.post("/{quill_id}/token")

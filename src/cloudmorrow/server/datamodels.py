@@ -31,6 +31,7 @@ __all__ = [
     "load_datamodel",
     "parse_datamodel",
     "parse_duration",
+    "parse_field",
 ]
 
 # Every kind has a widget on every surface, so the list is short on purpose.
@@ -233,6 +234,15 @@ def _replace(f: Field, **changes) -> Field:
     values = {name: getattr(f, name) for name in Field.__slots__}
     values.update(changes)
     return Field(**values)
+
+
+def parse_field(where: str, name: str, spec: object) -> Field:
+    """One field on its own: an action's form is fields, checked the way a datamodel's are."""
+    if isinstance(spec, str):
+        spec = {"kind": spec}
+    if not FIELD_RE.match(name):
+        raise DatamodelError(f"{where}: {name!r} is not a field name: lowercase letters, digits and _")
+    return _field(where, name, spec)
 
 
 def _field(where: str, name: str, spec: object) -> Field:

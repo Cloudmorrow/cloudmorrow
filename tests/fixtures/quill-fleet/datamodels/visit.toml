@@ -1,0 +1,13 @@
+[datamodel]
+id = "fleet.visit"
+version = 1
+label = "Service visit"
+description = "A van at the garage: when, and at how many kilometres."
+scopes = ["personal"]
+title = "date"
+
+[fields]
+vehicle = { kind = "link", to = "vehicle", required = true, on_delete = "cascade" }
+date = { kind = "date", required = true, indexed = true }
+km = { kind = "int", required = true }
+note = { kind = "text" }
