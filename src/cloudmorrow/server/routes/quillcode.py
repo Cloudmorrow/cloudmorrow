@@ -32,7 +32,7 @@ from cloudmorrow.server.quills.hooks import RateLimit, apply_map, signature_ok
 from cloudmorrow.server.quills.proxy import MAX_BODY, forward, read_body
 from cloudmorrow.server.quills.tokens import runs_as
 from cloudmorrow.server.records import Principal
-from cloudmorrow.server.routes.records import ERRORS, _refused
+from cloudmorrow.server.routes.errors import ERRORS, http_error
 
 api_router = APIRouter(prefix="/api/q", tags=["quill code"])
 hooks_router = APIRouter(prefix="/hooks", tags=["quill code"])
@@ -160,7 +160,7 @@ async def webhook(
     try:
         record = state.records.create(principal, hook["model"], fields)
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
     return JSONResponse({"id": record.id, "model": record.model}, status_code=201)
 
 
