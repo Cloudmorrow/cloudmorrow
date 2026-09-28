@@ -57,6 +57,8 @@ def main() -> None:
     args = parser.parse_args()
 
     branch = git("rev-parse", "--abbrev-ref", "HEAD")
+    if branch == "HEAD":
+        sys.exit("HEAD is detached — check out the branch to release, then run this again.")
     if git("status", "--porcelain"):
         sys.exit("the working tree has changes — commit them first, then release.")
 

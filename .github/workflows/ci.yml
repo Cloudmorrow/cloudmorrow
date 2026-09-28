@@ -1,0 +1,45 @@
+# Lint and test every push and pull request. A push is a release
+# (scripts/release.py), so this is what says the release works.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "ruff>=0.6"
+      # Line length is not enforced yet: the code has not been formatted to it.
+      - run: ruff check --extend-ignore E501 src tests scripts
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # What the image runs. 3.11, the oldest the installers accept, belongs
+        # here too once the suite is known to pass on it.
+        python-version: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The version comes from the nearest tag (hatch-vcs).
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: pip install -e ".[tui,agent,server,dev]"
+      - run: pytest -q
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f deploy/docker/Dockerfile -t cloudmorrow:ci .
