@@ -406,10 +406,10 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     table is a file of its own: panes/kit_<kit>.py.
     """
     from cloudmorrow.tui.panes.kit_board import BoardPane
-    from cloudmorrow.tui.panes.kit_grouped import GroupedListPane, draws_here
     from cloudmorrow.tui.panes.kit_calendar import CalendarPane
     from cloudmorrow.tui.panes.kit_editor import EditorPane
     from cloudmorrow.tui.panes.kit_grid import GridPane
+    from cloudmorrow.tui.panes.kit_grouped import GroupedListPane, draws_here
     from cloudmorrow.tui.panes.kit_thread import ThreadPane
     from cloudmorrow.tui.panes.kit_view import ViewPane
 
