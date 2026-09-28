@@ -158,9 +158,12 @@ https (set it explicitly to override). A request whose scheme is not https
 is answered 426 Upgrade Required. The scheme is what uvicorn's
 proxy-header handling says it is: `X-Forwarded-Proto` from a trusted proxy
 (127.0.0.1 by default; set uvicorn's `forwarded_allow_ips` if the proxy is
-another box), else the socket's own. A request from this machine that
-carries no proxy header — a `curl 127.0.0.1:8787` on the box, a test
-client — is let through: it crosses no wire. Every https answer carries
+another box), else the socket's own. A request that comes straight to the
+port with no proxy header, from this machine or from the local network — a
+`curl 127.0.0.1:8787` on the box, a browser on the LAN or the tailnet
+opening `http://<ip>:8787` — is let through: the server answers on its own
+address as well as through the proxy. What is refused is a plain request
+the proxy relayed, and a plain one from off the local network. Every https answer carries
 `Strict-Transport-Security` for a year, so a browser that has seen the app
 never tries plain http again.
 

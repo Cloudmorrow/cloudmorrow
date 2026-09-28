@@ -1369,6 +1369,10 @@ things make sure that is the only plain hop:
   426, and every TLS answer carries HSTS. What uvicorn reads from the proxy's
   `X-Forwarded-Proto` is what counts. A call from the box itself with no
   proxy header — `curl 127.0.0.1:8787` — is let through; it crosses no wire.
+  So is one straight to the port from the local network or the tailnet, with
+  no proxy header: `http://<ip>:8787` in a browser at home answers. A plain
+  request the proxy relayed, or one from off the local network, still gets
+  426. To keep the LAN off the port, use `allowed_client_ips`.
 - **The clients refuse.** The TUI, the CLI and the agent will not talk to a
   plain `http://` address unless it is this machine, or the config says
   `allow_insecure_http = true`, which is a decision for a box you have

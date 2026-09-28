@@ -42,6 +42,22 @@ def test_a_call_from_this_machine_with_no_proxy_header_is_let_through(strict):
     assert strict.get("/api/health").status_code == 200
 
 
+@pytest.mark.parametrize(
+    "peer", ["192.168.10.122", "10.0.0.5", "172.16.3.4", "100.71.157.19", "fd00::7", "fe80::1"]
+)
+def test_a_browser_on_the_local_network_opens_the_ip_directly(strict, peer):
+    # http://192.168.10.195:8787 from the LAN or the mesh: no proxy, no TLS, answered.
+    direct = TestClient(strict.app, client=(peer, 50000))
+    assert direct.get("/api/health").status_code == 200
+
+
+def test_plain_from_off_the_local_network_is_refused(strict):
+    assert TestClient(strict.app, client=("8.8.8.8", 50000)).get("/api/health").status_code == 426
+    # A proxy on the LAN relaying a plain request is still refused.
+    via_proxy = TestClient(strict.app, client=("192.168.10.88", 50000))
+    assert via_proxy.get("/api/health", headers={"x-forwarded-proto": "http"}).status_code == 426
+
+
 def test_a_tls_request_is_answered_with_hsts(strict):
     got = strict.get("/api/health", headers={"x-forwarded-proto": "https"})
     # uvicorn's proxy-header handling is not in the test client, so the

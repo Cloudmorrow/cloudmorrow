@@ -8,14 +8,19 @@ had come over TLS. This middleware closes it.
 
 With `require_tls` on (the default when the public URL is https), a request
 whose scheme is not https is refused with 426 Upgrade Required — unless it
-comes from this machine without a proxy header, which is a local check or a
-test, and crosses no wire. The scheme is what uvicorn's proxy-header
-handling says it is: `X-Forwarded-Proto` from a trusted proxy, else the
-socket's own. Every https answer also carries HSTS, so a browser that has
-seen the app once never tries plain http again.
+came straight to the port, with no proxy header, from this machine or from
+the local network: a browser on the LAN opening `http://<ip>:8787`, or a
+local check. What that closes is the proxy relaying a plain request from
+outside, and anything off the local network reaching the port. The scheme
+is what uvicorn's proxy-header handling says it is: `X-Forwarded-Proto`
+from a trusted proxy, else the socket's own. Every https answer also
+carries HSTS, so a browser that has seen the app over https never tries
+plain http on that name again.
 """
 
 from __future__ import annotations
+
+from ipaddress import ip_address, ip_network
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -28,11 +33,27 @@ HSTS = "max-age=31536000; includeSubDomains"
 # What a call from this machine looks like: the loopback addresses, and the
 # name Starlette's test client gives itself.
 LOCAL_CLIENTS = {"127.0.0.1", "::1", "localhost", "testclient", None}
+# A tailnet's addresses (100.64.0.0/10) are not "private" to Python, but they
+# are as local as the LAN: only the mesh's own machines have them.
+MESH = ip_network("100.64.0.0/10")
+
+
+def _on_local_network(host: str | None) -> bool:
+    if host in LOCAL_CLIENTS:
+        return True
+    try:
+        address = ip_address(host or "")
+    except ValueError:
+        return False
+    if address.version == 6 and address.ipv4_mapped:
+        address = address.ipv4_mapped
+    return address.is_private or address.is_link_local or address in MESH
 
 
 def _is_local(request: Request) -> bool:
+    """Straight to the port from this machine or the LAN, not through a proxy."""
     host = request.client.host if request.client else None
-    return host in LOCAL_CLIENTS and "x-forwarded-proto" not in request.headers
+    return _on_local_network(host) and "x-forwarded-proto" not in request.headers
 
 
 def install(app: FastAPI, config: ServerConfig) -> None:
