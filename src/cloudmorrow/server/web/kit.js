@@ -27,6 +27,10 @@ import { spaceSection, wireSpace } from "./kit_space.js";
 import { renderEditor, renderEditorPage } from "./kit_editor.js";
 import { renderGrid, renderGridItem } from "./kit_grid.js";
 import { renderThread } from "./kit_thread.js";
+// A view is a Quill's own screen, drawn from the tree its code returns.
+import { renderView } from "./kit_view.js";
+// And a Quill's actions, on every record's sheet.
+import { sheetSection, wireSheetSection } from "./actions.js";
 
 const own = {
   // What a board is, for the button that opens its own sheet.
@@ -128,10 +132,10 @@ const canDrag = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
 // The kit elements this file draws. The server refuses to install a screen
 // of any other kind until every surface draws it, and a test holds this
 // list to the server's; the check below is for a server newer than the page.
-export const DRAWS = ["list", "board", "detail", "form", "calendar", "grid", "editor", "thread"];
+export const DRAWS = ["list", "board", "detail", "form", "calendar", "grid", "editor", "thread", "view"];
 
 // Each element that is more than rows is a file of its own: kit_<kit>.js.
-const OWN = { calendar: renderCalendar, thread: renderThread };
+const OWN = { calendar: renderCalendar, thread: renderThread, view: renderView };
 // And what it changes on the record sheet, if anything: kit_<kit>.js again.
 const SHEETS = { calendar: calendarSheet };
 
@@ -503,7 +507,7 @@ function localMoment(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function widget(f, value, links, own = null) {
+export function widget(f, value, links, own = null) {
   const drawn = own && own.widget ? own.widget(f, value) : null;
   if (drawn) return drawn;
   const data = `data-field="${esc(f.name)}"`;
@@ -537,14 +541,14 @@ function sayWidget(f, value, links) {
 }
 
 // An enum is a row of buttons, one lit: the lane control a task always had.
-const segments = (f, value) =>
+export const segments = (f, value) =>
   `<div class="segments" role="radiogroup" aria-label="${esc(f.label)}" data-field="${esc(f.name)}">` +
   lanesOf(f).map(([v, text]) => `<button type="button" role="radio" data-value="${esc(v)}"` +
     `${v === value ? ' class="active" aria-checked="true"' : ' aria-checked="false"'}>${esc(text)}</button>`).join("") +
   `</div>`;
 
 /** What a widget holds now, as the record would store it. */
-function read(f, el) {
+export function read(f, el) {
   switch (f.kind) {
     case "bool": return el.checked;
     case "enum": {
@@ -681,6 +685,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
           body.kind === "json" && record.fields[body.name] != null ? JSON.stringify(record.fields[body.name], null, 2) : record.fields[body.name] ?? "")}</textarea>` : ""}
       </div>
       ${people}
+      ${sheetSection(model.id)}
     </main>`;
   wireShell();
   app.querySelector(".nav").classList.add("lined");
@@ -704,6 +709,14 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   grow();
   addEventListener("resize", grow);
   wireSecretWidgets(box);
+  // An action runs on the record as saved, so what is being typed is saved
+  // first; and afterwards the sheet is drawn again, with what it changed.
+  wireSheetSection(app, {
+    record: id,
+    here: at,
+    before: () => settle(ed),
+    after: () => again(ed),
+  });
   // Nothing to save: the rest of this is the writing.
   if (looked) return;
 
@@ -856,6 +869,21 @@ async function saveSheet(ed, { keepalive = false } = {}) {
     ed.saving = false;
     if (ed.pending) { ed.pending = false; ed.dirty = true; saveSheet(ed); }
   }
+}
+
+/** Save what is waiting to be, and wait for it. */
+async function settle(ed) {
+  clearTimeout(ed.timer);
+  if (ed.dirty) await saveSheet(ed);
+  while (ed.saving) await new Promise((r) => setTimeout(r, 50));
+}
+
+/** The sheet drawn again, as it is on the server now. */
+async function again(ed) {
+  if (editor !== ed) return;
+  await leaveSheet(ed);
+  vacate(ed.hold);
+  await renderRoute();
 }
 
 async function leaveSheet(ed) {

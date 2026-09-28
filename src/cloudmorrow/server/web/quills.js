@@ -19,9 +19,10 @@
    first bar is already right rather than growing a tab a beat later. */
 
 import {
-  api, go, onShell, onSignOut, pixelArt, pixelIcon, registerScreen, renderRoute, replace,
+  api, go, onShell, onSignOut, parseHash, pixelArt, pixelIcon, registerScreen, renderRoute, replace,
   session, store, tabSlot, toast,
 } from "./core.js";
+import { knowQuills, placeActionBar } from "./actions.js";
 import { loadFeatures, redrawTabs } from "./features.js";
 import { renderKitScreen, renderRecordSheet } from "./kit.js";
 import { markThreadTabs } from "./kit_thread.js";
@@ -54,6 +55,8 @@ const yours = (quill) => quill.available !== false;
 
 function place(list) {
   quills = list.filter(yours);
+  // Their actions go on every record's sheet, whichever Quill it is in.
+  knowQuills(quills);
   fillTabs(quills.flatMap((quill) => quill.screens.map((screen) => ({
     name: tabName(quill, screen),
     label: screen.label || quill.name,
@@ -127,6 +130,11 @@ onShell(() => {
   // A thread's tab carries a pip when something is unread.
   markThreadTabs(quills.flatMap((quill) => quill.screens
     .filter((screen) => screen.kit === "thread").map((screen) => tabName(quill, screen))));
+  // A Quill's actions that are on no record sit under the title of each of
+  // its screens, so they are there whichever of them is open.
+  const { name, arg } = parseHash();
+  const quill = name === "q" && quills.find((q) => q.id === arg.split("/")[0]);
+  if (quill) placeActionBar(quill);
 });
 onSignOut(() => {
   loaded = null;

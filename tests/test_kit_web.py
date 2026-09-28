@@ -18,7 +18,10 @@ from cloudmorrow.server.routes.web import WEB, asset_version
 
 KIT_JS = (WEB / "kit.js").read_text(encoding="utf-8")
 # The elements that are more than rows, and spaces, each in files of their own.
-OWN_FILES = ("kit_calendar.js", "kit_calendar.css", "kit_space.js", "kit_space.css")
+OWN_FILES = (
+    "kit_calendar.js", "kit_calendar.css", "kit_space.js", "kit_space.css",
+    "kit_view.js", "kit_view.css", "actions.js", "actions.css",
+)
 KIT_CSS = (WEB / "kit.css").read_text(encoding="utf-8")
 QUILLS_JS = (WEB / "quills.js").read_text(encoding="utf-8")
 ADMIN_JS = (WEB / "quillsadmin.js").read_text(encoding="utf-8")
@@ -86,6 +89,31 @@ def test_nothing_in_the_kit_is_named_for_one_quill():
 def test_it_draws_what_the_server_installs():
     drawn = re.search(r"export const DRAWS = \[(.*?)\];", KIT_JS).group(1)
     assert set(re.findall(r'"(\w+)"', drawn)) == set(KIT_READY)
+
+
+def test_a_view_screen_is_drawn_by_its_own_file():
+    """`view` is in the list the server installs, and the kit hands it to kit_view.js."""
+    assert "view" in KIT_READY
+    assert 'import { renderView } from "./kit_view.js";' in KIT_JS
+    assert "view: renderView" in KIT_JS
+
+
+def test_every_record_sheet_has_the_actions_on_its_datamodel():
+    sheet = _code(_function(KIT_JS, "renderRecordSheet"))
+    assert "${sheetSection(model.id)}" in sheet
+    assert "wireSheetSection(app," in sheet
+    # Read-only sheets have them too: the gate says no if the code writes.
+    assert sheet.index("wireSheetSection(app,") < sheet.index("if (looked) return;")
+    # What is being typed is saved first, and the sheet is drawn again after.
+    assert "before: () => settle(ed)" in sheet and "after: () => again(ed)" in sheet
+    # The widgets an action's form is drawn with are the sheet's own.
+    for name in ("export function widget(", "export const segments =", "export function read("):
+        assert name in KIT_JS, name
+
+
+def test_a_quills_loose_actions_are_on_each_of_its_screens():
+    assert "knowQuills(quills);" in QUILLS_JS
+    assert "placeActionBar(quill);" in QUILLS_JS
 
 
 def test_every_field_kind_has_a_widget():
@@ -199,7 +227,8 @@ def test_the_calendar_asks_the_record_api_for_a_window_of_days():
         code = re.sub(r"/\*.*?\*/|//[^\n]*", "", calendar, flags=re.DOTALL)
         assert field not in code, field
     # Drawn by the kit, and its sheet changed by it, from its own file.
-    assert "const OWN = { calendar: renderCalendar, thread: renderThread };" in KIT_JS
+    own = "const OWN = { calendar: renderCalendar, thread: renderThread, view: renderView };"
+    assert own in KIT_JS
     assert "const SHEETS = { calendar: calendarSheet };" in KIT_JS
 
 

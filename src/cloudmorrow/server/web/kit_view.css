@@ -1,0 +1,344 @@
+/* The kit's `view`: every primitive a Quill's code can draw a screen with.
+
+   Built from the shapes the rest of the app already has — boxed groups of
+   rows, the enum's segments for tabs, the board's lanes, a month of days —
+   so a view looks like the screens beside it rather than like a web page
+   somebody put in a tab. On a phone everything is one column: columns stack,
+   rows wrap, a table's rows are cards. Nothing here is named for one Quill. */
+
+.quill-view { padding-bottom: 8px; }
+
+/* -- layout ------------------------------------------------------------------- */
+.v-stack { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.v-stack.gap-none { gap: 0; }
+.v-stack.gap-small { gap: 8px; }
+.v-stack.gap-large { gap: 24px; }
+/* What is in a stack brings no margins of its own: the gap is the spacing. */
+.v-stack > .group, .v-stack > .segments, .v-stack > .v-text, .v-stack > .v-title,
+.v-stack > .v-subtitle, .v-stack > .v-fields { margin: 0; }
+
+.v-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; }
+.v-row.nowrap { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.v-row > .v-stat { flex: 1 1 140px; align-self: stretch; }
+.v-row > .v-stack, .v-row > .v-fields, .v-row > .v-cards { flex: 1 1 260px; }
+
+/* One under another on a phone; side by side when there is room. */
+.v-columns { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.v-column { min-width: 0; }
+
+.v-tabs .v-tab-strip { margin: 0 0 12px; }
+.v-divider { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--line); }
+
+/* -- words ------------------------------------------------------------------- */
+.v-title { font-family: var(--display); font-size: 23px; font-weight: 600; line-height: 1.2; letter-spacing: -.005em; }
+.v-subtitle { font-family: var(--display); font-size: 17px; font-weight: 600; line-height: 1.25; color: var(--ink); }
+.v-text { margin: 0; overflow-wrap: anywhere; }
+.v-text.muted { color: var(--muted); }
+.v-text.small { color: var(--muted); font-size: 13px; }
+.v-text.mono {
+  font-family: var(--mono);
+  font-size: 14px;
+  white-space: pre-wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--card);
+}
+.v-none { margin: 0; padding: 14px 16px; color: var(--muted); font-size: 15px; border: 1px dashed var(--line); border-radius: var(--radius); text-align: center; }
+.v-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.v-markdown { overflow-wrap: anywhere; }
+.v-markdown > :first-child { margin-top: 0; }
+.v-markdown > :last-child { margin-bottom: 0; }
+.v-markdown p, .v-markdown ul, .v-markdown ol, .v-markdown blockquote, .v-markdown pre { margin: 0 0 10px; }
+.v-markdown h3, .v-markdown h4, .v-markdown h5, .v-markdown h6 { margin: 16px 0 6px; font-family: var(--display); font-weight: 600; }
+.v-markdown h3 { font-size: 21px; }
+.v-markdown h4 { font-size: 18px; }
+.v-markdown ul, .v-markdown ol { padding-left: 22px; }
+.v-markdown a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.v-markdown code { font-family: var(--mono); font-size: .9em; padding: 1px 5px; border-radius: 6px; background: var(--card-2); }
+.v-markdown pre { padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--card); overflow-x: auto; }
+.v-markdown pre code { padding: 0; background: none; }
+.v-markdown blockquote { padding-left: 12px; border-left: 3px solid var(--line-bright); color: var(--muted); }
+
+/* -- things with a tone ------------------------------------------------------------ */
+/* Status is its own three; info and primary are the platform's blue. Never
+   amber: amber is the action, not a state. */
+.tone-neutral { --tone: var(--muted); }
+.tone-info, .tone-primary { --tone: var(--accent); }
+.tone-good { --tone: var(--good); }
+.tone-warn { --tone: var(--warn); }
+.tone-bad, .tone-danger { --tone: var(--bad); }
+
+.v-badge {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  flex: none;
+  max-width: 100%;
+  padding: 1px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--tone, var(--muted)) 45%, transparent);
+  background: color-mix(in srgb, var(--tone, var(--muted)) 14%, transparent);
+  color: var(--tone, var(--muted));
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.v-badge.tone-neutral { color: var(--ink); }
+
+.v-stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.v-stat-label {
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.v-stat-value {
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.v-stat:not(.tone-neutral) .v-stat-value { color: var(--tone); }
+.v-stat-hint { font-size: 13px; color: var(--muted); }
+
+.v-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 16px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  text-align: center;
+}
+.v-empty p { margin: 0; }
+.v-failed { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.v-failed .act-button { margin-top: 12px; }
+
+/* -- pictures ------------------------------------------------------------------ */
+.v-image { display: block; max-width: 100%; height: auto; border-radius: var(--radius); }
+.v-thumb {
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--muted);
+  font-size: 14px;
+  overflow: hidden;
+}
+.v-thumb.has-img { min-height: 0; border: 0; background: none; }
+.v-thumb img { display: block; max-width: 100%; height: auto; }
+
+/* -- fields ------------------------------------------------------------------- */
+.v-fields .field .value { flex: 1; min-width: 0; text-align: right; color: var(--ink); font-size: 16px; overflow-wrap: anywhere; }
+.v-fields .v-enum { flex-wrap: wrap; }
+.v-fields .v-enum .segments { flex: 1 1 220px; margin: 0; }
+.v-fields .v-long { flex-direction: column; align-items: stretch; gap: 6px; }
+.v-fields .v-long .main { max-width: none; }
+.v-fields .v-long textarea.long { margin: 0; }
+
+/* A form in the view: the sheet's rows, with its button under them. */
+.v-form .group-label:first-child { margin-top: 0; }
+.v-form .act-buttons { padding: 0; }
+
+/* -- menus and buttons in a row --------------------------------------------------- */
+.v-row > .act-button { flex: none; }
+.v-menu svg { margin-left: 2px; color: var(--muted); }
+
+/* -- a table ---------------------------------------------------------------------- */
+/* On a phone, a card a row: its first column the title, the rest labelled
+   lines under it, and its action at the end. */
+.v-table table, .v-table tbody { display: block; }
+.v-table thead { display: none; }
+.v-table tr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+  padding: 10px 12px 10px 16px;
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.v-table tr + tr { margin-top: 8px; }
+.v-table tr.v-opens { cursor: pointer; }
+.v-table tr.v-opens:active { background: var(--card-2); }
+.v-table td { display: flex; gap: 8px; min-width: 0; font-size: 15px; color: var(--ink); }
+.v-table td::before { content: attr(data-label); color: var(--muted); }
+.v-table td:first-child { flex: 1 0 100%; font-weight: 600; font-size: 16px; }
+.v-table td:first-child::before { content: none; }
+.v-table td:first-child a { overflow-wrap: anywhere; }
+.v-table td.v-row-actions { margin-left: auto; }
+.v-table td.v-row-actions::before { content: none; }
+.v-more { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 36px; color: var(--accent); border-radius: var(--radius-control); }
+
+/* -- cards ----------------------------------------------------------------------- */
+.v-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.v-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+a.v-card:active { background: var(--card-2); }
+.v-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.v-card .title { font-weight: 600; overflow-wrap: anywhere; }
+.v-card-sub { font-size: 14px; color: var(--muted); }
+.v-card-body {
+  font-size: 15px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* -- lanes ----------------------------------------------------------------------- */
+/* Stacked on a phone, as the board's are; a lane with nothing in it still
+   says so, because a view's lanes are what the Quill chose to show. */
+.v-lanes { display: flex; flex-direction: column; gap: 4px; }
+.v-lane .group-label { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.v-count { color: var(--muted); font-weight: 500; letter-spacing: 0; }
+.v-lane-cards { margin: 0; }
+.v-lane-card .main { display: flex; flex-direction: column; justify-content: center; min-height: 32px; }
+.v-lane-card .title { white-space: normal; overflow-wrap: anywhere; }
+.v-lane .nothing { padding: 14px 16px; color: var(--muted); font-size: 14px; }
+
+/* -- a month --------------------------------------------------------------------- */
+.v-month-bar { display: flex; align-items: center; gap: 4px; margin: 0 0 8px; }
+.v-month-bar h3 { flex: 1; margin: 0; font-family: var(--display); font-size: 20px; font-weight: 600; text-align: center; }
+.v-month-bar .step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-control);
+  color: var(--accent);
+}
+.v-month-bar .step:active { background: var(--card); }
+.v-weekdays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); margin-bottom: 2px; color: var(--muted); font-size: 12px; font-weight: 600; text-align: center; }
+.v-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+/* On a phone a day is its number and a dot a thing; the list below says them. */
+.v-day {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: flex-start;
+  gap: 3px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 5px 2px 4px;
+  border-radius: var(--radius-control);
+  background: var(--card);
+  font-variant-numeric: tabular-nums;
+}
+.v-day .n { flex: 0 0 100%; text-align: center; font-size: 15px; }
+.v-day.out { background: none; color: var(--muted); }
+.v-day.today .n { color: var(--accent); font-weight: 700; }
+.v-day-item {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  overflow: hidden;
+  font-size: 0;
+}
+.v-day-more { font-size: 0; }
+.v-month-list { margin-top: 10px; }
+.v-month-list .group-label:first-child { margin-top: 8px; }
+
+/* -- on a computer ------------------------------------------------------------------ */
+@media (min-width: 900px) and (min-height: 600px) {
+  .v-columns { grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 18px; align-items: start; }
+  /* A button is as wide as what it says; on a phone it is the thumb's width. */
+  .v-stack > .act-button, .v-empty > .act-button { align-self: flex-start; }
+  .v-empty > .act-button { align-self: center; }
+  .v-cards { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+
+  /* A table is a table. */
+  .v-table {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--card);
+    overflow-x: auto;
+  }
+  .v-table table { display: table; width: 100%; border-collapse: collapse; }
+  .v-table thead { display: table-header-group; }
+  .v-table tbody { display: table-row-group; }
+  .v-table tr { display: table-row; padding: 0; border: 0; border-radius: 0; background: none; }
+  .v-table tr + tr { margin: 0; }
+  .v-table th, .v-table td { display: table-cell; padding: 10px 14px; text-align: left; vertical-align: middle; }
+  .v-table th {
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line);
+  }
+  .v-table td { font-size: 15px; }
+  .v-table tbody tr + tr td { border-top: 1px solid var(--line); }
+  .v-table td::before { content: none; }
+  .v-table td:first-child { font-size: 15px; }
+  .v-table td.v-row-actions, .v-table th.v-row-actions { width: 1%; text-align: right; white-space: nowrap; }
+
+  /* A day says what is on it; the list under the month is the phone's. */
+  .v-day { flex-direction: column; flex-wrap: nowrap; justify-content: flex-start; align-items: stretch; min-height: 92px; padding: 5px 5px 6px; }
+  .v-day .n { flex: none; text-align: left; font-size: 13px; padding-left: 3px; }
+  .v-day-item {
+    width: auto;
+    height: auto;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    color: var(--ink);
+    font-size: 12.5px;
+    line-height: 1.5;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .v-day-more { font-size: 12px; color: var(--muted); padding-left: 6px; }
+  .v-month-list { display: none; }
+}
+
+/* Lanes side by side once there is room for them, as the board's are. */
+@media (min-width: 1180px) and (min-height: 600px) {
+  #app:has(.v-lanes) { --column: 1120px; }
+  .v-lanes { display: grid; grid-template-columns: repeat(var(--lanes, 3), minmax(0, 1fr)); gap: 0 18px; align-items: start; }
+  .v-lane { min-height: 120px; }
+  .v-lane-card.dragging { opacity: .4; }
+  .v-lane.over .v-lane-cards { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--card)); }
+}
+
+@media (hover: hover) and (pointer: fine) and (min-width: 900px) and (min-height: 600px) {
+  .v-table tr.v-opens:hover td { background: var(--card-2); }
+  a.v-card:hover { border-color: var(--line-bright); background: var(--card-2); }
+  .v-day-item:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+  .v-month-bar .step:hover, .v-more:hover { background: var(--card); }
+}
