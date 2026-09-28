@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from cloudmorrow.client import rclone
-from cloudmorrow.client.config import config_dir
+from cloudmorrow.locations import config_dir
 
 FILENAME = "mounts.json"
 

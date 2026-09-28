@@ -26,9 +26,10 @@ from pathlib import Path
 
 import httpx
 
-from cloudmorrow.client.config import ClientConfig, StoredCredentials, config_dir
+from cloudmorrow.client.config import ClientConfig, StoredCredentials
 from cloudmorrow.desktop import system
 from cloudmorrow.desktop.bridge import Bridge
+from cloudmorrow.locations import config_dir
 from cloudmorrow.transport import InsecureUrlError, check_url
 
 ICON = system.ICON

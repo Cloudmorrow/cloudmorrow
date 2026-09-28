@@ -14,11 +14,11 @@ directory at a time, once a directory has earned it.
 
 from __future__ import annotations
 
-import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from cloudmorrow import locations
 from cloudmorrow.bundles import digest, validate_path
 
 BUNDLE = "omarchy"
@@ -100,7 +100,7 @@ class Applied:
 
 def config_root() -> Path:
     """`~/.config`, or wherever XDG says it is."""
-    return Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")).expanduser()
+    return locations.xdg_config_home()
 
 
 def is_omarchy(root: Path | None = None) -> bool:

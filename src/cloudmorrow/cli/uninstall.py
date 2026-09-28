@@ -21,21 +21,16 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from platformdirs import user_data_dir
 
 from cloudmorrow.agent import service
 from cloudmorrow.agent.config import AgentConfig
 from cloudmorrow.agent.config import default_config_path as agent_config_path
 from cloudmorrow.cli import dev
 from cloudmorrow.cli.common import client, console, run
-from cloudmorrow.client.config import APP_NAME, config_dir, credentials_path
+from cloudmorrow.client.config import credentials_path
 from cloudmorrow.desktop import launcher
 from cloudmorrow.links import COMMANDS
-
-
-def data_dir() -> Path:
-    """Where install.sh put the venv, and where the agent keeps its backups."""
-    return Path(user_data_dir(APP_NAME))
+from cloudmorrow.locations import APP_NAME, config_dir, data_dir
 
 
 def install_prefix() -> Path | None:
