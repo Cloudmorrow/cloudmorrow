@@ -101,8 +101,10 @@ for certificates and public access that just work.
 
 ## Install a server
 
-You need a Linux machine with systemd, `git` and Python 3.11 or newer, and a
-name it can be reached by, such as `cloud.example.com`. One command:
+You need a Linux machine with systemd and Python 3.11 or newer, and a name it
+can be reached by, such as `cloud.example.com`. The installer adds `git`,
+`sudo` and Python's venv module if they are missing, or says the command
+that would. One command:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
@@ -114,8 +116,10 @@ administrator, and which of the standard quills it should have (Notes,
 Tasks, Calendar, Chat, Files, Secrets; all of them unless you say). Then it creates a service user, clones the code into
 `/opt/cloudmorrow`, builds a virtualenv, writes the config and the systemd
 unit, generates the encryption key, starts the service and makes your
-account. Run it again any time: it keeps your config, notes, database and
-accounts, and never asks a question it already has the answer to.
+account. Run it again any time: if the server is running and answering, it
+says so and changes nothing; if not, it updates and reinstalls it and checks
+again (`--update` does that either way). It keeps your config, notes,
+database and accounts, and never asks a question it already has the answer to.
 
 Every answer can be a flag instead, for a script or a machine with no
 terminal, and `--dry-run` says what it would do without doing any of it:

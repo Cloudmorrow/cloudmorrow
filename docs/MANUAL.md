@@ -497,8 +497,8 @@ goes over ssh:
 cloudmorrow update server --ssh     # deploys the code that adds the endpoint
 ```
 
-then re-run `deploy/install-server.sh` (it rewrites the unit and is safe to run
-again) or edit `Restart=` in `/etc/systemd/system/cloudmorrow.service` by hand
+then re-run `deploy/install-server.sh --update` (it rewrites the unit and is
+safe to run again) or edit `Restart=` in `/etc/systemd/system/cloudmorrow.service` by hand
 and `sudo systemctl daemon-reload`. After that, `cloudmorrow update server` is
 the API path. Until the unit is right the deploy still lands — the server just
 reports that it did not restart itself, and says why.

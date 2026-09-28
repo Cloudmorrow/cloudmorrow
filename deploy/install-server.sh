@@ -13,11 +13,14 @@
 #   sudo sh install-server.sh --name "The Larsens" \
 #     --public-url https://cloud.example.com --user alice --quills all
 #
-# Idempotent: run it again to move the deployment to new settings. It never
-# overwrites an existing /etc/cloudmorrow/server.toml, your notes, or the
-# database, and it never asks a question it already has the answer to. For
-# routine "I pushed a change" updates, use `cloudmorrow update server` from
-# any machine, or the `cloudmorrow-update` command this script installs.
+# Run it again on a machine that already has Cloudmorrow and it checks the
+# server first: running and answering, it says so and changes nothing;
+# otherwise it updates and reinstalls it, and checks again. --update does
+# that whatever the check says. It never overwrites an existing
+# /etc/cloudmorrow/server.toml, your notes, or the database, and it never
+# asks a question it already has the answer to. For routine "I pushed a
+# change" updates, use `cloudmorrow update server` from any machine, or the
+# `cloudmorrow-update` command this script installs.
 set -eu
 
 DEFAULT_REPO="https://github.com/Cloudmorrow/cloudmorrow.git"
@@ -39,9 +42,10 @@ SSH_KEY=""
 NO_SSH_KEY=""
 QUILLS=""
 DRY_RUN=""
+UPDATE=""
 
 usage() {
-	sed -n '2,20p' "$0"
+	sed -n '2,23p' "$0"
 	cat <<EOF
 
 Options:
@@ -64,6 +68,8 @@ Options:
   --admin USER        unix user allowed to update and restart (default: \$SUDO_USER)
   --ssh-key PATH      deploy key for a private repo     (default: generate one)
   --no-ssh-key        the repo needs no key (it is public, or https)
+  --update            update and reinstall an existing server even when it
+                      is running well
   --dry-run           print what would happen, ask nothing, change nothing
 EOF
 }
@@ -86,6 +92,7 @@ while [ $# -gt 0 ]; do
 	--admin) ADMIN_USER="$2"; shift 2 ;;
 	--ssh-key) SSH_KEY="$2"; shift 2 ;;
 	--no-ssh-key) NO_SSH_KEY="1"; shift ;;
+	--update) UPDATE="1"; shift ;;
 	--dry-run) DRY_RUN="1"; shift ;;
 	-h | --help) usage; exit 0 ;;
 	*) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -120,7 +127,230 @@ CONFIG="$CONFIG_DIR/server.toml"
 KEY_FILE="$CONFIG_DIR/cloudmorrow.key"
 
 [ -n "$DRY_RUN" ] || [ "$(id -u)" = "0" ] || die "run this with sudo"
-command -v git >/dev/null 2>&1 || die "git is required"
+# --- what it needs ----------------------------------------------------------
+# Checked before anything is asked or changed, so a missing package shows up
+# in the first second, not after the user and the checkout are made. This
+# runs as root, so it installs what is missing with the machine's own
+# package manager; where it cannot, it says the exact command and stops.
+PKG=""
+for candidate in apt-get dnf yum zypper pacman apk; do
+	if command -v "$candidate" >/dev/null 2>&1; then
+		PKG="$candidate"
+		break
+	fi
+done
+
+pkg_command() {
+	case "$PKG" in
+	apt-get) echo "apt-get install -y $*" ;;
+	dnf | yum) echo "$PKG install -y $*" ;;
+	zypper) echo "zypper --non-interactive install $*" ;;
+	pacman) echo "pacman -S --noconfirm --needed $*" ;;
+	apk) echo "apk add $*" ;;
+	*) echo "" ;;
+	esac
+}
+
+# The package that brings a command, by package manager.
+pkg_for() {
+	case "$1:$PKG" in
+	git:* | sudo:*) echo "$1" ;;
+	python:pacman) echo python ;;
+	python:zypper) echo python311 ;;
+	python:*) echo python3 ;;
+	useradd:apt-get) echo passwd ;;
+	useradd:dnf | useradd:yum) echo shadow-utils ;;
+	useradd:*) echo shadow ;;
+	ssh:apt-get) echo openssh-client ;;
+	ssh:dnf | ssh:yum | ssh:zypper) echo openssh-clients ;;
+	ssh:*) echo openssh ;;
+	esac
+}
+
+# install_packages "what for" pkg...: installs them, or explains and stops.
+install_packages() {
+	what="$1"
+	shift
+	command="$(pkg_command "$@")"
+	if [ -z "$command" ]; then
+		die "this machine needs $what, and no package manager here is one this script knows. Install it and run this again."
+	fi
+	if [ -n "$DRY_RUN" ]; then
+		printf '   \033[2mwould run:\033[0m %s   (for %s)\n' "$command" "$what"
+		return 0
+	fi
+	say "installing $what: $command"
+	if [ "$PKG" = "apt-get" ]; then
+		DEBIAN_FRONTEND=noninteractive apt-get -qq update >/dev/null 2>&1 || true
+	fi
+	# The command is ours, and split on purpose.
+	# shellcheck disable=SC2086
+	DEBIAN_FRONTEND=noninteractive $command >/dev/null ||
+		die "that did not work. Install it yourself with: sudo $command"
+}
+
+find_python() {
+	PYTHON=""
+	for candidate in python3.14 python3.13 python3.12 python3.11 python3; do
+		if command -v "$candidate" >/dev/null 2>&1 &&
+			"$candidate" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
+			PYTHON="$candidate"
+			return 0
+		fi
+	done
+	return 1
+}
+
+MISSING=""
+NEEDED=""
+need() {
+	# need <command> <what>: notes the package when the command is missing.
+	if ! command -v "$1" >/dev/null 2>&1; then
+		MISSING="$MISSING $(pkg_for "$2")"
+		NEEDED="$NEEDED${NEEDED:+, }$1"
+	fi
+}
+need git git
+need sudo sudo
+need useradd useradd
+find_python || { MISSING="$MISSING $(pkg_for python)"; NEEDED="$NEEDED${NEEDED:+, }python3"; }
+if [ -n "$MISSING" ]; then
+	# shellcheck disable=SC2086
+	install_packages "$NEEDED" $MISSING
+fi
+
+if ! find_python && [ -z "$DRY_RUN" ]; then
+	newest="$(python3 -V 2>/dev/null || echo "no Python at all")"
+	die "Python 3.11 or newer is required, and this machine has $newest. Install a newer one (your distribution's python3.11 or later) and run this again."
+fi
+
+# Debian and Ubuntu ship venv's pip bootstrap in a package of its own
+# (python3.12-venv), so "import venv" works and making one does not, or
+# makes one without pip. Only making one, and asking its pip, says for sure.
+if [ -n "$PYTHON" ]; then
+	VENV_TEST="$(mktemp -d)"
+	if ! "$PYTHON" -m venv "$VENV_TEST/venv" >/dev/null 2>&1 ||
+		! "$VENV_TEST/venv/bin/python" -m pip --version >/dev/null 2>&1; then
+		version="$("$PYTHON" -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")')"
+		case "$PKG" in
+		apt-get) install_packages "Python's venv module and pip" "python$version-venv" ;;
+		*) die "$PYTHON cannot make a virtualenv with pip in it here. Install the venv module and pip for Python $version, then run this again." ;;
+		esac
+		if [ -z "$DRY_RUN" ]; then
+			rm -rf "$VENV_TEST/venv"
+			{ "$PYTHON" -m venv "$VENV_TEST/venv" >/dev/null 2>&1 &&
+				"$VENV_TEST/venv/bin/python" -m pip --version >/dev/null 2>&1; } ||
+				die "$PYTHON still cannot make a virtualenv with pip in it. Install python$version-venv and run this again."
+		fi
+	fi
+	rm -rf "$VENV_TEST"
+fi
+
+# The default repo is wherever this checkout came from, so running the script
+# straight out of a clone does the obvious thing; a copy on its own, or one
+# that arrived through curl, installs the public code.
+if [ -z "$REPO" ] && [ -f "$0" ]; then
+	# Only a script that is really on disk has a checkout around it; through
+	# a pipe, $0 is the shell, and whatever directory this runs from is not
+	# ours to read a remote off.
+	SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" 2>/dev/null && pwd || true)"
+	if [ -n "$SCRIPT_DIR" ] && [ -d "$SCRIPT_DIR/../.git" ]; then
+		REPO="$(git -C "$SCRIPT_DIR/.." remote get-url origin 2>/dev/null || true)"
+	fi
+fi
+[ -n "$REPO" ] || REPO="$DEFAULT_REPO"
+
+# A repository over ssh needs a deploy key, and the tools to make one.
+case "$REPO" in
+git@* | ssh://*)
+	if [ -z "$NO_SSH_KEY" ] && ! command -v ssh-keygen >/dev/null 2>&1; then
+		install_packages "ssh-keygen" "$(pkg_for ssh)"
+	fi
+	;;
+esac
+
+# --- already here? ------------------------------------------------------------
+# A server that is installed, running and answering is left as it is. One
+# that is not gets the whole install again over it: the checkout reset to
+# the branch, the packages reinstalled, the unit rewritten, the service
+# restarted. That mends almost everything short of lost data.
+config_value() { sed -n "s/^$1 = \"\{0,1\}\([^\"]*\)\"\{0,1\}\$/\1/p" "$CONFIG" 2>/dev/null | head -n 1; }
+HEALTH_HOST="$HOST"
+HEALTH_PORT="$PORT"
+if [ -f "$CONFIG" ]; then
+	HEALTH_HOST="$(config_value host)"
+	HEALTH_PORT="$(config_value port)"
+fi
+case "$HEALTH_HOST" in
+"" | 0.0.0.0 | ::) HEALTH_HOST="127.0.0.1" ;;
+esac
+HEALTH_URL="http://$HEALTH_HOST:${HEALTH_PORT:-8787}/api/health"
+HAS_SYSTEMD=""
+if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+	HAS_SYSTEMD="1"
+fi
+
+# health: prints what is wrong and fails, or prints nothing when all is well.
+health() {
+	if [ -n "$HAS_SYSTEMD" ]; then
+		if ! systemctl is-active --quiet "$SERVICE_NAME"; then
+			echo "the $SERVICE_NAME service is not running"
+			return 1
+		fi
+		if [ -f /etc/systemd/system/cloudmorrow-agent.service ] && ! systemctl is-active --quiet cloudmorrow-agent; then
+			echo "the server's agent (cloudmorrow-agent) is not running"
+			return 1
+		fi
+	fi
+	if [ ! -x "$VENV/bin/python" ]; then
+		echo "$VENV is missing"
+		return 1
+	fi
+	"$VENV/bin/python" - "$HEALTH_URL" <<'PY'
+import json, sys, urllib.request
+try:
+    with urllib.request.urlopen(sys.argv[1], timeout=5) as r:
+        status = json.load(r).get("status")
+except Exception as exc:
+    print(f"it does not answer on {sys.argv[1]} ({exc})")
+    sys.exit(1)
+if status != "ok":
+    print(f"{sys.argv[1]} says {status!r}")
+    sys.exit(1)
+PY
+}
+
+# wait_healthy: a freshly restarted server takes a few seconds to answer.
+wait_healthy() {
+	tries=0
+	while ! problem="$(health)"; do
+		tries=$((tries + 1))
+		if [ "$tries" -ge 20 ]; then
+			printf '%s' "$problem"
+			return 1
+		fi
+		sleep 1
+	done
+}
+
+if [ -z "$UPDATE" ] && [ -z "$DRY_RUN" ] && [ -f "$CONFIG" ] && [ -x "$VENV/bin/cloudmorrow-server" ]; then
+	if problem="$(health)"; then
+		NAME_NOW="$(config_value name)"
+		say "${NAME_NOW:-Cloudmorrow} is already installed here, running and answering on $HEALTH_URL"
+		cat <<EOF
+
+  Nothing to do. To update it anyway:
+
+    cloudmorrow-update                  here
+    cloudmorrow update server           from any of your computers
+    ... | sudo sh -s -- --update        this installer, the whole way
+
+EOF
+		exit 0
+	fi
+	warn "Cloudmorrow is installed here, but $problem"
+	say "updating and reinstalling it, then checking again"
+fi
 
 # --- the questions ---------------------------------------------------------
 # Asked on the terminal, not stdin: the script itself may be what is on stdin
@@ -225,30 +455,6 @@ if [ -n "$DRY_RUN" ]; then
 	[ -n "$ACCOUNT" ] || [ "$EXISTING_USERS" != "0" ] || warn "would ask for the first account's username and password"
 fi
 
-# The default repo is wherever this checkout came from, so running the script
-# straight out of a clone does the obvious thing; a copy on its own, or one
-# that arrived through curl, installs the public code.
-if [ -z "$REPO" ] && [ -f "$0" ]; then
-	# Only a script that is really on disk has a checkout around it; through
-	# a pipe, $0 is the shell, and whatever directory this runs from is not
-	# ours to read a remote off.
-	SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" 2>/dev/null && pwd || true)"
-	if [ -n "$SCRIPT_DIR" ] && [ -d "$SCRIPT_DIR/../.git" ]; then
-		REPO="$(git -C "$SCRIPT_DIR/.." remote get-url origin 2>/dev/null || true)"
-	fi
-fi
-[ -n "$REPO" ] || REPO="$DEFAULT_REPO"
-
-# --- python ----------------------------------------------------------------
-PYTHON=""
-for candidate in python3.14 python3.13 python3.12 python3.11 python3; do
-	if command -v "$candidate" >/dev/null 2>&1 &&
-		"$candidate" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
-		PYTHON="$candidate"
-		break
-	fi
-done
-[ -n "$PYTHON" ] || die "Python 3.11 or newer is required"
 say "python: $($PYTHON -V 2>&1)"
 say "cloud: $CLOUD_NAME${PUBLIC_URL:+ at $PUBLIC_URL}"
 
@@ -356,6 +562,13 @@ if [ -n "${GIT_SSH:-}" ]; then
 fi
 
 # --- virtualenv ------------------------------------------------------------
+# A venv without pip is what a run that stopped halfway leaves behind (the
+# venv module could make the directory but not bootstrap pip). It holds
+# nothing but installed packages, so it is made again.
+if [ -x "$VENV/bin/python" ] && ! "$VENV/bin/python" -m pip --version >/dev/null 2>&1; then
+	say "the virtualenv at $VENV has no pip; making it again"
+	run rm -rf "$VENV"
+fi
 if [ ! -x "$VENV/bin/python" ]; then
 	say "creating the virtualenv at $VENV"
 	run sudo -u "$SERVICE_USER" "$PYTHON" -m venv "$VENV"
@@ -530,7 +743,14 @@ if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
 	run systemctl daemon-reload
 	run systemctl enable --quiet "$SERVICE_NAME"
 	run systemctl restart "$SERVICE_NAME"
-	say "$SERVICE_NAME is enabled and running"
+	if [ -n "$DRY_RUN" ]; then
+		:
+	elif problem="$(wait_healthy)"; then
+		say "$SERVICE_NAME is enabled, running and answering"
+	else
+		warn "$SERVICE_NAME was started, but $problem"
+		warn "to see why:  journalctl -u $SERVICE_NAME -n 50"
+	fi
 else
 	warn "systemd is not running here; start the server yourself:"
 	printf '     %s serve\n' "$VENV/bin/cloudmorrow-server"
