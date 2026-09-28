@@ -3,7 +3,7 @@
 The Files Quill, as `GET /api/quills` sends it, and the `shares` backend
 behind it: `share` records made from the fake's share list and `file`
 records from its share tree, with their bytes and thumbnails, a folder made,
-a file put, renamed, moved and deleted — the promises server/backends.py
+a file put, renamed, moved and deleted — the promises server/backends/
 keeps. A FakeClient mixes this in before the Quill half, so every other
 datamodel still goes to the fake record store.
 """

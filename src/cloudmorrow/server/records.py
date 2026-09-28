@@ -462,7 +462,7 @@ class RecordStore:
         # (principal, action, record, fields before). What runs a Quill's
         # hooks listens here (quillcode.py); it must be quick, and may not raise.
         self.on_change: list[Callable[[Principal, str, Record, dict | None], None]] = []
-        # Datamodels served from elsewhere, by backend name (see backends.py).
+        # Datamodels served from elsewhere, by backend name (see backends/).
         self.backends: dict[str, object] = {}
         # What a person may do with each datamodel, from their circles
         # (circles.py). None is a store with no circles: everybody everything.
@@ -839,7 +839,7 @@ class RecordStore:
             records = [self._record(conn, model, row, principal) for row in rows]
         conn.close()
         # A secret field is never in a listing: reading the one record is
-        # how it is asked for (see backends.py for the store that has one).
+        # how it is asked for (see backends/ for the store that has one).
         hidden = [f.name for f in model.fields if f.secret]
         for record in records:
             for name in hidden:

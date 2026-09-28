@@ -3,7 +3,7 @@
 The Notes Quill is installed, as `GET /api/quills` sends it — one `editor`
 screen on the `note` datamodel, which can search, keep folders and keep
 attachments — and a note backend that keeps the promises the real one
-makes (server/backends.py): a note's id is its path, so moving it changes
+makes (server/backends/): a note's id is its path, so moving it changes
 it; a stale rev is a 409; a folder exists before anything is in it, and
 takes everything in it when it goes. A FakeClient mixes this in, ahead of
 FakeQuills, and hands every other datamodel on.
