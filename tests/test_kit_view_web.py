@@ -16,6 +16,7 @@ from pathlib import Path
 from cloudmorrow.quill import effects as sdk_effects
 from cloudmorrow.quill.ui import PRIMITIVES, TEXT_STYLES, TONES
 from cloudmorrow.server.routes.web import WEB, asset_version
+from tests.conftest import js_code
 
 VIEW_JS = (WEB / "kit_view.js").read_text(encoding="utf-8")
 VIEW_CSS = (WEB / "kit_view.css").read_text(encoding="utf-8")
@@ -25,10 +26,6 @@ KIT_JS = (WEB / "kit.js").read_text(encoding="utf-8")
 APP_CSS = (WEB / "app.css").read_text(encoding="utf-8")
 
 FLEET = Path(__file__).parent / "fixtures" / "quill-fleet"
-
-
-def _code(source: str) -> str:
-    return re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.DOTALL)
 
 
 def _block(source: str, start: str) -> str:
@@ -74,7 +71,7 @@ def test_every_effect_is_handled_in_one_place():
         sdk_effects.error("x")["effect"],
         sdk_effects.redraw()["effect"],
     }
-    handled = set(re.findall(r'case "(\w+)":', _code(ACTIONS_JS)))
+    handled = set(re.findall(r'case "(\w+)":', js_code(ACTIONS_JS)))
     assert made <= handled
     # And only there: the view hands its effects over rather than reading them.
     assert "export async function applyEffects(" in ACTIONS_JS
@@ -82,7 +79,7 @@ def test_every_effect_is_handled_in_one_place():
 
 
 def test_every_way_to_press_goes_through_press():
-    code = _code(VIEW_JS)
+    code = js_code(VIEW_JS)
     assert "press(quill, action," in code or "press(v.at.quill, action," in code
     # A button does exactly one of the three things ui.button allows.
     for key in ("n.action", "n.open", "n.go"):
@@ -134,11 +131,11 @@ def test_the_fleet_quill_is_what_the_page_reads(config, users):
 # -- on the brand ---------------------------------------------------------------------------------
 def test_no_colour_is_spelled_out():
     for name, css in (("kit_view.css", VIEW_CSS), ("actions.css", ACTIONS_CSS)):
-        code = _code(css)
+        code = js_code(css)
         assert not re.search(r"#[0-9a-fA-F]{3,8}\b", code), name
         assert not re.search(r"\brgba?\(|\bhsla?\(", code), name
     for name, js in (("kit_view.js", VIEW_JS), ("actions.js", ACTIONS_JS)):
-        assert not re.search(r"#[0-9a-fA-F]{6}\b", _code(js)), name
+        assert not re.search(r"#[0-9a-fA-F]{6}\b", js_code(js)), name
 
 
 def test_amber_is_one_action_per_view():
@@ -152,7 +149,7 @@ def test_amber_is_one_action_per_view():
 def test_nothing_in_it_is_named_for_one_quill():
     for source, name in ((VIEW_JS, "kit_view.js"), (VIEW_CSS, "kit_view.css"),
                          (ACTIONS_JS, "actions.js"), (ACTIONS_CSS, "actions.css")):
-        code = _code(source)
+        code = js_code(source)
         for word in ("fleet", "vehicle", "garage", "odometer", "task", "log-service"):
             named = re.search(rf"[\"'.`#]{word}[\"'`\s.-]", code, re.IGNORECASE)
             assert not named, f"{name} names {word!r}"

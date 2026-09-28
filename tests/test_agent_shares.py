@@ -8,7 +8,6 @@ whom, and that nothing escapes the directory.
 
 from __future__ import annotations
 
-import base64
 from pathlib import Path
 
 import httpx
@@ -17,6 +16,7 @@ import pytest
 from cloudmorrow.agent.config import AgentConfig
 from cloudmorrow.agent.runner import AgentRunner
 from cloudmorrow.agent.shares import ShareHost
+from tests.conftest import basic
 
 
 class FakeClient:
@@ -37,11 +37,6 @@ class FakeClient:
 
     def claim_job(self) -> None:
         return None
-
-
-def basic(username: str, secret: str) -> dict[str, str]:
-    raw = base64.b64encode(f"{username}:{secret}".encode()).decode()
-    return {"Authorization": f"Basic {raw}"}
 
 
 @pytest.fixture()

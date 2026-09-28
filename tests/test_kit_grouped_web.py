@@ -12,16 +12,13 @@ from __future__ import annotations
 import re
 
 from cloudmorrow.server.routes.web import WEB, asset_version
+from tests.conftest import js_code
 
 GROUPED_JS = (WEB / "kit_grouped.js").read_text(encoding="utf-8")
 GROUPED_CSS = (WEB / "kit_grouped.css").read_text(encoding="utf-8")
 KIT_JS = (WEB / "kit.js").read_text(encoding="utf-8")
 QUILLS_JS = (WEB / "quills.js").read_text(encoding="utf-8")
 APP_CSS = (WEB / "app.css").read_text(encoding="utf-8")
-
-
-def _code(source: str) -> str:
-    return re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.DOTALL)
 
 
 def test_it_is_served_and_wired_in(client):
@@ -38,7 +35,7 @@ def test_it_is_served_and_wired_in(client):
 
 def test_nothing_in_it_is_named_for_one_quill():
     for source, name in ((GROUPED_JS, "kit_grouped.js"), (GROUPED_CSS, "kit_grouped.css")):
-        code = _code(source)
+        code = js_code(source)
         for word in ("vault", "environment", "secrets", "key", "production", "task"):
             assert not re.search(rf"[\"'.`#]{word}[\"'`\s.-]", code, re.IGNORECASE), f"{name} names {word!r}"
 

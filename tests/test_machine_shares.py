@@ -9,23 +9,11 @@ a machine share: the machine serves it.
 
 from __future__ import annotations
 
-import base64
-
 import pytest
 
 from cloudmorrow.server.agents import AgentStore
 from cloudmorrow.server.shares import MACHINE, SERVER, SharePathError, ShareStore
-from tests.conftest import GUEST, token_for
-
-
-def basic(username: str, secret: str) -> dict[str, str]:
-    raw = base64.b64encode(f"{username}:{secret}".encode()).decode()
-    return {"Authorization": f"Basic {raw}"}
-
-
-@pytest.fixture()
-def guest_auth(client) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token_for(client, *GUEST)}"}
+from tests.conftest import GUEST, basic
 
 
 def enroll(client, auth, name="laptop") -> dict[str, str]:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import re
 from pathlib import Path
 
 import pytest
@@ -67,6 +69,22 @@ def token_for(client: TestClient, username: str, password: str) -> str:
 @pytest.fixture()
 def auth(client) -> dict[str, str]:
     return {"Authorization": f"Bearer {token_for(client, *ADMIN)}"}
+
+
+@pytest.fixture()
+def guest_auth(client) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token_for(client, *GUEST)}"}
+
+
+def basic(username: str, secret: str) -> dict[str, str]:
+    """HTTP Basic headers, the way a WebDAV client signs in."""
+    raw = base64.b64encode(f"{username}:{secret}".encode()).decode()
+    return {"Authorization": f"Basic {raw}"}
+
+
+def js_code(source: str) -> str:
+    """JavaScript with its comments taken out, so a test reads only the code."""
+    return re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.DOTALL)
 
 
 @pytest.fixture()

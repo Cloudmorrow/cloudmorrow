@@ -11,16 +11,13 @@ from __future__ import annotations
 import re
 
 from cloudmorrow.server.routes.web import WEB, asset_version
+from tests.conftest import js_code
 
 EDITOR_JS = (WEB / "kit_editor.js").read_text(encoding="utf-8")
 EDITOR_CSS = (WEB / "kit_editor.css").read_text(encoding="utf-8")
 KIT_JS = (WEB / "kit.js").read_text(encoding="utf-8")
 PICTURES_JS = (WEB / "pictures.js").read_text(encoding="utf-8")
 APP_CSS = (WEB / "app.css").read_text(encoding="utf-8")
-
-
-def _code(source: str) -> str:
-    return re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.DOTALL)
 
 
 def test_the_editor_is_its_own_file_drawn_from_the_kit(client):
@@ -48,7 +45,7 @@ def test_the_old_notes_screen_is_gone():
 def test_nothing_in_the_editor_is_named_for_notes():
     for source, name in ((EDITOR_JS, "kit_editor.js"), (EDITOR_CSS, "kit_editor.css"),
                          (PICTURES_JS, "pictures.js")):
-        code = _code(source)
+        code = js_code(source)
         for word in ("note", "notes"):
             assert not re.search(rf"[\"'.`/]{word}[\"'`\s/]", code), f"{name} names {word!r}"
 
@@ -61,7 +58,7 @@ def test_it_reads_the_bindings_and_what_the_model_can_do():
 
 
 def test_the_calls_it_makes_are_the_record_apis():
-    code = _code(EDITOR_JS)
+    code = js_code(EDITOR_JS)
     assert '"?previews=true"' in code
     assert '"?q=" + encodeURIComponent(query)' in code
     assert '"/_folders"' in code and '"/_attachments"' in code
@@ -76,7 +73,7 @@ def test_the_calls_it_makes_are_the_record_apis():
 def test_side_by_side_is_the_computer_only(client):
     assert "min-width: 900px) and (min-height: 600px)" in EDITOR_JS
     assert '<main class="split">' in EDITOR_JS
-    media = _code(EDITOR_CSS).split("@media (min-width: 900px) and (min-height: 600px)", 1)
+    media = js_code(EDITOR_CSS).split("@media (min-width: 900px) and (min-height: 600px)", 1)
     assert len(media) == 2 and "main.split {" in media[1]
     assert "main.split" not in media[0]
 

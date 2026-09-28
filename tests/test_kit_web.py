@@ -15,6 +15,7 @@ import re
 from cloudmorrow.server.datamodels import FIELD_KINDS
 from cloudmorrow.server.quills import KIT_READY
 from cloudmorrow.server.routes.web import WEB, asset_version
+from tests.conftest import js_code
 
 KIT_JS = (WEB / "kit.js").read_text(encoding="utf-8")
 # The elements that are more than rows, and spaces, each in files of their own.
@@ -99,7 +100,7 @@ def test_a_view_screen_is_drawn_by_its_own_file():
 
 
 def test_every_record_sheet_has_the_actions_on_its_datamodel():
-    sheet = _code(_function(KIT_JS, "renderRecordSheet"))
+    sheet = js_code(_function(KIT_JS, "renderRecordSheet"))
     assert "${sheetSection(model.id)}" in sheet
     assert "wireSheetSection(app," in sheet
     # Read-only sheets have them too: the gate says no if the code writes.
@@ -255,10 +256,6 @@ def test_the_old_calendar_screen_is_gone():
 
 
 # -- read is drawn as read (docs/CIRCLES.md) ----------------------------------------
-def _code(source: str) -> str:
-    return re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.DOTALL)
-
-
 def _function(source: str, name: str) -> str:
     """One top-level function's text, up to the next one."""
     start = source.index(f"function {name}(")
@@ -272,7 +269,7 @@ def test_what_may_be_written_is_asked_in_one_place():
     assert "export const canWrite = (at, modelId) => mayWrite(at.quill.models[modelId]);" in KIT_JS
     for name in ("kit_calendar.js", "kit_editor.js", "kit_grid.js", "kit_grouped.js",
                  "kit_space.js", "kit_thread.js"):
-        source = _code((WEB / name).read_text(encoding="utf-8"))
+        source = js_code((WEB / name).read_text(encoding="utf-8"))
         assert "mayWrite" in source or "canWrite" in source, name
         assert ".access" not in source, name
 
@@ -290,7 +287,7 @@ def test_the_access_the_kit_reads_is_the_one_the_server_sends(client, tasks_quil
 
 
 def test_a_board_you_may_only_read_is_one_you_look_at():
-    board = _code(_function(KIT_JS, "renderBoard"))
+    board = js_code(_function(KIT_JS, "renderBoard"))
     assert "const writes = mayWrite(model);" in board
     # No add row or pen, no new board, no ticking, no dragging.
     assert "const canAdd = (!groupModel || group) && writes &&" in board
@@ -304,19 +301,19 @@ def test_a_board_you_may_only_read_is_one_you_look_at():
 
 
 def test_a_list_you_may_only_read_has_no_add_row_and_no_ticking():
-    listing = _code(_function(KIT_JS, "renderList"))
+    listing = js_code(_function(KIT_JS, "renderList"))
     assert "const writes = mayWrite(model);" in listing
     assert "${writes ? `<form class=\"add\">" in listing
     assert "${writes ? `<button class=\"tick\"" in listing
     assert 'querySelectorAll("button.tick")' in listing
-    grouped = _code((WEB / "kit_grouped.js").read_text(encoding="utf-8"))
+    grouped = js_code((WEB / "kit_grouped.js").read_text(encoding="utf-8"))
     assert "${writes ? `<form class=\"add\">" in grouped
     assert "tick && writes ? `<button class=\"tick\"" in grouped
     assert "namesGroups(f) ? `<button class=\"chip new-group\"" in grouped
 
 
 def test_the_sheet_of_a_record_you_may_only_read_says_it():
-    sheet = _code(_function(KIT_JS, "renderRecordSheet"))
+    sheet = js_code(_function(KIT_JS, "renderRecordSheet"))
     assert "const looked = !mayWrite(model) || (model.space && !record.can_manage);" in sheet
     # Said rather than typed, nothing to delete, and none of the saving wired.
     assert "looked && !f.secret ? sayWidget(" in sheet
@@ -329,9 +326,9 @@ def test_the_sheet_of_a_record_you_may_only_read_says_it():
 
 def test_a_link_to_a_datamodel_that_is_not_there_is_left_off():
     """A datamodel you may not read is not sent; a link to it is not a picker of nothing."""
-    sheet = _code(_function(KIT_JS, "renderRecordSheet"))
+    sheet = js_code(_function(KIT_JS, "renderRecordSheet"))
     assert '(f.kind !== "link" || !f.to || quill.models[f.to])' in sheet
-    assert '!quill.models[f.to]) continue;' in _code(_function(KIT_JS, "linkTitles"))
+    assert '!quill.models[f.to]) continue;' in js_code(_function(KIT_JS, "linkTitles"))
 
 
 def test_a_quill_with_nothing_left_has_no_tab():
@@ -340,22 +337,22 @@ def test_a_quill_with_nothing_left_has_no_tab():
 
 
 def test_spaces_you_may_only_read_are_not_made_or_changed():
-    space = _code((WEB / "kit_space.js").read_text(encoding="utf-8"))
+    space = js_code((WEB / "kit_space.js").read_text(encoding="utf-8"))
     assert "if (!mayWrite(model)) return notYours(" in space
     assert space.count("return notYours(") == 2   # making one, and writing to somebody
-    section = _code(_function(space, "spaceSection"))
+    section = js_code(_function(space, "spaceSection"))
     assert "const writes = mayWrite(model);" in section
     assert section.count("writes &&") >= 3   # adding, taking out, leaving
-    calendar = _code((WEB / "kit_calendar.js").read_text(encoding="utf-8"))
+    calendar = js_code((WEB / "kit_calendar.js").read_text(encoding="utf-8"))
     assert "const adds = mayWrite(b.model);" in calendar
     assert 'const addLine = !adds ? "" :' in calendar
     assert 'if (!form) return;' in calendar
 
 
 def test_the_editor_opens_pages_you_may_only_read_read_only():
-    editor = _code((WEB / "kit_editor.js").read_text(encoding="utf-8"))
+    editor = js_code((WEB / "kit_editor.js").read_text(encoding="utf-8"))
     assert "writes: mayWrite(model)," in editor
-    page = _code(_function(editor, "renderPage"))
+    page = js_code(_function(editor, "renderPage"))
     assert 'const actions = !b.writes ? "" :' in page
     assert '${b.writes ? "" : " readonly"}' in page
     assert "area.readOnly = true;" in page

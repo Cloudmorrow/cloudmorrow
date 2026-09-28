@@ -2,26 +2,15 @@
 
 from __future__ import annotations
 
-import base64
 import re
 
 import pytest
 
-from tests.conftest import ADMIN, GUEST, token_for
-
-
-def basic(username: str, secret: str) -> dict[str, str]:
-    raw = base64.b64encode(f"{username}:{secret}".encode()).decode()
-    return {"Authorization": f"Basic {raw}"}
+from tests.conftest import ADMIN, GUEST, basic
 
 
 def hrefs(body: str) -> list[str]:
     return [h for h in re.findall(r"<[^>]*:href>([^<]*)</[^>]*:href>", body) if h.startswith("/")]
-
-
-@pytest.fixture()
-def guest_auth(client) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token_for(client, *GUEST)}"}
 
 
 @pytest.fixture()
