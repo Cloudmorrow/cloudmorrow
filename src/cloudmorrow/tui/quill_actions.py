@@ -17,7 +17,7 @@ on the record sheet — unless it has none, or the button already said every
 one of them. What comes back is a list of effects, and `apply_effects` is
 the one place they are carried out, for every surface in here:
 
-    toast     a line in the corner that goes away (Textual's notify)
+    toast     a line in the log along the bottom, as everything the app says is
     open      the record's sheet
     go        another screen of the Quill, with its parameters
     confirm   a question; on yes, the action `then`, with `args`, on the same record
@@ -33,7 +33,6 @@ from collections.abc import Callable, Iterator
 from functools import partial
 from typing import Any
 
-import httpx
 from textual.app import ComposeResult
 from textual.command import DiscoveryHit, Hit, Hits, Provider
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -102,45 +101,21 @@ def all_models(app: Any, quill: dict | None = None) -> dict:
 
 
 # -- talking to the server ------------------------------------------------------
-async def _send(api: Any, method: str, url: str, **kwargs: Any) -> Any:
-    """One call on the client's own connection, with the Quill's words when it refuses.
-
-    The client says a refusal as its detail, which for Quill code is
-    `{kind, message}`; here the message is the error, and the kind is kept
-    as its payload.
-    """
-    try:
-        response = await api._client.request(method, url, headers=api._headers(), **kwargs)
-    except httpx.HTTPError as exc:
-        raise ApiError(f"cannot reach the server: {exc}") from exc
-    if response.status_code < 400:
-        return response.json()
-    try:
-        detail = response.json().get("detail")
-    except (ValueError, AttributeError):
-        detail = response.text or f"HTTP {response.status_code}"
-    if response.status_code == 401:
-        raise AuthError(str(detail), status_code=401)
-    if isinstance(detail, dict) and "message" in detail:
-        raise ApiError(str(detail["message"]), status_code=response.status_code, payload=detail)
-    raise ApiError(str(detail), status_code=response.status_code, payload=detail)
-
-
 async def fetch_view(api: Any, quill_id: str, screen_id: str, params: dict | None = None) -> dict:
     """A view's tree, drawn for whoever is signed in: `{"quill", "screen", "tree"}`."""
     clean = {k: str(v) for k, v in (params or {}).items() if v not in (None, "")}
-    return await _send(api, "GET", f"/api/quills/{quill_id}/views/{screen_id}", params=clean)
+    record = clean.pop("record", "")
+    return await api.quill_view(quill_id, screen_id, record=record, **clean)
 
 
 async def press(
     api: Any, quill_id: str, action_id: str, *, record: str = "", fields: dict | None = None
 ) -> list[dict]:
-    """Run an action on the server, as whoever is signed in. Its effects."""
-    body: dict = {"fields": dict(fields or {})}
-    if record:
-        body["record"] = record
-    answer = await _send(api, "POST", f"/api/quills/{quill_id}/actions/{action_id}", json=body)
-    return list((answer or {}).get("effects") or [])
+    """Run an action on the server, as whoever is signed in. Its effects.
+
+    A refusal is the client's ApiError, in the Quill's own words.
+    """
+    return list(await api.quill_action(quill_id, action_id, record=record, fields=fields) or [])
 
 
 def failure(effects: list[dict]) -> str | None:
@@ -382,7 +357,7 @@ async def run_action(
             await app.sign_out(message="Session expired — sign in again.")
             return False
         except ApiError as exc:
-            app.notify(str(exc), title=str(action.get("label") or ""), severity="error")
+            app.say(f"{action.get('label') or ''}: {exc}", error=True)
             return False
     await apply_effects(app, quill, effects, record=record, leave=leave)
     return True
@@ -400,10 +375,9 @@ async def apply_effects(
     for effect in effects:
         kind = effect.get("effect")
         if kind == "toast":
-            app.notify(str(effect.get("text") or ""), title=str(quill.get("name") or ""))
+            app.say(str(effect.get("text") or ""))
         elif kind == "error":
-            app.notify(str(effect.get("text") or ""), title=str(quill.get("name") or ""),
-                       severity="error")
+            app.say(str(effect.get("text") or ""), error=True)
         elif kind == "open":
             model_id, record_id = str(effect.get("model") or ""), str(effect.get("id") or "")
             await open_record(app, quill, model_id, record_id)
@@ -415,8 +389,7 @@ async def apply_effects(
         elif kind == "confirm":
             then = find_action(quill, str(effect.get("then") or ""))
             if then is None:
-                app.notify(f"{quill.get('name')} has no action {effect.get('then')!r}.",
-                           severity="error")
+                app.say(f"{quill.get('name')} has no action {effect.get('then')!r}.", error=True)
                 continue
             yes = await app.push_screen_wait(
                 ConfirmModal(str(effect.get("text") or ""),
@@ -433,7 +406,7 @@ async def open_record(app: Any, quill: dict, model_id: str, record_id: str) -> d
     api = app.client
     models = all_models(app, quill)
     if model_id not in models or not record_id:
-        app.notify(f"There is no {model_id or 'record'} here to open.", severity="error")
+        app.say(f"There is no {model_id or 'record'} here to open.", error=True)
         return None
     try:
         record = await api.record(model_id, record_id)
@@ -441,7 +414,7 @@ async def open_record(app: Any, quill: dict, model_id: str, record_id: str) -> d
         await app.sign_out(message="Session expired — sign in again.")
         return None
     except ApiError as exc:
-        app.notify(str(exc), severity="error")
+        app.say(str(exc), error=True)
         return None
     choices = await link_choices(api, models, models[model_id])
     return await app.push_screen_wait(

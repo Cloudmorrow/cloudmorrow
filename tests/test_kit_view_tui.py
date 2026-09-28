@@ -87,8 +87,13 @@ async def open_garage(app, pilot) -> ViewPane:
     return screen.query_one(ViewPane)
 
 
-def toasts(app) -> list[str]:
-    return [str(note.message) for note in app._notifications]
+def toasts(app) -> str:
+    """What the app has said in the log along the bottom: nothing here is a toast."""
+    from cloudmorrow.tui.screens.workspace import WorkspaceScreen
+    from tests.tui_harness import said
+
+    workspace = next(s for s in app.screen_stack if isinstance(s, WorkspaceScreen))
+    return said(workspace)
 
 
 def vans(app) -> list[dict]:
@@ -237,7 +242,7 @@ async def test_a_refusal_is_said_in_the_quills_words(fleet):
         app.run_worker(go())
         await settle(app, pilot)
         assert ran == [False]
-        assert any("did not ask for contact" in str(n.message) for n in app._notifications)
+        assert "did not ask for contact" in toasts(app)
 
 
 async def test_a_view_that_fails_says_why_where_it_would_be(fleet):

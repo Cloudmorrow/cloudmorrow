@@ -333,7 +333,7 @@ class FieldNode(Horizontal):
         try:
             value = read_field(self._widget(), self.field)
         except ValueError as exc:
-            self.app.notify(str(exc), severity="error")
+            self.app.say(str(exc), error=True)
             return
         if value == self.saved or (value in (None, "") and self.saved in (None, "")):
             return
@@ -858,7 +858,7 @@ class Drawer:
 
     def draw_lanes(self, node: dict, path: str) -> Widget:
         records = node.get("records") or []
-        model_id = records[0]["model"] if records else self.pane.model_id
+        model_id = node.get("model") or (records[0]["model"] if records else self.pane.model_id)
         return LanesNode(node, model_id, self.models.get(model_id), id=path)
 
     def draw_month(self, node: dict, path: str) -> Widget:
