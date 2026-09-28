@@ -114,6 +114,12 @@ export function fileStem(title) {
     .trim();
 }
 
+// A Date as the clock here reads it, the way an ISO date and a
+// datetime-local box spell it: 2026-03-07, 2026-03-07T09:05.
+export const pad2 = (n) => String(n).padStart(2, "0");
+export const localDay = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+export const localMinute = (d) => `${localDay(d)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+
 export function formatDate(seconds, { long = false } = {}) {
   const date = new Date(seconds * 1000);
   if (long) {

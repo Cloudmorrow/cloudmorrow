@@ -32,7 +32,7 @@
    still opens, and is still sent on or saved. */
 
 import {
-  api, apiRaw, app, encodePath, esc, formatDate, heading, icons, nav, onSignOut,
+  api, apiRaw, app, encodePath, esc, formatDate, heading, icons, localDay, nav, onSignOut, pad2,
   recordsUrl, renderRoute, replace, route, seconds, store, tabs, toast, wireShell, back,
 } from "./core.js";
 import { mayWrite } from "./kit.js";
@@ -468,9 +468,7 @@ addEventListener("paste", async (event) => {
 
 function photoName(file) {
   const now = new Date();
-  const pad = (n) => String(n).padStart(2, "0");
-  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ` +
-    `${pad(now.getHours())}.${pad(now.getMinutes())}.${pad(now.getSeconds())}`;
+  const stamp = `${localDay(now)} ${pad2(now.getHours())}.${pad2(now.getMinutes())}.${pad2(now.getSeconds())}`;
   const ext = (file.type.split("/")[1] || "jpg").replace("jpeg", "jpg");
   return `Photo ${stamp}.${ext}`;
 }

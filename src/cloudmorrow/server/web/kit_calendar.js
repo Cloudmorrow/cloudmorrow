@@ -28,8 +28,8 @@
    on a sheet that says them. */
 
 import {
-  api, app, esc, heading, icons, nav, recordsUrl, renderRoute, replace, store, tabs, toast,
-  wireShell,
+  api, app, esc, heading, icons, localDay, localMinute, nav, pad2, recordsUrl, renderRoute,
+  replace, store, tabs, toast, wireShell,
 } from "./core.js";
 import { mayWrite, sheetHash } from "./kit.js";
 import { renderNewSpace, renderSpaceList } from "./kit_space.js";
@@ -47,21 +47,19 @@ const glyphs = {
 // -- days, the way this file counts them -------------------------------------------
 // Everything here is an ISO date string. A Date is only ever a calculator:
 // made at noon, so no daylight saving can shift the day out from under it,
-// and turned back into a string before it is used.
-export const iso = (date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+// and turned back into a string, by core.js's localDay, before it is used.
 
 export const dateOf = (day) => {
   const [y, m, d] = String(day).slice(0, 10).split("-").map(Number);
   return new Date(y, m - 1, d, 12);
 };
 
-export const today = () => iso(new Date());
+export const today = () => localDay(new Date());
 
 export function addDays(day, days) {
   const date = dateOf(day);
   date.setDate(date.getDate() + days);
-  return iso(date);
+  return localDay(date);
 }
 
 export function addMonths(day, months) {
@@ -69,7 +67,7 @@ export function addMonths(day, months) {
   const wanted = date.getMonth() + months;
   date.setDate(1);
   date.setMonth(wanted);
-  return iso(date);
+  return localDay(date);
 }
 
 export const monthOf = (day) => day.slice(0, 7);
@@ -103,9 +101,7 @@ export function wall(stamp) {
   if (!/(Z|[+-]\d\d:?\d\d)$/.test(text) || text.length <= 10) return text.slice(0, 16);
   const ms = Date.parse(text);
   if (Number.isNaN(ms)) return text.slice(0, 16);
-  const d = new Date(ms);
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${iso(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return localMinute(new Date(ms));
 }
 
 const clock = (stamp) => (stamp.length > 10 ? stamp.slice(11, 16) : "");
@@ -367,7 +363,7 @@ export function newFields(b, day, text) {
   if (timed && Number(timed[1]) < 24 && Number(timed[2]) < 60) {
     const start = Number(timed[1]) * 60 + Number(timed[2]);
     const end = Math.min(start + 60, 24 * 60 - 1);
-    const hhmm = (n) => `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
+    const hhmm = (n) => `${pad2(Math.floor(n / 60))}:${pad2(n % 60)}`;
     const fields = { [b.title]: timed[3].trim(), [b.starts]: `${day}T${hhmm(start)}`, [b.ends]: `${day}T${hhmm(end)}` };
     if (b.allDay) fields[b.allDay] = false;
     return fields;
@@ -469,7 +465,7 @@ function weekGrid(days, filed, picked, href) {
   return `<div class="week" style="--hour:${HOUR}px;--hours:${hours.length}">
     <div class="corner"></div>${head}
     <div class="corner whole-label">all day</div>${whole}
-    <div class="hours">${hours.map((h) => `<span>${String(h).padStart(2, "0")}:00</span>`).join("")}</div>${columns}
+    <div class="hours">${hours.map((h) => `<span>${pad2(h)}:00</span>`).join("")}</div>${columns}
   </div>`;
 }
 
@@ -556,7 +552,5 @@ function shifted(end, was, now) {
     return end.length === 10 ? addDays(end, days) : `${addDays(end.slice(0, 10), days)}${end.slice(10)}`;
   }
   const ms = (s) => new Date(s.slice(0, 16)).getTime();
-  const moved = new Date(ms(end) + (ms(now) - ms(was)));
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${iso(moved)}T${pad(moved.getHours())}:${pad(moved.getMinutes())}`;
+  return localMinute(new Date(ms(end) + (ms(now) - ms(was))));
 }

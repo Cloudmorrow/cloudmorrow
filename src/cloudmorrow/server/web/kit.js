@@ -17,8 +17,8 @@
    {quill, screen, tab, base}, where base is the screen's own hash. */
 
 import {
-  SAVE_DELAY, api, app, back, esc, formatDate, heading, icons, nav, occupy, recordsUrl,
-  renderRoute, replace, seconds, setStatus, store, tabs, toast, vacate, wireShell,
+  SAVE_DELAY, api, app, back, esc, formatDate, heading, icons, localMinute, nav, occupy,
+  recordsUrl, renderRoute, replace, seconds, setStatus, store, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
 import { drawsHere, renderGroupedList, secretWidget, wireSecretWidgets } from "./kit_grouped.js";
@@ -556,9 +556,7 @@ function localMoment(iso) {
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(text)) return text.slice(0, 16);
   const ms = Date.parse(text);
   if (Number.isNaN(ms)) return "";
-  const d = new Date(ms);
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return localMinute(new Date(ms));
 }
 
 export function widget(f, value, links, own = null) {
