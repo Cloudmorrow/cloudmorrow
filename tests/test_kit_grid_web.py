@@ -23,6 +23,7 @@ from tests.conftest import QUILL_CATALOG
 GRID_JS = (WEB / "kit_grid.js").read_text(encoding="utf-8")
 GRID_CSS = (WEB / "kit_grid.css").read_text(encoding="utf-8")
 KIT_JS = (WEB / "kit.js").read_text(encoding="utf-8")
+CORE_JS = (WEB / "core.js").read_text(encoding="utf-8")
 
 
 def code_of(source: str) -> str:
@@ -78,7 +79,9 @@ def test_nothing_in_the_grid_is_named_for_one_quill():
 
 def test_the_record_calls_it_makes_are_the_generic_ones():
     code = code_of(GRID_JS)
-    assert '"/api/records/"' in code
+    # Its addresses are the shell's one way of saying where records are.
+    assert re.search(r'import \{[^}]*\brecordsUrl\b[^}]*\} from "\./core\.js"', code)
+    assert '"/api/records/"' in code_of(CORE_JS)
     for call in ('+ "/content"', '+ "/thumb?size="', '+ "/upload"'):
         assert call in code, call
     # Folders are made as records whose kind field says so.

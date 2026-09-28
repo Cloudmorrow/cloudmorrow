@@ -34,13 +34,10 @@
    {quill, screen, tab, base}. */
 
 import {
-  api, app, esc, heading, icons, nav, onSignOut, renderRoute, replace, session, tabs, toast,
-  wireShell,
+  api, app, esc, heading, icons, nav, onSignOut, recordsUrl, renderRoute, replace, session, tabs,
+  toast, wireShell,
 } from "./core.js";
 import { mayWrite, sheetHash } from "./kit.js";
-
-export const recordsUrl = (model, id = "", rest = "") =>
-  "/api/records/" + encodeURIComponent(model) + (id ? "/" + encodeURIComponent(id) : "") + rest;
 
 // -- reading a space ---------------------------------------------------------------------
 /** How the screen says spaces are made: scope (or `direct`) → the fields it sets. */

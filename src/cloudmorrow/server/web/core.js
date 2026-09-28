@@ -72,6 +72,11 @@ export async function api(method, path, body, { keepalive = false } = {}) {
 
 export const encodePath = (path) => path.split("/").map(encodeURIComponent).join("/");
 
+// Where a datamodel's records are, or one of them, and anything past it:
+// recordsUrl(model, id, "/move"), or recordsUrl(model, "", "/_folders").
+export const recordsUrl = (model, id = "", rest = "") =>
+  "/api/records/" + encodeURIComponent(model) + (id ? "/" + encodeURIComponent(id) : "") + rest;
+
 // -- helpers --------------------------------------------------------------------
 export const esc = (s) => String(s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")

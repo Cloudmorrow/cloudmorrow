@@ -25,8 +25,8 @@
 
 import {
   SAVE_DELAY, SEARCH_DELAY, api, app, back, encodePath, esc, fileStem, formatDate, heading,
-  icons, nav, occupy, previousHash, renderRoute, replace, sectionOf, seconds, setStatus, tabs,
-  toast, vacate, wireShell,
+  icons, nav, occupy, previousHash, recordsUrl, renderRoute, replace, sectionOf, seconds,
+  setStatus, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
 import { mayWrite } from "./kit.js";
@@ -49,7 +49,6 @@ const NEW = "~new";
 const folderOf = (path) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
 const baseName = (path) => path.slice(path.lastIndexOf("/") + 1);
 const join = (folder, name) => (folder ? folder + "/" + name : name);
-const recordsUrl = (model, rest = "") => "/api/records/" + encodeURIComponent(model) + rest;
 
 // -- the screen's bindings ---------------------------------------------------------
 function bind(at) {
@@ -64,7 +63,7 @@ function bind(at) {
     path: screen.path || "",
     keepsFolders: !!screen.path && can.has("folders"),
     search: can.has("search"),
-    attachments: can.has("attachments") ? recordsUrl(model.id, "/_attachments") : "",
+    attachments: can.has("attachments") ? recordsUrl(model.id, "", "/_attachments") : "",
     label: screen.label || quill.name,
     noun: model.label.toLowerCase(),
     writes: mayWrite(model),
@@ -81,7 +80,7 @@ const pageHash = (b, id) =>
 // [{id, path, title, folder, modified, preview}], and the folders in tree
 // order: [{path, name, depth, count}], the top first.
 async function load(b) {
-  const rows = await api("GET", recordsUrl(b.model.id, "?previews=true"));
+  const rows = await api("GET", recordsUrl(b.model.id, "", "?previews=true"));
   const pages = rows.map((r) => {
     const path = String(r.fields[b.path || b.title] || "");
     return {
@@ -97,7 +96,7 @@ async function load(b) {
   const add = (folder) => { while (folder) { known.add(folder); folder = folderOf(folder); } };
   for (const page of pages) add(page.folder);
   if (b.keepsFolders) {
-    try { for (const f of await api("GET", recordsUrl(b.model.id, "/_folders"))) add(f.path); }
+    try { for (const f of await api("GET", recordsUrl(b.model.id, "", "/_folders"))) add(f.path); }
     catch { /* the folders there are pages in are still the tree */ }
   }
   const byPath = (x, y) => {
@@ -221,7 +220,7 @@ function listView(b, data, key, openId = "") {
         const request = ++latest;
         timer = setTimeout(async () => {
           let found;
-          try { found = await api("GET", recordsUrl(b.model.id, "?q=" + encodeURIComponent(query))); }
+          try { found = await api("GET", recordsUrl(b.model.id, "", "?q=" + encodeURIComponent(query))); }
           catch (err) { toast(err.message); return; }
           if (request !== latest) return;
           const hits = new Map(local.map((p) => [p.id, p]));
@@ -241,7 +240,7 @@ async function newFolder(b, parent) {
   const name = fileStem(prompt("Folder name") || "");
   if (!name) return;
   try {
-    await api("POST", recordsUrl(b.model.id, "/_folders"), { path: join(parent, name) });
+    await api("POST", recordsUrl(b.model.id, "", "/_folders"), { path: join(parent, name) });
     renderRoute();
   } catch (err) {
     toast(err.message);
@@ -292,7 +291,7 @@ const aOr = (label) => (/^[aeiou]/i.test(label) ? "an " : "a ") + label;
 export async function renderEditorPage(at, id, arg) {
   const b = bind(at);
   let record;
-  try { record = await api("GET", recordsUrl(b.model.id, "/" + encodeURIComponent(id))); }
+  try { record = await api("GET", recordsUrl(b.model.id, id)); }
   catch (err) {
     if (err.status === 404) { toast(`That ${b.noun} is gone`); replace(at.base); return renderRoute(); }
     throw err;
@@ -421,7 +420,7 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
     try {
       clearTimeout(ed.timer);
       ed.dirty = false;
-      await api("DELETE", recordsUrl(b.model.id, "/" + encodeURIComponent(ed.id)));
+      await api("DELETE", recordsUrl(b.model.id, ed.id));
       vacate(hold);
       editor = null;
       back(parent);
@@ -462,7 +461,7 @@ async function saveEditor(ed, { keepalive = false } = {}) {
       if (title && title !== ed.stem) await renameTo(ed, title);
       let saved;
       try {
-        saved = await api("PATCH", recordsUrl(b.model.id, "/" + encodeURIComponent(ed.id)),
+        saved = await api("PATCH", recordsUrl(b.model.id, ed.id),
           { fields: { [b.body]: compose(ed.stem, body, ed.hadHeading) }, rev: ed.rev }, { keepalive });
       } catch (err) {
         const current = err.status === 409 && err.detail && err.detail.current;
@@ -513,7 +512,7 @@ async function createUnique(ed, stem, body) {
 async function renameTo(ed, stem) {
   const { b } = ed;
   try {
-    const renamed = await api("PATCH", recordsUrl(b.model.id, "/" + encodeURIComponent(ed.id)),
+    const renamed = await api("PATCH", recordsUrl(b.model.id, ed.id),
       { fields: { [b.title]: stem } });
     ed.stem = pageState(b, renamed).stem;
     ed.rev = renamed.rev;
@@ -537,7 +536,7 @@ async function leaveEditor(ed) {
   if (ed.dirty) await saveEditor(ed);
   while (ed.saving) await new Promise((r) => setTimeout(r, 50));
   if (ed.created && !fileStem(ed.titleEl.value) && !bodyText(ed).trim()) {
-    try { await api("DELETE", recordsUrl(ed.b.model.id, "/" + encodeURIComponent(ed.id))); }
+    try { await api("DELETE", recordsUrl(ed.b.model.id, ed.id)); }
     catch { /* it will show up; fine */ }
   }
 }

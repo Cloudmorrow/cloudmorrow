@@ -17,8 +17,8 @@
    {quill, screen, tab, base}, where base is the screen's own hash. */
 
 import {
-  SAVE_DELAY, api, app, back, esc, formatDate, heading, icons, nav, occupy, renderRoute,
-  replace, seconds, setStatus, store, tabs, toast, vacate, wireShell,
+  SAVE_DELAY, api, app, back, esc, formatDate, heading, icons, nav, occupy, recordsUrl,
+  renderRoute, replace, seconds, setStatus, store, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
 import { drawsHere, renderGroupedList, secretWidget, wireSecretWidgets } from "./kit_grouped.js";
@@ -39,8 +39,6 @@ const own = {
 };
 
 // -- reading a datamodel -----------------------------------------------------------
-export const recordsUrl = (model, id) =>
-  "/api/records/" + encodeURIComponent(model) + (id ? "/" + encodeURIComponent(id) : "");
 export const fieldOf = (model, name) => model.fields.find((f) => f.name === name);
 export const titleField = (at, model) => (model.id === at.screen.model && at.screen.title) || model.title;
 export const titleOf = (model, record, name = model.title) => String(record.fields[name] || "").trim() || "Untitled";

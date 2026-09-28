@@ -17,10 +17,12 @@
    Nothing here knows what it is drawing: a vault and an environment are a
    group and a subgroup, as a customer and a project would be. */
 
-import { api, app, esc, go, heading, icons, nav, replace, store, tabs, toast, wireShell } from "./core.js";
+import {
+  api, app, esc, go, heading, icons, nav, recordsUrl, replace, store, tabs, toast, wireShell,
+} from "./core.js";
 import { installCard } from "./install.js";
 import {
-  aOr, canWrite, circle, fieldOf, linkTitles, mayWrite, recordsUrl, sheetHash, spoken, timeLeft,
+  aOr, canWrite, circle, fieldOf, linkTitles, mayWrite, sheetHash, spoken, timeLeft,
   titleField, titleOf, wireAdd,
 } from "./kit.js";
 

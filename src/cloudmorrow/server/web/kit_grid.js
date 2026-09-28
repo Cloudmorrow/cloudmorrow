@@ -33,7 +33,7 @@
 
 import {
   ApiError, api, app, authHeaders, encodePath, esc, formatDate, heading, icons, nav, onSignOut,
-  renderRoute, replace, route, seconds, store, tabs, toast, wireShell, back,
+  recordsUrl, renderRoute, replace, route, seconds, store, tabs, toast, wireShell, back,
 } from "./core.js";
 import { mayWrite } from "./kit.js";
 
@@ -99,8 +99,6 @@ const folderOf = (path) => (path.includes("/") ? path.slice(0, path.lastIndexOf(
 const join = (folder, name) => (folder ? folder + "/" + name : name);
 const extOf = (name) => (name.includes(".") ? name.slice(name.lastIndexOf(".") + 1).toLowerCase() : "");
 
-const recordsUrl = (model, id) =>
-  "/api/records/" + encodeURIComponent(model) + (id ? "/" + encodeURIComponent(id) : "");
 const folderHash = (at, group, folder) =>
   `${at.base}/${encodeURIComponent(group)}` + (folder ? "/" + encodePath(folder) : "");
 const itemHash = (at, b, id) =>

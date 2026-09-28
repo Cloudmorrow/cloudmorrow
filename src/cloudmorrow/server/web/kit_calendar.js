@@ -28,13 +28,11 @@
    on a sheet that says them. */
 
 import {
-  api, app, esc, heading, icons, nav, renderRoute, replace, store, tabs, toast, wireShell,
+  api, app, esc, heading, icons, nav, recordsUrl, renderRoute, replace, store, tabs, toast,
+  wireShell,
 } from "./core.js";
 import { mayWrite, sheetHash } from "./kit.js";
 import { renderNewSpace, renderSpaceList } from "./kit_space.js";
-
-const recordsUrl = (model, id) =>
-  "/api/records/" + encodeURIComponent(model) + (id ? "/" + encodeURIComponent(id) : "");
 
 // The colours a space can be, by name: the record says "violet", and the
 // stylesheet and the terminal each know what violet looks like.

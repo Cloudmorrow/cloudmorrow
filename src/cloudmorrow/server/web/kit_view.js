@@ -20,8 +20,10 @@
    dragged to another lane moves at once, and the server agrees or it goes
    back when the view is drawn again. */
 
-import { api, app, authHeaders, esc, go, heading, nav, tabs, toast, wireShell } from "./core.js";
-import { fieldOf, mayWrite, read, recordsUrl, segments, sheetHash, spoken, titleOf, widget } from "./kit.js";
+import {
+  api, app, authHeaders, esc, go, heading, nav, recordsUrl, tabs, toast, wireShell,
+} from "./core.js";
+import { fieldOf, mayWrite, read, segments, sheetHash, spoken, titleOf, widget } from "./kit.js";
 import { addDays, addMonths, dateOf, longDay, monthOf, today, weeksOf } from "./kit_calendar.js";
 import {
   ask, choose, findAction, formFields, hideFromBar, linksFor, onRedrawHere, press, readFields, run,

@@ -33,12 +33,12 @@
    Nothing in this file knows what a channel or a message is. */
 
 import {
-  api, app, esc, formatDate, heading, icons, nav, occupy, onShell, onSignOut, replace,
-  renderRoute, seconds, session, store, tabs, toast, vacate, wireShell,
+  api, app, esc, formatDate, heading, icons, nav, occupy, onShell, onSignOut, recordsUrl,
+  replace, renderRoute, seconds, session, store, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { onPush, refreshBadge, onBadge, lastCounts } from "./push.js";
 import {
-  isBetween, madeAs, recordsUrl, renderNewSpace, renderSpaceAbout, renderWriteTo, spaceMark,
+  isBetween, madeAs, renderNewSpace, renderSpaceAbout, renderWriteTo, spaceMark,
   spaceName,
 } from "./kit_space.js";
 import { mayWrite } from "./kit.js";
