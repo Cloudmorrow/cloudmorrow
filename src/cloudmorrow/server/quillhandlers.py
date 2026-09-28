@@ -71,7 +71,7 @@ from cloudmorrow.server.records import (
 from cloudmorrow.server.secrets import DEFAULT_ENVIRONMENT, DEFAULT_VAULT
 
 if TYPE_CHECKING:
-    from cloudmorrow.server.deps import AppState
+    from cloudmorrow.server.state import AppState
 
 __all__ = ["CodeError", "QuillCode"]
 
@@ -194,7 +194,7 @@ class HostCalls:
         return model
 
     def op_records_list(self, args: dict) -> list[dict]:
-        from cloudmorrow.server.routes.records import seed
+        from cloudmorrow.server.seeding import seed
 
         model = self._model(args)
         where = {str(k): v for k, v in (args.get("where") or {}).items()}

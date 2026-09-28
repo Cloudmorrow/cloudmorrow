@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import threading
 
-from cloudmorrow.server.deps import AppState
+from cloudmorrow.server.badge import notify_message
 from cloudmorrow.server.records import Principal, Record
-from cloudmorrow.server.routes.push import notify_message
+from cloudmorrow.server.state import AppState
 
 
 def _screen_of(state: AppState, model: str) -> tuple[str, dict]:

@@ -36,6 +36,7 @@ from cloudmorrow.server.records import (
     UnknownModelError,
     UnknownRecordError,
 )
+from cloudmorrow.server.seeding import seed
 
 router = APIRouter(prefix="/api/records", tags=["records"])
 models_router = APIRouter(prefix="/api/datamodels", tags=["records"])
@@ -106,18 +107,6 @@ def switched_on(state: AppState, model: str) -> None:
 
 def person(user: User) -> Principal:
     return Principal.person(user.username, admin=user.is_admin)
-
-
-def seed(state: AppState, principal: Principal, model: str) -> None:
-    """Write any dataset for *model* not written yet: per person, per space, or once per server."""
-    for manifest, dataset in state.quills.seeds_for(model):
-        if dataset["seed"] == "per-space":
-            state.records.seed_spaces(principal, model, dataset["records"], writer=manifest.id)
-            continue
-        state.records.seed(
-            principal, model, dataset["records"], writer=manifest.id,
-            once=dataset["seed"] == "once", scope=dataset.get("scope"),
-        )
 
 
 @models_router.get("")

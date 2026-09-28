@@ -24,7 +24,6 @@ from cloudmorrow.paths import UnsafePathError
 from cloudmorrow.quill_reference import quill_reference
 from cloudmorrow.server.circles import Access
 from cloudmorrow.server.db import User
-from cloudmorrow.server.deps import AppState
 from cloudmorrow.server.notes import (
     NoteConflictError,
     NoteExistsError,
@@ -39,7 +38,8 @@ from cloudmorrow.server.records import (
     RecordConflictError,
     Refused,
 )
-from cloudmorrow.server.routes.records import seed
+from cloudmorrow.server.seeding import seed
+from cloudmorrow.server.state import AppState
 
 Handler = Callable[[AppState, User, dict[str, Any]], Any]
 

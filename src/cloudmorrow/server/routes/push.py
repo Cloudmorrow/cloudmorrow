@@ -5,14 +5,7 @@ endpoint, and hands back that endpoint with two keys. All this has to do is
 remember them against the account, and hand out the server's public key so
 the browser has something to ask with.
 
-The badge is here rather than in any Quill because it is nobody's in
-particular: it is the one number on the home-screen icon, and it has to mean
-everything waiting — what was written in your spaces since you last looked
-(a channel's messages, whichever Quill declared them `unread`), plus
-notifications you have not read. The record store counts the one, the
-notifications the other, and this adds them up. One number, one place it is
-worked out, so the page, the service worker and the push payload can never
-disagree about it.
+The number on the icon is worked out in badge.py; this only serves it.
 
 The service worker is served from here too, at `/app/sw.js`. A service
 worker may only control pages at or below its own path, so it cannot live
@@ -29,9 +22,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from cloudmorrow.server.badge import badge_for
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_current_user, get_state
-from cloudmorrow.server.records import Principal
 
 WEB = Path(__file__).resolve().parent.parent / "web"
 
@@ -78,68 +71,6 @@ class BadgeOut(BaseModel):
     messages: int = 0
     notifications: int = 0
     badge: int = 0
-
-
-# -- the count ------------------------------------------------------------------
-def unread_models(state: AppState, username: str) -> list[str]:
-    """The space datamodels whose unread counts for this person.
-
-    Their own switch counts here as well: a number on the icon for a tab
-    they have turned off is a count of something they cannot go and read.
-    So a space counts when some Quill that uses it is on for them.
-    """
-    return [
-        model.id
-        for model in state.quills.datamodels.values()
-        if model.space
-        and any(state.features.enabled_for(username, quill) for quill in state.quills.users_of(model.id))
-    ]
-
-
-def badge_for(state: AppState, username: str) -> dict:
-    """Everything waiting for one person, as the icon would say it."""
-    wanted = unread_models(state, username)
-    messages = (
-        state.records.unread_total(Principal.person(username), models=wanted) if wanted else 0
-    )
-    notifications = state.notifications.unread_count(username)
-    return {
-        "messages": messages,
-        "notifications": notifications,
-        "badge": messages + notifications,
-    }
-
-
-def notify_message(
-    state: AppState,
-    usernames: list[str],
-    *,
-    title: str,
-    body: str,
-    url: str = "",
-    tag: str = "",
-) -> int:
-    """Push a line to everyone named, each with their own badge number.
-
-    The badge differs per person — it is what *they* have waiting — so this
-    cannot be one payload sent to a list. It is a handful of requests to a
-    handful of devices, run as a background task after the response has
-    gone, so nobody waits on Apple to answer.
-    """
-    landed = 0
-    for who in dict.fromkeys(usernames):
-        counts = badge_for(state, who)
-        landed += state.push.send(
-            [who],
-            {
-                "title": title,
-                "body": body[:200],
-                "url": url,
-                "tag": tag,
-                "badge": counts["badge"],
-            },
-        )
-    return landed
 
 
 # -- subscribing -----------------------------------------------------------------

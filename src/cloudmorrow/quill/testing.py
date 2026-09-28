@@ -263,7 +263,7 @@ class Harness:
 
     def list(self, model: str, **where) -> list[Record]:
         """Records of *model* the person may see; listing seeds its datasets, as on a server."""
-        from cloudmorrow.server.routes.records import seed
+        from cloudmorrow.server.seeding import seed
 
         principal = self._principal()
         seed(self.state, principal, model)
