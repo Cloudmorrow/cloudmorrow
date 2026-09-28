@@ -41,7 +41,7 @@ import {
   isBetween, madeAs, renderNewSpace, renderSpaceAbout, renderWriteTo, spaceMark,
   spaceName,
 } from "./kit_space.js";
-import { mayWrite } from "./kit.js";
+import { mayWrite, plural } from "./kit.js";
 
 // How often an open conversation asks for what it has not got, and how
 // much of one is read when it opens.
@@ -73,8 +73,6 @@ function shape(at) {
 
 const lastKey = (at) => "thread.open." + at.tab;
 const draftKey = (at, id) => `thread.draft.${at.tab}.${id}`;
-const plural = (label) => (/s$/i.test(label) ? label : label + "s");
-
 export async function renderThread(at, arg) {
   stop();
   const s = shape(at);

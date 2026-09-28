@@ -91,6 +91,11 @@ export async function apiRaw(method, path, { body, type, fail = "request failed"
 }
 
 export const encodePath = (path) => path.split("/").map(encodeURIComponent).join("/");
+// A path's folder and its last part, and the path of a name in a folder
+// ("" being the top).
+export const folderOf = (path) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
+export const baseName = (path) => path.slice(path.lastIndexOf("/") + 1);
+export const joinPath = (folder, name) => (folder ? folder + "/" + name : name);
 
 // Where a datamodel's records are, or one of them, and anything past it:
 // recordsUrl(model, id, "/move"), or recordsUrl(model, "", "/_folders").

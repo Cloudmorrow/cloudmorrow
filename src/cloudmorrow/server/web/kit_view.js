@@ -23,8 +23,10 @@
 import {
   api, apiRaw, app, esc, go, heading, nav, recordsUrl, tabs, toast, wireShell,
 } from "./core.js";
-import { fieldOf, mayWrite, read, segments, sheetHash, spoken, titleOf, widget } from "./kit.js";
-import { addDays, addMonths, dateOf, longDay, monthOf, today, weeksOf } from "./kit_calendar.js";
+import { canDrag, fieldOf, mayWrite, read, segments, sheetHash, spoken, titleOf, widget } from "./kit.js";
+import {
+  WEEKDAYS, addDays, addMonths, dateOf, longDay, monthOf, today, weeksOf,
+} from "./kit_calendar.js";
 import {
   ask, choose, findAction, formFields, hideFromBar, linksFor, onRedrawHere, press, readFields, run,
   said, screenAt, wireFields,
@@ -38,8 +40,6 @@ const glyphs = {
 };
 
 // The same test the board uses: a phone has no way to drag anything.
-const canDrag = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export async function renderView(at, arg) {
   const params = Object.fromEntries(new URLSearchParams(arg || ""));

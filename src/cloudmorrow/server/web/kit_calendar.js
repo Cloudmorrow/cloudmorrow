@@ -31,7 +31,7 @@ import {
   api, app, esc, heading, icons, localDay, localMinute, nav, pad2, recordsUrl, renderRoute,
   replace, store, tabs, toast, wireShell,
 } from "./core.js";
-import { mayWrite, sheetHash } from "./kit.js";
+import { aOr, mayWrite, sheetHash } from "./kit.js";
 import { renderNewSpace, renderSpaceList } from "./kit_space.js";
 
 // The colours a space can be, by name: the record says "violet", and the
@@ -142,7 +142,7 @@ const shortDay = (day) =>
   dateOf(day).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 const monthName = (day) =>
   dateOf(day).toLocaleDateString(undefined, { month: "long", year: "numeric" });
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+export const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /** How long a thing lasts, in the fewest words that are still true. */
 export function whenSaid(event) {
@@ -221,7 +221,6 @@ export function eventRow(href, event) {
 }
 
 // -- the screen ---------------------------------------------------------------------------
-const aOr = (label) => (/^[aeiou]/i.test(label) ? "an " : "a ") + label.toLowerCase();
 const wide = () => matchMedia("(min-width: 1180px) and (min-height: 600px)").matches;
 
 export async function renderCalendar(at, arg) {

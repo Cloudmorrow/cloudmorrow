@@ -66,6 +66,7 @@ const stillTick = (state, label) =>
 
 // "Add a task", "Add an entry": the label is the model's, the article is ours.
 export const aOr = (label) => (/^[aeiou]/i.test(label) ? "an " : "a ") + label.toLowerCase();
+export const plural = (label) => (/s$/i.test(label) ? label : label + "s");
 
 /** The lanes of an enum field, as [value, label] pairs. */
 const lanesOf = (f) => f.values.map((value, i) => [value, (f.labels && f.labels[i]) || value]);
@@ -129,7 +130,7 @@ export const circle = (state) => `<span class="check ${state}">${state === "done
 // Whether a card is worth making draggable. A phone has the circle and the
 // lane control and no way to drag anything, and `draggable` on a touch
 // screen is only something for a long press to catch on.
-const canDrag = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
+export const canDrag = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
 
 // The kit elements this file draws. The server refuses to install a screen
 // of any other kind until every surface draws it, and a test holds this

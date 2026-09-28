@@ -24,9 +24,9 @@
      #/r/<quill>/<screen>/<model>/<id>   a page */
 
 import {
-  SAVE_DELAY, SEARCH_DELAY, api, app, back, encodePath, esc, fileStem, formatDate, heading,
-  icons, nav, occupy, previousHash, recordsUrl, renderRoute, replace, sectionOf, seconds,
-  setStatus, tabs, toast, vacate, wireShell,
+  SAVE_DELAY, SEARCH_DELAY, api, app, back, baseName, encodePath, esc, fileStem, folderOf,
+  formatDate, heading, icons, joinPath, nav, occupy, previousHash, recordsUrl, renderRoute,
+  replace, sectionOf, seconds, setStatus, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
 import { mayWrite } from "./kit.js";
@@ -46,9 +46,6 @@ const FOLDERS = "~folders";
 const TOP = "~top";
 const NEW = "~new";
 
-const folderOf = (path) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
-const baseName = (path) => path.slice(path.lastIndexOf("/") + 1);
-const join = (folder, name) => (folder ? folder + "/" + name : name);
 
 // -- the screen's bindings ---------------------------------------------------------
 function bind(at) {
@@ -240,7 +237,7 @@ async function newFolder(b, parent) {
   const name = fileStem(prompt("Folder name") || "");
   if (!name) return;
   try {
-    await api("POST", recordsUrl(b.model.id, "", "/_folders"), { path: join(parent, name) });
+    await api("POST", recordsUrl(b.model.id, "", "/_folders"), { path: joinPath(parent, name) });
     renderRoute();
   } catch (err) {
     toast(err.message);
@@ -502,7 +499,7 @@ async function createUnique(ed, stem, body) {
     const name = n === 1 ? stem : `${stem} ${n}`;
     if (taken.has(name)) continue;
     const fields = { [b.body]: compose(name, body, true) };
-    if (b.path) fields[b.path] = join(ed.folder, name);
+    if (b.path) fields[b.path] = joinPath(ed.folder, name);
     else fields[b.title] = name;
     return api("POST", recordsUrl(b.model.id), { fields });
   }
