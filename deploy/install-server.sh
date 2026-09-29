@@ -321,8 +321,45 @@ install_tailscale() {
 			curl -fsSL https://tailscale.com/install.sh | sh
 		fi
 	fi
+	tailscale_started || return 1
 	# The service joins the mesh itself, after linking: it may, as operator.
 	run tailscale set --operator="$SERVICE_USER"
+}
+
+# A container (Proxmox LXC, some VPSes) often has no /dev/net/tun, and
+# tailscaled will not start without one. Its userspace mode needs none, and
+# the box's mesh address still reaches the services listening here, Caddy
+# among them.
+TUN_DEVICE="${CLOUDMORROW_TUN_DEVICE:-/dev/net/tun}"
+TAILSCALED_DEFAULTS="/etc/default/tailscaled"
+tailscale_started() {
+	if [ ! -e "$TUN_DEVICE" ]; then
+		say "no $TUN_DEVICE here (a container?): tailscaled runs in userspace mode"
+		if [ -n "$DRY_RUN" ]; then
+			printf '   \033[2mwould set:\033[0m FLAGS="--tun=userspace-networking" in %s\n' "$TAILSCALED_DEFAULTS"
+		elif [ -f "$TAILSCALED_DEFAULTS" ] && grep -q '^FLAGS=' "$TAILSCALED_DEFAULTS"; then
+			grep -q 'userspace-networking' "$TAILSCALED_DEFAULTS" ||
+				sed -i 's/^FLAGS="\(.*\)"$/FLAGS="\1 --tun=userspace-networking"/' "$TAILSCALED_DEFAULTS"
+		else
+			echo 'FLAGS="--tun=userspace-networking"' >>"$TAILSCALED_DEFAULTS"
+		fi
+	fi
+	if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+		run systemctl reset-failed tailscaled 2>/dev/null || true
+		run systemctl enable --quiet tailscaled
+		run systemctl restart tailscaled
+	fi
+	[ -n "$DRY_RUN" ] && return 0
+	# Setting the operator talks to the daemon: wait for it to answer.
+	tries=0
+	until tailscale debug prefs >/dev/null 2>&1; do
+		tries=$((tries + 1))
+		if [ "$tries" -ge 20 ]; then
+			warn "tailscaled did not start; see: journalctl -u tailscaled -n 30"
+			return 1
+		fi
+		sleep 1
+	done
 }
 
 LINKED_URL=""
@@ -344,7 +381,7 @@ link_now() {
 	fi
 	LINKED_URL="$(sudo -u "$SERVICE_USER" -H env CLOUDMORROW_SERVER_CONFIG="$CONFIG" \
 		"$VENV/bin/cloudmorrow-server" access status --json 2>/dev/null |
-		sed -n 's/^  "address": "\(https:.*\)",$/\1/p' | head -n 1)"
+		sed -n 's/^  "host": "\(.*\)",$/https:\/\/\1/p' | head -n 1)"
 }
 
 [ -n "$DRY_RUN" ] || [ "$(id -u)" = "0" ] || die "run this with sudo"
@@ -1132,8 +1169,10 @@ else
 	printf "\n  ${GOOD}✓${OFF} %s is installed.\n" "$CLOUD_NAME"
 fi
 
-case "$PUBLIC_URL" in
-https://*)
+# A linked cloud has its name and certificate already: no proxy to set up.
+case "$LINK:$LINKED_URL:$PUBLIC_URL" in
+yes:* | *:https://*:*) ;;
+*:*:https://*)
 	heading "First, a proxy in front, for TLS"
 	line "With Caddy, this is the whole file:"
 	printf '\n      %s {\n          reverse_proxy %s:%s\n      }\n' "$PUBLIC_HOST" "$HEALTH_HOST" "$PORT"

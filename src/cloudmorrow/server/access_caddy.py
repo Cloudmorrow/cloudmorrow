@@ -57,6 +57,11 @@ def upstream_host(config: ServerConfig) -> str:
 # from an email address, which it needs.
 ZEROSSL = "https://acme.zerossl.com/v2/DV90"
 
+# Where Caddy checks that the challenge record is out. Not the box's own
+# resolver: a container's resolv.conf can list servers it cannot reach (a
+# tailnet's fd7a:…::53 in an LXC), and Caddy gives up on the first of them.
+RESOLVERS = ("1.1.1.1", "8.8.8.8")
+
 
 def _issuer(acme: dict, control: str, *, directory: str = "", email: str = "") -> list[str]:
     """One `issuer acme` block, proving the name by DNS through the relay's acme-dns."""
@@ -73,6 +78,7 @@ def _issuer(acme: dict, control: str, *, directory: str = "", email: str = "") -
         # The link says where updates go; the relay's own /v1/acme-dns when it does not.
         f"\t\t\t\tserver_url {_quote(acme.get('server_url') or control.rstrip('/') + '/v1/acme-dns')}",
         "\t\t\t}",
+        f"\t\t\tresolvers {' '.join(RESOLVERS)}",
         "\t\t}",
     ]
     return lines

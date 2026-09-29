@@ -53,6 +53,13 @@ def test_the_relays_own_endpoint_when_the_link_names_none(config):
     assert f'server_url "{CONTROL}/v1/acme-dns"' in site_block(cloud, config, CONTROL)
 
 
+def test_every_issuer_checks_the_challenge_with_public_resolvers(config):
+    """Not the box's resolv.conf, which in a container can list servers it cannot reach."""
+    config.access_acme_email = "owner@example.org"
+    site = site_block(CLOUD, config, CONTROL)
+    assert site.count("resolvers 1.1.1.1 8.8.8.8") == site.count("issuer acme {") == 2
+
+
 def test_the_upstream_is_where_the_server_listens(config):
     assert upstream_host(config) == "127.0.0.1"
     config.host = "10.0.0.2, 127.0.0.1"

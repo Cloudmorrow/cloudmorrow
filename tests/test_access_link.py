@@ -66,6 +66,8 @@ def test_waiting_then_linked_then_set_up(access, fakes, config):
     # The box joined as `cloud`, with a key it asked for with no label.
     up = next(line for line in tailscale_calls(fakes.tailscale_dir) if line.startswith("up "))
     assert f"--login-server {LOGIN_SERVER}" in up and "--hostname cloud" in up and "--authkey hskey-" in up
+    # The box keeps its own resolver: the mesh's names are for its devices.
+    assert "--accept-dns=false" in up
     key_calls = [c for c in fakes.control.calls if c[1] == "/v1/clouds/me/mesh/keys"]
     assert key_calls and set(key_calls[0][2]) <= {"ephemeral", "expires_in"}
     # Caddy's site is the name, by the DNS challenge with the link's acme-dns account.

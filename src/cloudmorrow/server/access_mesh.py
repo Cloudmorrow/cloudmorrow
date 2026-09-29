@@ -118,7 +118,9 @@ class Mesh:
         # --reset, so a box that was on some other tailnet with other flags
         # is not refused for not repeating them; and --operator, because
         # --reset would otherwise take the service's right to do this again.
-        args = ["up", "--login-server", login_server, "--hostname", hostname, "--reset"]
+        # --accept-dns=false: the box never needs the mesh's names, and letting
+        # the mesh take over its resolver can leave it unable to look up anything.
+        args = ["up", "--login-server", login_server, "--hostname", hostname, "--reset", "--accept-dns=false"]
         operator = operator_name()
         if operator:
             args += ["--operator", operator]

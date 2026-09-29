@@ -229,6 +229,33 @@ def test_linking_installs_what_it_needs_and_waits_for_the_code_as_the_service_us
     assert "Linked, and on its mesh" in out
 
 
+def test_a_box_without_a_tun_device_runs_tailscale_in_userspace(tmp_path):
+    """An LXC container has no /dev/net/tun; tailscaled only starts in userspace mode there."""
+    args = (
+        "--name",
+        "X",
+        "--link",
+        "--yes",
+        "--host",
+        "0.0.0.0",
+        "--user",
+        "alice",
+        "--quills",
+        "all",
+        "--public-url",
+        "https://c.test",
+    )
+    without = dry_run(*args, env={**ANSWERS, "CLOUDMORROW_TUN_DEVICE": str(tmp_path / "no-tun")}).stdout
+    assert "tailscaled runs in userspace mode" in without
+    assert 'FLAGS="--tun=userspace-networking"' in without
+    # The daemon is started before the operator is set: that call needs it.
+    assert without.index("systemctl restart tailscaled") < without.index("tailscale set --operator")
+    with_tun = dry_run(*args, env={**ANSWERS, "CLOUDMORROW_TUN_DEVICE": str(tmp_path)}).stdout
+    assert "userspace" not in with_tun
+    # Linked, there is no proxy to put in front.
+    assert "First, a proxy in front" not in without
+
+
 def test_linking_asks_before_installing_anything():
     result = dry_run("--name", "X", "--link", "--user", "alice", "--quills", "all", env=ANSWERS)
     assert result.returncode == 0, result.stderr + result.stdout
