@@ -163,6 +163,9 @@ def _cert(ca_key, ca_cert, name: str):
         .not_valid_before(now - dt.timedelta(days=1))
         .not_valid_after(now + dt.timedelta(days=1))
         .add_extension(x509.SubjectAlternativeName([x509.DNSName(name)]), critical=False)
+        # Python 3.13's strict verification wants these, as real certificates have.
+        .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()), critical=False)
+        .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
         .sign(ca_key, hashes.SHA256())
     )
     return key, cert
@@ -182,6 +185,21 @@ def pki(tmp_path):
         .not_valid_before(now - dt.timedelta(days=1))
         .not_valid_after(now + dt.timedelta(days=1))
         .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .add_extension(x509.SubjectKeyIdentifier.from_public_key(ca_key.public_key()), critical=False)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=True,
+                crl_sign=True,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
         .sign(ca_key, hashes.SHA256())
     )
     trust = ssl.create_default_context(cadata=ca_cert.public_bytes(serialization.Encoding.PEM).decode())
