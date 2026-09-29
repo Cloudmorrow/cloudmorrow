@@ -80,170 +80,237 @@ the guarantee that matters.
 
 A cloud on a box behind a home router has no public address and no
 certificate, and the person who owns it must never have to learn what
-either is. There are three ways to reach one, and an owner can have any mix
-of them. They are chosen at install (a question in the installer and on the
-setup page) and changed later in **Administration → Access**.
+either is. There are two ways to reach one:
 
 | way | who reaches it | what the owner does | runs where |
 | --- | --- | --- | --- |
 | **Home network** | devices on the same network as the box | nothing: it is always on | the box |
-| **Public** | anybody with the address; the sign-in page is the door | picks a name: `larsens.cloudmorrow.com` | the box, and the relay at cloudmorrow.com |
-| **Private** | only devices you enrolled, from anywhere | enrolls each device once | the box, and the coordination server at cloudmorrow.com |
+| **The mesh** | devices that joined the cloud's mesh, from anywhere | links the box to a cloudmorrow.com account once, at install; invites each device once | the box, and the relay at `cloudmorrow.tech` |
 
-Everything at cloudmorrow.com lives in its own repository,
-[`Cloudmorrow/relay`](https://github.com/Cloudmorrow/relay), and can be run
-by anybody for themselves: the core only knows the address of a *control
-server* (`access_control` in the server config, `https://relay.cloudmorrow.com`
-by default).
+Linking is a choice. A box that is not linked is reached on the home
+network only, at `<name>.local` or its address, and never talks to anything
+at cloudmorrow.com or cloudmorrow.tech. A linked box gets a name,
+`<name>.cloudmorrow.tech`, that works from anywhere for devices on its mesh.
+Nothing reaches a cloud's web app from the open internet: someone who opens
+the name without being on the mesh gets a landing page with the client
+downloads, served by the relay, not by the box.
+
+### What leaves the box
+
+This is the rule the rest of the section keeps to. A linked box sends the
+relay:
+
+- the WireGuard coordination Tailscale's own client sends to any
+  coordination server (its public key, its endpoints, its mesh hostname,
+  which the core sets to `cloud`);
+- the `_acme-challenge` TXT value for its own name, when its certificate is
+  renewed;
+- `/v1` calls under its token: asking for a mesh key or an invite code, and
+  reading its own record.
+
+That is all. It sends no account, user, file, note, label or name of a
+person, and it never talks to cloudmorrow.com itself. What the website shows
+about a cloud (online, uptime) the relay reads from Headscale, which knows it
+already; what the landing page shows (a display name, a logo) the owner types
+into the website.
+
+Devices on the mesh are the same: the core asks the relay for keys and codes
+without saying whose device it is for, keeps its own labels ("jimmi:
+laptop"), and enrols computers under an opaque hostname (`cm-<6 hex>`). A
+phone joins with the Tailscale app, which sends the phone's own device name
+to Headscale; the relay does not store it or pass it on.
 
 ### Home network
 
 The box announces itself on the local network with multicast DNS, as
 `<name>.local` (the cloud's name made into a hostname: `larsens.local`) and
-as a service, `_cloudmorrow._tcp`, whose TXT record carries the cloud's name,
-its version, and its public or private address if it has one.
+as a service, `_cloudmorrow._tcp`, whose TXT record carries:
+
+| key | value |
+| --- | --- |
+| `name` | what the cloud is called ("The Larsens") |
+| `version` | the server's version |
+| `url` | what to open on this network: `https://<name>.<zone>` when the box is linked, else `http://<name>.local:<port>` |
+| `mesh` | `<name>.<zone>`, when the box is linked |
+
+The service's port is 443 when the box is linked (Caddy answers there with
+the certificate for its name), and the server's own port (8787) when it is
+not. `access_lan = false` turns it off.
 
 - A fresh box with no accounts is set up from any browser on the network at
-  `http://<name>.local` (or `http://cloudmorrow.local` before it has a name).
-- `cm login` with no server lists the clouds it finds on the network, and the
-  client installer offers the same.
-- When a cloud with a public or private name is found on the local network,
-  the desktop app and `cm` connect to it directly, at its local address,
-  still checking its certificate against its real name. The data does not go
-  out to the internet and back to cross the living room.
+  `http://<name>.local:8787` (or `http://cloudmorrow.local:8787` before it has
+  a name).
+- `cm login` with no server lists the clouds it finds on the network.
+- A linked cloud stays reachable at home without the mesh. `cm`, the TUI and
+  the desktop app connect to its local address, sending the real name as SNI
+  and `Host` and checking its certificate against it; a browser uses
+  `http://<name>.local:8787`. The data does not go out to the internet and
+  back to cross the living room.
 
-Plain `http` on the local network is used only for the first setup and for
-finding the box: a phone's web app needs a real certificate for push and the
-home screen, and that comes with a public or private name.
+### Linking the box
 
-### Public: the relay
+At install (the installer's question, or the setup page), or later in
+**Administration → Access**, the box asks the relay for a link code, the
+way a television signs in:
 
-The relay moves bytes it cannot read. It never terminates a cloud's TLS and
-never holds a certificate for one.
+1. `POST /v1/links` (no token, nothing in the body) answers `{code, poll,
+   url, expires_at, interval}`: `code` is eight characters shown as
+   `KXRT-4829`, `url` is `https://cloudmorrow.com/link`, both valid fifteen
+   minutes.
+2. The box shows: *Open cloudmorrow.com/link and enter KXRT-4829.* (The
+   setup page and Access screen show the link with the code filled in, and a
+   QR code of it.)
+3. On cloudmorrow.com the person signs in or makes an account, enters the
+   code, and picks a free name: 5–40 of `a-z 0-9 -`, not starting or ending
+   with `-`, not reserved. The website asks the relay to approve the code
+   with that name and the account (the admin API, below).
+4. The box polls `POST /v1/links/poll` `{poll}` every `interval` seconds.
+   Until approval it gets 202; after, once, 200 with `{cloud_id, token, name,
+   zone, login_server, acme_dns}`. Expired or refused: 410.
+5. The box seals the token in its data directory, joins the mesh (below),
+   gets its certificate, and `public_url` becomes `https://<name>.<zone>`.
 
-**Enrolment.** The box calls the control server once, with the name it wants
-(`POST /v1/clouds`, below), and gets back a cloud id and a token. The token is
-kept in the server's data directory, sealed; it is the cloud's only
-credential there.
+**Unlinking** from the box (`DELETE /v1/clouds/me`) or from the website
+gives the name back and revokes the token, the mesh and every device on it.
+The box goes back to home network only.
 
-**The tunnel** (protocol `cmtunnel/1`). The box opens one long-lived, outbound
-TLS connection to the relay host on port 443 — outbound only, so no port
-forwarding and no router settings — and keeps it open, reconnecting with
-backoff. On it:
+**Renaming** is done on the website. The box reads its record
+(`GET /v1/clouds/me`) every ten minutes and at start; when the name has
+changed it rewrites its Caddy site, gets a certificate for the new name and
+changes `public_url`. The old name stops resolving at once.
 
-1. The box sends one line: `CMTUNNEL/1 <cloud_id> <token>\n`. The relay
-   answers `OK <name>.<zone>\n` or `NO <reason>\n` and closes.
-2. After `OK`, both sides speak frames: a 9-byte header — `type` (1 byte),
-   `stream` (4 bytes, big-endian), `length` (4 bytes, big-endian) — then
-   `length` bytes of payload. Types:
+### The mesh
 
-   | type | name | direction | payload |
-   | --- | --- | --- | --- |
-   | 1 | `OPEN` | relay → box | JSON `{"port": 443 or 80, "remote": "ip:port"}` |
-   | 2 | `DATA` | both | bytes, at most 64 KiB |
-   | 3 | `CLOSE` | both | empty: this side is done with the stream |
-   | 4 | `WINDOW` | both | 4 bytes: more bytes the sender may now send on the stream |
-   | 5 | `PING` | both | 8 bytes, echoed back in a `PONG` |
-   | 6 | `PONG` | both | the 8 bytes of the `PING` |
+The mesh is the technology Tailscale is made of — WireGuard between devices,
+direct where the networks allow it (on the same network: over it) and
+through a DERP relay where they do not — using
+[Headscale](https://github.com/juanfont/headscale), the open-source
+coordination server (0.26 or newer), and Tailscale's own open-source apps on
+every device. Each cloud is one Headscale user, `cloud-<cloud_id>`, and the
+policy is `autogroup:self`: a cloud's box and devices reach each other, and
+nobody else's.
 
-   Each stream starts with a window of 256 KiB each way; a side sends `WINDOW`
-   as it consumes data. Streams are opened only by the relay. The box answers
-   an `OPEN` by connecting to its local upstream for that port (`443` → the
-   local TLS terminator, Caddy; `80` → the same, for the ACME challenge and
-   the redirect to https) and splicing; if that fails it sends `CLOSE`.
-   Either side sends a `PING` after 25 seconds of silence and drops the
-   connection after 60 without a frame.
+**The box** joins right after linking: the core asks the relay for a key
+(`POST /v1/clouds/me/mesh/keys`), installs `tailscale` if it is not there
+(the installer asks first), and runs `tailscale up --login-server
+<login_server> --authkey <key> --hostname cloud --reset
+--operator=<service user>`.
 
-**Routing.** The relay listens on 443 and 80 for its whole zone. On 443 it
-reads the SNI from the first TLS record without answering it: SNI equal to the
-relay's own host is the relay's own business (the tunnel and the control API,
-TLS terminated by the relay with its own certificate); SNI `<name>.<zone>`
-with a live tunnel becomes an `OPEN` on port 443, and the bytes already read
-are the first `DATA`. On 80 it reads the request's `Host` header the same
-way. Anything else is closed. The relay adds nothing to the stream (the
-client's address is in the `OPEN`'s `remote`, for the box's logs).
+**The name inside the mesh.** The relay keeps a Headscale extra-records file
+(`dns.extra_records_path`) with `<name>.<zone>` → the box's mesh address for
+every linked cloud whose box has one, read from Headscale. Devices on the
+mesh resolve the name to the box and go straight to it. Everywhere else the
+name resolves to the relay.
 
-**The certificate.** Ports 80 and 443 reach the box unchanged, so Caddy on the
-box gets and renews a Let's Encrypt certificate for `<name>.<zone>` by the
-ordinary HTTP challenge. No DNS token on the box, no wildcard key on the relay.
+**Certificates.** Nothing on the internet reaches the box, so Caddy gets its
+Let's Encrypt certificate for `<name>.<zone>` by the DNS challenge, through
+the relay's [acme-dns](https://github.com/joohoi/acme-dns)-compatible
+endpoint and Caddy's `acmedns` module. The relay publishes the
+`_acme-challenge` TXT record for the cloud's name, and nothing else; the key
+never leaves the box. The service keeps Caddy in step with the name through
+`/var/lib/cloudmorrow-caddy/*.caddy` and Caddy's admin endpoint.
 
-**The address.** `public_url` becomes `https://<name>.<zone>`; `require_tls`
-follows it, and phones have push, the badge and the home screen.
+**Inviting a device.** Someone already on the cloud — on the mesh, at home,
+or the owner at the end of the install — makes an invite in **Me → Invite a
+device** (`POST /api/access/mesh/invite`, which calls `POST
+/v1/clouds/me/mesh/invites`). An invite is a six-character code, valid ten
+minutes, once. It works two ways:
 
-### Private: the mesh
+- **A computer:** the client installer from the landing page asks for it
+  (`--invite <code>`), trades it at the relay for a one-time key (`POST
+  /v1/invites/redeem` `{name, code}` → `{key, login_server, expires_at}`,
+  no token, limited per address), installs `tailscale` with the person's
+  consent, joins as `cm-<6 hex>`, and then signs in to the cloud as usual.
+- **A phone:** the Tailscale app, pointed at the login server (the landing
+  page and the invite show a QR code of it), shows the relay's pairing page,
+  which asks for the code.
 
-The private way is the technology Tailscale is made of — WireGuard between
-devices, direct where the networks allow it and through a relay (DERP) where
-they do not — using [Headscale](https://github.com/juanfont/headscale), the
-open-source coordination server, and Tailscale's own open-source apps on
-every device. Each cloud is one Headscale user: its box and the devices its
-people enroll can reach each other, and nobody else's.
+A signed-in computer on the home network can also join without an invite:
+`cm access join` asks its cloud for a key (`POST /api/access/mesh/key`).
 
-**The box** joins at install or when private access is turned on: the core
-asks the control server for a key (`POST /v1/clouds/me/mesh/keys`), installs
-`tailscale` if it is not there (the installer asks first), and runs
-`tailscale up --login-server <login_server> --authkey <key> --hostname cloud`.
-The control server records the box's mesh address and publishes
-`<name>.<zone>` as it inside the mesh (a Headscale DNS extra record), so
-enrolled devices go straight to the box.
+### The landing page
 
-**A computer** is enrolled by the client installer (`--private`, or its
-question when the cloud is private-only): signed in, it asks its cloud for a
-one-time key (`POST /api/access/mesh/key`), installs `tailscale` with the
-person's consent, and joins. The desktop app shows whether this computer is
-enrolled and offers to do it.
+`<name>.<zone>` resolves to the relay for anybody not on the mesh. The relay
+terminates TLS for it with its own wildcard certificate for `*.<zone>` and
+serves one page, and nothing is forwarded to the box:
 
-**A phone** uses the Tailscale app, pointed at the cloud's login server (a QR
-code in **Me → This phone** carries it). The app shows a sign-in page from the
-coordination server; that page asks for a six-character pairing code, which
-the person gets from their cloud (**Me → Pair a device**, `POST
-/api/access/mesh/pair`), and the control server registers the phone to that
-cloud. A pairing code works once, for ten minutes.
+- the cloud's display name and logo, if the owner turned them on in **My
+  Clouds**; otherwise *A Cloudmorrow cloud*;
+- the client downloads, linked to the core repository's GitHub Releases,
+  so they cost the relay nothing;
+- `curl -fsSL https://<name>.<zone>/install.sh | sh`, a few lines that fetch
+  the released client installer and run it with `--server
+  https://<name>.<zone> --invite`;
+- the QR code for a phone's Tailscale app;
+- one line: *This cloud's web app opens on its devices. Ask someone on it
+  for an invite.*
 
-**Certificates in private mode.** When public access is off, nothing on the
-internet can reach the box for the HTTP challenge, so Caddy uses the DNS
-challenge instead, through the control server's
-[acme-dns](https://github.com/joohoi/acme-dns)-compatible endpoint (`POST
-/v1/acme-dns/update`) and Caddy's `acmedns` DNS module. The control server
-publishes the `_acme-challenge` TXT record for the cloud's name, and nothing
-else; the certificate's private key never leaves the box.
+A name that is not linked to anything answers *There is no cloud here.*
 
-**Both at once.** With public and private access on, `<name>.<zone>` points
-at the relay for everybody and at the box's mesh address for enrolled
-devices. One name, one certificate, the shortest path for each device.
+### My Clouds (cloudmorrow.com)
 
-### The control server's API (`/v1`)
+A signed-in account sees its linked clouds, each with: the name, online or
+not and since when, uptime over the last 30 days, and switches for showing
+the display name and the logo on the landing page, the display name itself,
+the logo (PNG, SVG or JPEG, at most 256 KiB), rename, and unlink. The website
+knows nothing else about a cloud: not its devices, not its people.
 
-Served by the relay host over HTTPS. The box authenticates with `Authorization:
-Bearer <token>` from enrolment. JSON in and out; errors are `{"detail": "…"}`
-with a plain sentence.
+The relay counts uptime from Headscale: once a minute it reads whether each
+cloud's box (the node named `cloud`) is online, and keeps the changes.
+
+### The relay's API (`/v1`)
+
+Served at `relay.<zone>` over HTTPS; the box's `access_control` points there
+(`https://relay.cloudmorrow.tech` by default). The box authenticates with
+`Authorization: Bearer <token>`. JSON in and out; errors are `{"detail": "…"}`
+with a plain sentence; a missing or revoked token is 401.
 
 | call | what it does |
 | --- | --- |
-| `POST /v1/clouds` `{name}` | Claim a name. `name` is 3–40 of `a-z 0-9 -`, not reserved (`www`, `relay`, `mesh`, `api`, `mail`, …). Returns `{cloud_id, token, name, zone, public_host, relay_host, login_server}`. 409 if taken. |
-| `GET /v1/clouds/me` | The cloud's record: name, public on/off, tunnel connected since, bytes in and out, mesh address, devices. |
-| `PATCH /v1/clouds/me` `{name?, public?}` | Rename, or turn public access on or off (off: the relay refuses the name, and DNS points it at the mesh address if there is one). |
-| `DELETE /v1/clouds/me` | Give the name back; revoke the token, the mesh user and its devices. |
-| `POST /v1/clouds/me/mesh/keys` `{ephemeral?, expires_in?, for?}` | A one-time Headscale pre-auth key for this cloud's user. `for` is a label ("the box", "Jimmi's laptop"). Returns `{key, login_server, expires_at}`. |
-| `POST /v1/clouds/me/mesh/pair` `{for}` | A six-character pairing code for a phone, valid ten minutes, once. Returns `{code, expires_at, login_server}`. |
-| `GET /v1/clouds/me/mesh/devices` / `DELETE …/devices/{id}` | The enrolled devices, and removing one. |
-| `PUT /v1/clouds/me/mesh/address` `{address}` | The box reports its mesh address, for DNS. |
-| `POST /v1/acme-dns/register` | acme-dns compatible: credentials for this cloud's `_acme-challenge` record (Bearer-authenticated). |
-| `POST /v1/acme-dns/update` | acme-dns compatible (`X-Api-User`, `X-Api-Key`, `{subdomain, txt}`). |
+| `POST /v1/links` | Start linking. No token. 201 with `{code, poll, url, expires_at, interval}`. Limited per address. |
+| `POST /v1/links/poll` `{poll}` | 202 until the code is approved; then once 200 with `{cloud_id, token, name, zone, login_server, acme_dns}`; 410 when expired or refused. |
+| `GET /v1/clouds/me` | `{cloud_id, name, zone, mesh_address, login_server}`. |
+| `DELETE /v1/clouds/me` | Unlink: give the name back, revoke the token, the mesh user and its devices. 204. |
+| `POST /v1/clouds/me/mesh/keys` `{ephemeral?, expires_in?}` | A one-time Headscale pre-auth key for this cloud. 201 with `{key, login_server, expires_at, node_hint}`. |
+| `POST /v1/clouds/me/mesh/invites` | An invite code, six characters, ten minutes, once. 201 with `{code, expires_at, login_server}`. |
+| `POST /v1/invites/redeem` `{name, code}` | No token. Trades an invite for a one-time key. 201 with `{key, login_server, expires_at}`; 404 for a wrong or used code. Limited per address. |
+| `GET /v1/clouds/me/mesh/devices` / `DELETE …/devices/{id}` | The devices on the mesh, `{id, address, online, last_seen}`, and removing one. The box joins them to its own labels by `id`. |
+| `POST /v1/acme-dns/update` | acme-dns compatible (`X-Api-User`, `X-Api-Key`, `{subdomain, txt}`); the credentials come in the link's `acme_dns`. |
 
-The DNS for the zone is answered by the relay repository's own small
-authoritative server (it holds `<name>` → the relay or the mesh address,
-`_acme-challenge.<name>` TXT, and the relay's and coordination server's own
-names); the zone's parent delegates to it.
+The login server, `mesh.<zone>`, is TLS-terminated by the relay like the
+API: Tailscale's protocol paths go to Headscale, `/register/<auth_id>` to
+the relay's pairing page.
+
+### The admin API (the website → the relay)
+
+Served at `relay.<zone>/admin/v1`, only to the website, which authenticates
+with `Authorization: Bearer <admin secret>` from the relay's secrets file.
+Accounts are opaque to the relay: the website's account id, nothing else.
+
+| call | what it does |
+| --- | --- |
+| `GET /admin/v1/names/{name}` | `{available, problem}`: whether a name can be taken. |
+| `GET /admin/v1/links/{code}` | Whether a link code is waiting: `{waiting, expires_at}`. |
+| `POST /admin/v1/links/{code}/approve` `{account, name}` | Makes the cloud, owned by `account`, and hands its token to the waiting box. 409 if the name is taken, 410 if the code is gone. |
+| `POST /admin/v1/links/{code}/refuse` | The person said no. |
+| `GET /admin/v1/accounts/{account}/clouds` | `[{cloud_id, name, created, online, online_since, uptime_30d, show_name, show_logo, display_name, has_logo}]`. |
+| `PATCH /admin/v1/clouds/{id}` `{account, name?, display_name?, show_name?, show_logo?}` | Rename, and the landing page's switches. The cloud must be the account's. |
+| `PUT` / `DELETE /admin/v1/clouds/{id}/logo?account=…` | The logo, as the request body with its content type. |
+| `DELETE /admin/v1/clouds/{id}?account=…` | Unlink. |
 
 ### What the relay knows, and what it cannot
 
-It knows which names exist, which cloud each belongs to, whether its tunnel
-is up, how many bytes went through, and which devices are enrolled in each
-cloud's mesh. It cannot read anything any of them said: public traffic is TLS
-end to end between the visitor and the box, and mesh traffic is WireGuard end
-to end between devices. A cloud that wants none of it runs its own relay
-repository and points `access_control` at it, or uses only the home network.
+It knows which names exist and which account owns each, whether each box is
+online, which devices are on each cloud's mesh (by key, address and the
+device name a phone's Tailscale app reports), and what an owner chose to show
+on the landing page. It cannot read anything the devices say to each other:
+mesh traffic is WireGuard end to end, and the relay carries it only when two
+devices cannot reach each other directly. A cloud that wants none of it runs
+the relay repository itself and points `access_control` at it, or is never
+linked.
+
+The website knows accounts, and for each the names of its clouds and what
+the relay tells it above. It never talks to a box.
 
 ## What is in the repository, and what is not
 
@@ -253,6 +320,7 @@ repository and points `access_control` at it, or uses only the home network.
 | First-boot setup page and `/api/setup` | `server/routes/setup.py`, `templates/setup.html` | built |
 | The name, in the database, `GET`/`PATCH /api/server/settings` | `server/settings.py` | built |
 | The container image, compose file, Caddyfile | `deploy/docker/` | built, not yet run in CI |
-| Home network discovery, the tunnel client, private enrolment | `server/access_*.py`, `routes/access.py`, `client/discover.py` | being built |
-| The relay, the control server, DNS, Headscale | [`Cloudmorrow/relay`](https://github.com/Cloudmorrow/relay) | being built |
+| Home network discovery, linking, the mesh, invites | `server/access_*.py`, `routes/access.py`, `client/discover.py` | being built (from the `access-core` branch, without its tunnel) |
+| The relay, its API and admin API, the landing page, Headscale | [`Cloudmorrow/relay`](https://github.com/Cloudmorrow/relay) | running at cloudmorrow.tech with the tunnel; linking and the landing page being built |
+| `/link` and My Clouds | [`Cloudmorrow/cloudmorrow-web`](https://github.com/Cloudmorrow/cloudmorrow-web) | not started |
 | The shop and the tenant control plane | their own repositories | not started |
