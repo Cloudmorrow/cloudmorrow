@@ -116,10 +116,6 @@ def open_folder(path: str | os.PathLike) -> Path:
     return folder
 
 
-def _applescript_string(value: str) -> str:
-    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
-
-
 def notify(title: str, body: str = "") -> bool:
     """A notification from the system, best effort. False when there was none to send.
 
@@ -131,8 +127,8 @@ def notify(title: str, body: str = "") -> bool:
     try:
         if name == MACOS:
             script = (
-                f"display notification {_applescript_string(body)} "
-                f"with title {_applescript_string(title)}"
+                f"display notification {mounts.applescript_string(body)} "
+                f"with title {mounts.applescript_string(title)}"
             )
             return _run(["osascript", "-e", script]).returncode == 0
         if name == LINUX:

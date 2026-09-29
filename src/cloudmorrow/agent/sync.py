@@ -26,8 +26,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from platformdirs import user_data_dir
-
+from cloudmorrow import locations
 from cloudmorrow.agent import omarchy
 from cloudmorrow.agent.client import AgentApiError, AgentClient
 from cloudmorrow.agent.config import AgentConfig
@@ -39,7 +38,7 @@ BUNDLES = {omarchy.BUNDLE: omarchy}
 
 
 def state_dir() -> Path:
-    return Path(user_data_dir("cloudmorrow")) / "sync"
+    return locations.data_dir() / "sync"
 
 
 @dataclass(slots=True)

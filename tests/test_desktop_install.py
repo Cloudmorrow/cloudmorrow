@@ -200,3 +200,14 @@ def test_cm_app_without_a_display_says_so_and_fails(monkeypatch):
     result = CliRunner().invoke(cli, ["app"])
     assert result.exit_code == 1
     assert "no display" in result.output
+
+
+def test_the_window_title_is_not_asked_of_a_plain_http_address(monkeypatch):
+    from cloudmorrow.desktop import app as desktop_app
+
+    def asked(*args, **kwargs):
+        raise AssertionError("a plain-http address to elsewhere was asked for its name")
+
+    monkeypatch.setattr(desktop_app.httpx, "get", asked)
+    config = ClientConfig(api_url="http://cloud.example.org")
+    assert desktop_app.cloud_name(config) == desktop_app.DEFAULT_NAME

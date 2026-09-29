@@ -46,11 +46,9 @@ def list_circles() -> None:
 
     async def _list() -> None:
         _, api = client()
-        try:
+        async with api:
             circles = await api.circles()
             users = await api.users()
-        finally:
-            await api.aclose()
         table = Table(title="circles", title_style=TITLE)
         for column in ("circle", "default", "rules", "people"):
             table.add_column(column, overflow="fold")
@@ -81,10 +79,8 @@ def add(
 
     async def _add() -> None:
         _, api = client()
-        try:
+        async with api:
             circle = await api.create_circle(name)
-        finally:
-            await api.aclose()
         console.print(
             f"[green]Made[/] {circle['name']}. [dim]Give it data with "
             f"`cm circle rule {circle['id']} <datamodel> write`, and people with "
@@ -107,10 +103,8 @@ def rule(
 
     async def _rule() -> None:
         _, api = client()
-        try:
+        async with api:
             changed = await api.set_circle_rule(circle, model, access)
-        finally:
-            await api.aclose()
         console.print(f"[green]{changed['name']}[/]: {said(changed['rules'])}")
 
     run(_rule())
@@ -124,10 +118,8 @@ def join(
 
     async def _join() -> None:
         _, api = client()
-        try:
+        async with api:
             changed = await api.join_circle(circle, username)
-        finally:
-            await api.aclose()
         console.print(f"[green]{username}[/] is in {changed['name']}.")
 
     run(_join())
@@ -141,11 +133,9 @@ def leave(
 
     async def _leave() -> None:
         _, api = client()
-        try:
+        async with api:
             changed = await api.leave_circle(circle, username)
             circles = await api.circles()
-        finally:
-            await api.aclose()
         console.print(f"[green]{username}[/] is out of {changed['name']}.")
         if not any(username in c["members"] for c in circles):
             console.print(f"[yellow]![/] [dim]{username} is in no circle now: no data at all.[/]")
@@ -164,10 +154,8 @@ def default(
 
     async def _default() -> None:
         _, api = client()
-        try:
+        async with api:
             changed = await api.update_circle(circle, default=not off)
-        finally:
-            await api.aclose()
         if off:
             console.print(f"New accounts no longer go into {changed['name']}.")
         else:
@@ -182,10 +170,8 @@ def delete(circle: CircleArg) -> None:
 
     async def _delete() -> None:
         _, api = client()
-        try:
+        async with api:
             await api.delete_circle(circle)
-        finally:
-            await api.aclose()
         console.print(f"[green]Deleted[/] {circle}.")
 
     run(_delete())
@@ -196,10 +182,8 @@ def access() -> None:
 
     async def _access() -> None:
         _, api = client()
-        try:
+        async with api:
             mine = await api.my_access()
-        finally:
-            await api.aclose()
         circles = mine.get("circles") or []
         if not circles:
             console.print("[yellow]You are in no circle, so you reach no data.[/]")

@@ -73,10 +73,8 @@ def list_notes(
 
     async def _list() -> None:
         config, api = client()
-        try:
+        async with api:
             tree = await api.tree()
-        finally:
-            await api.aclose()
         notes = sorted(_walk(tree), key=lambda note: note["path"].lower())
         if plain:
             emit("".join(f"{_title(note['path'])}\n" for note in notes))
@@ -100,14 +98,13 @@ def show(title: TitleArgument) -> None:
 
     async def _show() -> None:
         config, api = client()
-        try:
-            note = await api.read(title)
-        except ApiError as exc:
-            if exc.status_code != 404:
-                raise
-            fail(f"no such note: {title}")
-        finally:
-            await api.aclose()
+        async with api:
+            try:
+                note = await api.read(title)
+            except ApiError as exc:
+                if exc.status_code != 404:
+                    raise
+                fail(f"no such note: {title}")
         emit(note["content"])
 
     run(_show())
@@ -125,7 +122,7 @@ def add(
 
     async def _add() -> None:
         config, api = client()
-        try:
+        async with api:
             try:
                 note = await api.create_note(title, text)
             except ApiError as exc:
@@ -134,8 +131,6 @@ def add(
                 if not force:
                     fail(f"{title} already exists — --force replaces it")
                 note = await api.write(title, text)
-        finally:
-            await api.aclose()
         console.print(
             f"[green]Saved[/] {_title(note['path'])} "
             f"[dim]({plural(len(text), 'byte')})[/]"
@@ -150,7 +145,7 @@ def edit(title: TitleArgument) -> None:
 
     async def _edit() -> None:
         config, api = client()
-        try:
+        async with api:
             try:
                 note = await api.read(title)
             except ApiError as exc:
@@ -163,8 +158,6 @@ def edit(title: TitleArgument) -> None:
                 return
             # The rev we read is what stops a TUI save landing on top of this.
             saved = await api.write(title, text, note["rev"])
-        finally:
-            await api.aclose()
         console.print(f"[green]Saved[/] {_title(saved['path'])}")
 
     run(_edit())
@@ -184,14 +177,13 @@ def remove(
         config, api = client()
         if not yes:
             typer.confirm(f"Delete {title}?", abort=True)
-        try:
-            await api.delete(title, recursive=recursive)
-        except ApiError as exc:
-            if exc.status_code != 404:
-                raise
-            fail(f"no such note: {title}")
-        finally:
-            await api.aclose()
+        async with api:
+            try:
+                await api.delete(title, recursive=recursive)
+            except ApiError as exc:
+                if exc.status_code != 404:
+                    raise
+                fail(f"no such note: {title}")
         console.print(f"[green]Deleted[/] {title}")
 
     run(_remove())
@@ -206,10 +198,8 @@ def rename(
 
     async def _rename() -> None:
         config, api = client()
-        try:
+        async with api:
             result = await api.move(title, new_title)
-        finally:
-            await api.aclose()
         console.print(f"[green]Renamed[/] {title} → {_title(result['path'])}")
 
     run(_rename())
@@ -223,10 +213,8 @@ def search(
 
     async def _search() -> None:
         config, api = client()
-        try:
+        async with api:
             payload = await api.search(query)
-        finally:
-            await api.aclose()
         results = payload.get("results", [])
         if not results:
             console.print(f"[dim]No notes match {query!r}.[/]")

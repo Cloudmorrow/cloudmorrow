@@ -9,17 +9,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import tomli_w
-from platformdirs import user_config_dir
 
+from cloudmorrow.locations import config_dir
 from cloudmorrow.privatefile import write_private
 
-APP_NAME = "cloudmorrow"
 DEFAULT_API_URL = "https://cm.hl.bramlabs.io"
-
-
-def config_dir() -> Path:
-    override = os.environ.get("CLOUDMORROW_CONFIG_DIR")
-    return Path(override).expanduser() if override else Path(user_config_dir(APP_NAME))
 
 
 def config_path() -> Path:

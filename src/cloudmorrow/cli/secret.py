@@ -114,7 +114,7 @@ def list_secrets(
     async def _list() -> None:
         config, api, chosen_vault = in_vault(vault)
         chosen = environment_for(config, environment)
-        try:
+        async with api:
             secrets = await api.secrets(None if every else chosen, reveal=reveal)
             if not secrets:
                 if plain:
@@ -125,8 +125,6 @@ def list_secrets(
                 if not every:
                     await _hint_other_environments(api, chosen, chosen_vault)
                 return
-        finally:
-            await api.aclose()
         if plain:
             emit("".join(f"{secret['key']}\n" for secret in secrets))
             return
@@ -163,10 +161,8 @@ def get(
     async def _get() -> None:
         config, api, _ = in_vault(vault)
         chosen = environment_for(config, environment)
-        try:
+        async with api:
             secret = await api.read_secret(key, chosen)
-        finally:
-            await api.aclose()
         # Raw stdout, with a newline a shell will strip: `$( )` eats it, and a
         # redirect to a file gets the tidy trailing newline a file should have.
         emit((secret["value"] or "") + "\n")
@@ -196,10 +192,8 @@ def set_secret(
     async def _set() -> None:
         config, api, chosen_vault = in_vault(vault)
         chosen = environment_for(config, environment)
-        try:
+        async with api:
             secret = await api.write_secret(key, value, chosen)
-        finally:
-            await api.aclose()
         console.print(
             f"[green]Set[/] {secret['key']} [dim]in {where(chosen_vault, chosen)} "
             f"({plural(secret['length'], 'byte')})[/]"
@@ -223,12 +217,10 @@ def remove(
         place = where(chosen_vault, chosen)
         if not yes:
             typer.confirm(f"Delete {', '.join(keys)} from {place}?", abort=True)
-        try:
+        async with api:
             for key in keys:
                 await api.delete_secret(key, chosen)
                 console.print(f"[green]Deleted[/] {key} [dim]from {place}[/]")
-        finally:
-            await api.aclose()
 
     run(_remove())
 
@@ -265,12 +257,10 @@ def import_secrets(
     async def _import() -> None:
         config, api, chosen_vault = in_vault(vault)
         chosen = environment_for(config, environment)
-        try:
+        async with api:
             result = await api.import_secrets(
                 entries, chosen, prune=prune, overwrite=overwrite, dry_run=dry_run
             )
-        finally:
-            await api.aclose()
         console.print(
             f"[dim]{'would import' if dry_run else 'imported'} "
             f"{plural(len(entries), 'key')} from {file} into[/] "
@@ -301,10 +291,8 @@ def export(
         config, api, chosen_vault = in_vault(vault)
         chosen = environment_for(config, environment)
         place = where(chosen_vault, chosen)
-        try:
+        async with api:
             entries = await api.export_secrets(chosen)
-        finally:
-            await api.aclose()
         if not entries:
             fail(f"no secrets in {place}")
         if fmt == "json":
@@ -337,10 +325,8 @@ def vaults() -> None:
 
     async def _vaults() -> None:
         config, api = client()
-        try:
+        async with api:
             found = await api.secret_vaults()
-        finally:
-            await api.aclose()
         if not found:
             console.print("[dim]No secrets yet. `cloudmorrow secret set KEY` makes the first.[/]")
             return
@@ -370,10 +356,8 @@ def environments(vault: VaultOption = None) -> None:
 
     async def _environments() -> None:
         config, api, chosen_vault = in_vault(vault)
-        try:
+        async with api:
             found = await api.secret_environments()
-        finally:
-            await api.aclose()
         if not found:
             console.print(f"[dim]No secrets yet in {chosen_vault}.[/]")
             return
@@ -412,13 +396,11 @@ def purge(
         place = chosen_vault if whole_vault else where(chosen_vault, chosen)
         if not yes:
             typer.confirm(f"Delete every secret in {place}?", abort=True)
-        try:
+        async with api:
             if whole_vault:
                 result = await api.delete_vault(chosen_vault)
             else:
                 result = await api.delete_environment(chosen)
-        finally:
-            await api.aclose()
         console.print(
             f"[green]Deleted[/] {plural(result['removed'], 'secret')} [dim]from {place}[/]"
         )
@@ -446,10 +428,8 @@ def run_with(
         config, api, chosen_vault = in_vault(vault)
         chosen = environment_for(config, environment)
         place = where(chosen_vault, chosen)
-        try:
+        async with api:
             entries = await api.export_secrets(chosen)
-        finally:
-            await api.aclose()
         if entries:
             console.print(f"[dim]{plural(len(entries), 'secret')} from {place} → {command[0]}[/]")
         else:

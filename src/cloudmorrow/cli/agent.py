@@ -20,10 +20,8 @@ def list_agents() -> None:
 
     async def _list() -> None:
         _, api = client()
-        try:
+        async with api:
             agents = await api.agents()
-        finally:
-            await api.aclose()
         table = Table(title="agents", title_style=TITLE)
         for column in ("", "id", "name", "host", "platform", "last seen", "can"):
             table.add_column(column)
@@ -50,10 +48,8 @@ def enroll_token(
 
     async def _token() -> None:
         config, api = client()
-        try:
+        async with api:
             token = await api.enroll_token(label)
-        finally:
-            await api.aclose()
         console.print(
             f"\n  [dim]run this on the new machine (expires "
             f"{token['expires_at'].replace('T', ' ')}):[/]\n\n"
@@ -75,10 +71,8 @@ def run_job(
 
     async def _run_job() -> None:
         _, api = client()
-        try:
+        async with api:
             job = await api.create_job(agent_id, job_type, json.loads(payload))
-        finally:
-            await api.aclose()
         console.print(f"[green]Queued[/] {job['type']} #{job['id']}")
 
     run(_run_job())
@@ -93,10 +87,8 @@ def jobs(
 
     async def _jobs() -> None:
         _, api = client()
-        try:
+        async with api:
             found = await api.jobs(agent_id, limit)
-        finally:
-            await api.aclose()
         table = Table(title=f"jobs · agent {agent_id}", title_style=TITLE)
         for column in ("id", "type", "status", "created", "result"):
             table.add_column(column)

@@ -8,7 +8,8 @@ from typing import Any
 import httpx
 
 from cloudmorrow.client.config import ClientConfig, StoredCredentials
-from cloudmorrow.transport import InsecureUrlError, check_url
+from cloudmorrow.httpcommon import ServerError
+from cloudmorrow.httpcommon import detail as _detail
 
 TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 # A deploy is a git fetch, a pip install and a wheel build. It is the one call
@@ -18,11 +19,8 @@ DEPLOY_TIMEOUT = httpx.Timeout(600.0, connect=5.0)
 UPLOAD_TIMEOUT = httpx.Timeout(120.0, connect=5.0)
 
 
-class ApiError(RuntimeError):
-    def __init__(self, message: str, *, status_code: int | None = None, payload: Any = None):
-        super().__init__(message)
-        self.status_code = status_code
-        self.payload = payload
+class ApiError(ServerError):
+    """What the client raises: the server's refusal, in its words, or no server at all."""
 
 
 class AuthError(ApiError):
@@ -58,10 +56,7 @@ class CloudmorrowClient:
         # works in the vault you chose. The TUI leaves it None and passes
         # `vault=` where it means one — there is no selected vault there.
         self.vault = vault
-        try:
-            check_url(config.api_url, allow_insecure=config.allow_insecure_http)
-        except InsecureUrlError as exc:
-            raise ApiError(str(exc)) from exc
+        ApiError.refuse_insecure(config.api_url, allow_insecure=config.allow_insecure_http)
         self._client = httpx.AsyncClient(
             base_url=config.api_url,
             timeout=TIMEOUT,
@@ -71,6 +66,13 @@ class CloudmorrowClient:
 
     async def aclose(self) -> None:
         await self._client.aclose()
+
+    # `async with api:` closes the connection pool however the block ends.
+    async def __aenter__(self) -> CloudmorrowClient:
+        return self
+
+    async def __aexit__(self, *exc_info: object) -> None:
+        await self.aclose()
 
     @property
     def token(self) -> str | None:
@@ -97,7 +99,7 @@ class CloudmorrowClient:
         try:
             response = await self._client.request(method, url, headers=headers, **kwargs)
         except httpx.HTTPError as exc:
-            raise ApiError(f"cannot reach {self.config.api_url}: {exc}") from exc
+            raise ApiError.unreachable(self.config.api_url, exc) from exc
         if response.status_code == 401:
             # The server's own wording ("invalid username or password",
             # "token expired") is more useful than a generic message.
@@ -791,16 +793,6 @@ class CloudmorrowClient:
         return (
             await self._request("POST", "/api/notifications/read", json={"ids": ids})
         ).json()
-
-
-def _detail(response: httpx.Response) -> Any:
-    try:
-        payload = response.json()
-    except ValueError:
-        return response.text or f"HTTP {response.status_code}"
-    if isinstance(payload, dict) and "detail" in payload:
-        return payload["detail"]
-    return payload
 
 
 def client_from_credentials(

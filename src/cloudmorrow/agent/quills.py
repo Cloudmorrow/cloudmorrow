@@ -28,8 +28,7 @@ import tarfile
 import time
 from pathlib import Path
 
-from platformdirs import user_data_dir
-
+from cloudmorrow import locations
 from cloudmorrow.agent.client import AgentApiError, AgentClient
 from cloudmorrow.agent.config import AgentConfig
 from cloudmorrow.quill import context as sdk
@@ -41,7 +40,7 @@ OUTPUT_LIMIT = 64 * 1024
 
 
 def quills_dir() -> Path:
-    return Path(user_data_dir("cloudmorrow")) / "quills"
+    return locations.data_dir() / "quills"
 
 
 def parse_every(text: str) -> float:

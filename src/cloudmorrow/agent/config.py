@@ -14,31 +14,31 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import tomli_w
-from platformdirs import user_data_dir
 
+from cloudmorrow import locations
 from cloudmorrow.privatefile import write_private
 
-DEFAULT_PATHS = (
-    Path("/etc/cloudmorrow/agent.toml"),
-    Path.home() / ".config" / "cloudmorrow" / "agent.toml",
-)
+SYSTEM_CONFIG = Path("/etc/cloudmorrow/agent.toml")
 
 
 def default_config_path() -> Path:
     override = os.environ.get("CLOUDMORROW_AGENT_CONFIG")
     if override:
         return Path(override).expanduser()
-    for candidate in DEFAULT_PATHS:
+    user = locations.agent_config_path()
+    # The legacy place last: on Linux it is the user's place anyway, and on a
+    # Mac it is where an install from before the move left its config.
+    for candidate in (SYSTEM_CONFIG, user, locations.LEGACY_AGENT_CONFIG):
         if candidate.exists():
             return candidate
     # Root installs are system-wide; everything else stays in the user's config.
     if os.geteuid() == 0:
-        return DEFAULT_PATHS[0]
-    return DEFAULT_PATHS[1]
+        return SYSTEM_CONFIG
+    return user
 
 
 def default_backup_dir() -> Path:
-    return Path(user_data_dir("cloudmorrow")) / "backups"
+    return locations.data_dir() / "backups"
 
 
 @dataclass(slots=True)

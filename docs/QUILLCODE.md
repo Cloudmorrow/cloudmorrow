@@ -445,7 +445,7 @@ WebAssembly.
 | the routes: views and actions; webhooks and APIs answered by code | `server/routes/quills.py`, `server/routes/quillcode.py` |
 | a machine's side of it, on the server and in the agent | `server/routes/agentquills.py`, `agent/quills.py`, `cm quill machine` in `cli/quill.py` |
 | actions as MCP tools | `server/mcptools.py` (`action_tools`) |
-| actions and views on the command line | `cli/quillrun.py` (`dispatch`, `_press`, `_view`) |
+| actions and views on the command line | `cli/quillrun/` (`dispatch`; `_press`, `_view` in `actions.py`) |
 | views and actions in the web app | `server/web/kit_view.js` + `kit_view.css` (the primitives), `actions.js` + `actions.css` (forms, effects, the sheet's actions, the action bar), `kit.js` |
 | views and actions in the terminal | `tui/panes/kit_view.py` + `tui/kit_view.tcss` (the primitives), `tui/quill_actions.py` (forms, effects, the ctrl+e palette), `tui/screens/record_sheet.py` |
 | the template, and its skills | `quill_template/`, `quill_template/claude/skills/` |

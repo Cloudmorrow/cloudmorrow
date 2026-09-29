@@ -21,21 +21,16 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from platformdirs import user_data_dir
 
 from cloudmorrow.agent import service
 from cloudmorrow.agent.config import AgentConfig
 from cloudmorrow.agent.config import default_config_path as agent_config_path
 from cloudmorrow.cli import dev
-from cloudmorrow.cli.common import client, console
-from cloudmorrow.client.config import APP_NAME, config_dir, credentials_path
+from cloudmorrow.cli.common import client, console, run
+from cloudmorrow.client.config import credentials_path
 from cloudmorrow.desktop import launcher
 from cloudmorrow.links import COMMANDS
-
-
-def data_dir() -> Path:
-    """Where install.sh put the venv, and where the agent keeps its backups."""
-    return Path(user_data_dir(APP_NAME))
+from cloudmorrow.locations import APP_NAME, config_dir, data_dir
 
 
 def install_prefix() -> Path | None:
@@ -164,25 +159,22 @@ async def forget_on_server(name: str) -> str:
         _config, api = client()
     except Exception as exc:  # no stored session, or a config that cannot be read
         return f"not signed in ({exc}); the agent record stays on the server"
-    try:
-        for agent in await api.agents():
-            if agent.get("name") == name:
-                await api.delete_agent(agent["id"])
-                return ""
-        return "no agent by that name on the server"
-    except Exception as exc:
-        return f"could not reach the server ({exc}); the agent record stays"
-    finally:
-        await api.aclose()
+    async with api:
+        try:
+            for agent in await api.agents():
+                if agent.get("name") == name:
+                    await api.delete_agent(agent["id"])
+                    return ""
+            return "no agent by that name on the server"
+        except Exception as exc:
+            return f"could not reach the server ({exc}); the agent record stays"
 
 
 def remove(found: Plan, *, forget=forget_on_server) -> list[str]:
     """Carry the plan out. Returns the notes worth reading afterwards."""
-    import asyncio
-
     notes: list[str] = []
     if found.agent_name:
-        note = asyncio.run(forget(found.agent_name))
+        note = run(forget(found.agent_name))
         if note:
             notes.append(note)
     if found.service:

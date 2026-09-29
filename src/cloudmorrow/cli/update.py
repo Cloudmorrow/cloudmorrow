@@ -185,10 +185,8 @@ def installed_version() -> str:
 
 
 async def _fetch_release(api: CloudmorrowClient) -> dict:
-    try:
+    async with api:
         return await api.client_release()
-    finally:
-        await api.aclose()
 
 
 @app.command("server")
@@ -391,10 +389,8 @@ def _update_over_ssh(*, host: str | None, branch: str | None, force: bool) -> No
 async def _deploy(
     api: CloudmorrowClient, *, branch: str | None, force: bool, restart: bool
 ) -> dict:
-    try:
+    async with api:
         return await api.update_server(branch=branch, force=force, restart=restart)
-    finally:
-        await api.aclose()
 
 
 def _wait_for(config: ClientConfig, *, expect: str, seconds: int) -> None:
@@ -413,12 +409,11 @@ def _wait_for(config: ClientConfig, *, expect: str, seconds: int) -> None:
         while time.monotonic() < deadline:
             bar.tick()
             api = client_from_credentials(config, StoredCredentials.load())
-            try:
-                return (await api.health()).get("commit", "")
-            except ApiError:
-                await asyncio.sleep(0.5)
-            finally:
-                await api.aclose()
+            async with api:
+                try:
+                    return (await api.health()).get("commit", "")
+                except ApiError:
+                    await asyncio.sleep(0.5)
         return None
 
     with progress.Waiter(console, "waiting for the server to come back", seconds) as bar:
@@ -448,16 +443,15 @@ def _require_admin(config: ClientConfig) -> None:
 
     async def _me() -> dict | None:
         api = client_from_credentials(config, StoredCredentials.load())
-        try:
-            return await api.me()
-        except ApiError:
-            # Signed out, or the server is down — which is exactly when you
-            # might want to redeploy it. Let ssh have the final say.
-            return None
-        finally:
-            await api.aclose()
+        async with api:
+            try:
+                return await api.me()
+            except ApiError:
+                # Signed out, or the server is down — which is exactly when you
+                # might want to redeploy it. Let ssh have the final say.
+                return None
 
-    user = asyncio.run(_me())
+    user = run(_me())
     if user is None:
         console.print("[dim]could not check your account; ssh decides.[/]")
         return

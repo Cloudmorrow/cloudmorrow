@@ -111,28 +111,27 @@ def login(
     password = getpass.getpass("Password: ")
 
     async def _login() -> None:
-        api = CloudmorrowClient(config)
-        session = await api.login(username, password)
-        StoredCredentials(
-            api_url=config.api_url,
-            username=session.username,
-            access_token=session.access_token,
-            expires_at=session.expires_at,
-        ).save()
-        console.print(
-            f"[green]Signed in[/] as [b]{session.username}[/] on {config.api_url}\n"
-            f"[dim]token stored in {credentials_path()}[/]"
-        )
-        if agent_setup:
-            result = await ensure_agent(api)
-            if result.enrolled and result.started:
-                console.print(f"[dim]this machine is registered as '{result.agent_name}'[/]")
-            elif result.enrolled:
-                console.print(
-                    f"[dim]registered as '{result.agent_name}', but it is not running: "
-                    f"{result.detail}[/]"
-                )
-        await api.aclose()
+        async with CloudmorrowClient(config) as api:
+            session = await api.login(username, password)
+            StoredCredentials(
+                api_url=config.api_url,
+                username=session.username,
+                access_token=session.access_token,
+                expires_at=session.expires_at,
+            ).save()
+            console.print(
+                f"[green]Signed in[/] as [b]{session.username}[/] on {config.api_url}\n"
+                f"[dim]token stored in {credentials_path()}[/]"
+            )
+            if agent_setup:
+                result = await ensure_agent(api)
+                if result.enrolled and result.started:
+                    console.print(f"[dim]this machine is registered as '{result.agent_name}'[/]")
+                elif result.enrolled:
+                    console.print(
+                        f"[dim]registered as '{result.agent_name}', but it is not running: "
+                        f"{result.detail}[/]"
+                    )
 
     run(_login())
 
@@ -158,10 +157,8 @@ def whoami() -> None:
 
     async def _whoami() -> None:
         config, api = client()
-        try:
+        async with api:
             user = await api.me()
-        finally:
-            await api.aclose()
         # A server from before roles existed sends only the flag.
         role = user.get("role") or ("administrator" if user["is_admin"] else "user")
         kind = user.get("user_type") or "human"
