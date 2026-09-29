@@ -31,6 +31,9 @@ from cloudmorrow.server.quills.services import Supervisor
 from cloudmorrow.server.quills.tokens import QuillTokenStore
 from cloudmorrow.server.records import RecordStore
 from cloudmorrow.server.routes import (
+    access as access_routes,
+)
+from cloudmorrow.server.routes import (
     agentquills,
     agents,
     auth,
@@ -52,9 +55,6 @@ from cloudmorrow.server.routes import (
     today,
     users,
     web,
-)
-from cloudmorrow.server.routes import (
-    access as access_routes,
 )
 from cloudmorrow.server.routes import (
     server as server_routes,

@@ -1,15 +1,16 @@
-"""`cloudmorrow-server access`, the installer's way to claim a name and join the mesh."""
+"""`cloudmorrow-server access`, the installer's way to link the box and put it on its mesh."""
 
 from __future__ import annotations
 
 import json
+import threading
 
 import pytest
 from typer.testing import CliRunner
 
 from cloudmorrow.server import cli_access
 from cloudmorrow.server.access_ways import Access
-from tests.access_fakes import LOGIN_SERVER, ZONE, wire
+from tests.access_fakes import ZONE, wire
 
 
 @pytest.fixture()
@@ -24,46 +25,85 @@ def run(*args: str):
     return CliRunner().invoke(cli_access.app, list(args))
 
 
-def test_status_before_a_name(wired) -> None:
+def test_status_before_linking(wired) -> None:
     result = run("status")
     assert result.exit_code == 0, result.output
-    assert "claim the-larsens" in result.output
+    assert "cloudmorrow-server access link" in result.output
 
 
-def test_claim_public_and_private_then_status(wired) -> None:
-    access, fakes = wired
-    result = run("claim", "larsens", "--private")
+def test_link_without_waiting_shows_the_code(wired) -> None:
+    access, _ = wired
+    result = run("link", "--no-wait")
     assert result.exit_code == 0, result.output
-    assert f"larsens.{ZONE}" in result.output and "public, private" in result.output
+    code = access.pending().code
+    assert f"Open cloudmorrow.test/link and enter {code}" in result.output
+    assert f"https://cloudmorrow.test/link?code={code}" in result.output
     status = json.loads(run("status", "--json").output)
-    assert status["public"]["on"] and status["private"]["on"]
-    assert status["private"]["address"] == "100.64.0.7"
+    assert status["link_state"] == "waiting"
 
 
-def test_mesh_key_prints_the_login_server_and_the_key_only(wired) -> None:
+def test_link_waits_for_the_code_and_sets_up(wired, monkeypatch) -> None:
     access, fakes = wired
-    assert run("mesh-key").exit_code == 1
-    run("claim", "larsens", "--no-public")
-    result = CliRunner().invoke(cli_access.app, ["mesh-key"])
-    login, key = result.stdout.split()
-    assert login == LOGIN_SERVER and key.startswith("hskey-")
-    assert fakes.control.by_name("larsens").keys[-1]["for"] == "the box"
+    monkeypatch.setattr("cloudmorrow.server.access_ways.time.sleep", lambda s: None)
+    polls = {"n": 0}
+    real = access.poll_once
+
+    def poll():
+        # The person enters the code while the box waits.
+        polls["n"] += 1
+        if polls["n"] == 3:
+            fakes.control.approve(None, "larsens")
+        return real()
+
+    monkeypatch.setattr(access, "poll_once", poll)
+    result = run("link")
+    assert result.exit_code == 0, result.output
+    assert f"linked as larsens.{ZONE}, and on its mesh" in result.output
+    status = json.loads(run("status", "--json").output)
+    assert status["linked"] and status["mesh"]["on"] and status["mesh"]["address"] == "100.64.0.7"
+    assert "linked" in run("status").output and f"larsens.{ZONE}" in run("status").output
+    # Asked again: already linked, nothing new at the relay.
+    before = len(fakes.control.calls)
+    assert "already linked" in run("link").output
+    assert len(fakes.control.calls) == before
 
 
-def test_switches_and_release(wired) -> None:
+def test_a_code_that_runs_out_fails_the_command(wired, monkeypatch) -> None:
     access, fakes = wired
-    run("claim", "larsens")
-    assert run("public", "off").exit_code == 0
-    assert access.cloud().public is False
-    assert run("public", "maybe").exit_code != 0
-    assert run("release", "--yes").exit_code == 0
-    assert access.cloud() is None and fakes.control.clouds == {}
+    monkeypatch.setattr("cloudmorrow.server.access_ways.time.sleep", lambda s: None)
+    real = access.poll_once
 
+    def poll():
+        fakes.control.refuse(None)
+        return real()
 
-def test_a_taken_name_fails_with_the_sentence(wired) -> None:
-    access, fakes = wired
-    run("claim", "larsens")
-    access.store.clear()
-    result = run("claim", "larsens")
+    monkeypatch.setattr(access, "poll_once", poll)
+    result = run("link")
     assert result.exit_code == 1
-    assert "larsens is taken" in result.output
+    assert "ran out" in result.output
+
+
+def test_unlink_asks_unless_told(wired) -> None:
+    access, fakes = wired
+    fakes.control.approve(access.link()["code"], "larsens")
+    access.poll_once()
+    result = CliRunner().invoke(cli_access.app, ["unlink"], input="n\n")
+    assert result.exit_code == 1 and access.cloud() is not None
+    result = run("unlink", "--yes")
+    assert result.exit_code == 0, result.output
+    assert "unlinked" in result.output and access.cloud() is None
+
+
+def test_unlink_while_waiting_lets_the_code_go(wired) -> None:
+    access, _ = wired
+    access.link()
+    result = run("unlink")
+    assert result.exit_code == 0 and "stopped waiting" in result.output
+    assert access.pending() is None
+
+
+def test_nothing_waits_forever_on_a_thread(wired) -> None:
+    # The CLI polls in the foreground; it starts no thread of its own.
+    before = threading.active_count()
+    run("link", "--no-wait")
+    assert threading.active_count() == before

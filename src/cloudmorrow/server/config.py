@@ -104,6 +104,12 @@ class ServerConfig:
     access_caddy_dir: Path = Path("/var/lib/cloudmorrow-caddy")
     access_caddy_admin: str = "http://127.0.0.1:2019"
     access_caddyfile: Path = Path("/etc/caddy/Caddyfile")
+    # The certificate for a linked name: Let's Encrypt, then ZeroSSL when
+    # Let's Encrypt says no (its weekly limit for the zone, say). ZeroSSL
+    # needs an email address to make its account with; without one there is
+    # no fallback. The address goes to the certificate authorities only.
+    access_acme_fallback: bool = True
+    access_acme_email: str = ""
     config_path: Path | None = None
 
     @property
@@ -263,6 +269,8 @@ def load_config(path: Path | None = None) -> ServerConfig:
             "access_caddy_dir",
             "access_caddy_admin",
             "access_caddyfile",
+            "access_acme_fallback",
+            "access_acme_email",
         ):
             if key in section:
                 value = section[key]
@@ -310,6 +318,8 @@ def load_config(path: Path | None = None) -> ServerConfig:
         "ACCESS_CADDY_DIR": ("access_caddy_dir", lambda v: Path(v).expanduser()),
         "ACCESS_CADDY_ADMIN": ("access_caddy_admin", str),
         "ACCESS_CADDYFILE": ("access_caddyfile", lambda v: Path(v).expanduser()),
+        "ACCESS_ACME_FALLBACK": ("access_acme_fallback", _env_bool),
+        "ACCESS_ACME_EMAIL": ("access_acme_email", str),
     }
     for env_suffix, (attr, caster) in env_map.items():
         raw = os.environ.get(ENV_PREFIX + env_suffix)

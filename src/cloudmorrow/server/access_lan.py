@@ -8,16 +8,15 @@ it from a list:
 
     name     what the cloud is called ("The Larsens")
     version  the server's version
-    url      what to open on this network — https://<its real name> when it
-             has a public or private name, else http://<name>.local:<port>
-    public   its public name, when public access is on
-    private  its private name, when private access is on
+    url      what to open on this network — https://<name>.<zone> when the
+             box is linked, else http://<name>.local:<port>
+    mesh     <name>.<zone>, when the box is linked
 
-With a real name the service's port is 443, where Caddy answers with the
+Linked, the service's port is 443, where Caddy answers with the
 certificate for that name, so a client on the same network connects to
 the box's local address and still checks the certificate against the real
-name (`client/discover.py`). Without one it is the server's own port, and
-plain http, which is only for setting the box up and finding it.
+name (`client/discover.py`). Not linked, it is the server's own port, and
+plain http, which is only for a home network.
 
 A box whose server listens only on loopback and has no real name has
 nothing to offer the network, so it says nothing. `access_lan = false`
@@ -53,7 +52,7 @@ _SKIP = (
 
 
 def hostname_label(name: str) -> str:
-    """"The Larsens" → `the-larsens`: a DNS label, at most 63 characters."""
+    """ "The Larsens" → `the-larsens`: a DNS label, at most 63 characters."""
     label = re.sub(r"[^a-z0-9-]+", "-", name.strip().lower()).strip("-")
     label = re.sub(r"-{2,}", "-", label)[:63].strip("-")
     return label or DEFAULT_LABEL
@@ -68,16 +67,13 @@ class Announcement:
     version: str
     port: int
     url: str
-    public: str = ""
-    private: str = ""
+    mesh: str = ""
     addresses: list[str] = field(default_factory=list)
 
     def properties(self) -> dict[str, str]:
         props = {"name": self.name, "version": self.version, "url": self.url}
-        if self.public:
-            props["public"] = self.public
-        if self.private:
-            props["private"] = self.private
+        if self.mesh:
+            props["mesh"] = self.mesh
         return props
 
 

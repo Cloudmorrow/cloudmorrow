@@ -47,8 +47,7 @@ def test_local_addresses_leave_out_loopback_and_the_mesh() -> None:
 def test_the_announcer_registers_updates_and_withdraws() -> None:
     zc = FakeZeroconf()
     wanted: list[Announcement | None] = [
-        Announcement("larsens", "The Larsens", "0.4.0", 8787, "http://larsens.local:8787",
-                     addresses=["192.168.1.20"])
+        Announcement("larsens", "The Larsens", "0.4.0", 8787, "http://larsens.local:8787", addresses=["192.168.1.20"])
     ]
     lan = LanAnnouncer(lambda: wanted[0], zeroconf_factory=lambda: zc)
     lan.refresh()
@@ -63,12 +62,20 @@ def test_the_announcer_registers_updates_and_withdraws() -> None:
     assert info.properties[b"url"] == b"http://larsens.local:8787"
     assert lan.status()["hostname"] == "larsens.local"
 
-    wanted[0] = Announcement("larsens", "The Larsens", "0.4.0", 443, f"https://larsens.{ZONE}",
-                             public=f"larsens.{ZONE}", addresses=["192.168.1.20"])
+    wanted[0] = Announcement(
+        "larsens",
+        "The Larsens",
+        "0.4.0",
+        443,
+        f"https://larsens.{ZONE}",
+        mesh=f"larsens.{ZONE}",
+        addresses=["192.168.1.20"],
+    )
     lan.refresh()
     kind, info = zc.calls[1]
     assert kind == "update" and info.port == 443
-    assert info.properties[b"public"] == f"larsens.{ZONE}".encode()
+    assert info.properties[b"mesh"] == f"larsens.{ZONE}".encode()
+    assert set(info.properties) == {b"name", b"version", b"url", b"mesh"}
 
     wanted[0] = None
     lan.refresh()
@@ -92,19 +99,21 @@ def test_a_failing_network_is_a_status_not_a_crash() -> None:
 
 def test_what_the_cloud_announces(config, users, tmp_path) -> None:
     access = Access(config, lambda: "The Larsens", addresses=lambda: ["192.168.1.20"])
-    # Listening on loopback, with no name: nothing a neighbour could reach.
+    # Listening on loopback only, not linked: nothing a neighbour could reach.
+    config.host = "127.0.0.1, ::1"
     assert access.announcement() is None
     config.host = "0.0.0.0"
     home = access.announcement()
     assert (home.label, home.port, home.url) == ("the-larsens", 8787, "http://the-larsens.local:8787")
-    assert home.public == "" and home.private == ""
-    # With a name, the box is reached at 443 on the network, by its real name.
-    wire(access, tmp_path)
-    access.claim("larsens", public=True, private=True)
+    assert home.mesh == "" and set(home.properties()) == {"name", "version", "url"}
+    # Linked, the box is reached at 443 on the network, by its real name.
+    fakes = wire(access, tmp_path)
+    fakes.control.approve(access.link()["code"], "larsens")
+    access.poll_once()
     named = access.announcement()
     assert named.label == "larsens" and named.port == 443
     assert named.url == f"https://larsens.{ZONE}"
-    assert named.public == named.private == f"larsens.{ZONE}"
+    assert named.mesh == f"larsens.{ZONE}"
 
 
 def test_access_lan_false_announces_nothing(config, users, tmp_path) -> None:

@@ -1,12 +1,12 @@
 """End to end against the real relay repository, when it is installed beside us.
 
-`cloudmorrow-relay dev` runs the whole relay on this machine — the control
-server, the tunnel and the router for `*.cm.localhost` — with a throwaway
-CA. This test enrols a cloud there through `Access`, runs the real tunnel
-client, serves the box's certificate from a local TLS upstream standing in
-for Caddy, and fetches `https://<name>.cm.localhost` through the relay the
-way a visitor would. Skipped where the relay is not installed; point
-CLOUDMORROW_RELAY_BIN at its `cloudmorrow-relay` to run it.
+`cloudmorrow-relay dev` runs the whole relay on this machine — the /v1 API,
+the admin API the website uses, and a fake Headscale behind it — with a
+throwaway CA. This test links a box through `Access` the way a person
+would (a code, approved as the website approves it), puts it on the mesh
+with a fake tailscale, reads its record, makes an invite and redeems it as
+a computer's installer would, and unlinks. Skipped where the relay is not
+installed; point CLOUDMORROW_RELAY_BIN at its `cloudmorrow-relay` to run it.
 """
 
 from __future__ import annotations
@@ -17,17 +17,17 @@ import shutil
 import socket
 import ssl
 import subprocess
-import threading
 import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 
 import httpx
 import pytest
 
+from cloudmorrow.client import meshjoin
 from cloudmorrow.server.access_ways import Access
+from tests.access_fakes import wire
 
 RELAY_BIN = os.environ.get("CLOUDMORROW_RELAY_BIN") or shutil.which("cloudmorrow-relay")
+ADMIN_SECRET = "e2e-admin-secret-long-enough-for-the-relay"
 
 pytestmark = pytest.mark.skipif(not RELAY_BIN, reason="the relay repository is not installed")
 
@@ -46,15 +46,17 @@ def free_base() -> int:
     raise RuntimeError("no free ports")
 
 
-def wait_for(port: int, timeout: float = 20.0) -> None:
+def wait_for(port: int, process: subprocess.Popen, log, timeout: float = 60.0) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError(f"the relay stopped: {log.read_text()[-2000:]}")
         try:
             socket.create_connection(("127.0.0.1", port), 0.2).close()
             return
         except OSError:
             time.sleep(0.1)
-    raise RuntimeError(f"nothing came up on {port}")
+    raise RuntimeError(f"nothing came up on {port}: {log.read_text()[-2000:]}")
 
 
 @pytest.fixture()
@@ -63,12 +65,15 @@ def relay(tmp_path):
     state = tmp_path / "relaydev"
     process = subprocess.Popen(
         [RELAY_BIN, "dev", "--dir", str(state), "--port-base", str(base)],
-        stdout=subprocess.PIPE,
+        # A file, not a pipe: nobody reads it as it runs, and a full pipe
+        # would stop the relay; a failure shows it.
+        stdout=(tmp_path / "relay.log").open("w"),
         stderr=subprocess.STDOUT,
+        env={**os.environ, "RELAY_ADMIN_SECRET": ADMIN_SECRET},
     )
     try:
-        wait_for(base + 443)
-        yield base, state / "tls"
+        wait_for(base + 443, process, tmp_path / "relay.log")
+        yield f"https://relay.cm.localhost:{base + 443}", state / "tls" / "ca.pem"
     finally:
         process.terminate()
         try:
@@ -77,65 +82,41 @@ def relay(tmp_path):
             process.kill()
 
 
-class Hello(BaseHTTPRequestHandler):
-    def do_GET(self):  # noqa: N802 - the standard library's name
-        body = f"hello from the box, for {self.headers.get('Host')}".encode()
-        self.send_response(200)
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def log_message(self, *args):
-        pass
-
-
-def box_upstream(tls: Path) -> tuple[ThreadingHTTPServer, int]:
-    """Caddy's part: TLS with the box's own certificate, then an answer."""
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Hello)
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.load_cert_chain(tls / "box.pem", tls / "box-key.pem")
-    server.socket = context.wrap_socket(server.socket, server_side=True)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    return server, server.server_address[1]
-
-
-def test_a_visitor_reaches_the_box_through_the_real_relay(relay, config, users, tmp_path):
-    base, tls = relay
-    ca = str(tls / "ca.pem")
-    trust = ssl.create_default_context(cafile=ca)
-    upstream, port = box_upstream(tls)
-
-    config.access_control = f"https://relay.cm.localhost:{base + 443}"
+def test_a_box_links_joins_invites_and_unlinks_through_the_real_relay(relay, config, users, tmp_path):
+    control, ca = relay
+    trust = ssl.create_default_context(cafile=str(ca))
+    config.access_control = control
     config.access_lan = False
-    config.access_upstream_443 = f"127.0.0.1:{port}"
-    config.access_caddy_dir = tmp_path / "no-caddy-here"
-    access = Access(config, lambda: "The Larsens", http=httpx.Client(verify=trust))
-    access.tunnel_options = {"tls": trust}
+    access = Access(config, lambda: "The Larsens")
+    wire(access, tmp_path)  # the fake tailscale and Caddy; the relay stays real
+    access.http = httpx.Client(verify=trust)
     name = "e2e-" + secrets.token_hex(3)
-    try:
-        cloud = access.claim(name, public=True)
-        assert cloud.host == f"{name}.cm.localhost"
-        assert config.public_url == f"https://{name}.cm.localhost"
-        access.start()
-        deadline = time.monotonic() + 15
-        while access.tunnel.status()["state"] != "connected":
-            assert time.monotonic() < deadline, access.tunnel.status()
-            time.sleep(0.1)
-        assert access.tunnel.status()["host"] == f"{name}.cm.localhost"
 
-        # A visitor: TLS end to end with the box, through the relay.
-        with httpx.Client(verify=trust) as visitor:
-            answer = visitor.get(f"https://{name}.cm.localhost:{base + 443}/")
-        assert answer.status_code == 200
-        assert answer.text == f"hello from the box, for {name}.cm.localhost:{base + 443}"
-        status = access.tunnel.status()
-        assert status["bytes_in"] > 0 and status["bytes_out"] > 0
+    shown = access.link()
+    assert access.poll_once() == "waiting"
+    with httpx.Client(verify=trust) as website:
+        approved = website.post(
+            f"{control}/admin/v1/links/{shown['code']}/approve",
+            headers={"Authorization": f"Bearer {ADMIN_SECRET}"},
+            json={"account": "acct_e2e", "name": name},
+        )
+    assert approved.status_code in (200, 201), approved.text
+    assert access.poll_once() == "linked"
+    cloud = access.cloud()
+    assert cloud.host == f"{name}.cm.localhost" and cloud.set_up, access.setup_error
+    assert cloud.acme and cloud.acme.get("username")
+    assert config.public_url == f"https://{name}.cm.localhost"
 
-        # Public off at the control server: the relay stops routing the name.
-        access.set_public(False)
-        assert access.tunnel is None
-        access.release()
-        assert access.cloud() is None
-    finally:
-        access.stop()
-        upstream.shutdown()
+    # Its own record, as every ten minutes.
+    assert access.refresh().name == name
+
+    # An invite, redeemed the way a computer's installer does it.
+    invite = access.invite()
+    assert len(invite["code"]) == 6
+    with httpx.Client(verify=trust) as computer:
+        key = meshjoin.redeem(f"https://{name}.cm.localhost", invite["code"], access_control=control, http=computer)
+    assert key["key"] and key["login_server"]
+    assert isinstance(access.devices(None), list)
+
+    access.unlink()
+    assert access.cloud() is None and config.public_url == ""

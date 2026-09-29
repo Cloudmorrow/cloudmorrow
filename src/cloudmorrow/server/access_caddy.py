@@ -1,9 +1,10 @@
 """Caddy on the box: the certificate for the cloud's real name, and TLS for it.
 
-Public or private, a visitor's TLS ends on the box, in Caddy, never at the
-relay. So when a name is claimed, renamed, or given back, Caddy has to be
-told. The service cannot write /etc (ProtectSystem=strict) and cannot
-restart Caddy, so the installer arranges two things once, as root:
+A linked cloud is reached at `https://<name>.<zone>`, by its devices on the
+mesh and by those at home, and TLS ends on the box, in Caddy. So when the
+box is linked, renamed on the website, or unlinked, Caddy has to be told.
+The service cannot write /etc (ProtectSystem=strict) and cannot restart
+Caddy, so the installer arranges two things once, as root:
 
 * a directory the service owns and Caddy can read
   (`access_caddy_dir`, /var/lib/cloudmorrow-caddy, group caddy), and
@@ -14,11 +15,11 @@ block for `<name>.<zone>` — and asks Caddy's admin endpoint (localhost:2019)
 to load the Caddyfile again, which picks it up. Caddy reads the same files
 when it starts, so nothing is lost to a restart.
 
-The certificate is the ordinary HTTP challenge when public access is on
-(port 80 reaches the box through the tunnel). With only private access,
-nothing on the internet can reach the box, so the site asks for the DNS
-challenge through the control server's acme-dns endpoint, which needs
-Caddy built with the `acmedns` module (the installer gets that build).
+Nothing on the internet reaches the box, so the certificate is always the
+DNS challenge, through the relay's acme-dns endpoint, with the account the
+link handed over (`acme_dns`). That needs Caddy built with the `acmedns`
+module, which the installer gets. Let's Encrypt first, ZeroSSL when that
+fails (`site_block`).
 """
 
 from __future__ import annotations
@@ -41,28 +42,66 @@ def _quote(value: str) -> str:
     return '"' + str(value).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
+def upstream_host(config: ServerConfig) -> str:
+    """Where Caddy finds the server: loopback when it listens there (or everywhere), else its first address."""
+    hosts = config.hosts
+    if hosts[0] in ("0.0.0.0", "::"):
+        return "127.0.0.1"
+    local = [h for h in hosts if h in ("127.0.0.1", "localhost", "::1")]
+    host = (local or hosts)[0]
+    return f"[{host}]" if ":" in host else host
+
+
+# ZeroSSL's ACME endpoint: the second issuer, for when Let's Encrypt's weekly
+# limit for the zone is used up. Caddy fetches its EAB credentials itself,
+# from an email address, which it needs.
+ZEROSSL = "https://acme.zerossl.com/v2/DV90"
+
+
+def _issuer(acme: dict, control: str, *, directory: str = "", email: str = "") -> list[str]:
+    """One `issuer acme` block, proving the name by DNS through the relay's acme-dns."""
+    lines = ["\t\tissuer acme {"]
+    if directory:
+        lines.append(f"\t\t\tdir {directory}")
+    if email:
+        lines.append(f"\t\t\temail {_quote(email)}")
+    lines += [
+        "\t\t\tdns acmedns {",
+        f"\t\t\t\tusername {_quote(acme.get('username', ''))}",
+        f"\t\t\t\tpassword {_quote(acme.get('password', ''))}",
+        f"\t\t\t\tsubdomain {_quote(acme.get('subdomain', ''))}",
+        # The link says where updates go; the relay's own /v1/acme-dns when it does not.
+        f"\t\t\t\tserver_url {_quote(acme.get('server_url') or control.rstrip('/') + '/v1/acme-dns')}",
+        "\t\t\t}",
+        "\t\t}",
+    ]
+    return lines
+
+
 def site_block(cloud: Cloud, config: ServerConfig, control: str) -> str:
-    """The Caddyfile site for the cloud's real name, reverse-proxying to the server."""
-    upstream = f"{'127.0.0.1' if config.host in ('0.0.0.0', '::', '') else config.host}:{config.port}"
+    """The Caddyfile site for the cloud's real name, reverse-proxying to the server.
+
+    Two issuers, tried in order, both by the DNS challenge: Let's Encrypt,
+    then ZeroSSL (`access_acme_fallback`, which needs `access_acme_email`).
+    Every linked cloud's name is under one zone, and Let's Encrypt allows a
+    zone only so many new certificates a week; the second keeps new clouds
+    getting one when that runs out.
+    """
+    upstream = f"{upstream_host(config)}:{config.port}"
+    email = (config.access_acme_email or "").strip()
     lines = [
         "# Written by Cloudmorrow (Administration -> Access). It is rewritten when",
         "# the name changes; edit /etc/caddy/Caddyfile instead.",
         f"{cloud.host} {{",
     ]
-    if not cloud.public and cloud.acme:
-        acme = cloud.acme
-        lines += [
-            "\ttls {",
-            "\t\tdns acmedns {",
-            f"\t\t\tusername {_quote(acme.get('username', ''))}",
-            f"\t\t\tpassword {_quote(acme.get('password', ''))}",
-            f"\t\t\tsubdomain {_quote(acme.get('subdomain', ''))}",
-            # The register call says where updates go; the control server's
-            # own /v1/acme-dns when it does not.
-            f"\t\t\tserver_url {_quote(acme.get('server_url') or control.rstrip('/') + '/v1/acme-dns')}",
-            "\t\t}",
-            "\t}",
-        ]
+    if cloud.acme:
+        lines.append("\ttls {")
+        lines += _issuer(cloud.acme, control, email=email)
+        if config.access_acme_fallback and email:
+            lines += _issuer(cloud.acme, control, directory=ZEROSSL, email=email)
+        elif config.access_acme_fallback:
+            lines.append("\t\t# ZeroSSL, the fallback, needs an email: access_acme_email in server.toml.")
+        lines.append("\t}")
     lines += [f"\treverse_proxy {upstream}", "}", ""]
     return "\n".join(lines)
 
@@ -93,12 +132,16 @@ class Caddy:
     def apply(self, cloud: Cloud | None, control: str) -> bool:
         """Make the site file say what *cloud* needs (nothing, for None), and reload."""
         if not self.available():
+            if cloud is None:
+                # Nothing to hold, and nowhere to hold it: all is as it should be.
+                self.error = ""
+                return True
             self.error = (
                 f"Caddy is not set up for Cloudmorrow on this box ({self.config.access_caddy_dir} "
-                "is missing); the server installer does it: sudo sh install-server.sh"
+                "is missing); the server installer does it: sudo sh install-server.sh --link"
             )
             return False
-        wanted = site_block(cloud, self.config, control) if cloud and cloud.reachable else ""
+        wanted = site_block(cloud, self.config, control) if cloud is not None else ""
         try:
             current = self.site_path.read_text(encoding="utf-8") if self.site_path.exists() else ""
             if wanted == current:

@@ -1,7 +1,7 @@
-"""The private way in: the box on the cloud's own mesh, through the `tailscale` CLI.
+"""The box on its cloud's mesh, through the `tailscale` CLI.
 
-Private access is WireGuard between the box and the devices its people
-enroll, coordinated by the Headscale behind the control server. The box
+The mesh is WireGuard between the box and the devices its people invited,
+coordinated by the Headscale behind the relay. The box
 does its part with Tailscale's own open-source client, which is a daemon
 (`tailscaled`, root, installed by the installer with the owner's consent)
 and a CLI that talks to it. This module is only the CLI, run as the
@@ -10,12 +10,13 @@ bring the box up and down without root.
 
 What it does: say what state the box is in (`tailscale status --json`),
 join (`tailscale up --login-server … --authkey … --hostname cloud`), leave
-(`tailscale down`), and read the box's mesh address, which the control
-server is told so `<name>.<zone>` points at the box inside the mesh.
+(`tailscale down`), and read the box's mesh address. The relay reads that
+address from Headscale itself, so `<name>.<zone>` points at the box inside
+the mesh without the box saying anything.
 
-Keys and pairing codes for people's devices are not the box's business
-with tailscale: they are minted at the control server, labelled with who
-asked for which device, and handed to the person (`access_ways`).
+Keys and invite codes for people's devices are not the box's business with
+tailscale: they are minted at the relay, for nobody in particular, and
+handed to the person (`access_ways`).
 """
 
 from __future__ import annotations
@@ -74,7 +75,7 @@ class Mesh:
         if path is None:
             raise MeshError(
                 "tailscale is not installed on this box; the server installer adds it "
-                "with --private (sudo sh install-server.sh --private)"
+                "when it links the cloud (sudo sh install-server.sh --link)"
             )
         try:
             return subprocess.run(
@@ -127,10 +128,7 @@ class Mesh:
         if result.returncode != 0:
             detail = _last_line(result.stderr) or _last_line(result.stdout)
             if "access denied" in detail.lower() or "permission" in detail.lower():
-                detail += (
-                    " — the service is not tailscale's operator yet: "
-                    "sudo tailscale set --operator=cloudmorrow"
-                )
+                detail += " — the service is not tailscale's operator yet: sudo tailscale set --operator=cloudmorrow"
             raise MeshError(f"tailscale up failed: {detail}")
         return self.status()
 
@@ -155,22 +153,3 @@ def operator_name() -> str:
 def _last_line(text: str | None) -> str:
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
     return lines[-1] if lines else ""
-
-
-def owner_of(device: dict) -> str:
-    """Whose device this is: the `owner` the key was minted with, else the label's prefix.
-
-    Keys and codes are labelled `"<username>: <device>"` and carry `owner`
-    as well; a control server that keeps only `for` still says whose it is.
-    """
-    owner = str(device.get("owner") or "")
-    if owner:
-        return owner
-    label = str(device.get("for") or "")
-    head, sep, _ = label.partition(": ")
-    return head if sep else ""
-
-
-def label_for(username: str, device: str) -> str:
-    device = " ".join((device or "").split())[:60] or "a device"
-    return f"{username}: {device}"

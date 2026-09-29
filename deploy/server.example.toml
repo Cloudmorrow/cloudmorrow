@@ -82,20 +82,23 @@ service_name = "cloudmorrow"
 # which needs no key. Leave it empty and the page shows no weather.
 weather_place = "Copenhagen"
 
-# Reaching your cloud (docs/HOSTING.md, "Reaching your cloud"). The name,
-# public and private are chosen in Administration -> Access and kept in the
-# database; these are the plumbing under them.
+# Reaching your cloud (docs/HOSTING.md, "Reaching your cloud"). Linking to
+# a cloudmorrow.com account is done in Administration -> Access (or by
+# install-server.sh --link) and kept in the database; these are the
+# plumbing under it.
 #
 # Announce <name>.local and _cloudmorrow._tcp on the home network.
 access_lan = true
-# The control server a public or private name is claimed at. Run your own
-# (the Cloudmorrow/relay repository) and point this at it.
-access_control = "https://relay.cloudmorrow.com"
-# Where the relay's streams are spliced to on this box: Caddy.
-access_upstream_443 = "127.0.0.1:443"
-access_upstream_80 = "127.0.0.1:80"
+# The relay a cloud is linked through, and its mesh coordinated by. Run your
+# own (the Cloudmorrow/relay repository) and point this at it.
+access_control = "https://relay.cloudmorrow.tech"
 # The directory Caddy imports the name's site from, Caddy's admin endpoint,
-# and the Caddyfile that imports it (install-server.sh sets all three up).
+# and the Caddyfile that imports it (install-server.sh --link sets them up).
 access_caddy_dir = "/var/lib/cloudmorrow-caddy"
 access_caddy_admin = "http://127.0.0.1:2019"
 access_caddyfile = "/etc/caddy/Caddyfile"
+# The certificate for a linked name: Let's Encrypt first, ZeroSSL when it
+# says no (its weekly limit for the whole zone, say). ZeroSSL needs an email
+# address for its account; without one there is no fallback.
+access_acme_fallback = true
+access_acme_email = ""

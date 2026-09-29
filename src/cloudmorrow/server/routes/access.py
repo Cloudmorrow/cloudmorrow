@@ -1,15 +1,15 @@
-"""Administration → Access, and Me → Pair a device.
+"""Administration → Access, and Me → Invite a device.
 
-An administrator sees the three ways in and changes them: claims, renames
-or gives back the name, turns public and private access on and off.
-Everybody signed in can see how the cloud is reached, and — while private
-access is on — get a key for a computer or a pairing code for a phone, and
-see and remove their own enrolled devices. Whose a device is comes from
-the label its key was minted with (`<username>: <device>`), so a person
-sees theirs and an administrator sees all of them.
+An administrator sees how the cloud is reached and links it to a
+cloudmorrow.com account (a code to enter on the website) or unlinks it.
+Everybody signed in can see how the cloud is reached and, once it is on its
+mesh, invite a device, get a key for one of their computers, and see and
+remove their own devices. Whose a device is comes from the box's own labels
+(`access_labels`), never from the relay, so a person sees theirs and an
+administrator sees all of them.
 
-Every handler is a plain def: they call the control server and tailscale,
-and FastAPI runs them on a worker thread, off the event loop.
+Every handler is a plain def: they call the relay and tailscale, and
+FastAPI runs them on a worker thread, off the event loop.
 """
 
 from __future__ import annotations
@@ -24,23 +24,15 @@ from cloudmorrow.server.deps import AppState, get_admin_user, get_current_user, 
 router = APIRouter(prefix="/api/access", tags=["access"])
 
 
-class ClaimRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=64)
-    # Claimed from Administration, a name is for public access unless said.
-    public: bool = True
-    private: bool = False
+class MineRequest(BaseModel):
+    # The computer's address on the mesh, which tailscale on it knows.
+    address: str = Field(min_length=1, max_length=64)
+    # What the person calls it: "laptop", "Anna's desktop".
+    device: str = Field(default="", max_length=60)
 
 
-class SwitchRequest(BaseModel):
-    on: bool
-
-
-class RenameRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=64)
-
-
-class DeviceRequest(BaseModel):
-    # What the person calls the device: "laptop", "Anna's phone".
+class LabelRequest(BaseModel):
+    owner: str = Field(default="", max_length=64)
     device: str = Field(default="", max_length=60)
 
 
@@ -56,97 +48,79 @@ def _fail(exc: AccessError) -> HTTPException:
 
 
 @router.get("")
-def read_access(
-    state: AppState = Depends(get_state), user: User = Depends(get_current_user)
-) -> dict:
-    """How this cloud is reached. Administrators see the tunnel, the mesh and Caddy too."""
+def read_access(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> dict:
+    """How this cloud is reached. Administrators see the link, the mesh and Caddy too."""
     return _access(state).status(admin=user.is_admin)
 
 
-@router.post("/name")
-def claim_name(
-    payload: ClaimRequest, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)
-) -> dict:
-    """Claim a name at the control server (enrolling the cloud), or move to another."""
+@router.post("/link")
+def start_link(state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> dict:
+    """A code to enter at cloudmorrow.com/link. The box waits for it on its own."""
     access = _access(state)
     try:
-        access.claim(payload.name, public=payload.public, private=payload.private)
+        access.link()
     except AccessError as exc:
         raise _fail(exc) from exc
     return access.status(admin=True)
 
 
-@router.patch("/name")
-def rename(
-    payload: RenameRequest, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)
-) -> dict:
+@router.delete("/link")
+def cancel_link(state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> dict:
+    """Stop waiting for a code nobody entered."""
+    access = _access(state)
+    access.cancel_link()
+    return access.status(admin=True)
+
+
+@router.post("/unlink")
+def unlink(state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> dict:
+    """Give the name back: the mesh and every device on it go too. The home network stays."""
     access = _access(state)
     try:
-        access.rename(payload.name)
+        access.unlink()
     except AccessError as exc:
         raise _fail(exc) from exc
     return access.status(admin=True)
 
 
-@router.delete("/name")
-def release_name(
-    state: AppState = Depends(get_state), _: User = Depends(get_admin_user)
-) -> dict:
-    """Give the name back: public and private access end, and the devices are forgotten."""
+@router.post("/setup")
+def set_up(state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> dict:
+    """Try again to put a linked box on its mesh, after fixing what stopped it."""
     access = _access(state)
     try:
-        access.release()
-    except AccessError as exc:
-        raise _fail(exc) from exc
-    return access.status(admin=True)
-
-
-@router.put("/public")
-def switch_public(
-    payload: SwitchRequest, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)
-) -> dict:
-    access = _access(state)
-    try:
-        access.set_public(payload.on)
-    except AccessError as exc:
-        raise _fail(exc) from exc
-    return access.status(admin=True)
-
-
-@router.put("/private")
-def switch_private(
-    payload: SwitchRequest, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)
-) -> dict:
-    access = _access(state)
-    try:
-        access.set_private(payload.on)
+        access.set_up()
     except AccessError as exc:
         raise _fail(exc) from exc
     return access.status(admin=True)
 
 
 @router.post("/mesh/key")
-def mesh_key(
-    payload: DeviceRequest,
-    state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
-) -> dict:
-    """A one-time key for one of the signed-in person's computers to join with."""
+def mesh_key(state: AppState = Depends(get_state), _: User = Depends(get_current_user)) -> dict:
+    """A one-time key for one of the signed-in person's computers, and the name it joins as."""
     try:
-        return _access(state).mesh_key(user.username, payload.device or "a computer")
+        return _access(state).mesh_key()
     except AccessError as exc:
         raise _fail(exc) from exc
 
 
-@router.post("/mesh/pair")
-def mesh_pair(
-    payload: DeviceRequest,
+@router.post("/mesh/invite")
+def mesh_invite(state: AppState = Depends(get_state), _: User = Depends(get_current_user)) -> dict:
+    """A six-character code, good once, for ten minutes: for a computer's installer or a phone."""
+    try:
+        return _access(state).invite()
+    except AccessError as exc:
+        raise _fail(exc) from exc
+
+
+@router.post("/mesh/mine")
+def claim_device(
+    payload: MineRequest,
     state: AppState = Depends(get_state),
     user: User = Depends(get_current_user),
 ) -> dict:
-    """A six-character code for a phone's Tailscale app, good once, for ten minutes."""
+    """The computer at this mesh address is the signed-in person's: the box labels it so."""
     try:
-        return _access(state).pair(user.username, payload.device or "a phone")
+        return _access(state).claim_device(user.username, payload.address, payload.device)
     except AccessError as exc:
         raise _fail(exc) from exc
 
@@ -157,10 +131,24 @@ def mesh_devices(
     state: AppState = Depends(get_state),
     user: User = Depends(get_current_user),
 ) -> dict:
-    """The person's enrolled devices; an administrator's `?everyone=true` is all of them."""
+    """The person's devices; an administrator's `?everyone=true` is all of them."""
     whose = None if (everyone and user.is_admin) else user.username
     try:
         return {"devices": _access(state).devices(whose)}
+    except AccessError as exc:
+        raise _fail(exc) from exc
+
+
+@router.put("/mesh/devices/{device_id}")
+def label_device(
+    device_id: str,
+    payload: LabelRequest,
+    state: AppState = Depends(get_state),
+    _: User = Depends(get_admin_user),
+) -> dict:
+    """Say whose a device is, and what it is called. Kept on the box, never sent to the relay."""
+    try:
+        return _access(state).label_device(device_id, payload.owner, payload.device)
     except AccessError as exc:
         raise _fail(exc) from exc
 

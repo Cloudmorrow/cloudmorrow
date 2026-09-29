@@ -1,4 +1,4 @@
-"""Administration → Access and Me → Pair a device, against a fake control server."""
+"""Administration → Access and Me → Invite a device, over HTTP, against a fake relay."""
 
 from __future__ import annotations
 
@@ -6,8 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from cloudmorrow.server.app import create_app
-from cloudmorrow.server.sealed import sealer_for
-from tests.access_fakes import LOGIN_SERVER, ZONE, tailscale_calls, wire
+from tests.access_fakes import ZONE, wire
 from tests.conftest import ADMIN, GUEST, token_for
 
 
@@ -21,183 +20,138 @@ def wired(config, users, tmp_path):
     return client, fakes, admin, guest, app
 
 
+def linked(client, fakes, admin, name="larsens"):
+    started = client.post("/api/access/link", headers=admin)
+    assert started.status_code == 200, started.text
+    fakes.control.approve(started.json()["link"]["code"], name)
+    assert client.app.state.cloudmorrow.access.poll_once() == "linked"
+
+
 def test_a_fresh_cloud_is_reached_at_home_only(wired) -> None:
     client, _, admin, guest, _ = wired
     status = client.get("/api/access", headers=admin).json()
-    assert status["enrolled"] is False
-    assert status["public"]["on"] is False and status["private"]["on"] is False
-    assert status["public"]["tunnel"]["state"] == "off"
-    assert status["suggested_name"] == "cloudmorrow"
+    assert status["linked"] is False and status["mesh"]["on"] is False
+    assert status["link"] is None and status["link_state"] == ""
+    assert status["lan"]["on"] is True
     # Everybody may see how it is reached; not the workings.
     mine = client.get("/api/access", headers=guest).json()
-    assert "tunnel" not in mine["public"] and "control" not in mine
-
-
-def test_only_an_admin_claims_and_switches(wired) -> None:
-    client, _, _, guest, _ = wired
-    assert client.post("/api/access/name", json={"name": "larsens"}, headers=guest).status_code == 403
-    assert client.put("/api/access/public", json={"on": True}, headers=guest).status_code == 403
-    assert client.put("/api/access/private", json={"on": True}, headers=guest).status_code == 403
-    assert client.delete("/api/access/name", headers=guest).status_code == 403
+    assert "control" not in mine and "link" not in mine and "box" not in mine["mesh"]
     assert client.get("/api/access").status_code == 401
 
 
-def test_claiming_a_public_name(wired, config) -> None:
-    client, fakes, admin, _, app = wired
-    response = client.post("/api/access/name", json={"name": "Larsens"}, headers=admin)
-    assert response.status_code == 200, response.text
-    status = response.json()
-    assert status["host"] == f"larsens.{ZONE}"
-    assert status["public"]["on"] is True
-    # public_url, and with it require_tls, follow the name.
+def test_only_an_admin_links_and_unlinks(wired) -> None:
+    client, _, _, guest, _ = wired
+    assert client.post("/api/access/link", headers=guest).status_code == 403
+    assert client.delete("/api/access/link", headers=guest).status_code == 403
+    assert client.post("/api/access/unlink", headers=guest).status_code == 403
+    assert client.post("/api/access/setup", headers=guest).status_code == 403
+
+
+def test_linking_shows_a_code_and_then_the_name(wired, config) -> None:
+    client, fakes, admin, _, _ = wired
+    status = client.post("/api/access/link", headers=admin).json()
+    link = status["link"]
+    assert status["link_state"] == "waiting"
+    assert link["place"] == "cloudmorrow.test/link" and link["link"].endswith("?code=" + link["code"])
+    assert "poll" not in link
+    fakes.control.approve(link["code"], "larsens")
+    client.app.state.cloudmorrow.access.poll_once()
+    status = client.get("/api/access", headers=admin).json()
+    assert status["linked"] and status["host"] == f"larsens.{ZONE}" and status["mesh"]["on"]
+    assert status["link"] is None and status["link_state"] == "linked"
     assert config.public_url == f"https://larsens.{ZONE}"
-    assert config.tls_required
-    # Caddy has a site for it, and was asked to load it.
-    site = (config.access_caddy_dir / "cloudmorrow.caddy").read_text()
-    assert f"larsens.{ZONE} {{" in site and "reverse_proxy 127.0.0.1:8787" in site
-    assert "acmedns" not in site
-    assert fakes.caddy_loads
-    # The token is kept sealed, never plain.
-    import sqlite3
-
-    raw = sqlite3.connect(config.db_path).execute("SELECT token FROM access_cloud").fetchone()[0]
-    cloud = fakes.control.by_name("larsens")
-    assert cloud.token not in raw and raw.startswith("s1:")
-    assert app.state.cloudmorrow.access.cloud().token == cloud.token
-    assert sealer_for(config.db_path) is not None
+    # Linked twice is a sentence, not a second cloud.
+    again = client.post("/api/access/link", headers=admin)
+    assert again.status_code == 409 and "already linked" in again.json()["detail"]
 
 
-def test_a_taken_name_is_a_409_with_a_sentence(wired) -> None:
+def test_a_code_can_be_let_go(wired) -> None:
+    client, _, admin, _, _ = wired
+    client.post("/api/access/link", headers=admin)
+    status = client.delete("/api/access/link", headers=admin).json()
+    assert status["link"] is None and status["link_state"] == ""
+
+
+def test_unlinking_goes_back_home(wired, config) -> None:
     client, fakes, admin, _, _ = wired
-    from tests.access_fakes import FakeCloud
-
-    fakes.control.clouds["t"] = FakeCloud("c_x", "t", "larsens")
-    response = client.post("/api/access/name", json={"name": "larsens"}, headers=admin)
-    assert response.status_code == 409
-    assert response.json()["detail"] == "larsens is taken; try another name"
-    bad = client.post("/api/access/name", json={"name": "a"}, headers=admin)
-    assert bad.status_code == 400
-
-
-def test_rename_and_release(wired, config) -> None:
-    client, fakes, admin, _, _ = wired
-    client.post("/api/access/name", json={"name": "larsens"}, headers=admin)
-    response = client.patch("/api/access/name", json={"name": "the-larsens"}, headers=admin)
-    assert response.status_code == 200
-    assert response.json()["host"] == f"the-larsens.{ZONE}"
-    assert config.public_url == f"https://the-larsens.{ZONE}"
-    assert "the-larsens." in (config.access_caddy_dir / "cloudmorrow.caddy").read_text()
-    response = client.delete("/api/access/name", headers=admin)
-    assert response.status_code == 200
-    assert response.json()["enrolled"] is False
+    linked(client, fakes, admin)
+    status = client.post("/api/access/unlink", headers=admin).json()
+    assert status["linked"] is False and config.public_url == ""
     assert fakes.control.clouds == {}
-    assert config.public_url == ""
-    assert not (config.access_caddy_dir / "cloudmorrow.caddy").exists()
 
 
-def test_public_off_goes_back_to_the_configured_address(wired, config) -> None:
-    client, fakes, admin, _, _ = wired
-    client.post("/api/access/name", json={"name": "larsens"}, headers=admin)
-    response = client.put("/api/access/public", json={"on": False}, headers=admin)
-    assert response.json()["public"]["on"] is False
-    assert fakes.control.by_name("larsens").public is False
-    assert config.public_url == ""
-
-
-def test_private_joins_the_mesh_and_reports_the_address(wired, config) -> None:
-    client, fakes, admin, _, _ = wired
-    client.post("/api/access/name", json={"name": "larsens", "public": False}, headers=admin)
-    response = client.put("/api/access/private", json={"on": True}, headers=admin)
-    assert response.status_code == 200, response.text
-    status = response.json()
-    assert status["private"]["on"] is True
-    assert status["private"]["address"] == "100.64.0.7"
-    assert status["private"]["mesh"]["state"] == "Running"
-    cloud = fakes.control.by_name("larsens")
-    assert cloud.mesh_address == "100.64.0.7"
-    assert cloud.keys[0]["for"] == "the box"
-    up = [c for c in tailscale_calls(fakes.tailscale_dir) if c.startswith("up ")][0]
-    assert f"--login-server {LOGIN_SERVER}" in up
-    assert "--hostname cloud" in up and f"--authkey {cloud.keys[0]['key']}" in up
-    # Private only: the certificate by DNS, through the control server's acme-dns.
-    site = (config.access_caddy_dir / "cloudmorrow.caddy").read_text()
-    assert "dns acmedns" in site and cloud.acme["password"] in site
-    assert "/v1/acme-dns" in site
-    assert config.public_url == f"https://larsens.{ZONE}"
-    # Off: the box leaves, and the name no longer points at it inside the mesh.
-    response = client.put("/api/access/private", json={"on": False}, headers=admin)
-    assert response.json()["private"]["on"] is False
-    assert "down" in tailscale_calls(fakes.tailscale_dir)
-    assert cloud.mesh_address == ""
-
-
-def test_private_without_tailscale_says_what_to_do(wired, tmp_path) -> None:
+def test_a_relay_that_cannot_be_reached_is_a_502_with_a_sentence(wired, monkeypatch) -> None:
     client, _, admin, _, app = wired
-    from cloudmorrow.server.access_mesh import Mesh
+    import httpx
 
-    app.state.cloudmorrow.access.mesh = Mesh(str(tmp_path / "nowhere" / "tailscale"))
-    client.post("/api/access/name", json={"name": "larsens"}, headers=admin)
-    response = client.put("/api/access/private", json={"on": True}, headers=admin)
-    assert response.status_code == 503
-    assert "--private" in response.json()["detail"]
+    def down(*args, **kwargs):
+        raise httpx.ConnectError("no route to host")
+
+    monkeypatch.setattr(app.state.cloudmorrow.access.http, "request", down)
+    response = client.post("/api/access/link", headers=admin)
+    assert response.status_code == 502 and "cannot reach" in response.json()["detail"]
 
 
-def test_a_person_gets_a_key_and_a_code_and_sees_only_their_devices(wired) -> None:
+def test_before_the_mesh_there_is_nothing_to_invite_to(wired) -> None:
+    client, _, _, guest, _ = wired
+    for path in ("/api/access/mesh/invite", "/api/access/mesh/key"):
+        response = client.post(path, headers=guest)
+        assert response.status_code == 409 and "not linked" in response.json()["detail"]
+
+
+def test_anybody_signed_in_invites_a_device(wired) -> None:
     client, fakes, admin, guest, _ = wired
-    # Nothing to enroll in until private access is on.
-    assert client.post("/api/access/mesh/pair", json={}, headers=guest).status_code == 409
-    client.post("/api/access/name", json={"name": "larsens", "private": True}, headers=admin)
+    linked(client, fakes, admin)
+    invite = client.post("/api/access/mesh/invite", headers=guest)
+    assert invite.status_code == 200, invite.text
+    body = invite.json()
+    assert len(body["code"]) == 6 and body["login_server"].startswith("https://mesh.")
+    assert body["command"] == f"curl -fsSL https://larsens.{ZONE}/install.sh | sh"
+    assert body["host"] == f"larsens.{ZONE}"
+    # The relay was asked for a code and told nothing about who asked.
+    method, path, sent = fakes.control.calls[-1]
+    assert (method, path) == ("POST", "/v1/clouds/me/mesh/invites") and sent == {}
+    assert client.post("/api/access/mesh/invite").status_code == 401
 
-    key = client.post("/api/access/mesh/key", json={"device": "laptop"}, headers=guest)
-    assert key.status_code == 200, key.text
-    body = key.json()
-    assert body["login_server"] == LOGIN_SERVER and body["key"].startswith("hskey-")
-    assert body["hostname"] == f"larsens.{ZONE}"
-    cloud = fakes.control.by_name("larsens")
-    assert cloud.keys[-1]["for"] == "guest: laptop" and cloud.keys[-1]["owner"] == "guest"
 
-    code = client.post("/api/access/mesh/pair", json={"device": "phone"}, headers=guest).json()
-    assert len(code["code"]) == 6 and code["login_server"] == LOGIN_SERVER
-    assert cloud.codes[-1]["for"] == "guest: phone"
-
-    fakes.control.join(body["key"], "guests-laptop", "100.64.0.9")
-    admin_key = client.post("/api/access/mesh/key", json={"device": "desk"}, headers=admin).json()
-    theirs = fakes.control.join(admin_key["key"], "bram-desk", "100.64.0.10")
-    # A relay that keeps only the label still says whose a device is.
-    theirs.pop("owner")
-
-    mine = client.get("/api/access/mesh/devices", headers=guest).json()["devices"]
-    assert [d["name"] for d in mine] == ["guests-laptop"]
+def test_a_computer_joins_labels_itself_and_is_its_owners(wired) -> None:
+    client, fakes, admin, guest, _ = wired
+    linked(client, fakes, admin)
+    fakes.control.only().mesh_address = "100.64.0.7"
+    key = client.post("/api/access/mesh/key", headers=guest).json()
+    assert key["hostname"].startswith("cm-") and key["host"] == f"larsens.{ZONE}"
+    fakes.control.join(key["key"], "100.64.0.20")
+    mine = client.post("/api/access/mesh/mine", json={"address": "100.64.0.20", "device": "laptop"}, headers=guest)
+    assert mine.status_code == 200, mine.text
+    assert mine.json()["label"] == "guest: laptop"
+    listed = client.get("/api/access/mesh/devices", headers=guest).json()["devices"]
+    assert [d["label"] for d in listed] == ["guest: laptop"]
+    # An administrator sees them all, the box among them once the relay lists it.
+    assert client.get("/api/access/mesh/devices", headers=admin).json()["devices"] == []
     everyone = client.get("/api/access/mesh/devices?everyone=true", headers=admin).json()["devices"]
-    assert {d["owner"] for d in everyone} == {"guest", ADMIN[0]}
-    # ?everyone is an admin's word only.
-    assert len(client.get("/api/access/mesh/devices?everyone=true", headers=guest).json()["devices"]) == 1
-
-    # A person removes their own device, never somebody else's; an admin any.
-    assert client.delete(f"/api/access/mesh/devices/{theirs['id']}", headers=guest).status_code == 404
-    assert client.delete(f"/api/access/mesh/devices/{mine[0]['id']}", headers=guest).status_code == 204
-    assert client.delete(f"/api/access/mesh/devices/{theirs['id']}", headers=admin).status_code == 204
-    assert cloud.devices == []
-
-
-def test_the_record_survives_a_restart_and_follows_the_name(config, users, tmp_path) -> None:
-    app = create_app(config)
-    fakes = wire(app.state.cloudmorrow.access, tmp_path)
-    client = TestClient(app)
-    admin = {"Authorization": f"Bearer {token_for(client, *ADMIN)}"}
-    client.post("/api/access/name", json={"name": "larsens"}, headers=admin)
-    config.public_url = ""
-    again = create_app(config)
-    assert config.public_url == f"https://larsens.{ZONE}"
-    assert again.state.cloudmorrow.access.cloud().name == "larsens"
-    assert fakes.control.calls
+    assert [d["label"] for d in everyone] == ["this cloud", "guest: laptop"]
+    assert everyone[0]["box"] is True
+    # Somebody else cannot take it, or remove it.
+    device_id = listed[0]["id"]
+    taken = client.post("/api/access/mesh/mine", json={"address": "100.64.0.20"}, headers=admin)
+    assert taken.status_code == 403
+    missing = client.post("/api/access/mesh/mine", json={"address": "100.64.0.99"}, headers=guest)
+    assert missing.status_code == 404
+    assert client.delete(f"/api/access/mesh/devices/{device_id}", headers=admin).status_code == 204
+    assert client.get("/api/access/mesh/devices", headers=guest).json()["devices"] == []
+    assert "guest" not in fakes.control.bodies() and "laptop" not in fakes.control.bodies()
 
 
-def test_a_revoked_token_is_the_clouds_problem_not_the_persons(wired) -> None:
-    client, fakes, admin, _, _ = wired
-    client.post("/api/access/name", json={"name": "larsens", "private": True}, headers=admin)
-    fakes.control.clouds.clear()
-    response = client.post("/api/access/mesh/key", json={}, headers=admin)
-    # Not a 401: that would sign the person out of their own cloud.
-    assert response.status_code == 502
-    assert "refused this cloud" in response.json()["detail"]
+def test_an_admin_says_whose_a_phone_is(wired) -> None:
+    client, fakes, admin, guest, _ = wired
+    linked(client, fakes, admin)
+    key = client.post("/api/access/mesh/key", headers=admin).json()
+    phone = fakes.control.join(key["key"], "100.64.0.30")
+    refused = client.put(f"/api/access/mesh/devices/{phone['id']}", json={"owner": "guest"}, headers=guest)
+    assert refused.status_code == 403
+    done = client.put(
+        f"/api/access/mesh/devices/{phone['id']}", json={"owner": "guest", "device": "phone"}, headers=admin
+    )
+    assert done.status_code == 200 and done.json()["label"] == "guest: phone"
+    assert [d["id"] for d in client.get("/api/access/mesh/devices", headers=guest).json()["devices"]] == [phone["id"]]
+    assert "phone" not in fakes.control.bodies()
