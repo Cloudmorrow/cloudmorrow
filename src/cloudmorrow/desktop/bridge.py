@@ -197,21 +197,21 @@ class Bridge:
             return {"error": str(exc)}
         return {"name": mounted.name, "mounted": False, "path": str(mounted.path)}
 
-    # -- this computer on the cloud's private mesh ---------------------------------
+    # -- this computer on the cloud's mesh --------------------------------------------
     @bridged
     def mesh_status(self) -> dict:
         """Whether this computer is on the cloud's mesh, and whether it could be.
 
-        `available` is the cloud's private access being on; `enrolled` is
+        `available` is the cloud being linked and on its mesh; `enrolled` is
         tailscale running here, on the cloud's login server where tailscale
         says which one it is on.
         """
         status = self._server(lambda api: api.access())
-        private = status.get("private") or {}
+        mesh = status.get("mesh") or {}
         here = meshjoin.state(self._run)
-        login = str(private.get("login_server") or "")
+        login = str(mesh.get("login_server") or "")
         return {
-            "available": bool(private.get("on")),
+            "available": bool(mesh.get("on")),
             "login_server": login,
             "hostname": status.get("host", ""),
             "enrolled": here.on(login),
@@ -221,12 +221,13 @@ class Bridge:
 
     @bridged
     def mesh_join(self) -> dict:
-        """Put this computer on the mesh: a key from the cloud, then `tailscale up`.
+        """Put this computer on the mesh: a key from the cloud, then `tailscale up`, then say it is ours.
 
         Tailscale itself is not installed from here — that is a download and
-        root, which is the installer's (`install.sh --private`) or the
-        person's to do; the answer says how. `tailscale up` asks for the
-        password through pkexec, a dialog, since there is no terminal.
+        root, which is the installer's or the person's to do; the answer says
+        how. `tailscale up` asks for the password through pkexec, a dialog,
+        since there is no terminal. The computer joins as `cm-<6 hex>`; what
+        it is called ("annas-laptop") is told to the cloud, not the relay.
         """
         if meshjoin.tailscale_binary() is None:
             try:
@@ -235,12 +236,14 @@ class Bridge:
             except meshjoin.JoinError as exc:
                 how = str(exc)
             return {"error": f"Tailscale is not on this computer. {how}", "install": True}
-        name = meshjoin.device_name()
-        key = self._server(lambda api: api.mesh_key(name))
+        key = self._server(lambda api: api.mesh_key())
         try:
-            joined = meshjoin.join(key, hostname=name, graphical=True, run=self._run)
+            joined = meshjoin.join(key, graphical=True, run=self._run)
         except meshjoin.JoinError as exc:
             return {"error": str(exc)}
+        name = meshjoin.device_name()
+        if joined.address:
+            self._server(lambda api: api.claim_mesh_device(joined.address, name))
         return {"enrolled": joined.running, "address": joined.address, "device": name}
 
     # -- one sign-in for the machine ----------------------------------------------

@@ -1,69 +1,71 @@
-"""`cloudmorrow access` — how your cloud is reached, and this computer on its mesh.
+"""`cloudmorrow access` — your own access, how your cloud is reached, and this computer on its mesh.
 
-    cm access status                 the three ways in, and how each stands
-    cm access public larsens         claim larsens.<zone> and turn public on (admin)
-    cm access public off             public access off (admin)
-    cm access private on|off         the mesh, for enrolled devices (admin)
-    cm access release                give the name back (admin)
-    cm access pair                   a code for a phone's Tailscale app
-    cm access key                    a one-time key for a computer
-    cm access join                   put this computer on the mesh
-    cm access devices                your enrolled devices (--everyone: all, admin)
+    cm access                        what you may do with each datamodel (circles)
+    cm access status                 home network, linked or not, the mesh
+    cm access link                   a code to enter at cloudmorrow.com/link (admin)
+    cm access unlink                 give the name back; the mesh goes (admin)
+    cm access invite                 an invite code for a device
+    cm access join                   put this computer on the mesh (signed in, at home)
+    cm access join --invite CODE --server https://larsens.cloudmorrow.tech
+                                     the same with an invite, from anywhere, no sign-in
+    cm access mine                   tell the cloud this computer on its mesh is yours
+    cm access devices                your devices on the mesh (--everyone: all, admin)
+    cm access remove ID              take one off the mesh
 
-The server decides who may do what: an administrator changes the ways in,
-and everybody can enroll their own devices while private access is on.
+The server decides who may do what: an administrator links and unlinks,
+and everybody signed in can invite and join their own devices once the
+cloud is on its mesh.
 """
 
 from __future__ import annotations
 
 import json
+import time
 from typing import Annotated
 
 import typer
 
+from cloudmorrow.cli import circle
 from cloudmorrow.cli.common import client, console, fail, run
 from cloudmorrow.client import meshjoin
+from cloudmorrow.client.config import ClientConfig, StoredCredentials
 
-app = typer.Typer(help="How your cloud is reached: home network, public, private.", no_args_is_help=True)
+app = typer.Typer(help="Your own access, and how your cloud is reached: home network, and its mesh once linked.")
+
+
+@app.callback(invoke_without_command=True)
+def mine_by_default(ctx: typer.Context) -> None:
+    """With nothing after it: what you may do with each datamodel, and the circles that say so."""
+    if ctx.invoked_subcommand is None:
+        circle.access()
 
 
 async def _call(what):
     _, api = client()
-    try:
+    async with api:
         return await what(api)
-    finally:
-        await api.aclose()
 
 
 def _show(status: dict) -> None:
     lan = status.get("lan", {})
-    public = status.get("public", {})
-    private = status.get("private", {})
+    mesh = status.get("mesh", {})
     console.print(f"[b]address[/]       {status.get('address') or '(none set)'}")
     home = lan.get("hostname") or "not announced"
     console.print(f"[b]home network[/]  {'on' if lan.get('on') else 'off'}  [dim]{home}[/]")
-    line = "on" if public.get("on") else "off"
-    tunnel = public.get("tunnel")
-    if public.get("on") and tunnel:
-        line += f"  [dim]tunnel {tunnel.get('state')}"
-        if tunnel.get("connected_since"):
-            line += f" since {tunnel['connected_since']}, {tunnel.get('reconnects', 0)} reconnects"
-        if tunnel.get("error"):
-            line += f" — {tunnel['error']}"
-        line += "[/]"
-    console.print(f"[b]public[/]        {line}  [dim]{status.get('host') or ''}[/]")
-    line = "on" if private.get("on") else "off"
-    if private.get("on"):
-        where = private.get("address") or ""
-        line += f"  [dim]login server {private.get('login_server', '')}{', box at ' + where if where else ''}[/]"
-    if private.get("error"):
-        line += f"  [yellow]{private['error']}[/]"
-    console.print(f"[b]private[/]       {line}")
-    if status.get("enrolled") is False:
-        console.print(
-            f"[dim]no name yet — an administrator claims one: "
-            f"cm access public {status.get('suggested_name', 'my-cloud')}[/]"
-        )
+    if status.get("linked"):
+        console.print(f"[b]linked[/]        as {status.get('host')}")
+        line = "on" if mesh.get("on") else "not yet"
+        if mesh.get("on") and mesh.get("address"):
+            line += f"  [dim]the box is {mesh['address']}[/]"
+        console.print(f"[b]mesh[/]          {line}")
+    else:
+        link = status.get("link")
+        if link:
+            console.print(f"[b]linking[/]       open {link['place']} and enter [b]{link['code']}[/]")
+        else:
+            console.print("[b]linked[/]        no  [dim]an administrator links it: cm access link[/]")
+    if status.get("setup_error"):
+        console.print(f"[yellow]not on the mesh yet:[/] {status['setup_error']}")
     caddy = status.get("caddy") or {}
     if caddy.get("error"):
         console.print(f"[yellow]caddy:[/] {caddy['error']}")
@@ -71,7 +73,7 @@ def _show(status: dict) -> None:
 
 @app.command("status")
 def status(as_json: Annotated[bool, typer.Option("--json")] = False) -> None:
-    """The three ways in, and how each stands."""
+    """Home network, linked or not, and the mesh."""
     data = run(_call(lambda api: api.access()))
     if as_json:
         typer.echo(json.dumps(data, indent=2))
@@ -79,107 +81,142 @@ def status(as_json: Annotated[bool, typer.Option("--json")] = False) -> None:
     _show(data)
 
 
-@app.command("public")
-def public(
-    name: Annotated[str, typer.Argument(help="A name to claim (larsens), or on, or off.")],
+@app.command("link")
+def link(
+    wait: Annotated[bool, typer.Option("--wait/--no-wait", help="Wait here until the code is entered.")] = True,
 ) -> None:
-    """Claim a name and turn public access on; `off` turns it off. Administrators only."""
-
-    async def act(api):
-        if name.lower() in ("off", "on"):
-            return await api.set_public(name.lower() == "on")
-        current = await api.access()
-        return await api.claim_name(
-            name, public=True, private=bool(current.get("private", {}).get("on"))
-        )
-
-    data = run(_call(act))
-    if data.get("public", {}).get("on"):
-        console.print(f"[green]public[/]: {data.get('address')}")
-    else:
-        console.print("public access is off")
-
-
-@app.command("private")
-def private(switch: Annotated[str, typer.Argument(help="on or off")]) -> None:
-    """Private access through the mesh, on or off. Administrators only."""
-    if switch.lower() not in ("on", "off"):
-        fail("on or off")
-    data = run(_call(lambda api: api.set_private(switch.lower() == "on")))
-    if data.get("private", {}).get("on"):
-        console.print(f"[green]private[/]: the box is {data['private'].get('address') or 'on the mesh'}")
-    else:
-        console.print("private access is off")
+    """Link the cloud to a cloudmorrow.com account: a code to enter there. Administrators only."""
+    data = run(_call(lambda api: api.start_link()))
+    shown = data.get("link") or {}
+    console.print(f"\n  Open [b]{shown.get('place')}[/] and enter [b]{shown.get('code')}[/]")
+    console.print(f"  [dim]or open {shown.get('link')}[/]\n")
+    if not wait:
+        return
+    console.print("[dim]waiting for the code to be entered (Ctrl-C stops waiting; the cloud keeps waiting)…[/]")
+    try:
+        while True:
+            time.sleep(3)
+            now = run(_call(lambda api: api.access()))
+            if now.get("linked"):
+                console.print(f"[green]linked[/] as [b]{now.get('host')}[/]")
+                if not now.get("mesh", {}).get("on"):
+                    console.print(f"[yellow]not on the mesh yet:[/] {now.get('setup_error') or 'still joining'}")
+                return
+            if now.get("link_state") == "expired":
+                fail("the code ran out before it was entered; run this again for a new one")
+    except KeyboardInterrupt:
+        raise typer.Exit(code=1) from None
 
 
-@app.command("release")
-def release(yes: Annotated[bool, typer.Option("--yes", help="Do not ask.")] = False) -> None:
-    """Give the name back. Public and private access end. Administrators only."""
-    if not yes and not typer.confirm("Give the name back? Enrolled devices are forgotten too."):
+@app.command("unlink")
+def unlink(yes: Annotated[bool, typer.Option("--yes", help="Do not ask.")] = False) -> None:
+    """Give the name back. The mesh and every device on it go; the home network stays. Administrators only."""
+    if not yes and not typer.confirm("Unlink the cloud? Every device on its mesh loses its way in."):
         raise typer.Exit(code=1)
-    run(_call(lambda api: api.release_name()))
-    console.print("the name is given back; the cloud is reached at home only")
+    run(_call(lambda api: api.unlink()))
+    console.print("unlinked; the cloud is reached on the home network")
 
 
-@app.command("pair")
-def pair(device: Annotated[str, typer.Option("--device", help="What you call the phone.")] = "a phone") -> None:
-    """A pairing code for a phone: good once, for ten minutes."""
-    data = run(_call(lambda api: api.mesh_pair(device)))
+@app.command("invite")
+def invite() -> None:
+    """An invite code for a device: good once, for ten minutes (stdout: the code)."""
+    data = run(_call(lambda api: api.mesh_invite()))
     typer.echo(data["code"])
     console.print(
-        f"[dim]In the Tailscale app: Log in → change server → {data['login_server']},\n"
-        f"then enter the code. It works once, until {data.get('expires_at') or 'ten minutes from now'}.[/]"
+        f"[dim]A computer:  {data['command']}\n"
+        f"             (it asks for the code)\n"
+        f"A phone:     the Tailscale app, log in with another server: {data['login_server']}\n"
+        f"             then enter the code. Until {data.get('expires_at') or 'ten minutes from now'}.[/]"
     )
 
 
-@app.command("key")
-def key(device: Annotated[str, typer.Option("--device", help="What you call the computer.")] = "") -> None:
-    """A one-time key for a computer to join the mesh with (stdout: the key)."""
-    data = run(_call(lambda api: api.mesh_key(device or meshjoin.device_name())))
-    typer.echo(data["key"])
-    console.print(
-        f"[dim]sudo tailscale up --login-server {data['login_server']} --authkey <that key>[/]"
-    )
+def _consent(yes: bool):
+    def ask() -> bool:
+        return yes or typer.confirm("Tailscale is not installed. Install it now from tailscale.com?")
+
+    return ask
+
+
+def _claim(address: str, device: str) -> bool:
+    """Tell the cloud this computer is yours, when signed in to it; False when not."""
+    config = ClientConfig.load()
+    if StoredCredentials.load() is None or not config.api_url:
+        return False
+    run(_call(lambda api: api.claim_mesh_device(address, device or meshjoin.device_name())))
+    return True
 
 
 @app.command("join")
 def join(
+    invite_code: Annotated[
+        str | None, typer.Option("--invite", help="An invite code from Me → Invite a device.")
+    ] = None,
+    server: Annotated[str, typer.Option("--server", help="The cloud's address, with --invite.")] = "",
+    access_control: Annotated[
+        str, typer.Option("--access-control", help="The relay, when it is not relay.<zone>.")
+    ] = "",
+    device: Annotated[str, typer.Option("--device", help="What you call this computer.")] = "",
     yes: Annotated[bool, typer.Option("--yes", help="Install Tailscale without asking.")] = False,
 ) -> None:
     """Put this computer on the cloud's mesh: a key, Tailscale, and `tailscale up`."""
-    here = meshjoin.state()
-    if here.running and here.login_server:
+    if invite_code is not None:
+        server = server or ClientConfig.load().api_url
+        if not invite_code:
+            invite_code = typer.prompt("Invite code (from Me → Invite a device)")
+        try:
+            key = meshjoin.redeem(server, invite_code, access_control=access_control)
+        except meshjoin.JoinError as exc:
+            fail(str(exc))
+    else:
+        here = meshjoin.state()
         status = run(_call(lambda api: api.access()))
-        if here.on(status.get("private", {}).get("login_server", "")):
+        if here.running and here.on(status.get("mesh", {}).get("login_server", "")) and here.login_server:
             console.print(f"this computer is on the mesh already, at {here.address}")
+            if here.address:
+                _claim(here.address, device)
             return
-    name = meshjoin.device_name()
-    data = run(_call(lambda api: api.mesh_key(name)))
-
-    def consent() -> bool:
-        return yes or typer.confirm("Tailscale is not installed. Install it now from tailscale.com?")
-
-    console.print(f"joining as [b]{name}[/] — tailscale up needs your password")
+        key = run(_call(lambda api: api.mesh_key()))
+    hostname = str(key.get("hostname") or "") or meshjoin.new_hostname()
+    console.print(f"joining as [b]{hostname}[/] — tailscale up needs your password")
     try:
-        joined = meshjoin.join(data, hostname=name, install=consent)
+        joined = meshjoin.join(key, hostname=hostname, install=_consent(yes))
     except meshjoin.JoinError as exc:
         fail(str(exc))
-    console.print(
-        f"[green]on the mesh[/] at {joined.address or '?'}; "
-        f"{data.get('hostname', '')} now goes straight to the box"
-    )
+    console.print(f"[green]on the mesh[/] at {joined.address or '?'}")
+    if joined.address and invite_code is None:
+        _claim(joined.address, device)
+    elif invite_code is not None:
+        console.print("[dim]sign in, then: cloudmorrow access mine — so the cloud knows it is yours[/]")
+
+
+@app.command("mine")
+def mine(device: Annotated[str, typer.Argument(help="What you call this computer.")] = "") -> None:
+    """Tell the cloud this computer, on its mesh, is yours. Kept on the cloud, never sent anywhere else."""
+    here = meshjoin.state()
+    if not here.running or not here.address:
+        fail("this computer is not on a mesh; join it first: cloudmorrow access join")
+    if not _claim(here.address, device):
+        fail("sign in first: cloudmorrow login")
+    console.print(f"this computer ({here.address}) is yours on the cloud")
 
 
 @app.command("devices")
 def devices(
     everyone: Annotated[bool, typer.Option("--everyone", help="Everybody's (administrators).")] = False,
 ) -> None:
-    """Your enrolled devices."""
+    """Your devices on the mesh."""
     rows = run(_call(lambda api: api.mesh_devices(everyone=everyone)))
     if not rows:
-        console.print("[dim]no devices enrolled[/]")
+        console.print("[dim]no devices on the mesh[/]")
         return
     for row in rows:
-        online = "[green]online[/]" if row.get("online") else "[dim]offline[/]"
-        typer.echo(f"{row['id']}\t{row.get('name', '')}\t{row.get('address', '')}\t{row.get('owner', '')}")
-        console.print(f"[dim]  {row.get('for', '')} · {online}[/]")
+        online = "online" if row.get("online") else "offline"
+        label = row.get("label") or "(nobody's yet)"
+        typer.echo(f"{row['id']}\t{label}\t{row.get('address', '')}\t{online}")
+
+
+@app.command("remove")
+def remove(device_id: Annotated[str, typer.Argument(help="The id `cm access devices` shows.")]) -> None:
+    """Take a device off the mesh."""
+    run(_call(lambda api: api.remove_mesh_device(device_id)))
+    console.print(f"{device_id} is off the mesh")

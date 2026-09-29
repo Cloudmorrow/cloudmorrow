@@ -50,7 +50,7 @@ class Info:
 INFOS = [
     Info(
         "larsens._cloudmorrow._tcp.local.",
-        {"name": "The Larsens", "version": "0.4.0", "url": f"https://{HOST}", "public": HOST},
+        {"name": "The Larsens", "version": "0.4.0", "url": f"https://{HOST}", "mesh": HOST},
         ["fe80::1", "192.168.1.20"],
         443,
     ),
@@ -115,6 +115,11 @@ class FakeLoginClient:
         return Session(username=username, access_token="t", expires_at="")
 
     async def aclose(self) -> None: ...
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc) -> None: ...
 
 
 def test_login_browses_only_when_nothing_is_configured(monkeypatch) -> None:
@@ -196,7 +201,8 @@ def pki(tmp_path):
 
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self):  # noqa: N802
-                seen.append({"host": self.headers.get("Host"), "sni": getattr(self.connection, "server_hostname", None)})
+                sni = getattr(self.connection, "server_hostname", None)
+                seen.append({"host": self.headers.get("Host"), "sni": sni})
                 body = json.dumps({"address": f"https://{HOST}"}).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
@@ -272,49 +278,67 @@ def cloud(config, users, tmp_path, monkeypatch):
 
     def api_for(token: str) -> CloudmorrowClient:
         api = CloudmorrowClient(ClientConfig(api_url="http://testserver"), token=token)
-        api._client = httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
-        )
+        api._client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver")
         return api
 
-    monkeypatch.setattr(
-        access_cli, "client", lambda: (ClientConfig(), api_for(tokens[who["as"]]))
-    )
+    monkeypatch.setattr(access_cli, "client", lambda: (ClientConfig(), api_for(tokens[who["as"]])))
     return app, fakes, who, api_for, tokens
 
 
-def test_cm_access_status_public_private_pair_key_devices(cloud) -> None:
-    app, fakes, who, _, _ = cloud
+def linked(app, fakes, api_for, tokens, name="larsens") -> None:
+    import asyncio
+
+    admin = api_for(tokens[ADMIN[0]])
+    started = asyncio.run(admin.start_link())
+    fakes.control.approve(started["link"]["code"], name)
+    assert app.state.cloudmorrow.access.poll_once() == "linked"
+    fakes.control.only().mesh_address = "100.64.0.7"
+
+
+def test_cm_access_link_invite_devices(cloud, monkeypatch) -> None:
+    app, fakes, who, api_for, tokens = cloud
     runner = CliRunner()
     result = runner.invoke(access_cli.app, ["status"])
     assert result.exit_code == 0, result.output
-    assert "no name yet" in result.output
+    assert "cm access link" in result.output
 
-    result = runner.invoke(access_cli.app, ["public", "larsens"])
+    result = runner.invoke(access_cli.app, ["link", "--no-wait"])
     assert result.exit_code == 0, result.output
-    assert f"https://{HOST}" in result.output
-    result = runner.invoke(access_cli.app, ["private", "on"])
-    assert result.exit_code == 0, result.output
-    assert "100.64.0.7" in result.output
+    code = next(iter(fakes.control.links))
+    assert f"Open cloudmorrow.test/link and enter {code}" in result.output
+    fakes.control.approve(code, "larsens")
+    app.state.cloudmorrow.access.poll_once()
+    fakes.control.only().mesh_address = "100.64.0.7"
+    result = runner.invoke(access_cli.app, ["status", "--json"])
+    assert json.loads(result.stdout)["mesh"]["on"] is True
 
     who["as"] = GUEST[0]
-    assert runner.invoke(access_cli.app, ["public", "off"]).exit_code == 1
-    result = runner.invoke(access_cli.app, ["pair", "--device", "phone"])
-    assert result.exit_code == 0 and LOGIN_SERVER in result.output
-    code = fakes.control.by_name("larsens").codes[-1]["code"]
-    assert result.stdout.splitlines()[0] == code
-    result = runner.invoke(access_cli.app, ["key", "--device", "laptop"])
-    key = result.stdout.splitlines()[0]
-    assert key.startswith("hskey-")
-    fakes.control.join(key, "guests-laptop", "100.64.0.9")
+    assert runner.invoke(access_cli.app, ["unlink", "--yes"]).exit_code == 1
+    result = runner.invoke(access_cli.app, ["invite"])
+    assert result.exit_code == 0, result.output
+    assert result.stdout.splitlines()[0] == fakes.control.only().invites[-1]
+    assert f"curl -fsSL https://{HOST}/install.sh | sh" in result.output and LOGIN_SERVER in result.output
+
+    # A computer that joined with a key, and told the cloud it is the guest's.
+    import asyncio
+
+    key = asyncio.run(api_for(tokens[GUEST[0]]).mesh_key())
+    fakes.control.join(key["key"], "100.64.0.9")
+    asyncio.run(api_for(tokens[GUEST[0]]).claim_mesh_device("100.64.0.9", "laptop"))
     result = runner.invoke(access_cli.app, ["devices"])
-    assert "guests-laptop" in result.stdout
+    assert "guest: laptop" in result.stdout and "100.64.0.9" in result.stdout
 
     who["as"] = ADMIN[0]
-    result = runner.invoke(access_cli.app, ["public", "off"])
-    assert "public access is off" in result.output
-    result = runner.invoke(access_cli.app, ["status", "--json"])
-    assert json.loads(result.stdout)["private"]["on"] is True
+    result = runner.invoke(access_cli.app, ["unlink", "--yes"])
+    assert result.exit_code == 0 and "home network" in result.output
+    assert "guest" not in fakes.control.bodies() and "laptop" not in fakes.control.bodies()
+
+
+def test_bare_cm_access_is_your_own_access(cloud, monkeypatch) -> None:
+    called = []
+    monkeypatch.setattr(access_cli.circle, "access", lambda: called.append(True))
+    result = CliRunner().invoke(access_cli.app, [])
+    assert result.exit_code == 0 and called == [True]
 
 
 # -- this computer on the mesh -------------------------------------------------------
@@ -331,18 +355,13 @@ def unprivileged(calls: list[list[str]]):
     return run
 
 
-def test_the_desktop_bridge_says_whether_this_computer_is_on_the_mesh_and_joins(
-    cloud, tmp_path, monkeypatch
-) -> None:
+def test_the_desktop_bridge_says_whether_this_computer_is_on_the_mesh_and_joins(cloud, tmp_path, monkeypatch) -> None:
     app, fakes, _, api_for, tokens = cloud
     from tests.access_fakes import fake_tailscale
 
-    local = fake_tailscale(tmp_path / "laptop-bin", "NeedsLogin")
+    local = fake_tailscale(tmp_path / "laptop-bin", "NeedsLogin", ip="100.64.0.9")
     monkeypatch.setenv("PATH", f"{local}:{Path('/usr/bin')}:{Path('/bin')}")
-    admin = api_for(tokens[ADMIN[0]])
-    import asyncio
-
-    asyncio.run(admin.claim_name("larsens", public=True, private=True))
+    linked(app, fakes, api_for, tokens)
     calls: list[list[str]] = []
     bridge = Bridge(
         ClientConfig(api_url="http://testserver"),
@@ -353,17 +372,29 @@ def test_the_desktop_bridge_says_whether_this_computer_is_on_the_mesh_and_joins(
     assert status["available"] is True and status["enrolled"] is False
     assert status["login_server"] == LOGIN_SERVER and status["tailscale_installed"] is True
 
+    # The fake relay lists what joins with its keys; the fake tailscale here joins
+    # nothing there, so the bridge's key is joined by hand as the device would.
+    real_join = meshjoin.join
+
+    def join_and_appear(key, **kwargs):
+        done = real_join(key, **kwargs)
+        fakes.control.join(key["key"], done.address)
+        return done
+
+    monkeypatch.setattr(meshjoin, "join", join_and_appear)
     joined = bridge.mesh_join()
-    assert joined["enrolled"] is True and joined["address"] == "100.64.0.7"
+    assert joined["enrolled"] is True and joined["address"] == "100.64.0.9"
     up = next(c for c in calls if "up" in c)
     assert up[0] in ("pkexec", "sudo")
     assert up[up.index("--login-server") + 1] == LOGIN_SERVER
-    assert up[up.index("--hostname") + 1] == meshjoin.device_name()
-    minted = fakes.control.by_name("larsens").keys[-1]
-    assert up[up.index("--authkey") + 1] == minted["key"]
-    assert minted["for"] == f"guest: {meshjoin.device_name()}"
+    hostname = up[up.index("--hostname") + 1]
+    assert hostname.startswith("cm-") and len(hostname) == 9
     assert any(c.startswith("up ") for c in tailscale_calls(local))
     assert bridge.mesh_status()["enrolled"] is True
+    # The cloud labelled it the guest's; the relay heard neither the name nor whose.
+    labels = app.state.cloudmorrow.access.labels.all()
+    assert [(label.owner, label.device) for label in labels.values()] == [("guest", meshjoin.device_name())]
+    assert meshjoin.device_name() not in fakes.control.bodies()
 
 
 def test_without_tailscale_the_bridge_says_how_to_get_it(cloud, tmp_path, monkeypatch) -> None:
@@ -391,38 +422,129 @@ def test_join_installs_tailscale_only_with_consent(tmp_path, monkeypatch) -> Non
         meshjoin.join(key, install=lambda: True, run=lambda cmd: ran.append(list(cmd)))
 
 
-def test_device_names_are_hostnames(monkeypatch) -> None:
+def test_device_names_are_what_you_call_it_and_hostnames_say_nothing(monkeypatch) -> None:
     monkeypatch.setattr(meshjoin.socket, "gethostname", lambda: "Anna's MacBook.local")
     assert meshjoin.device_name() == "anna-s-macbook"
+    names = {meshjoin.new_hostname() for _ in range(20)}
+    assert all(n.startswith("cm-") and len(n) == 9 and "anna" not in n for n in names)
+    assert len(names) > 1
+
+
+# -- an invite -----------------------------------------------------------------------
+def test_an_invite_is_redeemed_at_the_relay_with_only_the_name_and_the_code(config, users, tmp_path) -> None:
+    from cloudmorrow.server.access_ways import Access
+
+    access = Access(config, lambda: "The Larsens")
+    fakes = wire(access, tmp_path)
+    fakes.control.approve(access.link()["code"], "larsens")
+    access.poll_once()
+    code = access.invite()["code"]
+    relay = TestClient(fakes.control.app)
+    before = len(fakes.control.calls)
+    key = meshjoin.redeem(f"https://{HOST}", code.lower()[:3] + "-" + code.lower()[3:], http=relay)
+    assert key["key"].startswith("hskey-") and key["login_server"] == LOGIN_SERVER
+    ((method, path, body),) = fakes.control.calls[before:]
+    assert (method, path) == ("POST", "/v1/invites/redeem") and body == {"name": "larsens", "code": code}
+    # Once.
+    with pytest.raises(meshjoin.JoinError, match="wrong, used, or ran out"):
+        meshjoin.redeem(f"https://{HOST}", code, http=relay)
+    assert meshjoin.relay_for(f"https://{HOST}") == "https://relay.cloudmorrow.test"
+    assert meshjoin.relay_for(f"https://{HOST}", "https://relay.example.org/") == "https://relay.example.org"
+    with pytest.raises(meshjoin.JoinError):
+        meshjoin.cloud_name_of("http://localhost:8787")
+
+
+def test_cm_access_join_with_an_invite(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        meshjoin, "redeem", lambda server, code, access_control="": {"key": "hskey-1", "login_server": LOGIN_SERVER}
+    )
+    joined_with: list[tuple] = []
+
+    def fake_join(key, *, hostname="", install=None, **kwargs):
+        joined_with.append((key["key"], hostname))
+        return meshjoin.MeshState(installed=True, running=True, address="100.64.0.9")
+
+    monkeypatch.setattr(meshjoin, "join", fake_join)
+    result = CliRunner().invoke(access_cli.app, ["join", "--invite", "ABC123", "--server", f"https://{HOST}"])
+    assert result.exit_code == 0, result.output
+    assert joined_with and joined_with[0][0] == "hskey-1" and joined_with[0][1].startswith("cm-")
+    assert "on the mesh" in result.output and "access mine" in result.output
 
 
 # -- the client installer ------------------------------------------------------------
-def test_the_installer_dry_run_with_private_signs_in_and_joins(client, tmp_path) -> None:
+def dry_run(script_text: str, tmp_path, *args: str):
     script = tmp_path / "install.sh"
-    script.write_text(client.get("/install.sh").text)
-    result = subprocess.run(
-        ["sh", str(script), "--dry-run", "--private", "--yes", "--no-desktop"],
+    script.write_text(script_text)
+    import re
+
+    done = subprocess.run(
+        ["sh", str(script), "--dry-run", "--no-desktop", *args],
         capture_output=True,
         text=True,
         env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"},
+        stdin=subprocess.DEVNULL,
+        start_new_session=True,  # no /dev/tty to ask on, as under a CI runner
         timeout=60,
     )
+    done.stdout = re.sub(r"\x1b\[[0-9;]*m", "", done.stdout)
+    return done
+
+
+def test_the_installer_dry_run_with_an_invite_joins_then_signs_in(client, tmp_path) -> None:
+    result = dry_run(client.get("/install.sh").text, tmp_path, "--invite", "--yes")
     assert result.returncode == 0, result.stderr
     out = result.stdout
     assert "would run:" in out and "pip install" in out
-    assert "cloudmorrow login --server" in out
-    assert "cloudmorrow access join --yes" in out
-    assert "lists the clouds it finds" in out
+    assert "would ask: the invite code" in out
+    join = next(line for line in out.splitlines() if "access join --invite" in line)
+    assert "--server http://testserver" in join and join.rstrip().endswith("--yes")
+    assert out.index("access join --invite") < out.index("cloudmorrow login --server") < out.index("access mine")
     # Nothing was installed.
     assert not (tmp_path / ".local" / "share" / "cloudmorrow").exists()
 
 
-def test_the_installer_without_private_mentions_joining(client, tmp_path) -> None:
-    script = tmp_path / "install.sh"
-    script.write_text(client.get("/install.sh").text)
-    result = subprocess.run(
-        ["sh", str(script), "--dry-run", "--no-desktop"],
-        capture_output=True, text=True, env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"}, timeout=60,
+def test_the_installer_takes_the_code_and_a_relay_of_its_own(client, tmp_path) -> None:
+    result = dry_run(
+        client.get("/install.sh").text, tmp_path, "--invite", "7QX2MP", "--access-control", "https://relay.example.org"
     )
     assert result.returncode == 0, result.stderr
-    assert "access join" in result.stdout and "--server" not in result.stdout.split("Installed.")[0]
+    assert "would ask: the invite code" not in result.stdout
+    assert "access join --invite 7QX2MP --server http://testserver --access-control https://relay.example.org" in (
+        result.stdout
+    )
+
+
+def test_the_installer_without_an_invite_mentions_joining(client, tmp_path) -> None:
+    result = dry_run(client.get("/install.sh").text, tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "access join --invite CODE" in result.stdout
+    assert "access join --invite" not in result.stdout.split("Installed.")[0]
+
+
+def test_the_released_installer_is_for_whichever_cloud_it_is_given(tmp_path) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    from release_installer import render
+
+    text = render("v9.9.9", "cloudmorrow-9.9.9-py3-none-any.whl")
+    assert "__" not in text.replace("in __*)", "")
+    assert (
+        'PACKAGE="cloudmorrow[tui,agent] @ '
+        'https://github.com/Cloudmorrow/cloudmorrow/releases/download/v9.9.9/cloudmorrow-9.9.9-py3-none-any.whl"'
+    ) in text
+    # With no --server and no terminal to ask on, it says what it needs.
+    lost = dry_run(text, tmp_path)
+    assert lost.returncode != 0 and "--server" in lost.stderr
+    # As the landing page runs it.
+    ran = dry_run(text, tmp_path, "--server", f"https://{HOST}/", "--invite", "7QX2MP")
+    assert ran.returncode == 0, ran.stderr
+    assert f"access join --invite 7QX2MP --server https://{HOST}" in ran.stdout
+    assert "releases/download/v9.9.9" in ran.stdout
+
+
+def test_the_release_workflow_publishes_the_installer() -> None:
+    workflow = (Path(__file__).resolve().parent.parent / ".github" / "workflows" / "release.yml").read_text()
+    assert 'tags: ["v*"]' in workflow
+    assert "scripts/release_installer.py" in workflow
+    assert "gh release create" in workflow and "dist/install.sh" in workflow and "dist/*.whl" in workflow

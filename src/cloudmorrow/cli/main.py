@@ -178,8 +178,8 @@ def use_found(config: ClientConfig, cloud: discover.Found) -> None:
         # Picking a home-only cloud from the list is saying it is meant to be plain.
         config.allow_insecure_http = True
         console.print(
-            "[yellow]note:[/] this cloud has no public or private name, so it is plain http "
-            "on your home network; an administrator can give it one in Administration → Access."
+            "[yellow]note:[/] this cloud is not linked, so it is plain http on your home network; "
+            "an administrator can link it in Administration → Access."
         )
     config.save()
 

@@ -2,18 +2,18 @@
 
 A box announces itself with multicast DNS as `_cloudmorrow._tcp`
 (server/access_lan.py), and its TXT record says what it is called, its
-version, the address to open, and its public or private name if it has
-one. `browse()` listens for a couple of seconds and returns what answered.
+version, the address to open, and its mesh name when it is linked to a
+cloudmorrow.com account. `browse()` listens for a couple of seconds and returns what answered.
 
 What a client does with one:
 
-* a cloud with a real name (public or private) is `https://<that name>`,
+* a linked cloud is `https://<its mesh name>`,
   and its local address — the address it answered from, on 443 — is kept
   as `local_address`, so at home the client goes straight to the box while
   still checking the certificate against the real name (localroute.py);
-* a cloud with no real name is its plain `http://<name>.local:<port>`
-  address, which is only for setting it up and for a home that wants no
-  more: the person picking it from the list is the person saying so.
+* a cloud that is not linked is its plain `http://<name>.local:<port>`
+  address, which is for a home that wants no more: the person picking it
+  from the list is the person saying so.
 
 python-zeroconf is imported only here and only when browsing, so a client
 without it simply finds nothing and asks for an address, as it always did.
@@ -38,16 +38,15 @@ class Found:
     name: str
     url: str
     version: str = ""
-    public: str = ""
-    private: str = ""
+    mesh: str = ""
     addresses: list[str] = field(default_factory=list)
     port: int = 0
     service: str = ""
 
     @property
     def host(self) -> str:
-        """Its real name, when it has one: public or private, the same name."""
-        return self.public or self.private
+        """Its real name, when it is linked: `larsens.cloudmorrow.tech`."""
+        return self.mesh
 
     @property
     def api_url(self) -> str:
@@ -65,9 +64,8 @@ class Found:
         return self.api_url.startswith("http://")
 
     def describe(self) -> str:
-        ways = [w for w, on in (("public", self.public), ("private", self.private)) if on]
         where = f"at {self.addresses[0]}" if self.addresses else ""
-        extra = ", ".join(ways) if ways else "home network only"
+        extra = "linked, and on its mesh" if self.mesh else "home network only"
         return f"{self.name}  {self.api_url}  ({extra}{', ' + where if where else ''})"
 
 
@@ -88,14 +86,13 @@ def found_from_info(info: Any) -> Found | None:
     service = _text(getattr(info, "name", ""))
     name = props.get("name") or service.split(".", 1)[0]
     url = props.get("url", "")
-    if not url and not (props.get("public") or props.get("private")):
+    if not url and not props.get("mesh"):
         return None
     return Found(
         name=name,
         url=url,
         version=props.get("version", ""),
-        public=props.get("public", ""),
-        private=props.get("private", ""),
+        mesh=props.get("mesh", ""),
         addresses=addresses,
         port=int(getattr(info, "port", 0) or 0),
         service=service,

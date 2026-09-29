@@ -1,9 +1,9 @@
 """The short way across the living room.
 
-A cloud with a public or private name is `https://larsens.cloudmorrow.com`
-wherever you are, and from home that name leads out to the relay and back
-in again: the laptop on the sofa talks to the box under the television by
-way of the internet. When the box has been found on the home network
+A linked cloud is `https://larsens.cloudmorrow.tech` wherever you are, and
+from home that name leads over the mesh, or — for a device not on it — to
+the relay's landing page: either way not the shortest road from the laptop
+on the sofa to the box under the television. When the box has been found on the home network
 (`client/discover.py`, which `cm login` records as `local_address`), the
 client goes to it directly instead.
 
@@ -11,7 +11,7 @@ Directly, but not trustingly. The request still names the real host — the
 `Host` header is the real name, and so is the TLS server name (httpcore's
 `sni_hostname` request extension) — so Caddy on the box answers with the
 certificate for that name, and the certificate is checked against that
-name, exactly as it would be through the relay. Another box on some other
+name, exactly as it would be over the mesh. Another box on some other
 network that happens to have the same address fails the check and is
 never spoken to. Only where the connection goes is changed.
 
