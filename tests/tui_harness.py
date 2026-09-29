@@ -6,8 +6,11 @@ rather than one per module.
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import re
+
+from textual.worker import WorkerCancelled
 
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.app import CloudmorrowApp
@@ -407,9 +410,17 @@ PRESS_ANIMATION = 0.3
 
 
 async def settle(app: CloudmorrowApp, pilot, *, delay: float = 0) -> None:
-    """Let the click land, and let the workers it started finish."""
+    """Let the click land, and let the workers it started finish.
+
+    An exclusive worker started again cancels the one before it: that one was
+    replaced, not broken, so it is waited past, and its replacement waited for.
+    A worker that failed still fails the test.
+    """
     await pilot.pause(delay) if delay else await pilot.pause()
-    await app.workers.wait_for_complete()
+    while running := [worker for worker in app.workers if not worker.is_finished]:
+        for outcome in await asyncio.gather(*(w.wait() for w in running), return_exceptions=True):
+            if isinstance(outcome, BaseException) and not isinstance(outcome, WorkerCancelled):
+                raise outcome
     await pilot.pause()
 
 
