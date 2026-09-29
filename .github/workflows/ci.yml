@@ -15,8 +15,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install "ruff>=0.6"
-      # Line length is not enforced yet: the code has not been formatted to it.
-      - run: ruff check --extend-ignore E501 src tests scripts
+      - run: ruff check src tests scripts
+      - run: ruff format --check src tests scripts
 
   test:
     runs-on: ubuntu-latest
