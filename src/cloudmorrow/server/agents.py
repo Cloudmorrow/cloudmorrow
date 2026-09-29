@@ -72,9 +72,7 @@ def new_token(prefix: str = TOKEN_PREFIX) -> str:
 def validate_agent_name(name: str) -> str:
     name = name.strip()
     if not AGENT_NAME_RE.match(name):
-        raise InvalidAgentNameError(
-            "agent name must be 1-64 chars of letters, digits, '.', '_' or '-'"
-        )
+        raise InvalidAgentNameError("agent name must be 1-64 chars of letters, digits, '.', '_' or '-'")
     return name
 
 
@@ -222,9 +220,7 @@ class AgentStore:
         name = validate_agent_name(name)
         token_hash = hash_token(enrollment_token)
         with connect(self.db_path) as conn:
-            row = conn.execute(
-                "SELECT * FROM enrollment_tokens WHERE token_hash = ?", (token_hash,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM enrollment_tokens WHERE token_hash = ?", (token_hash,)).fetchone()
             if row is None:
                 raise EnrollmentError("unknown enrolment token")
             if row["used_at"]:
@@ -251,12 +247,8 @@ class AgentStore:
                 )
             except sqlite3.IntegrityError as exc:
                 raise AgentExistsError(name) from exc
-            conn.execute(
-                "UPDATE enrollment_tokens SET used_at = ? WHERE id = ?", (_stamp(), row["id"])
-            )
-            agent_row = conn.execute(
-                "SELECT * FROM agents WHERE owner = ? AND name = ?", (owner, name)
-            ).fetchone()
+            conn.execute("UPDATE enrollment_tokens SET used_at = ? WHERE id = ?", (_stamp(), row["id"]))
+            agent_row = conn.execute("SELECT * FROM agents WHERE owner = ? AND name = ?", (owner, name)).fetchone()
         return _agent(agent_row), agent_token
 
     # -- lookup ------------------------------------------------------------
@@ -280,9 +272,7 @@ class AgentStore:
         agent_token = new_token()
         caps = ",".join(capabilities or [])
         with connect(self.db_path) as conn:
-            existing = conn.execute(
-                "SELECT id FROM agents WHERE owner = ? AND name = ?", (owner, name)
-            ).fetchone()
+            existing = conn.execute("SELECT id FROM agents WHERE owner = ? AND name = ?", (owner, name)).fetchone()
             if existing:
                 conn.execute(
                     "UPDATE agents SET token_hash = ?, hostname = ?, platform = ?,"
@@ -311,30 +301,22 @@ class AgentStore:
                         _stamp(),
                     ),
                 )
-            row = conn.execute(
-                "SELECT * FROM agents WHERE owner = ? AND name = ?", (owner, name)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM agents WHERE owner = ? AND name = ?", (owner, name)).fetchone()
         return _agent(row), agent_token
 
     def by_token(self, token: str) -> Agent | None:
         with connect(self.db_path) as conn:
-            row = conn.execute(
-                "SELECT * FROM agents WHERE token_hash = ?", (hash_token(token),)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM agents WHERE token_hash = ?", (hash_token(token),)).fetchone()
         return _agent(row) if row else None
 
     def list(self, owner: str) -> list[Agent]:
         with connect(self.db_path) as conn:
-            rows = conn.execute(
-                "SELECT * FROM agents WHERE owner = ? ORDER BY name", (owner,)
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM agents WHERE owner = ? ORDER BY name", (owner,)).fetchall()
         return [_agent(row) for row in rows]
 
     def get(self, owner: str, agent_id: int) -> Agent | None:
         with connect(self.db_path) as conn:
-            row = conn.execute(
-                "SELECT * FROM agents WHERE owner = ? AND id = ?", (owner, agent_id)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM agents WHERE owner = ? AND id = ?", (owner, agent_id)).fetchone()
         return _agent(row) if row else None
 
     def require(self, owner: str, agent_id: int) -> Agent:
@@ -382,9 +364,7 @@ class AgentStore:
 
     def delete(self, owner: str, agent_id: int) -> None:
         with connect(self.db_path) as conn:
-            cursor = conn.execute(
-                "DELETE FROM agents WHERE owner = ? AND id = ?", (owner, agent_id)
-            )
+            cursor = conn.execute("DELETE FROM agents WHERE owner = ? AND id = ?", (owner, agent_id))
             if cursor.rowcount == 0:
                 raise UnknownAgentError(str(agent_id))
 
@@ -440,14 +420,11 @@ class JobStore:
         if status not in {JOB_DONE, JOB_FAILED}:
             raise ValueError(f"invalid terminal status: {status}")
         with connect(self.db_path) as conn:
-            row = conn.execute(
-                "SELECT * FROM jobs WHERE id = ? AND agent_id = ?", (job_id, agent_id)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM jobs WHERE id = ? AND agent_id = ?", (job_id, agent_id)).fetchone()
             if row is None:
                 raise UnknownJobError(str(job_id))
             conn.execute(
-                "UPDATE jobs SET status = ?, result = ?, finished_at = ?"
-                " WHERE id = ? AND agent_id = ?",
+                "UPDATE jobs SET status = ?, result = ?, finished_at = ? WHERE id = ? AND agent_id = ?",
                 (
                     status,
                     conn.seal("jobs", "result", (row["owner"],), json.dumps(result or {})),
@@ -459,9 +436,7 @@ class JobStore:
             row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
         return _job(conn, row)
 
-    def list_for_agent(
-        self, owner: str, agent_id: int, *, limit: int = 50, project: str | None = None
-    ) -> list[Job]:
+    def list_for_agent(self, owner: str, agent_id: int, *, limit: int = 50, project: str | None = None) -> list[Job]:
         query = "SELECT * FROM jobs WHERE owner = ? AND agent_id = ?"
         params: list[object] = [owner, agent_id]
         if project is None:
@@ -476,9 +451,7 @@ class JobStore:
 
     def get(self, owner: str, job_id: int) -> Job | None:
         with connect(self.db_path) as conn:
-            row = conn.execute(
-                "SELECT * FROM jobs WHERE owner = ? AND id = ?", (owner, job_id)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM jobs WHERE owner = ? AND id = ?", (owner, job_id)).fetchone()
         return _job(conn, row) if row else None
 
     def queued_count(self, agent_id: int) -> int:
@@ -495,8 +468,7 @@ class JobStore:
         cutoff = (_now() - dt.timedelta(minutes=JOB_STALE_MINUTES)).isoformat(timespec="seconds")
         with connect(self.db_path) as conn:
             cursor = conn.execute(
-                "UPDATE jobs SET status = ?, finished_at = ?, result = ?"
-                " WHERE status = ? AND started_at < ?",
+                "UPDATE jobs SET status = ?, finished_at = ?, result = ? WHERE status = ? AND started_at < ?",
                 (
                     JOB_FAILED,
                     _stamp(),

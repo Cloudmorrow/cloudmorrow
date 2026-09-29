@@ -147,9 +147,7 @@ class ViewPane(KitPane):
             elif node.get("ui") == "form":
                 action = find_action(self.quill, str(node.get("action") or ""))
                 if action and any(f.get("kind") == "link" for f in action.get("fields") or []):
-                    self.choices[path] = await link_choices(
-                        self.api, models, {"fields": action["fields"]}, cache=read
-                    )
+                    self.choices[path] = await link_choices(self.api, models, {"fields": action["fields"]}, cache=read)
 
     async def draw(self) -> None:
         """The tree as widgets, keeping the focus and the scroll where they were."""
@@ -209,8 +207,7 @@ class ViewPane(KitPane):
             if record is None and action.get("on") and self.params.get("record"):
                 # A view opened on a record: its buttons are about that one.
                 record = {"id": self.params["record"], "model": action["on"]}
-            if await run_action(self.app, self.quill, action, record=record,
-                                values=node.get("args") or {}):
+            if await run_action(self.app, self.quill, action, record=record, values=node.get("args") or {}):
                 self.reload()
         elif node.get("open"):
             await self._open(node["open"])
@@ -222,9 +219,7 @@ class ViewPane(KitPane):
         await self._open(record)
 
     async def _open(self, record: dict) -> None:
-        result = await open_record(
-            self.app, self.quill, str(record.get("model") or ""), str(record.get("id") or "")
-        )
+        result = await open_record(self.app, self.quill, str(record.get("model") or ""), str(record.get("id") or ""))
         if result is not None:
             self.reload()
 
@@ -241,8 +236,11 @@ class ViewPane(KitPane):
         record = form.node.get("record") or None
         try:
             effects = await press(
-                self.api, str(self.quill["id"]), str(form.action["id"]),
-                record=str((record or {}).get("id") or ""), fields=fields,
+                self.api,
+                str(self.quill["id"]),
+                str(form.action["id"]),
+                record=str((record or {}).get("id") or ""),
+                fields=fields,
             )
         except AuthError as exc:
             await self.went_wrong(exc)
@@ -284,8 +282,7 @@ class ViewPane(KitPane):
     @work(group="ui")
     async def move(self, record: dict, field: str, lane: str, index: int | None) -> None:
         try:
-            await self.api.move_record(str(record["model"]), str(record["id"]), {field: lane},
-                                       index)
+            await self.api.move_record(str(record["model"]), str(record["id"]), {field: lane}, index)
         except ApiError as exc:
             if await self.went_wrong(exc) == "auth":
                 return

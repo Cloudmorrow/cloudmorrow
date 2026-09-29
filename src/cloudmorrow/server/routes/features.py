@@ -79,9 +79,7 @@ def require_quill(key: str) -> Callable[..., None]:
 
 
 @router.get("", response_model=list[FeatureOut])
-def list_features(
-    state: AppState = Depends(get_state), _: User = Depends(get_current_user)
-) -> list[FeatureOut]:
+def list_features(state: AppState = Depends(get_state), _: User = Depends(get_current_user)) -> list[FeatureOut]:
     return [FeatureOut(**row) for row in state.features.list()]
 
 
@@ -95,16 +93,12 @@ def set_feature(
     try:
         row = state.features.set(key, payload.enabled, changed_by=admin.username)
     except UnknownFeatureError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"no such feature: {key}"
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"no such feature: {key}") from exc
     return FeatureOut(**row)
 
 
 @mine_router.get("", response_model=list[MyFeatureOut])
-def my_features(
-    state: AppState = Depends(get_state), user: User = Depends(get_current_user)
-) -> list[MyFeatureOut]:
+def my_features(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> list[MyFeatureOut]:
     """What you may switch, and what you have. Tabs are drawn from this."""
     return [MyFeatureOut(**row) for row in state.features.list_for(user.username)]
 
@@ -120,7 +114,5 @@ def set_my_feature(
     try:
         row = state.features.set_for(user.username, key, payload.enabled)
     except UnknownFeatureError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"no such feature: {key}"
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"no such feature: {key}") from exc
     return MyFeatureOut(**row)

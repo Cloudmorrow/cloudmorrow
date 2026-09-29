@@ -340,8 +340,11 @@ class Supervisor:
             service = self._services.get(key)
             if service is None:
                 service = self._services[key] = Service(
-                    manifest.id, spec["id"], list(spec["command"]),
-                    bool(spec.get("always", False)), spec["id"] in scheduled,
+                    manifest.id,
+                    spec["id"],
+                    list(spec["command"]),
+                    bool(spec.get("always", False)),
+                    spec["id"] in scheduled,
                 )
             if service.scheduled:
                 continue
@@ -350,9 +353,7 @@ class Supervisor:
                     doomed.append((service, service.process))
                     service.process = None
                 service.done = False
-                service.set_state(
-                    "stopped", "switched off" if not on else "runs as nobody: reinstall it"
-                )
+                service.set_state("stopped", "switched off" if not on else "runs as nobody: reinstall it")
                 continue
             process = service.process
             if process is not None:
@@ -376,7 +377,7 @@ class Supervisor:
             return
         if now - service.started_at >= self.STEADY:
             service.failures = 0
-        wait = min(self.BACKOFF_MAX, self.BACKOFF_FIRST * (2 ** service.failures))
+        wait = min(self.BACKOFF_MAX, self.BACKOFF_FIRST * (2**service.failures))
         service.failures += 1
         service.next_start = now + wait
         service.set_state("restarting", f"exited with {code}; again in {wait:g}s")
@@ -395,8 +396,7 @@ class Supervisor:
 
     def _spawn(self, manifest: Manifest, service_id: str, port: int) -> subprocess.Popen | None:
         spec = next(s for s in manifest.services if s["id"] == service_id)
-        argv = [sys.executable if i == 0 and a == "python" else a
-                for i, a in enumerate(spec["command"])]
+        argv = [sys.executable if i == 0 and a == "python" else a for i, a in enumerate(spec["command"])]
         logfile = self._log(manifest.id, service_id)
         env = self.environment(manifest.id, service_id, port)
         try:
@@ -414,7 +414,9 @@ class Supervisor:
             return None
         logfile.note(f"started {' '.join(spec['command'])} (pid {process.pid}, port {port})")
         threading.Thread(
-            target=logfile.pump, args=(process.stdout,), name=f"log-{manifest.id}-{service_id}",
+            target=logfile.pump,
+            args=(process.stdout,),
+            name=f"log-{manifest.id}-{service_id}",
             daemon=True,
         ).start()
         return process
@@ -438,9 +440,7 @@ class Supervisor:
     def _log(self, quill: str, service: str) -> ServiceLog:
         key = (quill, service)
         if key not in self._logs:
-            self._logs[key] = ServiceLog(
-                self.config.data_dir / "logs" / "quills" / quill / f"{service}.log"
-            )
+            self._logs[key] = ServiceLog(self.config.data_dir / "logs" / "quills" / quill / f"{service}.log")
         return self._logs[key]
 
     def _terminate(self, doomed: list) -> None:
@@ -494,7 +494,9 @@ class Supervisor:
                 with self._lock:
                     self._jobs[key] = process
                 threading.Thread(
-                    target=self._await_job, args=(manifest.id, job, process), daemon=True,
+                    target=self._await_job,
+                    args=(manifest.id, job, process),
+                    daemon=True,
                     name=f"job-{manifest.id}-{job['id']}",
                 ).start()
                 started.append(f"{manifest.id}.{job['id']}")
@@ -511,17 +513,14 @@ class Supervisor:
 
     def _job_row(self, quill: str, job: str) -> sqlite3.Row | None:
         with connect(self.config.db_path) as conn:
-            row = conn.execute(
-                "SELECT * FROM quill_job_runs WHERE quill = ? AND job = ?", (quill, job)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM quill_job_runs WHERE quill = ? AND job = ?", (quill, job)).fetchone()
         conn.close()
         return row
 
     def _record_start(self, quill: str, job: str) -> None:
         with connect(self.config.db_path) as conn:
             conn.execute(
-                "INSERT OR REPLACE INTO quill_job_runs (quill, job, last_started, last_exit)"
-                " VALUES (?, ?, ?, NULL)",
+                "INSERT OR REPLACE INTO quill_job_runs (quill, job, last_started, last_exit) VALUES (?, ?, ?, NULL)",
                 (quill, job, _now()),
             )
         conn.close()
@@ -583,47 +582,58 @@ class Supervisor:
                 for spec in manifest.services:
                     found = self._services.get((manifest.id, spec["id"]))
                     services.append(
-                        found.to_dict() if found else Service(
-                            manifest.id, spec["id"], list(spec["command"]),
-                            bool(spec.get("always", False)), False,
+                        found.to_dict()
+                        if found
+                        else Service(
+                            manifest.id,
+                            spec["id"],
+                            list(spec["command"]),
+                            bool(spec.get("always", False)),
+                            False,
                         ).to_dict()
                     )
-                jobs_running = {
-                    k[1] for k, p in self._jobs.items() if k[0] == manifest.id and p.poll() is None
-                }
+                jobs_running = {k[1] for k, p in self._jobs.items() if k[0] == manifest.id and p.poll() is None}
             jobs = []
             for job in manifest.jobs:
                 if job["action"] != "run":
                     continue
                 row = self._job_row(manifest.id, job["id"])
-                jobs.append({
-                    "id": job["id"], "service": job["service"], "every": job["every"],
-                    "running": job["id"] in jobs_running,
-                    "last_started": row["last_started"] if row else "",
-                    "last_exit": row["last_exit"] if row else None,
-                })
-            rows.append({
-                "id": manifest.id,
-                "name": manifest.name,
-                "runs_as": runs_as(self.users, manifest.origin),
-                "enabled": self.features.enabled(manifest.id),
-                "reach": sorted(manifest.models),
-                "token": self.tokens.info(manifest.id),
-                "services": services,
-                "jobs": jobs,
-                "webhooks": [
+                jobs.append(
                     {
-                        "id": h["id"], "path": h["path"], "model": h.get("model", ""),
-                        "forward": h.get("forward", ""), "signature": h.get("signature", ""),
-                        "secret": self.tokens.webhook_secret(manifest.id, h["id"]),
+                        "id": job["id"],
+                        "service": job["service"],
+                        "every": job["every"],
+                        "running": job["id"] in jobs_running,
+                        "last_started": row["last_started"] if row else "",
+                        "last_exit": row["last_exit"] if row else None,
                     }
-                    for h in manifest.webhooks
-                ],
-                "apis": [
-                    {"id": a["id"], "service": a["service"], "prefix": a.get("prefix", "")}
-                    for a in manifest.apis
-                ],
-            })
+                )
+            rows.append(
+                {
+                    "id": manifest.id,
+                    "name": manifest.name,
+                    "runs_as": runs_as(self.users, manifest.origin),
+                    "enabled": self.features.enabled(manifest.id),
+                    "reach": sorted(manifest.models),
+                    "token": self.tokens.info(manifest.id),
+                    "services": services,
+                    "jobs": jobs,
+                    "webhooks": [
+                        {
+                            "id": h["id"],
+                            "path": h["path"],
+                            "model": h.get("model", ""),
+                            "forward": h.get("forward", ""),
+                            "signature": h.get("signature", ""),
+                            "secret": self.tokens.webhook_secret(manifest.id, h["id"]),
+                        }
+                        for h in manifest.webhooks
+                    ],
+                    "apis": [
+                        {"id": a["id"], "service": a["service"], "prefix": a.get("prefix", "")} for a in manifest.apis
+                    ],
+                }
+            )
         return rows
 
 

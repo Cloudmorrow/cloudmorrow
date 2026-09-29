@@ -84,9 +84,7 @@ async def test_unticking_tells_the_server_to_stop(app):
 
 async def test_a_machine_that_is_not_omarchy_cannot_be_ticked(app, monkeypatch):
     monkeypatch.setattr("cloudmorrow.tui.screens.settings.is_omarchy", lambda: False)
-    monkeypatch.setattr(
-        "cloudmorrow.tui.screens.settings.describe", lambda: "no ~/.config/hypr on this machine"
-    )
+    monkeypatch.setattr("cloudmorrow.tui.screens.settings.describe", lambda: "no ~/.config/hypr on this machine")
     app.client.agent_list = [agent_row("laptop", capabilities=["ping", "sysinfo"])]
     async with app.run_test() as pilot:
         screen = await open_settings(app, pilot)

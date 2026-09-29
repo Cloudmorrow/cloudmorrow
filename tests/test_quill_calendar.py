@@ -60,8 +60,7 @@ def event(cal, calendar: str, title: str, starts: str, ends: str | None = None, 
 # -- what the Quill seeds ----------------------------------------------------------
 def test_everybody_has_their_own_named_after_them_and_one_for_everybody(cal):
     bram = cal("GET", "/api/records/calendar")
-    assert sorted((c["scope"], c["fields"]["name"]) for c in bram) == [
-        ("personal", "bram"), ("public", "Everybody")]
+    assert sorted((c["scope"], c["fields"]["name"]) for c in bram) == [("personal", "bram"), ("public", "Everybody")]
     guest = cal("GET", "/api/records/calendar", who=cal.guest)
     assert sorted(c["fields"]["name"] for c in guest) == ["Everybody", "guest"]
     # Each sees their own and nobody else's.
@@ -89,8 +88,7 @@ def test_a_time_is_the_wall_clock_and_a_whole_day_is_a_date(cal):
     # A zone, when one is sent, is kept: that is a moment, not a wall clock.
     zoned = event(cal, home, "Call", "2026-10-01T10:00:00+02:00")
     assert zoned["fields"]["starts_at"] == "2026-10-01T10:00:00+02:00"
-    cal("POST", "/api/records/event", {"fields": {"calendar": home, "title": "x", "starts_at": "soon"}},
-        expect=400)
+    cal("POST", "/api/records/event", {"fields": {"calendar": home, "title": "x", "starts_at": "soon"}}, expect=400)
 
 
 # -- one call for a window of days -------------------------------------------------------
@@ -116,16 +114,18 @@ def test_a_range_is_on_indexed_fields_only_and_says_so(cal):
 def test_a_range_works_for_any_indexed_field_of_any_datamodel(tasks_quill, auth):
     board = tasks_quill.get("/api/records/board", headers=auth).json()[0]["id"]
     for title, due in (("early", "2026-10-01"), ("late", "2026-10-20"), ("none", None)):
-        tasks_quill.post("/api/records/task", json={"fields": {"board": board, "title": title, "due": due}},
-                         headers=auth)
+        tasks_quill.post(
+            "/api/records/task", json={"fields": {"board": board, "title": title, "due": due}}, headers=auth
+        )
     found = tasks_quill.get("/api/records/task", params={"due__lt": "2026-10-10"}, headers=auth).json()
     assert [t["fields"]["title"] for t in found] == ["early"]
 
 
 # -- the calendars themselves --------------------------------------------------------------
 def test_a_shared_calendar_is_its_peoples_and_they_are_told(cal):
-    house = cal("POST", "/api/records/calendar", {"fields": {"name": "House", "colour": "green"},
-                                                  "scope": "shared"}, expect=201)
+    house = cal(
+        "POST", "/api/records/calendar", {"fields": {"name": "House", "colour": "green"}, "scope": "shared"}, expect=201
+    )
     plumber = event(cal, house["id"], "Plumber", "2026-10-02T08:00", "2026-10-02T09:00")
     assert cal("GET", "/api/records/event", who=cal.guest, params=WEEK) == []
     cal("POST", f"/api/records/calendar/{house['id']}/members", {"username": "guest"})
@@ -136,10 +136,8 @@ def test_a_shared_calendar_is_its_peoples_and_they_are_told(cal):
     # In it, they write in it; its name and colour are its maker's, and so
     # is what somebody else wrote in it.
     event(cal, house["id"], "Boiler", "2026-10-03T08:00", "2026-10-03T09:00", who=cal.guest)
-    cal("PATCH", f"/api/records/event/{plumber['id']}", {"fields": {"title": "x"}}, who=cal.guest,
-        expect=403)
-    cal("PATCH", f"/api/records/calendar/{house['id']}", {"fields": {"colour": "rose"}}, who=cal.guest,
-        expect=403)
+    cal("PATCH", f"/api/records/event/{plumber['id']}", {"fields": {"title": "x"}}, who=cal.guest, expect=403)
+    cal("PATCH", f"/api/records/calendar/{house['id']}", {"fields": {"colour": "rose"}}, who=cal.guest, expect=403)
     cal("PATCH", f"/api/records/calendar/{house['id']}", {"fields": {"colour": "rose"}})
     # Its maker cannot leave it; the others can, and it is gone for them.
     cal("DELETE", f"/api/records/calendar/{house['id']}/members/bram", expect=400)
@@ -148,10 +146,10 @@ def test_a_shared_calendar_is_its_peoples_and_they_are_told(cal):
 
 
 def test_an_event_moves_to_another_calendar_and_a_deleted_calendar_takes_its_events(cal):
-    house = cal("POST", "/api/records/calendar", {"fields": {"name": "House"}, "scope": "shared"},
-                expect=201)
-    dentist = event(cal, mine(cal)["id"], "Dentist", "2026-10-01T10:00", "2026-10-01T11:00",
-                    location="town", notes="bring the card")
+    house = cal("POST", "/api/records/calendar", {"fields": {"name": "House"}, "scope": "shared"}, expect=201)
+    dentist = event(
+        cal, mine(cal)["id"], "Dentist", "2026-10-01T10:00", "2026-10-01T11:00", location="town", notes="bring the card"
+    )
     moved = cal("PATCH", f"/api/records/event/{dentist['id']}", {"fields": {"calendar": house["id"]}})
     assert moved["fields"]["calendar"] == house["id"]
     assert (moved["fields"]["location"], moved["fields"]["notes"]) == ("town", "bring the card")
@@ -162,14 +160,12 @@ def test_an_event_moves_to_another_calendar_and_a_deleted_calendar_takes_its_eve
 def test_an_event_is_its_writers_or_its_calendars_makers_to_change(cal):
     """Everybody in a shared calendar writes in it; only the writer, or whoever
     manages the calendar, changes or deletes what somebody wrote."""
-    house = cal("POST", "/api/records/calendar", {"fields": {"name": "House"}, "scope": "shared"},
-                expect=201)
+    house = cal("POST", "/api/records/calendar", {"fields": {"name": "House"}, "scope": "shared"}, expect=201)
     cal("POST", f"/api/records/calendar/{house['id']}/members", {"username": "guest"})
     mine = event(cal, house["id"], "Mine", "2026-10-01T10:00", "2026-10-01T11:00")
     theirs = event(cal, house["id"], "Theirs", "2026-10-02T10:00", "2026-10-02T11:00", who=cal.guest)
     # The guest cannot change bram's; bram made the calendar, so may change the guest's.
-    cal("PATCH", f"/api/records/event/{mine['id']}", {"fields": {"title": "x"}}, who=cal.guest,
-        expect=403)
+    cal("PATCH", f"/api/records/event/{mine['id']}", {"fields": {"title": "x"}}, who=cal.guest, expect=403)
     cal("DELETE", f"/api/records/event/{mine['id']}", who=cal.guest, expect=403)
     cal("PATCH", f"/api/records/event/{theirs['id']}", {"fields": {"title": "Theirs, moved"}})
     cal("PATCH", f"/api/records/event/{theirs['id']}", {"fields": {"title": "Back"}}, who=cal.guest)
@@ -196,8 +192,12 @@ def test_authored_is_true_false_or_or_manager_and_or_manager_is_in_a_space():
 
 def test_nobody_puts_a_thing_in_a_calendar_they_cannot_see(cal):
     theirs = mine(cal, cal.guest)["id"]
-    cal("POST", "/api/records/event", {"fields": {"calendar": theirs, "title": "x",
-                                                  "starts_at": "2026-10-01T10:00"}}, expect=400)
+    cal(
+        "POST",
+        "/api/records/event",
+        {"fields": {"calendar": theirs, "title": "x", "starts_at": "2026-10-01T10:00"}},
+        expect=400,
+    )
 
 
 def test_the_people_a_space_could_be_shared_with(cal):
@@ -281,15 +281,32 @@ def test_cm_calendar_lists_a_window_and_adds_with_its_moments(cli_screen):
     api = FakeApi(cli_screen.quill)
     asyncio.run(quillrun._act(api, cli_screen, "list", [], "", None, True, ("2026-10-01", "2026-10-31")))
     assert ("event", {"starts_at__lte": "2026-10-31T23:59", "ends_at__gte": "2026-10-01"}) in api.asked
-    asyncio.run(quillrun._act(api, cli_screen, "add", ["Dentist", "starts=2026-10-01T10:00"], "", None,
-                              False))
-    assert api.made[-1] == {"title": "Dentist", "starts_at": "2026-10-01T10:00",
-                            "ends_at": "2026-10-01T11:00", "all_day": False, "calendar": "r_mine"}
-    asyncio.run(quillrun._act(api, cli_screen, "add", ["Holiday", "starts_at=2026-10-12",
-                                                       "ends_at=2026-10-16", "calendar=House"], "", None,
-                              False))
-    assert api.made[-1] == {"title": "Holiday", "starts_at": "2026-10-12", "ends_at": "2026-10-16",
-                            "all_day": True, "calendar": "r_house"}
+    asyncio.run(quillrun._act(api, cli_screen, "add", ["Dentist", "starts=2026-10-01T10:00"], "", None, False))
+    assert api.made[-1] == {
+        "title": "Dentist",
+        "starts_at": "2026-10-01T10:00",
+        "ends_at": "2026-10-01T11:00",
+        "all_day": False,
+        "calendar": "r_mine",
+    }
+    asyncio.run(
+        quillrun._act(
+            api,
+            cli_screen,
+            "add",
+            ["Holiday", "starts_at=2026-10-12", "ends_at=2026-10-16", "calendar=House"],
+            "",
+            None,
+            False,
+        )
+    )
+    assert api.made[-1] == {
+        "title": "Holiday",
+        "starts_at": "2026-10-12",
+        "ends_at": "2026-10-16",
+        "all_day": True,
+        "calendar": "r_house",
+    }
 
 
 # -- from the old tables ------------------------------------------------------------------------
@@ -312,11 +329,14 @@ THEN = "2026-09-01T10:00:00+00:00"
 
 def old_calendar(conn, slug, name, kind, colour, owner, members) -> int:
     cursor = conn.execute(
-        "INSERT INTO calendars (slug, name, kind, colour, owner, created_at, updated_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?)", (slug, name, kind, colour, owner, THEN, THEN))
+        "INSERT INTO calendars (slug, name, kind, colour, owner, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (slug, name, kind, colour, owner, THEN, THEN),
+    )
     for who in members:
-        conn.execute("INSERT INTO calendar_members (calendar_id, username, joined_at) VALUES (?, ?, ?)",
-                     (cursor.lastrowid, who, THEN))
+        conn.execute(
+            "INSERT INTO calendar_members (calendar_id, username, joined_at) VALUES (?, ?, ?)",
+            (cursor.lastrowid, who, THEN),
+        )
     return int(cursor.lastrowid)
 
 
@@ -325,10 +345,19 @@ def old_event(conn, calendar_id, title, starts, ends, *, all_day=False, by="bram
     conn.execute(
         "INSERT INTO calendar_events (calendar_id, title, notes, location, starts_at, ends_at, all_day,"
         " created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (calendar_id, seal("calendar_events", "title", (calendar_id,), title),
-         seal("calendar_events", "notes", (calendar_id,), notes),
-         seal("calendar_events", "location", (calendar_id,), where),
-         starts, ends, int(all_day), by, THEN, "2026-09-02T10:00:00+00:00"))
+        (
+            calendar_id,
+            seal("calendar_events", "title", (calendar_id,), title),
+            seal("calendar_events", "notes", (calendar_id,), notes),
+            seal("calendar_events", "location", (calendar_id,), where),
+            starts,
+            ends,
+            int(all_day),
+            by,
+            THEN,
+            "2026-09-02T10:00:00+00:00",
+        ),
+    )
 
 
 @pytest.fixture()
@@ -348,10 +377,10 @@ def old(config, users):
         conn.executescript(OLD_SCHEMA)
         mine_id = old_calendar(conn, "my-bram", "Jimmi", "personal", "cyan", "bram", ["bram"])
         house = old_calendar(conn, "house", "House", "shared", "green", "bram", ["bram", "guest"])
-        everybody = old_calendar(conn, "holidays", "Holidays", "public", "violet", "guest",
-                                 ["bram", "guest"])
-        old_event(conn, mine_id, "Dentist", "2026-10-01T10:00", "2026-10-01T11:00",
-                  notes="bring the card", where="town")
+        everybody = old_calendar(conn, "holidays", "Holidays", "public", "violet", "guest", ["bram", "guest"])
+        old_event(
+            conn, mine_id, "Dentist", "2026-10-01T10:00", "2026-10-01T11:00", notes="bring the card", where="town"
+        )
         old_event(conn, house, "Plumber", "2026-10-02T08:00", "2026-10-02T09:00", by="guest")
         old_event(conn, everybody, "Autumn break", "2026-10-12", "2026-10-16", all_day=True)
     conn.close()
@@ -361,7 +390,7 @@ def old(config, users):
 def test_the_old_calendars_move_into_records_once(old, registry, records):
     db = old.db_path
     assert move_legacy_calendar(db, registry, records) == 6
-    assert "calendar" in registry.quills   # installed for them, from the catalog
+    assert "calendar" in registry.quills  # installed for them, from the catalog
     assert move_legacy_calendar(db, registry, records) == 0
     assert read_meta(db, LEGACY_CALENDAR) == "6"
 
@@ -382,7 +411,10 @@ def test_the_old_calendars_move_into_records_once(old, registry, records):
     assert events["Plumber"].owner == "guest"
     whole = events["Autumn break"]
     assert (whole.fields["starts_at"], whole.fields["ends_at"], whole.fields["all_day"]) == (
-        "2026-10-12", "2026-10-16", True)
+        "2026-10-12",
+        "2026-10-16",
+        True,
+    )
     # Who sees what is as it was: the guest has the shared one and everybody's, not bram's own.
     assert {e.fields["title"] for e in records.list(guest, "event")} == {"Plumber", "Autumn break"}
     # And listing makes no second calendar of anybody's own, nor a second one for everybody.
@@ -398,8 +430,10 @@ def test_a_server_that_never_had_the_old_calendar_moves_nothing(config, users, r
 def test_a_calendar_switched_off_and_empty_is_not_installed(config, users, registry, records):
     with connect(config.db_path) as conn:
         conn.executescript(OLD_SCHEMA)
-        conn.execute("CREATE TABLE IF NOT EXISTS features (key TEXT PRIMARY KEY, enabled INTEGER,"
-                     " changed_by TEXT, updated_at TEXT)")
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS features (key TEXT PRIMARY KEY, enabled INTEGER,"
+            " changed_by TEXT, updated_at TEXT)"
+        )
         conn.execute("INSERT OR REPLACE INTO features VALUES ('calendar', 0, 'bram', ?)", (THEN,))
     conn.close()
     assert move_legacy_calendar(config.db_path, registry, records) == 0
@@ -418,8 +452,13 @@ def test_boot_installs_it_for_a_server_that_had_the_calendar_on(config, users, r
 
 def test_the_old_code_is_gone():
     root = Path(__file__).parent.parent / "src" / "cloudmorrow"
-    for gone in ("server/calendar.py", "server/routes/calendar.py", "server/web/calendar.js",
-                 "server/web/calendar.css", "tui/panes/calendar.py"):
+    for gone in (
+        "server/calendar.py",
+        "server/routes/calendar.py",
+        "server/web/calendar.js",
+        "server/web/calendar.css",
+        "tui/panes/calendar.py",
+    ):
         assert not (root / gone).exists(), gone
     from cloudmorrow.server.features import FEATURE_KEYS
 

@@ -62,9 +62,7 @@ async def _entry(api: CloudmorrowClient, grid: _Grid, group: str, path: str) -> 
     fail(f"there is nothing called {path!r} in {group}")
 
 
-async def _act_grid(
-    api: CloudmorrowClient, screen: Screen, action: str, args: list[str], plain: bool
-) -> None:
+async def _act_grid(api: CloudmorrowClient, screen: Screen, action: str, args: list[str], plain: bool) -> None:
     grid = _Grid(screen)
     command = f"cm {screen.quill['id']}"
     if action in ("list", "groups") and not args:
@@ -98,8 +96,9 @@ async def _act_grid(
             table.add_column(column)
         folders = [r for r in found if r["fields"].get(grid.kind) == "folder"]
         others = [r for r in found if r["fields"].get(grid.kind) != "folder"]
-        for record in sorted(folders, key=lambda r: str(r["fields"].get(grid.name, "")).casefold()) + \
-                sorted(others, key=lambda r: str(r["fields"].get(grid.name, "")).casefold()):
+        for record in sorted(folders, key=lambda r: str(r["fields"].get(grid.name, "")).casefold()) + sorted(
+            others, key=lambda r: str(r["fields"].get(grid.name, "")).casefold()
+        ):
             fields = record["fields"]
             is_dir = fields.get(grid.kind) == "folder"
             table.add_row(
@@ -135,18 +134,19 @@ async def _act_grid(
             if not source.is_file():
                 fail(f"there is no file at {source}")
             made = await api.upload_record(
-                screen.model, {**grid.where(group, folder), grid.name: source.name},
+                screen.model,
+                {**grid.where(group, folder), grid.name: source.name},
                 source.read_bytes(),
             )
-            quillrun.console.print(f"[green]Put[/] {escape(str(made['fields'].get(grid.name)))} "
-                          f"in {escape(group)}/{escape(folder.strip('/'))}")
+            quillrun.console.print(
+                f"[green]Put[/] {escape(str(made['fields'].get(grid.name)))} "
+                f"in {escape(group)}/{escape(folder.strip('/'))}"
+            )
     elif action == "add":
         if not rest:
             fail(f"add what? {command} add {group} <folder/new folder>")
         folder, _, name = rest[0].strip("/").rpartition("/")
-        await api.create_record(
-            screen.model, {**grid.where(group, folder), grid.name: name, grid.kind: "folder"}
-        )
+        await api.create_record(screen.model, {**grid.where(group, folder), grid.name: name, grid.kind: "folder"})
         quillrun.console.print(f"[green]Made[/] {escape(rest[0].strip('/'))}/")
     elif action in ("show", "delete", "set"):
         if not rest:
@@ -158,9 +158,7 @@ async def _act_grid(
             else:
                 _show_record(screen, record)
         elif action == "set":
-            changed = await api.update_record(
-                screen.model, record["id"], _pairs(rest[1:], screen), rev=record["rev"]
-            )
+            changed = await api.update_record(screen.model, record["id"], _pairs(rest[1:], screen), rev=record["rev"])
             quillrun.console.print(f"[green]Saved[/] {escape(str(changed['fields'].get(grid.name, '')))}")
         else:
             await api.delete_record(screen.model, record["id"])

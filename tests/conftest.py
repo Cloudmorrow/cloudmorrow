@@ -26,9 +26,7 @@ def isolated_client_config(tmp_path_factory, monkeypatch):
     in the config of whoever is running the tests. Autouse because the test
     that needs this is always the one that forgot to ask for it.
     """
-    monkeypatch.setenv(
-        "CLOUDMORROW_CONFIG_DIR", str(tmp_path_factory.mktemp("client-config"))
-    )
+    monkeypatch.setenv("CLOUDMORROW_CONFIG_DIR", str(tmp_path_factory.mktemp("client-config")))
 
 
 # A local copy of the Quill Catalog, so no test reaches the network.

@@ -22,9 +22,7 @@ from tests.conftest import ADMIN, GUEST, token_for
 
 def api_for(test_client, token: str) -> CloudmorrowClient:
     api = CloudmorrowClient(ClientConfig(api_url="http://testserver"), token=token)
-    api._client = httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=test_client.app), base_url="http://testserver"
-    )
+    api._client = httpx.AsyncClient(transport=httpx.ASGITransport(app=test_client.app), base_url="http://testserver")
     return api
 
 
@@ -60,9 +58,16 @@ def test_say_then_show_then_list(run, chat_quill):
 
 def test_a_direct_conversation_is_found_by_the_other_persons_name(run, chat_quill):
     bram = {"Authorization": f"Bearer {token_for(chat_quill, *ADMIN)}"}
-    chat_quill.post("/api/records/channel", headers=bram, json={
-        "fields": {"name": "bram & guest", "kind": "direct"}, "scope": "shared",
-        "members": ["guest"], "unique": True})
+    chat_quill.post(
+        "/api/records/channel",
+        headers=bram,
+        json={
+            "fields": {"name": "bram & guest", "kind": "direct"},
+            "scope": "shared",
+            "members": ["guest"],
+            "unique": True,
+        },
+    )
     run("say", "guest", "are you up")
     assert "are you up" in run("show", "bram", who=GUEST)
 

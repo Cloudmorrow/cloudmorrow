@@ -29,9 +29,7 @@ def switch(client, auth, key: str, enabled: bool):
 
 
 def server_switch(client, auth, key: str, enabled: bool):
-    response = client.patch(
-        f"/api/server/features/{key}", json={"enabled": enabled}, headers=auth
-    )
+    response = client.patch(f"/api/server/features/{key}", json={"enabled": enabled}, headers=auth)
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -67,9 +65,7 @@ def test_switching_one_off_is_remembered_and_reversible(secrets_quill, auth):
     assert response.json() == {
         "key": "secrets",
         "label": "Secrets",
-        "description": (
-            "Keys and passwords in vaults and environments, sealed, and never shown until you ask."
-        ),
+        "description": ("Keys and passwords in vaults and environments, sealed, and never shown until you ask."),
         "enabled": False,
     }
     assert {row["key"]: row["enabled"] for row in mine(client, auth)}["secrets"] is False
@@ -111,7 +107,8 @@ def test_what_you_switch_off_you_are_not_counted_for(chat_quill, auth, guest):
     client = chat_quill
     general = client.get("/api/records/channel", headers=auth).json()[0]
     client.post(
-        "/api/records/message", json={"fields": {"channel": general["id"], "body": "morning"}},
+        "/api/records/message",
+        json={"fields": {"channel": general["id"], "body": "morning"}},
         headers=guest,
     )
     assert client.get("/api/push/badge", headers=auth).json()["messages"] == 1
@@ -139,17 +136,13 @@ def test_an_account_that_goes_takes_its_answers_with_it(secrets_quill, auth, gue
 def test_the_servers_own_list_is_unchanged_by_yours(secrets_quill, auth):
     client = secrets_quill
     switch(client, auth, "secrets", False)
-    server = {row["key"]: row["enabled"] for row in client.get(
-        "/api/server/features", headers=auth
-    ).json()}
+    server = {row["key"]: row["enabled"] for row in client.get("/api/server/features", headers=auth).json()}
     assert server["secrets"] is True, "your preference is not the server's setting"
 
 
 def test_only_an_administrator_throws_the_servers_switch(notes_quill, guest):
     client = notes_quill
-    assert client.patch(
-        "/api/server/features/notes", json={"enabled": False}, headers=guest
-    ).status_code == 403
+    assert client.patch("/api/server/features/notes", json={"enabled": False}, headers=guest).status_code == 403
     # But anybody may switch their own.
     assert switch(client, guest, "notes", False).status_code == 200
 

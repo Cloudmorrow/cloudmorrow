@@ -100,14 +100,10 @@ def fitted(quill: dict, access: Access) -> dict:
         kept[model_id] = model | {
             "access": level,
             "fields": [
-                f for f in model["fields"]
-                if f["kind"] != "link" or not f.get("to") or access.may("read", f["to"])
+                f for f in model["fields"] if f["kind"] != "link" or not f.get("to") or access.may("read", f["to"])
             ],
         }
-    screens = [
-        screen for screen in quill["screens"]
-        if all(needed in kept for needed in _screen_needs(screen, models))
-    ]
+    screens = [screen for screen in quill["screens"] if all(needed in kept for needed in _screen_needs(screen, models))]
     own = set(quill["uses"]) | set(quill["introduces"]) | set(quill["extends"])
     available = bool(screens) if quill["screens"] else any(m in kept for m in own)
     # An action on records they cannot see is not theirs to press; one they
@@ -128,9 +124,7 @@ def _for(state: AppState, user: User, quill: dict) -> dict:
 
 
 @router.get("")
-def list_quills(
-    state: AppState = Depends(get_state), user: User = Depends(get_current_user)
-) -> list[dict]:
+def list_quills(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> list[dict]:
     """Every installed Quill, with whether it is on for you, and what it draws."""
     rows = []
     for quill in state.quills.installed():
@@ -150,9 +144,7 @@ def catalog(state: AppState = Depends(get_state), _: User = Depends(get_current_
     installed = {q.id: q.version for q in state.quills.quills.values()}
     return {
         "categories": found.categories,
-        "quills": [
-            {**entry, "installed_version": installed.get(entry["id"])} for entry in found.quills
-        ],
+        "quills": [{**entry, "installed_version": installed.get(entry["id"])} for entry in found.quills],
     }
 
 
@@ -165,18 +157,22 @@ def _resolve(state: AppState, payload: QuillSource, tmp: Path) -> tuple[Path, Pa
         entry = found.entry(payload.id)
         folder = fetch(entry["repo"], str(entry.get("ref", "")), base=found.base, into=tmp / "q")
         models = state.quills.datamodels_source(found, tmp / "m")
-        return folder, models, {
-            "catalog": True, "repo": entry["repo"], "ref": entry.get("ref", ""),
-            "position": found.quills.index(entry),
-        }
+        return (
+            folder,
+            models,
+            {
+                "catalog": True,
+                "repo": entry["repo"],
+                "ref": entry.get("ref", ""),
+                "position": found.quills.index(entry),
+            },
+        )
     folder = fetch(payload.source, payload.ref, into=tmp / "q")
     if payload.datamodels:
         models = fetch(payload.datamodels, "", into=tmp / "m")
     else:
         try:
-            models = state.quills.datamodels_source(
-                load_catalog(state.config.quill_catalog), tmp / "m"
-            )
+            models = state.quills.datamodels_source(load_catalog(state.config.quill_catalog), tmp / "m")
         except QuillError:
             models = None
     return folder, models, {"catalog": False, "repo": payload.source, "ref": payload.ref}
@@ -207,9 +203,7 @@ def install(
         try:
             folder, models, origin = _resolve(state, payload, Path(tmp))
             # Its code, if it has any, runs as whoever said yes.
-            return state.quills.install(
-                folder, models, origin=origin | {"installed_by": admin.username}
-            )
+            return state.quills.install(folder, models, origin=origin | {"installed_by": admin.username})
         except QuillError as exc:
             raise _bad(exc) from exc
 
@@ -228,35 +222,28 @@ async def upload(
     """
     data = await request.body()
     if len(data) > MAX_DOWNLOAD:
-        raise HTTPException(
-            413, "bigger than a Quill should be"
-        )
+        raise HTTPException(413, "bigger than a Quill should be")
     with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
         root = Path(tmp) / "q"
         try:
             with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
                 archive.extractall(root, filter="data")
         except (tarfile.TarError, OSError) as exc:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST, f"not a .tar.gz of a Quill: {exc}"
-            ) from exc
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"not a .tar.gz of a Quill: {exc}") from exc
         manifests = sorted(root.rglob(MANIFEST), key=lambda p: len(p.parts))
         if not manifests:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST, f"there is no {MANIFEST} in what was sent"
-            )
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"there is no {MANIFEST} in what was sent")
         folder = manifests[0].parent
         try:
-            models = state.quills.datamodels_source(
-                load_catalog(state.config.quill_catalog), Path(tmp) / "m"
-            )
+            models = state.quills.datamodels_source(load_catalog(state.config.quill_catalog), Path(tmp) / "m")
         except QuillError:
             models = None
         try:
             if plan_only:
                 return state.quills.plan(folder, models)
             return state.quills.install(
-                folder, models,
+                folder,
+                models,
                 origin={"catalog": False, "dev": True, "installed_by": admin.username},
             )
         except QuillError as exc:
@@ -339,9 +326,7 @@ def press(
 ) -> dict:
     """Run an action as whoever pressed it: what the surface does next, as effects."""
     try:
-        effects = _code(state).action(
-            user.username, quill_id, action_id, record=payload.record, fields=payload.fields
-        )
+        effects = _code(state).action(user.username, quill_id, action_id, record=payload.record, fields=payload.fields)
     except CodeError as exc:
         raise _failed(exc) from exc
     return {"effects": effects}

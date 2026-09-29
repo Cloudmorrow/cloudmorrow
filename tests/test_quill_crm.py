@@ -48,11 +48,7 @@ def crm(client):
 
 
 def book_named(crm, name, who=None):
-    return next(
-        b
-        for b in crm("GET", "/api/records/book", who=who or crm.bram)
-        if b["fields"]["name"] == name
-    )
+    return next(b for b in crm("GET", "/api/records/book", who=who or crm.bram) if b["fields"]["name"] == name)
 
 
 def stage_names(crm, book_id, who=None):
@@ -100,20 +96,14 @@ def test_a_contact_in_no_book_is_its_writers_own_and_one_in_a_book_is_the_books(
     theirs = [c["fields"]["name"] for c in crm("GET", "/api/records/contact", who=crm.guest)]
     assert theirs == ["Ada"]
     crm("GET", f"/api/records/contact/{mine['id']}", who=crm.guest, expect=404)
-    assert (
-        crm("GET", f"/api/records/contact/{shared['id']}", who=crm.guest)["fields"]["email"]
-        == "ada@example.com"
-    )
+    assert crm("GET", f"/api/records/contact/{shared['id']}", who=crm.guest)["fields"]["email"] == "ada@example.com"
     # Moved into the book, it is sealed to the book, and everybody there reads it.
     crm(
         "PATCH",
         f"/api/records/contact/{mine['id']}",
         {"fields": {"book": customers["id"], "notes": "Tuesdays"}},
     )
-    assert (
-        crm("GET", f"/api/records/contact/{mine['id']}", who=crm.guest)["fields"]["notes"]
-        == "Tuesdays"
-    )
+    assert crm("GET", f"/api/records/contact/{mine['id']}", who=crm.guest)["fields"]["notes"] == "Tuesdays"
 
 
 def test_a_space_link_that_clears_is_refused():
@@ -154,9 +144,7 @@ def test_record_lanes_say_done_by_what_the_lane_has(tmp_path, done, problem):
     source = (FIXTURES / "quill-crm" / "quill.toml").read_text()
     folder = tmp_path / "crm"
     folder.mkdir()
-    (folder / "quill.toml").write_text(
-        source.replace('done = { outcome = "won" }', f"done = {done}")
-    )
+    (folder / "quill.toml").write_text(source.replace('done = { outcome = "won" }', f"done = {done}"))
     (folder / "quill.py").write_text((FIXTURES / "quill-crm" / "quill.py").read_text())
     registry = QuillRegistry(tmp_path / "quills", tmp_path / "datamodels")
     with pytest.raises(QuillError, match=re.escape(problem)):
@@ -207,13 +195,9 @@ def test_an_older_contact_is_brought_up_to_date_by_a_quill_that_needs_the_newer(
     for name in ("contact", "organisation"):
         text = (DATAMODELS / "crm" / f"{name}.toml").read_text()
         lines = [
-            line
-            for line in text.splitlines()
-            if not line.startswith(("book =", "in_space", "role =", "industry ="))
+            line for line in text.splitlines() if not line.startswith(("book =", "in_space", "role =", "industry ="))
         ]
-        (old / "crm" / f"{name}.toml").write_text(
-            "\n".join(lines).replace("version = 2", "version = 1")
-        )
+        (old / "crm" / f"{name}.toml").write_text("\n".join(lines).replace("version = 2", "version = 1"))
     registry = QuillRegistry(tmp_path / "quills", tmp_path / "datamodels")
     plain = tmp_path / "plain"
     plain.mkdir()
@@ -276,11 +260,7 @@ class FakeRecords:
         self.moves: list[tuple] = []
 
     async def records(self, model, **where):
-        return [
-            r
-            for r in self.rows.get(model, [])
-            if all(r["fields"].get(k) == v for k, v in where.items())
-        ]
+        return [r for r in self.rows.get(model, []) if all(r["fields"].get(k) == v for k, v in where.items())]
 
     async def move_record(self, model, record_id, fields, index):
         self.moves.append((model, record_id, fields, index))
@@ -323,9 +303,7 @@ def test_the_terminal_board_draws_a_books_stages_as_its_lanes():
                 await pilot.pause()
             assert [lane.label for lane in pane.query(Lane)] == ["Lead", "Proposal", "Won", "Lost"]
             assert pane.done == "r_st2"
-            by_lane = {
-                lane.label: [c.record["id"] for c in lane.cards()] for lane in pane.query(Lane)
-            }
+            by_lane = {lane.label: [c.record["id"] for c in lane.cards()] for lane in pane.query(Lane)}
             # A deal in no stage is drawn in the first, where it can be moved from.
             assert by_lane == {"Lead": ["r_d2"], "Proposal": ["r_d1"], "Won": [], "Lost": []}
             card = next(c for c in pane.query(RecordCard) if c.record["id"] == "r_d1")

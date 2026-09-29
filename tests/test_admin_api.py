@@ -41,17 +41,13 @@ def test_a_screen_on_the_wall_is_a_systems_user_that_displays_dashboards(client,
     assert account["user_type"] == "systems_user"
     # It may sign in, and it is not an administrator.
     assert account["is_admin"] is False
-    signed_in = client.post(
-        "/api/auth/login", json={"username": "hallway", "password": "supersecret1"}
-    )
+    signed_in = client.post("/api/auth/login", json={"username": "hallway", "password": "supersecret1"})
     assert signed_in.status_code == 200
     assert signed_in.json()["user"]["role"] == "dashboard_displayer"
 
 
 def test_the_role_decides_what_is_admin(client, auth):
-    promoted = client.patch(
-        "/api/users/guest", headers=auth, json={"role": "administrator"}
-    ).json()
+    promoted = client.patch("/api/users/guest", headers=auth, json={"role": "administrator"}).json()
     assert promoted["is_admin"] is True
     # And the guest can now read the user list they could not read before.
     assert client.get("/api/users", headers=headers(client, GUEST)).status_code == 200
@@ -104,9 +100,7 @@ def test_every_feature_is_on_to_begin_with(tasks_quill, notes_quill, secrets_qui
 def test_a_switched_off_feature_closes_its_api(tasks_quill, auth):
     client = tasks_quill
     assert client.get("/api/records/board", headers=auth).status_code == 200
-    switched = client.patch(
-        "/api/server/features/tasks", headers=auth, json={"enabled": False}
-    )
+    switched = client.patch("/api/server/features/tasks", headers=auth, json={"enabled": False})
     assert switched.status_code == 200
     assert switched.json()["changed_by"] == ADMIN[0]
 
@@ -132,14 +126,10 @@ def test_only_an_administrator_may_switch_one(client):
     guest = headers(client, GUEST)
     # A plain user reads the list — a client has to know which tabs to draw.
     assert client.get("/api/server/features", headers=guest).status_code == 200
-    refused = client.patch(
-        "/api/server/features/notes", headers=guest, json={"enabled": False}
-    )
+    refused = client.patch("/api/server/features/notes", headers=guest, json={"enabled": False})
     assert refused.status_code == 403
 
 
 def test_a_feature_nobody_has_heard_of_is_a_404(client, auth):
-    refused = client.patch(
-        "/api/server/features/telepathy", headers=auth, json={"enabled": False}
-    )
+    refused = client.patch("/api/server/features/telepathy", headers=auth, json={"enabled": False})
     assert refused.status_code == 404

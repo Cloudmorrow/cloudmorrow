@@ -272,9 +272,7 @@ def _columns(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
             if (table, column) == ("users", "role"):
                 # Everyone who was an admin before roles existed is one now.
-                conn.execute(
-                    "UPDATE users SET role = ? WHERE is_admin = 1", (ROLE_ADMIN,)
-                )
+                conn.execute("UPDATE users SET role = ? WHERE is_admin = 1", (ROLE_ADMIN,))
     conn.commit()
 
 
@@ -314,9 +312,7 @@ class Step:
     run: Callable[[sqlite3.Connection], None]
 
 
-STEPS: tuple[Step, ...] = (
-    Step(1, "the tables as they stood before they were versioned", _baseline),
-)
+STEPS: tuple[Step, ...] = (Step(1, "the tables as they stood before they were versioned", _baseline),)
 
 VERSION = STEPS[-1].version
 

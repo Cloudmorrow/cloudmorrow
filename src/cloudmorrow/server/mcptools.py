@@ -150,17 +150,13 @@ def search_notes(state: AppState, user: User, args: dict[str, Any]) -> Any:
 
 
 def create_note(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    note = _notes(state, user).create_note(
-        _str(args, "path", required=True), _str(args, "content")
-    )
+    note = _notes(state, user).create_note(_str(args, "path", required=True), _str(args, "content"))
     return {"path": note.path, "rev": note.rev, "created": True}
 
 
 def write_note(state: AppState, user: User, args: dict[str, Any]) -> Any:
     rev = _str(args, "rev") or None
-    note = _notes(state, user).write(
-        _str(args, "path", required=True), _str(args, "content", required=True), rev=rev
-    )
+    note = _notes(state, user).write(_str(args, "path", required=True), _str(args, "content", required=True), rev=rev)
     return {"path": note.path, "rev": note.rev}
 
 
@@ -177,9 +173,7 @@ def append_to_note(state: AppState, user: User, args: dict[str, Any]) -> Any:
 
 
 def move_note(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    moved = _notes(state, user).move(
-        _str(args, "from", required=True), _str(args, "to", required=True)
-    )
+    moved = _notes(state, user).move(_str(args, "from", required=True), _str(args, "to", required=True))
     return {"path": moved}
 
 
@@ -264,21 +258,31 @@ def create_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
         if state.users.get(username) is None:
             raise ToolError(f"no such account: {username}")
     return state.records.create(
-        _principal(user), _model(state, args), _fields(args), index=_int(args, "index"),
-        scope=_str(args, "scope") or None, members=members,
+        _principal(user),
+        _model(state, args),
+        _fields(args),
+        index=_int(args, "index"),
+        scope=_str(args, "scope") or None,
+        members=members,
     ).to_dict()
 
 
 def update_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
     return state.records.update(
-        _principal(user), _model(state, args), _str(args, "id", required=True), _fields(args),
+        _principal(user),
+        _model(state, args),
+        _str(args, "id", required=True),
+        _fields(args),
         rev=_rev(args),
     ).to_dict()
 
 
 def move_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
     return state.records.move(
-        _principal(user), _model(state, args), _str(args, "id", required=True), _fields(args),
+        _principal(user),
+        _model(state, args),
+        _str(args, "id", required=True),
+        _fields(args),
         _int(args, "index"),
     ).to_dict()
 
@@ -352,8 +356,9 @@ def quill_dev_install(state: AppState, user: User, args: dict[str, Any]) -> Any:
         folder = _write_draft(state, args, Path(tmp) / "q")
         try:
             plan = state.quills.install(
-                folder, _datamodels_for(state, Path(tmp)), origin={"catalog": False, "dev": True, "by": "assistant",
-                        "installed_by": user.username}
+                folder,
+                _datamodels_for(state, Path(tmp)),
+                origin={"catalog": False, "dev": True, "by": "assistant", "installed_by": user.username},
             )
         except QuillError as exc:
             raise ToolError(f"not installed: {exc}") from exc
@@ -484,15 +489,20 @@ TOOLS: tuple[Tool, ...] = (
     Tool(
         "list_records",
         "List the user's records of one datamodel, in order. Filter with `where` on indexed "
-        "fields, e.g. {\"board\": \"r_…\", \"lane\": \"todo\"}; `name__lt`, `__lte`, `__gt`, "
-        "`__gte` are ranges, e.g. the events in October: {\"starts_at__lte\": "
-        "\"2026-10-31T23:59\", \"ends_at__gte\": \"2026-10-01\"}. A datetime without a zone is "
+        'fields, e.g. {"board": "r_…", "lane": "todo"}; `name__lt`, `__lte`, `__gt`, '
+        '`__gte` are ranges, e.g. the events in October: {"starts_at__lte": '
+        '"2026-10-31T23:59", "ends_at__gte": "2026-10-01"}. A datetime without a zone is '
         "the wall clock; a bare date is a whole day. Search their text with `q` "
         "(a found record's `preview` is the line that matched).",
-        _schema({"model": _MODEL, "where": {"type": "object", "description": "Indexed field to value."},
-                 "q": {"type": "string", "description": "Text to search for. Optional."},
-                 "last": {"type": "integer", "description": "Only the newest this many, e.g. of a conversation."}},
-                ("model",)),
+        _schema(
+            {
+                "model": _MODEL,
+                "where": {"type": "object", "description": "Indexed field to value."},
+                "q": {"type": "string", "description": "Text to search for. Optional."},
+                "last": {"type": "integer", "description": "Only the newest this many, e.g. of a conversation."},
+            },
+            ("model",),
+        ),
         "",
         list_records,
     ),
@@ -507,32 +517,51 @@ TOOLS: tuple[Tool, ...] = (
         "create_record",
         "Make a record of a datamodel from its fields. Links are record ids. A space (a channel, "
         "a calendar) takes a scope, and a shared one the people in it besides you.",
-        _schema({"model": _MODEL, "fields": _FIELDS,
-                 "index": {"type": "integer", "description": "Place in its group; the end when left out."},
-                 "scope": {"type": "string", "description": "For a space: personal, shared or public."},
-                 "members": {"type": "array", "items": {"type": "string"},
-                             "description": "For a shared space: usernames to put in it."}},
-                ("model", "fields")),
+        _schema(
+            {
+                "model": _MODEL,
+                "fields": _FIELDS,
+                "index": {"type": "integer", "description": "Place in its group; the end when left out."},
+                "scope": {"type": "string", "description": "For a space: personal, shared or public."},
+                "members": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "For a shared space: usernames to put in it.",
+                },
+            },
+            ("model", "fields"),
+        ),
         "",
         create_record,
     ),
     Tool(
         "update_record",
-        "Change some fields of a record. Pass the rev you read so a change made elsewhere "
-        "is not overwritten.",
-        _schema({"model": _MODEL, "id": _RECORD_ID, "fields": _FIELDS,
-                 "rev": {"type": ["integer", "string"], "description": "The rev from get_record. Optional."}},
-                ("model", "id", "fields")),
+        "Change some fields of a record. Pass the rev you read so a change made elsewhere is not overwritten.",
+        _schema(
+            {
+                "model": _MODEL,
+                "id": _RECORD_ID,
+                "fields": _FIELDS,
+                "rev": {"type": ["integer", "string"], "description": "The rev from get_record. Optional."},
+            },
+            ("model", "id", "fields"),
+        ),
         "",
         update_record,
     ),
     Tool(
         "move_record",
-        "Move a record to another group (a task to another lane: {\"lane\": \"done\"}) and/or "
+        'Move a record to another group (a task to another lane: {"lane": "done"}) and/or '
         "to a place in it. Done tasks are swept away after a week.",
-        _schema({"model": _MODEL, "id": _RECORD_ID, "fields": _FIELDS,
-                 "index": {"type": "integer", "description": "0 for the top; the end when left out."}},
-                ("model", "id")),
+        _schema(
+            {
+                "model": _MODEL,
+                "id": _RECORD_ID,
+                "fields": _FIELDS,
+                "index": {"type": "integer", "description": "0 for the top; the end when left out."},
+            },
+            ("model", "id"),
+        ),
         "",
         move_record,
     ),
@@ -617,7 +646,9 @@ def _notes_allowed(state: AppState, user: User | None, tool: Tool) -> str:
 # not, is given no secret, and an action marked `assistant = false` is not
 # offered at all.
 JSON_KIND = {
-    "bool": {"type": "boolean"}, "int": {"type": "integer"}, "decimal": {"type": "number"},
+    "bool": {"type": "boolean"},
+    "int": {"type": "integer"},
+    "decimal": {"type": "number"},
     "json": {},
 }
 
@@ -645,7 +676,9 @@ def _action_tool(state: AppState, manifest, action: dict) -> Tool:
     properties = {f["name"]: _field_schema(f) for f in action["fields"]}
     required = [f["name"] for f in action["fields"] if f.get("required")]
     if action.get("on"):
-        properties = {"record": {"type": "string", "description": f"The id of the {action['on']} to do it to."}} | properties
+        properties = {
+            "record": {"type": "string", "description": f"The id of the {action['on']} to do it to."}
+        } | properties
         required = ["record", *required]
     description = f"{manifest.name}: {action['label']}."
     if action.get("description"):
@@ -704,8 +737,7 @@ def available(state: AppState, user: User | None = None) -> list[Tool]:
     """The tools on offer right now: those whose feature is switched on, and —
     for *user* — that their circles let them use; then every Quill's actions."""
     return [
-        tool for tool in TOOLS
-        if _enabled(state, tool.feature) and not _notes_allowed(state, user, tool)
+        tool for tool in TOOLS if _enabled(state, tool.feature) and not _notes_allowed(state, user, tool)
     ] + action_tools(state, user)
 
 
@@ -736,17 +768,14 @@ def call(state: AppState, user: User, name: str, arguments: Any) -> dict[str, An
         return _error(str(exc))
     except NoteConflictError as exc:
         return _error(
-            "the note changed since it was read; read it again before writing."
-            f" Its rev is now {exc.current_rev}"
+            f"the note changed since it was read; read it again before writing. Its rev is now {exc.current_rev}"
         )
     except NoteNotFoundError as exc:
         return _error(f"no such note or folder: {exc}")
     except NoteExistsError as exc:
         return _error(f"already there: {exc}")
     except RecordConflictError as exc:
-        return _error(
-            f"the record changed since it was read; its rev is now {exc.current.rev}. Read it again."
-        )
+        return _error(f"the record changed since it was read; its rev is now {exc.current.rev}. Read it again.")
     except Refused as exc:
         return _error(f"not allowed: {exc}")
     except (LookupError, ValueError, FileExistsError, UnsafePathError) as exc:

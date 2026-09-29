@@ -17,9 +17,7 @@ from cloudmorrow.server.update import (
 
 
 def git(*args: str, cwd) -> str:
-    return subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
-    ).stdout.strip()
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True).stdout.strip()
 
 
 @pytest.fixture()
@@ -220,9 +218,7 @@ def test_a_deploy_never_makes_a_merge_commit(deployment):
 
     assert result.new_commit == current_commit(origin)
     # Exactly the remote's history, with nothing of the server's spliced in.
-    assert git("rev-list", "--count", "HEAD", cwd=checkout) == git(
-        "rev-list", "--count", "HEAD", cwd=origin
-    )
+    assert git("rev-list", "--count", "HEAD", cwd=checkout) == git("rev-list", "--count", "HEAD", cwd=origin)
     assert not (checkout / "local.txt").exists()
 
 

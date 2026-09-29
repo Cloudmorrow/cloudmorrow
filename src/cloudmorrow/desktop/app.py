@@ -75,9 +75,7 @@ def cloud_name(config: ClientConfig, *, timeout: float = 3.0) -> str:
         # Asked before the window's own check, so it is refused here first:
         # a plain-http address to elsewhere is not asked anything, even this.
         check_url(config.api_url, allow_insecure=config.allow_insecure_http)
-        response = httpx.get(
-            config.api_url.rstrip("/") + "/api/health", timeout=timeout, verify=config.verify_tls
-        )
+        response = httpx.get(config.api_url.rstrip("/") + "/api/health", timeout=timeout, verify=config.verify_tls)
         name = str(response.json().get("name") or "").strip()
     except (httpx.HTTPError, ValueError, AttributeError):
         name = ""
@@ -111,11 +109,7 @@ class Plan:
 def plan(config: ClientConfig | None = None, *, title: str | None = None) -> Plan:
     config = config or ClientConfig.load()
     credentials = StoredCredentials.load()
-    signed_in = (
-        credentials.username
-        if credentials and credentials.api_url.rstrip("/") == config.api_url
-        else ""
-    )
+    signed_in = credentials.username if credentials and credentials.api_url.rstrip("/") == config.api_url else ""
     return Plan(
         url=app_url(config),
         title=title if title is not None else cloud_name(config),
@@ -139,9 +133,7 @@ def launch(config: ClientConfig | None = None, *, debug: bool = False, on_start=
     except InsecureUrlError as exc:
         raise DesktopError(str(exc)) from exc
     if not system.has_display():
-        raise DesktopError(
-            "there is no display here to open a window on — `cm` is the terminal app"
-        )
+        raise DesktopError("there is no display here to open a window on — `cm` is the terminal app")
     try:
         import webview
     except ImportError as exc:

@@ -241,18 +241,12 @@ class LiveMarkdownEditor(ScrollView, can_focus=True):
         # Only the background: the text keeps its own colour, the way a
         # selection looks everywhere else. Laid over the line, not under it —
         # every cell already has a background, which would otherwise win.
-        highlight = Style(
-            bgcolor=self.screen.get_component_rich_style("screen--selection").bgcolor
-        )
-        selected = Strip(
-            list(Segment.apply_style(list(strip.crop(start, end)), post_style=highlight))
-        )
+        highlight = Style(bgcolor=self.screen.get_component_rich_style("screen--selection").bgcolor)
+        selected = Strip(list(Segment.apply_style(list(strip.crop(start, end)), post_style=highlight)))
         return Strip.join([strip.crop(0, start), selected, strip.crop(end, length)])
 
     def _scroll_to_cursor(self) -> None:
-        self.scroll_to_region(
-            Region(self.cursor_col, self.cursor_row, 2, 1), animate=False, force=True
-        )
+        self.scroll_to_region(Region(self.cursor_col, self.cursor_row, 2, 1), animate=False, force=True)
 
     def watch_cursor_row(self) -> None:
         # Leaving a line is what flips it from source to rendered markdown.

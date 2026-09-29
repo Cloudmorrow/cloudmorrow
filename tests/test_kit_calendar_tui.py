@@ -28,8 +28,15 @@ from cloudmorrow.tui.widgets.kit_space import NewSpaceModal, SpaceModal
 from tests.tui_harness import feature_row, settle, start
 from tests.tui_quills import CALENDAR_MODELS, CALENDAR_QUILL, TODAY, calendar_records
 
-B = {"starts": "starts_at", "ends": "ends_at", "all_day": "all_day", "space": "calendar",
-     "colour": "colour", "title": "title", "subtitle": "location"}
+B = {
+    "starts": "starts_at",
+    "ends": "ends_at",
+    "all_day": "all_day",
+    "space": "calendar",
+    "colour": "colour",
+    "title": "title",
+    "subtitle": "location",
+}
 
 
 def with_calendar(app) -> None:
@@ -53,8 +60,17 @@ async def modal_up(pilot) -> None:
 
 
 def thing(starts: str, ends: str, **extra) -> dict:
-    return {"all_day": False, "starts": starts, "ends": ends, "colour": "cyan", "title": "Thing",
-            "subtitle": "", "space_name": "bram", "owner": "bram", **extra}
+    return {
+        "all_day": False,
+        "starts": starts,
+        "ends": ends,
+        "colour": "cyan",
+        "title": "Thing",
+        "subtitle": "",
+        "space_name": "bram",
+        "owner": "bram",
+        **extra,
+    }
 
 
 # -- what a day and a month say -----------------------------------------------------------
@@ -83,8 +99,9 @@ def test_how_long_a_thing_lasts_is_said_in_the_fewest_words():
 
 
 def test_a_line_is_one_line_its_title_is_not_markup_and_it_says_whose():
-    line = event_line(thing("2026-09-19T10:00", "2026-09-19T11:00", title="[b]x", owner="guest",
-                            space_name="Household"), me="bram")
+    line = event_line(
+        thing("2026-09-19T10:00", "2026-09-19T11:00", title="[b]x", owner="guest", space_name="Household"), me="bram"
+    )
     assert "\\[b]x" in line and "\n" not in line and "Household · guest" in line
 
 
@@ -212,8 +229,7 @@ async def test_opening_the_thing_under_the_cursor_is_its_record_sheet(app):
         await sheet.action_save()
         await settle(app, pilot)
         dentist = next(r for r in app.client.record_store["event"] if r["id"] == "r_dentist")
-        assert (dentist["fields"]["starts_at"], dentist["fields"]["ends_at"]) == (
-            f"{TODAY}T14:00", f"{TODAY}T15:00")
+        assert (dentist["fields"]["starts_at"], dentist["fields"]["ends_at"]) == (f"{TODAY}T14:00", f"{TODAY}T15:00")
 
 
 async def test_deleting_a_thing_asks_first(app):
@@ -300,8 +316,13 @@ async def test_it_has_the_key_the_calendar_always_had(app):
         # Tasks and Files first, as a server that had them gets them, then
         # Chat on the next key free, and Calendar on the key it always had.
         assert screen._quill_keys == {
-            "notes": "f1", "tasks": "f2", "files": "f5", "chat": "f4", "calendar": "f7",
-            "secrets": "f3"}
+            "notes": "f1",
+            "tasks": "f2",
+            "files": "f5",
+            "chat": "f4",
+            "calendar": "f7",
+            "secrets": "f3",
+        }
         screen.action_quill_key("f7")
         await settle(app, pilot)
         assert screen.query_one("#panes").current == "pane-calendar"

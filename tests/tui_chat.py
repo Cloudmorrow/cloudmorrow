@@ -33,8 +33,15 @@ CHAT_MODELS = {
         "notify": [],
         "fields": [
             {"name": "name", "kind": "string", "label": "Name", "required": True},
-            {"name": "kind", "kind": "enum", "label": "Kind", "indexed": True, "default": "public",
-             "values": ["public", "private", "direct"], "labels": ["Public", "Private", "Direct"]},
+            {
+                "name": "kind",
+                "kind": "enum",
+                "label": "Kind",
+                "indexed": True,
+                "default": "public",
+                "values": ["public", "private", "direct"],
+                "labels": ["Public", "Private", "Direct"],
+            },
             {"name": "topic", "kind": "text", "label": "Topic"},
         ],
     },
@@ -53,8 +60,15 @@ CHAT_MODELS = {
         "authored": True,
         "notify": [{"when": "created", "to": "members", "push": True, "unread": True}],
         "fields": [
-            {"name": "channel", "kind": "link", "label": "Channel", "required": True,
-             "indexed": True, "to": "channel", "on_delete": "cascade"},
+            {
+                "name": "channel",
+                "kind": "link",
+                "label": "Channel",
+                "required": True,
+                "indexed": True,
+                "to": "channel",
+                "on_delete": "cascade",
+            },
             {"name": "body", "kind": "text", "label": "Body", "required": True},
             {"name": "sent_at", "kind": "datetime", "label": "Sent at", "indexed": True},
         ],
@@ -62,8 +76,13 @@ CHAT_MODELS = {
 }
 
 CHAT_SCREEN = {
-    "id": "chat", "kit": "thread", "label": "Chat", "model": "message", "space": "channel",
-    "body": "body", "about": "topic",
+    "id": "chat",
+    "kit": "thread",
+    "label": "Chat",
+    "model": "message",
+    "space": "channel",
+    "body": "body",
+    "about": "topic",
     "made_as": {"public": {"kind": "public"}, "shared": {"kind": "private"}, "direct": {"kind": "direct"}},
 }
 
@@ -100,11 +119,25 @@ CHAT_QUILL = {
 }
 
 
-def space_row(record_id: str, name: str, kind: str, *, owner: str = "bram", scope: str = "",
-              members: list[str] | None = None, topic: str = "", at: str = "2026-09-01T09:00:00+00:00") -> dict:
+def space_row(
+    record_id: str,
+    name: str,
+    kind: str,
+    *,
+    owner: str = "bram",
+    scope: str = "",
+    members: list[str] | None = None,
+    topic: str = "",
+    at: str = "2026-09-01T09:00:00+00:00",
+) -> dict:
     row = record_row("channel", record_id, 0, name=name, kind=kind, topic=topic)
-    row.update(owner=owner, scope=scope or ("public" if kind == "public" else "shared"),
-               members=list(members or []), created_at=at, updated_at=at)
+    row.update(
+        owner=owner,
+        scope=scope or ("public" if kind == "public" else "shared"),
+        members=list(members or []),
+        created_at=at,
+        updated_at=at,
+    )
     return row
 
 
@@ -119,8 +152,9 @@ def seed_chat() -> dict[str, list[dict]]:
     return {
         "channel": [
             space_row("r_general", "general", "public", topic="everything else"),
-            space_row("r_dm", "bram & guest", "direct", owner="guest", members=["bram"],
-                      at="2026-09-18T08:00:00+00:00"),
+            space_row(
+                "r_dm", "bram & guest", "direct", owner="guest", members=["bram"], at="2026-09-18T08:00:00+00:00"
+            ),
         ],
         "message": [
             line_row("r_m1", "r_general", "bram", "the fans are loud again", "2026-09-19T14:02:00+00:00"),
@@ -159,8 +193,15 @@ class FakeSpaces:
             **row,
             "can_manage": row["owner"] == "bram",
             "unread": sum(1 for m in lines if m["owner"] != "bram" and m["created_at"] > since),
-            "last": {"id": last["id"], "model": "message", "owner": last["owner"],
-                     "created_at": last["created_at"], "title": last["fields"]["body"]} if last else None,
+            "last": {
+                "id": last["id"],
+                "model": "message",
+                "owner": last["owner"],
+                "created_at": last["created_at"],
+                "title": last["fields"]["body"],
+            }
+            if last
+            else None,
         }
 
     def _visible(self, model: str, row: dict) -> bool:
@@ -169,8 +210,9 @@ class FakeSpaces:
             return row["scope"] == "public" or "bram" in [row["owner"], *row.get("members", [])]
         return True
 
-    async def records(self, model: str, *, last: int | None = None, since: str | None = None,
-                      **where: object) -> list[dict]:
+    async def records(
+        self, model: str, *, last: int | None = None, since: str | None = None, **where: object
+    ) -> list[dict]:
         rows = await super().records(model, **where)  # type: ignore[misc]
         if model not in CHAT_MODELS:
             return rows
@@ -185,9 +227,16 @@ class FakeSpaces:
             rows = [self._space_extras(r) for r in rows]
         return rows
 
-    async def create_record(self, model: str, fields: dict, *, index: int | None = None,
-                            scope: str | None = None, members: list[str] | None = None,
-                            unique: bool = False) -> dict:
+    async def create_record(
+        self,
+        model: str,
+        fields: dict,
+        *,
+        index: int | None = None,
+        scope: str | None = None,
+        members: list[str] | None = None,
+        unique: bool = False,
+    ) -> dict:
         if model not in CHAT_MODELS:
             return await super().create_record(model, fields, index=index, scope=scope)  # type: ignore[misc]
         definition = self._model(model)  # type: ignore[attr-defined]

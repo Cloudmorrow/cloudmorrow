@@ -13,7 +13,11 @@ TASK = "task"
 @action
 def duplicate(ctx, task):
     copy = ctx.records.create(
-        TASK, board=task["board"], title=task["title"], body=task.get("body") or "", lane="todo",
+        TASK,
+        board=task["board"],
+        title=task["title"],
+        body=task.get("body") or "",
+        lane="todo",
         due=task.get("due"),
     )
     return [toast(f"Duplicated {task['title']}"), open(copy)]

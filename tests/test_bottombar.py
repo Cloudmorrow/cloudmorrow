@@ -78,7 +78,7 @@ async def test_a_message_is_said_once_in_the_log_and_the_bar_keeps_to_keys(app):
 
 
 async def test_how_a_pane_is_goes_in_its_header_not_the_log(app):
-    """"2 accounts" is not something that happened, so it is not logged."""
+    """ "2 accounts" is not something that happened, so it is not logged."""
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
         pane = screen.active_pane

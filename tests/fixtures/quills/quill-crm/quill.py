@@ -77,11 +77,7 @@ def _to_status(ctx, deal):
     current = next((s for s in stages if s.id == deal.get("stage")), None)
     if current is not None and current.get("outcome") == status:
         return
-    target = (
-        first_open(stages)
-        if status == "open"
-        else next((s for s in stages if s.get("outcome") == status), None)
-    )
+    target = first_open(stages) if status == "open" else next((s for s in stages if s.get("outcome") == status), None)
     fields = {"closed_at": None if status == "open" else _moment(ctx)}
     if target is not None:
         fields["stage"] = target.id
@@ -113,9 +109,7 @@ def _close(ctx, deal, outcome, note=""):
         return error(f"This book's pipeline has no {outcome} stage; add one with outcome {outcome}")
     fields = {"stage": stage.id}
     if note:
-        fields["notes"] = (
-            (deal.get("notes") or "").rstrip() + f"\n\n**{stage['name']}:** {note}"
-        ).strip()
+        fields["notes"] = ((deal.get("notes") or "").rstrip() + f"\n\n**{stage['name']}:** {note}").strip()
     ctx.records.move(DEAL, deal.id, fields)
     return toast(f"{deal['title']}: {stage['name']}")
 
@@ -232,9 +226,7 @@ def sales(ctx):
         chance = _number((stages.get(deal.get("stage")) or {}).get("probability"))
         _add(pipeline, deal.get("currency"), value)
         _add(weighted, deal.get("currency"), value * chance / 100)
-    won_now = [
-        d for d in deals if d.get("status") == "won" and _day(d.get("closed_at"))[:7] == month
-    ]
+    won_now = [d for d in deals if d.get("status") == "won" and _day(d.get("closed_at"))[:7] == month]
     for deal in won_now:
         _add(won, deal.get("currency"), _number(deal.get("value")))
 
@@ -296,11 +288,7 @@ def sales(ctx):
             ui.stack(
                 ui.text(book["name"], style="subtitle"),
                 ui.table(
-                    [
-                        s
-                        for s in sorted(stages.values(), key=lambda s: s.position)
-                        if s.get("book") == book.id
-                    ],
+                    [s for s in sorted(stages.values(), key=lambda s: s.position) if s.get("book") == book.id],
                     columns=["name", ("Chance (%)", "probability"), ("Outcome", "outcome")],
                     actions=["stage-earlier", "stage-later"],
                     empty="No stages yet.",

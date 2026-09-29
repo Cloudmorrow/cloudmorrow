@@ -27,9 +27,7 @@ async def open_files(app, pilot):
 
 def rows(screen) -> list[list[str]]:
     table = screen.query_one("#grid-table", DataTable)
-    return [
-        [str(cell) for cell in table.get_row_at(index)] for index in range(table.row_count)
-    ]
+    return [[str(cell) for cell in table.get_row_at(index)] for index in range(table.row_count)]
 
 
 async def test_files_opens_on_the_shares_with_where_each_is_mounted(app):
@@ -162,9 +160,7 @@ async def test_without_rclone_mount_offers_to_install_it_and_then_mounts(app, mo
         await pilot.pause()
         dialog = app.screen
         assert isinstance(dialog, InstallRcloneModal)
-        assert "sudo apt-get install -y rclone" in (
-            dialog.query_one("#install-command", Static).visual.plain
-        )
+        assert "sudo apt-get install -y rclone" in (dialog.query_one("#install-command", Static).visual.plain)
         await pilot.click("#install")
         await pilot.pause()
         await pilot.pause()

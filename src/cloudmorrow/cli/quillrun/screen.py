@@ -47,8 +47,7 @@ class Screen:
         """A list's group and subgroup when they are values, not links: picked by value."""
         if self.kit != "list" or self.group is not None:
             return []
-        return [self.fields[self.spec[n]] for n in ("group", "subgroup")
-                if self.spec.get(n) in self.fields]
+        return [self.fields[self.spec[n]] for n in ("group", "subgroup") if self.spec.get(n) in self.fields]
 
     def secret(self, name: str) -> bool:
         return bool(self.fields.get(name, {}).get("secret"))
@@ -81,9 +80,7 @@ def _screen_spec(quill: dict, screen_id: str) -> dict:
     if screen_id:
         screen = next((s for s in quill["screens"] if s["id"] == screen_id), None)
         if screen is None:
-            fail(
-                f"{quill['id']} has no screen {screen_id!r}: {', '.join(s['id'] for s in quill['screens'])}"
-            )
+            fail(f"{quill['id']} has no screen {screen_id!r}: {', '.join(s['id'] for s in quill['screens'])}")
     return screen
 
 
@@ -121,9 +118,7 @@ def _find(records: list[dict], key: str, title: str) -> dict:
     wanted = key if key.startswith("r_") else f"r_{key}"
     matches = [r for r in records if r["id"].startswith(key) or r["id"].startswith(wanted)]
     if not matches:
-        matches = [
-            r for r in records if str(r["fields"].get(title, "")).casefold() == key.casefold()
-        ]
+        matches = [r for r in records if str(r["fields"].get(title, "")).casefold() == key.casefold()]
     if len(matches) != 1:
         fail(f"{'no record' if not matches else 'more than one record'} matches {key!r}")
     return matches[0]

@@ -70,8 +70,7 @@ def test_the_server_enrols_itself_against_its_own_database(server, tmp_path):
     # It backs up the server's own data, not whoever's home ran the command.
     assert any("notes" in root for root in written["backup_roots"])
 
-    agents = AgentStore(Path(tomllib.loads(server.read_text())["server"]["data_dir"])
-                        / "cloudmorrow.db").list("bram")
+    agents = AgentStore(Path(tomllib.loads(server.read_text())["server"]["data_dir"]) / "cloudmorrow.db").list("bram")
     assert [agent.name for agent in agents] == ["bramserver"]
     assert store.require("bram").is_admin
 

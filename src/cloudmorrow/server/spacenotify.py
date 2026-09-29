@@ -48,9 +48,7 @@ def between_people(screen: dict, space: Record | None) -> bool:
     space has no name worth saying, because its name is whoever is in it.
     """
     marks = (screen.get("made_as") or {}).get("direct") or {}
-    return bool(marks) and space is not None and all(
-        space.fields.get(name) == value for name, value in marks.items()
-    )
+    return bool(marks) and space is not None and all(space.fields.get(name) == value for name, value in marks.items())
 
 
 def _space_of(state: AppState, record: Record) -> tuple[str, str, Record | None]:
@@ -102,8 +100,7 @@ def install(state: AppState) -> None:
             title = record.owner
         else:
             title = f"{record.owner} in {name}" if name else record.owner
-        _later(lambda: notify_message(state, people, title=title, body=line, url=url,
-                                      tag=f"{space_model}-{space_id}"))
+        _later(lambda: notify_message(state, people, title=title, body=line, url=url, tag=f"{space_model}-{space_id}"))
 
     def added(space: Record, username: str, by: str) -> None:
         if not state.records.readable(Principal.person(username), space.model):
@@ -115,8 +112,11 @@ def install(state: AppState) -> None:
         state.notifications.add(username, kind=f"{space.model}.added", title=said, body="")
         quill, screen = _where(state, space.model)
         url = f"#/q/{quill}/{screen}/{space.id}" if quill else ""
-        _later(lambda: notify_message(state, [username], title=name, body=said, url=url,
-                                      tag=f"{space.model}-added-{space.id}"))
+        _later(
+            lambda: notify_message(
+                state, [username], title=name, body=said, url=url, tag=f"{space.model}-added-{space.id}"
+            )
+        )
 
     state.records.on_notify.append(written)
     state.records.on_member_added.append(added)

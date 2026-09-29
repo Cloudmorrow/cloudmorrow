@@ -81,8 +81,7 @@ PANES: tuple[type[Pane], ...] = ()
 BELL_POLL = 60.0
 
 # Which server feature each built-in card belongs to.
-FEATURE_OF: dict[str, str] = {
-}
+FEATURE_OF: dict[str, str] = {}
 
 # Below this many columns the sidebar narrows, and its cards become one line.
 NARROW = 90
@@ -107,10 +106,7 @@ class WorkspaceScreen(QuillCards, Screen):
     # The cards and the header buttons wear their own keys, so they are bound
     # but not listed: the bottom line is for what is not written anywhere else.
     BINDINGS = [
-        *(
-            Binding(pane.TAB_KEY, f"show_pane('{_key(pane)}')", pane.TAB_LABEL, show=False)
-            for pane in PANES
-        ),
+        *(Binding(pane.TAB_KEY, f"show_pane('{_key(pane)}')", pane.TAB_LABEL, show=False) for pane in PANES),
         # A Quill card's key is decided at run time, so each free key is bound
         # to "whichever Quill card has it".
         *(
@@ -154,9 +150,7 @@ class WorkspaceScreen(QuillCards, Screen):
                 cloud.display = bool(PANES)
                 yield cloud
                 for pane in PANES:
-                    yield NavCard(
-                        _key(pane), pane.TAB_LABEL, tag=pane.TAB_KEY, id=f"nav-{_key(pane)}"
-                    )
+                    yield NavCard(_key(pane), pane.TAB_LABEL, tag=pane.TAB_KEY, id=f"nav-{_key(pane)}")
                 admin = SectionLabel("Administration", "f9", id="nav-section-admin")
                 admin.display = False
                 yield admin
@@ -293,9 +287,7 @@ class WorkspaceScreen(QuillCards, Screen):
             if on:
                 showing.append(key)
         self._showing = showing
-        self.query_one("#nav-section-quills").display = any(
-            key in showing for key in self._quill_panes
-        )
+        self.query_one("#nav-section-quills").display = any(key in showing for key in self._quill_panes)
         # Switch the last one off in Settings and there is no card to stand
         # on: say so, rather than leaving a pane up that nothing points at.
         self.query_one("#panes", ContentSwitcher).display = bool(showing)

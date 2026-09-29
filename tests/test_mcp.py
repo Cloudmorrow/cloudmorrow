@@ -332,9 +332,7 @@ def test_a_json_token_request_works_too(client):
 # -- MCP ---------------------------------------------------------------------------------
 def test_initialize_answers_with_the_version_asked_for(client):
     token = connect(client)["access_token"]
-    response = rpc(
-        client, token, "initialize", {"protocolVersion": "2025-06-18", "capabilities": {}}
-    )
+    response = rpc(client, token, "initialize", {"protocolVersion": "2025-06-18", "capabilities": {}})
     result = response.json()["result"]
     assert result["protocolVersion"] == "2025-06-18"
     assert result["serverInfo"]["name"] == "cloudmorrow"
@@ -367,9 +365,7 @@ def test_the_tools_are_listed_with_schemas(client):
 
 def test_an_assistant_writes_a_note_as_the_person(client, auth):
     token = connect(client)["access_token"]
-    result = call(
-        client, token, "create_note", path="ideas/garden", content="# Garden\n\n- beans\n"
-    )
+    result = call(client, token, "create_note", path="ideas/garden", content="# Garden\n\n- beans\n")
     assert "isError" not in result
     assert result["structuredContent"]["path"] == "ideas/garden.md"
     # It is a real note, where the person's own client sees it.
@@ -404,7 +400,10 @@ def test_an_assistant_adds_a_task_through_the_record_tools(tasks_quill, auth):
     boards = call(client, token, "list_records", model="board")["structuredContent"]["records"]
     assert len(boards) == 1  # the first board, seeded for the assistant as for the app
     created = call(
-        client, token, "create_record", model="task",
+        client,
+        token,
+        "create_record",
+        model="task",
         fields={"board": boards[0]["id"], "title": "Water the beans"},
     )["structuredContent"]
     assert created["fields"]["lane"] == "todo" and created["written_by"] == "assistant"
@@ -499,9 +498,7 @@ def test_no_stream_and_no_sessions(client):
 
 def test_an_ordinary_access_token_opens_mcp_too(client, auth):
     """For wiring a client up by hand, without the OAuth dance."""
-    response = client.post(
-        "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "ping"}, headers=auth
-    )
+    response = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "ping"}, headers=auth)
     assert response.status_code == 200
     assert response.json()["result"] == {}
 
@@ -531,10 +528,7 @@ def test_connections_are_listed_and_can_be_cut_off(client, auth):
     # Somebody else's list does not have it.
     guest_auth = {"Authorization": f"Bearer {token_for(client, *GUEST)}"}
     assert client.get("/api/mcp/connections", headers=guest_auth).json() == []
-    assert (
-        client.delete(f"/api/mcp/connections/{listed[0]['id']}", headers=guest_auth).status_code
-        == 404
-    )
+    assert client.delete(f"/api/mcp/connections/{listed[0]['id']}", headers=guest_auth).status_code == 404
     assert client.delete(f"/api/mcp/connections/{listed[0]['id']}", headers=auth).status_code == 204
     assert rpc(client, tokens["access_token"], "ping").status_code == 401
     refreshed = client.post(

@@ -63,12 +63,7 @@ def test_everyone_else_is_refused(config, users):
         # Including the endpoints that need no auth.
         assert client.get("/").status_code == 403
         assert client.get("/install.sh").status_code == 403
-        assert (
-            client.post(
-                "/api/auth/login", json={"username": "bram", "password": "supersecret1"}
-            ).status_code
-            == 403
-        )
+        assert client.post("/api/auth/login", json={"username": "bram", "password": "supersecret1"}).status_code == 403
 
 
 def test_forwarded_headers_cannot_spoof_the_check(config, users):

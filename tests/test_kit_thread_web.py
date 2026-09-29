@@ -44,8 +44,12 @@ def test_the_old_chat_screen_is_gone():
 
 
 def test_nothing_in_the_thread_is_named_for_chat():
-    for source, name in ((THREAD_JS, "kit_thread.js"), (SPACE_JS, "kit_space.js"),
-                         (THREAD_CSS, "kit_thread.css"), (SPACE_CSS, "kit_space.css")):
+    for source, name in (
+        (THREAD_JS, "kit_thread.js"),
+        (SPACE_JS, "kit_space.js"),
+        (THREAD_CSS, "kit_thread.css"),
+        (SPACE_CSS, "kit_space.css"),
+    ):
         body = code(source)
         # `direct` is the kit's own word, a key of `made_as`, like `shared`.
         for word in ("chat", "channel", "message", "topic", "private"):
@@ -54,7 +58,7 @@ def test_nothing_in_the_thread_is_named_for_chat():
 
 def test_a_thread_takes_the_rest_of_its_address():
     # #/q/<quill>/<screen>/<id>/about: everything after the screen is the screen's.
-    assert "const [quillId, screenId, ...rest] = arg.split(\"/\");" in QUILLS_JS
+    assert 'const [quillId, screenId, ...rest] = arg.split("/");' in QUILLS_JS
     assert 'renderKitScreen(at, rest.join("/"))' in QUILLS_JS
     for part in ('first === "new"', 'first === "people"', 'second === "about"'):
         assert part in THREAD_JS, part
@@ -80,7 +84,7 @@ def test_a_conversation_you_may_only_read_has_no_box_to_write_in():
     """docs/CIRCLES.md: no composer in a thread, and your own lines not yours to change."""
     thread = code(THREAD_JS)
     assert "says: mayWrite(model), makes: mayWrite(spaceModel)," in thread
-    assert "(s.says ? `\n      <form class=\"composer\">" in thread
+    assert '(s.says ? `\n      <form class="composer">' in thread
     assert 'class="composer-none"' in thread
     # With no composer the writing is never wired, and nothing reads a box that is not there.
     assert 'const box = form && form.querySelector("textarea");' in thread

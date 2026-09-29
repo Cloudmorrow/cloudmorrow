@@ -22,24 +22,28 @@ class Handler(BaseHTTPRequestHandler):
             os._exit(3)
         if self.path.startswith("/env"):
             return self._answer(dict(os.environ))
-        return self._answer({
-            "path": self.path,
-            "user": self.headers.get("X-Cloudmorrow-User"),
-            "quill": self.headers.get("X-Cloudmorrow-Quill"),
-            "api": self.headers.get("X-Cloudmorrow-Api"),
-            "authorization": self.headers.get("Authorization"),
-            "cookie": self.headers.get("Cookie"),
-        })
+        return self._answer(
+            {
+                "path": self.path,
+                "user": self.headers.get("X-Cloudmorrow-User"),
+                "quill": self.headers.get("X-Cloudmorrow-Quill"),
+                "api": self.headers.get("X-Cloudmorrow-Api"),
+                "authorization": self.headers.get("Authorization"),
+                "cookie": self.headers.get("Cookie"),
+            }
+        )
 
     def do_POST(self) -> None:
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length).decode()
-        return self._answer({
-            "path": self.path,
-            "body": body,
-            "webhook": self.headers.get("X-Cloudmorrow-Webhook"),
-            "token": self.headers.get("X-Cloudmorrow-Webhook-Token"),
-        })
+        return self._answer(
+            {
+                "path": self.path,
+                "body": body,
+                "webhook": self.headers.get("X-Cloudmorrow-Webhook"),
+                "token": self.headers.get("X-Cloudmorrow-Webhook-Token"),
+            }
+        )
 
     def log_message(self, *args) -> None:
         print("served", self.path, flush=True)

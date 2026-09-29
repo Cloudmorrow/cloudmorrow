@@ -36,20 +36,13 @@ def _bundle(name: str) -> str:
     try:
         return validate_bundle(name)
     except UnknownBundleError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"no such config bundle: {name}"
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"no such config bundle: {name}") from exc
 
 
 # -- operator-facing ---------------------------------------------------------
 @router.get("", response_model=list[BundleStatusOut])
-def list_bundles(
-    state: AppState = Depends(get_state), user: User = Depends(get_current_user)
-) -> list[BundleStatusOut]:
-    return [
-        _status(state, user.username, bundle.to_dict())
-        for bundle in state.config_sync.states(user.username)
-    ]
+def list_bundles(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> list[BundleStatusOut]:
+    return [_status(state, user.username, bundle.to_dict()) for bundle in state.config_sync.states(user.username)]
 
 
 @router.get("/{bundle}", response_model=BundleStatusOut)
@@ -136,10 +129,7 @@ def agent_push_bundle(
             detail=f"{agent.name} is not syncing {name}",
         )
     try:
-        files = [
-            ConfigFile(path=f.path, content=f.content, sha256=f.sha256, mode=f.mode)
-            for f in payload.files
-        ]
+        files = [ConfigFile(path=f.path, content=f.content, sha256=f.sha256, mode=f.mode) for f in payload.files]
     except InvalidPathError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     if not files:
@@ -168,9 +158,7 @@ def agent_push_bundle(
             },
         ) from exc
     except BundleTooBigError as exc:
-        raise HTTPException(
-            status_code=413, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=413, detail=str(exc)) from exc
 
     if first_claim:
         state.notifications.add(

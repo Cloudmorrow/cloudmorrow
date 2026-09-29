@@ -129,8 +129,7 @@ def login(
                     console.print(f"[dim]this machine is registered as '{result.agent_name}'[/]")
                 elif result.enrolled:
                     console.print(
-                        f"[dim]registered as '{result.agent_name}', but it is not running: "
-                        f"{result.detail}[/]"
+                        f"[dim]registered as '{result.agent_name}', but it is not running: {result.detail}[/]"
                     )
 
     run(_login())
@@ -138,9 +137,7 @@ def login(
 
 @app.command()
 def logout(
-    agent_stop: Annotated[
-        bool, typer.Option("--agent/--no-agent", help="Also stop this machine's agent.")
-    ] = True,
+    agent_stop: Annotated[bool, typer.Option("--agent/--no-agent", help="Also stop this machine's agent.")] = True,
 ) -> None:
     """Forget the stored access token, and stop the local agent."""
     if agent_stop:
@@ -163,9 +160,7 @@ def whoami() -> None:
         role = user.get("role") or ("administrator" if user["is_admin"] else "user")
         kind = user.get("user_type") or "human"
         badge = role if kind == "human" else f"{role}, {kind}"
-        console.print(
-            f"[b]{user['username']}[/] [cyan]({badge})[/] on {config.api_url}"
-        )
+        console.print(f"[b]{user['username']}[/] [cyan]({badge})[/] on {config.api_url}")
         console.print(f"[dim]vault:[/] {config.vault}")
         console.print(f"[dim]environment:[/] {config.environment}")
 

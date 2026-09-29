@@ -81,9 +81,7 @@ def test_every_client_is_told_the_actions_and_the_view(fleet):
 def _manifest(extra: str) -> dict:
     import tomllib
 
-    return tomllib.loads(
-        '[quill]\nid = "demo"\nname = "Demo"\nversion = "1.0.0"\n' + extra
-    )
+    return tomllib.loads('[quill]\nid = "demo"\nname = "Demo"\nversion = "1.0.0"\n' + extra)
 
 
 def test_a_handler_without_code_to_find_it_in_is_refused():
@@ -112,7 +110,7 @@ def test_a_handler_the_code_does_not_have_is_refused(tmp_path):
         ('[[actions]]\nid = "go"\nlabel = "Go"\n[actions.fields]\nx = "colour"\n', "kind"),
         ('[[hooks]]\non = "task"\nwhen = "renamed"\nhandler = "h"\n', "when is"),
         ('[[machine]]\nid = "m"\n', "why"),
-        ('[quill]\n', ""),
+        ("[quill]\n", ""),
     ],
 )
 def test_the_code_half_of_a_manifest_is_checked(extra, words):
@@ -168,9 +166,7 @@ def test_the_gate_holds_for_code_as_for_anybody(fleet):
 def test_a_hook_runs_when_a_record_changes_and_its_own_writes_do_not_loop(fleet):
     client, admin, _ = fleet
     van_id = add_van(client, admin)
-    answer = press(
-        client, admin, "log-service", record=van_id, fields={"date": "2026-09-28", "km": 1200}
-    )
+    answer = press(client, admin, "log-service", record=van_id, fields={"date": "2026-09-28", "km": 1200})
     assert answer.json()["effects"] == [{"effect": "toast", "text": "Logged Van at 1200 km"}]
     state = state_of(client)
     state.code.drain()

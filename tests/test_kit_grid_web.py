@@ -38,10 +38,7 @@ def test_the_grid_is_its_own_file_drawn_from_the_kit(client):
     assert 'import { renderGrid, renderGridItem } from "./kit_grid.js";' in KIT_JS
     assert 'if (kit === "grid") return renderGrid(at, arg);' in KIT_JS
     # A grid's own records open on the grid's page, not the sheet of fields.
-    assert (
-        'if (screen.kit === "grid" && modelId === screen.model) return renderGridItem(at, id);'
-        in KIT_JS
-    )
+    assert 'if (screen.kit === "grid" && modelId === screen.model) return renderGridItem(at, id);' in KIT_JS
     assert '@import "./kit_grid.css";' in (WEB / "app.css").read_text()
     version = asset_version()
     for name in ("kit_grid.js", "kit_grid.css"):
@@ -118,10 +115,7 @@ def test_the_calls_the_grid_makes_are_answered(client, auth, config):
     assert [r["fields"]["name"] for r in listed] == ["cat.txt"]
     got = client.get(f"/api/records/file/{listed[0]['id']}/content", headers=auth)
     assert got.content == b"meow"
-    assert (
-        client.get(f"/api/records/file/{listed[0]['id']}/thumb?size=256", headers=auth).status_code
-        == 415
-    )
+    assert client.get(f"/api/records/file/{listed[0]['id']}/thumb?size=256", headers=auth).status_code == 415
 
 
 # -- cm files ---------------------------------------------------------------------------
@@ -226,18 +220,17 @@ def test_a_folder_you_may_only_read_takes_nothing_in():
     assert "const moreButton = folder && b.writes" in code
     assert '${b.writes ? `<input type="file" class="pick-input"' in code
     # Dropping and pasting are wired after this, and not at all when read.
-    folder = code[code.index("async function renderFolder("):code.index("function photoName(")]
+    folder = code[code.index("async function renderFolder(") : code.index("function photoName(")]
     stop = folder.index("if (!b.writes) return;")
     assert folder.index("openFolder = null;") < stop
-    wired_after = ('addEventListener("drop"', "openFolder = { main: mainEl",
-                   '.heading .add").addEventListener')
+    wired_after = ('addEventListener("drop"', "openFolder = { main: mainEl", '.heading .add").addEventListener')
     for wired in wired_after:
         assert stop < folder.index(wired), wired
 
 
 def test_a_file_you_may_only_read_is_not_renamed_moved_or_deleted():
     code = code_of(GRID_JS)
-    item = code[code.index("export async function renderGridItem("):]
+    item = code[code.index("export async function renderGridItem(") :]
     assert '${b.writes ? `<div class="group item-actions">' in item
     # Sending it on, or saving it, is reading.
     assert 'app.querySelector(".download").addEventListener' in item

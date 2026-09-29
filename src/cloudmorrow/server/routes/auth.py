@@ -33,9 +33,7 @@ def user_out(user: User) -> UserOut:
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, state: AppState = Depends(get_state)) -> TokenResponse:
     user = state.users.get(payload.username)
-    invalid = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid username or password"
-    )
+    invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid username or password")
     if user is None or not user.is_active:
         # Spend the time anyway so a missing user is not obviously faster.
         hash_password("not-a-real-password")
@@ -46,12 +44,8 @@ def login(payload: LoginRequest, state: AppState = Depends(get_state)) -> TokenR
         state.users.update(user.username, password_hash=hash_password(payload.password))
     # Make sure the user's notes root exists the moment they log in.
     state.note_store(user)
-    issued = create_access_token(
-        user.username, state.config.ensure_secret_key(), state.config.token_ttl_hours
-    )
-    return TokenResponse(
-        access_token=issued.token, expires_at=issued.expires_at, user=user_out(user)
-    )
+    issued = create_access_token(user.username, state.config.ensure_secret_key(), state.config.token_ttl_hours)
+    return TokenResponse(access_token=issued.token, expires_at=issued.expires_at, user=user_out(user))
 
 
 @router.get("/me", response_model=UserOut)
@@ -66,7 +60,5 @@ def change_password(
     user: User = Depends(get_current_user),
 ) -> None:
     if not verify_password(payload.current_password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="current password is wrong"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="current password is wrong")
     state.users.update(user.username, password_hash=hash_password(payload.new_password))

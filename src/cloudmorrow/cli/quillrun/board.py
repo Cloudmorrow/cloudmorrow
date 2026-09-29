@@ -16,7 +16,9 @@ from cloudmorrow.console import TITLE
 from cloudmorrow.quill.screens import done_lane, in_order, lane_filter
 
 
-async def _lanes(api: CloudmorrowClient, screen: Screen, group_id: str | None) -> tuple[list[tuple[str, str]], str | None]:
+async def _lanes(
+    api: CloudmorrowClient, screen: Screen, group_id: str | None
+) -> tuple[list[tuple[str, str]], str | None]:
     """A board's lanes as (value, label), and the one `done` moves to.
 
     An enum's values, or — when the lane is a link — the linked records, in
@@ -54,8 +56,12 @@ def _show_board(screen: Screen, records: list[dict], heading: str, lanes: list[t
         table.add_column(label)
     # A record in no lane there is — none yet, or one since deleted — is in the first.
     columns = [
-        [r for r in records if (r["fields"].get(lane["name"]) if r["fields"].get(lane["name"]) in values
-                                else values[0]) == value] for value in values
+        [
+            r
+            for r in records
+            if (r["fields"].get(lane["name"]) if r["fields"].get(lane["name"]) in values else values[0]) == value
+        ]
+        for value in values
     ]
     for row in range(max((len(c) for c in columns), default=0)):
         cells = []
@@ -65,9 +71,7 @@ def _show_board(screen: Screen, records: list[dict], heading: str, lanes: list[t
                 left = ""
                 if record.get("expires_at"):
                     left = f" [dim](goes {record['expires_at'][:10]})[/]"
-                cells.append(
-                    f"{escape(str(record['fields'].get(screen.title, '')))} [dim]{record['id'][2:6]}[/]{left}"
-                )
+                cells.append(f"{escape(str(record['fields'].get(screen.title, '')))} [dim]{record['id'][2:6]}[/]{left}")
             else:
                 cells.append("")
         table.add_row(*cells)

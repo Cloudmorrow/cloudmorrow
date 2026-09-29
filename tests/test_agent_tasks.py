@@ -45,9 +45,7 @@ def test_backup_creates_an_archive(agent_config, tmp_path):
     (source / "notes" / "a.md").write_text("hello")
     (source / "skip.log").write_text("noise")
 
-    result = run_task(
-        "backup", {"paths": [str(source)], "name": "data", "exclude": [".log"]}, agent_config
-    )
+    result = run_task("backup", {"paths": [str(source)], "name": "data", "exclude": [".log"]}, agent_config)
     archive = tmp_path / "backups" / result["archive"].rsplit("/", 1)[-1]
     assert archive.is_file()
     assert result["bytes"] > 0

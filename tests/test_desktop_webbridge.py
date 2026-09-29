@@ -28,7 +28,7 @@ def test_without_pywebview_it_only_listens():
     # …and everything else asks for it first.
     assert "export const desktop = () => bridge;" in script
     assert "if (!bridge ||" in script
-    assert 'computerCard = () => (bridge ? ' in script
+    assert "computerCard = () => (bridge ? " in script
     # The page says it is in the app, for anything that wants to know.
     assert "document.documentElement.dataset.desktop" in script
 

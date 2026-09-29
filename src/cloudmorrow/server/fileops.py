@@ -239,9 +239,7 @@ def _make_thumb(source: Path, out: Path, edge: int) -> None:
             image = Image.alpha_composite(ground, rgba)
         image = image.convert("RGB")
         out.parent.mkdir(parents=True, exist_ok=True)
-        handle = tempfile.NamedTemporaryFile(
-            dir=out.parent, prefix=".thumb-", suffix=".jpg", delete=False
-        )
+        handle = tempfile.NamedTemporaryFile(dir=out.parent, prefix=".thumb-", suffix=".jpg", delete=False)
         try:
             with handle:
                 image.save(handle, "JPEG", quality=82, optimize=True)

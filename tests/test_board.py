@@ -109,9 +109,7 @@ def test_a_record_nothing_will_sweep_has_no_clock():
     assert days_left(None) is None
 
 
-@pytest.mark.parametrize(
-    ("after", "said"), [("7d", "a week"), ("1d", "1 day"), ("12h", "12 hours"), ("soon", "soon")]
-)
+@pytest.mark.parametrize(("after", "said"), [("7d", "a week"), ("1d", "1 day"), ("12h", "12 hours"), ("soon", "soon")])
 def test_an_expire_job_is_said_the_way_a_person_would(after, said):
     assert how_long(after) == said
 

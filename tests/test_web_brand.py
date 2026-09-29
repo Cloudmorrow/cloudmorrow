@@ -35,25 +35,33 @@ def _stylesheets() -> list[tuple[str, str]]:
 def test_the_colours_are_the_palettes():
     """One set of values for the app, the CLI and the terminal app."""
     pairs = {
-        "--bg": palette.INK, "--card": palette.SURFACE, "--card-2": palette.PANEL,
-        "--line": palette.LINE, "--line-bright": palette.LINE_BRIGHT,
-        "--ink": palette.TEXT, "--muted": palette.MUTED,
-        "--accent": palette.ACCENT, "--bar-accent": palette.ACCENT, "--second": palette.SECOND,
-        "--good": palette.GOOD, "--warn": palette.WARN, "--bad": palette.BAD,
+        "--bg": palette.INK,
+        "--card": palette.SURFACE,
+        "--card-2": palette.PANEL,
+        "--line": palette.LINE,
+        "--line-bright": palette.LINE_BRIGHT,
+        "--ink": palette.TEXT,
+        "--muted": palette.MUTED,
+        "--accent": palette.ACCENT,
+        "--bar-accent": palette.ACCENT,
+        "--second": palette.SECOND,
+        "--good": palette.GOOD,
+        "--warn": palette.WARN,
+        "--bad": palette.BAD,
     }
     for name, value in pairs.items():
         assert _var(name).lower() == value.lower(), name
 
 
 def test_blue_is_the_platform_and_amber_is_the_action():
-    assert _var("--accent").lower() == "#5aa6e0"      # Sky: links, the tab you are on
-    assert _var("--fill").lower() == "#1c70b1"        # Cloud: a chosen thing, white on it
+    assert _var("--accent").lower() == "#5aa6e0"  # Sky: links, the tab you are on
+    assert _var("--fill").lower() == "#1c70b1"  # Cloud: a chosen thing, white on it
     assert _var("--fill-ink").lower() == "#ffffff"
     assert _var("--fill-hover").lower() == "#3685bd"  # Puff
     assert _var("--fill-pressed").lower() == "#0a3f75"  # Deep
-    assert _var("--action").lower() == "#e0a84c"      # Lens: the one action
+    assert _var("--action").lower() == "#e0a84c"  # Lens: the one action
     assert _var("--action-ink").lower() == _var("--bg").lower()
-    assert _var("--warn").lower() == "#ff9f5a"        # orange, never amber
+    assert _var("--warn").lower() == "#ff9f5a"  # orange, never amber
     assert "#0a3f75" in _var("--brand") and "#5aa6e0" in _var("--brand")
 
 
@@ -79,9 +87,14 @@ def test_the_old_palette_is_gone():
 def test_the_amber_fills_are_the_actions():
     """Amber fills the one action a screen is for; anything else is blue or a ghost."""
     allowed = {
-        ".nav button.strong", ".login .submit", ".row.primary", ".composer button",
+        ".nav button.strong",
+        ".login .submit",
+        ".row.primary",
+        ".composer button",
         # A Quill's action: the first primary one in a view, a form's submit.
-        ".act-button.primary", ".act-button.primary:active", ".act-button.primary:hover",
+        ".act-button.primary",
+        ".act-button.primary:active",
+        ".act-button.primary:hover",
     }
     for name, css in _stylesheets():
         for head, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
@@ -128,8 +141,13 @@ def test_the_icon_is_the_hedgehog(client):
     page = client.get("/app").text
     assert 'href="/app/favicon-32.png"' in page and 'href="/app/favicon-16.png"' in page
     assert 'rel="apple-touch-icon" href="/app/icon-180.png"' in page
-    for name, size in (("favicon-16.png", 16), ("favicon-32.png", 32), ("icon-180.png", 180),
-                       ("icon-192.png", 192), ("icon-512.png", 512)):
+    for name, size in (
+        ("favicon-16.png", 16),
+        ("favicon-32.png", 32),
+        ("icon-180.png", 180),
+        ("icon-192.png", 192),
+        ("icon-512.png", 512),
+    ):
         data = (WEB / name).read_bytes()
         assert data.startswith(b"\x89PNG"), name
         width = int.from_bytes(data[16:20], "big")

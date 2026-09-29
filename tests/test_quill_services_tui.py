@@ -16,18 +16,37 @@ RUNNING = {
     "enabled": True,
     "reach": ["board", "task"],
     "token": {"issued_at": "2026-09-26T08:00:00+00:00", "last_used_at": ""},
-    "services": [{
-        "id": "sync", "command": ["python", "services/sync.py"], "always": True,
-        "scheduled": False, "state": "restarting", "since": "2026-09-26T08:01:00+00:00",
-        "problem": "exited with 1; again in 2s", "pid": None, "port": None,
-        "last_exit": 1, "last_exit_at": "2026-09-26T08:01:00+00:00", "restarts": 2,
-        "log": ["-- started python services/sync.py", "Traceback: [boom]"],
-    }],
-    "jobs": [{"id": "nightly", "service": "sync", "every": "1d", "running": False,
-              "last_started": "", "last_exit": None}],
-    "webhooks": [{"id": "inbound", "path": "inbound", "model": "task", "forward": "",
-                  "signature": "", "secret": "s3cret",
-                  "url": "https://cloud.example/hooks/tasks/inbound"}],
+    "services": [
+        {
+            "id": "sync",
+            "command": ["python", "services/sync.py"],
+            "always": True,
+            "scheduled": False,
+            "state": "restarting",
+            "since": "2026-09-26T08:01:00+00:00",
+            "problem": "exited with 1; again in 2s",
+            "pid": None,
+            "port": None,
+            "last_exit": 1,
+            "last_exit_at": "2026-09-26T08:01:00+00:00",
+            "restarts": 2,
+            "log": ["-- started python services/sync.py", "Traceback: [boom]"],
+        }
+    ],
+    "jobs": [
+        {"id": "nightly", "service": "sync", "every": "1d", "running": False, "last_started": "", "last_exit": None}
+    ],
+    "webhooks": [
+        {
+            "id": "inbound",
+            "path": "inbound",
+            "model": "task",
+            "forward": "",
+            "signature": "",
+            "secret": "s3cret",
+            "url": "https://cloud.example/hooks/tasks/inbound",
+        }
+    ],
     "apis": [],
 }
 

@@ -92,13 +92,22 @@ def test_everybody_gets_their_own_calendar_and_the_public_one(spaces):
 def test_a_shared_calendar_is_its_members_and_nobody_elses(spaces):
     house = spaces("POST", "/api/records/calendar", {"fields": {"name": "House"}}, expect=201)
     assert house["scope"] == "shared" and house["members"] == [] and house["can_manage"]
-    event = spaces("POST", "/api/records/event", {"fields": {
-        "calendar": house["id"], "title": "Plumber", "starts_at": "2026-10-01T10:00"}}, expect=201)
+    event = spaces(
+        "POST",
+        "/api/records/event",
+        {"fields": {"calendar": house["id"], "title": "Plumber", "starts_at": "2026-10-01T10:00"}},
+        expect=201,
+    )
     # Not in it: the guest cannot see the calendar, the event, or put anything in it.
     assert "House" not in titles(spaces("GET", "/api/records/calendar", who=spaces.guest))
     spaces("GET", f"/api/records/event/{event['id']}", who=spaces.guest, expect=404)
-    spaces("POST", "/api/records/event", {"fields": {
-        "calendar": house["id"], "title": "x", "starts_at": "2026-10-01T10:00"}}, who=spaces.guest, expect=400)
+    spaces(
+        "POST",
+        "/api/records/event",
+        {"fields": {"calendar": house["id"], "title": "x", "starts_at": "2026-10-01T10:00"}},
+        who=spaces.guest,
+        expect=400,
+    )
     # Added: they see it, and may write in it, but not manage it.
     added = spaces("POST", f"/api/records/calendar/{house['id']}/members", {"username": "guest"})
     assert added["members"] == ["guest"]
@@ -107,9 +116,16 @@ def test_a_shared_calendar_is_its_members_and_nobody_elses(spaces):
     assert shared["can_manage"] is False
     assert [e["fields"]["title"] for e in spaces("GET", "/api/records/event", who=spaces.guest)] == ["Plumber"]
     # What somebody else wrote is theirs, or the calendar's maker's, to change.
-    spaces("PATCH", f"/api/records/event/{event['id']}", {"fields": {"title": "Plumber at 10"}}, who=spaces.guest,
-           expect=403)
-    spaces("PATCH", f"/api/records/calendar/{house['id']}", {"fields": {"name": "Mine now"}}, who=spaces.guest, expect=403)
+    spaces(
+        "PATCH",
+        f"/api/records/event/{event['id']}",
+        {"fields": {"title": "Plumber at 10"}},
+        who=spaces.guest,
+        expect=403,
+    )
+    spaces(
+        "PATCH", f"/api/records/calendar/{house['id']}", {"fields": {"name": "Mine now"}}, who=spaces.guest, expect=403
+    )
     # Leaving: and it is gone again.
     spaces("DELETE", f"/api/records/calendar/{house['id']}/members/guest", who=spaces.guest, expect=204)
     spaces("GET", f"/api/records/event/{event['id']}", who=spaces.guest, expect=404)
@@ -125,8 +141,13 @@ def test_a_personal_calendar_cannot_be_shared_and_nobody_leaves_a_public_one(spa
 
 def test_everybody_writes_in_a_public_space_and_its_owner_and_admins_manage_it(spaces):
     public = spaces("POST", "/api/records/channel", {"fields": {"name": "general"}, "scope": "public"}, expect=201)
-    said = spaces("POST", "/api/records/message", {"fields": {"channel": public["id"], "body": "hello"}},
-                  who=spaces.guest, expect=201)
+    said = spaces(
+        "POST",
+        "/api/records/message",
+        {"fields": {"channel": public["id"], "body": "hello"}},
+        who=spaces.guest,
+        expect=201,
+    )
     # A message is its author's to change.
     spaces("PATCH", f"/api/records/message/{said['id']}", {"fields": {"body": "edited"}}, expect=403)
     spaces("DELETE", f"/api/records/message/{said['id']}", expect=403)
@@ -138,7 +159,8 @@ def test_everybody_writes_in_a_public_space_and_its_owner_and_admins_manage_it(s
 def test_a_message_is_unread_until_looked_at_and_its_members_are_told(spaces):
     told = []
     spaces.client.app.state.cloudmorrow.records.on_notify.append(
-        lambda record, rule, people: told.append((record.fields["body"], rule["push"], people)))
+        lambda record, rule, people: told.append((record.fields["body"], rule["push"], people))
+    )
     room = spaces("POST", "/api/records/channel", {"fields": {"name": "house"}}, expect=201)
     spaces("POST", f"/api/records/channel/{room['id']}/members", {"username": "guest"})
     spaces("POST", "/api/records/message", {"fields": {"channel": room["id"], "body": "dinner?"}}, expect=201)
@@ -154,7 +176,9 @@ def test_a_message_is_unread_until_looked_at_and_its_members_are_told(spaces):
 
 def test_deleting_a_space_takes_everybodys_things_in_it(spaces):
     room = spaces("POST", "/api/records/channel", {"fields": {"name": "tmp"}, "scope": "public"}, expect=201)
-    spaces("POST", "/api/records/message", {"fields": {"channel": room["id"], "body": "a"}}, who=spaces.guest, expect=201)
+    spaces(
+        "POST", "/api/records/message", {"fields": {"channel": room["id"], "body": "a"}}, who=spaces.guest, expect=201
+    )
     spaces("DELETE", f"/api/records/channel/{room['id']}", expect=204)
     assert spaces("GET", "/api/records/message", who=spaces.guest) == []
 
@@ -174,8 +198,12 @@ def test_a_message_is_sealed_to_its_channel(spaces, config):
 
 
 def test_a_space_that_is_not_a_space_has_no_scope_to_choose(spaces):
-    spaces("POST", "/api/records/event", {"fields": {"calendar": "x", "title": "t", "starts_at": "2026-10-01"},
-                                          "scope": "public"}, expect=400)
+    spaces(
+        "POST",
+        "/api/records/event",
+        {"fields": {"calendar": "x", "title": "t", "starts_at": "2026-10-01"}, "scope": "public"},
+        expect=400,
+    )
 
 
 def test_being_added_leaves_a_line_behind_the_bell(spaces):

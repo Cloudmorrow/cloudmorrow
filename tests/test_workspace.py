@@ -22,9 +22,7 @@ async def test_the_workspace_opens_on_notes(app):
         assert screen.query_one("#panes").current == "pane-notes"
         assert isinstance(screen.active_pane, NotesPane)
         # Landed, and the tree is already there to be clicked.
-        assert [node.data["path"] for node in screen.query_one(NoteTree).root.children] == [
-            "architecture"
-        ]
+        assert [node.data["path"] for node in screen.query_one(NoteTree).root.children] == ["architecture"]
         # Up top: whose cloud this is, and what it is — and the dev marker
         # when it is the checkout running. No vault: there is none the app is "in".
         top = screen.query_one("#topbar-left").visual.plain

@@ -51,7 +51,11 @@ async def test_the_workspace_opens_on_notes_with_its_folders(app):
         tree = screen.query_one(NoteTree)
         # Folders first, the empty one too; then the pages.
         assert _paths(tree) == [
-            "Archive/", "Projects/", "Projects/Garden/", "Projects/Garden/beds", "architecture",
+            "Archive/",
+            "Projects/",
+            "Projects/Garden/",
+            "Projects/Garden/beds",
+            "architecture",
         ]
         assert str(tree.root.label) == "notes"
 

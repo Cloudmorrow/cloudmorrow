@@ -11,8 +11,7 @@ def garage(ctx):
     return ui.stack(
         ui.text("Garage", style="title"),
         ui.row(ui.stat("Vans", len(vans))),
-        ui.table(vans, columns=["name", ("Odometer", "fleet.odometer")], actions=["log-service"],
-                 empty="No vans yet."),
+        ui.table(vans, columns=["name", ("Odometer", "fleet.odometer")], actions=["log-service"], empty="No vans yet."),
         ui.button("Add a van", action="add-van", tone="primary"),
     )
 

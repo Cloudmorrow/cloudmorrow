@@ -120,4 +120,3 @@ def load_catalog(location: str) -> Catalog:
         return parse_catalog(tomllib.loads(text), base)
     except tomllib.TOMLDecodeError as exc:
         raise QuillError(f"the catalog does not parse: {exc}") from exc
-

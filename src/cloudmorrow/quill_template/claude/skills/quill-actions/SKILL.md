@@ -28,6 +28,7 @@ The handler is `id` with `-` as `_`, unless `handler = "…"` says otherwise:
 ```python
 from cloudmorrow.quill import action, toast, error, open, go, confirm
 
+
 @action("log_service")
 def log_service(ctx, vehicle, date, km, note=None):
     if km < (vehicle.get("fleet.odometer") or 0):

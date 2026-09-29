@@ -24,9 +24,7 @@ def share(client, auth) -> dict:
 
 
 def test_a_share_is_created_and_listed_with_its_url(client, auth, config):
-    created = client.post(
-        "/api/shares", json={"name": "media", "description": "films"}, headers=auth
-    ).json()
+    created = client.post("/api/shares", json={"name": "media", "description": "films"}, headers=auth).json()
     assert created["managed"] is True
     assert created["path"] == str(config.notes_dir / "Shares" / "media")
     assert created["url"].endswith("/dav/media/")
@@ -115,9 +113,7 @@ def test_deleting_a_share_with_its_files(client, auth, share, config):
 def test_the_dav_root_lists_your_shares(client, auth, share):
     token = auth["Authorization"].split()[1]
     client.post("/api/shares", json={"name": "photos"}, headers=auth)
-    response = client.request(
-        "PROPFIND", "/dav/", headers={**basic("bram", token), "Depth": "1"}
-    )
+    response = client.request("PROPFIND", "/dav/", headers={**basic("bram", token), "Depth": "1"})
     assert response.status_code == 207, response.text
     assert hrefs(response.text) == ["/dav/", "/dav/my-files/", "/dav/media/", "/dav/photos/"]
 
@@ -131,16 +127,10 @@ def test_the_access_token_works_as_the_password(client, auth, share):
 
 
 def test_the_account_password_works_too(client, auth, share):
-    listing = client.request(
-        "PROPFIND", "/dav/media/", headers={**basic(*ADMIN), "Depth": "1"}
-    )
+    listing = client.request("PROPFIND", "/dav/media/", headers={**basic(*ADMIN), "Depth": "1"})
     assert listing.status_code == 207
     # And again: the second check is answered from the cache, not argon2.
-    assert (
-        client.request("PROPFIND", "/dav/media/", headers={**basic(*ADMIN), "Depth": "0"})
-        .status_code
-        == 207
-    )
+    assert client.request("PROPFIND", "/dav/media/", headers={**basic(*ADMIN), "Depth": "0"}).status_code == 207
 
 
 def test_wrong_credentials_are_a_401_with_a_basic_challenge(client, share):
@@ -152,9 +142,7 @@ def test_wrong_credentials_are_a_401_with_a_basic_challenge(client, share):
 
 
 def test_another_accounts_share_does_not_exist(client, share):
-    response = client.request(
-        "PROPFIND", "/dav/media/", headers={**basic(*GUEST), "Depth": "1"}
-    )
+    response = client.request("PROPFIND", "/dav/media/", headers={**basic(*GUEST), "Depth": "1"})
     assert response.status_code == 404
 
 
@@ -171,9 +159,7 @@ def test_folders_are_made_moved_and_listed(client, auth, share, config):
     )
     assert moved.status_code == 201, moved.text
     assert (root / "movies").is_dir() and not (root / "films").exists()
-    listing = client.request(
-        "PROPFIND", "/dav/media/", headers={**basic("bram", token), "Depth": "1"}
-    )
+    listing = client.request("PROPFIND", "/dav/media/", headers={**basic("bram", token), "Depth": "1"})
     assert hrefs(listing.text) == ["/dav/media/", "/dav/media/movies/"]
 
 
@@ -181,10 +167,7 @@ def test_nothing_escapes_the_share(client, auth, share, config):
     token = auth["Authorization"].split()[1]
     (config.notes_dir / "bram" / "notes").mkdir(parents=True, exist_ok=True)
     (config.notes_dir / "bram" / "notes" / "secret.md").write_text("x")
-    assert (
-        client.get("/dav/media/../notes/secret.md", headers=basic("bram", token)).status_code
-        == 404
-    )
+    assert client.get("/dav/media/../notes/secret.md", headers=basic("bram", token)).status_code == 404
     encoded = client.get("/dav/media/%2e%2e/notes/secret.md", headers=basic("bram", token))
     assert encoded.status_code in (403, 404)
 

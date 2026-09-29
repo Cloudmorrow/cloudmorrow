@@ -65,9 +65,7 @@ def _text_from_stdin_or_editor(initial: str = "", *, what: str) -> str:
 
 @app.command("list")
 def list_notes(
-    plain: Annotated[
-        bool, typer.Option("--plain", help="One title per line, for scripts.")
-    ] = False,
+    plain: Annotated[bool, typer.Option("--plain", help="One title per line, for scripts.")] = False,
 ) -> None:
     """List your notes."""
 
@@ -113,9 +111,7 @@ def show(title: TitleArgument) -> None:
 @app.command("add")
 def add(
     title: TitleArgument,
-    force: Annotated[
-        bool, typer.Option("--force", help="Replace a note that is already there.")
-    ] = False,
+    force: Annotated[bool, typer.Option("--force", help="Replace a note that is already there.")] = False,
 ) -> None:
     """Write a new note, from stdin or from $EDITOR."""
     text = _text_from_stdin_or_editor(f"# {title}\n\n", what="the note")
@@ -131,10 +127,7 @@ def add(
                 if not force:
                     fail(f"{title} already exists — --force replaces it")
                 note = await api.write(title, text)
-        console.print(
-            f"[green]Saved[/] {_title(note['path'])} "
-            f"[dim]({plural(len(text), 'byte')})[/]"
-        )
+        console.print(f"[green]Saved[/] {_title(note['path'])} [dim]({plural(len(text), 'byte')})[/]")
 
     run(_add())
 
@@ -166,9 +159,7 @@ def edit(title: TitleArgument) -> None:
 @app.command("remove")
 def remove(
     title: TitleArgument,
-    recursive: Annotated[
-        bool, typer.Option("--recursive", "-r", help="Delete a folder of notes.")
-    ] = False,
+    recursive: Annotated[bool, typer.Option("--recursive", "-r", help="Delete a folder of notes.")] = False,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip the confirmation.")] = False,
 ) -> None:
     """Delete a note."""

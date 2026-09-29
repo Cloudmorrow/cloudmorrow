@@ -49,7 +49,12 @@ from cloudmorrow.server.records import (
 
 class Backend(Protocol):
     def list(
-        self, principal: Principal, model: Datamodel, where: dict, *, q: str = "",
+        self,
+        principal: Principal,
+        model: Datamodel,
+        where: dict,
+        *,
+        q: str = "",
         previews: bool = False,
     ) -> list[Record]: ...
 
@@ -57,9 +62,7 @@ class Backend(Protocol):
 
     def create(self, principal: Principal, model: Datamodel, fields: dict) -> Record: ...
 
-    def update(
-        self, principal: Principal, model: Datamodel, record_id: str, fields: dict, rev: object
-    ) -> Record: ...
+    def update(self, principal: Principal, model: Datamodel, record_id: str, fields: dict, rev: object) -> Record: ...
 
     def delete(self, principal: Principal, model: Datamodel, record_id: str) -> int: ...
 
@@ -75,9 +78,7 @@ class ContentBackend(Backend, Protocol):
 
     def content(self, principal: Principal, model: Datamodel, record_id: str) -> tuple[Path, str]: ...
 
-    def thumbnail(
-        self, principal: Principal, model: Datamodel, record_id: str, size: int
-    ) -> Path: ...
+    def thumbnail(self, principal: Principal, model: Datamodel, record_id: str, size: int) -> Path: ...
 
     def put(self, principal: Principal, model: Datamodel, fields: dict, source: Path) -> Record: ...
 
@@ -99,7 +100,7 @@ def encode_id(prefix: str, key: str) -> str:
 def decode_id(prefix: str, record_id: str) -> str:
     if not record_id.startswith(prefix):
         raise UnknownRecordError(record_id)
-    raw = record_id[len(prefix):]
+    raw = record_id[len(prefix) :]
     try:
         return base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode("utf-8")
     except (binascii.Error, UnicodeDecodeError, ValueError):

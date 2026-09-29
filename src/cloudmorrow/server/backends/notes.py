@@ -45,8 +45,17 @@ class NotesBackend:
     def __init__(self, store_for: Callable[[str], NoteStore]) -> None:
         self._store_for = store_for
 
-    def _record(self, model: Datamodel, owner: str, path: str, *, body: str | None,
-                rev: str, modified: float, preview: str | None = None) -> Record:
+    def _record(
+        self,
+        model: Datamodel,
+        owner: str,
+        path: str,
+        *,
+        body: str | None,
+        rev: str,
+        modified: float,
+        preview: str | None = None,
+    ) -> Record:
         title_path = path[: -len(NOTE_SUFFIX)] if path.endswith(NOTE_SUFFIX) else path
         folder, _, title = title_path.rpartition("/")
         return Record(
@@ -56,8 +65,13 @@ class NotesBackend:
             scope="personal",
             rev=rev,
             position=0,
-            fields={"path": title_path, "folder": folder, "title": title, "body": body,
-                    "modified": iso_stamp(modified)},
+            fields={
+                "path": title_path,
+                "folder": folder,
+                "title": title,
+                "body": body,
+                "modified": iso_stamp(modified),
+            },
             written_by="notes",
             created_at=iso_stamp(modified),
             updated_at=iso_stamp(modified),
@@ -71,8 +85,9 @@ class NotesBackend:
             else:
                 into.append(child)
 
-    def list(self, principal: Principal, model: Datamodel, where: dict, *, q: str = "",
-             previews: bool = False) -> list[Record]:
+    def list(
+        self, principal: Principal, model: Datamodel, where: dict, *, q: str = "", previews: bool = False
+    ) -> list[Record]:
         unknown = set(where) - {"folder"}
         if unknown:
             raise RecordError(f"notes are filtered by folder only, not {', '.join(sorted(unknown))}")
@@ -93,8 +108,9 @@ class NotesBackend:
             if hits is not None and node.path not in hits:
                 continue
             preview = hits[node.path] if hits is not None else node.preview
-            record = self._record(model, principal.username, node.path, body=None,
-                                  rev="", modified=node.modified or 0, preview=preview)
+            record = self._record(
+                model, principal.username, node.path, body=None, rev="", modified=node.modified or 0, preview=preview
+            )
             if folder is not None and record.fields["folder"] != folder:
                 continue
             records.append(record)
@@ -107,8 +123,9 @@ class NotesBackend:
             note = store.read(store.with_suffix(path))
         except (NoteNotFoundError, UnsafePathError, IsADirectoryError):
             raise UnknownRecordError(record_id) from None
-        return self._record(model, principal.username, note.path, body=note.content,
-                            rev=note.rev, modified=note.modified)
+        return self._record(
+            model, principal.username, note.path, body=note.content, rev=note.rev, modified=note.modified
+        )
 
     @staticmethod
     def _path_from(fields: dict, *, folder: str = "", title: str = "") -> str:
@@ -132,8 +149,7 @@ class NotesBackend:
             raise RecordError(str(exc)) from None
         return self.get(principal, model, encode_id(self.PREFIX, note.path.removesuffix(NOTE_SUFFIX)))
 
-    def update(self, principal: Principal, model: Datamodel, record_id: str, fields: dict,
-               rev: object) -> Record:
+    def update(self, principal: Principal, model: Datamodel, record_id: str, fields: dict, rev: object) -> Record:
         unknown = set(fields) - {"path", "folder", "title", "body"}
         if unknown:
             raise RecordError(f"a note's {', '.join(sorted(unknown))} is not written directly")
@@ -142,13 +158,10 @@ class NotesBackend:
         path = current.fields["path"]
         if "body" in fields:
             try:
-                store.write(store.with_suffix(path), str(fields["body"] or ""),
-                            rev=str(rev) if rev else None)
+                store.write(store.with_suffix(path), str(fields["body"] or ""), rev=str(rev) if rev else None)
             except NoteConflictError:
                 raise RecordConflictError(self.get(principal, model, record_id)) from None
-        new_path = self._path_from(
-            fields, folder=current.fields["folder"], title=current.fields["title"]
-        ) or path
+        new_path = self._path_from(fields, folder=current.fields["folder"], title=current.fields["title"]) or path
         if new_path != path:
             try:
                 moved = store.move(store.with_suffix(path), store.with_suffix(new_path))

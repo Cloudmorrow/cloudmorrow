@@ -146,15 +146,11 @@ def sync_bundle(
 
     # 2. This machine has never synced: adopt what is there, whatever is here.
     if state.revision == 0:
-        return _pull(
-            client, bundle, module, root, state, remote, adopt=True, notify=notify
-        )
+        return _pull(client, bundle, module, root, state, remote, adopt=True, notify=notify)
 
     # 3. Somebody else moved it. Their revision wins; ours is backed up.
     if revision != state.revision:
-        return _pull(
-            client, bundle, module, root, state, remote, adopt=False, notify=notify
-        )
+        return _pull(client, bundle, module, root, state, remote, adopt=False, notify=notify)
 
     # 4. Level with the server, so anything different here is a local edit.
     if local_manifest != state.files:
@@ -177,9 +173,7 @@ def _push(
         if exc.status_code == 409:
             # Another machine got in first. Next pass sees the new revision
             # and pulls it, so there is nothing to do here but say so.
-            return SyncOutcome(
-                bundle, "stale", detail="another machine pushed first; pulling next pass"
-            )
+            return SyncOutcome(bundle, "stale", detail="another machine pushed first; pulling next pass")
         raise
 
     state.revision = int(result.get("revision", 0))
@@ -281,11 +275,7 @@ def sync_all(
     outcomes = []
     for bundle in bundles:
         try:
-            outcomes.append(
-                sync_bundle(
-                    client, config, bundle, root=root, state_directory=state_directory
-                )
-            )
+            outcomes.append(sync_bundle(client, config, bundle, root=root, state_directory=state_directory))
         except AgentApiError as exc:
             log.warning("config sync %s failed: %s", bundle, exc)
             outcomes.append(SyncOutcome(bundle, "failed", detail=str(exc)))

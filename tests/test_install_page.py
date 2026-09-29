@@ -57,10 +57,7 @@ def test_published_wheel_is_served_and_used(config, users):
 
     with TestClient(create_app(config)) as client:
         script = client.get("/install.sh").text
-        assert (
-            "cloudmorrow[tui,agent] @ https://cm.hl.bramlabs.io"
-            "/dist/cloudmorrow-0.1.0-py3-none-any.whl" in script
-        )
+        assert "cloudmorrow[tui,agent] @ https://cm.hl.bramlabs.io/dist/cloudmorrow-0.1.0-py3-none-any.whl" in script
         served = client.get("/dist/cloudmorrow-0.1.0-py3-none-any.whl")
         assert served.status_code == 200
         assert served.content == b"PK\x03\x04not-really-a-wheel"

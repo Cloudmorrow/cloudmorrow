@@ -98,9 +98,7 @@ class AgentRunner:
 
     def tick(self) -> None:
         """One heartbeat, the config, the shares, then drain whatever work is waiting."""
-        beat = self.client.heartbeat(
-            socket.gethostname(), platform.platform(), dav_base=self.shares.base_url
-        )
+        beat = self.client.heartbeat(socket.gethostname(), platform.platform(), dav_base=self.shares.base_url)
         self.stats.heartbeats += 1
         self.sync_config(beat.get("sync_bundles") or [])
         self.serve_shares(beat.get("shares") or [])

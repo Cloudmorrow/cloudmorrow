@@ -30,7 +30,10 @@ from dataclasses import dataclass
 QUOTES: tuple[tuple[str, str], ...] = (
     ("The unexamined life is not worth living.", "Socrates"),
     ("We are what we repeatedly do. Excellence, then, is not an act, but a habit.", "Will Durant, on Aristotle"),
-    ("It is the mark of an educated mind to be able to entertain a thought without accepting it.", "attributed to Aristotle"),
+    (
+        "It is the mark of an educated mind to be able to entertain a thought without accepting it.",
+        "attributed to Aristotle",
+    ),
     ("It is not that we have a short time to live, but that we waste a lot of it.", "Seneca"),
     ("We suffer more often in imagination than in reality.", "Seneca"),
     ("Begin at once to live, and count each separate day as a separate life.", "Seneca"),
@@ -38,30 +41,51 @@ QUOTES: tuple[tuple[str, str], ...] = (
     ("You have power over your mind, not outside events. Realize this, and you will find strength.", "Marcus Aurelius"),
     ("Waste no more time arguing about what a good man should be. Be one.", "Marcus Aurelius"),
     ("The impediment to action advances action. What stands in the way becomes the way.", "Marcus Aurelius"),
-    ("Very little is needed to make a happy life; it is all within yourself, in your way of thinking.", "Marcus Aurelius"),
+    (
+        "Very little is needed to make a happy life; it is all within yourself, in your way of thinking.",
+        "Marcus Aurelius",
+    ),
     ("It's not what happens to you, but how you react to it that matters.", "Epictetus"),
     ("First say to yourself what you would be; and then do what you have to do.", "Epictetus"),
     ("Wealth consists not in having great possessions, but in having few wants.", "Epictetus"),
-    ("No man ever steps in the same river twice, for it is not the same river and he is not the same man.", "Heraclitus"),
+    (
+        "No man ever steps in the same river twice, for it is not the same river and he is not the same man.",
+        "Heraclitus",
+    ),
     ("Character is destiny.", "Heraclitus"),
     ("Much learning does not teach understanding.", "Heraclitus"),
     ("The mind is not a vessel to be filled, but a fire to be kindled.", "Plutarch"),
     ("Wonder is the beginning of wisdom.", "attributed to Socrates"),
-    ("The whole problem with the world is that fools and fanatics are always so certain of themselves, and wiser people so full of doubts.", "Bertrand Russell"),
+    (
+        "The whole problem with the world is that fools and fanatics are always so certain of themselves, and wiser people so full of doubts.",
+        "Bertrand Russell",
+    ),
     ("He who has a why to live for can bear almost any how.", "Friedrich Nietzsche"),
     ("There are no facts, only interpretations.", "Friedrich Nietzsche"),
     ("If you gaze long into an abyss, the abyss also gazes into you.", "Friedrich Nietzsche"),
     ("Become who you are.", "Friedrich Nietzsche, after Pindar"),
-    ("Between stimulus and response there is a space. In that space is our power to choose our response.", "Viktor Frankl"),
+    (
+        "Between stimulus and response there is a space. In that space is our power to choose our response.",
+        "Viktor Frankl",
+    ),
     ("What we know is a drop, what we don't know is an ocean.", "Isaac Newton"),
     ("If I have seen further, it is by standing on the shoulders of giants.", "Isaac Newton"),
-    ("The first principle is that you must not fool yourself, and you are the easiest person to fool.", "Richard Feynman"),
+    (
+        "The first principle is that you must not fool yourself, and you are the easiest person to fool.",
+        "Richard Feynman",
+    ),
     ("Everything should be made as simple as possible, but not simpler.", "attributed to Albert Einstein"),
     ("The important thing is not to stop questioning. Curiosity has its own reason for existing.", "Albert Einstein"),
     ("Imagination is more important than knowledge.", "Albert Einstein"),
     ("Doubt is not a pleasant condition, but certainty is absurd.", "Voltaire"),
-    ("The greatest enemy of knowledge is not ignorance, it is the illusion of knowledge.", "attributed to Daniel J. Boorstin"),
-    ("Not everything that counts can be counted, and not everything that can be counted counts.", "William Bruce Cameron"),
+    (
+        "The greatest enemy of knowledge is not ignorance, it is the illusion of knowledge.",
+        "attributed to Daniel J. Boorstin",
+    ),
+    (
+        "Not everything that counts can be counted, and not everything that can be counted counts.",
+        "William Bruce Cameron",
+    ),
     ("A ship in harbor is safe, but that is not what ships are built for.", "John A. Shedd"),
     ("The best time to plant a tree was twenty years ago. The second best time is now.", "proverb"),
     ("How we spend our days is, of course, how we spend our lives.", "Annie Dillard"),
@@ -69,14 +93,23 @@ QUOTES: tuple[tuple[str, str], ...] = (
     ("We do not see things as they are, we see them as we are.", "Anaïs Nin"),
     ("The cave you fear to enter holds the treasure you seek.", "Joseph Campbell"),
     ("Out of the crooked timber of humanity, no straight thing was ever made.", "Immanuel Kant"),
-    ("Man is condemned to be free; because once thrown into the world, he is responsible for everything he does.", "Jean-Paul Sartre"),
+    (
+        "Man is condemned to be free; because once thrown into the world, he is responsible for everything he does.",
+        "Jean-Paul Sartre",
+    ),
     ("Life can only be understood backwards; but it must be lived forwards.", "Søren Kierkegaard"),
     ("Anxiety is the dizziness of freedom.", "Søren Kierkegaard"),
     ("The limits of my language mean the limits of my world.", "Ludwig Wittgenstein"),
-    ("It is the province of knowledge to speak, and it is the privilege of wisdom to listen.", "Oliver Wendell Holmes Sr."),
+    (
+        "It is the province of knowledge to speak, and it is the privilege of wisdom to listen.",
+        "Oliver Wendell Holmes Sr.",
+    ),
     ("Be kind, for everyone you meet is fighting a hard battle.", "attributed to Ian Maclaren"),
     ("Injustice anywhere is a threat to justice everywhere.", "Martin Luther King Jr."),
-    ("The arc of the moral universe is long, but it bends toward justice.", "Martin Luther King Jr., after Theodore Parker"),
+    (
+        "The arc of the moral universe is long, but it bends toward justice.",
+        "Martin Luther King Jr., after Theodore Parker",
+    ),
     ("Those who cannot remember the past are condemned to repeat it.", "George Santayana"),
     ("Power tends to corrupt, and absolute power corrupts absolutely.", "Lord Acton"),
     ("The price of anything is the amount of life you exchange for it.", "attributed to Henry David Thoreau"),
@@ -92,7 +125,10 @@ QUOTES: tuple[tuple[str, str], ...] = (
     ("Try again. Fail again. Fail better.", "Samuel Beckett"),
     ("The mystery of life isn't a problem to solve, but a reality to experience.", "Frank Herbert"),
     ("Fear is the mind-killer.", "Frank Herbert"),
-    ("The opposite of a correct statement is a false statement. But the opposite of a profound truth may well be another profound truth.", "Niels Bohr"),
+    (
+        "The opposite of a correct statement is a false statement. But the opposite of a profound truth may well be another profound truth.",
+        "Niels Bohr",
+    ),
     ("Prediction is very difficult, especially about the future.", "attributed to Niels Bohr"),
     ("Science is a way of thinking much more than it is a body of knowledge.", "Carl Sagan"),
     ("Extraordinary claims require extraordinary evidence.", "Carl Sagan"),
@@ -114,21 +150,36 @@ QUOTES: tuple[tuple[str, str], ...] = (
     ("In the beginner's mind there are many possibilities, but in the expert's there are few.", "Shunryu Suzuki"),
     ("You can't stop the waves, but you can learn to surf.", "Jon Kabat-Zinn"),
     ("Everything that irritates us about others can lead us to an understanding of ourselves.", "Carl Jung"),
-    ("Until you make the unconscious conscious, it will direct your life and you will call it fate.", "attributed to Carl Jung"),
+    (
+        "Until you make the unconscious conscious, it will direct your life and you will call it fate.",
+        "attributed to Carl Jung",
+    ),
     ("Freedom is nothing but a chance to be better.", "Albert Camus"),
     ("In the depth of winter, I finally learned that within me there lay an invincible summer.", "Albert Camus"),
     ("One must imagine Sisyphus happy.", "Albert Camus"),
     ("Man is the only creature who refuses to be what he is.", "Albert Camus"),
-    ("Programs must be written for people to read, and only incidentally for machines to execute.", "Harold Abelson and Gerald Jay Sussman"),
+    (
+        "Programs must be written for people to read, and only incidentally for machines to execute.",
+        "Harold Abelson and Gerald Jay Sussman",
+    ),
     ("There are only two hard things in computer science: cache invalidation and naming things.", "Phil Karlton"),
     ("Simplicity is prerequisite for reliability.", "Edsger W. Dijkstra"),
-    ("The question of whether a computer can think is no more interesting than the question of whether a submarine can swim.", "Edsger W. Dijkstra"),
+    (
+        "The question of whether a computer can think is no more interesting than the question of whether a submarine can swim.",
+        "Edsger W. Dijkstra",
+    ),
     ("Any sufficiently advanced technology is indistinguishable from magic.", "Arthur C. Clarke"),
-    ("The only way of discovering the limits of the possible is to venture a little way past them into the impossible.", "Arthur C. Clarke"),
+    (
+        "The only way of discovering the limits of the possible is to venture a little way past them into the impossible.",
+        "Arthur C. Clarke",
+    ),
     ("We can only see a short distance ahead, but we can see plenty there that needs to be done.", "Alan Turing"),
     ("Computers are useless. They can only give you answers.", "Pablo Picasso"),
     ("Inspiration exists, but it has to find you working.", "Pablo Picasso"),
-    ("Every child is an artist. The problem is how to remain an artist once we grow up.", "attributed to Pablo Picasso"),
+    (
+        "Every child is an artist. The problem is how to remain an artist once we grow up.",
+        "attributed to Pablo Picasso",
+    ),
     ("We are all in the gutter, but some of us are looking at the stars.", "Oscar Wilde"),
     ("Experience is simply the name we give our mistakes.", "Oscar Wilde"),
     ("The truth is rarely pure and never simple.", "Oscar Wilde"),
@@ -138,19 +189,34 @@ QUOTES: tuple[tuple[str, str], ...] = (
     ("All we have to decide is what to do with the time that is given us.", "J. R. R. Tolkien"),
     ("It's the job that's never started as takes longest to finish.", "J. R. R. Tolkien"),
     ("What is essential is invisible to the eye.", "Antoine de Saint-Exupéry"),
-    ("Perfection is achieved, not when there is nothing more to add, but when there is nothing left to take away.", "Antoine de Saint-Exupéry"),
+    (
+        "Perfection is achieved, not when there is nothing more to add, but when there is nothing left to take away.",
+        "Antoine de Saint-Exupéry",
+    ),
     ("Hope is the thing with feathers that perches in the soul.", "Emily Dickinson"),
     ("Tell all the truth but tell it slant.", "Emily Dickinson"),
     ("In three words I can sum up everything I've learned about life: it goes on.", "Robert Frost"),
     ("The best way out is always through.", "Robert Frost"),
     ("A book must be the axe for the frozen sea within us.", "Franz Kafka"),
-    ("You do not need to leave your room. Remain sitting at your table and listen. Do not even listen, simply wait.", "Franz Kafka"),
+    (
+        "You do not need to leave your room. Remain sitting at your table and listen. Do not even listen, simply wait.",
+        "Franz Kafka",
+    ),
     ("Whenever you find yourself on the side of the majority, it is time to pause and reflect.", "Mark Twain"),
-    ("It ain't what you don't know that gets you into trouble. It's what you know for sure that just ain't so.", "attributed to Mark Twain"),
+    (
+        "It ain't what you don't know that gets you into trouble. It's what you know for sure that just ain't so.",
+        "attributed to Mark Twain",
+    ),
     ("I didn't have time to write a short letter, so I wrote a long one instead.", "Mark Twain, after Pascal"),
     ("Good judgment comes from experience, and experience comes from bad judgment.", "proverb"),
-    ("The reasonable man adapts himself to the world; the unreasonable one persists in trying to adapt the world to himself. Therefore all progress depends on the unreasonable man.", "George Bernard Shaw"),
-    ("The single biggest problem in communication is the illusion that it has taken place.", "attributed to George Bernard Shaw"),
+    (
+        "The reasonable man adapts himself to the world; the unreasonable one persists in trying to adapt the world to himself. Therefore all progress depends on the unreasonable man.",
+        "George Bernard Shaw",
+    ),
+    (
+        "The single biggest problem in communication is the illusion that it has taken place.",
+        "attributed to George Bernard Shaw",
+    ),
     ("Those who can't change their minds can't change anything.", "George Bernard Shaw"),
     ("Talent hits a target no one else can hit; genius hits a target no one else can see.", "Arthur Schopenhauer"),
     ("Every man takes the limits of his own field of vision for the limits of the world.", "Arthur Schopenhauer"),
@@ -170,7 +236,10 @@ QUOTES: tuple[tuple[str, str], ...] = (
     ("Almost everything will work again if you unplug it for a few minutes, including you.", "Anne Lamott"),
     ("Life is what happens to you while you're busy making other plans.", "Allen Saunders, later John Lennon"),
     ("What the caterpillar calls the end of the world, the master calls a butterfly.", "Richard Bach"),
-    ("Yesterday is history, tomorrow is a mystery, today is a gift. That is why it is called the present.", "attributed to Alice Morse Earle"),
+    (
+        "Yesterday is history, tomorrow is a mystery, today is a gift. That is why it is called the present.",
+        "attributed to Alice Morse Earle",
+    ),
 )
 
 
@@ -272,9 +341,7 @@ def locate(place: str) -> Place:
     if not found:
         raise WeatherError(f"no place called {place!r}")
     hit = found[0]
-    where = ", ".join(
-        part for part in (hit.get("name"), hit.get("country")) if part
-    )
+    where = ", ".join(part for part in (hit.get("name"), hit.get("country")) if part)
     return Place(where or place, float(hit["latitude"]), float(hit["longitude"]))
 
 

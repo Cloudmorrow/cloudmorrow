@@ -140,6 +140,7 @@ folders = [{ name = "exports", access = "read" }]
 ```python
 from cloudmorrow.quill import action, hook, view, ui, toast, error, open, go, confirm, respond
 
+
 @view("garage")
 def garage(ctx):
     vans = ctx.records.list("vehicle")
@@ -148,6 +149,7 @@ def garage(ctx):
         ui.table(vans, columns=["name", ("Odometer", "fleet.odometer")], actions=["log-service"]),
         ui.button("Add a van", action="add-van", tone="primary"),
     )
+
 
 @action("log_service")
 def log_service(ctx, vehicle, date, km):
@@ -241,16 +243,20 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 URL, TOKEN = os.environ["CLOUDMORROW_URL"], os.environ["CLOUDMORROW_TOKEN"]
 
+
 def records(method, path, body=None):
     request = urllib.request.Request(
-        URL + "/api/records/" + path, method=method,
+        URL + "/api/records/" + path,
+        method=method,
         data=json.dumps(body).encode() if body is not None else None,
-        headers={"Authorization": "Bearer " + TOKEN, "Content-Type": "application/json"})
+        headers={"Authorization": "Bearer " + TOKEN, "Content-Type": "application/json"},
+    )
     with urllib.request.urlopen(request, timeout=10) as answer:
         return json.loads(answer.read() or b"null")
 
+
 class Api(BaseHTTPRequestHandler):
-    def do_GET(self):                           # GET /api/q/plants/count
+    def do_GET(self):  # GET /api/q/plants/count
         who = self.headers["X-Cloudmorrow-User"]
         body = json.dumps({"asked_by": who, "plants": len(records("GET", "plants.plant"))})
         self.send_response(200)
@@ -258,7 +264,8 @@ class Api(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body.encode())
 
-print("up", flush=True)                         # into its log
+
+print("up", flush=True)  # into its log
 ThreadingHTTPServer(("127.0.0.1", int(os.environ["PORT"])), Api).serve_forever()
 ```
 

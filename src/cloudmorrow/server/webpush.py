@@ -162,9 +162,7 @@ def default_subject(public_url: str = "") -> str:
     return f"mailto:cloudmorrow@{host or socket.gethostname() or 'localhost'}"
 
 
-def vapid_headers(
-    key: ec.EllipticCurvePrivateKey, endpoint: str, subject: str
-) -> dict[str, str]:
+def vapid_headers(key: ec.EllipticCurvePrivateKey, endpoint: str, subject: str) -> dict[str, str]:
     """The `Authorization` header for one push, good for `JWT_HOURS`.
 
     The audience is the push service's origin and nothing more of the URL —
@@ -175,9 +173,7 @@ def vapid_headers(
     token = jwt.encode(
         {
             "aud": f"{parts.scheme}://{parts.netloc}",
-            "exp": int(
-                (dt.datetime.now(tz=dt.UTC) + dt.timedelta(hours=JWT_HOURS)).timestamp()
-            ),
+            "exp": int((dt.datetime.now(tz=dt.UTC) + dt.timedelta(hours=JWT_HOURS)).timestamp()),
             "sub": subject,
         },
         key,
@@ -193,8 +189,14 @@ def _hkdf(salt: bytes, ikm: bytes, info: bytes, length: int) -> bytes:
     return hmac.new(prk, info + b"\x01", hashlib.sha256).digest()[:length]
 
 
-def encrypt(payload: bytes, p256dh: bytes, auth: bytes, *, salt: bytes | None = None,
-            private_key: ec.EllipticCurvePrivateKey | None = None) -> bytes:
+def encrypt(
+    payload: bytes,
+    p256dh: bytes,
+    auth: bytes,
+    *,
+    salt: bytes | None = None,
+    private_key: ec.EllipticCurvePrivateKey | None = None,
+) -> bytes:
     """Seal *payload* for one subscription: RFC 8291, in the aes128gcm of RFC 8188.
 
     The result is a whole body, header block and all — salt, record size, the
@@ -278,9 +280,7 @@ class PushStore:
     def public_key(self) -> str:
         return public_key_b64(self.key)
 
-    def subscribe(
-        self, username: str, *, endpoint: str, p256dh: str, auth: str, label: str = ""
-    ) -> Subscription:
+    def subscribe(self, username: str, *, endpoint: str, p256dh: str, auth: str, label: str = "") -> Subscription:
         """Remember a device. The same endpoint twice is the same device."""
         endpoint = endpoint.strip()
         if not endpoint.startswith("https://"):
@@ -301,9 +301,7 @@ class PushStore:
                     _now(),
                 ),
             )
-            row = conn.execute(
-                "SELECT * FROM push_subscriptions WHERE endpoint = ?", (endpoint,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM push_subscriptions WHERE endpoint = ?", (endpoint,)).fetchone()
         return _subscription(conn, row)
 
     def unsubscribe(self, username: str, endpoint: str) -> int:
@@ -331,8 +329,7 @@ class PushStore:
         with self._connect() as conn:
             if ok:
                 conn.execute(
-                    "UPDATE push_subscriptions SET last_ok = ?, failures = 0"
-                    " WHERE endpoint = ?",
+                    "UPDATE push_subscriptions SET last_ok = ?, failures = 0 WHERE endpoint = ?",
                     (_now(), endpoint),
                 )
                 return
@@ -370,9 +367,7 @@ class PushStore:
                 "Urgency": "high",
                 **vapid_headers(self.key, subscription.endpoint, self.subject),
             }
-            request = urllib.request.Request(
-                subscription.endpoint, data=body, headers=headers, method="POST"
-            )
+            request = urllib.request.Request(subscription.endpoint, data=body, headers=headers, method="POST")
             with urllib.request.urlopen(request, timeout=timeout):
                 pass
         except urllib.error.HTTPError as exc:

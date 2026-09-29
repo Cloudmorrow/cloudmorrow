@@ -44,11 +44,7 @@ def headers(client, who=ADMIN) -> dict[str, str]:
 def call(client, method, path, body=None, *, expect=200, who=ADMIN, **kwargs):
     response = client.request(method, path, json=body, headers=headers(client, who), **kwargs)
     assert response.status_code == expect, response.text
-    return (
-        response.json()
-        if response.content and "json" in response.headers.get("content-type", "")
-        else response
-    )
+    return response.json() if response.content and "json" in response.headers.get("content-type", "") else response
 
 
 def drive(config, username="bram"):
@@ -80,9 +76,7 @@ def test_a_grid_must_bind_a_folder_field_and_a_kind_with_folders(registry_with_f
     folder = tmp_path / "bad"
     folder.mkdir()
     (folder / "quill.toml").write_text(
-        (QUILL_CATALOG / "quill-files" / "quill.toml")
-        .read_text()
-        .replace('folder = "folder"', 'folder = "size"')
+        (QUILL_CATALOG / "quill-files" / "quill.toml").read_text().replace('folder = "folder"', 'folder = "size"')
     )
     with pytest.raises(QuillError, match="folder 'size' is a int; it wants string"):
         registry_with_files.plan(folder, QUILL_CATALOG / "datamodels")
@@ -163,9 +157,7 @@ def test_a_picture_has_a_thumbnail_and_anything_else_says_so(files, config):
     root = drive(config)
     (root / "red.png").write_bytes(png((400, 200)))
     (root / "notes.txt").write_text("x")
-    listed = {
-        f["fields"]["name"]: f for f in call(files, "GET", "/api/records/file?share=my-files")
-    }
+    listed = {f["fields"]["name"]: f for f in call(files, "GET", "/api/records/file?share=my-files")}
     thumb = call(files, "GET", f"/api/records/file/{listed['red.png']['id']}/thumb?size=128")
     assert thumb.headers["content-type"] == "image/jpeg"
     from PIL import Image
@@ -198,9 +190,7 @@ def test_a_file_is_put_in_a_folder_and_a_taken_name_gets_a_number(files, config)
 
     assert (root / "Photos" / "cat.jpg").stat().st_mode & 0o777 == FILE_MODE
     assert not [p for p in root.rglob(".upload-*")]
-    bad = files.post(
-        "/api/records/file/upload?share=my-files&name=../escape", content=b"x", headers=auth
-    )
+    bad = files.post("/api/records/file/upload?share=my-files&name=../escape", content=b"x", headers=auth)
     assert bad.status_code == 400
 
 
@@ -215,11 +205,7 @@ def test_folders_are_made_renamed_moved_and_deleted(files, config):
     )
     assert (root / "Tax").is_dir() and made["fields"]["kind"] == "folder"
     (root / "2025.pdf").write_bytes(b"%PDF")
-    pdf = next(
-        f
-        for f in call(files, "GET", "/api/records/file?share=my-files")
-        if f["fields"]["name"] == "2025.pdf"
-    )
+    pdf = next(f for f in call(files, "GET", "/api/records/file?share=my-files") if f["fields"]["name"] == "2025.pdf")
     # Moved into the folder by its folder, renamed by its name.
     moved = call(
         files,
@@ -228,9 +214,7 @@ def test_folders_are_made_renamed_moved_and_deleted(files, config):
         {"fields": {"folder": "Tax"}, "rev": pdf["rev"]},
     )
     assert moved["fields"]["path"] == "Tax/2025.pdf" and (root / "Tax" / "2025.pdf").is_file()
-    renamed = call(
-        files, "PATCH", f"/api/records/file/{moved['id']}", {"fields": {"name": "return.pdf"}}
-    )
+    renamed = call(files, "PATCH", f"/api/records/file/{moved['id']}", {"fields": {"name": "return.pdf"}})
     assert (root / "Tax" / "return.pdf").read_bytes() == b"%PDF"
     # The old id is gone with the old name.
     call(files, "GET", f"/api/records/file/{pdf['id']}", expect=404)
@@ -246,13 +230,9 @@ def test_folders_are_made_renamed_moved_and_deleted(files, config):
     )
     # A folder cannot go inside itself, and a name cannot be taken twice.
     tax = call(files, "GET", f"/api/records/file/{made['id']}")
-    call(
-        files, "PATCH", f"/api/records/file/{tax['id']}", {"fields": {"folder": "Tax"}}, expect=400
-    )
+    call(files, "PATCH", f"/api/records/file/{tax['id']}", {"fields": {"folder": "Tax"}}, expect=400)
     (root / "Other").mkdir()
-    call(
-        files, "PATCH", f"/api/records/file/{tax['id']}", {"fields": {"name": "Other"}}, expect=400
-    )
+    call(files, "PATCH", f"/api/records/file/{tax['id']}", {"fields": {"name": "Other"}}, expect=400)
     # Deleting a folder takes what is in it.
     call(files, "DELETE", f"/api/records/file/{tax['id']}", expect=204)
     assert not (root / "Tax").exists()

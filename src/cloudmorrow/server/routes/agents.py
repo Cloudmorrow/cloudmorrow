@@ -87,9 +87,7 @@ def enroll_self(
 
 
 @router.get("", response_model=list[AgentOut])
-def list_agents(
-    state: AppState = Depends(get_state), user: User = Depends(get_current_user)
-) -> list[AgentOut]:
+def list_agents(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> list[AgentOut]:
     return [AgentOut(**agent.to_dict()) for agent in state.agents.list(user.username)]
 
 
@@ -108,9 +106,7 @@ def set_agent_sync(
     try:
         bundles = [validate_bundle(name) for name in payload.sync_bundles]
     except UnknownBundleError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"no such config bundle: {exc}"
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"no such config bundle: {exc}") from exc
     try:
         agent = state.agents.set_sync_bundles(user.username, agent_id, bundles)
     except UnknownAgentError as exc:
@@ -210,14 +206,9 @@ def heartbeat(
         # Only bundles the machine says it can handle. Ticking the box for a
         # machine that has since stopped being an Omarchy box does nothing.
         sync_bundles=[
-            bundle
-            for bundle in agent.sync_bundles
-            if bundle in (payload.capabilities or agent.capabilities)
+            bundle for bundle in agent.sync_bundles if bundle in (payload.capabilities or agent.capabilities)
         ],
-        shares=[
-            HeartbeatShare(name=share.name, path=str(share.path))
-            for share in state.shares.on_agent(agent.id)
-        ],
+        shares=[HeartbeatShare(name=share.name, path=str(share.path)) for share in state.shares.on_agent(agent.id)],
     )
 
 
@@ -240,9 +231,7 @@ def check_credentials(
 
 
 @agent_router.post("/jobs/claim", response_model=JobOut | None)
-def claim_job(
-    state: AppState = Depends(get_state), agent: Agent = Depends(get_current_agent)
-) -> JobOut | None:
+def claim_job(state: AppState = Depends(get_state), agent: Agent = Depends(get_current_agent)) -> JobOut | None:
     """Take the next queued job, or get null when there is nothing to do."""
     state.agents.touch(agent.id)
     job = state.jobs.claim_next(agent.id)
@@ -257,11 +246,7 @@ def report_result(
     agent: Agent = Depends(get_current_agent),
 ) -> JobOut:
     try:
-        job = state.jobs.finish(
-            agent.id, job_id, status=payload.status, result=payload.result
-        )
+        job = state.jobs.finish(agent.id, job_id, status=payload.status, result=payload.result)
     except UnknownJobError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="no such job for this agent"
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such job for this agent") from exc
     return JobOut(**job.to_dict())

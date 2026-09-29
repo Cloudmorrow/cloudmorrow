@@ -108,26 +108,17 @@ class VaultsBackend:
             str(fields.get("key") or key).strip(),
         )
 
-    def list(self, principal: Principal, model: Datamodel, where: dict, *, q: str = "",
-             previews: bool = False) -> list[Record]:
+    def list(
+        self, principal: Principal, model: Datamodel, where: dict, *, q: str = "", previews: bool = False
+    ) -> list[Record]:
         """Secrets, filtered; `q` finds by key, never by value. No previews: nothing to show."""
         unknown = set(where) - self.FILTERS
         if unknown:
-            raise RecordError(
-                "secrets are filtered by vault, environment and key, not "
-                + ", ".join(sorted(unknown))
-            )
+            raise RecordError("secrets are filtered by vault, environment and key, not " + ", ".join(sorted(unknown)))
         owner = principal.username
         try:
-            vaults = (
-                [str(where["vault"])] if "vault" in where
-                else [v.vault for v in self._store.vaults(owner)]
-            )
-            found = [
-                secret
-                for vault in vaults
-                for secret in self._store.list(owner, vault, where.get("environment"))
-            ]
+            vaults = [str(where["vault"])] if "vault" in where else [v.vault for v in self._store.vaults(owner)]
+            found = [secret for vault in vaults for secret in self._store.list(owner, vault, where.get("environment"))]
         except _BAD_NAME as exc:
             raise RecordError(str(exc)) from None
         if "key" in where:
@@ -169,8 +160,7 @@ class VaultsBackend:
         """The names as the store keeps them, once it has checked them."""
         return validate_vault(where[0]), validate_environment(where[1]), validate_key(where[2])
 
-    def update(self, principal: Principal, model: Datamodel, record_id: str, fields: dict,
-               rev: object) -> Record:
+    def update(self, principal: Principal, model: Datamodel, record_id: str, fields: dict, rev: object) -> Record:
         self._check_fields(fields)
         owner = principal.username
         here = self._where(record_id)

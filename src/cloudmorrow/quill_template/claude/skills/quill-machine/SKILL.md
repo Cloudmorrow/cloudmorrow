@@ -23,6 +23,7 @@ run = []                     # programs it may start, e.g. ["lp"]; empty is best
 import csv
 from cloudmorrow.quill import machine
 
+
 @machine
 def import_exports(ctx):
     made = 0
@@ -33,7 +34,7 @@ def import_exports(ctx):
                 if vans:
                     ctx.records.create("fleet.visit", vehicle=vans[0].id, date=row["date"], km=int(row["km"]))
                     made += 1
-    return {"made": made}      # anything JSON; shown by `cm quill machine run`
+    return {"made": made}  # anything JSON; shown by `cm quill machine run`
 ```
 
 - `ctx.folder(name)` is the folder the person picked, and the only part of

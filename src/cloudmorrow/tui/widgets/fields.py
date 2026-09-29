@@ -57,9 +57,7 @@ PLACEHOLDERS = {
 }
 
 
-def field_widget(
-    field: dict, value: Any, wid: str, *, choices: list[tuple[str, str]] | None = None
-):
+def field_widget(field: dict, value: Any, wid: str, *, choices: list[tuple[str, str]] | None = None):
     """The one widget that edits a field of *field*'s kind, holding *value*.
 
     The sheet's, and the same for an action's form (tui/quill_actions.py)
@@ -198,9 +196,7 @@ def read_field(widget: Any, field: dict) -> Any:
                     return dt.date.fromisoformat(text).isoformat()
                 moment = dt.datetime.fromisoformat(text)
             except ValueError:
-                raise ValueError(
-                    f"{label} is a date and a time, like 2026-09-26 14:30."
-                ) from None
+                raise ValueError(f"{label} is a date and a time, like 2026-09-26 14:30.") from None
             if moment.tzinfo is None:
                 # Typed here with no zone: the time on the wall, as typed.
                 return moment.isoformat(timespec="minutes")

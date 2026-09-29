@@ -43,9 +43,7 @@ def gradient(t: float, stops=MARK_GRADIENT) -> str:
     index = min(len(stops) - 2, int(t))
     weight = t - index
     start, end = _rgb(stops[index]), _rgb(stops[index + 1])
-    return "#{:02x}{:02x}{:02x}".format(
-        *(round(a + (b - a) * weight) for a, b in zip(start, end, strict=True))
-    )
+    return "#{:02x}{:02x}{:02x}".format(*(round(a + (b - a) * weight) for a, b in zip(start, end, strict=True)))
 
 
 def painted_mark(word: str = "CLOUDMORROW") -> Text:
@@ -122,9 +120,7 @@ class Header(Horizontal):
 
     def set_health(self, state: str) -> None:
         self.health = state
-        self.query_one("#topbar-health", Static).update(
-            health_line(state, compact=self.has_class("-compact"))
-        )
+        self.query_one("#topbar-health", Static).update(health_line(state, compact=self.has_class("-compact")))
 
     def fit(self, width: int) -> None:
         """The full mark when there is room for it and the lines beside it."""

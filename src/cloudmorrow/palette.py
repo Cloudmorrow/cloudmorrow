@@ -35,35 +35,35 @@ never have picked; every one of these goes out as 24-bit RGB instead. See
 from __future__ import annotations
 
 # -- neutrals: the app's own, unchanged by the brand ---------------------------
-NIGHT = "#0b0d12"        # behind the logo; the darkest there is
-INK = "#14171f"          # the page
-SURFACE = "#1f242e"      # panels sitting on it
-PANEL = "#272d39"        # panels sitting on those
-LINE = "#333a48"         # borders
+NIGHT = "#0b0d12"  # behind the logo; the darkest there is
+INK = "#14171f"  # the page
+SURFACE = "#1f242e"  # panels sitting on it
+PANEL = "#272d39"  # panels sitting on those
+LINE = "#333a48"  # borders
 LINE_BRIGHT = "#4a5364"  # borders that want noticing
 TEXT = "#dfe5f0"
-MUTED = "#99a1b3"        # soft: secondary text
-FAINT = "#667085"        # labels, times, what you read last — between muted and line
+MUTED = "#99a1b3"  # soft: secondary text
+FAINT = "#667085"  # labels, times, what you read last — between muted and line
 
 # -- blue: the platform ----------------------------------------------------------
-DEEP = "#0a3f75"         # cloud in shadow: pressed, the dark end of the gradient
-CLOUD = "#1c70b1"        # the brand blue, as a fill with white text on it
-PUFF = "#3685bd"         # cloud, lit: hover on a blue fill
-SKY = "#5aa6e0"          # blue as text or a line on dark: where you are
+DEEP = "#0a3f75"  # cloud in shadow: pressed, the dark end of the gradient
+CLOUD = "#1c70b1"  # the brand blue, as a fill with white text on it
+PUFF = "#3685bd"  # cloud, lit: hover on a blue fill
+SKY = "#5aa6e0"  # blue as text or a line on dark: where you are
 
 # -- amber: the person -------------------------------------------------------------
-LENS = "#e0a84c"         # the one primary action's fill, and names as text
+LENS = "#e0a84c"  # the one primary action's fill, and names as text
 ACTION = LENS
-ACTION_INK = INK         # the text on an amber fill
+ACTION_INK = INK  # the text on an amber fill
 
 # -- status --------------------------------------------------------------------------
 GOOD = "#5ce89b"
-WARN = "#ff9f5a"         # orange, never to be confused with amber
+WARN = "#ff9f5a"  # orange, never to be confused with amber
 BAD = "#ff6b81"
 
 # The names the rest of the code has always used.
-ACCENT = SKY             # the current thing, focus, the brand in a line of text
-SECOND = LENS            # names, and what is yours
+ACCENT = SKY  # the current thing, focus, the brand in a line of text
+SECOND = LENS  # names, and what is yours
 
 # The banner is tinted across these, dark end first: the cloud from its
 # shadow to the sky.

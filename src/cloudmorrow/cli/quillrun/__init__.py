@@ -90,8 +90,20 @@ from cloudmorrow.cli.quillrun.thread import _thread, space_name  # noqa: F401
 from cloudmorrow.client.api import CloudmorrowClient
 
 ACTIONS = (
-    "list", "add", "show", "set", "move", "done", "undone", "delete", "groups", "get", "put",
-    "edit", "search", "say",
+    "list",
+    "add",
+    "show",
+    "set",
+    "move",
+    "done",
+    "undone",
+    "delete",
+    "groups",
+    "get",
+    "put",
+    "edit",
+    "search",
+    "say",
 )
 
 
@@ -104,29 +116,15 @@ def route(argv: list[str], commands: set[str]) -> list[str]:
 
 def main(
     quill: Annotated[str, typer.Argument(help="The Quill's id.")],
-    action: Annotated[
-        str, typer.Argument(help=" | ".join(ACTIONS) + " | actions | one of the Quill's own")
-    ] = "list",
+    action: Annotated[str, typer.Argument(help=" | ".join(ACTIONS) + " | actions | one of the Quill's own")] = "list",
     args: Annotated[list[str] | None, typer.Argument(help="What the action needs.")] = None,
-    screen_id: Annotated[
-        str, typer.Option("--screen", help="Another of the Quill's screens.")
-    ] = "",
-    group: Annotated[
-        str, typer.Option("--group", "-g", help="Which board (or other group), by name or id.")
-    ] = "",
-    index: Annotated[
-        int | None, typer.Option("--index", help="Where in the lane, 0 for the top.")
-    ] = None,
+    screen_id: Annotated[str, typer.Option("--screen", help="Another of the Quill's screens.")] = "",
+    group: Annotated[str, typer.Option("--group", "-g", help="Which board (or other group), by name or id.")] = "",
+    index: Annotated[int | None, typer.Option("--index", help="Where in the lane, 0 for the top.")] = None,
     plain: Annotated[bool, typer.Option("--plain", help="JSON, for scripts.")] = False,
-    reveal: Annotated[
-        bool, typer.Option("--reveal", help="show: include a hidden field's value.")
-    ] = False,
-    first: Annotated[
-        str, typer.Option("--from", help="A calendar: the first day, as 2026-10-01 (today).")
-    ] = "",
-    last: Annotated[
-        str, typer.Option("--to", help="A calendar: the last day (a week after --from).")
-    ] = "",
+    reveal: Annotated[bool, typer.Option("--reveal", help="show: include a hidden field's value.")] = False,
+    first: Annotated[str, typer.Option("--from", help="A calendar: the first day, as 2026-10-01 (today).")] = "",
+    last: Annotated[str, typer.Option("--to", help="A calendar: the last day (a week after --from).")] = "",
 ) -> None:
     """Run ACTION on an installed Quill: one of the kit's, or one the Quill declares."""
     args = list(args or [])
@@ -135,8 +133,16 @@ def main(
         _, api = client()
         async with api:
             await dispatch(
-                api, quill, action, args, screen_id=screen_id, group=group, index=index,
-                plain=plain, days=(first, last), reveal=reveal,
+                api,
+                quill,
+                action,
+                args,
+                screen_id=screen_id,
+                group=group,
+                index=index,
+                plain=plain,
+                days=(first, last),
+                reveal=reveal,
             )
 
     run(_run())

@@ -75,9 +75,7 @@ def test_a_database_from_before_sealing_is_sealed_on_first_connect(tmp_path):
     conn.close()
     connect(db).close()
     assert raw(db, "SELECT title FROM notifications")[0][0].startswith("s1:")
-    assert raw(db, "SELECT value FROM schema_meta WHERE key = 'sealed'") == [
-        (str(sealed.SEALED_VERSION),)
-    ]
+    assert raw(db, "SELECT value FROM schema_meta WHERE key = 'sealed'") == [(str(sealed.SEALED_VERSION),)]
     got = NotificationStore(db).list("bram")
     assert (got[0].title, got[0].body) == ("Plain title", "Plain body")
 
@@ -104,8 +102,7 @@ def test_a_note_is_ciphertext_on_disk_and_a_plain_one_is_sealed_by_the_sweep(tmp
 def test_the_key_file_can_live_elsewhere(tmp_path, monkeypatch):
     toml = tmp_path / "server.toml"
     toml.write_text(
-        f'[server]\nnotes_dir = "{tmp_path}/notes"\ndata_dir = "{tmp_path}/data"\n'
-        f'key_file = "{tmp_path}/etc/cm.key"\n',
+        f'[server]\nnotes_dir = "{tmp_path}/notes"\ndata_dir = "{tmp_path}/data"\nkey_file = "{tmp_path}/etc/cm.key"\n',
         encoding="utf-8",
     )
     config = load_config(toml)
@@ -146,8 +143,7 @@ def test_rotating_the_key_reseals_everything(tmp_path, config, users):
     registry.install_from_catalog("chat")
     store = RecordStore(db, registry.models, registry.expiries)
     bram = Principal.person("bram")
-    room = store.create(bram, "channel", {"name": "homelab", "kind": "public", "topic": "the rack"},
-                        scope="public")
+    room = store.create(bram, "channel", {"name": "homelab", "kind": "public", "topic": "the rack"}, scope="public")
     store.create(bram, "message", {"channel": room.id, "body": "hello there"})
     notes = NoteStore(tmp_path / "notes", old)
     notes.write("plan", "rotate me\n")
@@ -181,9 +177,7 @@ def test_the_api_round_trips_sealed_content(chat_quill, auth):
     )
     assert made.status_code == 201, made.text
     room = made.json()["id"]
-    posted = client.post(
-        "/api/records/message", json={"fields": {"channel": room, "body": "the pager"}}, headers=auth
-    )
+    posted = client.post("/api/records/message", json={"fields": {"channel": room, "body": "the pager"}}, headers=auth)
     assert posted.status_code == 201, posted.text
     listed = client.get(f"/api/records/message?channel={room}", headers=auth).json()
     assert [m["fields"]["body"] for m in listed] == ["the pager"]
@@ -196,15 +190,23 @@ def test_editing_part_of_an_event_keeps_the_rest_readable(client, auth):
     mine = client.get("/api/records/calendar", headers=auth).json()[0]["id"]
     made = client.post(
         "/api/records/event",
-        json={"fields": {"calendar": mine, "title": "Dentist", "starts_at": "2026-10-01T09:00",
-                         "ends_at": "2026-10-01T10:00", "notes": "bring the card",
-                         "location": "town"}},
+        json={
+            "fields": {
+                "calendar": mine,
+                "title": "Dentist",
+                "starts_at": "2026-10-01T09:00",
+                "ends_at": "2026-10-01T10:00",
+                "notes": "bring the card",
+                "location": "town",
+            }
+        },
         headers=auth,
     )
     assert made.status_code == 201, made.text
     event_id = made.json()["id"]
     moved = client.patch(
-        f"/api/records/event/{event_id}", json={"fields": {"starts_at": "2026-10-01T11:00"}},
+        f"/api/records/event/{event_id}",
+        json={"fields": {"starts_at": "2026-10-01T11:00"}},
         headers=auth,
     )
     assert moved.status_code == 200, moved.text

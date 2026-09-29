@@ -114,9 +114,7 @@ class QuillTokenStore:
         if not token or not token.startswith(PREFIX):
             return None
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT quill FROM quill_tokens WHERE token_hash = ?", (_hash(token),)
-            ).fetchone()
+            row = conn.execute("SELECT quill FROM quill_tokens WHERE token_hash = ?", (_hash(token),)).fetchone()
             if row is not None:
                 conn.execute(
                     "UPDATE quill_tokens SET last_used_at = ? WHERE quill = ?",
@@ -127,9 +125,7 @@ class QuillTokenStore:
 
     def info(self, quill: str) -> dict | None:
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT issued_at, last_used_at FROM quill_tokens WHERE quill = ?", (quill,)
-            ).fetchone()
+            row = conn.execute("SELECT issued_at, last_used_at FROM quill_tokens WHERE quill = ?", (quill,)).fetchone()
         conn.close()
         return dict(row) if row else None
 
@@ -154,10 +150,7 @@ class QuillTokenStore:
             row = conn.execute(
                 "SELECT secret FROM quill_webhooks WHERE quill = ? AND hook = ?", (quill, hook)
             ).fetchone()
-            value = (
-                conn.unseal("quill_webhooks", "secret", (quill, hook), row["secret"])
-                if row is not None else None
-            )
+            value = conn.unseal("quill_webhooks", "secret", (quill, hook), row["secret"]) if row is not None else None
         conn.close()
         return value if value is not None else self.rotate_webhook(quill, hook)
 
@@ -165,8 +158,7 @@ class QuillTokenStore:
         secret = secrets.token_urlsafe(24)
         with self._connect() as conn:
             conn.execute(
-                "INSERT OR REPLACE INTO quill_webhooks (quill, hook, secret, issued_at)"
-                " VALUES (?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO quill_webhooks (quill, hook, secret, issued_at) VALUES (?, ?, ?, ?)",
                 (quill, hook, conn.seal("quill_webhooks", "secret", (quill, hook), secret), _now()),
             )
         conn.close()
@@ -175,9 +167,7 @@ class QuillTokenStore:
     def forget_webhooks(self, quill: str, keep: set[str]) -> None:
         """Secrets of webhooks *quill* no longer declares: an update took them away."""
         with self._connect() as conn:
-            for row in conn.execute(
-                "SELECT hook FROM quill_webhooks WHERE quill = ?", (quill,)
-            ).fetchall():
+            for row in conn.execute("SELECT hook FROM quill_webhooks WHERE quill = ?", (quill,)).fetchall():
                 if row["hook"] not in keep:
                     conn.execute(
                         "DELETE FROM quill_webhooks WHERE quill = ? AND hook = ?",

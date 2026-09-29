@@ -58,9 +58,7 @@ def _share_or_404(state: AppState, user: User, name: str) -> Share:
     try:
         return state.shares.require(user.username, name)
     except UnknownShareError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"no such share: {name}"
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"no such share: {name}") from exc
 
 
 @router.get("", response_model=list[ShareOut])
@@ -102,13 +100,9 @@ def create_share(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="a machine share needs the machine that serves it",
             )
-        agent = next(
-            (a for a in state.agents.list(user.username) if a.name == machine), None
-        )
+        agent = next((a for a in state.agents.list(user.username) if a.name == machine), None)
         if agent is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"no such machine: {machine}"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"no such machine: {machine}")
         agent_id = agent.id
     elif kind == SERVER and not user.is_admin:
         raise HTTPException(
@@ -126,9 +120,7 @@ def create_share(
             description=payload.description,
         )
     except ShareExistsError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="a share with that name exists"
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="a share with that name exists") from exc
     except (InvalidSlugError, SharePathError, ShareKindError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return _out(share, base_url(request, state), _agents_of(state, user))

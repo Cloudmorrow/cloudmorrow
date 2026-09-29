@@ -34,8 +34,17 @@ CHUNK = 64 * 1024
 MAX_BODY = 10 * 1024 * 1024
 
 HOP_BY_HOP = {
-    "connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te",
-    "trailer", "trailers", "transfer-encoding", "upgrade", "host", "content-length",
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailer",
+    "trailers",
+    "transfer-encoding",
+    "upgrade",
+    "host",
+    "content-length",
 }
 # Never passed on to the service, whoever sent them.
 PRIVATE = {"authorization", "cookie", "x-cloudmorrow-webhook-token"}
@@ -63,9 +72,7 @@ def _outgoing(request: Request, extra: dict[str, str]) -> dict[str, str]:
     headers = {
         name: value
         for name, value in request.headers.items()
-        if name.lower() not in HOP_BY_HOP
-        and name.lower() not in PRIVATE
-        and not name.lower().startswith(OURS)
+        if name.lower() not in HOP_BY_HOP and name.lower() not in PRIVATE and not name.lower().startswith(OURS)
     }
     headers.update(extra)
     if request.client is not None:
@@ -112,9 +119,7 @@ async def forward(
     try:
         conn, answer = await run_in_threadpool(send)
     except (OSError, http.client.HTTPException) as exc:
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY, f"the Quill's service did not answer: {exc}"
-        ) from exc
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"the Quill's service did not answer: {exc}") from exc
 
     def stream() -> Iterator[bytes]:
         try:

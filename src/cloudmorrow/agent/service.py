@@ -217,9 +217,7 @@ def _uninstall_systemd(home: Path, runner) -> ServiceResult:
 
 # -- Linux, as a service account ---------------------------------------------
 def _system_unit(executable: str, run_as: str, config_path: Path | None) -> str:
-    environment = (
-        f"Environment=CLOUDMORROW_AGENT_CONFIG={config_path}\n" if config_path else ""
-    )
+    environment = f"Environment=CLOUDMORROW_AGENT_CONFIG={config_path}\n" if config_path else ""
     return f"""[Unit]
 Description=Cloudmorrow agent (server)
 After=network-online.target
@@ -261,9 +259,7 @@ def install_system(
     if not shutil.which("systemctl") or not Path("/run/systemd/system").exists():
         # The unit is on disk and correct; there is just nothing here to
         # start it. Saying so is more use than pretending it worked.
-        return ServiceResult(
-            False, "systemd-system", "systemd is not running here; start the agent yourself", path
-        )
+        return ServiceResult(False, "systemd-system", "systemd is not running here; start the agent yourself", path)
     runner(["systemctl", "daemon-reload"])
     runner(["systemctl", "enable", UNIT_NAME])
     result = runner(["systemctl", "restart", UNIT_NAME])

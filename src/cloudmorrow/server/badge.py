@@ -25,17 +25,14 @@ def unread_models(state: AppState, username: str) -> list[str]:
     return [
         model.id
         for model in state.quills.datamodels.values()
-        if model.space
-        and any(state.features.enabled_for(username, quill) for quill in state.quills.users_of(model.id))
+        if model.space and any(state.features.enabled_for(username, quill) for quill in state.quills.users_of(model.id))
     ]
 
 
 def badge_for(state: AppState, username: str) -> dict:
     """Everything waiting for one person, as the icon would say it."""
     wanted = unread_models(state, username)
-    messages = (
-        state.records.unread_total(Principal.person(username), models=wanted) if wanted else 0
-    )
+    messages = state.records.unread_total(Principal.person(username), models=wanted) if wanted else 0
     notifications = state.notifications.unread_count(username)
     return {
         "messages": messages,

@@ -145,8 +145,9 @@ def test_q_searches_the_record_store_too(tasks_quill, auth):
     client = tasks_quill
     board = client.get("/api/records/board", headers=auth).json()[0]
     for title, body in (("Fix the NAS", "swap the disk"), ("Buy bulbs", "E27, warm")):
-        client.post("/api/records/task", headers=auth,
-                    json={"fields": {"board": board["id"], "title": title, "body": body}})
+        client.post(
+            "/api/records/task", headers=auth, json={"fields": {"board": board["id"], "title": title, "body": body}}
+        )
     found = client.get("/api/records/task?q=DISK", headers=auth).json()
     assert [(t["fields"]["title"], t["preview"]) for t in found] == [("Fix the NAS", "swap the disk")]
     previews = client.get("/api/records/task?previews=true", headers=auth).json()
@@ -157,7 +158,8 @@ def test_q_searches_the_record_store_too(tasks_quill, auth):
 def test_folders_are_made_listed_renamed_and_deleted(api):
     note(api, "welcome-away", "")  # so the welcome note stays out of it
     assert api("POST", "/api/records/note/_folders", {"path": "Projects"}, expect=201) == {
-        "path": "Projects", "name": "Projects",
+        "path": "Projects",
+        "name": "Projects",
     }
     api("POST", "/api/records/note/_folders", {"path": "Projects/Garden"}, expect=201)
     api("POST", "/api/records/note/_folders", {"path": "Projects"}, expect=400)
@@ -166,9 +168,7 @@ def test_folders_are_made_listed_renamed_and_deleted(api):
     assert [(f["path"], f["count"]) for f in folders] == [("Projects", 0), ("Projects/Garden", 1)]
     # Renaming a folder takes what is in it along.
     api("PATCH", "/api/records/note/_folders", {"path": "Projects", "to": "Plans"})
-    assert [n["fields"]["path"] for n in api("GET", "/api/records/note?folder=Plans/Garden")] == [
-        "Plans/Garden/beds"
-    ]
+    assert [n["fields"]["path"] for n in api("GET", "/api/records/note?folder=Plans/Garden")] == ["Plans/Garden/beds"]
     api("PATCH", "/api/records/note/_folders", {"path": "Plans", "to": "Plans/inside"}, expect=400)
     # Deleting one deletes everything in it.
     api("DELETE", "/api/records/note/_folders?path=Plans", expect=204)
@@ -200,7 +200,8 @@ def test_a_note_moves_by_its_title_and_folder_too(api):
 # -- pictures, as the backend's attachments --------------------------------------------------
 def test_a_picture_is_kept_beside_the_notes_and_read_back_both_ways(api):
     response = api.client.post(
-        "/api/records/note/_attachments?filename=Holiday.png", content=PNG,
+        "/api/records/note/_attachments?filename=Holiday.png",
+        content=PNG,
         headers={**api.headers, "Content-Type": "image/png"},
     )
     assert response.status_code == 201, response.text
@@ -218,8 +219,7 @@ def test_a_picture_is_kept_beside_the_notes_and_read_back_both_ways(api):
 
 
 def test_what_is_not_a_picture_is_refused(api):
-    response = api.client.post("/api/records/note/_attachments", content=b"hello",
-                               headers=api.headers)
+    response = api.client.post("/api/records/note/_attachments", content=b"hello", headers=api.headers)
     assert response.status_code == 400
 
 
@@ -252,8 +252,10 @@ def test_a_server_that_had_notes_switched_off_is_left_without(config, users):
     db = config.db_path
     FeatureStore(db)
     with connect(db) as conn:  # a row from when it was built in
-        conn.execute("INSERT INTO features (key, enabled, changed_by, updated_at)"
-                     " VALUES ('notes', 0, 'bram', '2026-01-01T00:00:00+00:00')")
+        conn.execute(
+            "INSERT INTO features (key, enabled, changed_by, updated_at)"
+            " VALUES ('notes', 0, 'bram', '2026-01-01T00:00:00+00:00')"
+        )
     conn.close()
     registry = _registry(config)
     write_meta(db, SEEDED, "tasks")

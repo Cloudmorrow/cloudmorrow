@@ -154,8 +154,17 @@ class Fetches:
         self._answers: dict[tuple[str, str], dict] = {}
         self.sent: list[dict] = []
 
-    def add(self, url: str, *, method: str = "GET", json_body=None, text: str = "", status: int = 200,
-            headers: dict | None = None, **kwargs) -> None:
+    def add(
+        self,
+        url: str,
+        *,
+        method: str = "GET",
+        json_body=None,
+        text: str = "",
+        status: int = 200,
+        headers: dict | None = None,
+        **kwargs,
+    ) -> None:
         if "json" in kwargs:
             json_body = kwargs.pop("json")
         body = json.dumps(json_body).encode() if json_body is not None else text.encode()
@@ -163,7 +172,9 @@ class Fetches:
         if json_body is not None:
             head.setdefault("Content-Type", "application/json")
         self._answers[(method.upper(), url)] = {
-            "status": status, "headers": head, "body": base64.b64encode(body).decode("ascii"),
+            "status": status,
+            "headers": head,
+            "body": base64.b64encode(body).decode("ascii"),
         }
 
     def __call__(self, method: str, url: str, headers: dict, body: bytes) -> dict:
@@ -270,7 +281,9 @@ class Harness:
         return [Record(r.to_dict()) for r in self.state.records.list(principal, model, where)]
 
     def change(self, model: str, id: str, fields: dict | None = None, **values) -> Record:  # noqa: A002
-        record = self.state.records.update(self._principal(), model, getattr(id, "id", id), {**(fields or {}), **values})
+        record = self.state.records.update(
+            self._principal(), model, getattr(id, "id", id), {**(fields or {}), **values}
+        )
         self.state.code.drain()
         return Record(record.to_dict())
 
@@ -295,9 +308,7 @@ class Harness:
 
         record_id = getattr(record, "id", record) or ""
         try:
-            effects = self.state.code.action(
-                self.user, self.quill, action, record=record_id, fields=fields, via=via
-            )
+            effects = self.state.code.action(self.user, self.quill, action, record=record_id, fields=fields, via=via)
         except CodeError as exc:
             self._raise_for(exc)
             return Result(kind=exc.kind, message=exc.message)
@@ -310,7 +321,10 @@ class Harness:
 
         try:
             tree = self.state.code.view(
-                self.user, self.quill, screen, {k: str(v) for k, v in params.items()},
+                self.user,
+                self.quill,
+                screen,
+                {k: str(v) for k, v in params.items()},
                 record=getattr(record, "id", record) or "",
             )
         except CodeError as exc:
@@ -329,17 +343,27 @@ class Harness:
         finally:
             self.state.code.drain()
 
-    def webhook(self, hook: str, *, json_body=None, body: bytes | str = b"", headers: dict | None = None,
-                **kwargs) -> dict:
+    def webhook(
+        self, hook: str, *, json_body=None, body: bytes | str = b"", headers: dict | None = None, **kwargs
+    ) -> dict:
         """What a webhook answered (`{status, body, headers}`), for a request from outside."""
         if "json" in kwargs:
             json_body = kwargs.pop("json")
         found = next((h for h in self.manifest.webhooks if h["id"] == hook), None)
         if found is None or not found.get("handler"):
             raise AssertionError(f"{self.quill} has no webhook {hook} answered by code")
-        raw = json.dumps(json_body).encode() if json_body is not None else (body.encode() if isinstance(body, str) else body)
-        request = {"method": "POST", "path": found["path"], "query": {}, "headers": dict(headers or {}),
-                   "body": base64.b64encode(raw).decode("ascii")}
+        raw = (
+            json.dumps(json_body).encode()
+            if json_body is not None
+            else (body.encode() if isinstance(body, str) else body)
+        )
+        request = {
+            "method": "POST",
+            "path": found["path"],
+            "query": {},
+            "headers": dict(headers or {}),
+            "body": base64.b64encode(raw).decode("ascii"),
+        }
         return self._answer(lambda: self.state.code.webhook(self.manifest, found, request))
 
     def api(self, path: str, *, method: str = "GET", json_body=None, **kwargs) -> dict:
@@ -347,15 +371,24 @@ class Harness:
         if "json" in kwargs:
             json_body = kwargs.pop("json")
         found = next(
-            (a for a in self.manifest.apis
-             if a.get("handler") and (not a.get("prefix") or path == a["prefix"] or path.startswith(a["prefix"] + "/"))),
+            (
+                a
+                for a in self.manifest.apis
+                if a.get("handler")
+                and (not a.get("prefix") or path == a["prefix"] or path.startswith(a["prefix"] + "/"))
+            ),
             None,
         )
         if found is None:
             raise AssertionError(f"{self.quill} has no API answered by code at {path}")
         raw = json.dumps(json_body).encode() if json_body is not None else b""
-        request = {"method": method, "path": path, "query": {}, "headers": {},
-                   "body": base64.b64encode(raw).decode("ascii")}
+        request = {
+            "method": method,
+            "path": path,
+            "query": {},
+            "headers": {},
+            "body": base64.b64encode(raw).decode("ascii"),
+        }
         return self._answer(lambda: self.state.code.api(self.manifest, found, self.user, request, as_quill=False))
 
     def _answer(self, call) -> dict:
@@ -397,15 +430,23 @@ class Harness:
 
         kind = InProcessGuest if self.state.code.trusted else Guest
         guest = kind(
-            self.folder, self.manifest.code,
-            folders={n: (Path(p), next(f["access"] for f in spec["folders"] if f["name"] == n) == "write")
-                     for n, p in folders.items()},
+            self.folder,
+            self.manifest.code,
+            folders={
+                n: (Path(p), next(f["access"] for f in spec["folders"] if f["name"] == n) == "write")
+                for n, p in folders.items()
+            },
             runtime_base=self.state.config.data_dir / "sandbox",
             on_log=lambda line: self.state.code.log(self.quill).write(line + "\n"),
         )
         try:
-            return guest.call("machine", spec["handler"], {"quill": self.quill, "user": {"username": self.user},
-                                                          "where": "machine"}, {}, host)
+            return guest.call(
+                "machine",
+                spec["handler"],
+                {"quill": self.quill, "user": {"username": self.user}, "where": "machine"},
+                {},
+                host,
+            )
         except Failed as failure:
             raise HandlerFailed(f"{failure.message}\n\n{failure.trace}".rstrip()) from failure
         finally:

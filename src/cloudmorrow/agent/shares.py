@@ -200,7 +200,7 @@ def _mounted_at_dav(app):
         path = environ.get("PATH_INFO", "")
         if path == MOUNT_PATH or path.startswith(MOUNT_PATH + "/"):
             environ["SCRIPT_NAME"] = environ.get("SCRIPT_NAME", "") + MOUNT_PATH
-            environ["PATH_INFO"] = path[len(MOUNT_PATH):] or "/"
+            environ["PATH_INFO"] = path[len(MOUNT_PATH) :] or "/"
             try:
                 length = int(environ.get("CONTENT_LENGTH") or 0)
             except ValueError:
@@ -287,10 +287,7 @@ class ShareHost:
         """WsgiDAV is here, or was just fetched. A recent failure is not retried yet."""
         if webdav_installed():
             return True
-        if (
-            self._install_failed_at is not None
-            and time.monotonic() - self._install_failed_at < INSTALL_RETRY_SECONDS
-        ):
+        if self._install_failed_at is not None and time.monotonic() - self._install_failed_at < INSTALL_RETRY_SECONDS:
             return False
         if self.installer():
             self._install_failed_at = None
@@ -314,9 +311,7 @@ class ShareHost:
             return
         host = self.config.share_host or _address_towards(self.config.server_url)
         self._base = f"http://{host}:{self._server.server_port}"
-        self._thread = threading.Thread(
-            target=self._server.serve_forever, name="cloudmorrow-shares", daemon=True
-        )
+        self._thread = threading.Thread(target=self._server.serve_forever, name="cloudmorrow-shares", daemon=True)
         self._thread.start()
         log.info("shares served at %s%s/", self._base, MOUNT_PATH)
 

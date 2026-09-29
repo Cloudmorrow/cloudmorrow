@@ -167,8 +167,7 @@ def validate_vault(vault: str | None) -> str:
         return DEFAULT_VAULT
     if not VAULT_RE.match(vault):
         raise InvalidVaultError(
-            "a vault name is 1-32 chars of lowercase letters, digits, '.', '_' "
-            "or '-', starting with a letter or digit"
+            "a vault name is 1-32 chars of lowercase letters, digits, '.', '_' or '-', starting with a letter or digit"
         )
     return vault
 
@@ -177,8 +176,7 @@ def validate_key(name: str) -> str:
     name = (name or "").strip()
     if not KEY_RE.match(name):
         raise InvalidSecretNameError(
-            f"{name!r} is not a usable variable name: letters, digits and '_', "
-            "not starting with a digit"
+            f"{name!r} is not a usable variable name: letters, digits and '_', not starting with a digit"
         )
     return name
 
@@ -244,8 +242,7 @@ class SecretStore:
                 (owner, validate_vault(vault)),
             ).fetchall()
         return [
-            Environment(environment=row["environment"], secrets=row["n"], updated_at=row["updated"])
-            for row in rows
+            Environment(environment=row["environment"], secrets=row["n"], updated_at=row["updated"]) for row in rows
         ]
 
     def list(
@@ -267,13 +264,10 @@ class SecretStore:
             rows = conn.execute(query, params).fetchall()
         return [self._row_to_secret(row, reveal=reveal) for row in rows]
 
-    def get(
-        self, owner: str, vault: str, environment: str, name: str, *, reveal: bool = True
-    ) -> Secret | None:
+    def get(self, owner: str, vault: str, environment: str, name: str, *, reveal: bool = True) -> Secret | None:
         with connect(self.db_path) as conn:
             row = conn.execute(
-                "SELECT * FROM secrets WHERE owner = ? AND vault = ? AND environment = ?"
-                " AND name = ?",
+                "SELECT * FROM secrets WHERE owner = ? AND vault = ? AND environment = ? AND name = ?",
                 (
                     owner,
                     validate_vault(vault),
@@ -291,15 +285,10 @@ class SecretStore:
 
     def export(self, owner: str, vault: str, environment: str) -> dict[str, str]:
         """Every secret in one environment as plain pairs, ready for a `.env`."""
-        return {
-            secret.key: secret.value or ""
-            for secret in self.list(owner, vault, environment, reveal=True)
-        }
+        return {secret.key: secret.value or "" for secret in self.list(owner, vault, environment, reveal=True)}
 
     # -- writes ------------------------------------------------------------
-    def set(
-        self, owner: str, vault: str, environment: str, name: str, value: str
-    ) -> tuple[Secret, str]:
+    def set(self, owner: str, vault: str, environment: str, name: str, value: str) -> tuple[Secret, str]:
         """Create or replace one secret. Returns it with what happened to it."""
         vault = validate_vault(vault)
         environment = validate_environment(environment)
@@ -320,8 +309,7 @@ class SecretStore:
         now: str,
     ) -> str:
         existing = conn.execute(
-            "SELECT fingerprint FROM secrets WHERE owner = ? AND vault = ? AND"
-            " environment = ? AND name = ?",
+            "SELECT fingerprint FROM secrets WHERE owner = ? AND vault = ? AND environment = ? AND name = ?",
             (owner, vault, environment, name),
         ).fetchone()
         digest = fingerprint(self._key, value)
@@ -369,8 +357,7 @@ class SecretStore:
             present = {
                 row["name"]: row["fingerprint"]
                 for row in conn.execute(
-                    "SELECT name, fingerprint FROM secrets WHERE owner = ? AND vault = ?"
-                    " AND environment = ?",
+                    "SELECT name, fingerprint FROM secrets WHERE owner = ? AND vault = ? AND environment = ?",
                     (owner, vault, environment),
                 ).fetchall()
             }
@@ -387,17 +374,14 @@ class SecretStore:
                         result.updated.append(name)
                     continue
                 action = self._set(conn, owner, vault, environment, name, value, now)
-                {"created": result.added, "updated": result.updated}.get(
-                    action, result.unchanged
-                ).append(name)
+                {"created": result.added, "updated": result.updated}.get(action, result.unchanged).append(name)
             if prune:
                 stale = sorted(set(present) - set(pairs))
                 result.removed.extend(stale)
                 if not dry_run:
                     for name in stale:
                         conn.execute(
-                            "DELETE FROM secrets WHERE owner = ? AND vault = ? AND"
-                            " environment = ? AND name = ?",
+                            "DELETE FROM secrets WHERE owner = ? AND vault = ? AND environment = ? AND name = ?",
                             (owner, vault, environment, name),
                         )
             if dry_run:
@@ -407,8 +391,7 @@ class SecretStore:
     def delete(self, owner: str, vault: str, environment: str, name: str) -> None:
         with connect(self.db_path) as conn:
             cursor = conn.execute(
-                "DELETE FROM secrets WHERE owner = ? AND vault = ? AND environment = ?"
-                " AND name = ?",
+                "DELETE FROM secrets WHERE owner = ? AND vault = ? AND environment = ? AND name = ?",
                 (
                     owner,
                     validate_vault(vault),

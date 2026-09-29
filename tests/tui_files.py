@@ -238,10 +238,7 @@ class FakeFiles:
             self.record_calls.append((model, dict(where)))
             share, folder = str(where.get("share", "")), str(where.get("folder", ""))
             self.listing_calls.append((share, folder))
-            return [
-                self._file_record(share, folder, e)
-                for e in copy.deepcopy(self._folder(share, folder))
-            ]
+            return [self._file_record(share, folder, e) for e in copy.deepcopy(self._folder(share, folder))]
         return await super().records(model, **where)
 
     async def record(self, model: str, record_id: str) -> dict:

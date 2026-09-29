@@ -81,9 +81,7 @@ class Bridge:
         self._config = config or ClientConfig.load()
         # How a call that talks to the server gets a client: the stored
         # sign-in, read afresh each time, since the page may just have changed it.
-        self._api_factory = api_factory or (
-            lambda config: client_from_credentials(config, StoredCredentials.load())
-        )
+        self._api_factory = api_factory or (lambda config: client_from_credentials(config, StoredCredentials.load()))
         self._enrol = enrol or ensure_agent
         self._window = None
 

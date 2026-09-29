@@ -124,13 +124,7 @@ def app_alias() -> RedirectResponse:
 def _asset(filename: str) -> FileResponse:
     path = WEB / filename
     media_type = MEDIA_TYPES.get(path.suffix)
-    if (
-        media_type is None
-        or "/" in filename
-        or filename.startswith(".")
-        or path.parent != WEB
-        or not path.is_file()
-    ):
+    if media_type is None or "/" in filename or filename.startswith(".") or path.parent != WEB or not path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such file")
     return FileResponse(
         path,

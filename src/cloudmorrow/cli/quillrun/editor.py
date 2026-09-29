@@ -52,9 +52,7 @@ def _text(initial: str, *, what: str) -> str:
     return text
 
 
-async def _act_editor(
-    api: CloudmorrowClient, screen: Screen, action: str, args: list[str], plain: bool
-) -> None:
+async def _act_editor(api: CloudmorrowClient, screen: Screen, action: str, args: list[str], plain: bool) -> None:
     body = screen.spec.get("body") or "body"
     path = screen.spec.get("path")
     if action == "search":
@@ -117,9 +115,7 @@ async def _act_editor(
         await api.delete_record(screen.model, found["id"])
         quillrun.console.print(f"[green]Deleted[/] {escape(_page_key(screen, found))}")
     elif action == "set":
-        changed = await api.update_record(
-            screen.model, found["id"], _pairs(args[1:], screen), rev=found["rev"]
-        )
+        changed = await api.update_record(screen.model, found["id"], _pairs(args[1:], screen), rev=found["rev"])
         quillrun.console.print(f"[green]Saved[/] {escape(_page_key(screen, changed))}")
     else:
         fail(f"an editor has list, show, add, edit, set, delete and search, not {action}")

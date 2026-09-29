@@ -109,10 +109,7 @@ def test_the_install_sheet_says_everything_a_quill_adds(registry, tmp_path):
         "fields": ["fleet.odometer"],
     }
     assert data["fleet.visit"]["how"] == "introduces" and data["fleet.visit"]["new"]
-    assert (
-        data["contact"]["how"] == "asks for"
-        and data["contact"]["why"] == "to show who drives each car"
-    )
+    assert data["contact"]["how"] == "asks for" and data["contact"]["why"] == "to show who drives each car"
     assert [s["label"] for s in plan["screens"]] == ["Cars", "Services"]
     assert plan["surfaces"] == ["phone", "web", "terminal", "command line", "assistant"]
     # What it would run on this server, and all it could reach there.
@@ -246,7 +243,12 @@ def test_a_bad_request_is_a_400_with_the_reason(client, auth):
 def test_a_fresh_server_gets_the_foundation_quills_once(config, users, registry, tmp_path):
     db = config.db_path
     assert install_foundation(db, registry) == [
-        "notes", "tasks", "files", "calendar", "chat", "secrets",
+        "notes",
+        "tasks",
+        "files",
+        "calendar",
+        "chat",
+        "secrets",
     ]
     for quill in ("notes", "tasks", "files", "calendar", "chat", "secrets"):
         registry.uninstall(quill)
@@ -294,9 +296,7 @@ def test_boards_and_tasks_from_before_move_into_records(config, users, registry)
     bram = Principal.person("bram")
     boards = store.list(bram, "board")
     assert [b.fields["title"] for b in boards] == ["Home"]
-    tasks = sorted(
-        store.list(bram, "task", {"board": boards[0].id}), key=lambda t: t.fields["title"]
-    )
+    tasks = sorted(store.list(bram, "task", {"board": boards[0].id}), key=lambda t: t.fields["title"])
     assert [(t.fields["title"], t.fields["lane"], t.fields["body"]) for t in tasks] == [
         ("Buy bulbs", "done", "- [ ] one"),
         ("Fix the NAS", "doing", "- [ ] one"),

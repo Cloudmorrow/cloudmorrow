@@ -95,9 +95,7 @@ def run_installer(client, tmp_path):
         if display:
             env["WAYLAND_DISPLAY"] = "wayland-1"
         log.write_text("")
-        done = subprocess.run(
-            ["sh", str(script), *args], env=env, capture_output=True, text=True, timeout=60
-        )
+        done = subprocess.run(["sh", str(script), *args], env=env, capture_output=True, text=True, timeout=60)
         assert done.returncode == 0, done.stderr
         return done.stdout + done.stderr, log.read_text().splitlines()
 

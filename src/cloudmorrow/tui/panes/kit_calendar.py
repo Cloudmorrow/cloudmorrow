@@ -247,17 +247,17 @@ class CalendarPane(KitPane):
         self.space_id = ""
         self._grid: list[list[dt.date]] = []
         space_noun = self.space_noun
-        self.ACTIONS = self.offer([
-            Action("new_record", f"New {self.noun}", "n", variant="primary",
-                   hint="On the day you are on"),
-            Action("open_record", "Edit" if self.writes else "Open", "e",
-                   hint=f"The {self.noun} under the cursor"),
-            Action("delete_record", "Delete", "del"),
-            Action("new_space", f"New {space_noun}", "c", hint="Shared, or one everybody is in"),
-            Action("people", "People", "p", hint=f"Who is in this {space_noun}: add, take out, leave"),
-            Action("edit_space", f"Rename {space_noun}", "r", hint="Its name and its colour"),
-            Action("today", "Today", "t"),
-        ])
+        self.ACTIONS = self.offer(
+            [
+                Action("new_record", f"New {self.noun}", "n", variant="primary", hint="On the day you are on"),
+                Action("open_record", "Edit" if self.writes else "Open", "e", hint=f"The {self.noun} under the cursor"),
+                Action("delete_record", "Delete", "del"),
+                Action("new_space", f"New {space_noun}", "c", hint="Shared, or one everybody is in"),
+                Action("people", "People", "p", hint=f"Who is in this {space_noun}: add, take out, leave"),
+                Action("edit_space", f"Rename {space_noun}", "r", hint="Its name and its colour"),
+                Action("today", "Today", "t"),
+            ]
+        )
 
     @property
     def space_noun(self) -> str:
@@ -382,15 +382,15 @@ class CalendarPane(KitPane):
     def _draw_day(self) -> None:
         showing = self.day_events()
         self.query_one("#day-title", Static).update(
-            f"[{ACCENT}]{self.day.strftime('%A %d %B')}[/]"
-            + (f"  [{MUTED}]{len(showing)} on[/]" if showing else "")
+            f"[{ACCENT}]{self.day.strftime('%A %d %B')}[/]" + (f"  [{MUTED}]{len(showing)} on[/]" if showing else "")
         )
         table = self.query_one("#day-table", DataTable)
         table.clear()
         if not showing:
             table.add_row(
                 f"[{MUTED}]Nothing on. Press n to put something here.[/]"
-                if "new_record" not in self.refused else f"[{MUTED}]Nothing on.[/]"
+                if "new_record" not in self.refused
+                else f"[{MUTED}]Nothing on.[/]"
             )
             return
 
@@ -550,9 +550,7 @@ class CalendarPane(KitPane):
         except ApiError as exc:
             await self.went_wrong(exc)
             return
-        result = await self.app.push_screen_wait(
-            SpaceModal(self.api, self.space_model, space, everyone, me=self.me)
-        )
+        result = await self.app.push_screen_wait(SpaceModal(self.api, self.space_model, space, everyone, me=self.me))
         if result == "left":
             self.space_id = ""
             self.status(f"You left {title_of(space, self.space_model)}.")
@@ -564,8 +562,7 @@ class CalendarPane(KitPane):
         if space is None:
             return
         if not space.get("can_manage"):
-            self.status(f"Only whoever made {title_of(space, self.space_model)} may change it.",
-                        error=True)
+            self.status(f"Only whoever made {title_of(space, self.space_model)} may change it.", error=True)
             return
         self.edit_space(space)
 
@@ -577,8 +574,12 @@ class CalendarPane(KitPane):
         fields = []
         for f in model.get("fields") or []:
             if f["name"] == self.b["colour"]:
-                f = {**f, "kind": "enum", "values": list(COLOUR_NAMES),
-                     "labels": [name.capitalize() for name in COLOUR_NAMES]}
+                f = {
+                    **f,
+                    "kind": "enum",
+                    "values": list(COLOUR_NAMES),
+                    "labels": [name.capitalize() for name in COLOUR_NAMES],
+                }
             fields.append(f)
         model["fields"] = fields
         models[self.space_model_id] = model

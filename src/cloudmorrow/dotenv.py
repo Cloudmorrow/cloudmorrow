@@ -30,6 +30,7 @@ _ESCAPES = {"n": "\n", "r": "\r", "t": "\t", "\\": "\\", '"': '"', "'": "'"}
 # An unquoted value ends at a `#` that follows whitespace.
 _INLINE_COMMENT_RE = re.compile(r"\s#")
 
+
 class DotenvError(ValueError):
     """A line we refuse to guess at, with the line number to look at."""
 
@@ -114,11 +115,7 @@ def quote(value: str) -> str:
         # Single quotes are literal: no escapes, and no $VAR expansion.
         return f"'{value}'"
     escaped = (
-        value.replace("\\", "\\\\")
-        .replace('"', '\\"')
-        .replace("\n", "\\n")
-        .replace("\r", "\\r")
-        .replace("\t", "\\t")
+        value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
     )
     return f'"{escaped}"'
 

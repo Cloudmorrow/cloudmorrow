@@ -16,8 +16,18 @@ def test_a_new_database_is_made_at_the_current_version_with_every_stores_tables(
     conn = connect(tmp_path / "cloud.db")
     assert schema.version_of(conn) == schema.VERSION
     # Tables from db's own schema, from stores, and the first circle.
-    assert {"users", "records", "mcp_tokens", "settings", "features", "push_subscriptions",
-            "quill_tokens", "quill_job_runs", "quill_call_runs", "circles"} <= tables(conn)
+    assert {
+        "users",
+        "records",
+        "mcp_tokens",
+        "settings",
+        "features",
+        "push_subscriptions",
+        "quill_tokens",
+        "quill_job_runs",
+        "quill_call_runs",
+        "circles",
+    } <= tables(conn)
     assert conn.execute("SELECT COUNT(*) FROM circles WHERE is_default = 1").fetchone()[0] == 1
     conn.close()
 
@@ -53,9 +63,7 @@ def test_a_database_from_before_versions_gets_its_columns_and_keeps_its_admins(t
 def test_a_current_database_runs_no_step_again(tmp_path, monkeypatch):
     connect(tmp_path / "cloud.db").close()
     ran = []
-    monkeypatch.setattr(
-        schema, "STEPS", tuple(schema.Step(s.version, s.what, ran.append) for s in schema.STEPS)
-    )
+    monkeypatch.setattr(schema, "STEPS", tuple(schema.Step(s.version, s.what, ran.append) for s in schema.STEPS))
     connect(tmp_path / "cloud.db").close()
     assert ran == []
 

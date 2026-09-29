@@ -105,4 +105,3 @@ class GroupList(ListView):
 
     def action_new_group(self) -> None:
         self.post_message(self.NewRequested())
-

@@ -40,7 +40,10 @@ def run(payload: dict, tmp_path) -> object:
     script.write_text(RUNNER % FORMAT.as_uri(), encoding="utf-8")
     done = subprocess.run(
         ["node", str(script)],
-        input=json.dumps(payload), capture_output=True, text=True, check=False,
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        check=False,
     )
     assert done.returncode == 0, done.stderr
     return json.loads(done.stdout)
@@ -60,9 +63,7 @@ def test_a_wrap_goes_round_the_words_and_leaves_them_selected(tmp_path):
 
 @node
 @pytest.mark.parametrize("start,end", [(0, 6), (2, 4)])
-def test_a_wrap_comes_off_again_whether_the_marks_are_in_or_out_of_the_selection(
-    tmp_path, start, end
-):
+def test_a_wrap_comes_off_again_whether_the_marks_are_in_or_out_of_the_selection(tmp_path, start, end):
     (out,) = cases(tmp_path, ["bold", "**hi**", start, end])
     assert out["text"] == "hi"
     assert out["selected"] == "hi"
@@ -108,9 +109,7 @@ def test_a_list_comes_off_when_every_line_already_has_it(tmp_path):
         ("quote", "- a", "> a"),
     ],
 )
-def test_one_line_carries_one_mark_so_a_new_one_replaces_the_old(
-    tmp_path, name, before, after
-):
+def test_one_line_carries_one_mark_so_a_new_one_replaces_the_old(tmp_path, name, before, after):
     (out,) = cases(tmp_path, [name, before, 0, len(before)])
     assert out["text"] == after
 
@@ -135,9 +134,7 @@ def test_indented_lines_keep_their_indent(tmp_path):
 
 # -- headings and links ----------------------------------------------------------
 @node
-@pytest.mark.parametrize(
-    "before,after", [("t", "# t"), ("# t", "## t"), ("## t", "### t"), ("### t", "t")]
-)
+@pytest.mark.parametrize("before,after", [("t", "# t"), ("# t", "## t"), ("## t", "### t"), ("### t", "t")])
 def test_a_heading_cycles_through_three_levels_and_off(tmp_path, before, after):
     (out,) = cases(tmp_path, ["heading", before, 0, len(before)])
     assert out["text"] == after
@@ -176,6 +173,4 @@ def test_the_bar_is_registered_once_and_owns_its_own_files():
     assert (WEB / "app.js").read_text().count('import "./format.js";') == 1
     assert (WEB / "app.css").read_text().count('@import "./format.css";') == 1
     # It reaches the editors through the DOM, not through their modules.
-    assert "import" not in FORMAT.read_text().split("// -- the marks")[0].replace(
-        "Imported by node", ""
-    )
+    assert "import" not in FORMAT.read_text().split("// -- the marks")[0].replace("Imported by node", "")

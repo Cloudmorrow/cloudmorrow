@@ -143,9 +143,12 @@ class NewSpaceModal(Modal[dict | None]):
         self.title_field = model.get("title") or "name"
         taken = {name for fields in made_as(self.screen_spec).values() for name in fields}
         self.extra = [
-            f for f in model.get("fields", [])
-            if f["name"] != self.title_field and f["name"] not in taken
-            and f.get("kind") in TYPED_KINDS and not f.get("stamp")
+            f
+            for f in model.get("fields", [])
+            if f["name"] != self.title_field
+            and f["name"] not in taken
+            and f.get("kind") in TYPED_KINDS
+            and not f.get("stamp")
         ]
 
     def compose(self) -> ComposeResult:
@@ -315,21 +318,16 @@ class SpaceModal(Modal[str | None]):
                 said += f"  [{MUTED}]made it[/]"
             parts: list = [Static(said, classes="space-member-name")]
             if self.writes and self.space.get("can_manage") and name != owner:
-                parts.append(Button("Take out", id=f"out-{safe_id(name)}",
-                                    classes="space-take-out", compact=True))
+                parts.append(Button("Take out", id=f"out-{safe_id(name)}", classes="space-take-out", compact=True))
             await box.mount(Horizontal(*parts, classes="space-member"))
         outside = [p for p in self.people if p["username"] not in self.inside]
-        may_add = self.writes and self.shared and (
-            self.space.get("can_manage") or self.me in self.inside
-        )
+        may_add = self.writes and self.shared and (self.space.get("can_manage") or self.me in self.inside)
         adder = self.query_one("#space-add")
         adder.display = bool(may_add and outside)
         self.query_one("#space-add-who", Select).set_options(
             [(p.get("display_name") or p["username"], p["username"]) for p in outside]
         )
-        self.query_one("#space-leave", Button).display = (
-            self.writes and self.shared and owner != self.me
-        )
+        self.query_one("#space-leave", Button).display = self.writes and self.shared and owner != self.me
 
     def _say(self, message: str) -> None:
         self.query_one("#space-complaint", Static).update(f"[{BAD}]{message}[/]" if message else "")
@@ -367,9 +365,7 @@ class SpaceModal(Modal[str | None]):
             self._say("Pick somebody first.")
             return
         try:
-            self.space = await self.client.add_member(
-                self.model["id"], self.space["id"], str(chosen.value)
-            )
+            self.space = await self.client.add_member(self.model["id"], self.space["id"], str(chosen.value))
         except ApiError as exc:
             self._say(str(exc))
             return
@@ -451,6 +447,16 @@ class PickPersonModal(Modal[str | None]):
 
 
 __all__ = [
-    "NewSpaceModal", "PickPersonModal", "SpaceModal", "is_between", "made_as", "make_space",
-    "people_in", "person_label", "scope_label", "scope_said", "scopes_for", "space_name",
+    "NewSpaceModal",
+    "PickPersonModal",
+    "SpaceModal",
+    "is_between",
+    "made_as",
+    "make_space",
+    "people_in",
+    "person_label",
+    "scope_label",
+    "scope_said",
+    "scopes_for",
+    "space_name",
 ]

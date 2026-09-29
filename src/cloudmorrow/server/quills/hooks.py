@@ -68,7 +68,7 @@ def parse_path(text: str) -> tuple[str | int, ...]:
     while at < len(text):
         match = _STEP_RE.match(text, at)
         if match is None:
-            raise PathError(f"{text!r}: only .name, [n] and [\"name\"] steps, from $")
+            raise PathError(f'{text!r}: only .name, [n] and ["name"] steps, from $')
         if match.group("name") is not None:
             steps.append(match.group("name"))
         elif match.group("index") is not None:
@@ -117,7 +117,7 @@ def signature_ok(secret: str, body: bytes, sent: str | None) -> bool:
         return False
     sent = sent.strip()
     if sent.lower().startswith("sha256="):
-        sent = sent[len("sha256="):]
+        sent = sent[len("sha256=") :]
     expected = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, sent.lower())
 

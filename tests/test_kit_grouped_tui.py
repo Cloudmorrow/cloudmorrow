@@ -59,7 +59,11 @@ async def test_a_new_record_goes_into_the_group_and_subgroup_on_screen(app):
         made = app.client.record_store["secret"][-1]["fields"]
         # Exactly as typed: a secret's trailing space is part of it.
         assert (made["vault"], made["environment"], made["key"], made["value"]) == (
-            "verticore", "production", "DATABASE_URL", "postgres://db ")
+            "verticore",
+            "production",
+            "DATABASE_URL",
+            "postgres://db ",
+        )
         assert [r["fields"]["key"] for r in pane.records] == ["STRIPE_KEY", "DATABASE_URL"]
 
 

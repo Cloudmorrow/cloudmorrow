@@ -83,13 +83,9 @@ def test_read_only_data_is_seen_and_not_changed(tasks_quill, circles):
     boards = tasks_quill.get("/api/records/board", headers=guest)
     assert boards.status_code == 200 and len(boards.json()) == 1
     board = boards.json()[0]["id"]
-    made = tasks_quill.post(
-        "/api/records/task", json={"fields": {"board": board, "title": "Tidy"}}, headers=guest
-    )
+    made = tasks_quill.post("/api/records/task", json={"fields": {"board": board, "title": "Tidy"}}, headers=guest)
     assert made.status_code == 403 and "not change" in made.json()["detail"]
-    renamed = tasks_quill.patch(
-        f"/api/records/board/{board}", json={"fields": {"title": "Mine"}}, headers=guest
-    )
+    renamed = tasks_quill.patch(f"/api/records/board/{board}", json={"fields": {"title": "Mine"}}, headers=guest)
     assert renamed.status_code == 403
     # Administrators are in Members, and Members has everything.
     assert tasks_quill.get("/api/records/board", headers=admin).status_code == 200
@@ -115,8 +111,7 @@ def test_a_quill_is_fitted_to_the_person_asking(tasks_quill, circles):
     guest = headers(tasks_quill, GUEST)
 
     def tasks() -> dict:
-        (quill,) = [q for q in tasks_quill.get("/api/quills", headers=guest).json()
-                    if q["id"] == "tasks"]
+        (quill,) = [q for q in tasks_quill.get("/api/quills", headers=guest).json() if q["id"] == "tasks"]
         return quill
 
     whole = tasks()
@@ -152,13 +147,14 @@ def test_circles_are_made_changed_joined_and_deleted(client, auth, circles):
     )
     assert made.status_code == 201, made.text
     assert made.json() == {
-        "id": "kids", "name": "Kids", "default": False,
-        "rules": {"task": "write"}, "members": [GUEST[0]],
+        "id": "kids",
+        "name": "Kids",
+        "default": False,
+        "rules": {"task": "write"},
+        "members": [GUEST[0]],
     }
     assert client.post("/api/circles", json={"name": "kids"}, headers=auth).status_code == 400
-    changed = client.patch(
-        "/api/circles/kids", json={"rules": {"event": "read"}, "default": True}, headers=auth
-    ).json()
+    changed = client.patch("/api/circles/kids", json={"rules": {"event": "read"}, "default": True}, headers=auth).json()
     assert changed["rules"] == {"event": "read"} and changed["default"]
     joined = client.put(f"/api/circles/kids/members/{ADMIN[0]}", headers=auth).json()
     assert joined["members"] == [ADMIN[0], GUEST[0]]

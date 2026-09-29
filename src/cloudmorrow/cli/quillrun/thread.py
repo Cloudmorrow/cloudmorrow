@@ -34,8 +34,7 @@ def _find_space(spaces: list[dict], key: str, me: str, screen: Screen) -> dict:
     named = [s for s in spaces if space_name(s, me, screen).casefold() == wanted.casefold()]
     matches = named or by_id
     if len(matches) != 1:
-        fail(f"{'no' if not matches else 'more than one'} {screen.fields[screen.spec['space']]['to']}"
-             f" matches {key!r}")
+        fail(f"{'no' if not matches else 'more than one'} {screen.fields[screen.spec['space']]['to']} matches {key!r}")
     return matches[0]
 
 
@@ -80,15 +79,16 @@ async def _thread(api: CloudmorrowClient, screen: Screen, action: str, args: lis
         table.add_column(screen.models[space_model]["label"])
         table.add_column("new", justify="right")
         table.add_column("last")
-        ordered = sorted(spaces, key=lambda s: (s.get("last") or {}).get("created_at") or s["created_at"],
-                         reverse=True)
+        ordered = sorted(spaces, key=lambda s: (s.get("last") or {}).get("created_at") or s["created_at"], reverse=True)
         for space in ordered:
             last = space.get("last") or {}
             said = f"{last.get('owner', '')}: {last.get('title', '')}" if last else ""
             unread = space.get("unread") or 0
             table.add_row(
                 space["id"][2:6],
-                f"[bold]{escape(space_name(space, me, screen))}[/]" if unread else escape(space_name(space, me, screen)),
+                f"[bold]{escape(space_name(space, me, screen))}[/]"
+                if unread
+                else escape(space_name(space, me, screen)),
                 f"[bold]{unread}[/]" if unread else "",
                 escape(said[:60]),
             )

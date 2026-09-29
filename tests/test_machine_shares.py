@@ -18,9 +18,7 @@ from tests.conftest import GUEST, basic
 
 def enroll(client, auth, name="laptop") -> dict[str, str]:
     """An agent of the caller's, and the headers it heartbeats with."""
-    enrolled = client.post(
-        "/api/agents/enroll-self", json={"name": name}, headers=auth
-    ).json()
+    enrolled = client.post("/api/agents/enroll-self", json={"name": name}, headers=auth).json()
     return {"Authorization": f"Bearer {enrolled['agent_token']}"}
 
 
@@ -36,9 +34,7 @@ def beat(client, agent_headers, **fields) -> dict:
 def test_the_store_keeps_a_machine_share_as_a_record_only(tmp_path):
     store = ShareStore(tmp_path / "db", lambda owner: tmp_path / owner)
     agent, _token = AgentStore(tmp_path / "db").enroll_for_user("bram", name="laptop")
-    share = store.create(
-        "bram", "music", kind=MACHINE, path="/home/bram/Music", agent_id=agent.id
-    )
+    share = store.create("bram", "music", kind=MACHINE, path="/home/bram/Music", agent_id=agent.id)
     assert (share.kind, share.agent_id, share.managed) == (MACHINE, agent.id, False)
     assert str(share.path) == "/home/bram/Music"
     # Nothing was made here: the directory is on the machine.
@@ -134,9 +130,7 @@ def test_an_older_agent_that_says_nothing_keeps_its_address(client, guest_auth):
     agent = enroll(client, guest_auth)
     beat(client, agent, dav_base="http://192.168.1.20:8788")
     beat(client, agent)
-    assert client.get("/api/agents", headers=guest_auth).json()[0]["dav_base"] == (
-        "http://192.168.1.20:8788"
-    )
+    assert client.get("/api/agents", headers=guest_auth).json()[0]["dav_base"] == ("http://192.168.1.20:8788")
 
 
 def test_the_servers_dav_does_not_show_a_machine_share(client, auth):
@@ -175,9 +169,7 @@ def test_an_agent_asks_the_server_whether_a_mount_may_come_in(client, auth, gues
     # The owner's machine, the owner's shares: nobody else, admin or not.
     assert ask("bram", admin_token) is False
     # And not without an agent token at all.
-    assert client.post(
-        "/api/agent/credentials", json={"username": "guest", "password": guest_token}
-    ).status_code == 401
+    assert client.post("/api/agent/credentials", json={"username": "guest", "password": guest_token}).status_code == 401
 
 
 def test_removing_the_machine_removes_its_shares(client, guest_auth):

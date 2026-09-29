@@ -66,9 +66,7 @@ def test_on_linux_rclone_mounts_it_where_you_say(linux, not_mounted, monkeypatch
     mounted = mounts.mount("media", URL, "bram", "the-token", path=target)
     assert mounted.path == target and mounted.tool == "rclone"
     assert target.is_dir()
-    (command, kwargs) = next(
-        (command, kwargs) for command, kwargs in shell.calls if command[1:2] == ["mount"]
-    )
+    (command, kwargs) = next((command, kwargs) for command, kwargs in shell.calls if command[1:2] == ["mount"])
     assert command[2:4] == [":webdav:", str(target)]
     assert "--daemon" in command and "writes" in command
     # The credentials go in the environment, obscured, not on the command line.
@@ -92,9 +90,7 @@ def test_without_rclone_the_message_says_what_to_install(monkeypatch, not_mounte
         mounts.mount("media", URL, "bram", "the-token")
 
 
-def test_a_directory_with_things_in_it_is_not_mounted_over(
-    linux, not_mounted, monkeypatch, tmp_path
-):
+def test_a_directory_with_things_in_it_is_not_mounted_over(linux, not_mounted, monkeypatch, tmp_path):
     monkeypatch.setattr(mounts, "_run", Shell())
     target = tmp_path / "media"
     target.mkdir()
@@ -167,9 +163,7 @@ def test_on_a_mac_finder_mounts_it_and_says_where(macos, not_mounted, monkeypatc
     assert 'as user name "bram"' in script and 'with password "the-token"' in script
 
 
-def test_on_a_mac_the_volume_is_assumed_when_mount_does_not_list_it(
-    macos, not_mounted, monkeypatch
-):
+def test_on_a_mac_the_volume_is_assumed_when_mount_does_not_list_it(macos, not_mounted, monkeypatch):
     monkeypatch.setattr(mounts, "_run", Shell())
     assert mounts.mount("media", URL, "bram", "the-token").path == Path("/Volumes/media")
 

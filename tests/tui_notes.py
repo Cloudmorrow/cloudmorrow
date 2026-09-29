@@ -53,8 +53,15 @@ NOTES_QUILL = {
     "introduces": [],
     "grants": [],
     "screens": [
-        {"id": "notes", "kit": "editor", "label": "Notes", "model": "note", "title": "title",
-         "body": "body", "path": "path"},
+        {
+            "id": "notes",
+            "kit": "editor",
+            "label": "Notes",
+            "model": "note",
+            "title": "title",
+            "body": "body",
+            "path": "path",
+        },
     ],
     "jobs": [],
     "datasets": [{"id": "welcome", "model": "note", "seed": "per-owner", "count": 1}],
@@ -91,11 +98,23 @@ class FakeNotes:
         text, rev = self.note_files[path]
         folder, _, title = path.rpartition("/")
         row = {
-            "id": note_id(path), "model": "note", "owner": "bram", "scope": "personal",
-            "rev": f"{rev}-x", "position": 0,
-            "fields": {"path": path, "folder": folder, "title": title,
-                       "body": text if body else None, "modified": STAMP},
-            "written_by": "notes", "created_at": STAMP, "updated_at": STAMP, "expires_at": None,
+            "id": note_id(path),
+            "model": "note",
+            "owner": "bram",
+            "scope": "personal",
+            "rev": f"{rev}-x",
+            "position": 0,
+            "fields": {
+                "path": path,
+                "folder": folder,
+                "title": title,
+                "body": text if body else None,
+                "modified": STAMP,
+            },
+            "written_by": "notes",
+            "created_at": STAMP,
+            "updated_at": STAMP,
+            "expires_at": None,
         }
         if preview is not None:
             row["preview"] = preview
@@ -149,9 +168,7 @@ class FakeNotes:
         self.note_files[path] = [str(fields.get("body") or ""), 1]
         return self._note(path)
 
-    async def update_record(
-        self, model: str, record_id: str, fields: dict, *, rev: object = None
-    ) -> dict:
+    async def update_record(self, model: str, record_id: str, fields: dict, *, rev: object = None) -> dict:
         if model != "note":
             return await super().update_record(model, record_id, fields, rev=rev)
         path = self._path_of(record_id)
@@ -193,10 +210,11 @@ class FakeNotes:
 
     async def move_record_folder(self, model: str, path: str, to: str) -> dict:
         self.note_calls.append(("mvdir", path, to))
-        self.note_folders = {to + f[len(path):] if f == path or f.startswith(path + "/") else f
-                             for f in self.note_folders}
+        self.note_folders = {
+            to + f[len(path) :] if f == path or f.startswith(path + "/") else f for f in self.note_folders
+        }
         for old in [p for p in self.note_files if p.startswith(path + "/")]:
-            self.note_files[to + old[len(path):]] = self.note_files.pop(old)
+            self.note_files[to + old[len(path) :]] = self.note_files.pop(old)
         return {"path": to, "name": to.rsplit("/", 1)[-1]}
 
     async def delete_record_folder(self, model: str, path: str) -> None:

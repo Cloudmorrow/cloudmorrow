@@ -24,18 +24,20 @@ First time: `uv sync` in the Quill's folder (makes .venv with Cloudmorrow and py
 import pytest
 from cloudmorrow.quill.testing import Harness
 
+
 @pytest.fixture()
 def q():
     with Harness(".", circles={"Kids": {"vehicle": "read"}}) as harness:
         yield harness
 
+
 def test_it(q):
-    van = q.seed("vehicle", name="Van")               # a record, made as the person (hooks run)
+    van = q.seed("vehicle", name="Van")  # a record, made as the person (hooks run)
     done = q.act("log-service", van, date="2026-09-28", km=5)
-    assert done.ok and done.toast == "…"              # also .error, .refused, .opened, .effects
+    assert done.ok and done.toast == "…"  # also .error, .refused, .opened, .effects
     assert q.get("vehicle", van.id)["fleet.odometer"] == 5
-    assert "Van" in q.view("garage").text()           # also .find("table"), .buttons, .tree
-    kid = q.as_user("sam", circles=["Kids"])          # somebody else, in only these circles
+    assert "Van" in q.view("garage").text()  # also .find("table"), .buttons, .tree
+    kid = q.as_user("sam", circles=["Kids"])  # somebody else, in only these circles
     assert kid.act("log-service", van, date="2026-09-28", km=1).refused
 ```
 

@@ -29,9 +29,7 @@ class FakeRunner:
 def api_for(test_client, token: str) -> CloudmorrowClient:
     """A real async client speaking ASGI straight to the app under test."""
     api = CloudmorrowClient(ClientConfig(api_url="http://testserver"), token=token)
-    api._client = httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=test_client.app), base_url="http://testserver"
-    )
+    api._client = httpx.AsyncClient(transport=httpx.ASGITransport(app=test_client.app), base_url="http://testserver")
     return api
 
 
@@ -45,9 +43,7 @@ def test_machine_name_is_a_valid_agent_name():
 # -- service files -----------------------------------------------------------
 def test_launchd_plist_is_written_and_loaded(tmp_path):
     runner = FakeRunner()
-    result = service.install(
-        home=tmp_path, executable="/opt/bc/bin/cloudmorrow-agent", runner=runner, kind="launchd"
-    )
+    result = service.install(home=tmp_path, executable="/opt/bc/bin/cloudmorrow-agent", runner=runner, kind="launchd")
     assert result.installed
     plist = tmp_path / "Library" / "LaunchAgents" / "io.bramlabs.cloudmorrow-agent.plist"
     assert plist.is_file()
@@ -60,9 +56,7 @@ def test_launchd_plist_is_written_and_loaded(tmp_path):
 
 def test_systemd_user_unit_is_written_and_enabled(tmp_path):
     runner = FakeRunner()
-    result = service.install(
-        home=tmp_path, executable="/opt/bc/bin/cloudmorrow-agent", runner=runner, kind="systemd"
-    )
+    result = service.install(home=tmp_path, executable="/opt/bc/bin/cloudmorrow-agent", runner=runner, kind="systemd")
     assert result.installed
     unit = tmp_path / ".config" / "systemd" / "user" / "cloudmorrow-agent.service"
     assert "ExecStart=/opt/bc/bin/cloudmorrow-agent run" in unit.read_text()
@@ -112,9 +106,7 @@ def test_restarting_what_is_not_installed_says_so(tmp_path):
 
 
 def test_service_failure_is_reported_not_raised(tmp_path):
-    result = service.install(
-        home=tmp_path, executable="x", runner=FakeRunner(returncode=1), kind="systemd"
-    )
+    result = service.install(home=tmp_path, executable="x", runner=FakeRunner(returncode=1), kind="systemd")
     assert not result.installed
     assert "boom" in result.detail
 
@@ -144,9 +136,7 @@ async def test_login_enrols_this_machine(client, tmp_path):
     assert saved.agent_token.startswith("bca_")
     assert saved.server_url == "http://testserver"
     # And the server now lists it for that user.
-    agents = client.get(
-        "/api/agents", headers={"Authorization": f"Bearer {token_for(client, *ADMIN)}"}
-    ).json()
+    agents = client.get("/api/agents", headers={"Authorization": f"Bearer {token_for(client, *ADMIN)}"}).json()
     assert [a["name"] for a in agents] == [result.agent_name]
 
 
@@ -162,14 +152,10 @@ async def test_signing_in_again_rotates_rather_than_failing(client, tmp_path):
     assert first.enrolled and second.enrolled
     assert token_one != token_two
     # Still one agent, not two.
-    agents = client.get(
-        "/api/agents", headers={"Authorization": f"Bearer {token_for(client, *ADMIN)}"}
-    ).json()
+    agents = client.get("/api/agents", headers={"Authorization": f"Bearer {token_for(client, *ADMIN)}"}).json()
     assert len(agents) == 1
     # The old token stops working.
-    assert client.post(
-        "/api/agent/jobs/claim", headers={"Authorization": f"Bearer {token_one}"}
-    ).status_code == 401
+    assert client.post("/api/agent/jobs/claim", headers={"Authorization": f"Bearer {token_one}"}).status_code == 401
 
 
 async def test_the_agent_belongs_to_the_user_who_signed_in(client, tmp_path):
@@ -185,9 +171,7 @@ async def test_the_agent_belongs_to_the_user_who_signed_in(client, tmp_path):
 async def test_enrolment_needs_authentication(client, tmp_path):
     anonymous = api_for(client, "")
     anonymous._token = None
-    result = await ensure_agent(
-        anonymous, config_path=tmp_path / "agent.toml", install_service=False
-    )
+    result = await ensure_agent(anonymous, config_path=tmp_path / "agent.toml", install_service=False)
     assert not result.enrolled
     assert not (tmp_path / "agent.toml").exists()
 

@@ -329,8 +329,7 @@ class RecordSheet(Modal[dict | str | None]):
             return
         await self._show(fresh)
         self._say(
-            "This changed somewhere else while it was open. Theirs is shown now — "
-            "make your change again and save.",
+            "This changed somewhere else while it was open. Theirs is shown now — make your change again and save.",
             colour=WARN,
         )
 
@@ -392,15 +391,11 @@ class RecordSheet(Modal[dict | str | None]):
             model.get("label") or model_id
             for model_id, model in self.models.items()
             for f in model.get("fields", [])
-            if f.get("kind") == "link" and f.get("to") == self.model_id
-            and f.get("on_delete") == "cascade"
+            if f.get("kind") == "link" and f.get("to") == self.model_id and f.get("on_delete") == "cascade"
         ]
         detail = "[dim]It is not recoverable.[/]"
         if cascades:
-            detail = (
-                f"[dim]Every {' and '.join(c.lower() for c in cascades)} on it goes too. "
-                "It is not recoverable.[/]"
-            )
+            detail = f"[dim]Every {' and '.join(c.lower() for c in cascades)} on it goes too. It is not recoverable.[/]"
         self.app.push_screen(ConfirmModal(f"Delete {name}?", detail=detail), self._delete_answered)
 
     async def _delete_answered(self, confirmed: bool | None) -> None:

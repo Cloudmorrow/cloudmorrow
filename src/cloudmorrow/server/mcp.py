@@ -228,9 +228,7 @@ class MCPStore:
         return connect(self.db_path)
 
     # -- clients -----------------------------------------------------------
-    def register(
-        self, name: str, redirect_uris: list[str], *, public: bool = True
-    ) -> tuple[Client, str]:
+    def register(self, name: str, redirect_uris: list[str], *, public: bool = True) -> tuple[Client, str]:
         """Take a client on. Returns it and its secret — empty for a public one."""
         if not redirect_uris:
             raise RegistrationError("at least one redirect_uri is required")
@@ -254,9 +252,7 @@ class MCPStore:
 
     def client(self, client_id: str) -> Client | None:
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM mcp_clients WHERE client_id = ?", (client_id or "",)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM mcp_clients WHERE client_id = ?", (client_id or "",)).fetchone()
         return self._client(row) if row else None
 
     @staticmethod
@@ -272,15 +268,11 @@ class MCPStore:
     def authenticate_client(self, client_id: str, client_secret: str | None) -> Client:
         """The client behind a token request, or a GrantError."""
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM mcp_clients WHERE client_id = ?", (client_id or "",)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM mcp_clients WHERE client_id = ?", (client_id or "",)).fetchone()
         if row is None:
             raise GrantError("invalid_client", "unknown client")
         expected = row["client_secret_hash"]
-        if expected and not (
-            client_secret and secrets.compare_digest(_hash(client_secret), expected)
-        ):
+        if expected and not (client_secret and secrets.compare_digest(_hash(client_secret), expected)):
             raise GrantError("invalid_client", "wrong client secret")
         return self._client(row)
 
@@ -314,14 +306,10 @@ class MCPStore:
             )
         return code
 
-    def redeem_code(
-        self, client: Client, code: str, *, redirect_uri: str, code_verifier: str
-    ) -> Tokens:
+    def redeem_code(self, client: Client, code: str, *, redirect_uri: str, code_verifier: str) -> Tokens:
         """Trade a code for tokens, once. Anything wrong is a GrantError."""
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM mcp_codes WHERE code_hash = ?", (_hash(code or ""),)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM mcp_codes WHERE code_hash = ?", (_hash(code or ""),)).fetchone()
             if row is not None:
                 # Whatever happens next, the code is spent.
                 conn.execute("DELETE FROM mcp_codes WHERE code_hash = ?", (row["code_hash"],))
@@ -332,16 +320,12 @@ class MCPStore:
             raise GrantError("invalid_grant", "code was issued to another client")
         if redirect_uri and row["redirect_uri"] != redirect_uri:
             raise GrantError("invalid_grant", "redirect_uri does not match")
-        if not code_verifier or not pkce_matches(
-            code_verifier, row["code_challenge"], row["code_challenge_method"]
-        ):
+        if not code_verifier or not pkce_matches(code_verifier, row["code_challenge"], row["code_challenge_method"]):
             raise GrantError("invalid_grant", "PKCE verification failed")
         return self._issue(row["username"], client.client_id, row["scope"])
 
     # -- tokens ------------------------------------------------------------
-    def _issue(
-        self, username: str, client_id: str, scope: str, *, row_id: int | None = None
-    ) -> Tokens:
+    def _issue(self, username: str, client_id: str, scope: str, *, row_id: int | None = None) -> Tokens:
         access = "bcm_" + secrets.token_urlsafe(32)
         refresh = "bcr_" + secrets.token_urlsafe(32)
         now = _now()
@@ -403,9 +387,7 @@ class MCPStore:
             ).fetchone()
             if row is None or _expired(row["access_expires_at"]):
                 return None
-            conn.execute(
-                "UPDATE mcp_tokens SET last_used_at = ? WHERE id = ?", (_stamp(), row["id"])
-            )
+            conn.execute("UPDATE mcp_tokens SET last_used_at = ? WHERE id = ?", (_stamp(), row["id"]))
         return self._connection(row)
 
     @staticmethod
@@ -424,9 +406,7 @@ class MCPStore:
     def connections(self, username: str) -> list[Connection]:
         """Every client *username* has let in and not yet cut off."""
         with self._connect() as conn:
-            conn.execute(
-                "DELETE FROM mcp_tokens WHERE refresh_expires_at <= ?", (_stamp(),)
-            )
+            conn.execute("DELETE FROM mcp_tokens WHERE refresh_expires_at <= ?", (_stamp(),))
             rows = conn.execute(
                 "SELECT t.*, c.client_name FROM mcp_tokens t"
                 " LEFT JOIN mcp_clients c ON c.client_id = t.client_id"

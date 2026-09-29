@@ -128,9 +128,7 @@ def call(kind: str, name: str, data: dict, args: dict, host) -> object:
             json.dumps(result)
             return result
     except HostError as exc:
-        kind_name = next(
-            (k for k, cls in _error_kinds().items() if isinstance(exc, cls)), "refused"
-        )
+        kind_name = next((k for k, cls in _error_kinds().items() if isinstance(exc, cls)), "refused")
         raise Failure(kind_name, str(exc), _trace(exc)) from exc
     except ui.TreeError as exc:
         raise Failure("error", f"{name}: {exc}", _trace(exc)) from exc

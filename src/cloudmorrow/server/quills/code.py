@@ -100,8 +100,14 @@ CREATE TABLE IF NOT EXISTS quill_call_runs (
 
 # How a failure is answered over HTTP.
 STATUS = {
-    "refused": 403, "notfound": 404, "invalid": 400, "conflict": 409,
-    "timeout": 504, "error": 500, "off": 403, "unavailable": 503,
+    "refused": 403,
+    "notfound": 404,
+    "invalid": 400,
+    "conflict": 409,
+    "timeout": 504,
+    "error": 500,
+    "off": 403,
+    "unavailable": 503,
 }
 
 
@@ -217,15 +223,21 @@ class HostCalls:
 
     def op_records_patch(self, args: dict) -> dict:
         record = self.state.records.update(
-            self.principal, self._model(args), str(args.get("id", "")),
-            dict(args.get("fields") or {}), rev=args.get("rev"),
+            self.principal,
+            self._model(args),
+            str(args.get("id", "")),
+            dict(args.get("fields") or {}),
+            rev=args.get("rev"),
         )
         return record.to_dict()
 
     def op_records_move(self, args: dict) -> dict:
         record = self.state.records.move(
-            self.principal, self._model(args), str(args.get("id", "")),
-            dict(args.get("fields") or {}), args.get("index"),
+            self.principal,
+            self._model(args),
+            str(args.get("id", "")),
+            dict(args.get("fields") or {}),
+            args.get("index"),
         )
         return record.to_dict()
 
@@ -264,7 +276,8 @@ class HostCalls:
         if method not in FETCH_METHODS:
             raise sdk.Invalid(f"{method} is not a method ctx.fetch sends")
         headers = {
-            str(k): str(v) for k, v in (args.get("headers") or {}).items()
+            str(k): str(v)
+            for k, v in (args.get("headers") or {}).items()
             if str(k).lower() not in ("host", "content-length", "connection")
         }
         headers.setdefault("User-Agent", f"cloudmorrow-quill/{self.manifest.id}")
@@ -543,9 +556,11 @@ class QuillCode:
         depth = getattr(self._local, "depth", 0)
         hooking = getattr(self._local, "quill", "")
         after = record.fields
-        changed = sorted(
-            k for k in set(after) | set(before or {}) if (before or {}).get(k) != after.get(k)
-        ) if before is not None else sorted(after)
+        changed = (
+            sorted(k for k in set(after) | set(before or {}) if (before or {}).get(k) != after.get(k))
+            if before is not None
+            else sorted(after)
+        )
         for manifest in list(self.state.quills.quills.values()):
             if not manifest.hooks or not manifest.code:
                 continue
@@ -557,14 +572,10 @@ class QuillCode:
                 if action == "changed" and hook.get("fields") and not set(hook["fields"]) & set(changed):
                     continue
                 if depth >= HOOK_DEPTH:
-                    self.log(manifest.id).note(
-                        f"hook on {record.model} not run: {HOOK_DEPTH} hooks deep already"
-                    )
+                    self.log(manifest.id).note(f"hook on {record.model} not run: {HOOK_DEPTH} hooks deep already")
                     continue
                 self._busy.set()
-                self._hooks.put(
-                    (manifest.id, hook, principal, action, record.to_dict(), before, changed, depth + 1)
-                )
+                self._hooks.put((manifest.id, hook, principal, action, record.to_dict(), before, changed, depth + 1))
 
     def _run_hooks(self) -> None:
         while not self._stop.is_set():
@@ -691,11 +702,16 @@ class QuillCode:
                     "SELECT last_started, last_error FROM quill_call_runs WHERE quill = ? AND job = ?",
                     (quill_id, job["id"]),
                 ).fetchone()
-                rows.append({
-                    "id": job["id"], "every": job["every"], "handler": job["handler"],
-                    "last_run": row[0] if row else None, "last_error": row[1] if row else "",
-                    "running": (quill_id, job["id"]) in self._running_jobs,
-                })
+                rows.append(
+                    {
+                        "id": job["id"],
+                        "every": job["every"],
+                        "handler": job["handler"],
+                        "last_run": row[0] if row else None,
+                        "last_error": row[1] if row else "",
+                        "running": (quill_id, job["id"]) in self._running_jobs,
+                    }
+                )
         conn.close()
         return rows
 

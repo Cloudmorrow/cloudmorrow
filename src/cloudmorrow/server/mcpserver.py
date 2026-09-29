@@ -46,8 +46,8 @@ def handle_message(state: AppState, user: User, message: Any) -> dict[str, Any] 
     params = message.get("params") or {}
     if not isinstance(method, str):
         # A response, or nothing we understand: there is no one to answer.
-        return None if "result" in message or "error" in message else rpc_error(
-            request_id, INVALID_REQUEST, "no method"
+        return (
+            None if "result" in message or "error" in message else rpc_error(request_id, INVALID_REQUEST, "no method")
         )
     if request_id is None:
         # A notification. `notifications/initialized` and the like: noted.
@@ -69,9 +69,7 @@ def handle_message(state: AppState, user: User, message: Any) -> dict[str, Any] 
     if method == "ping":
         return rpc_result(request_id, {})
     if method == "tools/list":
-        return rpc_result(
-            request_id, {"tools": [tool.to_dict() for tool in mcptools.available(state, user)]}
-        )
+        return rpc_result(request_id, {"tools": [tool.to_dict() for tool in mcptools.available(state, user)]})
     if method == "tools/call":
         name = params.get("name")
         if not isinstance(name, str) or mcptools.find(state, name, user) is None:

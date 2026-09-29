@@ -52,9 +52,7 @@ def parse_every(text: str) -> float:
 class MachineQuills:
     """The handlers switched on here, fetched, kept, run on time or when asked."""
 
-    def __init__(
-        self, config: AgentConfig, client: AgentClient, *, base: Path | None = None, guest=None
-    ) -> None:
+    def __init__(self, config: AgentConfig, client: AgentClient, *, base: Path | None = None, guest=None) -> None:
         self.config = config
         self.client = client
         self.base = base or quills_dir()

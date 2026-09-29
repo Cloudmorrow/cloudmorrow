@@ -168,12 +168,18 @@ def run(runtime: Path, sdk: Path, quill: Path, code: str, folders: dict[str, tup
     store.set_limits(memory_size=MEMORY_LIMIT)
     wasi = wasmtime.WasiConfig()
     wasi.argv = [
-        "python", "-S", "-c",
+        "python",
+        "-S",
+        "-c",
         "import sys; sys.path[:0] = ['/sdk', '/quill']; "
         f"from cloudmorrow.quill.guest import main; main('/quill', {code!r})",
     ]
-    wasi.env = [("PYTHONHOME", "/"), ("PYTHONPATH", f"/lib/{PYTHON_LIB}"),
-                ("PYTHONDONTWRITEBYTECODE", "1"), ("PYTHONUNBUFFERED", "1")]
+    wasi.env = [
+        ("PYTHONHOME", "/"),
+        ("PYTHONPATH", f"/lib/{PYTHON_LIB}"),
+        ("PYTHONDONTWRITEBYTECODE", "1"),
+        ("PYTHONUNBUFFERED", "1"),
+    ]
     wasi.inherit_stdin()
     wasi.inherit_stdout()
     wasi.inherit_stderr()
@@ -257,9 +263,17 @@ class Guest:
         runtime = ensure_runtime(self.runtime_base)
         sdk = sdk_dir(self.runtime_base)
         command = [
-            sys.executable, "-m", "cloudmorrow.sandbox",
-            "--runtime", str(runtime), "--sdk", str(sdk),
-            "--quill", str(self.quill), "--code", self.code,
+            sys.executable,
+            "-m",
+            "cloudmorrow.sandbox",
+            "--runtime",
+            str(runtime),
+            "--sdk",
+            str(sdk),
+            "--quill",
+            str(self.quill),
+            "--code",
+            self.code,
         ]
         for name, (path, writable) in self.folders.items():
             command += ["--folder", f"{name}={path}{':rw' if writable else ''}"]

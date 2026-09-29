@@ -69,7 +69,7 @@ def test_only_the_shell_asks_the_server_with_the_token():
     has ended signs out wherever it is noticed. The one other fetch is
     fresh.js asking which deploy is served, which needs no token."""
     core = (WEB / "core.js").read_text()
-    assert "authHeaders()" in core and 'res.status === 401 && session.token' in core
+    assert "authHeaders()" in core and "res.status === 401 && session.token" in core
     assert not re.search(r"^export const authHeaders", core, re.MULTILINE)
     for script in WEB.glob("*.js"):
         if script.name == "core.js":
@@ -112,9 +112,7 @@ def test_tree_previews_show_what_a_note_says(client, auth):
 
 
 def test_tree_previews_are_capped(client, auth):
-    client.post(
-        "/api/notes/file", json={"path": "long", "content": "x" * 500}, headers=auth
-    )
+    client.post("/api/notes/file", json={"path": "long", "content": "x" * 500}, headers=auth)
     tree = client.get("/api/notes/tree", params={"previews": "true"}, headers=auth).json()
     preview = tree["children"][0]["preview"]
     assert len(preview) == 120
@@ -171,7 +169,7 @@ def test_what_a_screen_makes_is_beside_its_title_not_in_the_bar():
                 raise AssertionError(f"{name} still puts a create button in the bar: {line.strip()}")
     for name in ("kit_editor.js", "kit.js", "kit_grid.js", "kit_thread.js", "kit_calendar.js", "admin.js"):
         assert "heading(" in (WEB / name).read_text(), name
-    assert '.heading .compose' in (WEB / "desktop.js").read_text()
+    assert ".heading .compose" in (WEB / "desktop.js").read_text()
 
 
 def test_a_calendar_screen_has_a_title_like_every_other_tab():

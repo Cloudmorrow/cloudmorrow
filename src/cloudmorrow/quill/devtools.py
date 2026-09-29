@@ -96,9 +96,15 @@ def serve(folder: Path, *, port: int, sandbox: bool, host: str) -> int:
     users.create(you, hash_password(password), is_admin=True)
     users.create("sam", hash_password(password))
     # Only this Quill: none of the catalog's own, which a fresh server would fetch.
-    for key in (quilljobs.SEEDED, quilljobs.SECRETS_QUILL, quilljobs.FILES_QUILL,
-                quilljobs.LEGACY_TASKS, quilljobs.LEGACY_CALENDAR, quilljobs.LEGACY_CHAT,
-                *(quilljobs.adopted_key(q) for q in quilljobs.MOVED_BUILTINS)):
+    for key in (
+        quilljobs.SEEDED,
+        quilljobs.SECRETS_QUILL,
+        quilljobs.FILES_QUILL,
+        quilljobs.LEGACY_TASKS,
+        quilljobs.LEGACY_CALENDAR,
+        quilljobs.LEGACY_CHAT,
+        *(quilljobs.adopted_key(q) for q in quilljobs.MOVED_BUILTINS),
+    ):
         quilljobs.write_meta(config.db_path, key, "0")
     app = create_app(config)
     state = app.state.cloudmorrow

@@ -148,8 +148,12 @@ def test_amber_is_one_action_per_view():
 
 
 def test_nothing_in_it_is_named_for_one_quill():
-    for source, name in ((VIEW_JS, "kit_view.js"), (VIEW_CSS, "kit_view.css"),
-                         (ACTIONS_JS, "actions.js"), (ACTIONS_CSS, "actions.css")):
+    for source, name in (
+        (VIEW_JS, "kit_view.js"),
+        (VIEW_CSS, "kit_view.css"),
+        (ACTIONS_JS, "actions.js"),
+        (ACTIONS_CSS, "actions.css"),
+    ):
         code = js_code(source)
         for word in ("fleet", "vehicle", "garage", "odometer", "task", "log-service"):
             named = re.search(rf"[\"'.`#]{word}[\"'`\s.-]", code, re.IGNORECASE)

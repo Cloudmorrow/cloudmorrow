@@ -30,9 +30,7 @@ def parse_rules(values: list[str]) -> list[IPv4Network | IPv6Network]:
         try:
             networks.append(ip_network(entry, strict=False))
         except ValueError as exc:
-            raise InvalidClientRule(
-                f"{entry!r} is not an IP address or CIDR range"
-            ) from exc
+            raise InvalidClientRule(f"{entry!r} is not an IP address or CIDR range") from exc
     return networks
 
 

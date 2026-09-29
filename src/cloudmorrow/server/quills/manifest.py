@@ -31,9 +31,7 @@ ORIGIN = ".origin.json"
 KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor", "view")
 # The ones every surface draws *today*. A screen of another kind is refused at
 # install, so a Quill never lands with a tab that draws nothing somewhere.
-KIT_READY = frozenset(
-    {"list", "board", "detail", "form", "calendar", "grid", "editor", "thread", "view"}
-)
+KIT_READY = frozenset({"list", "board", "detail", "form", "calendar", "grid", "editor", "thread", "view"})
 
 # How a thread screen may make a space: in one of the scopes, or `direct`,
 # found-or-made between the people picked.
@@ -121,8 +119,7 @@ class Manifest:
             "screens": list(self.screens),
             "jobs": list(self.jobs),
             "datasets": [
-                {k: v for k, v in d.items() if k != "records"} | {"count": len(d["records"])}
-                for d in self.datasets
+                {k: v for k, v in d.items() if k != "records"} | {"count": len(d["records"])} for d in self.datasets
             ],
             "services": list(self.services),
             "webhooks": list(self.webhooks),
@@ -160,17 +157,13 @@ def _dataset_records(folder: Path | None, item: dict, where: str) -> list[dict]:
     records = item.get("records")
     source = item.get("file")
     if (records is None) == (source is None):
-        raise QuillError(
-            f"{where}: dataset {item.get('id')!r} has `records` or a `file`, one of them"
-        )
+        raise QuillError(f"{where}: dataset {item.get('id')!r} has `records` or a `file`, one of them")
     if records is not None:
         if not isinstance(records, list) or not all(isinstance(r, dict) for r in records):
             raise QuillError(f"{where}: dataset {item.get('id')!r} records are tables")
         return records
     if folder is None:
-        raise QuillError(
-            f"{where}: dataset {item.get('id')!r} names a file, and there is no folder"
-        )
+        raise QuillError(f"{where}: dataset {item.get('id')!r} names a file, and there is no folder")
     path = (folder / str(source)).resolve()
     if folder.resolve() not in path.parents or not path.is_file():
         raise QuillError(f"{where}: dataset file {source!r} is not in the Quill")
@@ -261,18 +254,14 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
     _ids_unique(jobs, "job", where)
     for job in jobs:
         if job.get("action") not in JOB_ACTIONS:
-            raise QuillError(
-                f"{where}: job {job['id']!r} action is one of {', '.join(sorted(JOB_ACTIONS))}"
-            )
+            raise QuillError(f"{where}: job {job['id']!r} action is one of {', '.join(sorted(JOB_ACTIONS))}")
         for key in ("every", "after"):
             if key in job:
                 try:
                     parse_duration(str(job[key]))
                 except ValueError as exc:
                     raise QuillError(f"{where}: job {job['id']!r} {key}: {exc}") from exc
-        if job["action"] == "expire" and not (
-            job.get("model") and job.get("field") and job.get("after")
-        ):
+        if job["action"] == "expire" and not (job.get("model") and job.get("field") and job.get("after")):
             raise QuillError(f"{where}: an expire job names a model, a field and after")
 
     datasets = []
@@ -280,9 +269,7 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
     _ids_unique(raw_sets, "dataset", where)
     for item in raw_sets:
         if item.get("seed") not in SEED_KINDS:
-            raise QuillError(
-                f"{where}: dataset {item['id']!r} seed is {', '.join(sorted(SEED_KINDS))}"
-            )
+            raise QuillError(f"{where}: dataset {item['id']!r} seed is {', '.join(sorted(SEED_KINDS))}")
         if not item.get("model"):
             raise QuillError(f"{where}: dataset {item['id']!r} names a model")
         datasets.append(
@@ -296,11 +283,7 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
     _ids_unique(services, "service", where)
     for service in services:
         command = service.get("command")
-        if (
-            not isinstance(command, list)
-            or not command
-            or not all(isinstance(c, str) and c for c in command)
-        ):
+        if not isinstance(command, list) or not command or not all(isinstance(c, str) and c for c in command):
             raise QuillError(f"{where}: service {service['id']!r} command is a list of strings")
         if not isinstance(service.get("always", False), bool):
             raise QuillError(f"{where}: service {service['id']!r} always is true or false")
@@ -310,19 +293,15 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
     for job in jobs:
         if job["action"] == "run":
             if job.get("service") not in service_ids:
-                raise QuillError(
-                    f"{where}: job {job['id']!r} runs one of its services: service = \"<id>\""
-                )
+                raise QuillError(f'{where}: job {job["id"]!r} runs one of its services: service = "<id>"')
             if not job.get("every"):
-                raise QuillError(f"{where}: job {job['id']!r} runs every so often: every = \"1h\"")
+                raise QuillError(f'{where}: job {job["id"]!r} runs every so often: every = "1h"')
     paths: set[str] = set()
     for hook in webhooks:
         _check_webhook(hook, service_ids, paths, where)
     for api in apis:
         if bool(api.get("handler")) == bool(api.get("service")):
-            raise QuillError(
-                f"{where}: api {api['id']!r} is answered by a handler or one of its services, one of them"
-            )
+            raise QuillError(f"{where}: api {api['id']!r} is answered by a handler or one of its services, one of them")
         if api.get("service") and api["service"] not in service_ids:
             raise QuillError(f"{where}: api {api['id']!r} is served by one of its services")
         prefix = api.get("prefix", "")
@@ -385,7 +364,7 @@ def _check_webhook(hook: dict, service_ids: set[str], paths: set[str], where: st
     if (hook.get("forward") or hook.get("handler")) and mapping:
         raise QuillError(f"{where}: {thing} has no map: only a webhook that makes a record maps")
     if not isinstance(mapping, dict):
-        raise QuillError(f"{where}: {thing} map is a table: field = \"$.path\"")
+        raise QuillError(f'{where}: {thing} map is a table: field = "$.path"')
     for name, path_text in mapping.items():
         try:
             parse_path(path_text)

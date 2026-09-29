@@ -50,8 +50,7 @@ def render(notes: list[dict]) -> str:
         where = f" [{MUTED}]{note['machine']}[/]" if note["machine"] else ""
         lines.append(
             f"{mark} [{MUTED}]{short_stamp(note['created_at'], 16)}[/] "
-            f"[{colour}]{note['title']}[/]{where}"
-            + (f"\n    [{MUTED}]{note['body']}[/]" if note["body"] else "")
+            f"[{colour}]{note['title']}[/]{where}" + (f"\n    [{MUTED}]{note['body']}[/]" if note["body"] else "")
         )
     return "\n".join(lines)
 

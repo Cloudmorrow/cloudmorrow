@@ -112,8 +112,6 @@ FEATURES = [
 ]
 
 
-
-
 def share_row(name: str, **extra) -> dict:
     return {
         "name": name,
@@ -252,9 +250,7 @@ class FakeClient(FakeSpaces, FakeNotes, FakeFiles, FakeQuills, FakeCircles):
         user_type: str = "human",
     ) -> dict:
         self.user_calls.append(("create", username, role, user_type))
-        fresh = user_row(
-            username, role=role, user_type=user_type, display_name=display_name
-        )
+        fresh = user_row(username, role=role, user_type=user_type, display_name=display_name)
         self.user_list.append(fresh)
         return fresh
 
@@ -405,7 +401,6 @@ class FakeClient(FakeSpaces, FakeNotes, FakeFiles, FakeQuills, FakeCircles):
         return {"marked": len(self.notes), "unread": 0}
 
 
-
 # A Button ignores a second click while its press animation is running, so
 # clicking the same button twice has to wait that out.
 PRESS_ANIMATION = 0.3
@@ -430,8 +425,6 @@ async def open_secrets(app: CloudmorrowApp, pilot) -> WorkspaceScreen:
     await pilot.click("#nav-secrets")
     await settle(app, pilot)
     return screen
-
-
 
 
 def said(screen) -> str:

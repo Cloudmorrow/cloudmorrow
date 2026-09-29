@@ -50,9 +50,7 @@ def span(first: dt.date, last: dt.date, *, most: int | None = None) -> list[dt.d
 
 def days_of(event: dict) -> list[dt.date]:
     """Every day a thing is on, so a month can draw it on each of them."""
-    return span(
-        dt.date.fromisoformat(event["starts"][:10]), dt.date.fromisoformat(event["ends"][:10])
-    )
+    return span(dt.date.fromisoformat(event["starts"][:10]), dt.date.fromisoformat(event["ends"][:10]))
 
 
 # -- moments -----------------------------------------------------------------------

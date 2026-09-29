@@ -306,9 +306,7 @@ class NoteStore:
 
     def _walk(self, directory: Path, node: NoteNode, *, previews: bool = False) -> None:
         try:
-            entries = sorted(
-                os.scandir(directory), key=lambda e: (not e.is_dir(), e.name.lower())
-            )
+            entries = sorted(os.scandir(directory), key=lambda e: (not e.is_dir(), e.name.lower()))
         except FileNotFoundError:
             return
         for entry in entries:

@@ -28,9 +28,7 @@ class FakeCircles:
     """Mixed into FakeClient; asks `user_list` who is on the server."""
 
     def setup_circles(self) -> None:
-        self.circle_list: list[dict] = [
-            circle_row("Members", {"*": "write"}, ["bram", "guest"], default=True)
-        ]
+        self.circle_list: list[dict] = [circle_row("Members", {"*": "write"}, ["bram", "guest"], default=True)]
         self.circle_calls: list[tuple] = []
 
     def _circle(self, key: str) -> dict:

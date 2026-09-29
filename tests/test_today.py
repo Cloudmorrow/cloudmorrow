@@ -13,9 +13,7 @@ from cloudmorrow.server.config import ServerConfig
 from cloudmorrow.server.today import QUOTES, Weather, WeatherError, quote_for
 from tests.conftest import ADMIN, token_for
 
-GEOCODE = {
-    "results": [{"name": "Copenhagen", "country": "Denmark", "latitude": 55.68, "longitude": 12.57}]
-}
+GEOCODE = {"results": [{"name": "Copenhagen", "country": "Denmark", "latitude": 55.68, "longitude": 12.57}]}
 FORECAST = {
     "current": {
         "temperature_2m": 14.3,
@@ -159,9 +157,7 @@ def test_today_with_a_place_has_the_weather(tmp_path, users, calls):
 
 
 def test_today_says_when_the_weather_could_not_be_had(tmp_path, users, monkeypatch):
-    monkeypatch.setattr(
-        today, "fetch_json", lambda url: (_ for _ in ()).throw(WeatherError("could not reach it"))
-    )
+    monkeypatch.setattr(today, "fetch_json", lambda url: (_ for _ in ()).throw(WeatherError("could not reach it")))
     config = ServerConfig(
         notes_dir=tmp_path / "notes",
         data_dir=tmp_path / "data",

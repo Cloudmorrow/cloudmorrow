@@ -42,9 +42,7 @@ class StaleRevisionError(RuntimeError):
     """The bundle moved on while this machine was working from an older copy."""
 
     def __init__(self, current: int, base: int | None) -> None:
-        super().__init__(
-            f"bundle is at revision {current}, not {base if base is not None else 'unclaimed'}"
-        )
+        super().__init__(f"bundle is at revision {current}, not {base if base is not None else 'unclaimed'}")
         self.current = current
         self.base = base
 
@@ -124,8 +122,7 @@ class ConfigStore:
                 "SELECT * FROM config_bundles WHERE owner = ? AND bundle = ?", (owner, bundle)
             ).fetchone()
             files = conn.execute(
-                "SELECT path, sha256, mode FROM config_files"
-                " WHERE owner = ? AND bundle = ? ORDER BY path",
+                "SELECT path, sha256, mode FROM config_files WHERE owner = ? AND bundle = ? ORDER BY path",
                 (owner, bundle),
             ).fetchall()
         if row is None:
@@ -147,8 +144,7 @@ class ConfigStore:
         bundle = validate_bundle(bundle)
         with connect(self.db_path) as conn:
             rows = conn.execute(
-                "SELECT path, content, sha256, mode FROM config_files"
-                " WHERE owner = ? AND bundle = ? ORDER BY path",
+                "SELECT path, content, sha256, mode FROM config_files WHERE owner = ? AND bundle = ? ORDER BY path",
                 (owner, bundle),
             ).fetchall()
         return [
@@ -184,8 +180,7 @@ class ConfigStore:
         oversized = [f.path for f in files if len(f.content.encode("utf-8")) > MAX_FILE_BYTES]
         if oversized:
             raise BundleTooBigError(
-                f"too big for a config bundle ({MAX_FILE_BYTES // 1024} KiB max): "
-                + ", ".join(sorted(oversized)[:3])
+                f"too big for a config bundle ({MAX_FILE_BYTES // 1024} KiB max): " + ", ".join(sorted(oversized)[:3])
             )
 
         stamp = _now()
@@ -208,14 +203,11 @@ class ConfigStore:
                 )
             else:
                 conn.execute(
-                    "UPDATE config_bundles SET revision = ?, origin = ?, updated_at = ?"
-                    " WHERE owner = ? AND bundle = ?",
+                    "UPDATE config_bundles SET revision = ?, origin = ?, updated_at = ? WHERE owner = ? AND bundle = ?",
                     (revision, machine, stamp, owner, bundle),
                 )
             # The push is the whole bundle, so what it does not mention is gone.
-            conn.execute(
-                "DELETE FROM config_files WHERE owner = ? AND bundle = ?", (owner, bundle)
-            )
+            conn.execute("DELETE FROM config_files WHERE owner = ? AND bundle = ?", (owner, bundle))
             conn.executemany(
                 "INSERT INTO config_files (owner, bundle, path, sha256, content, mode,"
                 " updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -238,9 +230,5 @@ class ConfigStore:
         """Throw the bundle away, so the next machine to tick the box claims it."""
         bundle = validate_bundle(bundle)
         with connect(self.db_path) as conn:
-            conn.execute(
-                "DELETE FROM config_files WHERE owner = ? AND bundle = ?", (owner, bundle)
-            )
-            conn.execute(
-                "DELETE FROM config_bundles WHERE owner = ? AND bundle = ?", (owner, bundle)
-            )
+            conn.execute("DELETE FROM config_files WHERE owner = ? AND bundle = ?", (owner, bundle))
+            conn.execute("DELETE FROM config_bundles WHERE owner = ? AND bundle = ?", (owner, bundle))

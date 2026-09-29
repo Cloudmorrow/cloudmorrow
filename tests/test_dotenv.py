@@ -40,7 +40,7 @@ def test_round_trip_survives_dump():
 
 @pytest.mark.parametrize(
     "value",
-    ["plain", "", " leading and trailing ", 'quotes " and \' both', "$SHELL", "a\nb", "#hash"],
+    ["plain", "", " leading and trailing ", "quotes \" and ' both", "$SHELL", "a\nb", "#hash"],
 )
 def test_quoting_is_reversible(value):
     assert dotenv.parse(f"K={dotenv.quote(value)}\n") == {"K": value}

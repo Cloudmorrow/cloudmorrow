@@ -72,8 +72,7 @@ class NavCard(Static, can_focus=False):
             self.card = card
             super().__init__()
 
-    def __init__(self, key: str, title: str, *, tag: str = "", compact: bool = False,
-                 **kwargs) -> None:
+    def __init__(self, key: str, title: str, *, tag: str = "", compact: bool = False, **kwargs) -> None:
         super().__init__("", **kwargs)
         self.nav_key = key
         self.name_text = title

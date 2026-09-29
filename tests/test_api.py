@@ -14,9 +14,7 @@ def test_notes_require_auth(client):
 
 
 def test_bad_password_is_rejected(client):
-    response = client.post(
-        "/api/auth/login", json={"username": ADMIN[0], "password": "wrong-password"}
-    )
+    response = client.post("/api/auth/login", json={"username": ADMIN[0], "password": "wrong-password"})
     assert response.status_code == 401
 
 
@@ -27,9 +25,7 @@ def test_login_and_me(client, auth):
 
 
 def test_note_lifecycle(client, auth):
-    created = client.post(
-        "/api/notes/file", json={"path": "work/plan", "content": "# Plan\n"}, headers=auth
-    )
+    created = client.post("/api/notes/file", json={"path": "work/plan", "content": "# Plan\n"}, headers=auth)
     assert created.status_code == 201
     assert created.json()["path"] == "work/plan.md"
 
@@ -46,9 +42,7 @@ def test_note_lifecycle(client, auth):
     assert updated.status_code == 200
     assert "ship it" in client.get("/api/notes/file/work/plan.md", headers=auth).json()["content"]
 
-    moved = client.post(
-        "/api/notes/move", json={"src": "work/plan.md", "dest": "done/plan.md"}, headers=auth
-    )
+    moved = client.post("/api/notes/move", json={"src": "work/plan.md", "dest": "done/plan.md"}, headers=auth)
     assert moved.json()["path"] == "done/plan.md"
 
     assert client.delete("/api/notes/done/plan.md", headers=auth).status_code == 204
@@ -59,9 +53,7 @@ def test_stale_write_returns_conflict(client, auth):
     created = client.post("/api/notes/file", json={"path": "n.md", "content": "one"}, headers=auth)
     stale_rev = created.json()["rev"]
     client.put("/api/notes/file/n.md", json={"content": "two"}, headers=auth)
-    conflict = client.put(
-        "/api/notes/file/n.md", json={"content": "three", "rev": stale_rev}, headers=auth
-    )
+    conflict = client.put("/api/notes/file/n.md", json={"content": "three", "rev": stale_rev}, headers=auth)
     assert conflict.status_code == 409
     detail = conflict.json()["detail"]
     assert detail["error"] == "conflict"
@@ -69,15 +61,14 @@ def test_stale_write_returns_conflict(client, auth):
 
 
 def test_path_traversal_is_refused(client, auth):
-    assert (
-        client.put(
-            "/api/notes/file/../../escape.md", json={"content": "nope"}, headers=auth
-        ).status_code
-        in (400, 404)
+    assert client.put("/api/notes/file/../../escape.md", json={"content": "nope"}, headers=auth).status_code in (
+        400,
+        404,
     )
-    assert client.post(
-        "/api/notes/file", json={"path": "../escape.md", "content": "nope"}, headers=auth
-    ).status_code == 400
+    assert (
+        client.post("/api/notes/file", json={"path": "../escape.md", "content": "nope"}, headers=auth).status_code
+        == 400
+    )
 
 
 def test_users_have_separate_note_trees(client, auth):
@@ -131,12 +122,7 @@ def test_non_admin_cannot_manage_users(client):
 
 def test_deactivated_user_cannot_log_in(client, users):
     users.update(GUEST[0], is_active=False)
-    assert (
-        client.post(
-            "/api/auth/login", json={"username": GUEST[0], "password": GUEST[1]}
-        ).status_code
-        == 401
-    )
+    assert client.post("/api/auth/login", json={"username": GUEST[0], "password": GUEST[1]}).status_code == 401
 
 
 def test_change_own_password(client, auth):
@@ -149,8 +135,5 @@ def test_change_own_password(client, auth):
         == 204
     )
     assert (
-        client.post(
-            "/api/auth/login", json={"username": ADMIN[0], "password": "brand-new-secret"}
-        ).status_code
-        == 200
+        client.post("/api/auth/login", json={"username": ADMIN[0], "password": "brand-new-secret"}).status_code == 200
     )

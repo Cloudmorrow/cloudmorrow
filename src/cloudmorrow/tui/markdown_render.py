@@ -207,12 +207,8 @@ def render_line(
         if task:
             mark, task_body = task.groups()
             done = mark.lower() == "x"
-            text.append(
-                ("☑" if done else "☐") + " ", theme.task_done if done else theme.task_open
-            )
-            text.append_text(
-                render_inline(task_body, theme, theme.task_done_text if done else theme.text)
-            )
+            text.append(("☑" if done else "☐") + " ", theme.task_done if done else theme.task_open)
+            text.append_text(render_inline(task_body, theme, theme.task_done_text if done else theme.text))
             return text
         text.append(BULLETS[level % len(BULLETS)] + " ", theme.bullet)
         text.append_text(render_inline(body, theme))

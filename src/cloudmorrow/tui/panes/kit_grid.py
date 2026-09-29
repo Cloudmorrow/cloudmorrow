@@ -437,33 +437,31 @@ class GridPane(KitPane):
             self.refused.add("new_group")
         extra = [action for ext in self.extensions for action in ext.actions]
         group_noun = str(self.group_model.get("label") or "group").lower()
-        self.ACTIONS = self.offer([
-            *extra,
-            Action(
-                "put",
-                "Put a file here",
-                "p",
-                variant="primary",
-                hint="A file from this machine, into the folder you are in",
-            ),
-            Action("new_record", "New folder", "^n"),
-            Action(
-                "open",
-                "Open",
-                "enter",
-                hint=f"Into the {group_noun} or folder, or the picture beside",
-            ),
-            Action("up", "Up", "bksp", hint=f"The folder above; the {group_noun}s at the top"),
-            Action("rename", "Rename", "e", hint="Rename it; M moves it to another folder"),
-            Action("delete_record", "Delete", "del", variant="error"),
-            Action(
-                "toggle_view", "Thumbnails", "v", hint="Show the folder as pictures, or as a list"
-            ),
-            Action(
-                "sort", "Sort: Name", "s", hint="Name, date, size or type; shift-s turns it around"
-            ),
-            Action("refresh", "Refresh", "r"),
-        ])
+        self.ACTIONS = self.offer(
+            [
+                *extra,
+                Action(
+                    "put",
+                    "Put a file here",
+                    "p",
+                    variant="primary",
+                    hint="A file from this machine, into the folder you are in",
+                ),
+                Action("new_record", "New folder", "^n"),
+                Action(
+                    "open",
+                    "Open",
+                    "enter",
+                    hint=f"Into the {group_noun} or folder, or the picture beside",
+                ),
+                Action("up", "Up", "bksp", hint=f"The folder above; the {group_noun}s at the top"),
+                Action("rename", "Rename", "e", hint="Rename it; M moves it to another folder"),
+                Action("delete_record", "Delete", "del", variant="error"),
+                Action("toggle_view", "Thumbnails", "v", hint="Show the folder as pictures, or as a list"),
+                Action("sort", "Sort: Name", "s", hint="Name, date, size or type; shift-s turns it around"),
+                Action("refresh", "Refresh", "r"),
+            ]
+        )
         self.top_actions = AT_TOP | {a.id for a in extra}
 
         # None at the top, where the groups are; then a group and a folder in it.
@@ -792,9 +790,7 @@ class GridPane(KitPane):
         elif kind_of(entry) == "image":
             self.update_picture()
         else:
-            self.status(
-                f"{entry['name']} is a {type_label(entry).lower()} — g gets it onto this machine."
-            )
+            self.status(f"{entry['name']} is a {type_label(entry).lower()} — g gets it onto this machine.")
 
     def act_up(self) -> None:
         if self.at_top:
@@ -907,9 +903,7 @@ class GridPane(KitPane):
         except ApiError as exc:
             self.status(str(exc), error=True)
             return
-        self.status(
-            f"Put {(made.get('fields') or {}).get(self.title_field, source.name)} in {self._here()}"
-        )
+        self.status(f"Put {(made.get('fields') or {}).get(self.title_field, source.name)} in {self._here()}")
         self.reload()
 
     def _here(self) -> str:
@@ -977,16 +971,12 @@ class GridPane(KitPane):
                 return
             fields = {self.folder_field: answer.strip("/ ")}
         try:
-            await self.api.update_record(
-                self.model_id, entry["id"], fields, rev=entry["rev"] or None
-            )
+            await self.api.update_record(self.model_id, entry["id"], fields, rev=entry["rev"] or None)
         except ApiError as exc:
             if await self.went_wrong(exc, stale=True) != "auth":
                 self.reload()
             return
-        self.status(
-            "Renamed" if what == "rename" else f"Moved to {answer.strip('/ ') or 'the top'}"
-        )
+        self.status("Renamed" if what == "rename" else f"Moved to {answer.strip('/ ') or 'the top'}")
         self.reload()
 
     def act_delete_record(self) -> None:

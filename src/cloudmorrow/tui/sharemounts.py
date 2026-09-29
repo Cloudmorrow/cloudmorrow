@@ -70,9 +70,7 @@ def detail(share: dict) -> str:
     if fields.get("url"):
         return f"[{MUTED}]{fields['url']}[/]"
     if fields.get("kind") == "machine":
-        return (
-            f"[{MUTED}]{fields.get('machine') or 'its machine'} has not said where it serves yet[/]"
-        )
+        return f"[{MUTED}]{fields.get('machine') or 'its machine'} has not said where it serves yet[/]"
     return f"[{MUTED}]{fields.get('path', '')}[/]"
 
 
@@ -114,8 +112,7 @@ async def new_share(pane: GridPane) -> None:
         # A share is a directory on this machine, and only its agent can
         # serve one. Without that there is nothing to open a dialog for.
         pane.status(
-            f"This machine ({here}) has no agent, so nothing here can serve a share — "
-            "`cloudmorrow login` enrols it.",
+            f"This machine ({here}) has no agent, so nothing here can serve a share — `cloudmorrow login` enrols it.",
             error=True,
         )
         return
@@ -147,8 +144,7 @@ async def new_share(pane: GridPane) -> None:
         return
     if share.get("kind") == "machine" and not share.get("online"):
         pane.status(
-            f"Created {share['name']} — {share.get('machine')} starts serving it on its "
-            f"agent's next heartbeat."
+            f"Created {share['name']} — {share.get('machine')} starts serving it on its agent's next heartbeat."
         )
     else:
         pane.status(f"Created {share['name']} — Mount puts it on this machine.")
@@ -184,8 +180,7 @@ async def mount_share(pane: GridPane, share: dict) -> None:
                 f"Mount {name} at",
                 value=str(mounts.default_mountpoint(name)),
                 detail=(
-                    "[dim]An empty directory; it is made if it is not there. "
-                    "rclone does the mounting on Linux.[/]"
+                    "[dim]An empty directory; it is made if it is not there. rclone does the mounting on Linux.[/]"
                 ),
             )
         )
@@ -226,8 +221,7 @@ async def _ensure_rclone(pane: GridPane) -> bool:
             CommandModal(
                 "Install rclone by hand",
                 shlex.join(command),
-                note="This screen cannot hand the terminal over, so run this in one "
-                "yourself, and then Mount again.",
+                note="This screen cannot hand the terminal over, so run this in one yourself, and then Mount again.",
             )
         )
         return False
@@ -268,9 +262,7 @@ async def remove_share(pane: GridPane, share: dict) -> None:
     name = share["id"]
     fields = _fields(share)
     if fields.get("kind") == "drive":
-        pane.status(
-            f"{fields.get('label') or name} is your own drive on the server — it stays.", error=True
-        )
+        pane.status(f"{fields.get('label') or name} is your own drive on the server — it stays.", error=True)
         return
     confirmed = await pane.app.push_screen_wait(
         ConfirmModal(

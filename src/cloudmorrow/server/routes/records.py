@@ -84,20 +84,14 @@ def person(user: User) -> Principal:
 
 
 @models_router.get("")
-def list_datamodels(
-    state: AppState = Depends(get_state), user: User = Depends(get_current_user)
-) -> list[dict]:
+def list_datamodels(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> list[dict]:
     """Every datamodel on this server you may use, foundational first, with who uses
     each and your `access` to it. One your circles do not give is not there."""
     rows = state.quills.catalogue_of_models()
     if state.circles is None:
         return rows
     access = state.circles.access_for(user.username)
-    return [
-        row | {"access": access.level(row["id"])}
-        for row in rows
-        if access.may("read", row["id"])
-    ]
+    return [row | {"access": access.level(row["id"])} for row in rows if access.may("read", row["id"])]
 
 
 @router.get("/{model}")
@@ -122,9 +116,7 @@ def list_records(
     since = where.pop("_since", None)
     try:
         seed(state, principal, model)
-        records = state.records.list(
-            principal, model, where, last=_whole(last), since=since or None
-        )
+        records = state.records.list(principal, model, where, last=_whole(last), since=since or None)
     except ERRORS as exc:
         raise http_error(exc) from exc
     return [record.to_dict() for record in records]
@@ -246,7 +238,8 @@ def attachment(
         raise http_error(exc) from exc
     # A name is never reused for another file, so it may be kept for good.
     return Response(
-        data, media_type=content_type,
+        data,
+        media_type=content_type,
         headers={"Cache-Control": "private, max-age=31536000, immutable"},
     )
 
@@ -316,9 +309,7 @@ def change_record(
 ) -> dict:
     switched_on(state, model)
     try:
-        record = state.records.update(
-            principal, model, record_id, payload.fields, rev=payload.rev
-        )
+        record = state.records.update(principal, model, record_id, payload.fields, rev=payload.rev)
     except ERRORS as exc:
         raise http_error(exc) from exc
     return record.to_dict()
@@ -335,9 +326,7 @@ def move_record(
     """Change the fields that say which group, and the place in it: a dragged card."""
     switched_on(state, model)
     try:
-        record = state.records.move(
-            principal, model, record_id, payload.fields, payload.index
-        )
+        record = state.records.move(principal, model, record_id, payload.fields, payload.index)
     except ERRORS as exc:
         raise http_error(exc) from exc
     return record.to_dict()
@@ -491,9 +480,7 @@ def seen(
 
 # -- who a space could be shared with ------------------------------------------------
 @people_router.get("")
-def list_people(
-    state: AppState = Depends(get_state), user: User = Depends(get_current_user)
-) -> list[dict]:
+def list_people(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> list[dict]:
     """Everybody a space could be shared with: the people on this server, not you.
 
     What a "Share with" list is drawn from — for a calendar, a channel, any

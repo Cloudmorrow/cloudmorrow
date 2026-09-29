@@ -341,9 +341,7 @@ class RecordStore:
             return (model.id, "space", str(indexed[model.in_space]), record_id)
         return (model.id, owner, record_id)
 
-    def _record(
-        self, conn: Connection, model: Datamodel, row: sqlite3.Row, asker: Principal | None = None
-    ) -> Record:
+    def _record(self, conn: Connection, model: Datamodel, row: sqlite3.Row, asker: Principal | None = None) -> Record:
         fields = json.loads(row["indexed"] or "{}")
         scope = self._seal_scope(model, row["owner"], row["id"], fields)
         body = conn.unseal("records", "body", scope, row["body"])
@@ -427,12 +425,8 @@ class RecordStore:
         # its writer's alone, like any personal record.
         return row["owner"] == principal.username
 
-    def _row(
-        self, conn: Connection, principal: Principal, model: Datamodel, record_id: str
-    ) -> sqlite3.Row:
-        row = conn.execute(
-            "SELECT * FROM records WHERE id = ? AND model = ?", (record_id, model.id)
-        ).fetchone()
+    def _row(self, conn: Connection, principal: Principal, model: Datamodel, record_id: str) -> sqlite3.Row:
+        row = conn.execute("SELECT * FROM records WHERE id = ? AND model = ?", (record_id, model.id)).fetchone()
         # Not there, and there but not yours, are the same answer: a record
         # somebody cannot see is not one they can learn exists.
         if row is None or not self._visible(conn, principal, model, row):
@@ -451,8 +445,7 @@ class RecordStore:
             if space is not None and self._may_manage(principal, space):
                 return
             raise Refused(
-                f"only whoever wrote this {model.label.lower()}, or whoever manages where it is,"
-                " may change it"
+                f"only whoever wrote this {model.label.lower()}, or whoever manages where it is, may change it"
             )
         raise Refused(f"only whoever wrote this {model.label.lower()} may change it")
 
@@ -507,9 +500,7 @@ class RecordStore:
         try:
             # The accounts live in the same database; a store made on its own,
             # as a test makes one, has no such table and counts from the start.
-            account = conn.execute(
-                "SELECT created_at FROM users WHERE username = ?", (username,)
-            ).fetchone()
+            account = conn.execute("SELECT created_at FROM users WHERE username = ?", (username,)).fetchone()
         except sqlite3.OperationalError:
             account = None
         return ">=", str(account["created_at"]) if account else ""
@@ -606,9 +597,7 @@ class RecordStore:
         query = str(where.pop("q", "") or "").strip()
         previews = _truthy(where.pop("previews", False))
         if model.backend:
-            return self._backend(model).list(
-                principal, model, where, q=query, previews=previews
-            )
+            return self._backend(model).list(principal, model, where, q=query, previews=previews)
         records = self._list_stored(principal, model, where, last=last, since=since)
         if query:
             records = [r for r in records if _matches(model, r, query)]
@@ -618,8 +607,13 @@ class RecordStore:
         return records
 
     def _list_stored(
-        self, principal: Principal, model: Datamodel, where: dict, *,
-        last: int | None = None, since: str | None = None,
+        self,
+        principal: Principal,
+        model: Datamodel,
+        where: dict,
+        *,
+        last: int | None = None,
+        since: str | None = None,
     ) -> list[Record]:
         model_id = model.id
         self.sweep(model_id, owner=None if (model.space or model.in_space) else principal.username)
@@ -755,8 +749,7 @@ class RecordStore:
             if not self._may_manage(principal, row) and not self._space_visible(conn, principal, row):
                 raise Refused("only somebody in it may add people")
             added = conn.execute(
-                "INSERT OR IGNORE INTO record_members (space_id, username, added_by, joined_at)"
-                " VALUES (?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO record_members (space_id, username, added_by, joined_at) VALUES (?, ?, ?, ?)",
                 (space_id, username, principal.username, iso_stamp()),
             ).rowcount
             if username == row["owner"]:
@@ -780,9 +773,7 @@ class RecordStore:
                 raise Refused("only whoever made it may take somebody else out")
             if username == row["owner"]:
                 raise RecordError("its owner cannot leave; delete it instead")
-            conn.execute(
-                "DELETE FROM record_members WHERE space_id = ? AND username = ?", (space_id, username)
-            )
+            conn.execute("DELETE FROM record_members WHERE space_id = ? AND username = ?", (space_id, username))
         conn.close()
 
     def mark_seen(self, principal: Principal, model_id: str, space_id: str) -> None:
@@ -827,9 +818,7 @@ class RecordStore:
             if f.required and (value is None or value == ""):
                 raise RecordError(f"{model.id}.{f.name} is required")
             if f.kind == "link" and value:
-                target = conn.execute(
-                    "SELECT * FROM records WHERE id = ? AND model = ?", (value, f.to)
-                ).fetchone()
+                target = conn.execute("SELECT * FROM records WHERE id = ? AND model = ?", (value, f.to)).fetchone()
                 # A link only reaches what its writer may see: nobody puts a
                 # task on somebody else's board, or a message in a channel
                 # they are not in.
@@ -962,9 +951,7 @@ class RecordStore:
                 (record_id, model.id, owner, scope, position, indexed, body, principal.writer, now, now),
             )
             if model.ordered and index is not None:
-                self._renumber(
-                    conn, model, owner, self._group(model, fields), moved=record_id, insert_at=index
-                )
+                self._renumber(conn, model, owner, self._group(model, fields), moved=record_id, insert_at=index)
             for username in people:
                 conn.execute(
                     "INSERT OR IGNORE INTO record_members (space_id, username, added_by, joined_at)"
@@ -1024,8 +1011,7 @@ class RecordStore:
         clause, params = self._visible_clause(model, principal.username)
         with connect(self.db_path) as conn:
             rows = conn.execute(
-                f"SELECT * FROM records WHERE model = ? AND scope = ? AND {clause}"
-                " ORDER BY created_at, rowid",
+                f"SELECT * FROM records WHERE model = ? AND scope = ? AND {clause} ORDER BY created_at, rowid",
                 [model.id, scope, *params],
             ).fetchall()
             found = None
@@ -1118,9 +1104,7 @@ class RecordStore:
         self._changed(principal, "changed", changed, dict(current.fields))
         return changed
 
-    def move(
-        self, principal: Principal, model_id: str, record_id: str, incoming: dict, index: int | None
-    ) -> Record:
+    def move(self, principal: Principal, model_id: str, record_id: str, incoming: dict, index: int | None) -> Record:
         """Put a record in a group, at *index* in it: what dragging a card is."""
         return self.update(principal, model_id, record_id, incoming, index=index, action="moved")
 
@@ -1128,9 +1112,7 @@ class RecordStore:
     def has_content(self, model_id: str) -> bool:
         """Whether records of *model_id* have bytes beside their fields: a file's."""
         model = self.model(model_id)
-        return bool(model.backend) and callable(
-            getattr(self.backends.get(model.backend), "content", None)
-        )
+        return bool(model.backend) and callable(getattr(self.backends.get(model.backend), "content", None))
 
     def _content_backend(self, model: Datamodel):
         backend = self._backend(model) if model.backend else None
@@ -1183,9 +1165,7 @@ class RecordStore:
             self._changed(principal, "deleted", before, dict(before.fields))
         return gone
 
-    def _delete(
-        self, conn: Connection, principal: Principal, model: Datamodel, record_id: str, action: str
-    ) -> int:
+    def _delete(self, conn: Connection, principal: Principal, model: Datamodel, record_id: str, action: str) -> int:
         row = conn.execute("SELECT * FROM records WHERE id = ?", (record_id,)).fetchone()
         if row is None:
             return 0
@@ -1216,9 +1196,7 @@ class RecordStore:
                     if f.on_delete == "cascade":
                         gone += self._delete(conn, principal, other, child, action)
                     else:
-                        child_row = conn.execute(
-                            "SELECT indexed FROM records WHERE id = ?", (child,)
-                        ).fetchone()
+                        child_row = conn.execute("SELECT indexed FROM records WHERE id = ?", (child,)).fetchone()
                         indexed = json.loads(child_row["indexed"] or "{}")
                         indexed[f.name] = None
                         conn.execute(
@@ -1288,19 +1266,13 @@ class RecordStore:
         made = []
         for fields in records:
             filled = {
-                key: (
-                    value.replace("{owner}", principal.username)
-                    if isinstance(value, str)
-                    else value
-                )
+                key: (value.replace("{owner}", principal.username) if isinstance(value, str) else value)
                 for key, value in fields.items()
             }
             made.append(self.create(who, model_id, filled, scope=scope))
         return made
 
-    def seed_spaces(
-        self, principal: Principal, model_id: str, records: Iterable[dict], writer: str
-    ) -> list[Record]:
+    def seed_spaces(self, principal: Principal, model_id: str, records: Iterable[dict], writer: str) -> list[Record]:
         """Write *records* into every space *principal* can see that has none of *model_id*.
 
         A new book's stages: each space gets its own copy, owned by whoever

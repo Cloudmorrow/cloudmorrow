@@ -55,15 +55,11 @@ def test_a_task_starts_in_todo_at_the_bottom_and_moves_between_lanes(api):
         {"fields": {"board": board, "title": "Repot the fig"}},
         expect=201,
     )
-    second = api(
-        "POST", "/api/records/task", {"fields": {"board": board, "title": "Water it"}}, expect=201
-    )
+    second = api("POST", "/api/records/task", {"fields": {"board": board, "title": "Water it"}}, expect=201)
     assert first["fields"]["lane"] == "todo" and first["position"] == 0
     assert second["position"] == 1 and first["rev"] == 1
 
-    moved = api(
-        "POST", f"/api/records/task/{second['id']}/move", {"fields": {"lane": "doing"}, "index": 0}
-    )
+    moved = api("POST", f"/api/records/task/{second['id']}/move", {"fields": {"lane": "doing"}, "index": 0})
     assert moved["fields"]["lane"] == "doing" and moved["position"] == 0 and moved["rev"] == 2
 
     todo = api("GET", f"/api/records/task?board={board}&lane=todo")
@@ -77,9 +73,7 @@ def test_a_task_starts_in_todo_at_the_bottom_and_moves_between_lanes(api):
 
 def test_done_is_stamped_on_entering_kept_while_there_and_cleared_on_leaving(api):
     board = board_of(api)
-    task = api(
-        "POST", "/api/records/task", {"fields": {"board": board, "title": "Finish"}}, expect=201
-    )
+    task = api("POST", "/api/records/task", {"fields": {"board": board, "title": "Finish"}}, expect=201)
     assert task["fields"]["done_at"] is None and task["expires_at"] is None
     done = api("POST", f"/api/records/task/{task['id']}/move", {"fields": {"lane": "done"}})
     stamped = done["fields"]["done_at"]
@@ -108,13 +102,9 @@ def test_a_task_done_for_a_week_is_swept_when_the_board_is_read(api, config):
     # Eight days ago, as far as the store can tell.
     long_ago = (dt.datetime.now(tz=dt.UTC) - dt.timedelta(days=8)).isoformat(timespec="seconds")
     with sqlite3.connect(config.db_path) as conn:
-        indexed = json.loads(
-            conn.execute("SELECT indexed FROM records WHERE id = ?", (old["id"],)).fetchone()[0]
-        )
+        indexed = json.loads(conn.execute("SELECT indexed FROM records WHERE id = ?", (old["id"],)).fetchone()[0])
         indexed["done_at"] = long_ago
-        conn.execute(
-            "UPDATE records SET indexed = ? WHERE id = ?", (json.dumps(indexed), old["id"])
-        )
+        conn.execute("UPDATE records SET indexed = ? WHERE id = ?", (json.dumps(indexed), old["id"]))
     left = api("GET", f"/api/records/task?board={board}")
     assert [t["id"] for t in left] == [fresh["id"]]
     changes = api.client.app.state.cloudmorrow.records.changes("bram")
@@ -125,9 +115,7 @@ def test_deleting_a_board_takes_its_tasks(api):
     board = board_of(api)
     other = api("POST", "/api/records/board", {"fields": {"title": "Garden"}}, expect=201)
     api("POST", "/api/records/task", {"fields": {"board": board, "title": "Stays"}}, expect=201)
-    api(
-        "POST", "/api/records/task", {"fields": {"board": other["id"], "title": "Goes"}}, expect=201
-    )
+    api("POST", "/api/records/task", {"fields": {"board": other["id"], "title": "Goes"}}, expect=201)
     api("DELETE", f"/api/records/board/{other['id']}", expect=204)
     assert [t["fields"]["title"] for t in api("GET", "/api/records/task")] == ["Stays"]
 
@@ -160,9 +148,7 @@ def test_fields_are_checked_against_the_datamodel(api):
 
 def test_a_stale_write_is_a_conflict_not_a_loss(api):
     board = board_of(api)
-    task = api(
-        "POST", "/api/records/task", {"fields": {"board": board, "title": "One"}}, expect=201
-    )
+    task = api("POST", "/api/records/task", {"fields": {"board": board, "title": "One"}}, expect=201)
     api("PATCH", f"/api/records/task/{task['id']}", {"fields": {"title": "Two"}, "rev": 1})
     conflict = api(
         "PATCH",
@@ -175,9 +161,7 @@ def test_a_stale_write_is_a_conflict_not_a_loss(api):
 
 def test_records_are_their_owners_alone(api):
     board = board_of(api)
-    task = api(
-        "POST", "/api/records/task", {"fields": {"board": board, "title": "Mine"}}, expect=201
-    )
+    task = api("POST", "/api/records/task", {"fields": {"board": board, "title": "Mine"}}, expect=201)
     guest = {"Authorization": f"Bearer {token_for(api.client, *GUEST)}"}
     api("GET", f"/api/records/task/{task['id']}", expect=404, as_=guest)
     api(
@@ -195,9 +179,7 @@ def test_records_are_their_owners_alone(api):
         expect=400,
         as_=guest,
     )
-    assert [b["fields"]["title"] for b in api("GET", "/api/records/board", as_=guest)] == [
-        "guest's tasks"
-    ]
+    assert [b["fields"]["title"] for b in api("GET", "/api/records/board", as_=guest)] == ["guest's tasks"]
 
 
 def test_content_is_sealed_at_rest_and_lanes_are_not(api, config):
@@ -217,9 +199,7 @@ def test_content_is_sealed_at_rest_and_lanes_are_not(api, config):
 
 def test_a_sealed_record_moved_to_another_owner_does_not_open(api, config):
     board = board_of(api)
-    task = api(
-        "POST", "/api/records/task", {"fields": {"board": board, "title": "Mine"}}, expect=201
-    )
+    task = api("POST", "/api/records/task", {"fields": {"board": board, "title": "Mine"}}, expect=201)
     with sqlite3.connect(config.db_path) as conn:
         conn.execute("UPDATE records SET owner = 'guest' WHERE id = ?", (task["id"],))
     store = api.client.app.state.cloudmorrow.records

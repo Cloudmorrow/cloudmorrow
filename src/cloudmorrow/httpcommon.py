@@ -20,9 +20,7 @@ from cloudmorrow.transport import InsecureUrlError, check_url
 class ServerError(RuntimeError):
     """The server said no, or could not be asked."""
 
-    def __init__(
-        self, message: str, *, status_code: int | None = None, payload: Any = None
-    ) -> None:
+    def __init__(self, message: str, *, status_code: int | None = None, payload: Any = None) -> None:
         super().__init__(message)
         self.status_code = status_code
         # The server's own body, for the callers that act on what is in it —

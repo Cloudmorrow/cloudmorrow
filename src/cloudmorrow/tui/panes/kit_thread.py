@@ -128,8 +128,7 @@ class ThreadPane(KitPane):
             self.refused |= {"new_record", "new_space", "write_to", "add", "leave", "edit_space"}
         noun = str(self.space_model.get("label") or "space").lower()
         actions = [
-            Action("new_space", f"New {noun}", "n", variant="primary",
-                   hint="Everybody's, or the people you pick"),
+            Action("new_space", f"New {noun}", "n", variant="primary", hint="Everybody's, or the people you pick"),
         ]
         if made_as(screen).get("direct"):
             actions.append(Action("write_to", "Message", "m", hint="Write to one person"))
@@ -152,8 +151,9 @@ class ThreadPane(KitPane):
     def content(self) -> ComposeResult:
         with Horizontal(id="thread-body"):
             with Vertical(id="space-side"):
-                yield Static(f"[{MUTED}]{str(self.space_model.get('label') or 'space').lower()}s[/]",
-                             classes="pane-title")
+                yield Static(
+                    f"[{MUTED}]{str(self.space_model.get('label') or 'space').lower()}s[/]", classes="pane-title"
+                )
                 yield DataTable(id="space-table", cursor_type="row")
             with Vertical(id="conversation"):
                 yield Static(f"[{MUTED}]pick one[/]", id="conversation-title", classes="pane-title")
@@ -276,7 +276,7 @@ class ThreadPane(KitPane):
             await self.went_wrong(exc)
             return
         if space_id != self._open:
-            return   # moved on while this was in the air
+            return  # moved on while this was in the air
         self.lines = lines
         self._loaded = space_id
         space = self.space or {}
@@ -337,9 +337,7 @@ class ThreadPane(KitPane):
         if self._open and self._loaded == self._open:
             newest = max((str(line.get("updated_at") or "") for line in self.lines), default="")
             try:
-                fresh = await self.api.records(
-                    self.model_id, since=newest or None, **{self.link: self._open}
-                )
+                fresh = await self.api.records(self.model_id, since=newest or None, **{self.link: self._open})
             except ApiError:
                 return
             if self._merge(fresh):
@@ -422,9 +420,13 @@ class ThreadPane(KitPane):
         self._open = made["id"]
         await self.reload().wait()
         count = len(wanted["members"])
-        who = ("everybody is in it" if wanted["scope"] == "public"
-               else "yours alone for now; press a to add people" if not count
-               else f"{', '.join(wanted['members'])} {'is' if count == 1 else 'are'} in it")
+        who = (
+            "everybody is in it"
+            if wanted["scope"] == "public"
+            else "yours alone for now; press a to add people"
+            if not count
+            else f"{', '.join(wanted['members'])} {'is' if count == 1 else 'are'} in it"
+        )
         self.status(f"{self.label(made)} — {who}.")
 
     @work(group="ui")
@@ -442,8 +444,11 @@ class ThreadPane(KitPane):
         title = self.space_model.get("title") or "name"
         try:
             made = await self.api.create_record(
-                self.space_model_id, {title: " & ".join(names), **direct},
-                scope="shared", members=[who], unique=True,
+                self.space_model_id,
+                {title: " & ".join(names), **direct},
+                scope="shared",
+                members=[who],
+                unique=True,
             )
         except ApiError as exc:
             self.status(str(exc), error=True)
@@ -452,7 +457,6 @@ class ThreadPane(KitPane):
         self.reload()
         for box in self.query("#thread-input"):
             box.focus()
-
 
     def _refuse(self, space: dict, doing: str) -> bool:
         """Say why a space cannot be added to or left, when it cannot."""
@@ -475,8 +479,9 @@ class ThreadPane(KitPane):
         inside = set(people_in(space))
         outside = [p for p in await self._people() if p["username"] not in inside]
         who = await self.app.push_screen_wait(
-            PickPersonModal(f"Add to {self.label(space)}", outside,
-                            detail="They are added, not invited — they will be told.")
+            PickPersonModal(
+                f"Add to {self.label(space)}", outside, detail="They are added, not invited — they will be told."
+            )
         )
         if not who:
             return

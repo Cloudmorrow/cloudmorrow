@@ -93,9 +93,7 @@ async def test_saving_sends_what_changed_with_the_rev(app):
         assert not isinstance(app.screen, RecordSheet)
         await settle(app, pilot)
 
-        assert seen == [
-            ("task", "r_task1", {"title": "Wire the whole rack", "due": "2026-10-01"}, 1)
-        ]
+        assert seen == [("task", "r_task1", {"title": "Wire the whole rack", "due": "2026-10-01"}, 1)]
 
 
 async def test_a_bad_date_is_said_in_the_sheet_and_nothing_is_sent(app):
@@ -211,10 +209,8 @@ async def open_reading(app, pilot):
 
     app.client.feature_list.append(feature_row("reading", "Reading"))
     app.client.record_store["reading.book"] = [
-        record_row("reading.book", "r_book1", 0, title="Middlemarch", author="George Eliot",
-                   read=False, pages=880),
-        record_row("reading.book", "r_book2", 1, title="Stoner", author="John Williams",
-                   read=True, pages=288),
+        record_row("reading.book", "r_book1", 0, title="Middlemarch", author="George Eliot", read=False, pages=880),
+        record_row("reading.book", "r_book2", 1, title="Stoner", author="John Williams", read=True, pages=288),
     ]
     screen = await start(app, pilot)
     await pilot.click("#nav-reading")

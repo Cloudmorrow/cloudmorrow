@@ -34,9 +34,7 @@ def get_tree(
 
 
 @router.get("/search")
-def search(
-    q: str = Query(min_length=1), store: NoteStore = Depends(get_note_store)
-) -> dict:
+def search(q: str = Query(min_length=1), store: NoteStore = Depends(get_note_store)) -> dict:
     return {"query": q, "results": store.search(q)}
 
 
@@ -50,11 +48,7 @@ async def upload_image(
     try:
         info = store.save_image(await request.body(), filename=filename)
     except InvalidImageError as exc:
-        code = (
-            413
-            if "too big" in str(exc)
-            else status.HTTP_400_BAD_REQUEST
-        )
+        code = 413 if "too big" in str(exc) else status.HTTP_400_BAD_REQUEST
         raise HTTPException(status_code=code, detail=str(exc)) from exc
     return ImageOut(**info.to_dict())
 
@@ -88,9 +82,7 @@ def read_note(path: str, store: NoteStore = Depends(get_note_store)) -> NoteOut:
 
 
 @router.put("/file/{path:path}", response_model=NoteOut)
-def write_note(
-    path: str, payload: NoteWrite, store: NoteStore = Depends(get_note_store)
-) -> NoteOut:
+def write_note(path: str, payload: NoteWrite, store: NoteStore = Depends(get_note_store)) -> NoteOut:
     try:
         note = store.write(path, payload.content, rev=payload.rev)
     except NoteConflictError as exc:
@@ -113,9 +105,7 @@ def create_note(payload: NoteCreate, store: NoteStore = Depends(get_note_store))
     try:
         note = store.create_note(payload.path, payload.content)
     except NoteExistsError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="note already exists"
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="note already exists") from exc
     except UnsafePathError as exc:
         raise _bad_path(exc) from exc
     return NoteOut(**asdict(note))
@@ -126,9 +116,7 @@ def create_dir(payload: NoteCreate, store: NoteStore = Depends(get_note_store)) 
     try:
         return {"path": store.create_dir(payload.path), "is_dir": True}
     except NoteExistsError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="folder already exists"
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="folder already exists") from exc
     except UnsafePathError as exc:
         raise _bad_path(exc) from exc
 
@@ -140,9 +128,7 @@ def move(payload: NoteMove, store: NoteStore = Depends(get_note_store)) -> dict:
     except NoteNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such note") from exc
     except NoteExistsError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="destination exists"
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="destination exists") from exc
     except UnsafePathError as exc:
         raise _bad_path(exc) from exc
 
@@ -158,8 +144,6 @@ def delete(
     except NoteNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such note") from exc
     except NoteExistsError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="folder is not empty"
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="folder is not empty") from exc
     except UnsafePathError as exc:
         raise _bad_path(exc) from exc

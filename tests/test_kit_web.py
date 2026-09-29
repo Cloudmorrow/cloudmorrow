@@ -20,8 +20,14 @@ from tests.conftest import js_code
 KIT_JS = (WEB / "kit.js").read_text(encoding="utf-8")
 # The elements that are more than rows, and spaces, each in files of their own.
 OWN_FILES = (
-    "kit_calendar.js", "kit_calendar.css", "kit_space.js", "kit_space.css",
-    "kit_view.js", "kit_view.css", "actions.js", "actions.css",
+    "kit_calendar.js",
+    "kit_calendar.css",
+    "kit_space.js",
+    "kit_space.css",
+    "kit_view.js",
+    "kit_view.css",
+    "actions.js",
+    "actions.css",
 )
 KIT_CSS = (WEB / "kit.css").read_text(encoding="utf-8")
 QUILLS_JS = (WEB / "quills.js").read_text(encoding="utf-8")
@@ -170,7 +176,8 @@ def test_the_record_calls_it_makes_exist(client, auth, tasks_quill):
     assert boards, "listing seeds the first board"
     board = boards[0]["id"]
     made = client.post(
-        "/api/records/task", json={"fields": {"title": "Repot the fig", "lane": "todo", "board": board}},
+        "/api/records/task",
+        json={"fields": {"title": "Repot the fig", "lane": "todo", "board": board}},
         headers=auth,
     )
     assert made.status_code == 201
@@ -206,8 +213,21 @@ def test_the_install_sheet_calls_the_endpoints_that_exist(client, auth):
     plan = client.post("/api/quills/plan", json={"id": "tasks"}, headers=auth)
     assert plan.status_code == 200
     # Everything the sheet reads is in what the server sends.
-    for key in ("data", "datasets", "screens", "jobs", "services", "webhooks", "apis",
-                "surfaces", "runs_code", "runs_as", "reach", "installed_version", "readme"):
+    for key in (
+        "data",
+        "datasets",
+        "screens",
+        "jobs",
+        "services",
+        "webhooks",
+        "apis",
+        "surfaces",
+        "runs_code",
+        "runs_as",
+        "reach",
+        "installed_version",
+        "readme",
+    ):
         assert key in plan.json(), key
     for key in ("how", "label", "new", "foundation"):
         assert all(key in row for row in plan.json()["data"]), key
@@ -259,16 +279,15 @@ def test_the_old_calendar_screen_is_gone():
 def _function(source: str, name: str) -> str:
     """One top-level function's text, up to the next one."""
     start = source.index(f"function {name}(")
-    following = re.search(r"\n(?:export )?(?:async )?function \w+\(", source[start + 1:])
-    return source[start:start + 1 + following.start()] if following else source[start:]
+    following = re.search(r"\n(?:export )?(?:async )?function \w+\(", source[start + 1 :])
+    return source[start : start + 1 + following.start()] if following else source[start:]
 
 
 def test_what_may_be_written_is_asked_in_one_place():
     """Every kit file asks kit.js, per datamodel; none reads `access` itself."""
     assert 'export const mayWrite = (model) => !!model && model.access !== "read";' in KIT_JS
     assert "export const canWrite = (at, modelId) => mayWrite(at.quill.models[modelId]);" in KIT_JS
-    for name in ("kit_calendar.js", "kit_editor.js", "kit_grid.js", "kit_grouped.js",
-                 "kit_space.js", "kit_thread.js"):
+    for name in ("kit_calendar.js", "kit_editor.js", "kit_grid.js", "kit_grouped.js", "kit_space.js", "kit_thread.js"):
         source = js_code((WEB / name).read_text(encoding="utf-8"))
         assert "mayWrite" in source or "canWrite" in source, name
         assert ".access" not in source, name
@@ -291,10 +310,10 @@ def test_a_board_you_may_only_read_is_one_you_look_at():
     assert "const writes = mayWrite(model);" in board
     # No add row or pen, no new board, no ticking, no dragging.
     assert "const canAdd = (!groupModel || group) && writes &&" in board
-    assert "(writes ? `<button class=\"compose\"" in board
-    assert "mayWrite(groupModel) ? `<button class=\"chip new-group\"" in board
+    assert '(writes ? `<button class="compose"' in board
+    assert 'mayWrite(groupModel) ? `<button class="chip new-group"' in board
     assert "writes && canDrag()" in board and "if (writes) wireDragging();" in board
-    assert "${writes ? `<button class=\"tick\"" in board and "stillTick(state," in board
+    assert '${writes ? `<button class="tick"' in board and "stillTick(state," in board
     # The still circle is not a button, so nothing wires a click to it.
     assert 'querySelectorAll("button.tick")' in board
     assert 'class="tick still" role="img"' in KIT_JS
@@ -303,13 +322,13 @@ def test_a_board_you_may_only_read_is_one_you_look_at():
 def test_a_list_you_may_only_read_has_no_add_row_and_no_ticking():
     listing = js_code(_function(KIT_JS, "renderList"))
     assert "const writes = mayWrite(model);" in listing
-    assert "${writes ? `<form class=\"add\">" in listing
-    assert "${writes ? `<button class=\"tick\"" in listing
+    assert '${writes ? `<form class="add">' in listing
+    assert '${writes ? `<button class="tick"' in listing
     assert 'querySelectorAll("button.tick")' in listing
     grouped = js_code((WEB / "kit_grouped.js").read_text(encoding="utf-8"))
-    assert "${writes ? `<form class=\"add\">" in grouped
-    assert "tick && writes ? `<button class=\"tick\"" in grouped
-    assert "namesGroups(f) ? `<button class=\"chip new-group\"" in grouped
+    assert '${writes ? `<form class="add">' in grouped
+    assert 'tick && writes ? `<button class="tick"' in grouped
+    assert 'namesGroups(f) ? `<button class="chip new-group"' in grouped
 
 
 def test_the_sheet_of_a_record_you_may_only_read_says_it():
@@ -328,7 +347,7 @@ def test_a_link_to_a_datamodel_that_is_not_there_is_left_off():
     """A datamodel you may not read is not sent; a link to it is not a picker of nothing."""
     sheet = js_code(_function(KIT_JS, "renderRecordSheet"))
     assert '(f.kind !== "link" || !f.to || quill.models[f.to])' in sheet
-    assert '!quill.models[f.to]) continue;' in js_code(_function(KIT_JS, "linkTitles"))
+    assert "!quill.models[f.to]) continue;" in js_code(_function(KIT_JS, "linkTitles"))
 
 
 def test_a_quill_with_nothing_left_has_no_tab():
@@ -339,14 +358,14 @@ def test_a_quill_with_nothing_left_has_no_tab():
 def test_spaces_you_may_only_read_are_not_made_or_changed():
     space = js_code((WEB / "kit_space.js").read_text(encoding="utf-8"))
     assert "if (!mayWrite(model)) return notYours(" in space
-    assert space.count("return notYours(") == 2   # making one, and writing to somebody
+    assert space.count("return notYours(") == 2  # making one, and writing to somebody
     section = js_code(_function(space, "spaceSection"))
     assert "const writes = mayWrite(model);" in section
-    assert section.count("writes &&") >= 3   # adding, taking out, leaving
+    assert section.count("writes &&") >= 3  # adding, taking out, leaving
     calendar = js_code((WEB / "kit_calendar.js").read_text(encoding="utf-8"))
     assert "const adds = mayWrite(b.model);" in calendar
     assert 'const addLine = !adds ? "" :' in calendar
-    assert 'if (!form) return;' in calendar
+    assert "if (!form) return;" in calendar
 
 
 def test_the_editor_opens_pages_you_may_only_read_read_only():

@@ -29,8 +29,7 @@ from cloudmorrow.client.config import ClientConfig, StoredCredentials
 from tests.conftest import ADMIN, token_for
 
 pytestmark = pytest.mark.skipif(
-    platform.system() != "Linux"
-    or not all(importlib.util.find_spec(name) for name in ("webview", "qtpy", "PyQt6")),
+    platform.system() != "Linux" or not all(importlib.util.find_spec(name) for name in ("webview", "qtpy", "PyQt6")),
     reason="needs the desktop extra (pywebview and Qt) on Linux",
 )
 
@@ -72,9 +71,7 @@ def server(client):
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
-    instance = uvicorn.Server(
-        uvicorn.Config(client.app, host="127.0.0.1", port=port, log_level="warning")
-    )
+    instance = uvicorn.Server(uvicorn.Config(client.app, host="127.0.0.1", port=port, log_level="warning"))
     thread = threading.Thread(target=instance.run, daemon=True)
     thread.start()
     deadline = time.time() + 15
@@ -99,12 +96,8 @@ def open_window(tmp_path, probe: str) -> dict:
         "PYTHONPATH": os.pathsep.join(sys.path),
         "CLOUDMORROW_AGENT_CONFIG": str(agent),
     }
-    done = subprocess.run(
-        [sys.executable, str(script)], env=env, capture_output=True, text=True, timeout=120
-    )
-    line = next(
-        (line for line in done.stdout.splitlines() if line.startswith("PROBE ")), None
-    )
+    done = subprocess.run([sys.executable, str(script)], env=env, capture_output=True, text=True, timeout=120)
+    line = next((line for line in done.stdout.splitlines() if line.startswith("PROBE ")), None)
     assert line, f"no answer from the window:\n{done.stdout}\n{done.stderr[-3000:]}"
     return json.loads(line.removeprefix("PROBE "))
 
@@ -164,8 +157,6 @@ print("PROBE " + json.dumps(found), flush=True)
 def test_a_sign_in_in_the_window_is_stored_for_the_terminal_app(server, tmp_path):
     ClientConfig(api_url=server).save()
     assert StoredCredentials.load() is None
-    found = open_window(
-        tmp_path, SIGN_IN % {"user": json.dumps(ADMIN[0]), "password": json.dumps(ADMIN[1])}
-    )
+    found = open_window(tmp_path, SIGN_IN % {"user": json.dumps(ADMIN[0]), "password": json.dumps(ADMIN[1])})
     assert found.get("user") == ADMIN[0], found
     assert found.get("token"), found

@@ -65,9 +65,7 @@ async def fetch_view(api: Any, quill_id: str, screen_id: str, params: dict | Non
     return await api.quill_view(quill_id, screen_id, record=record, **clean)
 
 
-async def press(
-    api: Any, quill_id: str, action_id: str, *, record: str = "", fields: dict | None = None
-) -> list[dict]:
+async def press(api: Any, quill_id: str, action_id: str, *, record: str = "", fields: dict | None = None) -> list[dict]:
     """Run an action on the server, as whoever is signed in. Its effects.
 
     A refusal is the client's ApiError, in the Quill's own words.
@@ -171,9 +169,7 @@ class ActionModal(Modal[list | None]):
             first.focus()
 
     def say(self, message: str) -> None:
-        self.query_one("#action-complaint", Static).update(
-            f"[{BAD}]{escape(message)}[/]" if message else ""
-        )
+        self.query_one("#action-complaint", Static).update(f"[{BAD}]{escape(message)}[/]" if message else "")
 
     async def action_submit(self) -> None:
         try:
@@ -258,8 +254,11 @@ async def run_action(
     else:
         try:
             effects = await press(
-                api, str(quill["id"]), str(action["id"]),
-                record=str((record or {}).get("id") or ""), fields=values,
+                api,
+                str(quill["id"]),
+                str(action["id"]),
+                record=str((record or {}).get("id") or ""),
+                fields=values,
             )
         except AuthError:
             await app.sign_out(message=SESSION_EXPIRED)
@@ -300,12 +299,12 @@ async def apply_effects(
                 app.say(f"{quill.get('name')} has no action {effect.get('then')!r}.", error=True)
                 continue
             yes = await app.push_screen_wait(
-                ConfirmModal(str(effect.get("text") or ""),
-                             confirm_label=str(then.get("label") or "Yes"))
+                ConfirmModal(str(effect.get("text") or ""), confirm_label=str(then.get("label") or "Yes"))
             )
             if yes:
-                await run_action(app, quill, then, record=record, values=effect.get("args") or {},
-                                 ask=False, leave=leave)
+                await run_action(
+                    app, quill, then, record=record, values=effect.get("args") or {}, ask=False, leave=leave
+                )
         # `redraw` is what every caller does after an action anyway.
 
 
@@ -357,8 +356,9 @@ class QuillCommands(Provider):
         for name, help_text, quill, action in self._commands():
             score = matcher.match(name)
             if score > 0:
-                yield Hit(score, matcher.highlight(name), partial(self._run, quill, action),
-                          text=name, help=help_text or None)
+                yield Hit(
+                    score, matcher.highlight(name), partial(self._run, quill, action), text=name, help=help_text or None
+                )
 
     def _run(self, quill: dict, action: dict) -> None:
         runner = getattr(self.screen, "run_quill_action", None)

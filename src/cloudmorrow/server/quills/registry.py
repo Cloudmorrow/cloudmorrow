@@ -137,9 +137,7 @@ class QuillRegistry:
         )
         # The datamodels as they would be after installing, for a preview.
         touched = set(manifest.models)
-        touched |= {
-            f.to for m in touched if m in models for f in models[m].fields if f.kind == "link"
-        }
+        touched |= {f.to for m in touched if m in models for f in models[m].fields if f.kind == "link"}
         plan["models"] = {m: models[m].to_dict() for m in sorted(touched) if m in models}
         return plan
 
@@ -152,9 +150,7 @@ class QuillRegistry:
             # Not here, or here in an older version than the one it came with:
             # a datamodel grows (a contact kept in a book), and never loses a field.
             here = self.foundation.get(model_id)
-            return here is None or (
-                model_id in available and available[model_id][0].version > here.version
-            )
+            return here is None or (model_id in available and available[model_id][0].version > here.version)
 
         wanted = {
             m
@@ -182,9 +178,7 @@ class QuillRegistry:
         return found
 
     # -- installing --------------------------------------------------------------------
-    def install(
-        self, folder: Path, datamodels_source: Path | None = None, *, origin: dict | None = None
-    ) -> dict:
+    def install(self, folder: Path, datamodels_source: Path | None = None, *, origin: dict | None = None) -> dict:
         """Install the Quill in *folder*, replacing an earlier version of it. Returns the plan."""
         with self._lock:
             plan = self.plan(folder, datamodels_source)
@@ -197,9 +191,7 @@ class QuillRegistry:
             staging = self.quills_dir / f".{manifest_id}.new"
             if staging.exists():
                 shutil.rmtree(staging)
-            shutil.copytree(
-                folder, staging, ignore=shutil.ignore_patterns(".git", "__pycache__", ORIGIN)
-            )
+            shutil.copytree(folder, staging, ignore=shutil.ignore_patterns(".git", "__pycache__", ORIGIN))
             (staging / ORIGIN).write_text(
                 json.dumps(
                     {
@@ -207,9 +199,7 @@ class QuillRegistry:
                         # To the microsecond: Quills installed together at
                         # boot keep the order they were installed in, which
                         # is the order of their tabs.
-                        "installed_at": dt.datetime.now(tz=dt.UTC).isoformat(
-                            timespec="microseconds"
-                        ),
+                        "installed_at": dt.datetime.now(tz=dt.UTC).isoformat(timespec="microseconds"),
                     }
                 ),
                 encoding="utf-8",
@@ -234,9 +224,7 @@ class QuillRegistry:
                 if q.id != quill_id and any(m.startswith(quill_id + ".") for m in q.models)
             ]
             if dependants:
-                raise QuillError(
-                    f"{', '.join(dependants)} use what {quill_id} introduced; remove those first"
-                )
+                raise QuillError(f"{', '.join(dependants)} use what {quill_id} introduced; remove those first")
             shutil.rmtree(target)
             self.reload()
 
@@ -244,15 +232,15 @@ class QuillRegistry:
         catalog = catalog or load_catalog(self.catalog_location)
         entry = catalog.entry(quill_id)
         with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
-            folder = fetch(
-                entry["repo"], str(entry.get("ref", "")), base=catalog.base, into=Path(tmp) / "q"
-            )
+            folder = fetch(entry["repo"], str(entry.get("ref", "")), base=catalog.base, into=Path(tmp) / "q")
             models = self.datamodels_source(catalog, Path(tmp) / "m")
             return self.install(
                 folder,
                 models,
                 origin={
-                    "catalog": True, "repo": entry["repo"], "ref": entry.get("ref", ""),
+                    "catalog": True,
+                    "repo": entry["repo"],
+                    "ref": entry.get("ref", ""),
                     # Where it stands in the catalog, which is where its tabs stand.
                     "position": catalog.quills.index(entry),
                 },
@@ -273,6 +261,7 @@ class QuillRegistry:
         One installed before the catalog said where (Tasks, on a server from
         before this) goes after those that know.
         """
+
         def place(m: Manifest) -> tuple:
             position = m.origin.get("position")
             known = isinstance(position, int)

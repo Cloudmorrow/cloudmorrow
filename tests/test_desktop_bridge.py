@@ -140,9 +140,7 @@ def test_refusals_come_back_as_words_not_exceptions(bridge, machine, signed_in):
 
 
 def test_a_server_that_cannot_be_reached_is_an_error_too(machine, signed_in):
-    bridge = Bridge(
-        ClientConfig(api_url=API), api_factory=lambda config: FakeApi(fail="cannot reach it")
-    )
+    bridge = Bridge(ClientConfig(api_url=API), api_factory=lambda config: FakeApi(fail="cannot reach it"))
     assert bridge.shares() == {"error": "cannot reach it"}
 
 
@@ -150,9 +148,7 @@ def test_mounting_needs_a_sign_in(bridge, machine):
     assert bridge.mount("media") == {"error": "this computer is not signed in"}
 
 
-def test_without_rclone_the_answer_is_the_command_that_installs_it(
-    bridge, machine, signed_in, monkeypatch
-):
+def test_without_rclone_the_answer_is_the_command_that_installs_it(bridge, machine, signed_in, monkeypatch):
     monkeypatch.setattr(rclone, "installed", lambda: False)
     monkeypatch.setattr(rclone, "install_command", lambda: ["sudo", "pacman", "-S", "rclone"])
     answer = bridge.mount("media")
@@ -260,6 +256,16 @@ def test_nothing_private_is_handed_to_the_page():
     """pywebview gives the page every public attribute; these are all of them."""
     public = {name for name in dir(Bridge) if not name.startswith("_")}
     assert public == {
-        "platform", "version", "agent_status", "notify", "open_folder", "mounted_here",
-        "shares", "mount", "unmount", "session", "signed_in", "signed_out",
+        "platform",
+        "version",
+        "agent_status",
+        "notify",
+        "open_folder",
+        "mounted_here",
+        "shares",
+        "mount",
+        "unmount",
+        "session",
+        "signed_in",
+        "signed_out",
     }

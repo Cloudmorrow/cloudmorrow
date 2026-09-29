@@ -21,9 +21,7 @@ router = APIRouter(prefix="/api/users", tags=["users"])
 
 
 @router.get("", response_model=list[UserOut])
-def list_users(
-    state: AppState = Depends(get_state), _: User = Depends(get_admin_user)
-) -> list[UserOut]:
+def list_users(state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> list[UserOut]:
     return [user_out(user) for user in state.users.list()]
 
 
@@ -61,13 +59,9 @@ def update_user(
     password = fields.pop("password", None)
     if password is not None:
         fields["password_hash"] = hash_password(str(password))
-    demoted = fields.get("is_admin") is False or (
-        fields.get("role") is not None and fields["role"] != ROLE_ADMIN
-    )
+    demoted = fields.get("is_admin") is False or (fields.get("role") is not None and fields["role"] != ROLE_ADMIN)
     if username == admin.username and demoted:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="refusing to demote yourself"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="refusing to demote yourself")
     try:
         return user_out(state.users.update(username, **fields))
     except UnknownUserError as exc:
@@ -83,9 +77,7 @@ def delete_user(
     admin: User = Depends(get_admin_user),
 ) -> None:
     if username == admin.username:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="refusing to delete yourself"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="refusing to delete yourself")
     try:
         state.users.delete(username)
     except UnknownUserError as exc:

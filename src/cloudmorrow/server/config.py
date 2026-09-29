@@ -17,9 +17,7 @@ DEFAULT_CONFIG_PATHS = (
 
 ENV_PREFIX = "CLOUDMORROW_"
 
-DEFAULT_QUILL_CATALOG = (
-    "https://raw.githubusercontent.com/Cloudmorrow/quill-catalog/main/catalog.toml"
-)
+DEFAULT_QUILL_CATALOG = "https://raw.githubusercontent.com/Cloudmorrow/quill-catalog/main/catalog.toml"
 
 
 @dataclass(slots=True)

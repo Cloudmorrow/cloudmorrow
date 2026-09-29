@@ -35,9 +35,7 @@ def said(rules: dict[str, str]) -> str:
     if not rules:
         return "[dim]nothing[/]"
     order = sorted(rules, key=lambda model: (model != "*", model))
-    return ", ".join(
-        f"{model} [{COLOURS.get(rules[model], 'dim')}]{rules[model]}[/]" for model in order
-    )
+    return ", ".join(f"{model} [{COLOURS.get(rules[model], 'dim')}]{rules[model]}[/]" for model in order)
 
 
 @app.command("list")
@@ -64,9 +62,7 @@ def list_circles() -> None:
         placed = {name for circle in circles for name in circle["members"]}
         adrift = [user["username"] for user in users if user["username"] not in placed]
         if adrift:
-            console.print(
-                f"[yellow]![/] [dim]in no circle, so reaching no data:[/] {', '.join(adrift)}"
-            )
+            console.print(f"[yellow]![/] [dim]in no circle, so reaching no data:[/] {', '.join(adrift)}")
 
     run(_list())
 
@@ -111,9 +107,7 @@ def rule(
 
 
 @app.command("join")
-def join(
-    circle: CircleArg, username: Annotated[str, typer.Argument(help="Who to put in it.")]
-) -> None:
+def join(circle: CircleArg, username: Annotated[str, typer.Argument(help="Who to put in it.")]) -> None:
     """Put somebody in a circle."""
 
     async def _join() -> None:
@@ -126,9 +120,7 @@ def join(
 
 
 @app.command("leave")
-def leave(
-    circle: CircleArg, username: Annotated[str, typer.Argument(help="Who to take out.")]
-) -> None:
+def leave(circle: CircleArg, username: Annotated[str, typer.Argument(help="Who to take out.")]) -> None:
     """Take somebody out of a circle. Their other circles stay."""
 
     async def _leave() -> None:
@@ -146,9 +138,7 @@ def leave(
 @app.command("default")
 def default(
     circle: CircleArg,
-    off: Annotated[
-        bool, typer.Option("--off", help="Stop new accounts going into it.")
-    ] = False,
+    off: Annotated[bool, typer.Option("--off", help="Stop new accounts going into it.")] = False,
 ) -> None:
     """Make a circle where new accounts go. More than one may be."""
 

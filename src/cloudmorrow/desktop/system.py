@@ -127,8 +127,7 @@ def notify(title: str, body: str = "") -> bool:
     try:
         if name == MACOS:
             script = (
-                f"display notification {mounts.applescript_string(body)} "
-                f"with title {mounts.applescript_string(title)}"
+                f"display notification {mounts.applescript_string(body)} with title {mounts.applescript_string(title)}"
             )
             return _run(["osascript", "-e", script]).returncode == 0
         if name == LINUX:

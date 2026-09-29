@@ -105,10 +105,7 @@ def sheet_text(plan: dict) -> str:
         lines += ["", f"[b {ACCENT}]Jobs[/]"]
         for job in jobs:
             if job.get("action") == "expire":
-                what = (
-                    f"deletes {job.get('model')} records {job.get('after')} after "
-                    f"{job.get('field')}"
-                )
+                what = f"deletes {job.get('model')} records {job.get('after')} after {job.get('field')}"
             else:
                 what = f"{job.get('action')}"
             every = f", every {job['every']}" if job.get("every") else ""
@@ -185,12 +182,9 @@ class QuillSheet(Modal[bool]):
 
     def compose(self) -> ComposeResult:
         installed = self.plan.get("installed_version")
-        verb = "Reinstall" if installed == self.plan.get("version") else (
-            "Update" if installed else "Install"
-        )
+        verb = "Reinstall" if installed == self.plan.get("version") else ("Update" if installed else "Install")
         with Vertical(classes="modal modal-wide", id="quill-sheet"):
-            yield Label(f"{verb} {self.plan.get('name') or self.plan.get('id')}?",
-                        classes="modal-title")
+            yield Label(f"{verb} {self.plan.get('name') or self.plan.get('id')}?", classes="modal-title")
             with VerticalScroll(id="quill-sheet-body"):
                 yield Static(sheet_text(self.plan), id="quill-sheet-text")
                 if self.circles:
@@ -204,11 +198,11 @@ class QuillSheet(Modal[bool]):
                     with Vertical(id="sheet-circles"):
                         for index, circle in enumerate(self.circles):
                             everything = has_everything(circle)
-                            label = circle["name"] + (
-                                "  (has everything: gets it anyway)" if everything else ""
-                            )
+                            label = circle["name"] + ("  (has everything: gets it anyway)" if everything else "")
                             yield Checkbox(
-                                label, value=everything, disabled=everything,
+                                label,
+                                value=everything,
+                                disabled=everything,
                                 id=f"sheet-circle-{index}",
                             )
             with Horizontal(classes="modal-buttons"):
@@ -224,8 +218,7 @@ class QuillSheet(Modal[bool]):
             self.chosen = [
                 circle["id"]
                 for index, circle in enumerate(self.circles)
-                if not has_everything(circle)
-                and self.query_one(f"#sheet-circle-{index}", Checkbox).value
+                if not has_everything(circle) and self.query_one(f"#sheet-circle-{index}", Checkbox).value
             ]
         self.dismiss(event.button.id == "install")
 
@@ -244,12 +237,9 @@ class QuillsView(Pane):
         ("r", "fire('running')", "Running"),
     ]
     ACTIONS = (
-        Action("install", "Install…", "i", variant="primary",
-               hint="See what it adds, then install it"),
-        Action("running", "Running…", "r",
-               hint="What its code is doing: services, logs, webhook addresses"),
-        Action("remove", "Remove", "d", variant="error",
-               hint="Its tabs and jobs go; its records stay"),
+        Action("install", "Install…", "i", variant="primary", hint="See what it adds, then install it"),
+        Action("running", "Running…", "r", hint="What its code is doing: services, logs, webhook addresses"),
+        Action("remove", "Remove", "d", variant="error", hint="Its tabs and jobs go; its records stay"),
     )
 
     def __init__(self, **kwargs) -> None:
@@ -266,9 +256,7 @@ class QuillsView(Pane):
         yield DataTable(id="admin-quill-table", cursor_type="row", zebra_stripes=False)
 
     def on_mount(self) -> None:
-        self.query_one("#admin-quill-table", DataTable).add_columns(
-            "QUILL", "INSTALLED", "PUBLISHER", "WHAT IT IS"
-        )
+        self.query_one("#admin-quill-table", DataTable).add_columns("QUILL", "INSTALLED", "PUBLISHER", "WHAT IT IS")
 
     def on_show(self) -> None:
         self.reload()
@@ -314,9 +302,7 @@ class QuillsView(Pane):
         if self._rows:
             table.move_cursor(row=self._nearest(max(row, 0)))
         installed = sum(1 for q in quills if q.get("installed_version"))
-        self.status(
-            f"{plural(len(quills), 'Quill')} in the catalog, {installed} installed", note=True
-        )
+        self.status(f"{plural(len(quills), 'Quill')} in the catalog, {installed} installed", note=True)
 
     def _nearest(self, row: int) -> int:
         """The row to stand on: *row*, or the first Quill below a heading."""

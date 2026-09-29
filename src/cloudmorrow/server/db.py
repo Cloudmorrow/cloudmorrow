@@ -36,6 +36,7 @@ TYPE_AGENT = "agent"
 TYPE_SYSTEM = "systems_user"
 USER_TYPES: tuple[str, ...] = (TYPE_HUMAN, TYPE_AGENT, TYPE_SYSTEM)
 
+
 class Connection(sqlite3.Connection):
     """A connection that can seal content on the way in and open it on the way out.
 
@@ -47,14 +48,10 @@ class Connection(sqlite3.Connection):
 
     sealer: Sealer
 
-    def seal(
-        self, table: str, column: str, scope: Iterable[object], text: str | None
-    ) -> str | None:
+    def seal(self, table: str, column: str, scope: Iterable[object], text: str | None) -> str | None:
         return self.sealer.seal(table, column, scope, text)
 
-    def unseal(
-        self, table: str, column: str, scope: Iterable[object], blob: str | None
-    ) -> str | None:
+    def unseal(self, table: str, column: str, scope: Iterable[object], blob: str | None) -> str | None:
         return self.sealer.unseal(table, column, scope, blob)
 
 
@@ -146,8 +143,7 @@ def validate_username(username: str) -> str:
     username = username.strip().lower()
     if not USERNAME_RE.match(username):
         raise InvalidUsernameError(
-            "username must be 1-32 chars: lowercase letters, digits, '_' or '-', "
-            "starting with a letter or '_'"
+            "username must be 1-32 chars: lowercase letters, digits, '_' or '-', starting with a letter or '_'"
         )
     return username
 
@@ -169,9 +165,7 @@ class UserStore:
 
     def get(self, username: str) -> User | None:
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM users WHERE username = ?", (username.strip().lower(),)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM users WHERE username = ?", (username.strip().lower(),)).fetchone()
         return _row_to_user(row) if row else None
 
     def require(self, username: str) -> User:
@@ -198,9 +192,7 @@ class UserStore:
     ) -> User:
         """Make an account. *role* wins over *is_admin* when both are given."""
         username = validate_username(username)
-        role = validate_role(role) if role is not None else (
-            ROLE_ADMIN if is_admin else ROLE_USER
-        )
+        role = validate_role(role) if role is not None else (ROLE_ADMIN if is_admin else ROLE_USER)
         user_type = validate_user_type(user_type)
         now = _now()
         try:
@@ -267,11 +259,7 @@ class UserStore:
 
     def delete(self, username: str) -> None:
         with self._connect() as conn:
-            cursor = conn.execute(
-                "DELETE FROM users WHERE username = ?", (username.strip().lower(),)
-            )
+            cursor = conn.execute("DELETE FROM users WHERE username = ?", (username.strip().lower(),))
             if cursor.rowcount == 0:
                 raise UnknownUserError(username)
-            conn.execute(
-                "DELETE FROM circle_members WHERE username = ?", (username.strip().lower(),)
-            )
+            conn.execute("DELETE FROM circle_members WHERE username = ?", (username.strip().lower(),))

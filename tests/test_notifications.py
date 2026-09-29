@@ -68,9 +68,7 @@ def test_they_belong_to_one_person(config):
 
 
 def test_an_agent_signs_its_own_notifications(client, auth):
-    enrolled = client.post(
-        "/api/agents/enroll-self", json={"name": "laptop"}, headers=auth
-    ).json()
+    enrolled = client.post("/api/agents/enroll-self", json={"name": "laptop"}, headers=auth).json()
     agent_auth = {"Authorization": f"Bearer {enrolled['agent_token']}"}
 
     posted = client.post(
@@ -87,9 +85,7 @@ def test_an_agent_signs_its_own_notifications(client, auth):
 
 
 def test_another_user_cannot_read_them(client, auth):
-    enrolled = client.post(
-        "/api/agents/enroll-self", json={"name": "laptop"}, headers=auth
-    ).json()
+    enrolled = client.post("/api/agents/enroll-self", json={"name": "laptop"}, headers=auth).json()
     client.post(
         "/api/agent/notifications",
         json={"title": "private"},

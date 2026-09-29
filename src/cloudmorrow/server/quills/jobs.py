@@ -87,9 +87,7 @@ def write_meta(db_path: Path, key: str, value: str) -> None:
 def _legacy_rows(db_path: Path) -> bool:
     with connect(db_path) as conn:
         try:
-            row = conn.execute(
-                "SELECT (SELECT COUNT(*) FROM boards) + (SELECT COUNT(*) FROM tasks)"
-            ).fetchone()
+            row = conn.execute("SELECT (SELECT COUNT(*) FROM boards) + (SELECT COUNT(*) FROM tasks)").fetchone()
         except sqlite3.OperationalError:
             return False
     conn.close()
@@ -337,6 +335,8 @@ def install_files(db_path: Path, registry: QuillRegistry) -> bool:
     write_meta(db_path, FILES_QUILL, "installed")
     log.info("installed the Files Quill in place of the built-in Files")
     return True
+
+
 def _has_rows(db_path: Path, query: str) -> bool:
     with connect(db_path) as conn:
         try:

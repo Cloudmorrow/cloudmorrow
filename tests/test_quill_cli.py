@@ -39,9 +39,7 @@ def test_a_quill_that_does_not_check_out_says_why_and_fails(tmp_path, monkeypatc
     runner.invoke(quill_cli.app, ["new", "plants"])
     manifest = tmp_path / "quill-plants" / "quill.toml"
     manifest.write_text(manifest.read_text().replace('title = "name"', 'title = "colour"'))
-    checked = runner.invoke(
-        quill_cli.app, ["check", str(manifest.parent), "--datamodels", str(DATAMODELS)]
-    )
+    checked = runner.invoke(quill_cli.app, ["check", str(manifest.parent), "--datamodels", str(DATAMODELS)])
     assert checked.exit_code == 1
     assert "colour" in checked.output
 

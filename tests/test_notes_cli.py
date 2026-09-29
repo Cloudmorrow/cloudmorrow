@@ -26,9 +26,7 @@ def cm(notes_quill, monkeypatch):
 
     def api_for():
         api = CloudmorrowClient(ClientConfig(api_url="http://testserver"), token=token)
-        api._client = httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=client.app), base_url="http://testserver"
-        )
+        api._client = httpx.AsyncClient(transport=httpx.ASGITransport(app=client.app), base_url="http://testserver")
         return None, api
 
     monkeypatch.setattr(quillrun, "client", api_for)

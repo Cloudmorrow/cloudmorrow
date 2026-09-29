@@ -142,9 +142,7 @@ class Circle:
 
 def ensure(conn: sqlite3.Connection) -> None:
     """The tables, and — the first time they are made — Members, with everybody in it."""
-    present = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'circles'"
-    ).fetchone()
+    present = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'circles'").fetchone()
     if present:
         return
     conn.executescript(TABLE)
@@ -157,9 +155,7 @@ def ensure(conn: sqlite3.Connection) -> None:
         "INSERT INTO circle_rules (circle_id, model, access) VALUES (?, ?, ?)",
         (circle_id, EVERY, WRITE),
     )
-    has_users = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'users'"
-    ).fetchone()
+    has_users = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'users'").fetchone()
     if has_users:
         conn.execute(
             "INSERT INTO circle_members (circle_id, username) SELECT ?, username FROM users",
@@ -284,9 +280,7 @@ class CircleStore:
 
     @staticmethod
     def _join(conn: sqlite3.Connection, circle_id: str, username: str) -> None:
-        user = conn.execute(
-            "SELECT 1 FROM users WHERE username = ?", (username.strip().lower(),)
-        ).fetchone()
+        user = conn.execute("SELECT 1 FROM users WHERE username = ?", (username.strip().lower(),)).fetchone()
         if user is None:
             raise CircleError(f"there is nobody called {username} on this server")
         conn.execute(
@@ -306,17 +300,13 @@ class CircleStore:
             circle_id = self._find(conn, key)["id"]
             if name is not None and name.strip():
                 try:
-                    conn.execute(
-                        "UPDATE circles SET name = ? WHERE id = ?", (name.strip(), circle_id)
-                    )
+                    conn.execute("UPDATE circles SET name = ? WHERE id = ?", (name.strip(), circle_id))
                 except sqlite3.IntegrityError as exc:
                     raise CircleError(f"there is already a circle called {name}") from exc
             if rules is not None:
                 self._set_rules(conn, circle_id, rules)
             if default is not None:
-                conn.execute(
-                    "UPDATE circles SET is_default = ? WHERE id = ?", (int(default), circle_id)
-                )
+                conn.execute("UPDATE circles SET is_default = ? WHERE id = ?", (int(default), circle_id))
         return self.get(circle_id)
 
     def set_rule(self, key: str, model: str, access: str) -> Circle:

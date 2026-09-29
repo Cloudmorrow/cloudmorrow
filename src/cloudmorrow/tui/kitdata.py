@@ -176,21 +176,13 @@ def installed(app: Any) -> list[dict]:
 def actions_on(quills: list[dict], model_id: str) -> list[tuple[dict, dict]]:
     """Every (Quill, action) `on` *model_id*, in the Quills' order: the sheet's buttons."""
     return [
-        (quill, action)
-        for quill in quills
-        for action in quill.get("actions") or []
-        if action.get("on") == model_id
+        (quill, action) for quill in quills for action in quill.get("actions") or [] if action.get("on") == model_id
     ]
 
 
 def loose_actions(quills: list[dict]) -> list[tuple[dict, dict]]:
     """Every (Quill, action) not on a record: the palette's."""
-    return [
-        (quill, action)
-        for quill in quills
-        for action in quill.get("actions") or []
-        if not action.get("on")
-    ]
+    return [(quill, action) for quill in quills for action in quill.get("actions") or [] if not action.get("on")]
 
 
 def find_action(quill: dict, action_id: str) -> dict | None:

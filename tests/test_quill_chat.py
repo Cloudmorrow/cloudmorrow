@@ -43,16 +43,22 @@ def pushes_at_once(monkeypatch):
     monkeypatch.setattr(spacenotify, "_later", lambda work: work())
 
 
-def channel(chat, name: str, *, scope: str = "public", kind: str | None = None,
-            members: list[str] | None = None, who=None) -> dict:
+def channel(
+    chat, name: str, *, scope: str = "public", kind: str | None = None, members: list[str] | None = None, who=None
+) -> dict:
     kind = kind or {"public": "public", "shared": "private"}[scope]
     body = {"fields": {"name": name, "kind": kind}, "scope": scope, "members": members or []}
     return chat("POST", "/api/records/channel", body, who=who or chat.bram, expect=201)
 
 
 def say(chat, space: dict, text: str, *, who=None) -> dict:
-    return chat("POST", "/api/records/message", {"fields": {"channel": space["id"], "body": text}},
-                who=who or chat.bram, expect=201)
+    return chat(
+        "POST",
+        "/api/records/message",
+        {"fields": {"channel": space["id"], "body": text}},
+        who=who or chat.bram,
+        expect=201,
+    )
 
 
 def listed(chat, who=None) -> dict[str, dict]:
@@ -66,8 +72,7 @@ def test_the_quill_is_a_thread_over_channel_and_message(chat_quill):
     (screen,) = manifest.screens
     assert screen["kit"] == "thread" and screen["space"] == "channel" and screen["body"] == "body"
     assert screen["made_as"]["direct"] == {"kind": "direct"}
-    quills = chat_quill.get("/api/quills", headers={
-        "Authorization": f"Bearer {token_for(chat_quill, *GUEST)}"}).json()
+    quills = chat_quill.get("/api/quills", headers={"Authorization": f"Bearer {token_for(chat_quill, *GUEST)}"}).json()
     assert "chat" in [q["id"] for q in quills]
 
 
@@ -121,23 +126,44 @@ def test_a_private_channel_is_only_its_people(chat):
     said = say(chat, room, "just me")
     assert "secret" not in listed(chat, chat.guest)
     chat("GET", f"/api/records/message/{said['id']}", who=chat.guest, expect=404)
-    chat("POST", "/api/records/message", {"fields": {"channel": room["id"], "body": "let me in"}},
-         who=chat.guest, expect=400)
+    chat(
+        "POST",
+        "/api/records/message",
+        {"fields": {"channel": room["id"], "body": "let me in"}},
+        who=chat.guest,
+        expect=400,
+    )
 
 
 def test_nobody_is_put_in_a_public_channel_by_name(chat):
-    chat("POST", "/api/records/channel", {"fields": {"name": "x", "kind": "public"},
-                                          "scope": "public", "members": ["guest"]}, expect=400)
-    chat("POST", "/api/records/channel", {"fields": {"name": "x", "kind": "private"},
-                                          "scope": "shared", "members": ["nobody"]}, expect=404)
+    chat(
+        "POST",
+        "/api/records/channel",
+        {"fields": {"name": "x", "kind": "public"}, "scope": "public", "members": ["guest"]},
+        expect=400,
+    )
+    chat(
+        "POST",
+        "/api/records/channel",
+        {"fields": {"name": "x", "kind": "private"}, "scope": "shared", "members": ["nobody"]},
+        expect=404,
+    )
 
 
 def direct(chat, other: str, *, who=None, expect=201) -> dict:
     me = "bram" if (who or chat.bram) is chat.bram else "guest"
-    return chat("POST", "/api/records/channel", {
-        "fields": {"name": " & ".join(sorted({me, other})), "kind": "direct"},
-        "scope": "shared", "members": [other], "unique": True,
-    }, who=who or chat.bram, expect=expect)
+    return chat(
+        "POST",
+        "/api/records/channel",
+        {
+            "fields": {"name": " & ".join(sorted({me, other})), "kind": "direct"},
+            "scope": "shared",
+            "members": [other],
+            "unique": True,
+        },
+        who=who or chat.bram,
+        expect=expect,
+    )
 
 
 def test_a_direct_channel_is_the_same_one_from_either_side(chat):
@@ -158,9 +184,12 @@ def test_a_private_channel_of_the_same_two_is_not_their_direct_one(chat):
 
 
 def test_there_is_no_direct_channel_with_nobody(chat):
-    chat("POST", "/api/records/channel", {
-        "fields": {"name": "x", "kind": "direct"}, "scope": "shared",
-        "members": ["nobody"], "unique": True}, expect=404)
+    chat(
+        "POST",
+        "/api/records/channel",
+        {"fields": {"name": "x", "kind": "direct"}, "scope": "shared", "members": ["nobody"], "unique": True},
+        expect=404,
+    )
 
 
 # -- messages ----------------------------------------------------------------------
@@ -169,16 +198,14 @@ def test_only_the_author_may_change_or_delete_what_was_said(chat):
     said = say(chat, general, "helo", who=chat.guest)
     chat("PATCH", f"/api/records/message/{said['id']}", {"fields": {"body": "x"}}, expect=403)
     chat("DELETE", f"/api/records/message/{said['id']}", expect=403)
-    edited = chat("PATCH", f"/api/records/message/{said['id']}", {"fields": {"body": "hello"}},
-                  who=chat.guest)
+    edited = chat("PATCH", f"/api/records/message/{said['id']}", {"fields": {"body": "hello"}}, who=chat.guest)
     assert edited["fields"]["body"] == "hello" and edited["rev"] == 2
     chat("DELETE", f"/api/records/message/{said['id']}", who=chat.guest, expect=204)
 
 
 def test_an_empty_message_is_not_a_message(chat):
     general = listed(chat)["general"]
-    chat("POST", "/api/records/message", {"fields": {"channel": general["id"], "body": ""}},
-         expect=400)
+    chat("POST", "/api/records/message", {"fields": {"channel": general["id"], "body": ""}}, expect=400)
 
 
 def test_a_conversation_comes_back_in_order_and_its_newest_page_first(chat):
@@ -195,8 +222,12 @@ def test_a_conversation_comes_back_in_order_and_its_newest_page_first(chat):
 
 
 def test_the_topic_and_the_words_are_sealed(chat, config):
-    room = chat("POST", "/api/records/channel", {"fields": {"name": "ops", "kind": "public",
-                "topic": "the pager rota"}, "scope": "public"}, expect=201)
+    room = chat(
+        "POST",
+        "/api/records/channel",
+        {"fields": {"name": "ops", "kind": "public", "topic": "the pager rota"}, "scope": "public"},
+        expect=201,
+    )
     say(chat, room, "who has the pager")
     with sqlite3.connect(config.db_path) as conn:
         rows = [r[0] + (r[1] or "") for r in conn.execute("SELECT indexed, body FROM records")]
@@ -230,8 +261,7 @@ def test_the_badge_counts_every_unread_line_plus_notifications(chat):
     say(chat, general, "one")
     say(chat, general, "two")
     channel(chat, "club", scope="shared", members=["guest"])
-    assert chat("GET", "/api/push/badge", who=chat.guest) == {
-        "messages": 2, "notifications": 1, "badge": 3}
+    assert chat("GET", "/api/push/badge", who=chat.guest) == {"messages": 2, "notifications": 1, "badge": 3}
     chat("POST", f"/api/records/channel/{general['id']}/seen", who=chat.guest, expect=204)
     chat("POST", "/api/notifications/read", {}, who=chat.guest)
     assert chat("GET", "/api/push/badge", who=chat.guest)["badge"] == 0
@@ -280,23 +310,32 @@ def test_the_people_are_everybody_but_you(chat):
 def _old_chat(db) -> None:
     """Rows as the built-in chat wrote them: a public room, a private one, a direct line."""
     with connect(db) as conn:
+
         def room(slug, name, kind, by, topic=""):
             return conn.execute(
                 "INSERT INTO chat_channels (slug, name, topic, kind, created_by, created_at, updated_at)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (slug, name, conn.seal("chat_channels", "topic", (slug,), topic), kind, by,
-                 "2026-09-01T10:00:00+00:00", "2026-09-01T10:00:00+00:00"),
+                (
+                    slug,
+                    name,
+                    conn.seal("chat_channels", "topic", (slug,), topic),
+                    kind,
+                    by,
+                    "2026-09-01T10:00:00+00:00",
+                    "2026-09-01T10:00:00+00:00",
+                ),
             ).lastrowid
 
         def member(cid, who, last_read=0):
             conn.execute(
                 "INSERT INTO chat_members (channel_id, username, added_by, joined_at, last_read)"
-                " VALUES (?, ?, 'bram', '2026-09-01T10:00:00+00:00', ?)", (cid, who, last_read))
+                " VALUES (?, ?, 'bram', '2026-09-01T10:00:00+00:00', ?)",
+                (cid, who, last_read),
+            )
 
         def line(cid, who, body, at, edited=None):
             return conn.execute(
-                "INSERT INTO chat_messages (channel_id, author, body, created_at, edited_at)"
-                " VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO chat_messages (channel_id, author, body, created_at, edited_at) VALUES (?, ?, ?, ?, ?)",
                 (cid, who, conn.seal("chat_messages", "body", (cid,), body), at, edited),
             ).lastrowid
 
@@ -330,22 +369,28 @@ def test_the_old_chat_moves_into_records_once(config, users, tmp_path):
     assert set(spaces) == {"Homelab", "Club", "bram & guest"}
     homelab = spaces["Homelab"]
     assert (homelab.scope, homelab.owner, homelab.fields["kind"], homelab.fields["topic"]) == (
-        "public", "bram", "public", "the rack")
+        "public",
+        "bram",
+        "public",
+        "the rack",
+    )
     assert (spaces["Club"].scope, spaces["Club"].members) == ("shared", ["guest"])
     dm = spaces["bram & guest"]
     assert (dm.scope, dm.owner, dm.members, dm.fields["kind"]) == ("shared", "guest", ["bram"], "direct")
 
     lines = store.list(guest, "message", {"channel": homelab.id})
     assert [(m.owner, m.fields["body"]) for m in lines] == [
-        ("bram", "rack is up"), ("guest", "nice"), ("bram", "thanks")]
+        ("bram", "rack is up"),
+        ("guest", "nice"),
+        ("bram", "thanks"),
+    ]
     assert lines[0].created_at == "2026-09-02T09:00:00+00:00"
     assert lines[1].updated_at == "2026-09-02T09:06:00+00:00", "an edit keeps its time"
     # Guest had read the first line only: the one after, not theirs, is unread.
     assert {c.fields["name"]: c.unread for c in store.list(guest, "channel")}["Homelab"] == 1
     assert {c.fields["name"]: c.unread for c in store.list(bram, "channel")}["Homelab"] == 0
     # The members-only line reaches its members and nobody else.
-    assert [m.fields["body"] for m in store.list(bram, "message", {"channel": spaces["Club"].id})] == [
-        "members only"]
+    assert [m.fields["body"] for m in store.list(bram, "message", {"channel": spaces["Club"].id})] == ["members only"]
 
     # Once: a second boot moves nothing again.
     assert move_legacy_chat(db, registry, store) == 0

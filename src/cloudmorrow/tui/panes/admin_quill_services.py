@@ -69,8 +69,11 @@ def services_text(row: dict, logs: dict[str, list[str]] | None = None) -> str:
         when = job.get("last_started") or "never yet"
         running = "  [b]running now[/]" if job.get("running") else ""
         exit_ = "" if job.get("last_exit") is None else f", exit {job['last_exit']}"
-        lines += ["", f"[b {ACCENT}]Job[/] [b]{escape(job['id'])}[/] "
-                      f"[{MUTED}]runs {escape(job['service'])} every {job['every']}; last {when}{exit_}[/]{running}"]
+        lines += [
+            "",
+            f"[b {ACCENT}]Job[/] [b]{escape(job['id'])}[/] "
+            f"[{MUTED}]runs {escape(job['service'])} every {job['every']}; last {when}{exit_}[/]{running}",
+        ]
 
     hooks = row.get("webhooks") or []
     if hooks:
@@ -114,9 +117,7 @@ class QuillServicesModal(Modal[None]):
         if button == "close":
             self.dismiss(None)
         elif button == "copy":
-            self.app.copy_to_clipboard(
-                "\n".join(hook_address(h) for h in self.row.get("webhooks") or [])
-            )
+            self.app.copy_to_clipboard("\n".join(hook_address(h) for h in self.row.get("webhooks") or []))
             self.notify("Copied every webhook's address, secret included.")
         else:
             self.act(button or "")

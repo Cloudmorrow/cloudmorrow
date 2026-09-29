@@ -88,9 +88,7 @@ def test_a_picture_is_read_back_by_name_only(store):
 
 
 def test_upload_and_fetch(client, auth):
-    posted = client.post(
-        "/api/notes/img", content=PNG, params={"filename": "rack.png"}, headers=auth
-    )
+    posted = client.post("/api/notes/img", content=PNG, params={"filename": "rack.png"}, headers=auth)
     assert posted.status_code == 201, posted.text
     info = posted.json()
     assert info["path"] == f"img/{info['name']}" and info["content_type"] == "image/png"

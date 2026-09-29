@@ -69,7 +69,7 @@ def circles_by_person(circles: Iterable[dict]) -> dict[str, list[str]]:
 
 
 def _domain_label(domain: str) -> str:
-    """"calendars" is Calendars, "crm" is CRM."""
+    """ "calendars" is Calendars, "crm" is CRM."""
     if not domain:
         return "Other"
     words = domain.replace(".", " ").replace("_", " ").replace("-", " ")
@@ -124,9 +124,7 @@ class RulesModal(Modal[dict | None]):
     def compose(self) -> ComposeResult:
         with Vertical(classes="modal modal-wide", id="rules-modal"):
             yield Label(f"{self.circle['name']}: its data", classes="modal-title")
-            note = (
-                "w write · r read · n nothing · - as everything · enter opens a domain"
-            )
+            note = "w write · r read · n nothing · - as everything · enter opens a domain"
             if self.partial:
                 note += "\nOnly the datamodels your own circles reach are listed."
             yield Static(f"[{MUTED}]{note}[/]", classes="modal-detail")
@@ -156,9 +154,7 @@ class RulesModal(Modal[dict | None]):
         table.clear()
         self._rows = []
         every = self.rules.get(EVERY, "none")
-        table.add_row(
-            "[b]Everything[/]", self._said(every), f"[{FAINT}]and datamodels installed later[/]"
-        )
+        table.add_row("[b]Everything[/]", self._said(every), f"[{FAINT}]and datamodels installed later[/]")
         self._rows.append((EVERY, None))
         for shelf in self.shelves:
             opened = shelf["id"] in self.open
@@ -244,17 +240,13 @@ class PeopleModal(Modal[list[str] | None]):
         members = set(self.circle.get("members") or [])
         with Vertical(classes="modal", id="people-modal"):
             yield Label(f"Who is in {self.circle['name']}", classes="modal-title")
-            yield Static(
-                f"[{MUTED}]space ticks · ↑↓ move · ctrl+s saves[/]", classes="modal-detail"
-            )
+            yield Static(f"[{MUTED}]space ticks · ↑↓ move · ctrl+s saves[/]", classes="modal-detail")
             with VerticalScroll(id="people-list"):
                 for index, user in enumerate(self.users):
                     name = user["username"]
                     if user.get("display_name"):
                         name += f"  ({user['display_name']})"
-                    yield Checkbox(
-                        name, value=user["username"] in members, id=f"member-{index}"
-                    )
+                    yield Checkbox(name, value=user["username"] in members, id=f"member-{index}")
             with Horizontal(classes="modal-buttons"):
                 yield Button("Cancel", id="cancel")
                 yield Button("Save", variant="primary", id="save")
@@ -265,11 +257,13 @@ class PeopleModal(Modal[list[str] | None]):
             boxes[0].focus()
 
     def action_save(self) -> None:
-        self.dismiss([
-            user["username"]
-            for index, user in enumerate(self.users)
-            if self.query_one(f"#member-{index}", Checkbox).value
-        ])
+        self.dismiss(
+            [
+                user["username"]
+                for index, user in enumerate(self.users)
+                if self.query_one(f"#member-{index}", Checkbox).value
+            ]
+        )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         event.stop()
@@ -301,8 +295,7 @@ class CirclesView(Pane):
         Action("people", "People…", "p", hint="Who is in it"),
         Action("rename", "Rename", "e"),
         Action("default", "Default", "t", hint="Whether new accounts go into it"),
-        Action("remove", "Delete", "d", variant="error",
-               hint="Its people keep their other circles"),
+        Action("remove", "Delete", "d", variant="error", hint="Its people keep their other circles"),
     )
 
     def __init__(self, **kwargs) -> None:
@@ -314,9 +307,7 @@ class CirclesView(Pane):
         yield DataTable(id="admin-circle-table", cursor_type="row", zebra_stripes=True)
 
     def on_mount(self) -> None:
-        self.query_one("#admin-circle-table", DataTable).add_columns(
-            "CIRCLE", "DEFAULT", "PEOPLE", "DATA"
-        )
+        self.query_one("#admin-circle-table", DataTable).add_columns("CIRCLE", "DEFAULT", "PEOPLE", "DATA")
 
     def on_show(self) -> None:
         self.reload()
@@ -401,9 +392,7 @@ class CirclesView(Pane):
 
     @work(group="ui")
     async def rename(self, circle: dict) -> None:
-        name = await self.app.push_screen_wait(
-            PromptModal(f"Rename {circle['name']}", value=circle["name"])
-        )
+        name = await self.app.push_screen_wait(PromptModal(f"Rename {circle['name']}", value=circle["name"]))
         if not name or name == circle["name"]:
             return
         try:
@@ -421,9 +410,7 @@ class CirclesView(Pane):
     @work(group="admin-circles-write")
     async def toggle_default(self, circle: dict) -> None:
         try:
-            changed = await self.api.update_circle(
-                circle["id"], default=not circle.get("default")
-            )
+            changed = await self.api.update_circle(circle["id"], default=not circle.get("default"))
         except ApiError as exc:
             self.status(str(exc), error=True)
             return
@@ -502,12 +489,9 @@ class CirclesView(Pane):
         # The datamodels are the ones this administrator reaches: all of them
         # from a `*` circle, some of them otherwise, which the dialog says.
         whole = any(
-            me.get("username") in (c.get("members") or []) and (c.get("rules") or {}).get(EVERY)
-            for c in self._circles
+            me.get("username") in (c.get("members") or []) and (c.get("rules") or {}).get(EVERY) for c in self._circles
         )
-        rules = await self.app.push_screen_wait(
-            RulesModal(circle, models, partial=not whole)
-        )
+        rules = await self.app.push_screen_wait(RulesModal(circle, models, partial=not whole))
         if rules is None:
             return
         try:

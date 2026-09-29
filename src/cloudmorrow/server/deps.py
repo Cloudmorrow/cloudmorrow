@@ -102,9 +102,7 @@ def get_current_agent(
         )
     agent = state.agents.by_token(credentials.credentials)
     if agent is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="unknown agent token"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unknown agent token")
     return agent
 
 
@@ -141,14 +139,10 @@ def get_scope(
 
 
 def get_environment(
-    env: Annotated[str, Query(alias="env", description="local, test, production, …")] = (
-        DEFAULT_ENVIRONMENT
-    ),
+    env: Annotated[str, Query(alias="env", description="local, test, production, …")] = (DEFAULT_ENVIRONMENT),
 ) -> str:
     """The environment a secrets call works in, from ?env=."""
     try:
         return validate_environment(env)
     except InvalidEnvironmentError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

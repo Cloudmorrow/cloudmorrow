@@ -76,9 +76,7 @@ class UpdateResult:
 
 def _run(args: list[str], *, cwd: Path | None = None) -> str:
     try:
-        completed = subprocess.run(
-            args, cwd=cwd, capture_output=True, text=True, check=True
-        )
+        completed = subprocess.run(args, cwd=cwd, capture_output=True, text=True, check=True)
     except FileNotFoundError as exc:
         raise UpdateError(f"{args[0]} is not installed") from exc
     except subprocess.CalledProcessError as exc:
@@ -164,9 +162,7 @@ def commits_not_on(source: Path, ref: str) -> int:
 def service_is_active(service: str) -> bool:
     if shutil.which("systemctl") is None:
         return False
-    result = subprocess.run(
-        ["systemctl", "is-active", "--quiet", service], capture_output=True
-    )
+    result = subprocess.run(["systemctl", "is-active", "--quiet", service], capture_output=True)
     return result.returncode == 0
 
 

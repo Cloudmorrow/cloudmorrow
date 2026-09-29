@@ -81,11 +81,7 @@ def test_the_wall_clock_and_the_sheet_agree_about_a_moment():
 
 def test_a_span_is_every_day_and_can_be_capped():
     first = dt.date(2026, 1, 30)
-    assert span(first, dt.date(2026, 2, 1)) == [
-        dt.date(2026, 1, 30), dt.date(2026, 1, 31), dt.date(2026, 2, 1)
-    ]
+    assert span(first, dt.date(2026, 2, 1)) == [dt.date(2026, 1, 30), dt.date(2026, 1, 31), dt.date(2026, 2, 1)]
     assert span(first, dt.date(2025, 1, 1)) == [first]
     assert len(span(first, dt.date(2030, 1, 1), most=366)) == 367
-    assert days_of({"starts": "2026-01-30T09:00", "ends": "2026-01-31"}) == [
-        dt.date(2026, 1, 30), dt.date(2026, 1, 31)
-    ]
+    assert days_of({"starts": "2026-01-30T09:00", "ends": "2026-01-31"}) == [dt.date(2026, 1, 30), dt.date(2026, 1, 31)]

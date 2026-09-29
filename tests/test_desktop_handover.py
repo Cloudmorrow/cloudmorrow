@@ -53,7 +53,10 @@ def test_a_sign_in_in_the_window_signs_the_terminal_app_in(tmp_path, monkeypatch
     assert answer == {"saved": True, "agent": "desk"}
     stored = StoredCredentials.load()
     assert (stored.api_url, stored.username, stored.access_token, stored.expires_at) == (
-        API, "bram", "tok-web", "2026-10-01T00:00:00",
+        API,
+        "bram",
+        "tok-web",
+        "2026-10-01T00:00:00",
     )
     # As `cloudmorrow login` does: this machine becomes an agent.
     assert len(enrolled) == 1
@@ -86,7 +89,7 @@ def test_but_not_a_sign_in_the_terminal_app_made_since():
 def test_the_shell_tells_whoever_asks_about_a_sign_in():
     core = (WEB / "core.js").read_text()
     assert "export function onSignIn(fn)" in core
-    sign_in = core[core.index("export function signIn(data)"):core.index("export function signOut")]
+    sign_in = core[core.index("export function signIn(data)") : core.index("export function signOut")]
     assert "for (const fn of signInHooks) fn(data);" in sign_in
 
 

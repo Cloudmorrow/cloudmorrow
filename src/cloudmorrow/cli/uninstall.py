@@ -218,9 +218,7 @@ def remove(found: Plan, *, forget=forget_on_server) -> list[str]:
 
 def uninstall(
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Do not ask first.")] = False,
-    keep_backups: Annotated[
-        bool, typer.Option("--keep-backups", help="Leave the backups the agent made.")
-    ] = False,
+    keep_backups: Annotated[bool, typer.Option("--keep-backups", help="Leave the backups the agent made.")] = False,
 ) -> None:
     """Remove Cloudmorrow from this machine: the agent, the config, the command.
 

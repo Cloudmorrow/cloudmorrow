@@ -30,10 +30,10 @@ def _list_actions(quill: dict, plain: bool) -> None:
         return
     for action in actions:
         on = f" <{action['on']}>" if action.get("on") else ""
-        takes = " ".join(
-            f"{f['name']}=…" if f.get("required") else f"[{f['name']}=…]" for f in action["fields"]
+        takes = " ".join(f"{f['name']}=…" if f.get("required") else f"[{f['name']}=…]" for f in action["fields"])
+        quillrun.out.print(
+            f"[bold]{escape(action['id'])}[/]{escape(on)} {escape(takes)}  [dim]{escape(action['label'])}[/]"
         )
-        quillrun.out.print(f"[bold]{escape(action['id'])}[/]{escape(on)} {escape(takes)}  [dim]{escape(action['label'])}[/]")
 
 
 async def _view(api: CloudmorrowClient, quill: dict, screen: dict, args: list[str], plain: bool) -> None:

@@ -17,10 +17,7 @@ from tests.tui_harness import said, settle, start, user_row
 def rows(screen) -> list[list[str]]:
     """What the table says, with the colour markup taken off."""
     table = screen.query_one("#admin-user-table", DataTable)
-    return [
-        [Text.from_markup(str(cell)).plain for cell in table.get_row_at(index)]
-        for index in range(table.row_count)
-    ]
+    return [[Text.from_markup(str(cell)).plain for cell in table.get_row_at(index)] for index in range(table.row_count)]
 
 
 async def open_dialog(app, pilot, button: str) -> None:
@@ -133,9 +130,7 @@ async def test_a_new_account_is_a_dialog_with_a_role_and_a_type(app):
         await pilot.click("#type-systems_user")
         await pilot.click("#save")
         await settle(app, pilot)
-        assert app.client.user_calls == [
-            ("create", "hallway", "dashboard_displayer", "systems_user")
-        ]
+        assert app.client.user_calls == [("create", "hallway", "dashboard_displayer", "systems_user")]
         # And the table has it, without being told to refresh.
         assert rows(screen)[-1][0] == "hallway"
 
@@ -242,10 +237,7 @@ async def test_a_feature_the_server_refuses_to_switch_says_so(app):
 # -- circles -----------------------------------------------------------------------
 def circle_rows(screen) -> list[list[str]]:
     table = screen.query_one("#admin-circle-table", DataTable)
-    return [
-        [Text.from_markup(str(cell)).plain for cell in table.get_row_at(index)]
-        for index in range(table.row_count)
-    ]
+    return [[Text.from_markup(str(cell)).plain for cell in table.get_row_at(index)] for index in range(table.row_count)]
 
 
 async def open_circles(app, pilot):
@@ -317,15 +309,13 @@ async def test_data_is_set_by_domain_and_opens_to_its_datamodels(app):
         await pilot.pause()
         dialog = app.screen
         table = dialog.query_one("#rules-table", DataTable)
-        labels = [Text.from_markup(str(table.get_row_at(i)[0])).plain.strip()
-                  for i in range(table.row_count)]
+        labels = [Text.from_markup(str(table.get_row_at(i)[0])).plain.strip() for i in range(table.row_count)]
         assert labels[0] == "Everything" and "▸ Tasks" in labels
         table.move_cursor(row=labels.index("▸ Tasks"))
         await pilot.press("r")
         await pilot.press("enter")
         await pilot.pause()
-        labels = [Text.from_markup(str(table.get_row_at(i)[0])).plain.strip()
-                  for i in range(table.row_count)]
+        labels = [Text.from_markup(str(table.get_row_at(i)[0])).plain.strip() for i in range(table.row_count)]
         assert "▾ Tasks" in labels and "Task" in labels
         table.move_cursor(row=labels.index("Task"))
         await pilot.press("w")
@@ -333,9 +323,7 @@ async def test_data_is_set_by_domain_and_opens_to_its_datamodels(app):
         assert "Mixed" in Text.from_markup(str(table.get_row_at(tasks)[1])).plain
         await pilot.press("ctrl+s")
         await settle(app, pilot)
-        assert app.client.circle_calls == [
-            ("update", "kids", {"rules": {"task": "write", "board": "read"}})
-        ]
+        assert app.client.circle_calls == [("update", "kids", {"rules": {"task": "write", "board": "read"}})]
 
 
 async def test_everything_at_nothing_takes_the_star_away(app):

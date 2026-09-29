@@ -48,9 +48,7 @@ def test_container_entrypoint_publishes_the_wheel_it_was_built_with(tmp_path):
     image = tmp_path / "image-dist"
     image.mkdir()
     (image / "cloudmorrow-0.9.0-py3-none-any.whl").write_bytes(b"new")
-    script = (DEPLOY / "docker" / "entrypoint.sh").read_text().replace(
-        "/opt/cloudmorrow/dist", str(image)
-    )
+    script = (DEPLOY / "docker" / "entrypoint.sh").read_text().replace("/opt/cloudmorrow/dist", str(image))
     result = subprocess.run(
         ["sh", "-c", script, "entrypoint", "printf", "ran"],
         capture_output=True,
@@ -64,10 +62,14 @@ def test_container_entrypoint_publishes_the_wheel_it_was_built_with(tmp_path):
 
 def test_dry_run_with_every_answer_asks_nothing():
     result = dry_run(
-        "--name", "The Larsens",
-        "--public-url", "https://cloud.example.com/",
-        "--user", "alice",
-        "--quills", "all",
+        "--name",
+        "The Larsens",
+        "--public-url",
+        "https://cloud.example.com/",
+        "--user",
+        "alice",
+        "--quills",
+        "all",
         env={"CLOUDMORROW_ADMIN_PASSWORD": "longenough"},
     )
     assert result.returncode == 0, result.stderr + result.stdout
@@ -90,7 +92,12 @@ def test_dry_run_says_which_question_it_would_have_asked():
 
 def test_a_plain_http_address_is_allowed_with_a_warning():
     result = dry_run(
-        "--name", "Test", "--public-url", "http://192.168.1.10:8787", "--user", "alice",
+        "--name",
+        "Test",
+        "--public-url",
+        "http://192.168.1.10:8787",
+        "--user",
+        "alice",
         env={"CLOUDMORROW_ADMIN_PASSWORD": "longenough"},
     )
     assert result.returncode == 0, result.stderr + result.stdout

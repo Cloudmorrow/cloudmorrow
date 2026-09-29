@@ -100,7 +100,5 @@ def install() -> Path:
         raise InstallError(f"`{shlex.join(command)}` exited {result.returncode}")
     found = shutil.which("rclone")
     if found is None:
-        raise InstallError(
-            f"`{shlex.join(command)}` finished, but rclone is still not on the PATH."
-        )
+        raise InstallError(f"`{shlex.join(command)}` finished, but rclone is still not on the PATH.")
     return Path(found)

@@ -42,9 +42,7 @@ def _event_defaults(screen: Screen, fields: dict, spaces: list[dict]) -> dict:
             moment = dt.datetime.fromisoformat(start) + dt.timedelta(hours=1)
             fields[ends] = moment.strftime("%Y-%m-%dT%H:%M")
     if space and not fields.get(space):
-        mine = next((s for s in spaces if s.get("scope") == "personal"), None) or (
-            spaces[0] if spaces else None
-        )
+        mine = next((s for s in spaces if s.get("scope") == "personal"), None) or (spaces[0] if spaces else None)
         if mine is None:
             fail(f"there is nothing to put it in: {space}=<name>")
         fields[space] = mine["id"]

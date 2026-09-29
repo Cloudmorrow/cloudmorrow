@@ -70,17 +70,29 @@ def test_folders_come_first_whichever_way_the_files_are_sorted():
         entry_row("apple", is_dir=True),
     ]
     assert [e["name"] for e in sort_entries(entries, "name", False)] == [
-        "apple", "Zed", "a.jpg", "b.txt",
+        "apple",
+        "Zed",
+        "a.jpg",
+        "b.txt",
     ]
     assert [e["name"] for e in sort_entries(entries, "size", True)] == [
-        "Zed", "apple", "a.jpg", "b.txt",
+        "Zed",
+        "apple",
+        "a.jpg",
+        "b.txt",
     ]
     assert [e["name"] for e in sort_entries(entries, "date", True)] == [
-        "Zed", "apple", "b.txt", "a.jpg",
+        "Zed",
+        "apple",
+        "b.txt",
+        "a.jpg",
     ]
     # By type: pictures before text, folders still first.
     assert [e["name"] for e in sort_entries(entries, "type", False)] == [
-        "apple", "Zed", "a.jpg", "b.txt",
+        "apple",
+        "Zed",
+        "a.jpg",
+        "b.txt",
     ]
 
 
@@ -235,11 +247,20 @@ async def test_an_empty_share_opens_empty(app):
 
 
 async def test_a_machine_share_is_listed_but_says_to_mount_it(app):
-    app.client.share_list.append({
-        "name": "laptop", "kind": "machine", "machine": "book", "online": False,
-        "path": "/home/me/stuff", "managed": False, "description": "", "url": "",
-        "created_at": "", "updated_at": "",
-    })
+    app.client.share_list.append(
+        {
+            "name": "laptop",
+            "kind": "machine",
+            "machine": "book",
+            "online": False,
+            "path": "/home/me/stuff",
+            "managed": False,
+            "description": "",
+            "url": "",
+            "created_at": "",
+            "updated_at": "",
+        }
+    )
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_browse(app, pilot)
         assert names(screen) == ["media", "photos", "laptop"]
@@ -349,8 +370,7 @@ async def test_among_the_shares_only_what_works_there_is_offered(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_browse(app, pilot)
         shown = [b.id for b in screen.active_pane.query(".toolbar Button") if b.display]
-        assert shown == ["do-new_group", "do-mount", "do-unmount", "do-copy_url", "do-remove",
-                         "do-open", "do-refresh"]
+        assert shown == ["do-new_group", "do-mount", "do-unmount", "do-copy_url", "do-remove", "do-open", "do-refresh"]
         await pilot.press("enter")
         await settle(app, pilot)
         shown = [b.id for b in screen.active_pane.query(".toolbar Button") if b.display]

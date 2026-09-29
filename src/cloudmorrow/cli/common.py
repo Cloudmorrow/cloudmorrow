@@ -119,9 +119,7 @@ def would_commit(path: Path) -> bool:
 
     def git(*args: str) -> int:
         try:
-            return subprocess.run(
-                ["git", *args], cwd=str(path.parent), capture_output=True, timeout=15
-            ).returncode
+            return subprocess.run(["git", *args], cwd=str(path.parent), capture_output=True, timeout=15).returncode
         except (OSError, subprocess.SubprocessError):
             return 1
 
@@ -133,9 +131,7 @@ def would_commit(path: Path) -> bool:
 def warn_if_tracked(path: Path) -> None:
     """Say something if a file of secrets just landed somewhere git would commit."""
     if would_commit(path):
-        console.print(
-            f"[yellow]![/] [dim]{path.name} is not in .gitignore — and this is a git repo.[/]"
-        )
+        console.print(f"[yellow]![/] [dim]{path.name} is not in .gitignore — and this is a git repo.[/]")
 
 
 def edit_text(initial: str = "", *, suffix: str = ".md") -> str:
@@ -143,9 +139,7 @@ def edit_text(initial: str = "", *, suffix: str = ".md") -> str:
     editor = os.environ.get("CLOUDMORROW_EDITOR") or os.environ.get("EDITOR") or "vi"
     import tempfile
 
-    with tempfile.NamedTemporaryFile(
-        "w", suffix=suffix, delete=False, encoding="utf-8"
-    ) as handle:
+    with tempfile.NamedTemporaryFile("w", suffix=suffix, delete=False, encoding="utf-8") as handle:
         handle.write(initial)
         temporary = Path(handle.name)
     try:

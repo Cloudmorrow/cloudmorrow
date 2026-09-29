@@ -40,9 +40,7 @@ from cloudmorrow.cli.common import client, console, fail, out, run
 from cloudmorrow.console import TITLE
 from cloudmorrow.quill_reference import quill_reference
 
-app = typer.Typer(
-    help="Quills: make one, check it, try it; add them from the catalog.", no_args_is_help=True
-)
+app = typer.Typer(help="Quills: make one, check it, try it; add them from the catalog.", no_args_is_help=True)
 
 TEMPLATE = Path(__file__).resolve().parent.parent / "quill_template"
 # Stored without their dots, so the package keeps them; restored on copy.
@@ -57,9 +55,7 @@ def new(
     quill_id: Annotated[str, typer.Argument(help="Its id: lowercase letters, digits and _.")],
     name: Annotated[str, typer.Option("--name", help="What people call it.")] = "",
     summary: Annotated[str, typer.Option("--summary", help="One line on what it is for.")] = "",
-    into: Annotated[
-        Path | None, typer.Option("--dir", help="Where to make it. ./quill-<id>.")
-    ] = None,
+    into: Annotated[Path | None, typer.Option("--dir", help="Where to make it. ./quill-<id>.")] = None,
 ) -> None:
     """Start a Quill: a manifest, a datamodel, quill.py, tests, a CLAUDE.md with skills, and CI."""
     if not re.match(r"^[a-z][a-z0-9_]{1,31}$", quill_id):
@@ -86,9 +82,7 @@ def new(
         (TEMPLATE / "CLAUDE.md.head").read_text(encoding="utf-8") + quill_reference(),
         encoding="utf-8",
     )
-    console.print(
-        f"[green]Made[/] {target}/ — next: [b]cd {target} && uv sync && cm quill check && cm quill test[/]"
-    )
+    console.print(f"[green]Made[/] {target}/ — next: [b]cd {target} && uv sync && cm quill check && cm quill test[/]")
 
 
 @app.command("reference")
@@ -110,13 +104,9 @@ def _datamodels_folder(given: Path | None, tmp: Path) -> Path | None:
         catalog = load_catalog(DEFAULT_QUILL_CATALOG)
         if not catalog.datamodels.get("repo"):
             return None
-        return fetch(
-            str(catalog.datamodels["repo"]), str(catalog.datamodels.get("ref", "")), into=tmp
-        )
+        return fetch(str(catalog.datamodels["repo"]), str(catalog.datamodels.get("ref", "")), into=tmp)
     except QuillError as exc:
-        fail(
-            f"could not read the foundational datamodels ({exc}); point --datamodels at a checkout of them"
-        )
+        fail(f"could not read the foundational datamodels ({exc}); point --datamodels at a checkout of them")
 
 
 def preview(plan: dict) -> str:
@@ -133,9 +123,7 @@ def preview(plan: dict) -> str:
         model = plan["models"].get(screen["model"], {})
         fields = {f["name"]: f for f in model.get("fields", [])}
         title = screen.get("title") or model.get("title", "")
-        lines.append(
-            f"── {screen['label'] or screen['id']} ({screen['kit']} of {screen['model']}) ──"
-        )
+        lines.append(f"── {screen['label'] or screen['id']} ({screen['kit']} of {screen['model']}) ──")
         if screen["kit"] == "board":
             lane = fields.get(screen["lane"], {})
             labels = lane.get("labels") or lane.get("values") or []
@@ -258,13 +246,14 @@ def print_plan(plan: dict) -> None:
         )
     for service in plan["services"]:
         always = ", kept running" if service.get("always") else ""
-        table.add_row(
-            "service", escape(service["id"]), escape(" ".join(service["command"]) + always)
-        )
+        table.add_row("service", escape(service["id"]), escape(" ".join(service["command"]) + always))
     for hook in plan["webhooks"]:
         what = (
-            f"→ {hook['model']}" if hook.get("model")
-            else f"→ {hook['handler']}()" if hook.get("handler") else f"→ {hook.get('forward')}"
+            f"→ {hook['model']}"
+            if hook.get("model")
+            else f"→ {hook['handler']}()"
+            if hook.get("handler")
+            else f"→ {hook.get('forward')}"
         )
         table.add_row("webhook", escape(hook["id"]), escape(f"POST /hooks/{plan['id']}/{hook['path']} {what}"))
     for api in plan["apis"]:
@@ -275,7 +264,9 @@ def print_plan(plan: dict) -> None:
         takes = ", ".join(f["name"] for f in action["fields"]) or "nothing"
         table.add_row("action", escape(action["label"]), escape(f"{action['handler']}(){on}, takes {takes}"))
     for hook in plan.get("hooks", []):
-        table.add_row("hook", escape(hook["handler"] + "()"), escape(f"when a {hook['on']} is {' or '.join(hook['when'])}"))
+        table.add_row(
+            "hook", escape(hook["handler"] + "()"), escape(f"when a {hook['on']} is {' or '.join(hook['when'])}")
+        )
     for machine in plan.get("machine", []):
         folders = ", ".join(f"{f['name']} ({f['access']})" for f in machine["folders"]) or "no folders"
         table.add_row("on a machine", escape(machine["id"]), escape(f"{machine['why']} — {folders}"))
@@ -316,8 +307,15 @@ def check(
             import tomllib
 
             data = tomllib.loads((folder / "quill.toml").read_text(encoding="utf-8"))
-            spec = parse_code(data, folder, plan["id"], screens=data.get("screens", []),
-                              jobs=data.get("jobs", []), webhooks=data.get("webhooks", []), apis=data.get("apis", []))
+            spec = parse_code(
+                data,
+                folder,
+                plan["id"],
+                screens=data.get("screens", []),
+                jobs=data.get("jobs", []),
+                webhooks=data.get("webhooks", []),
+                apis=data.get("apis", []),
+            )
             have = scan_handlers(folder, plan["code"])
         except CodeSpecError as exc:
             fail(f"✗ {exc}")
@@ -348,14 +346,18 @@ def _dev_python(folder: Path) -> str:
     import subprocess
     import sys
 
-    candidates = [folder / ".venv" / "bin" / "python", folder / ".venv" / "Scripts" / "python.exe",
-                  Path(sys.executable)]
+    candidates = [
+        folder / ".venv" / "bin" / "python",
+        folder / ".venv" / "Scripts" / "python.exe",
+        Path(sys.executable),
+    ]
     for candidate in candidates:
         if not candidate.exists():
             continue
         probe = subprocess.run(  # noqa: S603 - our own interpreter, or the Quill's venv
             [str(candidate), "-c", "import cloudmorrow.server.app, pytest"],
-            capture_output=True, check=False,
+            capture_output=True,
+            check=False,
         )
         if probe.returncode == 0:
             return str(candidate)
@@ -378,9 +380,7 @@ def _in_dev_python(folder: Path, args: list[str], env: dict | None = None) -> No
 @app.command("test")
 def test(
     folder: FolderArgument = Path("."),
-    sandbox: Annotated[
-        bool, typer.Option("--sandbox", help="Run its code in the sandbox, as a server does.")
-    ] = False,
+    sandbox: Annotated[bool, typer.Option("--sandbox", help="Run its code in the sandbox, as a server does.")] = False,
     pytest_args: Annotated[list[str] | None, typer.Argument(help="More for pytest, after --.")] = None,
 ) -> None:
     """Check it, then run its tests: the real record store and gate, its code, your tests."""
@@ -414,9 +414,7 @@ def dev(
         bool, typer.Option("--local", help="A throwaway server on this machine instead of yours.")
     ] = False,
     port: Annotated[int, typer.Option("--port", help="--local: the port it listens on.")] = 8799,
-    no_sandbox: Annotated[
-        bool, typer.Option("--no-sandbox", help="--local: run its code in plain Python.")
-    ] = False,
+    no_sandbox: Annotated[bool, typer.Option("--no-sandbox", help="--local: run its code in plain Python.")] = False,
 ) -> None:
     """Install this folder on your server as a development Quill, or run one here (--local)."""
     folder = folder.resolve()
@@ -454,11 +452,7 @@ def list_installed() -> None:
             table.add_column(column)
         for quill in quills:
             origin = quill.get("origin", {})
-            source = (
-                "dev"
-                if origin.get("dev")
-                else ("catalog" if origin.get("catalog") else origin.get("repo", ""))
-            )
+            source = "dev" if origin.get("dev") else ("catalog" if origin.get("catalog") else origin.get("repo", ""))
             table.add_row(
                 quill["id"],
                 escape(quill["name"]),
@@ -492,16 +486,22 @@ def services() -> None:
                 state = "by its job" if service.get("scheduled") else service["state"]
                 exit_ = "" if service.get("last_exit") is None else str(service["last_exit"])
                 table.add_row(
-                    row["id"], escape(f"service {service['id']}"),
-                    f"[{colour.get(state, 'dim')}]{state}[/]", service.get("since", ""),
-                    exit_, who,
+                    row["id"],
+                    escape(f"service {service['id']}"),
+                    f"[{colour.get(state, 'dim')}]{state}[/]",
+                    service.get("since", ""),
+                    exit_,
+                    who,
                 )
             for job in row["jobs"]:
                 exit_ = "" if job.get("last_exit") is None else str(job["last_exit"])
                 table.add_row(
-                    row["id"], escape(f"job {job['id']} (every {job['every']})"),
+                    row["id"],
+                    escape(f"job {job['id']} (every {job['every']})"),
                     "[green]running[/]" if job.get("running") else "",
-                    job.get("last_started") or "never yet", exit_, who,
+                    job.get("last_started") or "never yet",
+                    exit_,
+                    who,
                 )
         out.print(table)
         # Whole, outside the table, so they can be copied: what a sender is given.
@@ -509,7 +509,9 @@ def services() -> None:
             for hook in row["webhooks"]:
                 out.print(
                     f"webhook {row['id']}/{hook['id']}: {hook['url']}?token={hook['secret']}",
-                    markup=False, highlight=False, soft_wrap=True,
+                    markup=False,
+                    highlight=False,
+                    soft_wrap=True,
                 )
 
     run(_services())
@@ -563,9 +565,7 @@ def catalog() -> None:
 @app.command("add")
 def add(
     quill_id: Annotated[str, typer.Argument(help="The Quill's id in the catalog.")] = "",
-    source: Annotated[
-        str, typer.Option("--source", help="Instead: a repository or a folder on the server.")
-    ] = "",
+    source: Annotated[str, typer.Option("--source", help="Instead: a repository or a folder on the server.")] = "",
     ref: Annotated[str, typer.Option("--ref", help="The release of --source, e.g. v1.0.0.")] = "",
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Do not ask.")] = False,
 ) -> None:
@@ -689,13 +689,18 @@ def machine_enable(
         console.print(f"  {need['access']}s {escape(given[need['name']])}  [dim]({need['name']})[/]")
     for program in spec.get("run", []):
         allowed = program in config.quill_programs
-        console.print(f"  may start {escape(program)}" + ("" if allowed else "  [dim](not allowed here until it is in quill_programs)[/]"))
+        console.print(
+            f"  may start {escape(program)}"
+            + ("" if allowed else "  [dim](not allowed here until it is in quill_programs)[/]")
+        )
     console.print("  [dim]In a sandbox: nothing else on this machine is within its reach.[/]")
     if not yes and not typer.confirm("Switch it on here?"):
         raise typer.Exit(1)
     config.quills.setdefault(quill_id, {})[handler] = {"folders": given}
     config.save()
-    console.print(f"[green]On[/] — the agent runs it{' every ' + spec['every'] if spec.get('every') else ' when asked'}")
+    console.print(
+        f"[green]On[/] — the agent runs it{' every ' + spec['every'] if spec.get('every') else ' when asked'}"
+    )
 
 
 @machine_app.command("disable")

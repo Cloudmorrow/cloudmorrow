@@ -88,8 +88,7 @@ def validate_share_name(name: str) -> str:
     name = name.strip().lower()
     if not SLUG_RE.match(name):
         raise InvalidSlugError(
-            "share name must be 1-64 chars of lowercase letters, digits or '-', "
-            "starting with a letter or digit"
+            "share name must be 1-64 chars of lowercase letters, digits or '-', starting with a letter or digit"
         )
     if name == DRIVE_NAME:
         raise InvalidSlugError(f"{DRIVE_NAME} is your own drive on the server, not a share name")
@@ -213,18 +212,14 @@ class ShareStore:
         """
         moved: list[Share] = []
         with connect(self.db_path) as conn:
-            rows = conn.execute(
-                "SELECT * FROM shares WHERE kind = ? AND managed = 1", (SERVER,)
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM shares WHERE kind = ? AND managed = 1", (SERVER,)).fetchall()
         for share in (_share(row) for row in rows):
             root = self.shares_dir(share.owner)
             if share.path.parent == root or not share.path.is_dir():
                 continue
             target = root / share.path.name
             if target.exists():
-                log.warning(
-                    "share %s stays at %s: %s is already taken", share.name, share.path, target
-                )
+                log.warning("share %s stays at %s: %s is already taken", share.name, share.path, target)
                 continue
             shutil.move(str(share.path), str(target))
             with connect(self.db_path) as conn:
@@ -342,13 +337,11 @@ class ShareStore:
             root.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             raise SharePathError(
-                f"the server cannot make the folder for {name} in its Shares folder: "
-                f"{exc.strerror or exc}"
+                f"the server cannot make the folder for {name} in its Shares folder: {exc.strerror or exc}"
             ) from exc
         if not os.access(root, os.R_OK | os.W_OK | os.X_OK):
             raise SharePathError(
-                f"the server cannot read and write {root} — give its service user "
-                f"access to that folder, then share it"
+                f"the server cannot read and write {root} — give its service user access to that folder, then share it"
             )
         return root
 
@@ -361,9 +354,7 @@ class ShareStore:
         """
         share = self.require(owner, name)
         with connect(self.db_path) as conn:
-            conn.execute(
-                "DELETE FROM shares WHERE owner = ? AND name = ?", (owner, share.name)
-            )
+            conn.execute("DELETE FROM shares WHERE owner = ? AND name = ?", (owner, share.name))
         if remove_files and share.managed and share.path.is_dir():
             shutil.rmtree(share.path)
         return share
@@ -371,8 +362,4 @@ class ShareStore:
     def forget_agent(self, agent_id: int) -> int:
         """The machine is gone; so are the shares it served. Returns how many."""
         with connect(self.db_path) as conn:
-            return int(
-                conn.execute(
-                    "DELETE FROM shares WHERE agent_id = ? AND kind = ?", (agent_id, MACHINE)
-                ).rowcount
-            )
+            return int(conn.execute("DELETE FROM shares WHERE agent_id = ? AND kind = ?", (agent_id, MACHINE)).rowcount)

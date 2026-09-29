@@ -104,9 +104,7 @@ class GroupedListPane(ListPane):
 
     def __init__(self, quill: dict, screen: dict, **kwargs) -> None:
         super().__init__(quill, screen, **kwargs)
-        self.levels: list[dict] = [
-            f for f in (field_of(self.model, screen.get(n)) for n in ("group", "subgroup")) if f
-        ]
+        self.levels: list[dict] = [f for f in (field_of(self.model, screen.get(n)) for n in ("group", "subgroup")) if f]
         self.hidden = self.subtitle if self.subtitle and self.subtitle.get("secret") else None
         # Naming a new value is for putting a record in it; one that is a
         # record itself is made in the datamodel the level links to.
@@ -133,8 +131,7 @@ class GroupedListPane(ListPane):
     def content(self) -> ComposeResult:
         with Horizontal(classes="kit-grouped"):
             if self.levels:
-                yield GroupList(id="kit-group-list", classes="kit-group-list",
-                                new="new_group" not in self.refused)
+                yield GroupList(id="kit-group-list", classes="kit-group-list", new="new_group" not in self.refused)
             with Vertical(classes="kit-group-side"):
                 if self.levels:
                     yield Static("", id="kit-group-name", classes="kit-group-name")
@@ -188,8 +185,11 @@ class GroupedListPane(ListPane):
             if current is None:
                 default = field.get("default")
                 current = (
-                    str(default) if default is not None and str(default) in values
-                    else values[0] if values else (str(default) if default is not None else None)
+                    str(default)
+                    if default is not None and str(default) in values
+                    else values[0]
+                    if values
+                    else (str(default) if default is not None else None)
                 )
             if current is not None and current not in values:
                 choices.append((current, current))
@@ -212,7 +212,9 @@ class GroupedListPane(ListPane):
         self.query_one("#kit-group-name", Static).update(f"[b]{' · '.join(names)}[/]")
         if len(self.levels) > 1:
             await self.query_one(SubgroupBar).show(
-                self.offered[1], self.chosen[1], field_label(self.levels[1]).lower(),
+                self.offered[1],
+                self.chosen[1],
+                field_label(self.levels[1]).lower(),
                 new="new_subgroup" not in self.refused,
             )
 

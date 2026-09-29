@@ -22,10 +22,10 @@ HALVES = {
     (True, True): "\u2588",
 }
 
-ROWS = 7      # dots down, per letter
-WIDTH = 5     # dots across, per letter
-GAP = 1       # dots between two letters
-SPACE = 3     # dots a space is worth
+ROWS = 7  # dots down, per letter
+WIDTH = 5  # dots across, per letter
+GAP = 1  # dots between two letters
+SPACE = 3  # dots a space is worth
 
 GLYPHS: dict[str, tuple[str, ...]] = {
     "A": (
@@ -440,7 +440,5 @@ def rows(text: str) -> list[str]:
     lines = []
     for top in range(0, ROWS, 2):
         bottom = top + 1
-        lines.append("".join(
-            HALVES[(column[top], bottom < ROWS and column[bottom])] for column in grid
-        ))
+        lines.append("".join(HALVES[(column[top], bottom < ROWS and column[bottom])] for column in grid))
     return lines

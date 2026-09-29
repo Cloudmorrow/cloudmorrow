@@ -23,9 +23,7 @@ from cloudmorrow.cli.quillrun.screen import (
 from cloudmorrow.client.api import CloudmorrowClient
 
 
-async def _group_id(
-    api: CloudmorrowClient, screen: Screen, wanted: str
-) -> tuple[str | None, list[dict]]:
+async def _group_id(api: CloudmorrowClient, screen: Screen, wanted: str) -> tuple[str | None, list[dict]]:
     """The group a board command is about: named, or the first there is."""
     if screen.group is None:
         return None, []
@@ -76,9 +74,7 @@ async def _act_records(
     if screen.moments:
         # A calendar lists a range of days, across every space it can see.
         start = _day(days[0], "--from") if days[0] else dt.date.today().isoformat()
-        end = _day(days[1], "--to") if days[1] else (
-            dt.date.fromisoformat(start) + dt.timedelta(days=6)
-        ).isoformat()
+        end = _day(days[1], "--to") if days[1] else (dt.date.fromisoformat(start) + dt.timedelta(days=6)).isoformat()
         if end < start:
             fail("--to is before --from")
         where = {f"{screen.moments[0]}__lte": f"{end}T23:59", f"{screen.moments[1]}__gte": start}
@@ -110,7 +106,7 @@ async def _act_records(
         elif screen.moments:
             _show_calendar(screen, records, spaces, f"{heading} · {start} to {end}")
         else:
-            _show_list(screen, records, heading, screen.levels[len(picked):])
+            _show_list(screen, records, heading, screen.levels[len(picked) :])
         return
 
     if action == "add":
@@ -149,7 +145,9 @@ async def _act_records(
             _show_record(screen, record, reveal=reveal)
     elif action == "set":
         changed = await api.update_record(
-            screen.model, record["id"], await _link_values(api, screen, _pairs(rest, screen)),
+            screen.model,
+            record["id"],
+            await _link_values(api, screen, _pairs(rest, screen)),
             rev=record["rev"],
         )
         quillrun.console.print(f"[green]Saved[/] {escape(str(changed['fields'].get(screen.title, '')))}")
@@ -159,9 +157,7 @@ async def _act_records(
         lanes, _ = await _lanes(api, screen, _group_of(screen, record) or group_id)
         if not rest:
             fail(f"move takes a lane: {', '.join(label for _, label in lanes)}")
-        await api.move_record(
-            screen.model, record["id"], {screen.lane["name"]: _lane_named(lanes, rest[0])}, index
-        )
+        await api.move_record(screen.model, record["id"], {screen.lane["name"]: _lane_named(lanes, rest[0])}, index)
         quillrun.console.print(f"[green]Moved[/] to {rest[0]}")
     elif action in ("done", "undone"):
         if screen.lane is not None:
@@ -171,14 +167,10 @@ async def _act_records(
             lane = target if action == "done" else lanes[0][0]
             await api.move_record(screen.model, record["id"], {screen.lane["name"]: lane}, None)
         elif screen.spec.get("tick"):
-            await api.update_record(
-                screen.model, record["id"], {screen.spec["tick"]: action == "done"}
-            )
+            await api.update_record(screen.model, record["id"], {screen.spec["tick"]: action == "done"})
         else:
             fail(f"{screen.quill['id']} has nothing to tick")
         quillrun.console.print(f"[green]{'Done' if action == 'done' else 'Not done'}[/]")
     elif action == "delete":
         await api.delete_record(screen.model, record["id"])
-        quillrun.console.print(
-            f"[green]Deleted[/] {escape(str(record['fields'].get(screen.title, '')))}"
-        )
+        quillrun.console.print(f"[green]Deleted[/] {escape(str(record['fields'].get(screen.title, '')))}")

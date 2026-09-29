@@ -91,13 +91,9 @@ def test_the_recipient_can_open_it():
     as_public = body[21:86]
     ciphertext = body[86:]
 
-    shared = ua.exchange(
-        ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), as_public)
-    )
+    shared = ua.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), as_public))
     ikm = hmac.new(AUTH, shared, hashlib.sha256).digest()
-    ikm = hmac.new(
-        ikm, b"WebPush: info\x00" + ua_public + as_public + b"\x01", hashlib.sha256
-    ).digest()
+    ikm = hmac.new(ikm, b"WebPush: info\x00" + ua_public + as_public + b"\x01", hashlib.sha256).digest()
     prk = hmac.new(salt, ikm, hashlib.sha256).digest()
     key = hmac.new(prk, b"Content-Encoding: aes128gcm\x00\x01", hashlib.sha256).digest()[:16]
     nonce = hmac.new(prk, b"Content-Encoding: nonce\x00\x01", hashlib.sha256).digest()[:12]
@@ -152,9 +148,7 @@ def test_the_authorization_header_names_the_service_and_not_the_subscription(tmp
     # The key the browser was given has to be the key that signed the token,
     # or the push service rejects it.
     public = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), unb64(bits["k"]))
-    claims = jwt.decode(
-        bits["t"], public, algorithms=["ES256"], audience="https://web.push.apple.com"
-    )
+    claims = jwt.decode(bits["t"], public, algorithms=["ES256"], audience="https://web.push.apple.com")
     assert claims["aud"] == "https://web.push.apple.com", "the origin, not the path"
     assert claims["sub"] == "mailto:a@b.c"
     assert len(unb64(bits["t"].split(".")[2])) == 64, "JWS wants raw r||s, not DER"
@@ -214,9 +208,7 @@ def test_a_subscription_the_service_has_buried_is_forgotten(store, monkeypatch):
 
 def test_a_device_whose_keys_are_useless_goes_at_once(store, monkeypatch):
     """No countdown: a key that cannot be used once cannot be used ever."""
-    store.subscribe(
-        "bram", endpoint="https://push.example.com/bad", p256dh=b64(b"k" * 65), auth=b64(AUTH)
-    )
+    store.subscribe("bram", endpoint="https://push.example.com/bad", p256dh=b64(b"k" * 65), auth=b64(AUTH))
     reached = []
     monkeypatch.setattr("urllib.request.urlopen", lambda *a, **k: reached.append(1))
     assert store.send(["bram"], {"title": "hi"}) == 0
@@ -226,9 +218,7 @@ def test_a_device_whose_keys_are_useless_goes_at_once(store, monkeypatch):
 
 def test_a_device_that_keeps_failing_is_dropped_in_the_end(store, monkeypatch):
     _subscribe(store)
-    monkeypatch.setattr(
-        "urllib.request.urlopen", lambda *a, **k: (_ for _ in ()).throw(OSError("offline"))
-    )
+    monkeypatch.setattr("urllib.request.urlopen", lambda *a, **k: (_ for _ in ()).throw(OSError("offline")))
     for _ in range(4):
         store.send(["bram"], {"title": "hi"})
         assert store.list("bram"), "a phone that is off is not a phone that is gone"
@@ -240,9 +230,7 @@ def test_a_delivery_forgives_the_failures_before_it(store, monkeypatch):
     import contextlib
 
     _subscribe(store)
-    monkeypatch.setattr(
-        "urllib.request.urlopen", lambda *a, **k: (_ for _ in ()).throw(OSError("offline"))
-    )
+    monkeypatch.setattr("urllib.request.urlopen", lambda *a, **k: (_ for _ in ()).throw(OSError("offline")))
     store.send(["bram"], {"title": "hi"})
     monkeypatch.setattr("urllib.request.urlopen", lambda *a, **k: contextlib.nullcontext())
     assert store.send(["bram"], {"title": "hi"}) == 1
@@ -256,9 +244,7 @@ def test_what_goes_on_the_wire(store, monkeypatch):
     import contextlib
 
     ua = ec.generate_private_key(ec.SECP256R1())
-    store.subscribe(
-        "bram", endpoint="https://push.example.com/one", p256dh=b64(_point(ua)), auth=b64(AUTH)
-    )
+    store.subscribe("bram", endpoint="https://push.example.com/one", p256dh=b64(_point(ua)), auth=b64(AUTH))
     sent = {}
 
     def capture(request, timeout=None):
@@ -294,9 +280,10 @@ def test_a_browser_can_fetch_the_key_and_subscribe(client, auth):
     assert [d["endpoint"] for d in client.get("/api/push/devices", headers=auth).json()] == [
         "https://web.push.apple.com/abc"
     ]
-    assert client.post(
-        "/api/push/unsubscribe", json={"endpoint": subscription["endpoint"]}, headers=auth
-    ).status_code == 204
+    assert (
+        client.post("/api/push/unsubscribe", json={"endpoint": subscription["endpoint"]}, headers=auth).status_code
+        == 204
+    )
     assert client.get("/api/push/devices", headers=auth).json() == []
 
 
@@ -320,9 +307,7 @@ def test_devices_are_not_shared_between_accounts(client, auth):
 
 def test_the_test_push_goes_to_yourself(client, auth, monkeypatch):
     pushed = []
-    monkeypatch.setattr(
-        PushStore, "send", lambda self, who, payload: pushed.append((who, payload)) or 1
-    )
+    monkeypatch.setattr(PushStore, "send", lambda self, who, payload: pushed.append((who, payload)) or 1)
     assert client.post("/api/push/test", headers=auth).status_code == 200
     assert pushed[0][0] == ["bram"]
     assert pushed[0][1]["tag"] == "push-test"
@@ -341,8 +326,6 @@ def test_the_service_worker_is_served_uncached_at_the_top_of_its_scope(client):
 
 
 def test_the_subscription_dataclass_says_nothing_it_should_not():
-    seen = Subscription(
-        id=1, username="bram", endpoint="https://x/y", p256dh="p", auth="a", label="iPhone"
-    ).to_dict()
+    seen = Subscription(id=1, username="bram", endpoint="https://x/y", p256dh="p", auth="a", label="iPhone").to_dict()
     assert "auth" not in seen and "p256dh" not in seen
     assert "username" not in seen

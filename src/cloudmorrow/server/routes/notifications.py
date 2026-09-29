@@ -38,9 +38,7 @@ def mark_read(
     user: User = Depends(get_current_user),
 ) -> NotificationsReadOut:
     marked = state.notifications.mark_read(user.username, payload.ids)
-    return NotificationsReadOut(
-        marked=marked, unread=state.notifications.unread_count(user.username)
-    )
+    return NotificationsReadOut(marked=marked, unread=state.notifications.unread_count(user.username))
 
 
 @agent_router.post("", response_model=NotificationOut)

@@ -70,8 +70,7 @@ class Feature:
     uses: tuple[str, ...] = ()
 
 
-FEATURES: tuple[Feature, ...] = (
-)
+FEATURES: tuple[Feature, ...] = ()
 
 # What each app declared, for the types catalogue to say who reaches what.
 USES: dict[str, tuple[str, ...]] = {feature.key: feature.uses for feature in FEATURES}

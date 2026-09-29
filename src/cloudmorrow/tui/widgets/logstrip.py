@@ -85,10 +85,7 @@ class LogStrip(Static):
         for note in sorted(fresh, key=lambda n: str(n.get("created_at") or "")):
             key = f"n{note.get('id')}"
             self._seen.add(key)
-            self.lines.append(
-                LogLine(moment(note.get("created_at")), str(note.get("title") or ""),
-                        tone_of(note), key)
-            )
+            self.lines.append(LogLine(moment(note.get("created_at")), str(note.get("title") or ""), tone_of(note), key))
         if fresh:
             self.lines.sort(key=lambda line: line.at)
             del self.lines[:-KEEP]
@@ -103,15 +100,16 @@ class LogStrip(Static):
         return max(1, self.size.height or 3)
 
     def redraw(self) -> None:
-        shown = self.lines[-self.rows():]
+        shown = self.lines[-self.rows() :]
         out = Text(no_wrap=True, overflow="ellipsis")
         if not shown:
             out.append("Nothing has happened yet. Quiet is good.", style=FAINT)
         for index, line in enumerate(shown):
             if index:
                 out.append("\n")
-            stamp = line.at.strftime("%H:%M:%S") if line.at.date() == dt.date.today() \
-                else line.at.strftime("%d %b %H:%M")
+            stamp = (
+                line.at.strftime("%H:%M:%S") if line.at.date() == dt.date.today() else line.at.strftime("%d %b %H:%M")
+            )
             out.append(f"{stamp} ", style=FAINT)
             out.append(line.text, style=TONE_COLOURS.get(line.tone, MUTED))
         self.update(out)

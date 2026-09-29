@@ -136,7 +136,9 @@ class ViewButton(Button):
 
     def __init__(self, node: dict, **kwargs: Any) -> None:
         super().__init__(
-            str(node.get("label") or ""), variant=variant_for(node.get("tone")), compact=True,
+            str(node.get("label") or ""),
+            variant=variant_for(node.get("tone")),
+            compact=True,
             **kwargs,
         )
         self.node = node
@@ -197,8 +199,9 @@ class ViewMenu(Button):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         event.stop()
         items = [item for item in self.node.get("items") or [] if item.get("ui") == "button"]
-        self.app.push_screen(MenuModal(str(self.node.get("label") or ""), items),
-                             lambda index: self._chosen(items, index))
+        self.app.push_screen(
+            MenuModal(str(self.node.get("label") or ""), items), lambda index: self._chosen(items, index)
+        )
 
     def _chosen(self, items: list[dict], index: int | None) -> None:
         if index is not None and 0 <= index < len(items):
@@ -377,9 +380,7 @@ class FormNode(Vertical):
         return {**(self.node.get("values") or {}), **values}
 
     def say(self, message: str) -> None:
-        self.query_one(".view-form-complaint", Static).update(
-            Text(message, style=BAD) if message else ""
-        )
+        self.query_one(".view-form-complaint", Static).update(Text(message, style=BAD) if message else "")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         event.stop()
@@ -461,9 +462,7 @@ class TableNode(Vertical):
         record = self.selected
         prefix = f"{self.id}-act-"
         button_id = event.button.id or ""
-        action = next(
-            (a for a in self.actions if button_id == f"{prefix}{safe_id(a['id'])}"), None
-        )
+        action = next((a for a in self.actions if button_id == f"{prefix}{safe_id(a['id'])}"), None)
         if record is not None and action is not None:
             self.post_message(ViewAct({"ui": "button", "action": action["id"], "record": record}))
 
@@ -576,8 +575,7 @@ class LanesNode(Horizontal):
         target = lane_under(self.screen, event.x, event.y)
         if not self.movable or target is None or target not in self.query(Lane):
             return
-        self.post_message(self.Moved(event.record, self.field, target.value,
-                                     target.index_at(event.y)))
+        self.post_message(self.Moved(event.record, self.field, target.value, target.index_at(event.y)))
 
 
 class MonthNode(Vertical):
@@ -636,10 +634,8 @@ class MonthNode(Vertical):
             yield Button("‹", id=f"{self.id}-back", compact=True, classes="view-button")
             yield Static("", classes="view-month-title")
             yield Button("›", id=f"{self.id}-on", compact=True, classes="view-button")
-        yield DataTable(id=f"{self.id}-grid", cursor_type="none", show_cursor=False,
-                        classes="view-month-grid")
-        yield DataTable(id=f"{self.id}-list", cursor_type="row", show_header=False,
-                        classes="view-month-list")
+        yield DataTable(id=f"{self.id}-grid", cursor_type="none", show_cursor=False, classes="view-month-grid")
+        yield DataTable(id=f"{self.id}-list", cursor_type="row", show_header=False, classes="view-month-list")
 
     def on_mount(self) -> None:
         grid = self.query_one(f"#{self.id}-grid", DataTable)
@@ -663,10 +659,10 @@ class MonthNode(Vertical):
         for week in weeks_of(self.shown):
             cells = []
             for day in week:
-                cell = Text(f"{day.day:>2}", style=(
-                    f"bold {ACCENT}" if day == today
-                    else MUTED if day.month != self.shown.month else TEXT
-                ))
+                cell = Text(
+                    f"{day.day:>2}",
+                    style=(f"bold {ACCENT}" if day == today else MUTED if day.month != self.shown.month else TEXT),
+                )
                 count = on_day.get(day, 0) if day.month == self.shown.month else 0
                 if count:
                     cell.append(" " + "●" * min(count, 3), style=ACCENT)
@@ -716,8 +712,7 @@ class Drawer:
         kind = node.get("ui") if isinstance(node, dict) else None
         method = RENDERERS.get(str(kind))
         if method is None:
-            return Static(Text(f"({kind!r} is not drawn in the terminal yet)", style=MUTED),
-                          id=path)
+            return Static(Text(f"({kind!r} is not drawn in the terminal yet)", style=MUTED), id=path)
         return getattr(self, method)(node, path)
 
     def _children(self, node: dict, key: str, path: str) -> list[Widget]:
@@ -726,17 +721,13 @@ class Drawer:
     # layout
     def draw_stack(self, node: dict, path: str) -> Widget:
         gap = node.get("gap") if node.get("gap") in GAPS else "normal"
-        return Vertical(*self._children(node, "children", path), id=path,
-                        classes=f"view-stack -gap-{gap}")
+        return Vertical(*self._children(node, "children", path), id=path, classes=f"view-stack -gap-{gap}")
 
     def draw_row(self, node: dict, path: str) -> Widget:
         return Horizontal(*self._children(node, "children", path), id=path, classes="view-row")
 
     def draw_columns(self, node: dict, path: str) -> Widget:
-        columns = [
-            Vertical(child, classes="view-column")
-            for child in self._children(node, "children", path)
-        ]
+        columns = [Vertical(child, classes="view-column") for child in self._children(node, "children", path)]
         return Horizontal(*columns, id=path, classes="view-columns")
 
     def draw_tabs(self, node: dict, path: str) -> Widget:
@@ -758,8 +749,7 @@ class Drawer:
         return ViewImage(node, id=path)
 
     def draw_badge(self, node: dict, path: str) -> Widget:
-        return Static(_text(f" {node.get('text')} "), id=path,
-                      classes=f"view-badge -tone-{_tone(node.get('tone'))}")
+        return Static(_text(f" {node.get('text')} "), id=path, classes=f"view-badge -tone-{_tone(node.get('tone'))}")
 
     def draw_stat(self, node: dict, path: str) -> Widget:
         text = Text(str(node.get("label") or ""), style=MUTED)
@@ -773,10 +763,12 @@ class Drawer:
         if node.get("action"):
             action = find_action(self.pane.quill, str(node["action"])) or {}
             label = node.get("label") or action.get("label") or node["action"]
-            parts.append(ViewButton(
-                {"ui": "button", "label": label, "action": node["action"], "tone": "primary"},
-                id=f"{path}-do",
-            ))
+            parts.append(
+                ViewButton(
+                    {"ui": "button", "label": label, "action": node["action"], "tone": "primary"},
+                    id=f"{path}-do",
+                )
+            )
         return Vertical(*parts, id=path, classes="view-empty")
 
     def draw_divider(self, node: dict, path: str) -> Widget:
@@ -801,8 +793,7 @@ class Drawer:
 
     def draw_table(self, node: dict, path: str) -> Widget:
         actions = [
-            a for a in (find_action(self.pane.quill, str(i)) for i in node.get("actions") or [])
-            if a is not None
+            a for a in (find_action(self.pane.quill, str(i)) for i in node.get("actions") or []) if a is not None
         ]
         table = TableNode(node, self.models, actions, id=path)
         table.cursor = int(self.pane.kept.get(path) or 0)
@@ -811,12 +802,12 @@ class Drawer:
     def draw_cards(self, node: dict, path: str) -> Widget:
         records = node.get("records") or []
         if not records:
-            return Static(_text(node.get("empty") or "Nothing here."), id=path,
-                          classes="view-muted")
+            return Static(_text(node.get("empty") or "Nothing here."), id=path, classes="view-muted")
         return Vertical(
             *(
-                ViewCard(record, node, self.models.get(record.get("model", "")),
-                         id=f"{path}-card-{safe_id(record['id'])}")
+                ViewCard(
+                    record, node, self.models.get(record.get("model", "")), id=f"{path}-card-{safe_id(record['id'])}"
+                )
                 for record in records
             ),
             id=path,

@@ -50,15 +50,9 @@ def dev_checkout() -> Path | None:
 @app.callback(invoke_without_command=True)
 def update_local(
     ctx: typer.Context,
-    check: Annotated[
-        bool, typer.Option("--check", help="Say what would be installed, and change nothing.")
-    ] = False,
-    agent: Annotated[
-        bool, typer.Option(help="Also restart this machine's agent afterwards.")
-    ] = True,
-    force: Annotated[
-        bool, typer.Option("--force", help="Update even from a development checkout.")
-    ] = False,
+    check: Annotated[bool, typer.Option("--check", help="Say what would be installed, and change nothing.")] = False,
+    agent: Annotated[bool, typer.Option(help="Also restart this machine's agent afterwards.")] = True,
+    force: Annotated[bool, typer.Option("--force", help="Update even from a development checkout.")] = False,
 ) -> None:
     """Update the CLI and the agent on this machine, from your server.
 
@@ -120,8 +114,7 @@ def _update_client(*, check: bool, agent: bool, force: bool) -> None:
         # --force-reinstall because a redeploy of the same tag publishes the
         # same version, and pip would decide the copy installed satisfies it.
         completed = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "--quiet", "--upgrade",
-             "--force-reinstall", release["package"]],
+            [sys.executable, "-m", "pip", "install", "--quiet", "--upgrade", "--force-reinstall", release["package"]],
             capture_output=True,
             text=True,
         )
@@ -134,8 +127,7 @@ def _update_client(*, check: bool, agent: bool, force: bool) -> None:
             # which is what --force-reinstall on the whole extra would do.
             activity.step("keeping the desktop app")
             subprocess.run(
-                [sys.executable, "-m", "pip", "install", "--quiet",
-                 desktop_extra.with_extra(release["package"])],
+                [sys.executable, "-m", "pip", "install", "--quiet", desktop_extra.with_extra(release["package"])],
                 capture_output=True,
                 text=True,
             )
@@ -153,8 +145,7 @@ def _update_client(*, check: bool, agent: bool, force: bool) -> None:
         else:
             progress.warn(
                 console,
-                f"agent not restarted  "
-                f"[{MUTED}]{restarted.detail or 'not installed here'}[/]",
+                f"agent not restarted  [{MUTED}]{restarted.detail or 'not installed here'}[/]",
             )
     console.print()
 
@@ -191,22 +182,12 @@ async def _fetch_release(api: CloudmorrowClient) -> dict:
 
 @app.command("server")
 def update_server(
-    ssh: Annotated[
-        bool, typer.Option("--ssh", help="Deploy over ssh instead of the API.")
-    ] = False,
-    host: Annotated[
-        str | None, typer.Option("--host", "-H", help="ssh target. Implies --ssh.")
-    ] = None,
+    ssh: Annotated[bool, typer.Option("--ssh", help="Deploy over ssh instead of the API.")] = False,
+    host: Annotated[str | None, typer.Option("--host", "-H", help="ssh target. Implies --ssh.")] = None,
     branch: Annotated[str | None, typer.Option(help="Branch to deploy.")] = None,
-    force: Annotated[
-        bool, typer.Option("--force", help="Update even with local changes or nothing new.")
-    ] = False,
-    restart: Annotated[
-        bool, typer.Option(help="Restart the service onto the new code.")
-    ] = True,
-    wait: Annotated[
-        int, typer.Option(help="Seconds to wait for the server to come back.")
-    ] = 60,
+    force: Annotated[bool, typer.Option("--force", help="Update even with local changes or nothing new.")] = False,
+    restart: Annotated[bool, typer.Option(help="Restart the service onto the new code.")] = True,
+    wait: Annotated[int, typer.Option(help="Seconds to wait for the server to come back.")] = 60,
 ) -> None:
     """Deploy the server from git: push, then run this. Admin accounts only.
 
@@ -256,21 +237,11 @@ def update_server(
 @app.command("all")
 def update_all(
     branch: Annotated[str | None, typer.Option(help="Branch to deploy.")] = None,
-    ssh: Annotated[
-        bool, typer.Option("--ssh", help="Deploy the server over ssh instead of the API.")
-    ] = False,
-    host: Annotated[
-        str | None, typer.Option("--host", "-H", help="ssh target. Implies --ssh.")
-    ] = None,
-    wait: Annotated[
-        int, typer.Option(help="Seconds to wait for the server to come back.")
-    ] = 60,
-    agent: Annotated[
-        bool, typer.Option(help="Also restart this machine's agent afterwards.")
-    ] = True,
-    force: Annotated[
-        bool, typer.Option("--force", help="Deploy and install even with nothing new.")
-    ] = False,
+    ssh: Annotated[bool, typer.Option("--ssh", help="Deploy the server over ssh instead of the API.")] = False,
+    host: Annotated[str | None, typer.Option("--host", "-H", help="ssh target. Implies --ssh.")] = None,
+    wait: Annotated[int, typer.Option(help="Seconds to wait for the server to come back.")] = 60,
+    agent: Annotated[bool, typer.Option(help="Also restart this machine's agent afterwards.")] = True,
+    force: Annotated[bool, typer.Option("--force", help="Deploy and install even with nothing new.")] = False,
 ) -> None:
     """The whole thing: deploy the server, then follow it on this machine.
 
@@ -329,17 +300,18 @@ def _deploy_lines(result: dict, *, restart: bool, force: bool) -> tuple[list[str
             f"  [{MUTED}]{result['changed_files']} files · {result['branch']}[/]"
         )
     else:
-        lines.append(
-            f" [{GOOD}]✔[/] Already up to date  "
-            f"[{MUTED}]{_name(result, 'new')} · {result['branch']}[/]"
-        )
+        lines.append(f" [{GOOD}]✔[/] Already up to date  [{MUTED}]{_name(result, 'new')} · {result['branch']}[/]")
     if subject:
         lines.append(f"   [{SECOND}]{subject}[/]")
     # One line for the housekeeping, since neither half is news on its own.
-    done = [word for word, did in
-            (("reinstalled", result.get("reinstalled")),
-             (f"published {escape(result.get('published_wheel') or '')}",
-              result.get("published_wheel"))) if did]
+    done = [
+        word
+        for word, did in (
+            ("reinstalled", result.get("reinstalled")),
+            (f"published {escape(result.get('published_wheel') or '')}", result.get("published_wheel")),
+        )
+        if did
+    ]
     if done:
         lines.append(f"   [{MUTED}]{' · '.join(done)}[/]")
 
@@ -380,15 +352,10 @@ def _update_over_ssh(*, host: str | None, branch: str | None, force: bool) -> No
         # reinstalled and restarted before whatever failed.
         fail(f"ssh exited {completed.returncode} — see its output above.")
     progress.good(console, "Server updated")
-    console.print(
-        f"   [{MUTED}]the client wheel was republished too — "
-        f"`cloudmorrow update` to follow it.[/]\n"
-    )
+    console.print(f"   [{MUTED}]the client wheel was republished too — `cloudmorrow update` to follow it.[/]\n")
 
 
-async def _deploy(
-    api: CloudmorrowClient, *, branch: str | None, force: bool, restart: bool
-) -> dict:
+async def _deploy(api: CloudmorrowClient, *, branch: str | None, force: bool, restart: bool) -> dict:
     async with api:
         return await api.update_server(branch=branch, force=force, restart=restart)
 
@@ -432,10 +399,7 @@ def _wait_for(config: ClientConfig, *, expect: str, seconds: int) -> None:
         )
         return
     progress.good(console, f"Back up on [b]{expect[:8]}[/]")
-    console.print(
-        f"   [{MUTED}]the client wheel was republished too — "
-        f"`cloudmorrow update` to follow it.[/]"
-    )
+    console.print(f"   [{MUTED}]the client wheel was republished too — `cloudmorrow update` to follow it.[/]")
 
 
 def _require_admin(config: ClientConfig) -> None:

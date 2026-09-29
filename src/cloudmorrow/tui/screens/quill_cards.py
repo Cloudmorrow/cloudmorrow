@@ -36,7 +36,11 @@ QUILL_KEYS: tuple[str, ...] = ("f1", "f2", "f5", "f7", "f4", "f10", "f11", "f12"
 # have to learn them again. Chat's f6 is not one: in Notes it was Import as
 # well, so Chat takes the next key free, f4.
 FORMER_KEYS: dict[str, str] = {
-    "notes": "f1", "tasks": "f2", "files": "f5", "calendar": "f7", "secrets": "f3",
+    "notes": "f1",
+    "tasks": "f2",
+    "files": "f5",
+    "calendar": "f7",
+    "secrets": "f3",
 }
 
 
@@ -79,7 +83,6 @@ class QuillCards:
                 # theirs, so no card, the same as one switched off.
                 continue
             for screen in quill.get("screens") or []:
-
                 signature = json.dumps(
                     [quill.get("version"), quill.get("jobs"), screen, quill.get("models")],
                     sort_keys=True,
@@ -115,9 +118,7 @@ class QuillCards:
             self._quill_keys[key] = free
         return free
 
-    async def _add_quill_pane(
-        self, key: str, quill: dict, screen: dict, *, after
-    ) -> NavCard | None:
+    async def _add_quill_pane(self, key: str, quill: dict, screen: dict, *, after) -> NavCard | None:
         if self.query(f"#pane-{key}") or self.query(f"#nav-{key}"):
             # Half there from a sync that was cut short by the next one.
             await self._drop_quill_pane(key)
@@ -156,9 +157,7 @@ class QuillCards:
     def go_to(self, quill_id: str, screen_id: str, params: dict | None = None) -> None:
         """A Quill's `go`: to one of its screens, a view asked again with *params*."""
         quill = next((q for q in self.app.quills if q.get("id") == quill_id), None)
-        screen = next(
-            (s for s in (quill or {}).get("screens") or [] if s.get("id") == screen_id), None
-        )
+        screen = next((s for s in (quill or {}).get("screens") or [] if s.get("id") == screen_id), None)
         if quill is None or screen is None:
             self.set_status(f"{quill_id} has no screen called {screen_id}.", error=True)
             return
@@ -181,9 +180,7 @@ class QuillCards:
         if not loose_actions([q for q in self.app.quills if q.get("enabled", True)]):
             self.set_status("No Quill here has an action of its own.", error=True)
             return
-        self.app.push_screen(
-            CommandPalette(providers=[QuillCommands], placeholder="Run a Quill action…")
-        )
+        self.app.push_screen(CommandPalette(providers=[QuillCommands], placeholder="Run a Quill action…"))
 
     def run_quill_action(self, quill: dict, action: dict) -> None:
         """One chosen in the palette: run it, then draw the pane you are on again."""

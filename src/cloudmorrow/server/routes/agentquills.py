@@ -33,8 +33,18 @@ router = APIRouter(prefix="/api/agent/quills", tags=["agents"])
 # What a machine handler may ask the server for. `run` is answered on the
 # machine itself; nothing else is anybody's to ask for.
 OPS = frozenset(
-    {"records.list", "records.get", "records.create", "records.patch", "records.move",
-     "records.delete", "now", "log", "fetch", "secret"}
+    {
+        "records.list",
+        "records.get",
+        "records.create",
+        "records.patch",
+        "records.move",
+        "records.delete",
+        "now",
+        "log",
+        "fetch",
+        "secret",
+    }
 )
 
 

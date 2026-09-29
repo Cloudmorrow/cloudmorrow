@@ -43,16 +43,34 @@ TASK_MODELS = {
         "ordered_within": ["board", "lane"],
         "source": "foundation",
         "fields": [
-            {"name": "board", "kind": "link", "label": "Board", "required": True,
-             "indexed": True, "to": "board", "on_delete": "cascade"},
+            {
+                "name": "board",
+                "kind": "link",
+                "label": "Board",
+                "required": True,
+                "indexed": True,
+                "to": "board",
+                "on_delete": "cascade",
+            },
             {"name": "title", "kind": "string", "label": "Title", "required": True},
             {"name": "body", "kind": "markdown", "label": "Body", "default": ""},
-            {"name": "lane", "kind": "enum", "label": "Lane", "indexed": True,
-             "default": "todo", "values": ["todo", "doing", "done"],
-             "labels": ["To Do", "Doing", "Done"]},
+            {
+                "name": "lane",
+                "kind": "enum",
+                "label": "Lane",
+                "indexed": True,
+                "default": "todo",
+                "values": ["todo", "doing", "done"],
+                "labels": ["To Do", "Doing", "Done"],
+            },
             {"name": "due", "kind": "date", "label": "Due", "indexed": True},
-            {"name": "done_at", "kind": "datetime", "label": "Done", "indexed": True,
-             "stamp": {"field": "lane", "value": "done"}},
+            {
+                "name": "done_at",
+                "kind": "datetime",
+                "label": "Done",
+                "indexed": True,
+                "stamp": {"field": "lane", "value": "done"},
+            },
         ],
     },
 }
@@ -71,12 +89,20 @@ TASKS_QUILL = {
     "introduces": [],
     "grants": [],
     "screens": [
-        {"id": "board", "kit": "board", "label": "Tasks", "model": "task", "group": "board",
-         "lane": "lane", "title": "title", "body": "body", "done": "done"},
+        {
+            "id": "board",
+            "kit": "board",
+            "label": "Tasks",
+            "model": "task",
+            "group": "board",
+            "lane": "lane",
+            "title": "title",
+            "body": "body",
+            "done": "done",
+        },
     ],
     "jobs": [
-        {"id": "sweep_done", "action": "expire", "model": "task", "field": "done_at",
-         "after": "7d", "every": "1h"},
+        {"id": "sweep_done", "action": "expire", "model": "task", "field": "done_at", "after": "7d", "every": "1h"},
     ],
     "datasets": [{"id": "first_board", "model": "board", "seed": "per-owner", "count": 1}],
     "services": [],
@@ -109,8 +135,15 @@ READING_QUILL = {
     "introduces": ["reading.book"],
     "grants": [],
     "screens": [
-        {"id": "shelf", "kit": "list", "label": "Reading", "model": "reading.book",
-         "title": "title", "subtitle": "author", "tick": "read"},
+        {
+            "id": "shelf",
+            "kit": "list",
+            "label": "Reading",
+            "model": "reading.book",
+            "title": "title",
+            "subtitle": "author",
+            "tick": "read",
+        },
     ],
     "jobs": [],
     "datasets": [],
@@ -118,8 +151,7 @@ READING_QUILL = {
     "webhooks": [],
     "apis": [],
     "data": [
-        {"id": "reading.book", "label": "Book", "how": "introduces", "foundation": False,
-         "new": True},
+        {"id": "reading.book", "label": "Book", "how": "introduces", "foundation": False, "new": True},
     ],
     "surfaces": ["phone", "web", "terminal", "command line", "assistant"],
     "installed_version": None,
@@ -157,10 +189,15 @@ SECRET_MODEL = {
     "source": "foundation",
     "backend": "vaults",
     "fields": [
-        {"name": "vault", "kind": "string", "label": "Vault", "required": True, "indexed": True,
-         "default": "default"},
-        {"name": "environment", "kind": "string", "label": "Environment", "required": True,
-         "indexed": True, "default": "local"},
+        {"name": "vault", "kind": "string", "label": "Vault", "required": True, "indexed": True, "default": "default"},
+        {
+            "name": "environment",
+            "kind": "string",
+            "label": "Environment",
+            "required": True,
+            "indexed": True,
+            "default": "local",
+        },
         {"name": "key", "kind": "string", "label": "Key", "required": True, "indexed": True},
         {"name": "value", "kind": "string", "label": "Value", "secret": True},
         {"name": "length", "kind": "int", "label": "Length", "indexed": True},
@@ -181,9 +218,17 @@ SECRETS_QUILL = {
     "introduces": [],
     "grants": [],
     "screens": [
-        {"id": "vaults", "kit": "list", "label": "Secrets", "model": "secret", "title": "key",
-         "subtitle": "value", "group": "vault", "subgroup": "environment",
-         "fields": ["key", "value", "vault", "environment"]},
+        {
+            "id": "vaults",
+            "kit": "list",
+            "label": "Secrets",
+            "model": "secret",
+            "title": "key",
+            "subtitle": "value",
+            "group": "vault",
+            "subgroup": "environment",
+            "fields": ["key", "value", "vault", "environment"],
+        },
     ],
     "jobs": [],
     "datasets": [],
@@ -204,27 +249,45 @@ SECRETS_QUILL = {
 SECRET_VALUES = {"s_api": "https://api.example.org", "s_stripe": "sk_live_abc", "s_wifi": "hunter2"}
 CALENDAR_MODELS = {
     "calendar": {
-        "id": "calendar", "version": 1, "label": "Calendar", "title": "name",
-        "scopes": ["personal", "shared", "public"], "ordered_within": [], "source": "foundation",
-        "space": True, "in_space": "",
+        "id": "calendar",
+        "version": 1,
+        "label": "Calendar",
+        "title": "name",
+        "scopes": ["personal", "shared", "public"],
+        "ordered_within": [],
+        "source": "foundation",
+        "space": True,
+        "in_space": "",
         "fields": [
             {"name": "name", "kind": "string", "label": "Name", "required": True},
             {"name": "colour", "kind": "string", "label": "Colour"},
         ],
     },
     "event": {
-        "id": "event", "version": 1, "label": "Event", "title": "title",
-        "scopes": ["personal", "shared", "public"], "ordered_within": [], "source": "foundation",
-        "space": False, "in_space": "calendar", "authored": "or-manager",
+        "id": "event",
+        "version": 1,
+        "label": "Event",
+        "title": "title",
+        "scopes": ["personal", "shared", "public"],
+        "ordered_within": [],
+        "source": "foundation",
+        "space": False,
+        "in_space": "calendar",
+        "authored": "or-manager",
         "fields": [
-            {"name": "calendar", "kind": "link", "label": "Calendar", "required": True,
-             "indexed": True, "to": "calendar", "on_delete": "cascade"},
+            {
+                "name": "calendar",
+                "kind": "link",
+                "label": "Calendar",
+                "required": True,
+                "indexed": True,
+                "to": "calendar",
+                "on_delete": "cascade",
+            },
             {"name": "title", "kind": "string", "label": "Title", "required": True},
-            {"name": "starts_at", "kind": "datetime", "label": "Starts at", "required": True,
-             "indexed": True},
+            {"name": "starts_at", "kind": "datetime", "label": "Starts at", "required": True, "indexed": True},
             {"name": "ends_at", "kind": "datetime", "label": "Ends at", "indexed": True},
-            {"name": "all_day", "kind": "bool", "label": "All day", "default": False,
-             "indexed": True},
+            {"name": "all_day", "kind": "bool", "label": "All day", "default": False, "indexed": True},
             {"name": "location", "kind": "string", "label": "Location"},
             {"name": "notes", "kind": "markdown", "label": "Notes"},
         ],
@@ -239,9 +302,19 @@ CALENDAR_QUILL = {
     "icon": "calendar",
     "uses": ["calendar", "event"],
     "screens": [
-        {"id": "month", "kit": "calendar", "label": "Calendar", "model": "event",
-         "space": "calendar", "colour": "colour", "title": "title", "subtitle": "location",
-         "starts": "starts_at", "ends": "ends_at", "all_day": "all_day"},
+        {
+            "id": "month",
+            "kit": "calendar",
+            "label": "Calendar",
+            "model": "event",
+            "space": "calendar",
+            "colour": "colour",
+            "title": "title",
+            "subtitle": "location",
+            "starts": "starts_at",
+            "ends": "ends_at",
+            "all_day": "all_day",
+        },
     ],
     "jobs": [],
     "datasets": [
@@ -257,19 +330,30 @@ TODAY = dt.date.today()
 TOMORROW = TODAY + dt.timedelta(days=1)
 
 
-def space_row(record_id: str, name: str, scope: str, colour: str, *, owner: str = "bram",
-              members: list[str] | None = None) -> dict:
+def space_row(
+    record_id: str, name: str, scope: str, colour: str, *, owner: str = "bram", members: list[str] | None = None
+) -> dict:
     row = record_row("calendar", record_id, 0, name=name, colour=colour)
-    row.update(scope=scope, owner=owner, members=list(members or []),
-               can_manage=owner == "bram", unread=0)
+    row.update(scope=scope, owner=owner, members=list(members or []), can_manage=owner == "bram", unread=0)
     return row
 
 
 def calendar_records() -> dict[str, list[dict]]:
     """bram's own, a shared one guest is in, everybody's; three things on them."""
+
     def event(record_id, title, calendar, starts, ends, *, all_day=False, owner="bram", **more):
-        row = record_row("event", record_id, 0, calendar=calendar, title=title, starts_at=starts,
-                         ends_at=ends, all_day=all_day, location=more.get("location", ""), notes="")
+        row = record_row(
+            "event",
+            record_id,
+            0,
+            calendar=calendar,
+            title=title,
+            starts_at=starts,
+            ends_at=ends,
+            all_day=all_day,
+            location=more.get("location", ""),
+            notes="",
+        )
         row["owner"] = owner
         return row
 
@@ -280,12 +364,9 @@ def calendar_records() -> dict[str, list[dict]]:
             space_row("r_all", "Everybody", "public", "green", owner="guest"),
         ],
         "event": [
-            event("r_dentist", "Dentist", "r_mine", f"{TODAY}T10:00", f"{TODAY}T11:00",
-                  location="High Street"),
-            event("r_bins", "Bins out", "r_house", str(TODAY), str(TODAY), all_day=True,
-                  owner="guest"),
-            event("r_boiler", "Boiler service", "r_house", f"{TOMORROW}T09:00",
-                  f"{TOMORROW}T10:00"),
+            event("r_dentist", "Dentist", "r_mine", f"{TODAY}T10:00", f"{TODAY}T11:00", location="High Street"),
+            event("r_bins", "Bins out", "r_house", str(TODAY), str(TODAY), all_day=True, owner="guest"),
+            event("r_boiler", "Boiler service", "r_house", f"{TOMORROW}T09:00", f"{TOMORROW}T10:00"),
         ],
     }
 
@@ -297,13 +378,32 @@ CATALOG = {
         {"id": "developer", "label": "Developer", "description": "Machines, secrets, pipelines."},
     ],
     "quills": [
-        {"id": "tasks", "name": "Tasks", "summary": TASKS_QUILL["summary"], "repo": "quill-tasks",
-         "category": "personal", "publisher": "Cloudmorrow", "foundation": True},
-        {"id": "secrets", "name": "Secrets", "summary": SECRETS_QUILL["summary"],
-         "repo": "quill-secrets", "category": "developer", "publisher": "Cloudmorrow",
-         "foundation": True},
-        {"id": "reading", "name": "Reading", "summary": READING_QUILL["summary"],
-         "repo": "quill-reading", "category": "home", "publisher": "Somebody Else"},
+        {
+            "id": "tasks",
+            "name": "Tasks",
+            "summary": TASKS_QUILL["summary"],
+            "repo": "quill-tasks",
+            "category": "personal",
+            "publisher": "Cloudmorrow",
+            "foundation": True,
+        },
+        {
+            "id": "secrets",
+            "name": "Secrets",
+            "summary": SECRETS_QUILL["summary"],
+            "repo": "quill-secrets",
+            "category": "developer",
+            "publisher": "Cloudmorrow",
+            "foundation": True,
+        },
+        {
+            "id": "reading",
+            "name": "Reading",
+            "summary": READING_QUILL["summary"],
+            "repo": "quill-reading",
+            "category": "home",
+            "publisher": "Somebody Else",
+        },
     ],
 }
 
@@ -334,21 +434,64 @@ def seed_records() -> dict[str, list[dict]]:
             record_row("board", "r_errands", 1, title="Errands"),
         ],
         "task": [
-            record_row("task", "r_task1", 0, board="r_homelab", title="Wire the rack",
-                       body="- [ ] label\n- [x] shelf\n", lane="todo", due=None, done_at=None),
-            record_row("task", "r_task2", 1, board="r_homelab", title="Repaint", body="",
-                       lane="todo", due=None, done_at=None),
-            record_row("task", "r_task3", 0, board="r_homelab", title="Swap the switch",
-                       body="", lane="doing", due=None, done_at=None),
+            record_row(
+                "task",
+                "r_task1",
+                0,
+                board="r_homelab",
+                title="Wire the rack",
+                body="- [ ] label\n- [x] shelf\n",
+                lane="todo",
+                due=None,
+                done_at=None,
+            ),
+            record_row(
+                "task", "r_task2", 1, board="r_homelab", title="Repaint", body="", lane="todo", due=None, done_at=None
+            ),
+            record_row(
+                "task",
+                "r_task3",
+                0,
+                board="r_homelab",
+                title="Swap the switch",
+                body="",
+                lane="doing",
+                due=None,
+                done_at=None,
+            ),
         ],
         # Two vaults, one with two environments: the shape the Secrets tab always had.
         "secret": [
-            record_row("secret", "s_api", 0, vault="verticore", environment="local", key="API_URL",
-                       value=SECRET_VALUES["s_api"], length=23),
-            record_row("secret", "s_stripe", 0, vault="verticore", environment="production",
-                       key="STRIPE_KEY", value=SECRET_VALUES["s_stripe"], length=11),
-            record_row("secret", "s_wifi", 0, vault="homelab", environment="local",
-                       key="WIFI_PASSWORD", value=SECRET_VALUES["s_wifi"], length=7),
+            record_row(
+                "secret",
+                "s_api",
+                0,
+                vault="verticore",
+                environment="local",
+                key="API_URL",
+                value=SECRET_VALUES["s_api"],
+                length=23,
+            ),
+            record_row(
+                "secret",
+                "s_stripe",
+                0,
+                vault="verticore",
+                environment="production",
+                key="STRIPE_KEY",
+                value=SECRET_VALUES["s_stripe"],
+                length=11,
+            ),
+            record_row(
+                "secret",
+                "s_wifi",
+                0,
+                vault="homelab",
+                environment="local",
+                key="WIFI_PASSWORD",
+                value=SECRET_VALUES["s_wifi"],
+                length=7,
+            ),
         ],
     }
 
@@ -360,8 +503,7 @@ def _matches(fields: dict, key: str, value: object) -> bool:
         have = fields.get(name)
         if have is None:
             return False
-        return {"lt": have < value, "lte": have <= value, "gt": have > value,
-                "gte": have >= value}[op]
+        return {"lt": have < value, "lte": have <= value, "gt": have > value, "gte": have >= value}[op]
     return fields.get(key) == value
 
 
@@ -394,10 +536,7 @@ class FakeQuills:
         installed = {q["id"]: q["version"] for q in self.quill_list}
         return {
             "categories": list(self.catalog["categories"]),
-            "quills": [
-                {**entry, "installed_version": installed.get(entry["id"])}
-                for entry in self.catalog["quills"]
-            ],
+            "quills": [{**entry, "installed_version": installed.get(entry["id"])} for entry in self.catalog["quills"]],
         }
 
     def _published(self, quill_id: str) -> dict:
@@ -495,9 +634,7 @@ class FakeQuills:
                 continue
             if row["fields"].get(stamp["field"]) == stamp["value"]:
                 if not row["fields"].get(f["name"]):
-                    row["fields"][f["name"]] = dt.datetime.now(tz=dt.UTC).isoformat(
-                        timespec="seconds"
-                    )
+                    row["fields"][f["name"]] = dt.datetime.now(tz=dt.UTC).isoformat(timespec="seconds")
             else:
                 row["fields"][f["name"]] = None
         row["expires_at"] = None
@@ -507,9 +644,9 @@ class FakeQuills:
                     continue
                 moment = row["fields"].get(job["field"])
                 if moment:
-                    row["expires_at"] = (
-                        dt.datetime.fromisoformat(moment) + _after(job["after"])
-                    ).isoformat(timespec="seconds")
+                    row["expires_at"] = (dt.datetime.fromisoformat(moment) + _after(job["after"])).isoformat(
+                        timespec="seconds"
+                    )
 
     def _seed(self, model_id: str) -> None:
         """A per-owner dataset: the first board, made the first time boards are listed."""
@@ -518,9 +655,7 @@ class FakeQuills:
         for quill in self.quill_list:
             for dataset in quill.get("datasets") or []:
                 if dataset.get("model") == model_id and dataset.get("seed") == "per-owner":
-                    self._rows(model_id).append(
-                        record_row(model_id, self._fresh_id(), 0, title="bram's tasks")
-                    )
+                    self._rows(model_id).append(record_row(model_id, self._fresh_id(), 0, title="bram's tasks"))
                     return
 
     def _fresh_id(self) -> str:
@@ -531,8 +666,9 @@ class FakeQuills:
         self.record_calls.append((model, dict(where)))
         definition = self._model(model)
         self._seed(model)
-        rows = [row for row in self._rows(model) if all(
-            _matches(row["fields"], key, value) for key, value in where.items())]
+        rows = [
+            row for row in self._rows(model) if all(_matches(row["fields"], key, value) for key, value in where.items())
+        ]
         order = definition.get("ordered_within") or []
         rows.sort(key=lambda r: (tuple(str(r["fields"].get(n)) for n in order), r["position"]))
         rows = copy.deepcopy(rows)
@@ -571,9 +707,7 @@ class FakeQuills:
         self._renumber(definition, group)
         return copy.deepcopy(row)
 
-    async def update_record(
-        self, model: str, record_id: str, fields: dict, *, rev: int | None = None
-    ) -> dict:
+    async def update_record(self, model: str, record_id: str, fields: dict, *, rev: int | None = None) -> dict:
         definition = self._model(model)
         row = self._find(model, record_id)
         if rev is not None and rev != row["rev"]:
@@ -589,9 +723,7 @@ class FakeQuills:
             self._renumber(definition, after)
         return copy.deepcopy(row)
 
-    async def move_record(
-        self, model: str, record_id: str, fields: dict, index: int | None = None
-    ) -> dict:
+    async def move_record(self, model: str, record_id: str, fields: dict, index: int | None = None) -> dict:
         self.moves.append((record_id, dict(fields), index))
         definition = self._model(model)
         row = self._find(model, record_id)
@@ -605,8 +737,7 @@ class FakeQuills:
         row["position"] = 10_000 if index is None else index - 0.5
         if after == before and index is not None:
             others = sorted(
-                (r for r in self._rows(model)
-                 if self._group(definition, r) == after and r is not row),
+                (r for r in self._rows(model) if self._group(definition, r) == after and r is not row),
                 key=lambda r: r["position"],
             )
             for number, other in enumerate(others):
@@ -633,8 +764,7 @@ class FakeQuills:
 
     # -- the people in a space ----------------------------------------------------
     async def people(self) -> list[dict]:
-        return [{"username": "guest", "display_name": "Guest"},
-                {"username": "ada", "display_name": ""}]
+        return [{"username": "guest", "display_name": "Guest"}, {"username": "ada", "display_name": ""}]
 
     async def add_member(self, model: str, space_id: str, username: str) -> dict:
         self.record_calls.append((f"add:{space_id}", {"username": username}))

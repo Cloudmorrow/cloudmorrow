@@ -55,7 +55,9 @@ def test_a_note_is_edited_moved_and_deleted_as_a_record(api):
     changed = api("PATCH", f"/api/records/note/{made['id']}", {"fields": {"body": "two\n"}, "rev": made["rev"]})
     assert changed["fields"]["body"] == "two\n"
     # The old rev is a conflict, not a loss.
-    stale = api("PATCH", f"/api/records/note/{made['id']}", {"fields": {"body": "three\n"}, "rev": made["rev"]}, expect=409)
+    stale = api(
+        "PATCH", f"/api/records/note/{made['id']}", {"fields": {"body": "three\n"}, "rev": made["rev"]}, expect=409
+    )
     assert stale["detail"]["current"]["fields"]["body"] == "two\n"
     moved = api("PATCH", f"/api/records/note/{changed['id']}", {"fields": {"path": "archive/log"}})
     assert moved["fields"]["folder"] == "archive"

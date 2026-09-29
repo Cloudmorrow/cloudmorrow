@@ -120,7 +120,9 @@ def choose_cmd(
     if done["installed"]:
         console.print("installed: " + ", ".join(names[i] for i in done["installed"]))
     if done["off"]:
-        console.print("switched off: " + ", ".join(names[i] for i in done["off"]) + " [dim](on again from Administration)[/]")
+        console.print(
+            "switched off: " + ", ".join(names[i] for i in done["off"]) + " [dim](on again from Administration)[/]"
+        )
     kept = [names[o.id] for o in options if o.id in wanted]
     console.print("[green]Your cloud has:[/] " + (", ".join(kept) or "none of them"))
 
@@ -140,7 +142,9 @@ def list_cmd(config_path: ConfigOption = None) -> None:
 
 
 @app.command("add")
-def add(quill_id: Annotated[str, typer.Argument(help="Its id in the Quill Catalog.")], config_path: ConfigOption = None) -> None:
+def add(
+    quill_id: Annotated[str, typer.Argument(help="Its id in the Quill Catalog.")], config_path: ConfigOption = None
+) -> None:
     """Install a quill from the catalog. Restart the service afterwards if it is running."""
     try:
         plan = _registry(_config(config_path)).install_from_catalog(quill_id)

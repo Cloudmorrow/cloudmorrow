@@ -31,9 +31,7 @@ from cloudmorrow.client import mounts, rclone, sharing
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.client.config import StoredCredentials
 
-app = typer.Typer(
-    help="Fileshares: on the server or on your machines, mounted here.", no_args_is_help=True
-)
+app = typer.Typer(help="Fileshares: on the server or on your machines, mounted here.", no_args_is_help=True)
 
 NameArgument = Annotated[str, typer.Argument(help="The share's name.")]
 
@@ -70,8 +68,7 @@ def list_shares(
             return
         if not shares:
             console.print(
-                "[dim]No shares yet — `cloudmorrow share add NAME --path DIR` shares a "
-                "directory on this machine.[/]"
+                "[dim]No shares yet — `cloudmorrow share add NAME --path DIR` shares a directory on this machine.[/]"
             )
             return
         table = Table(title="fileshares", title_style="bold cyan")
@@ -107,9 +104,7 @@ def show(name: NameArgument) -> None:
         url = share["url"] or "— (the machine has not said where it serves yet)"
         console.print(f"[dim]url:[/]        {url}")
         if share.get("kind") == "machine":
-            console.print(
-                f"[dim]directory:[/]  {share['path']}  [dim](on {share.get('machine')})[/]"
-            )
+            console.print(f"[dim]directory:[/]  {share['path']}  [dim](on {share.get('machine')})[/]")
         else:
             console.print(f"[dim]server:[/]     {share['path']}")
         console.print(f"[dim]mounted at:[/] {_mounted_at(share['name']) or 'not on this machine'}")
@@ -178,9 +173,7 @@ def add(
                 raise
         console.print(f"[green]Created[/] [b]{share['name']}[/] — {_where(share)}")
         if share.get("kind") == "machine" and not share.get("online"):
-            console.print(
-                f"[dim]{share.get('machine')} starts serving it on its agent's next heartbeat.[/]"
-            )
+            console.print(f"[dim]{share.get('machine')} starts serving it on its agent's next heartbeat.[/]")
         else:
             console.print(f"[dim]at {share['url']}[/]")
         console.print(f"[dim]mount it with `cloudmorrow share mount {share['name']}`[/]")
@@ -195,8 +188,7 @@ def remove(
         bool,
         typer.Option(
             "--files",
-            help="Delete its folder on the server too. A directory on a machine is never "
-            "deleted from here.",
+            help="Delete its folder on the server too. A directory on a machine is never deleted from here.",
         ),
     ] = False,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip the confirmation.")] = False,

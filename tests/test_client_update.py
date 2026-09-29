@@ -102,8 +102,7 @@ def test_a_forced_redeploy_of_the_same_commit_still_says_it_is_restarting():
 
 def test_nothing_new_and_no_force_waits_for_nothing():
     lines, waiting = _deploy_lines(
-        _result(changed=False, new_commit="a" * 40, reinstalled=False,
-                published_wheel="", restarting=False),
+        _result(changed=False, new_commit="a" * 40, reinstalled=False, published_wheel="", restarting=False),
         restart=True,
         force=False,
     )
@@ -123,9 +122,7 @@ def test_a_blocked_restart_is_said_out_loud_and_not_waited_for():
 
 
 def test_no_restart_says_so_only_when_there_was_something_to_restart_for():
-    lines, waiting = _deploy_lines(
-        _result(restarting=False), restart=False, force=False
-    )
+    lines, waiting = _deploy_lines(_result(restarting=False), restart=False, force=False)
     assert waiting is False
     assert any("not restarted, as asked" in line for line in lines)
 
@@ -234,12 +231,8 @@ def test_update_all_deploys_the_server_before_installing_here(monkeypatch):
     from cloudmorrow.cli import update as update_cli
 
     order: list[tuple[str, dict]] = []
-    monkeypatch.setattr(
-        update_cli, "update_server", lambda **kwargs: order.append(("server", kwargs))
-    )
-    monkeypatch.setattr(
-        update_cli, "_update_client", lambda **kwargs: order.append(("client", kwargs))
-    )
+    monkeypatch.setattr(update_cli, "update_server", lambda **kwargs: order.append(("server", kwargs)))
+    monkeypatch.setattr(update_cli, "_update_client", lambda **kwargs: order.append(("client", kwargs)))
 
     result = CliRunner().invoke(update_cli.app, ["all", "--branch", "main", "--no-agent"])
 

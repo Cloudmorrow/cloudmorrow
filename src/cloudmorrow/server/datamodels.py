@@ -250,9 +250,7 @@ def _field(where: str, name: str, spec: object) -> Field:
         raise DatamodelError(f"{where}: field {name!r} must be a table")
     kind = spec.get("kind")
     if kind not in FIELD_KINDS:
-        raise DatamodelError(
-            f"{where}: field {name!r} has kind {kind!r}; one of {', '.join(sorted(FIELD_KINDS))}"
-        )
+        raise DatamodelError(f"{where}: field {name!r} has kind {kind!r}; one of {', '.join(sorted(FIELD_KINDS))}")
     known = {
         "kind",
         "label",
@@ -276,9 +274,7 @@ def _field(where: str, name: str, spec: object) -> Field:
         if not values:
             raise DatamodelError(f"{where}: enum field {name!r} needs values")
         if labels and len(labels) != len(values):
-            raise DatamodelError(
-                f"{where}: {name!r} has {len(labels)} labels for {len(values)} values"
-            )
+            raise DatamodelError(f"{where}: {name!r} has {len(labels)} labels for {len(values)} values")
     elif values or labels:
         raise DatamodelError(f"{where}: only an enum field has values")
     to = str(spec.get("to", ""))
@@ -330,9 +326,7 @@ def parse_datamodel(data: dict, *, source: str = "foundation", where: str = "") 
     model_id = str(head.get("id", ""))
     where = where or model_id or "datamodel"
     if not ID_RE.match(model_id):
-        raise DatamodelError(
-            f"{where}: id {model_id!r} is lowercase words, optionally `quill.name`"
-        )
+        raise DatamodelError(f"{where}: id {model_id!r} is lowercase words, optionally `quill.name`")
     if source != "foundation" and not model_id.startswith(source + "."):
         raise DatamodelError(f"{where}: a datamodel {source} introduces is named {source}.<name>")
     if source == "foundation" and "." in model_id:
@@ -352,9 +346,7 @@ def parse_datamodel(data: dict, *, source: str = "foundation", where: str = "") 
             if watched is None:
                 raise DatamodelError(f"{where}: {f.name!r} stamps on a field that is not there")
             if watched.kind == "enum" and f.stamp_value not in watched.values:
-                raise DatamodelError(
-                    f"{where}: {f.name!r} stamps on a value {watched.name} never has"
-                )
+                raise DatamodelError(f"{where}: {f.name!r} stamps on a value {watched.name} never has")
     scopes = tuple(str(s) for s in head.get("scopes", ["personal"]))
     if not scopes or not set(scopes) <= SCOPES:
         raise DatamodelError(f"{where}: scopes are some of {', '.join(sorted(SCOPES))}")
@@ -366,9 +358,7 @@ def parse_datamodel(data: dict, *, source: str = "foundation", where: str = "") 
     ordered_within = tuple(str(n) for n in head.get("ordered_within", ()))
     for name in ordered_within:
         if name not in by_name or not by_name[name].indexed:
-            raise DatamodelError(
-                f"{where}: ordered_within names {name!r}, which must be an indexed field"
-            )
+            raise DatamodelError(f"{where}: ordered_within names {name!r}, which must be an indexed field")
     version = head.get("version", 1)
     if not isinstance(version, int) or version < 1:
         raise DatamodelError(f"{where}: version is a whole number from 1")
@@ -388,11 +378,17 @@ def parse_datamodel(data: dict, *, source: str = "foundation", where: str = "") 
     notify = []
     for rule in data.get("notify", []):
         if not isinstance(rule, dict) or rule.get("when") not in NOTIFY_WHEN or rule.get("to") != "members":
-            raise DatamodelError(f"{where}: a notify rule is when = \"created\", to = \"members\"")
+            raise DatamodelError(f'{where}: a notify rule is when = "created", to = "members"')
         if not in_space:
             raise DatamodelError(f"{where}: only a datamodel in a space notifies its members")
-        notify.append({"when": "created", "to": "members", "push": bool(rule.get("push", False)),
-                       "unread": bool(rule.get("unread", False))})
+        notify.append(
+            {
+                "when": "created",
+                "to": "members",
+                "push": bool(rule.get("push", False)),
+                "unread": bool(rule.get("unread", False)),
+            }
+        )
     backend = str(head.get("backend", ""))
     if backend and backend not in BACKENDS:
         raise DatamodelError(f"{where}: backend is one of {', '.join(sorted(BACKENDS))}")

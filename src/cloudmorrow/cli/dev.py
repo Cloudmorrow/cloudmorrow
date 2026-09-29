@@ -72,9 +72,7 @@ def command(root: Path, argv: list[str]) -> tuple[str, list[str], dict[str, str]
     env = dict(os.environ)
     # Ahead of site-packages: the installed package is importable in this same
     # interpreter, and the working tree has to win.
-    env["PYTHONPATH"] = (
-        os.pathsep.join([source, env["PYTHONPATH"]]) if env.get("PYTHONPATH") else source
-    )
+    env["PYTHONPATH"] = os.pathsep.join([source, env["PYTHONPATH"]]) if env.get("PYTHONPATH") else source
     env[ENV] = str(root)
     return python, [python, "-m", "cloudmorrow.cli.main", *argv], env
 
@@ -114,10 +112,7 @@ def handle(argv: list[str]) -> list[str]:
 
     root = find_checkout()
     if root is None:
-        sys.exit(
-            f"{FLAG} runs the cloudmorrow checkout you are standing in, and "
-            f"{Path.cwd()} is not inside one."
-        )
+        sys.exit(f"{FLAG} runs the cloudmorrow checkout you are standing in, and {Path.cwd()} is not inside one.")
     if running_from(root):
         # Started from source already — the flag has nothing to change but the
         # label, which is worth setting so the TUI agrees with itself.

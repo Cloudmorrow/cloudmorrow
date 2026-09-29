@@ -46,9 +46,7 @@ class Session:
 class CloudmorrowClient:
     """Everything the TUI needs to talk to the server."""
 
-    def __init__(
-        self, config: ClientConfig, token: str | None = None, vault: str | None = None
-    ) -> None:
+    def __init__(self, config: ClientConfig, token: str | None = None, vault: str | None = None) -> None:
         self.config = config
         self._token = token
         # The vault every secrets call names when it does not name one
@@ -123,9 +121,7 @@ class CloudmorrowClient:
 
     # -- auth --------------------------------------------------------------
     async def login(self, username: str, password: str) -> Session:
-        response = await self._request(
-            "POST", "/api/auth/login", json={"username": username, "password": password}
-        )
+        response = await self._request("POST", "/api/auth/login", json={"username": username, "password": password})
         data = response.json()
         self._token = data["access_token"]
         return Session(
@@ -152,9 +148,7 @@ class CloudmorrowClient:
         """The package this server hands out, for `cloudmorrow update`."""
         return (await self._request("GET", "/api/client")).json()
 
-    async def update_server(
-        self, *, branch: str | None = None, force: bool = False, restart: bool = True
-    ) -> dict:
+    async def update_server(self, *, branch: str | None = None, force: bool = False, restart: bool = True) -> dict:
         """Deploy the server from git. Admin only, and it restarts underneath you."""
         return (
             await self._request(
@@ -195,9 +189,7 @@ class CloudmorrowClient:
 
     async def update_user(self, username: str, **fields: object) -> dict:
         """Change one account: display_name, role, user_type, password, is_active."""
-        return (
-            await self._request("PATCH", f"/api/users/{username}", json=fields)
-        ).json()
+        return (await self._request("PATCH", f"/api/users/{username}", json=fields)).json()
 
     async def delete_user(self, username: str) -> None:
         await self._request("DELETE", f"/api/users/{username}")
@@ -207,11 +199,7 @@ class CloudmorrowClient:
         return (await self._request("GET", "/api/server/features")).json()
 
     async def set_feature(self, key: str, enabled: bool) -> dict:
-        return (
-            await self._request(
-                "PATCH", f"/api/server/features/{key}", json={"enabled": enabled}
-            )
-        ).json()
+        return (await self._request("PATCH", f"/api/server/features/{key}", json={"enabled": enabled})).json()
 
     async def my_features(self) -> list[dict]:
         """What this account may switch, with its own answer on each.
@@ -223,9 +211,7 @@ class CloudmorrowClient:
         return (await self._request("GET", "/api/me/features")).json()
 
     async def set_my_feature(self, key: str, enabled: bool) -> dict:
-        return (
-            await self._request("PATCH", f"/api/me/features/{key}", json={"enabled": enabled})
-        ).json()
+        return (await self._request("PATCH", f"/api/me/features/{key}", json={"enabled": enabled})).json()
 
     # -- circles: who may use which data (docs/CIRCLES.md) -------------------
     # A circle is named by its id or its name; the server takes either.
@@ -245,11 +231,7 @@ class CloudmorrowClient:
 
     async def set_circle_rule(self, circle: str, model: str, access: str) -> dict:
         """One rule of a circle, the others kept: `write`, `read` or `none`."""
-        return (
-            await self._request(
-                "PUT", f"/api/circles/{circle}/rules/{model}", json={"access": access}
-            )
-        ).json()
+        return (await self._request("PUT", f"/api/circles/{circle}/rules/{model}", json={"access": access})).json()
 
     async def delete_circle(self, circle: str) -> None:
         await self._request("DELETE", f"/api/circles/{circle}")
@@ -258,9 +240,7 @@ class CloudmorrowClient:
         return (await self._request("PUT", f"/api/circles/{circle}/members/{username}")).json()
 
     async def leave_circle(self, circle: str, username: str) -> dict:
-        return (
-            await self._request("DELETE", f"/api/circles/{circle}/members/{username}")
-        ).json()
+        return (await self._request("DELETE", f"/api/circles/{circle}/members/{username}")).json()
 
     async def my_access(self) -> dict:
         """What you may do with each datamodel, and the circles that say so."""
@@ -274,16 +254,10 @@ class CloudmorrowClient:
         return (await self._request("GET", f"/api/notes/file/{path}")).json()
 
     async def write(self, path: str, content: str, rev: str | None = None) -> dict:
-        return (
-            await self._request(
-                "PUT", f"/api/notes/file/{path}", json={"content": content, "rev": rev}
-            )
-        ).json()
+        return (await self._request("PUT", f"/api/notes/file/{path}", json={"content": content, "rev": rev})).json()
 
     async def create_note(self, path: str, content: str = "") -> dict:
-        return (
-            await self._request("POST", "/api/notes/file", json={"path": path, "content": content})
-        ).json()
+        return (await self._request("POST", "/api/notes/file", json={"path": path, "content": content})).json()
 
     async def create_dir(self, path: str) -> dict:
         return (await self._request("POST", "/api/notes/dir", json={"path": path})).json()
@@ -292,9 +266,7 @@ class CloudmorrowClient:
         await self._request("DELETE", f"/api/notes/{path}", params={"recursive": recursive})
 
     async def move(self, src: str, dest: str) -> dict:
-        return (
-            await self._request("POST", "/api/notes/move", json={"src": src, "dest": dest})
-        ).json()
+        return (await self._request("POST", "/api/notes/move", json={"src": src, "dest": dest})).json()
 
     async def search(self, query: str) -> dict:
         return (await self._request("GET", "/api/notes/search", params={"q": query})).json()
@@ -331,22 +303,16 @@ class CloudmorrowClient:
         params: dict[str, str | bool] = {"reveal": reveal}
         if environment:
             params["env"] = environment
-        return (
-            await self._request("GET", "/api/secrets", params=params, vault=vault)
-        ).json()
+        return (await self._request("GET", "/api/secrets", params=params, vault=vault)).json()
 
     async def secret_vaults(self) -> list[dict]:
         """The vaults that hold something, whichever one is selected."""
         return (await self._request("GET", "/api/secrets/vaults")).json()
 
     async def secret_environments(self, *, vault: str | None = None) -> list[dict]:
-        return (
-            await self._request("GET", "/api/secrets/environments", vault=vault)
-        ).json()
+        return (await self._request("GET", "/api/secrets/environments", vault=vault)).json()
 
-    async def read_secret(
-        self, key: str, environment: str, *, vault: str | None = None
-    ) -> dict:
+    async def read_secret(self, key: str, environment: str, *, vault: str | None = None) -> dict:
         return (
             await self._request(
                 "GET",
@@ -356,9 +322,7 @@ class CloudmorrowClient:
             )
         ).json()
 
-    async def write_secret(
-        self, key: str, value: str, environment: str, *, vault: str | None = None
-    ) -> dict:
+    async def write_secret(self, key: str, value: str, environment: str, *, vault: str | None = None) -> dict:
         return (
             await self._request(
                 "PUT",
@@ -368,9 +332,7 @@ class CloudmorrowClient:
             )
         ).json()
 
-    async def delete_secret(
-        self, key: str, environment: str, *, vault: str | None = None
-    ) -> None:
+    async def delete_secret(self, key: str, environment: str, *, vault: str | None = None) -> None:
         await self._request(
             "DELETE",
             f"/api/secrets/item/{key}",
@@ -406,9 +368,7 @@ class CloudmorrowClient:
             )
         ).json()
 
-    async def export_secrets(
-        self, environment: str, *, vault: str | None = None
-    ) -> dict[str, str]:
+    async def export_secrets(self, environment: str, *, vault: str | None = None) -> dict[str, str]:
         """Every value in one environment, as plain pairs to render locally."""
         return (
             await self._request(
@@ -419,14 +379,8 @@ class CloudmorrowClient:
             )
         ).json()
 
-    async def delete_environment(
-        self, environment: str, *, vault: str | None = None
-    ) -> dict:
-        return (
-            await self._request(
-                "DELETE", f"/api/secrets/environment/{environment}", vault=vault
-            )
-        ).json()
+    async def delete_environment(self, environment: str, *, vault: str | None = None) -> dict:
+        return (await self._request("DELETE", f"/api/secrets/environment/{environment}", vault=vault)).json()
 
     async def delete_vault(self, vault: str) -> dict:
         return (await self._request("DELETE", f"/api/secrets/vault/{vault}")).json()
@@ -441,9 +395,7 @@ class CloudmorrowClient:
         query = dict(params)
         if record:
             query["record"] = record
-        return (
-            await self._request("GET", f"/api/quills/{quill_id}/views/{screen_id}", params=query)
-        ).json()
+        return (await self._request("GET", f"/api/quills/{quill_id}/views/{screen_id}", params=query)).json()
 
     async def quill_action(
         self, quill_id: str, action_id: str, *, record: str = "", fields: dict | None = None
@@ -468,8 +420,11 @@ class CloudmorrowClient:
     async def upload_quill(self, data: bytes, *, plan_only: bool = False) -> dict:
         """Install a Quill from a .tar.gz of its folder — or, with plan_only, only say what it adds."""
         response = await self._request(
-            "POST", "/api/quills/upload", params={"plan_only": str(plan_only).lower()},
-            content=data, headers_extra={"Content-Type": "application/gzip"},
+            "POST",
+            "/api/quills/upload",
+            params={"plan_only": str(plan_only).lower()},
+            content=data,
+            headers_extra={"Content-Type": "application/gzip"},
         )
         return response.json()
 
@@ -485,9 +440,7 @@ class CloudmorrowClient:
         params: dict = {"lines": lines}
         if service:
             params["service"] = service
-        return (
-            await self._request("GET", f"/api/quillservices/{quill_id}/logs", params=params)
-        ).json()
+        return (await self._request("GET", f"/api/quillservices/{quill_id}/logs", params=params)).json()
 
     async def rotate_quill_token(self, quill_id: str) -> dict:
         return (await self._request("POST", f"/api/quillservices/{quill_id}/token")).json()
@@ -496,9 +449,7 @@ class CloudmorrowClient:
         return (await self._request("POST", f"/api/quillservices/{quill_id}/restart")).json()
 
     async def rotate_webhook_secret(self, quill_id: str, hook_id: str) -> dict:
-        return (
-            await self._request("POST", f"/api/quillservices/{quill_id}/webhooks/{hook_id}/secret")
-        ).json()
+        return (await self._request("POST", f"/api/quillservices/{quill_id}/webhooks/{hook_id}/secret")).json()
 
     async def datamodels(self) -> list[dict]:
         return (await self._request("GET", "/api/datamodels")).json()
@@ -546,21 +497,15 @@ class CloudmorrowClient:
             body["unique"] = True
         return (await self._request("POST", f"/api/records/{model}", json=body)).json()
 
-    async def update_record(
-        self, model: str, record_id: str, fields: dict, *, rev: int | None = None
-    ) -> dict:
+    async def update_record(self, model: str, record_id: str, fields: dict, *, rev: int | None = None) -> dict:
         body: dict = {"fields": fields}
         if rev is not None:
             body["rev"] = rev
         return (await self._request("PATCH", f"/api/records/{model}/{record_id}", json=body)).json()
 
-    async def move_record(
-        self, model: str, record_id: str, fields: dict, index: int | None = None
-    ) -> dict:
+    async def move_record(self, model: str, record_id: str, fields: dict, index: int | None = None) -> dict:
         body = {"fields": fields, "index": index}
-        return (
-            await self._request("POST", f"/api/records/{model}/{record_id}/move", json=body)
-        ).json()
+        return (await self._request("POST", f"/api/records/{model}/{record_id}/move", json=body)).json()
 
     async def delete_record(self, model: str, record_id: str) -> None:
         await self._request("DELETE", f"/api/records/{model}/{record_id}")
@@ -573,9 +518,7 @@ class CloudmorrowClient:
     async def add_member(self, model: str, space_id: str, username: str) -> dict:
         """Put somebody in a shared space. Returns the space, members and all."""
         return (
-            await self._request(
-                "POST", f"/api/records/{model}/{space_id}/members", json={"username": username}
-            )
+            await self._request("POST", f"/api/records/{model}/{space_id}/members", json={"username": username})
         ).json()
 
     async def remove_member(self, model: str, space_id: str, username: str) -> None:
@@ -592,9 +535,7 @@ class CloudmorrowClient:
         return (await self._request("GET", f"/api/records/{model}/_folders")).json()
 
     async def make_record_folder(self, model: str, path: str) -> dict:
-        return (
-            await self._request("POST", f"/api/records/{model}/_folders", json={"path": path})
-        ).json()
+        return (await self._request("POST", f"/api/records/{model}/_folders", json={"path": path})).json()
 
     async def move_record_folder(self, model: str, path: str, to: str) -> dict:
         body = {"path": path, "to": to}
@@ -607,30 +548,27 @@ class CloudmorrowClient:
         """Keep a file beside *model*'s records: `{name, path, …}`, `path` for Markdown."""
         return (
             await self._request(
-                "POST", f"/api/records/{model}/_attachments", content=data,
-                params={"filename": filename}, timeout=UPLOAD_TIMEOUT,
+                "POST",
+                f"/api/records/{model}/_attachments",
+                content=data,
+                params={"filename": filename},
+                timeout=UPLOAD_TIMEOUT,
             )
         ).json()
 
     async def attachment(self, model: str, name: str) -> bytes:
-        response = await self._request(
-            "GET", f"/api/records/{model}/_attachments/{name}", timeout=UPLOAD_TIMEOUT
-        )
+        response = await self._request("GET", f"/api/records/{model}/_attachments/{name}", timeout=UPLOAD_TIMEOUT)
         return response.content
 
     # The bytes beside a record, for a datamodel that keeps some: a file's.
     async def record_content(self, model: str, record_id: str) -> bytes:
-        response = await self._request(
-            "GET", f"/api/records/{model}/{record_id}/content", timeout=UPLOAD_TIMEOUT
-        )
+        response = await self._request("GET", f"/api/records/{model}/{record_id}/content", timeout=UPLOAD_TIMEOUT)
         return response.content
 
     async def record_thumb(self, model: str, record_id: str, *, size: int = 256) -> bytes:
         """A JPEG with its long edge at *size* or so; a 415 when the server
         cannot make one of that record's bytes."""
-        response = await self._request(
-            "GET", f"/api/records/{model}/{record_id}/thumb", params={"size": size}
-        )
+        response = await self._request("GET", f"/api/records/{model}/{record_id}/thumb", params={"size": size})
         return response.content
 
     async def upload_record(self, model: str, fields: dict, data: bytes) -> dict:
@@ -681,30 +619,22 @@ class CloudmorrowClient:
         return (await self._request("POST", "/api/shares", json=payload)).json()
 
     async def delete_share(self, name: str, *, remove_files: bool = False) -> None:
-        await self._request(
-            "DELETE", f"/api/shares/{name}", params={"remove_files": remove_files}
-        )
+        await self._request("DELETE", f"/api/shares/{name}", params={"remove_files": remove_files})
 
     # What is in a server share, the way the web app asks: a folder's
     # listing, a file, and a small copy of a picture for a grid or a panel.
     async def share_listing(self, name: str, path: str = "") -> dict:
         """{"share", "path", "entries": [{name, is_dir, size, modified, mime}]}."""
-        return (
-            await self._request("GET", f"/api/shares/{name}/ls", params={"path": path})
-        ).json()
+        return (await self._request("GET", f"/api/shares/{name}/ls", params={"path": path})).json()
 
     async def share_file(self, name: str, path: str) -> bytes:
-        response = await self._request(
-            "GET", f"/api/shares/{name}/file", params={"path": path}, timeout=UPLOAD_TIMEOUT
-        )
+        response = await self._request("GET", f"/api/shares/{name}/file", params={"path": path}, timeout=UPLOAD_TIMEOUT)
         return response.content
 
     async def share_thumb(self, name: str, path: str, *, size: int = 256) -> bytes:
         """A JPEG with its long edge at *size* or so; a 415 when the server
         cannot make one of that file."""
-        response = await self._request(
-            "GET", f"/api/shares/{name}/thumb", params={"path": path, "size": size}
-        )
+        response = await self._request("GET", f"/api/shares/{name}/thumb", params={"path": path, "size": size})
         return response.content
 
     # -- agents ------------------------------------------------------------
@@ -737,9 +667,7 @@ class CloudmorrowClient:
 
     async def enroll_token(self, label: str = "") -> dict:
         return (
-            await self._request(
-                "POST", "/api/agents/enroll-token", json={"label": label, "ttl_minutes": 60}
-            )
+            await self._request("POST", "/api/agents/enroll-token", json={"label": label, "ttl_minutes": 60})
         ).json()
 
     async def delete_agent(self, agent_id: int) -> None:
@@ -755,20 +683,12 @@ class CloudmorrowClient:
         ).json()
 
     async def jobs(self, agent_id: int, limit: int = 25) -> list[dict]:
-        return (
-            await self._request(
-                "GET", f"/api/agents/{agent_id}/jobs", params={"limit": limit}
-            )
-        ).json()
+        return (await self._request("GET", f"/api/agents/{agent_id}/jobs", params={"limit": limit})).json()
 
     # -- config sync -------------------------------------------------------
     async def set_agent_sync(self, agent_id: int, bundles: list[str]) -> dict:
         """Switch config syncing on or off for a machine. [] switches it off."""
-        return (
-            await self._request(
-                "PATCH", f"/api/agents/{agent_id}/sync", json={"sync_bundles": bundles}
-            )
-        ).json()
+        return (await self._request("PATCH", f"/api/agents/{agent_id}/sync", json={"sync_bundles": bundles})).json()
 
     async def config_bundle(self, bundle: str) -> dict:
         """One bundle: its revision, who claimed it, and who is keeping it."""
@@ -783,20 +703,12 @@ class CloudmorrowClient:
 
     # -- notifications -----------------------------------------------------
     async def notifications(self, *, limit: int = 50, unread: bool = False) -> list[dict]:
-        return (
-            await self._request(
-                "GET", "/api/notifications", params={"limit": limit, "unread": unread}
-            )
-        ).json()
+        return (await self._request("GET", "/api/notifications", params={"limit": limit, "unread": unread})).json()
 
     async def mark_notifications_read(self, ids: list[int] | None = None) -> dict:
-        return (
-            await self._request("POST", "/api/notifications/read", json={"ids": ids})
-        ).json()
+        return (await self._request("POST", "/api/notifications/read", json={"ids": ids})).json()
 
 
-def client_from_credentials(
-    config: ClientConfig, credentials: StoredCredentials | None
-) -> CloudmorrowClient:
+def client_from_credentials(config: ClientConfig, credentials: StoredCredentials | None) -> CloudmorrowClient:
     token = credentials.access_token if credentials else None
     return CloudmorrowClient(config, token=token, vault=config.vault or None)

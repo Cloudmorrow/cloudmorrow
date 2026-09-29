@@ -128,9 +128,7 @@ class Sealer:
     def _aad(table: str, column: str, scope: Iterable[object]) -> bytes:
         return "\x00".join((table, column, *(str(part) for part in scope))).encode("utf-8")
 
-    def seal(
-        self, table: str, column: str, scope: Iterable[object], text: str | None
-    ) -> str | None:
+    def seal(self, table: str, column: str, scope: Iterable[object], text: str | None) -> str | None:
         """Seal one column's value for one row. None stays None."""
         if text is None:
             return None
@@ -138,9 +136,7 @@ class Sealer:
         sealed = self._content.encrypt(nonce, text.encode("utf-8"), self._aad(table, column, scope))
         return f"{TEXT_FORMAT}:{_encode(nonce)}:{_encode(sealed)}"
 
-    def unseal(
-        self, table: str, column: str, scope: Iterable[object], blob: str | None
-    ) -> str | None:
+    def unseal(self, table: str, column: str, scope: Iterable[object], blob: str | None) -> str | None:
         if blob is None:
             return None
         version, _, rest = blob.partition(":")
@@ -148,9 +144,7 @@ class Sealer:
         if version != TEXT_FORMAT or not nonce or not sealed:
             raise SealError(f"{table}.{column} holds a value that is not sealed")
         try:
-            opened = self._content.decrypt(
-                _decode(nonce), _decode(sealed), self._aad(table, column, scope)
-            )
+            opened = self._content.decrypt(_decode(nonce), _decode(sealed), self._aad(table, column, scope))
         except (InvalidTag, ValueError) as exc:
             raise SealError(f"cannot open {table}.{column} with the current key") from exc
         return opened.decode("utf-8")
@@ -292,10 +286,7 @@ def _rotate_records(conn: sqlite3.Connection, old: Sealer, new: Sealer) -> int:
 
 def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
     return (
-        conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)
-        ).fetchone()
-        is not None
+        conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)).fetchone() is not None
     )
 
 
@@ -312,10 +303,7 @@ def _seal_table(
     for row in rows:
         scope = tuple(row[1 : 1 + len(scope_cols)])
         values = row[1 + len(scope_cols) :]
-        sealed = [
-            sealer.seal(table, column, scope, value)
-            for column, value in zip(columns, values, strict=True)
-        ]
+        sealed = [sealer.seal(table, column, scope, value) for column, value in zip(columns, values, strict=True)]
         conn.execute(f"UPDATE {table} SET {assignments} WHERE rowid = ?", (*sealed, row[0]))
 
 
@@ -375,17 +363,11 @@ def rotate(db_path: Path, note_roots: Iterable[Path], old: Sealer, new: Sealer) 
                         new.seal(table, column, scope, old.unseal(table, column, scope, blob))
                         for column, blob in zip(columns, blobs, strict=True)
                     ]
-                    conn.execute(
-                        f"UPDATE {table} SET {assignments} WHERE rowid = ?", (*values, row[0])
-                    )
+                    conn.execute(f"UPDATE {table} SET {assignments} WHERE rowid = ?", (*values, row[0]))
                     rows += 1
         if _table_exists(conn, "secrets"):
-            for row in conn.execute(
-                "SELECT id, owner, vault, environment, name, sealed FROM secrets"
-            ).fetchall():
-                aad = crypto.associated_data(
-                    row["owner"], row["vault"], row["environment"], row["name"]
-                )
+            for row in conn.execute("SELECT id, owner, vault, environment, name, sealed FROM secrets").fetchall():
+                aad = crypto.associated_data(row["owner"], row["vault"], row["environment"], row["name"])
                 value = crypto.unseal(old.master, row["sealed"], aad)
                 conn.execute(
                     "UPDATE secrets SET sealed = ?, fingerprint = ? WHERE id = ?",

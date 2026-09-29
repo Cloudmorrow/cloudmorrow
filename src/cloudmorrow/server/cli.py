@@ -130,9 +130,21 @@ def config(config_path: ConfigOption = None) -> None:
     table = Table(title="cloudmorrow server config", title_style=TITLE)
     table.add_column("key", style="dim")
     table.add_column("value")
-    for key in ("config_path", "name", "notes_dir", "data_dir", "per_user_dirs", "host",
-                "port", "token_ttl_hours", "cors_origins", "public_url", "package_spec",
-                "allow_api_update", "service_name"):
+    for key in (
+        "config_path",
+        "name",
+        "notes_dir",
+        "data_dir",
+        "per_user_dirs",
+        "host",
+        "port",
+        "token_ttl_hours",
+        "cors_origins",
+        "public_url",
+        "package_spec",
+        "allow_api_update",
+        "service_name",
+    ):
         table.add_row(key, str(getattr(cfg, key)))
     table.add_row("db_path", str(cfg.db_path))
     table.add_row("secret_key", "set" if cfg.secret_key else "generated on first run")
@@ -154,12 +166,8 @@ def user_create(
     config_path: ConfigOption = None,
     display_name: Annotated[str, typer.Option(help="Human-readable name.")] = "",
     admin: Annotated[bool, typer.Option(help="Grant admin rights.")] = False,
-    user_type: Annotated[
-        str, typer.Option("--type", help="human, agent or systems_user.")
-    ] = TYPE_HUMAN,
-    password: Annotated[
-        str | None, typer.Option(help="Password (prompted when omitted).")
-    ] = None,
+    user_type: Annotated[str, typer.Option("--type", help="human, agent or systems_user.")] = TYPE_HUMAN,
+    password: Annotated[str | None, typer.Option(help="Password (prompted when omitted).")] = None,
     password_stdin: Annotated[
         bool,
         typer.Option(
@@ -193,17 +201,13 @@ def user_create(
         raise typer.Exit(code=1) from None
     notes = cfg.notes_root(user.username)
     notes.mkdir(parents=True, exist_ok=True)
-    console.print(
-        f"[green]Created[/] {user.username} ({user.role}, {user.user_type}) — notes: {notes}"
-    )
+    console.print(f"[green]Created[/] {user.username} ({user.role}, {user.user_type}) — notes: {notes}")
 
 
 @user_app.command("list")
 def user_list(
     config_path: ConfigOption = None,
-    count: Annotated[
-        bool, typer.Option("--count", help="Print how many there are, and nothing else.")
-    ] = False,
+    count: Annotated[bool, typer.Option("--count", help="Print how many there are, and nothing else.")] = False,
 ) -> None:
     """List users."""
     store = _store(_load(config_path))
@@ -213,8 +217,7 @@ def user_list(
         print(store.count())
         return
     table = Table(title="cloudmorrow users", title_style=TITLE)
-    for column in ("username", "display name", "role", "type", "active", "system uid",
-                   "created"):
+    for column in ("username", "display name", "role", "type", "active", "system uid", "created"):
         table.add_column(column)
     for user in store.list():
         table.add_row(
@@ -267,21 +270,13 @@ def user_delete(
 @app.command("agent-install")
 def agent_install(
     config_path: ConfigOption = None,
-    name: Annotated[
-        str | None, typer.Option(help="What to call this machine (default: its hostname).")
-    ] = None,
-    owner: Annotated[
-        str | None, typer.Option(help="Whose agent it is (default: the first admin).")
-    ] = None,
-    url: Annotated[
-        str | None, typer.Option(help="How the agent reaches the API (default: this server).")
-    ] = None,
-    agent_config: Annotated[
-        Path, typer.Option("--agent-config", help="Where to write the agent's config.")
-    ] = Path("/etc/cloudmorrow/agent.toml"),
-    run_as: Annotated[
-        str | None, typer.Option(help="The system user to run it as. Omit to skip the service.")
-    ] = None,
+    name: Annotated[str | None, typer.Option(help="What to call this machine (default: its hostname).")] = None,
+    owner: Annotated[str | None, typer.Option(help="Whose agent it is (default: the first admin).")] = None,
+    url: Annotated[str | None, typer.Option(help="How the agent reaches the API (default: this server).")] = None,
+    agent_config: Annotated[Path, typer.Option("--agent-config", help="Where to write the agent's config.")] = Path(
+        "/etc/cloudmorrow/agent.toml"
+    ),
+    run_as: Annotated[str | None, typer.Option(help="The system user to run it as. Omit to skip the service.")] = None,
     service: Annotated[bool, typer.Option(help="Install and start a systemd unit.")] = True,
 ) -> None:
     """Give the server itself an agent.
@@ -389,14 +384,10 @@ def update(
     service: Annotated[str, typer.Option(help="systemd unit to restart.")] = "cloudmorrow",
     restart: Annotated[bool, typer.Option(help="Restart the service after updating.")] = True,
     reinstall: Annotated[bool, typer.Option(help="Reinstall in case dependencies moved.")] = True,
-    force: Annotated[
-        bool, typer.Option(help="Update even with local changes or nothing new.")
-    ] = False,
+    force: Annotated[bool, typer.Option(help="Update even with local changes or nothing new.")] = False,
     exit_status: Annotated[
         bool,
-        typer.Option(
-            help="Exit 3 when there was nothing to pull, so a caller can skip restarting."
-        ),
+        typer.Option(help="Exit 3 when there was nothing to pull, so a caller can skip restarting."),
     ] = False,
 ) -> None:
     """Pull the latest code from git and restart the server."""
@@ -425,10 +416,7 @@ def update(
         )
     where = f"v{result.new_version}" if result.new_version else result.new_commit[:8]
     if not result.changed:
-        console.print(
-            f"[green]Already up to date.[/] [b]{where}[/]  "
-            + describe(result.source, result.new_commit)
-        )
+        console.print(f"[green]Already up to date.[/] [b]{where}[/]  " + describe(result.source, result.new_commit))
         if not force:
             # Exit 3 lets cloudmorrow-update skip a pointless service restart.
             raise typer.Exit(code=3 if exit_status else 0)
@@ -463,9 +451,7 @@ def update(
 @app.command()
 def prune(
     config_path: ConfigOption = None,
-    yes: Annotated[
-        bool, typer.Option("--yes", "-y", help="Actually delete it. Without this, it only looks.")
-    ] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Actually delete it. Without this, it only looks.")] = False,
 ) -> None:
     """Find what an older layout left behind, and optionally delete it.
 
@@ -540,9 +526,7 @@ def rotate_key(
     config = _load(config_path)
     key_path = config.secrets_key_path
     if not yes:
-        console.print(
-            f"This reseals the database and every note under a new key at {key_path}."
-        )
+        console.print(f"This reseals the database and every note under a new key at {key_path}.")
         console.print("The service must be stopped. Continue? [y/N] ", end="")
         if input().strip().lower() not in {"y", "yes"}:
             raise typer.Exit(code=1)

@@ -27,9 +27,7 @@ FOUNDATION = "foundation"
 
 # What a field may be. Small on purpose: a vocabulary a manifest can be
 # written against, and every client can draw.
-FIELD_KINDS = frozenset(
-    {"string", "text", "markdown", "bool", "int", "datetime", "date", "json", "file", "ref"}
-)
+FIELD_KINDS = frozenset({"string", "text", "markdown", "bool", "int", "datetime", "date", "json", "file", "ref"})
 
 # Who may see a record of the type: exactly one person, a named set of
 # members, or everybody on the server: the three a space in the record

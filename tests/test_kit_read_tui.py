@@ -50,7 +50,7 @@ def only_read(app, quill_id: str, *models: str) -> None:
 
 
 def toolbar(pane) -> list[str]:
-    return [(button.id or "")[len("do-"):] for button in pane.query(".toolbar Button")]
+    return [(button.id or "")[len("do-") :] for button in pane.query(".toolbar Button")]
 
 
 def test_read_is_read_and_everything_else_is_write():
@@ -78,7 +78,6 @@ async def test_a_board_you_may_only_read_is_looked_at(app):
         assert not pane.query(f"#{NEW_GROUP_TAB}")
         tabs = [t.id for t in pane.query_one(Tabs).query("Tab")]
         assert tabs == ["group-r_homelab", "group-r_errands"]
-
 
         # ctrl+n and ctrl+b are there on a board you write; here they do nothing.
         await pilot.press("ctrl+n")
@@ -211,9 +210,7 @@ async def test_a_thread_you_may_only_read_has_no_line_to_type_in(app):
         assert not pane.query("#thread-input")
         assert toolbar(pane) == []
         # What is said is still there to read.
-        assert "I turned the fan curve down" in pane.query_one(
-            "#conversation-text", Static
-        ).visual.plain
+        assert "I turned the fan curve down" in pane.query_one("#conversation-text", Static).visual.plain
         pane.query_one("#space-table").focus()
         for key in ("n", "m", "a", "l", "e"):
             await pilot.press(key)
@@ -241,9 +238,7 @@ async def test_saying_things_in_channels_you_may_only_read(app):
         box.value = "read-only channels still hear me"
         await pilot.press("enter")
         await settle(app, pilot)
-        assert app.client.record_store["message"][-1]["fields"]["body"] == (
-            "read-only channels still hear me"
-        )
+        assert app.client.record_store["message"][-1]["fields"]["body"] == ("read-only channels still hear me")
 
 
 # -- the grid ------------------------------------------------------------------------
@@ -255,9 +250,7 @@ async def test_a_grid_you_may_only_read_gets_files_and_puts_none(app):
         screen = await into_holiday(app, pilot)
         pane = screen.query_one(GridPane)
 
-        shown = [
-            (b.id or "")[len("do-"):] for b in pane.query(".toolbar Button") if b.display
-        ]
+        shown = [(b.id or "")[len("do-") :] for b in pane.query(".toolbar Button") if b.display]
         assert shown == ["toggle_view", "sort", "refresh"]
         assert "get" not in pane.refused
         for key in ("p", "ctrl+n", "e", "M", "delete"):

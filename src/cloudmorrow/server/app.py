@@ -104,10 +104,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         # Each installed Quill is one more thing to switch, at both levels.
         features=FeatureStore(
             config.db_path,
-            lambda: (
-                Feature(q.id, q.name, q.summary, tuple(sorted(q.models)))
-                for q in quill_registry.quills.values()
-            ),
+            lambda: (Feature(q.id, q.name, q.summary, tuple(sorted(q.models))) for q in quill_registry.quills.values()),
         ),
         push=PushStore(
             config.db_path,
@@ -147,9 +144,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     # run it, kept in line with what is installed and switched on.
     state = app.state.cloudmorrow
     state.quill_tokens = QuillTokenStore(config.db_path)
-    state.services = Supervisor(
-        config, quill_registry, user_store, state.features, state.quill_tokens
-    )
+    state.services = Supervisor(config, quill_registry, user_store, state.features, state.quill_tokens)
     app.router.on_startup.append(state.services.start)
     # A Quill's Python: views, actions, hooks, `call` jobs, and handler
     # webhooks and APIs, each in the Quill's sandbox (quills/code.py).
@@ -231,12 +226,8 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.include_router(quillcode.api_router)
     app.include_router(quillcode.hooks_router)
     app.include_router(quillcode.admin_router)
-    app.include_router(
-        shares.router, dependencies=[*in_files, Depends(circles.require_data("share"))]
-    )
-    app.include_router(
-        sharefiles.router, dependencies=[*in_files, Depends(circles.require_data("file"))]
-    )
+    app.include_router(shares.router, dependencies=[*in_files, Depends(circles.require_data("share"))])
+    app.include_router(sharefiles.router, dependencies=[*in_files, Depends(circles.require_data("file"))])
     app.include_router(agents.router)
     app.include_router(agents.agent_router)
     app.include_router(agentquills.router)

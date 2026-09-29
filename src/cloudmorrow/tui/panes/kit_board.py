@@ -81,8 +81,9 @@ class BoardPane(KitPane):
         self.title_field: str = screen.get("title") or self.model.get("title") or "title"
         # Said under a card's title: one field, or several with a dot between.
         names = screen.get("subtitle") or []
-        self.subtitles = [f for f in (field_of(self.model, n) for n in
-                          ([names] if isinstance(names, str) else names)) if f]
+        self.subtitles = [
+            f for f in (field_of(self.model, n) for n in ([names] if isinstance(names, str) else names)) if f
+        ]
         body = field_of(self.model, screen.get("body"))
         self.body_field: str | None = body["name"] if body else None
         # The lane a tick moves a card to; for record lanes, known once they are read.
@@ -99,16 +100,14 @@ class BoardPane(KitPane):
         self._drawn: list[tuple[str, str]] = []
         first = self.lanes[0][1] if self.lanes else "the first lane"
         actions = [
-            Action("new_record", f"New {self.noun}", "^n", variant="primary",
-                   hint=f"Starts in {first}"),
+            Action("new_record", f"New {self.noun}", "^n", variant="primary", hint=f"Starts in {first}"),
         ]
         if self.group_field:
             group_noun = self.group_noun
             actions += [
                 Action("new_group", f"New {group_noun}", "^b"),
                 Action("rename_group", f"Rename {group_noun}"),
-                Action("delete_group", f"Delete {group_noun}",
-                       hint=f"The {group_noun} and every {self.noun} on it"),
+                Action("delete_group", f"Delete {group_noun}", hint=f"The {group_noun} and every {self.noun} on it"),
             ]
         self.ACTIONS = self.offer(actions)
 
@@ -133,8 +132,11 @@ class BoardPane(KitPane):
         with Horizontal(id="lanes"):
             for value, label in self.lanes:
                 yield Lane(
-                    value, label, note=self._lane_note(value),
-                    id=f"lane-{safe_id(value)}", classes="lane",
+                    value,
+                    label,
+                    note=self._lane_note(value),
+                    id=f"lane-{safe_id(value)}",
+                    classes="lane",
                 )
 
     def lane_widget(self, value: str) -> Lane:
@@ -193,8 +195,7 @@ class BoardPane(KitPane):
             if "new_group" in self.refused:
                 self.status(f"No {self.group_noun} here.", note=True)
             else:
-                self.status(f"No {self.group_noun} yet — New {self.group_noun} starts one.",
-                            note=True)
+                self.status(f"No {self.group_noun} yet — New {self.group_noun} starts one.", note=True)
             return
         where = {self.group_field: self.group} if self.group_field else {}
         self.forget_links()
@@ -222,11 +223,12 @@ class BoardPane(KitPane):
         self.lane_values = [value for value, _ in lanes]
         box = self.query_one("#lanes", Horizontal)
         await box.remove_children()
-        await box.mount_all([
-            Lane(value, label, note=self._lane_note(value),
-                 id=f"lane-{safe_id(value)}", classes="lane")
-            for value, label in lanes
-        ])
+        await box.mount_all(
+            [
+                Lane(value, label, note=self._lane_note(value), id=f"lane-{safe_id(value)}", classes="lane")
+                for value, label in lanes
+            ]
+        )
 
     def card_status(self) -> tuple[str, str] | None:
         """How many are in the first lane: "3 to do"."""
@@ -250,8 +252,7 @@ class BoardPane(KitPane):
 
     def _said(self, record: dict) -> str:
         fields = record.get("fields") or {}
-        said = (self.say(f, fields[f["name"]]) for f in self.subtitles
-                if fields.get(f["name"]) not in (None, ""))
+        said = (self.say(f, fields[f["name"]]) for f in self.subtitles if fields.get(f["name"]) not in (None, ""))
         return "  ·  ".join(text for text in said if text != "—")
 
     def _lane_of(self, record: dict) -> str:
@@ -263,8 +264,7 @@ class BoardPane(KitPane):
         if self.group_field and self.group is None:
             return ""
         counts = "  ".join(
-            f"{label} {sum(1 for row in self.records if self._lane_of(row) == value)}"
-            for value, label in self.lanes
+            f"{label} {sum(1 for row in self.records if self._lane_of(row) == value)}" for value, label in self.lanes
         )
         return f"[{MUTED}]{counts}[/]"
 
@@ -375,10 +375,7 @@ class BoardPane(KitPane):
         confirmed = await self.app.push_screen_wait(
             ConfirmModal(
                 f"Delete the {self.group_noun} {title_of(current, self.group_model)}?",
-                detail=(
-                    f"[dim]Every {self.noun} on it goes too — "
-                    f"{count} of them. Nothing else is touched.[/]"
-                ),
+                detail=(f"[dim]Every {self.noun} on it goes too — {count} of them. Nothing else is touched.[/]"),
             )
         )
         if not confirmed:
@@ -447,9 +444,7 @@ class BoardPane(KitPane):
         event.stop()
         target = lane_under(self.screen, event.x, event.y)
         for value in self.lane_values:
-            self.lane_widget(value).set_class(
-                target is not None and target.value == value, "-drop-target"
-            )
+            self.lane_widget(value).set_class(target is not None and target.value == value, "-drop-target")
 
     def on_record_card_dropped(self, event: RecordCard.Dropped) -> None:
         event.stop()

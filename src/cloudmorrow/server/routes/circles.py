@@ -69,9 +69,7 @@ def require_data(model: str) -> Callable[..., None]:
         if not access.may("read", model):
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
         if request.method not in READING and not access.may("write", model):
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN, f"you may read {model} records here, not change them"
-            )
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"you may read {model} records here, not change them")
 
     return guard
 
@@ -88,29 +86,21 @@ def my_access(state: AppState = Depends(get_state), user: User = Depends(get_cur
 
 
 @router.get("")
-def list_circles(
-    state: AppState = Depends(get_state), _: User = Depends(get_admin_user)
-) -> list[dict]:
+def list_circles(state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> list[dict]:
     return [circle.to_dict() for circle in _circles(state).list()]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def create_circle(
-    payload: CircleIn, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)
-) -> dict:
+def create_circle(payload: CircleIn, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> dict:
     try:
-        circle = _circles(state).create(
-            payload.name, payload.rules, payload.members, default=payload.default
-        )
+        circle = _circles(state).create(payload.name, payload.rules, payload.members, default=payload.default)
     except CircleError as exc:
         raise _failed(exc) from exc
     return circle.to_dict()
 
 
 @router.get("/{circle_id}")
-def get_circle(
-    circle_id: str, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)
-) -> dict:
+def get_circle(circle_id: str, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> dict:
     try:
         return _circles(state).get(circle_id).to_dict()
     except UnknownCircleError as exc:
@@ -125,9 +115,7 @@ def update_circle(
     _: User = Depends(get_admin_user),
 ) -> dict:
     try:
-        circle = _circles(state).update(
-            circle_id, name=payload.name, rules=payload.rules, default=payload.default
-        )
+        circle = _circles(state).update(circle_id, name=payload.name, rules=payload.rules, default=payload.default)
     except (CircleError, UnknownCircleError) as exc:
         raise _failed(exc) from exc
     return circle.to_dict()
@@ -150,9 +138,7 @@ def set_rule(
 
 
 @router.delete("/{circle_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_circle(
-    circle_id: str, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)
-) -> None:
+def delete_circle(circle_id: str, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> None:
     try:
         _circles(state).delete(circle_id)
     except UnknownCircleError as exc:

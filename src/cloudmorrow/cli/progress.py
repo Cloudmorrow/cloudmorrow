@@ -110,9 +110,7 @@ class Waiter:
                 transient=True,
             )
             self._progress.start()
-            self._task = self._progress.add_task(
-                "", total=self._seconds, left=self._seconds
-            )
+            self._task = self._progress.add_task("", total=self._seconds, left=self._seconds)
         else:
             self._console.print(f" [{MUTED}]{self._text}[/]", highlight=False)
         return self

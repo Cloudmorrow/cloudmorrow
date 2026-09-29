@@ -337,9 +337,7 @@ class ListPane(KitPane):
         for record in self.records:
             table.add_row(*self._row(record), key=str(record["id"]))
         if keep is not None:
-            row = next(
-                (index for index, record in enumerate(self.records) if record["id"] == keep), row
-            )
+            row = next((index for index, record in enumerate(self.records) if record["id"] == keep), row)
         if self.records:
             table.move_cursor(row=min(max(row, 0), len(self.records) - 1))
             table.call_after_refresh(settle_widths, table)
@@ -439,9 +437,7 @@ class ListPane(KitPane):
         name = self.tick["name"]
         value = not bool((record.get("fields") or {}).get(name))
         try:
-            await self.api.update_record(
-                self.model_id, record["id"], {name: value}, rev=record.get("rev")
-            )
+            await self.api.update_record(self.model_id, record["id"], {name: value}, rev=record.get("rev"))
         except ApiError as exc:
             if await self.went_wrong(exc, stale=True) != "auth":
                 self.reload()

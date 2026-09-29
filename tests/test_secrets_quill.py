@@ -68,10 +68,19 @@ def test_a_listing_is_filtered_by_vault_and_environment(api):
 
 
 def test_a_secret_made_as_a_record_is_the_one_cm_secret_reads(api):
-    made = api("POST", "/api/records/secret",
-               {"fields": {"key": "TOKEN", "value": "s3cret", "environment": "staging"}}, expect=201)
-    assert made["fields"] == {"vault": "default", "environment": "staging", "key": "TOKEN",
-                              "value": "s3cret", "length": 6}
+    made = api(
+        "POST",
+        "/api/records/secret",
+        {"fields": {"key": "TOKEN", "value": "s3cret", "environment": "staging"}},
+        expect=201,
+    )
+    assert made["fields"] == {
+        "vault": "default",
+        "environment": "staging",
+        "key": "TOKEN",
+        "value": "s3cret",
+        "length": 6,
+    }
     read = api("GET", "/api/secrets/item/TOKEN?env=staging")
     assert read["value"] == "s3cret"
     # Twice is a mistake, not a quiet overwrite.
@@ -82,17 +91,21 @@ def test_a_secret_made_as_a_record_is_the_one_cm_secret_reads(api):
 
 def test_a_secret_is_changed_moved_and_deleted_as_a_record(api):
     made = api("POST", "/api/records/secret", {"fields": {"key": "TOKEN", "value": "one"}}, expect=201)
-    changed = api("PATCH", f"/api/records/secret/{made['id']}",
-                  {"fields": {"value": "two"}, "rev": made["rev"]})
+    changed = api("PATCH", f"/api/records/secret/{made['id']}", {"fields": {"value": "two"}, "rev": made["rev"]})
     assert changed["fields"]["value"] == "two" and changed["rev"] != made["rev"]
     # The old rev is a conflict, not a loss.
-    stale = api("PATCH", f"/api/records/secret/{made['id']}",
-                {"fields": {"value": "three"}, "rev": made["rev"]}, expect=409)
+    stale = api(
+        "PATCH", f"/api/records/secret/{made['id']}", {"fields": {"value": "three"}, "rev": made["rev"]}, expect=409
+    )
     assert stale["detail"]["current"]["fields"]["value"] == "two"
-    moved = api("PATCH", f"/api/records/secret/{made['id']}",
-                {"fields": {"vault": "work", "environment": "production"}})
+    moved = api(
+        "PATCH", f"/api/records/secret/{made['id']}", {"fields": {"vault": "work", "environment": "production"}}
+    )
     assert (moved["fields"]["vault"], moved["fields"]["environment"], moved["fields"]["value"]) == (
-        "work", "production", "two")
+        "work",
+        "production",
+        "two",
+    )
     api("GET", f"/api/records/secret/{made['id']}", expect=404)
     assert api("GET", "/api/secrets/item/TOKEN?env=production&vault=work")["value"] == "two"
     api("DELETE", f"/api/records/secret/{moved['id']}", expect=204)
@@ -121,11 +134,15 @@ def test_switched_off_the_records_and_the_old_api_close_together(api):
 # -- a secret field ----------------------------------------------------------------------
 def test_a_secret_field_is_a_string_never_indexed():
     head = {"datamodel": {"id": "thing"}}
-    parsed = parse_datamodel({**head, "fields": {"name": {"kind": "string"},
-                                                  "pin": {"kind": "string", "secret": True}}})
+    parsed = parse_datamodel(
+        {**head, "fields": {"name": {"kind": "string"}, "pin": {"kind": "string", "secret": True}}}
+    )
     assert parsed.by_name["pin"].to_dict()["secret"] is True
-    for bad in ({"kind": "int", "secret": True}, {"kind": "string", "secret": True, "indexed": True},
-                {"kind": "string", "secret": "yes"}):
+    for bad in (
+        {"kind": "int", "secret": True},
+        {"kind": "string", "secret": True, "indexed": True},
+        {"kind": "string", "secret": "yes"},
+    ):
         with pytest.raises(DatamodelError):
             parse_datamodel({**head, "fields": {"name": {"kind": "string"}, "pin": bad}})
 
@@ -215,9 +232,7 @@ def test_a_server_that_had_secrets_off_keeps_it_off(client, config):
     from cloudmorrow.server.db import connect as db_connect
 
     with db_connect(config.db_path) as conn:
-        conn.execute(
-            "INSERT INTO features (key, enabled, changed_by, updated_at) VALUES ('secrets', 0, 'bram', 'x')"
-        )
+        conn.execute("INSERT INTO features (key, enabled, changed_by, updated_at) VALUES ('secrets', 0, 'bram', 'x')")
     conn.close()
     boot(config.db_path, state.quills, state.records)
     assert "secrets" in state.quills.quills

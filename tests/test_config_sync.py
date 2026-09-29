@@ -36,9 +36,7 @@ class Machine:
             headers=auth,
         ).json()
         self.agent_id = enrolled["agent_id"]
-        self.config = AgentConfig(
-            server_url="", agent_token=enrolled["agent_token"], name=name
-        )
+        self.config = AgentConfig(server_url="", agent_token=enrolled["agent_token"], name=name)
         self.client = AgentClient(self.config)
         self.client._client.close()
         self.client._client = test_client
@@ -128,9 +126,7 @@ def test_the_first_machine_to_sync_decides_the_configuration(laptop, desktop, en
 def test_a_machine_that_is_not_syncing_cannot_push(laptop):
     laptop.write("hypr/hyprland.conf", "x\n")
     with pytest.raises(AgentApiError) as exc:
-        laptop.client.push_config(
-            "omarchy", [{"path": "hypr/hyprland.conf", "content": "x\n"}], base_revision=None
-        )
+        laptop.client.push_config("omarchy", [{"path": "hypr/hyprland.conf", "content": "x\n"}], base_revision=None)
     assert exc.value.status_code == 403
 
 
@@ -210,9 +206,7 @@ def test_nothing_happens_when_nothing_changed(laptop, enable_sync):
     assert laptop.state().revision == 1
 
 
-def test_two_machines_editing_at_once_settle_on_the_one_that_pushed(
-    laptop, desktop, enable_sync
-):
+def test_two_machines_editing_at_once_settle_on_the_one_that_pushed(laptop, desktop, enable_sync):
     """Both edit while both believe they are at revision 1. Nobody loses work."""
     laptop.write("hypr/hyprland.conf", "one\n")
     enable_sync(laptop)
@@ -277,9 +271,7 @@ def test_a_machine_can_refuse_syncing_whatever_the_server_says(laptop, enable_sy
 
 
 # -- what the operator sees --------------------------------------------------
-def test_the_bundle_reports_who_claimed_it_and_who_is_keeping_it(
-    client, auth, laptop, desktop, enable_sync
-):
+def test_the_bundle_reports_who_claimed_it_and_who_is_keeping_it(client, auth, laptop, desktop, enable_sync):
     laptop.write("hypr/hyprland.conf", "x\n")
     enable_sync(laptop)
     enable_sync(desktop)

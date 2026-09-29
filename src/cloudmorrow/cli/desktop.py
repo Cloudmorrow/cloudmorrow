@@ -39,9 +39,7 @@ def app_command(
         bool,
         typer.Option("--remove-launcher", help="Take it out of the applications menu again."),
     ] = False,
-    debug: Annotated[
-        bool, typer.Option("--debug", help="Open the web inspector beside the window.")
-    ] = False,
+    debug: Annotated[bool, typer.Option("--debug", help="Open the web inspector beside the window.")] = False,
 ) -> None:
     """Open the desktop app: the web app in a window, mounting shares on this computer."""
     # Imported here: `cm note list` should not pay for any of this.

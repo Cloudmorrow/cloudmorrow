@@ -53,4 +53,3 @@ def data_dir() -> Path:
 def xdg_config_home() -> Path:
     """`~/.config`, or wherever XDG says it is: the root other programs' config lives in."""
     return Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")).expanduser()
-

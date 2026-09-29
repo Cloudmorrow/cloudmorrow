@@ -36,8 +36,14 @@ class CloudmorrowApp(App):
     # pane shares; and the kit — Quill screens, the record sheet, the Quills
     # admin. Later sheets win, so the frame's rules hold over the panes'.
     CSS_PATH = [
-        "cloudmorrow.tcss", "chrome.tcss", "kit.tcss", "kit_editor.tcss", "kit_calendar.tcss",
-        "kit_space.tcss", "kit_grouped.tcss", "kit_view.tcss",
+        "cloudmorrow.tcss",
+        "chrome.tcss",
+        "kit.tcss",
+        "kit_editor.tcss",
+        "kit_calendar.tcss",
+        "kit_space.tcss",
+        "kit_grouped.tcss",
+        "kit_view.tcss",
     ]
     TITLE = "Cloudmorrow"
     SUB_TITLE = "your own cloud"

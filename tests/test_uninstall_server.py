@@ -31,8 +31,16 @@ def made(tmp_path: Path) -> list[str]:
     dirs = [tmp_path / "opt", tmp_path / "notes", tmp_path / "data"]
     for d in dirs:
         d.mkdir()
-    return ["--prefix", str(dirs[0]), "--notes-dir", str(dirs[1]), "--data-dir", str(dirs[2]),
-            "--service-user", "nobody-here-at-all"]
+    return [
+        "--prefix",
+        str(dirs[0]),
+        "--notes-dir",
+        str(dirs[1]),
+        "--data-dir",
+        str(dirs[2]),
+        "--service-user",
+        "nobody-here-at-all",
+    ]
 
 
 def test_uninstaller_is_valid_posix_shell():

@@ -86,11 +86,15 @@ class NotificationStore:
         title = title.strip()[:200] or "(untitled)"
         with connect(self.db_path) as conn:
             cursor = conn.execute(
-                "INSERT INTO notifications (owner, kind, machine, title, body, created_at)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
-                (owner, kind.strip()[:64] or "info", machine[:64],
-                 conn.seal("notifications", "title", (owner,), title),
-                 conn.seal("notifications", "body", (owner,), body[:MAX_BODY_CHARS]), _now()),
+                "INSERT INTO notifications (owner, kind, machine, title, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    owner,
+                    kind.strip()[:64] or "info",
+                    machine[:64],
+                    conn.seal("notifications", "title", (owner,), title),
+                    conn.seal("notifications", "body", (owner,), body[:MAX_BODY_CHARS]),
+                    _now(),
+                ),
             )
             # Keep the tail bounded without a cron job for it.
             conn.execute(
@@ -99,9 +103,7 @@ class NotificationStore:
                 "  LIMIT 1 OFFSET ?)",
                 (owner, owner, KEEP),
             )
-            row = conn.execute(
-                "SELECT * FROM notifications WHERE id = ?", (cursor.lastrowid,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM notifications WHERE id = ?", (cursor.lastrowid,)).fetchone()
         return _row(conn, row)
 
     def list(self, owner: str, *, limit: int = 50, unread_only: bool = False) -> list[Notification]:
@@ -135,8 +137,7 @@ class NotificationStore:
                     return 0
                 marks = ", ".join("?" for _ in ids)
                 cursor = conn.execute(
-                    f"UPDATE notifications SET read_at = ? WHERE owner = ? AND read_at IS NULL"
-                    f" AND id IN ({marks})",
+                    f"UPDATE notifications SET read_at = ? WHERE owner = ? AND read_at IS NULL AND id IN ({marks})",
                     (_now(), owner, *ids),
                 )
             return cursor.rowcount

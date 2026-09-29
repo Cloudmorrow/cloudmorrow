@@ -80,13 +80,9 @@ def first_account(payload: SetupRequest, state: AppState = Depends(get_state)) -
             # Checked first, so a bad name makes no account; saved last, so a
             # bad account leaves no name behind.
             name = validate_name(payload.name)
-            user = state.users.create(
-                payload.username, hash_password(payload.password), is_admin=True
-            )
+            user = state.users.create(payload.username, hash_password(payload.password), is_admin=True)
         except (InvalidNameError, InvalidUsernameError, UserExistsError, ValueError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-            ) from exc
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
         state.settings.set_name(name, changed_by=user.username)
         state.config.notes_root(user.username).mkdir(parents=True, exist_ok=True)
     # The standard quills, after the account: a download that fails leaves a
@@ -95,8 +91,12 @@ def first_account(payload: SetupRequest, state: AppState = Depends(get_state)) -
     if payload.quills is not None:
         try:
             choose(
-                state.config, set(payload.quills), by=user.username,
-                registry=state.quills, features=state.features, remove_unwanted=True,
+                state.config,
+                set(payload.quills),
+                by=user.username,
+                registry=state.quills,
+                features=state.features,
+                remove_unwanted=True,
             )
         except QuillError as exc:
             note = f"{exc}. Add it later from Administration, Quills."

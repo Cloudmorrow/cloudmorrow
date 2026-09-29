@@ -26,9 +26,7 @@ from cloudmorrow.links import ensure_commands_linked
 app = typer.Typer(help="Cloudmorrow local agent.", no_args_is_help=True)
 console = make_console()
 
-ConfigOption = Annotated[
-    Path | None, typer.Option("--config", "-c", help="Path to agent.toml.")
-]
+ConfigOption = Annotated[Path | None, typer.Option("--config", "-c", help="Path to agent.toml.")]
 
 
 def _load(config_path: Path | None) -> AgentConfig:
@@ -52,9 +50,7 @@ def enroll(
     token: Annotated[str, typer.Option("--token", "-t", help="Single-use enrolment token.")],
     name: Annotated[str | None, typer.Option(help="Agent name (default: hostname).")] = None,
     config_path: ConfigOption = None,
-    allow_shell: Annotated[
-        bool, typer.Option(help="Let this machine run shell jobs.")
-    ] = False,
+    allow_shell: Annotated[bool, typer.Option(help="Let this machine run shell jobs.")] = False,
     backup_root: Annotated[
         list[str] | None,
         typer.Option("--backup-root", help="A directory backups may read (repeatable)."),
@@ -70,9 +66,7 @@ def enroll(
 
     with AgentClient(config) as client:
         try:
-            result = client.enroll(
-                token, config.name, socket.gethostname(), platform.platform()
-            )
+            result = client.enroll(token, config.name, socket.gethostname(), platform.platform())
         except AgentApiError as exc:
             console.print(f"[red]Enrolment failed:[/] {exc}")
             raise typer.Exit(code=1) from None
@@ -107,10 +101,7 @@ def run(
     runner = AgentRunner(config)
     runner.install_signal_handlers()
     stats = runner.run_forever(max_ticks=1 if once else None)
-    console.print(
-        f"[dim]{stats.heartbeats} heartbeats, {stats.jobs_done} jobs done, "
-        f"{stats.jobs_failed} failed[/]"
-    )
+    console.print(f"[dim]{stats.heartbeats} heartbeats, {stats.jobs_done} jobs done, {stats.jobs_failed} failed[/]")
 
 
 @app.command()
@@ -139,8 +130,7 @@ def status(config_path: ConfigOption = None) -> None:
     for bundle in sorted(BUNDLES):
         state = SyncState.load(bundle)
         held = (
-            f"revision {state.revision} from {state.origin or '?'}"
-            f" ({len(state.files)} files)"
+            f"revision {state.revision} from {state.origin or '?'} ({len(state.files)} files)"
             if state.revision
             else "never synced here"
         )

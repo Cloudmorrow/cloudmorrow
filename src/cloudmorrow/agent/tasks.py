@@ -135,9 +135,7 @@ def _prune(destination: Path, label: str, retention: int) -> list[str]:
     """Keep the newest *retention* archives for this label, delete the rest."""
     if retention <= 0:
         return []
-    archives = sorted(
-        destination.glob(f"{label}-*.tar.gz"), key=lambda p: p.stat().st_mtime, reverse=True
-    )
+    archives = sorted(destination.glob(f"{label}-*.tar.gz"), key=lambda p: p.stat().st_mtime, reverse=True)
     removed = []
     for old in archives[retention:]:
         old.unlink(missing_ok=True)
@@ -173,8 +171,7 @@ def task_shell(payload: dict, config: AgentConfig) -> dict:
         "exit_code": completed.returncode,
         "stdout": completed.stdout[:MAX_OUTPUT_CHARS],
         "stderr": completed.stderr[:MAX_OUTPUT_CHARS],
-        "truncated": len(completed.stdout) > MAX_OUTPUT_CHARS
-        or len(completed.stderr) > MAX_OUTPUT_CHARS,
+        "truncated": len(completed.stdout) > MAX_OUTPUT_CHARS or len(completed.stderr) > MAX_OUTPUT_CHARS,
     }
     if completed.returncode != 0:
         raise TaskError(f"command exited {completed.returncode}: {completed.stderr[:400]}")

@@ -88,9 +88,7 @@ def test_removing_takes_it_all_and_strikes_the_agent_off(machine):
     assert machine["removed"] == ["service"]
     assert not machine["config"].exists()
     assert not machine["prefix"].exists()
-    assert not any(
-        (machine["bindir"] / n).exists() for n in ("cloudmorrow", "cm", "cloudmorrow-agent")
-    )
+    assert not any((machine["bindir"] / n).exists() for n in ("cloudmorrow", "cm", "cloudmorrow-agent"))
     # Not ours, not touched.
     assert (machine["other"] / "cm").is_symlink()
 
@@ -99,9 +97,9 @@ def test_backups_elsewhere_are_their_own_line_and_can_be_kept(machine, tmp_path)
     elsewhere = tmp_path / "Backups"
     elsewhere.mkdir()
     (elsewhere / "a.tar.gz").write_bytes(b"x")
-    AgentConfig(
-        server_url="https://x", agent_token="a", name="box", backup_dir=str(elsewhere)
-    ).save(machine["config"] / "agent.toml")
+    AgentConfig(server_url="https://x", agent_token="a", name="box", backup_dir=str(elsewhere)).save(
+        machine["config"] / "agent.toml"
+    )
     assert uninstall.plan().backups == elsewhere
     assert uninstall.plan(keep_backups=True).backups is None
 

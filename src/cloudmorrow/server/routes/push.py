@@ -75,9 +75,7 @@ class BadgeOut(BaseModel):
 
 # -- subscribing -----------------------------------------------------------------
 @router.get("/key", response_model=KeyOut)
-def push_key(
-    state: AppState = Depends(get_state), _: User = Depends(get_current_user)
-) -> KeyOut:
+def push_key(state: AppState = Depends(get_state), _: User = Depends(get_current_user)) -> KeyOut:
     return KeyOut(public_key=state.push.public_key, subject=state.push.subject)
 
 
@@ -110,24 +108,18 @@ def unsubscribe(
 
 
 @router.get("/devices", response_model=list[DeviceOut])
-def devices(
-    state: AppState = Depends(get_state), user: User = Depends(get_current_user)
-) -> list[DeviceOut]:
+def devices(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> list[DeviceOut]:
     return [DeviceOut(**s.to_dict()) for s in state.push.list(user.username)]
 
 
 @router.get("/badge", response_model=BadgeOut)
-def badge(
-    state: AppState = Depends(get_state), user: User = Depends(get_current_user)
-) -> BadgeOut:
+def badge(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> BadgeOut:
     """What the page sets the icon to while it is open."""
     return BadgeOut(**badge_for(state, user.username))
 
 
 @router.post("/test", response_model=BadgeOut)
-def send_test(
-    state: AppState = Depends(get_state), user: User = Depends(get_current_user)
-) -> BadgeOut:
+def send_test(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> BadgeOut:
     """Push yourself, to find out whether this phone is actually wired up.
 
     Worth having: everything between here and the notification — the

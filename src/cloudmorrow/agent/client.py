@@ -49,9 +49,7 @@ class AgentClient:
 
     def _post(self, url: str, payload: dict, *, authenticated: bool = True) -> dict | None:
         try:
-            response = self._client.post(
-                url, json=payload, headers=self._headers(authenticated)
-            )
+            response = self._client.post(url, json=payload, headers=self._headers(authenticated))
         except httpx.HTTPError as exc:
             raise AgentApiError.unreachable(self.config.server_url, exc) from exc
         return self._check(response)
@@ -87,9 +85,7 @@ class AgentClient:
 
     def check_credentials(self, username: str, password: str) -> bool:
         """Whether a mount of one of this machine's shares may come in."""
-        answer = self._post(
-            "/api/agent/credentials", {"username": username, "password": password}
-        )
+        answer = self._post("/api/agent/credentials", {"username": username, "password": password})
         return bool(answer and answer.get("valid"))
 
     def claim_job(self) -> dict | None:
@@ -107,9 +103,7 @@ class AgentClient:
         """The whole bundle, contents and all."""
         return self._get(f"/api/agent/config/{bundle}/files") or {}
 
-    def push_config(
-        self, bundle: str, files: list[dict], *, base_revision: int | None
-    ) -> dict:
+    def push_config(self, bundle: str, files: list[dict], *, base_revision: int | None) -> dict:
         """Offer this machine's copy. 409 means somebody else got there first."""
         return (
             self._post(
@@ -136,11 +130,7 @@ class AgentClient:
 
     def quill_host(self, quill: str, op: str, args: dict, *, machine: str = "") -> dict:
         """One request from a machine handler: {ok, value} or {ok: false, kind, message}."""
-        return self._post(
-            f"/api/agent/quills/{quill}/host", {"op": op, "args": args, "machine": machine}
-        ) or {}
+        return self._post(f"/api/agent/quills/{quill}/host", {"op": op, "args": args, "machine": machine}) or {}
 
     def notify(self, *, kind: str, title: str, body: str = "") -> dict:
-        return self._post(
-            "/api/agent/notifications", {"kind": kind, "title": title, "body": body}
-        ) or {}
+        return self._post("/api/agent/notifications", {"kind": kind, "title": title, "body": body}) or {}

@@ -124,9 +124,7 @@ def upload(client, auth, path, filename, body=b"data", content_type="application
 
 
 def test_a_file_is_put_in_the_folder_named(client, auth, share):
-    response = upload(
-        client, auth, "Holiday", "dune.jpg", b"\xff\xd8\xff" + b"y" * 50, "image/jpeg"
-    )
+    response = upload(client, auth, "Holiday", "dune.jpg", b"\xff\xd8\xff" + b"y" * 50, "image/jpeg")
     assert response.status_code == 201, response.text
     saved = response.json()
     assert saved["name"] == "dune.jpg" and saved["size"] == 53 and saved["mime"] == "image/jpeg"

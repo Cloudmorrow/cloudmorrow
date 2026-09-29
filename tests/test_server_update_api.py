@@ -58,9 +58,7 @@ def deploy(monkeypatch):
     monkeypatch.setattr(route, "build_wheel", lambda *a, **k: Path("cloudmorrow-0.1.0.whl"))
     monkeypatch.setattr(route, "describe", lambda source, commit: "bbbbbbb a real commit")
     monkeypatch.setattr(route, "self_restart_blocker", lambda service: calls["blocker"])
-    monkeypatch.setattr(
-        route, "self_restart", lambda: calls.__setitem__("restarted", calls["restarted"] + 1)
-    )
+    monkeypatch.setattr(route, "self_restart", lambda: calls.__setitem__("restarted", calls["restarted"] + 1))
     return calls
 
 
@@ -144,16 +142,12 @@ def test_a_server_can_refuse_api_deploys_entirely(config, users, deploy):
 
 
 def test_the_branch_is_a_branch_and_not_a_git_flag(client, auth, deploy):
-    response = client.post(
-        "/api/server/update", json={"branch": "--upload-pack=touch /tmp/pwned"}, headers=auth
-    )
+    response = client.post("/api/server/update", json={"branch": "--upload-pack=touch /tmp/pwned"}, headers=auth)
     assert response.status_code == 409
     assert deploy["update"] is None
 
 
-@pytest.mark.parametrize(
-    "branch", ["--upload-pack=x", "-x", "", "   ", "a/../../etc", "x" * 200]
-)
+@pytest.mark.parametrize("branch", ["--upload-pack=x", "-x", "", "   ", "a/../../etc", "x" * 200])
 def test_branch_names_that_are_refused(branch):
     with pytest.raises(UpdateError):
         validate_branch(branch)

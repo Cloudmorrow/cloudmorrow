@@ -63,9 +63,7 @@ class SettingsScreen(Modal[None]):
 
                 yield Static(f"[{MUTED}]omarchy config[/]", classes="pane-title")
                 yield Static("Looking for this machine…", id="settings-omarchy")
-                yield Checkbox(
-                    "Keep Omarchy config in sync", value=False, id="sync-omarchy", disabled=True
-                )
+                yield Checkbox("Keep Omarchy config in sync", value=False, id="sync-omarchy", disabled=True)
                 yield Static("", id="settings-bundle")
 
                 yield Static(f"[{MUTED}]what this app shows you[/]", classes="pane-title")
@@ -136,10 +134,7 @@ class SettingsScreen(Modal[None]):
         seen = "online" if agent["online"] else f"last seen {short_stamp(agent['last_seen'])}"
         if not capable:
             box.disabled = True
-            line.update(
-                f"{dot} [{MUTED}]{seen}[/]\n"
-                f"[{MUTED}]{describe()} — nothing to sync from here.[/]"
-            )
+            line.update(f"{dot} [{MUTED}]{seen}[/]\n[{MUTED}]{describe()} — nothing to sync from here.[/]")
             self._draw_bundle()
             return
 
@@ -191,9 +186,7 @@ class SettingsScreen(Modal[None]):
             return
         machines = bundle.get("machines") or []
         here = machine_name()
-        listed = ", ".join(
-            f"[b]{name}[/]" if name == here else name for name in machines
-        )
+        listed = ", ".join(f"[b]{name}[/]" if name == here else name for name in machines)
         target.update(
             f"[{ACCENT}]revision {bundle['revision']}[/] "
             f"[{MUTED}]from[/] {bundle.get('origin') or '?'} "
@@ -267,13 +260,11 @@ class SettingsScreen(Modal[None]):
         # Said in the status bar under this screen, and read when it closes.
         if wanted and not claimed:
             self.app.say(
-                "This machine will claim the config on its next check-in — "
-                "its copy becomes the one the others adopt."
+                "This machine will claim the config on its next check-in — its copy becomes the one the others adopt."
             )
         elif wanted:
             self.app.say(
-                f"Syncing with revision {self._bundle['revision']} from "
-                f"{self._bundle.get('origin') or 'the server'}."
+                f"Syncing with revision {self._bundle['revision']} from {self._bundle.get('origin') or 'the server'}."
             )
         else:
             self.app.say("This machine keeps its files, and stops following the others.")

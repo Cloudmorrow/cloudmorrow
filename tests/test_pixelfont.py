@@ -11,10 +11,7 @@ from cloudmorrow.server.routes.web import WEB
 
 def _js_font(source: str, marker: str) -> dict[str, list[str]]:
     block = source.split(marker, 1)[1].split("\n};", 1)[0]
-    return {
-        key: json.loads(f"[{rows}]")
-        for key, rows in re.findall(r'^  "?(.)"?: \[(.*?)\],$', block, re.M)
-    }
+    return {key: json.loads(f"[{rows}]") for key, rows in re.findall(r'^  "?(.)"?: \[(.*?)\],$', block, re.M)}
 
 
 def test_every_glyph_is_five_across_and_seven_down():
@@ -35,7 +32,7 @@ def test_the_font_matches_the_one_the_web_app_draws_with():
 
 def test_half_blocks_pack_two_rows_of_dots_into_one_cell():
     # A column with only its top dot set is an upper half block, and so on.
-    assert pixelfont.rows("I")[0][2] == "█"   # both dots of the stem
+    assert pixelfont.rows("I")[0][2] == "█"  # both dots of the stem
     assert pixelfont.rows("L")[-1][0] == "▀"  # row 6 set, row 7 does not exist
     assert " " in pixelfont.rows("CLOUDMORROW")[0]
 

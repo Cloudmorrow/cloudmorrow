@@ -21,7 +21,7 @@ handler = "visit_logged"
 ```python
 @hook
 def visit_logged(ctx, change):
-    visit = change.record               # change.action, change.before (old fields), change.changed
+    visit = change.record  # change.action, change.before (old fields), change.changed
     van = ctx.records.get("vehicle", visit["vehicle"])
     ctx.records.patch("vehicle", van.id, {"fleet.odometer": visit["km"]})
 ```
@@ -54,9 +54,9 @@ signature = "Stripe-Signature"   # optional: an HMAC of the body instead of the 
 
 ```python
 @webhook
-def stripe_paid(ctx, request):          # request.json(), .text, .headers, .query
+def stripe_paid(ctx, request):  # request.json(), .text, .headers, .query
     ...
-    return respond(json={"ok": True})   # or nothing: 204
+    return respond(json={"ok": True})  # or nothing: 204
 ```
 
 It is at `POST /hooks/<quill>/<path>` with the webhook's secret, which an
@@ -72,8 +72,8 @@ handler = "summary"         # GET/POST/… /api/q/<quill>/<path>, for anybody si
 
 ```python
 @api
-def summary(ctx, request):              # request.method, .path, .user (who asked)
-    return {"vans": len(ctx.records.list("vehicle"))}   # a dict is sent as JSON
+def summary(ctx, request):  # request.method, .path, .user (who asked)
+    return {"vans": len(ctx.records.list("vehicle"))}  # a dict is sent as JSON
 ```
 
 ## The internet, and secrets
@@ -89,8 +89,9 @@ why = "to sign in to the tracker"
 ```
 
 ```python
-answer = ctx.fetch("https://api.example-tracker.com/vans",
-                   headers={"Authorization": "Bearer " + ctx.secret("TRACKER_KEY")})
+answer = ctx.fetch(
+    "https://api.example-tracker.com/vans", headers={"Authorization": "Bearer " + ctx.secret("TRACKER_KEY")}
+)
 if answer.ok:
     data = answer.json()
 ```

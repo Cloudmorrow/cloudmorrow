@@ -122,14 +122,10 @@ async def register(request: Request, state: AppState = Depends(get_state)) -> JS
         return _oauth_error("invalid_redirect_uri", "redirect_uris must be a list of strings")
     method = body.get("token_endpoint_auth_method") or "none"
     if method not in {"none", "client_secret_post", "client_secret_basic"}:
-        return _oauth_error(
-            "invalid_client_metadata", f"unsupported token_endpoint_auth_method: {method}"
-        )
+        return _oauth_error("invalid_client_metadata", f"unsupported token_endpoint_auth_method: {method}")
     name = body.get("client_name") if isinstance(body.get("client_name"), str) else ""
     try:
-        client, secret = _store(state).register(
-            name or "an MCP client", uris, public=method == "none"
-        )
+        client, secret = _store(state).register(name or "an MCP client", uris, public=method == "none")
     except RegistrationError as exc:
         return _oauth_error("invalid_redirect_uri", str(exc))
     answer: dict[str, Any] = {
@@ -148,9 +144,7 @@ async def register(request: Request, state: AppState = Depends(get_state)) -> JS
 
 
 def _oauth_error(error: str, description: str, code: int = 400) -> JSONResponse:
-    return JSONResponse(
-        {"error": error, "error_description": description}, status_code=code, headers=PUBLIC
-    )
+    return JSONResponse({"error": error, "error_description": description}, status_code=code, headers=PUBLIC)
 
 
 # -- authorization: the page where the person says yes -------------------------
@@ -169,9 +163,7 @@ def _redirect_with(uri: str, params: dict[str, str]) -> RedirectResponse:
     parts = urlsplit(uri)
     query = parts.query + ("&" if parts.query else "") + urlencode(params)
     target = urlunsplit((parts.scheme, parts.netloc, parts.path, query, ""))
-    return RedirectResponse(
-        target, status_code=status.HTTP_302_FOUND, headers={"Cache-Control": "no-store"}
-    )
+    return RedirectResponse(target, status_code=status.HTTP_302_FOUND, headers={"Cache-Control": "no-store"})
 
 
 async def _form(request: Request) -> dict[str, str]:
@@ -198,8 +190,7 @@ def _consent_page(
     code: int = 200,
 ) -> HTMLResponse:
     hidden = "\n".join(
-        f'<input type="hidden" name="{html.escape(key)}"'
-        f' value="{html.escape(params.get(key, ""))}">'
+        f'<input type="hidden" name="{html.escape(key)}" value="{html.escape(params.get(key, ""))}">'
         for key in AUTHORIZE_FIELDS
     )
     page = _render(
@@ -220,9 +211,7 @@ def _refusal_page(message: str) -> HTMLResponse:
         "mcp-refused.html",
         {"__MESSAGE__": html.escape(message), "__VERSION__": html.escape(__version__)},
     )
-    return HTMLResponse(
-        page, status_code=status.HTTP_400_BAD_REQUEST, headers={"Cache-Control": "no-store"}
-    )
+    return HTMLResponse(page, status_code=status.HTTP_400_BAD_REQUEST, headers={"Cache-Control": "no-store"})
 
 
 def _check_request(state: AppState, params: dict[str, str]):
@@ -233,13 +222,9 @@ def _check_request(state: AppState, params: dict[str, str]):
         return None, _refusal_page("Unknown client. Add the server to your assistant again.")
     redirect_uri = params.get("redirect_uri", "")
     if not redirect_uri or not client.allows_redirect(redirect_uri):
-        return None, _refusal_page(
-            "The assistant asked to be sent back somewhere it did not register."
-        )
+        return None, _refusal_page("The assistant asked to be sent back somewhere it did not register.")
     if (params.get("response_type") or "code") != "code":
-        return client, _redirect_with(
-            redirect_uri, _with_state(params, error="unsupported_response_type")
-        )
+        return client, _redirect_with(redirect_uri, _with_state(params, error="unsupported_response_type"))
     if not params.get("code_challenge") or params.get("code_challenge_method", "S256") != "S256":
         return client, _redirect_with(
             redirect_uri,
@@ -397,9 +382,7 @@ def mcp_user(request: Request, state: AppState = Depends(get_state)) -> User:
 
 
 @router.post(MCP_PATH, include_in_schema=False)
-async def mcp_post(
-    request: Request, state: AppState = Depends(get_state), user: User = Depends(mcp_user)
-) -> Response:
+async def mcp_post(request: Request, state: AppState = Depends(get_state), user: User = Depends(mcp_user)) -> Response:
     try:
         body = json.loads(await request.body())
     except ValueError:
@@ -424,16 +407,12 @@ def mcp_no_stream(user: User = Depends(mcp_user)) -> Response:
 
 # -- what the person sees ------------------------------------------------------------
 @router.get("/api/mcp/connections", tags=["mcp"])
-def list_connections(
-    state: AppState = Depends(get_state), user: User = Depends(get_current_user)
-) -> list[dict]:
+def list_connections(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> list[dict]:
     """The assistants you have let in."""
     return [connection.to_dict() for connection in _store(state).connections(user.username)]
 
 
-@router.delete(
-    "/api/mcp/connections/{connection_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["mcp"]
-)
+@router.delete("/api/mcp/connections/{connection_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["mcp"])
 def revoke_connection(
     connection_id: int,
     state: AppState = Depends(get_state),

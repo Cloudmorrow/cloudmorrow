@@ -66,9 +66,7 @@ def test_serving_starts_with_the_first_share_and_stops_with_the_last(host, music
 def test_a_directory_that_is_not_here_is_not_served(host, tmp_path, music):
     host.update([{"name": "gone", "path": str(tmp_path / "nope")}])
     assert host.base_url == ""
-    host.update(
-        [{"name": "gone", "path": str(tmp_path / "nope")}, {"name": "music", "path": str(music)}]
-    )
+    host.update([{"name": "gone", "path": str(tmp_path / "nope")}, {"name": "music", "path": str(music)}])
     assert host.base_url != ""
     assert [s.name for s in host.served.shares_for("bram")] == ["music"]
 
@@ -76,9 +74,7 @@ def test_a_directory_that_is_not_here_is_not_served(host, tmp_path, music):
 def test_the_machine_serves_its_share_to_its_owner(host, music):
     host.update([{"name": "music", "path": str(music)}])
     base = host.base_url
-    listing = httpx.request(
-        "PROPFIND", f"{base}/dav/", headers={**basic("bram", "token"), "Depth": "1"}
-    )
+    listing = httpx.request("PROPFIND", f"{base}/dav/", headers={**basic("bram", "token"), "Depth": "1"})
     assert listing.status_code == 207
     assert "/dav/music/" in listing.text
     song = httpx.get(f"{base}/dav/music/song.txt", headers=basic("bram", "token"))
@@ -97,25 +93,19 @@ def test_wrong_credentials_are_refused_with_a_basic_challenge(host, music):
 def test_nothing_escapes_the_share(host, music, tmp_path):
     (tmp_path / "secret.txt").write_text("no")
     host.update([{"name": "music", "path": str(music)}])
-    outside = httpx.get(
-        f"{host.base_url}/dav/music/../secret.txt", headers=basic("bram", "token")
-    )
+    outside = httpx.get(f"{host.base_url}/dav/music/../secret.txt", headers=basic("bram", "token"))
     assert outside.status_code in (403, 404)
 
 
 def test_writes_land_in_the_directory(host, music):
     host.update([{"name": "music", "path": str(music)}])
-    put = httpx.put(
-        f"{host.base_url}/dav/music/new.txt", content=b"hello", headers=basic("bram", "token")
-    )
+    put = httpx.put(f"{host.base_url}/dav/music/new.txt", content=b"hello", headers=basic("bram", "token"))
     assert put.status_code in (201, 204)
     assert (music / "new.txt").read_text() == "hello"
 
 
 def test_the_runner_reports_where_it_serves_on_the_next_heartbeat(tmp_path, music):
-    config = AgentConfig(
-        server_url="http://127.0.0.1:1", agent_token="x", share_port=0, share_host="127.0.0.1"
-    )
+    config = AgentConfig(server_url="http://127.0.0.1:1", agent_token="x", share_port=0, share_host="127.0.0.1")
     client = FakeClient()
     runner = AgentRunner(config, client=client)
     runner.tick()

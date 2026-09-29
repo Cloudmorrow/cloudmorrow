@@ -49,18 +49,14 @@ def _quill(state: AppState, quill_id: str) -> Manifest:
     if manifest is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"{quill_id} is not installed")
     if not state.features.enabled(quill_id):
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN, f"{manifest.name} is switched off on this server"
-        )
+        raise HTTPException(status.HTTP_403_FORBIDDEN, f"{manifest.name} is switched off on this server")
     return manifest
 
 
 def _port(state: AppState, manifest: Manifest, service: str) -> int:
     port = state.services.port_of(manifest.id, service) if state.services else None
     if port is None:
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE, f"{manifest.name}'s {service} is not running"
-        )
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"{manifest.name}'s {service} is not running")
     return port
 
 
@@ -78,10 +74,7 @@ async def quill_api(
     if principal.kind == "quill" and principal.quill != quill_id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "a Quill's token opens its own API only")
     api = next(
-        (
-            a for a in manifest.apis
-            if not a.get("prefix") or path == a["prefix"] or path.startswith(a["prefix"] + "/")
-        ),
+        (a for a in manifest.apis if not a.get("prefix") or path == a["prefix"] or path.startswith(a["prefix"] + "/")),
         None,
     )
     if api is None:
@@ -90,7 +83,11 @@ async def quill_api(
     if api.get("handler"):
         try:
             answer = await run_in_threadpool(
-                _code(state).api, manifest, api, principal.username, _request(request, path, body),
+                _code(state).api,
+                manifest,
+                api,
+                principal.username,
+                _request(request, path, body),
                 as_quill=principal.kind == "quill",
             )
         except CodeError as exc:
@@ -124,9 +121,7 @@ async def webhook(
     body = await read_body(request, HOOK_MAX_BODY)
     secret = state.quill_tokens.webhook_secret(quill_id, hook["id"])
     sent = token or request.headers.get("x-cloudmorrow-webhook-token", "")
-    signed = hook.get("signature") and signature_ok(
-        secret, body, request.headers.get(hook["signature"])
-    )
+    signed = hook.get("signature") and signature_ok(secret, body, request.headers.get(hook["signature"]))
     if not (signed or (sent and hmac.compare_digest(sent, secret))):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "not this webhook's secret")
     if not hook_rate.allow(f"{quill_id}/{hook['id']}"):
@@ -144,7 +139,11 @@ async def webhook(
     if hook.get("forward"):
         port = _port(state, manifest, hook["forward"])
         return await forward(
-            request, port, f"hooks/{hook['path']}", body, {"X-Cloudmorrow-Webhook": hook["id"]},
+            request,
+            port,
+            f"hooks/{hook['path']}",
+            body,
+            {"X-Cloudmorrow-Webhook": hook["id"]},
             drop=("token",),
         )
 
@@ -173,7 +172,8 @@ def _code(state: AppState):
 def _request(request: Request, path: str, body: bytes, drop: tuple[str, ...] = ()) -> dict:
     """A request, as a handler's `Request` gets it: never the caller's credentials."""
     headers = {
-        k.lower(): v for k, v in request.headers.items()
+        k.lower(): v
+        for k, v in request.headers.items()
         if k.lower() not in ("authorization", "cookie", "host", "content-length")
     }
     return {
@@ -187,7 +187,8 @@ def _request(request: Request, path: str, body: bytes, drop: tuple[str, ...] = (
 
 def _response(answer: dict) -> Response:
     headers = {
-        k: v for k, v in (answer.get("headers") or {}).items()
+        k: v
+        for k, v in (answer.get("headers") or {}).items()
         if k.lower() not in ("set-cookie", "content-length", "transfer-encoding")
     }
     return Response(
@@ -209,9 +210,7 @@ def _base(state: AppState, request: Request) -> str:
 
 
 @admin_router.get("")
-def services(
-    request: Request, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)
-) -> list[dict]:
+def services(request: Request, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> list[dict]:
     """Every Quill that runs code: its services and their state, jobs, webhooks, APIs."""
     base = _base(state, request)
     rows = _supervisor(state).status()
@@ -241,16 +240,15 @@ def logs(
     supervisor = _supervisor(state)
     return {
         # "code" is its Python's log: what its handlers printed, and what failed.
-        name: state.code.tail(quill_id, lines) if name == "code" and state.code else
-        supervisor.tail(quill_id, name, lines)
+        name: state.code.tail(quill_id, lines)
+        if name == "code" and state.code
+        else supervisor.tail(quill_id, name, lines)
         for name in ([service] if service else names)
     }
 
 
 @admin_router.post("/{quill_id}/token")
-def rotate_token(
-    quill_id: str, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)
-) -> dict:
+def rotate_token(quill_id: str, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> dict:
     """A new token; the old one stops working now, and the services restart with the new."""
     _quill(state, quill_id)
     _supervisor(state).rotate(quill_id)
@@ -258,9 +256,7 @@ def rotate_token(
 
 
 @admin_router.post("/{quill_id}/restart")
-def restart(
-    quill_id: str, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)
-) -> dict:
+def restart(quill_id: str, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> dict:
     _quill(state, quill_id)
     _supervisor(state).restart(quill_id)
     return {"restarted": quill_id}

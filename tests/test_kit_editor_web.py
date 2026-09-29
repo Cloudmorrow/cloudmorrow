@@ -43,8 +43,7 @@ def test_the_old_notes_screen_is_gone():
 
 
 def test_nothing_in_the_editor_is_named_for_notes():
-    for source, name in ((EDITOR_JS, "kit_editor.js"), (EDITOR_CSS, "kit_editor.css"),
-                         (PICTURES_JS, "pictures.js")):
+    for source, name in ((EDITOR_JS, "kit_editor.js"), (EDITOR_CSS, "kit_editor.css"), (PICTURES_JS, "pictures.js")):
         code = js_code(source)
         for word in ("note", "notes"):
             assert not re.search(rf"[\"'.`/]{word}[\"'`\s/]", code), f"{name} names {word!r}"
@@ -84,16 +83,18 @@ def test_the_record_calls_it_makes_exist(notes_quill, auth):
     assert all("preview" in r for r in rows)
     assert client.get("/api/records/note?q=welcome", headers=auth).status_code == 200
     assert client.get("/api/records/note/_folders", headers=auth).status_code == 200
-    made = client.post("/api/records/note", headers=auth,
-                       json={"fields": {"path": "a/New note", "body": "# New note\n\n"}})
+    made = client.post(
+        "/api/records/note", headers=auth, json={"fields": {"path": "a/New note", "body": "# New note\n\n"}}
+    )
     assert made.status_code == 201
     note = made.json()
-    renamed = client.patch(f"/api/records/note/{note['id']}", headers=auth,
-                           json={"fields": {"title": "Better"}}).json()
+    renamed = client.patch(f"/api/records/note/{note['id']}", headers=auth, json={"fields": {"title": "Better"}}).json()
     assert renamed["fields"]["path"] == "a/Better" and renamed["id"] != note["id"]
-    saved = client.patch(f"/api/records/note/{renamed['id']}", headers=auth,
-                         json={"fields": {"body": "x"}, "rev": renamed["rev"]})
+    saved = client.patch(
+        f"/api/records/note/{renamed['id']}", headers=auth, json={"fields": {"body": "x"}, "rev": renamed["rev"]}
+    )
     assert saved.status_code == 200
-    stale = client.patch(f"/api/records/note/{renamed['id']}", headers=auth,
-                         json={"fields": {"body": "y"}, "rev": renamed["rev"]})
+    stale = client.patch(
+        f"/api/records/note/{renamed['id']}", headers=auth, json={"fields": {"body": "y"}, "rev": renamed["rev"]}
+    )
     assert stale.status_code == 409 and stale.json()["detail"]["current"]["fields"]["body"] == "x"

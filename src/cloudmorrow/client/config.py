@@ -101,8 +101,10 @@ class StoredCredentials:
             return None
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            return cls(**{k: data[k] for k in ("api_url", "username", "access_token") if k in data},
-                       expires_at=data.get("expires_at", ""))
+            return cls(
+                **{k: data[k] for k in ("api_url", "username", "access_token") if k in data},
+                expires_at=data.get("expires_at", ""),
+            )
         except (json.JSONDecodeError, TypeError, KeyError):
             return None
 

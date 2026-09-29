@@ -48,29 +48,19 @@ def test_import_list_and_read(client, auth):
     assert listed[0]["length"] == len("sk-live")
     assert listed[0]["fingerprint"]
 
-    revealed = client.get(
-        "/api/secrets", params={"env": "production", "reveal": True}, headers=auth
-    ).json()
+    revealed = client.get("/api/secrets", params={"env": "production", "reveal": True}, headers=auth).json()
     assert revealed[0]["value"] == "sk-live"
 
-    one = client.get(
-        "/api/secrets/item/API_KEY", params={"env": "production"}, headers=auth
-    ).json()
+    one = client.get("/api/secrets/item/API_KEY", params={"env": "production"}, headers=auth).json()
     assert one["value"] == "sk-live"
 
 
 def test_write_and_delete_one(client, auth):
-    written = client.put(
-        "/api/secrets/item/TOKEN", json={"value": "abc", "environment": "test"}, headers=auth
-    )
+    written = client.put("/api/secrets/item/TOKEN", json={"value": "abc", "environment": "test"}, headers=auth)
     assert written.status_code == 200
     assert written.json()["environment"] == "test"
-    assert client.delete(
-        "/api/secrets/item/TOKEN", params={"env": "test"}, headers=auth
-    ).status_code == 204
-    assert client.get(
-        "/api/secrets/item/TOKEN", params={"env": "test"}, headers=auth
-    ).status_code == 404
+    assert client.delete("/api/secrets/item/TOKEN", params={"env": "test"}, headers=auth).status_code == 204
+    assert client.get("/api/secrets/item/TOKEN", params={"env": "test"}, headers=auth).status_code == 404
 
 
 def test_environments_are_listed_with_counts(client, auth):
@@ -80,7 +70,8 @@ def test_environments_are_listed_with_counts(client, auth):
         headers=auth,
     )
     client.post(
-        "/api/secrets/import", json={"environment": "production", "entries": {"A": "9"}},
+        "/api/secrets/import",
+        json={"environment": "production", "entries": {"A": "9"}},
         headers=auth,
     )
     listed = client.get("/api/secrets/environments", headers=auth).json()
@@ -90,16 +81,15 @@ def test_environments_are_listed_with_counts(client, auth):
 def test_export_is_a_dotenv_file_that_parses_back(client, auth):
     entries = {"API_KEY": "sk-live", "GREETING": "hello world", "EMPTY": ""}
     client.post(
-        "/api/secrets/import", json={"environment": "production", "entries": entries},
+        "/api/secrets/import",
+        json={"environment": "production", "entries": entries},
         headers=auth,
     )
     exported = client.get("/api/secrets/export", params={"env": "production"}, headers=auth)
     assert exported.headers["cache-control"] == "no-store"
     assert dotenv.parse(exported.text) == entries
 
-    as_json = client.get(
-        "/api/secrets/export", params={"env": "production", "format": "json"}, headers=auth
-    )
+    as_json = client.get("/api/secrets/export", params={"env": "production", "format": "json"}, headers=auth)
     assert as_json.json() == entries
 
 
@@ -117,13 +107,9 @@ def test_two_vaults_keep_their_own_copy_of_a_key(client, auth):
         headers=auth,
     )
 
-    assert client.get("/api/secrets", params={"env": "local"}, headers=other).json()[0][
-        "vault"
-    ] == "home-lab"
+    assert client.get("/api/secrets", params={"env": "local"}, headers=other).json()[0]["vault"] == "home-lab"
     for headers, expected in ((other, "for the homelab"), (auth, "for verticore")):
-        found = client.get(
-            "/api/secrets/item/DATABASE_URL", params={"env": "local"}, headers=headers
-        )
+        found = client.get("/api/secrets/item/DATABASE_URL", params={"env": "local"}, headers=headers)
         assert found.json()["value"] == expected
 
 
@@ -132,9 +118,7 @@ def test_no_vault_named_means_the_default_one(client, plain):
     listed = client.get("/api/secrets", params={"env": "local"}, headers=plain).json()
     assert [(s["key"], s["vault"]) for s in listed] == [("K", "default")]
     # The same place, named.
-    named = client.get(
-        "/api/secrets", params={"env": "local", "vault": "default"}, headers=plain
-    ).json()
+    named = client.get("/api/secrets", params={"env": "local", "vault": "default"}, headers=plain).json()
     assert [s["key"] for s in named] == ["K"]
     assert client.get("/api/secrets", headers=vault_headers(plain, "empty")).json() == []
 
@@ -145,7 +129,8 @@ def test_a_bad_vault_name_is_refused(client, auth):
 
 def test_vaults_are_listed_with_what_they_hold(client, auth, plain):
     client.post(
-        "/api/secrets/import", json={"environment": "local", "entries": {"A": "1", "B": "2"}},
+        "/api/secrets/import",
+        json={"environment": "local", "entries": {"A": "1", "B": "2"}},
         headers=auth,
     )
     client.put("/api/secrets/item/C", json={"value": "3", "environment": "local"}, headers=plain)
@@ -158,20 +143,20 @@ def test_vaults_are_listed_with_what_they_hold(client, auth, plain):
 
 def test_secrets_belong_to_one_user(client, auth):
     client.post(
-        "/api/secrets/import", json={"environment": "local", "entries": {"K": "mine"}},
+        "/api/secrets/import",
+        json={"environment": "local", "entries": {"K": "mine"}},
         headers=auth,
     )
     # The guest has a vault of their own with the same name, and cannot see in.
     guest = vault_headers({"Authorization": f"Bearer {token_for(client, *GUEST)}"}, "verticore")
     assert client.get("/api/secrets", params={"env": "local"}, headers=guest).json() == []
-    assert client.get(
-        "/api/secrets/item/K", params={"env": "local"}, headers=guest
-    ).status_code == 404
+    assert client.get("/api/secrets/item/K", params={"env": "local"}, headers=guest).status_code == 404
 
 
 def test_prune_and_dry_run_over_the_wire(client, auth):
     client.post(
-        "/api/secrets/import", json={"environment": "local", "entries": {"A": "1", "B": "2"}},
+        "/api/secrets/import",
+        json={"environment": "local", "entries": {"A": "1", "B": "2"}},
         headers=auth,
     )
     dry = client.post(
@@ -187,14 +172,13 @@ def test_prune_and_dry_run_over_the_wire(client, auth):
         json={"environment": "local", "entries": {"A": "1"}, "prune": True},
         headers=auth,
     )
-    assert [
-        s["key"] for s in client.get("/api/secrets", params={"env": "local"}, headers=auth).json()
-    ] == ["A"]
+    assert [s["key"] for s in client.get("/api/secrets", params={"env": "local"}, headers=auth).json()] == ["A"]
 
 
 def test_purging_an_environment(client, auth):
     client.post(
-        "/api/secrets/import", json={"environment": "test", "entries": {"A": "1", "B": "2"}},
+        "/api/secrets/import",
+        json={"environment": "test", "entries": {"A": "1", "B": "2"}},
         headers=auth,
     )
     assert client.delete("/api/secrets/environment/test", headers=auth).json()["removed"] == 2
@@ -202,40 +186,37 @@ def test_purging_an_environment(client, auth):
 
 
 def test_bad_environments_and_keys_are_refused(client, auth):
-    assert client.get(
-        "/api/secrets/item/K", params={"env": "NOT VALID"}, headers=auth
-    ).status_code == 400
-    assert client.put(
-        "/api/secrets/item/9bad", json={"value": "x", "environment": "local"}, headers=auth
-    ).status_code == 400
+    assert client.get("/api/secrets/item/K", params={"env": "NOT VALID"}, headers=auth).status_code == 400
+    assert (
+        client.put("/api/secrets/item/9bad", json={"value": "x", "environment": "local"}, headers=auth).status_code
+        == 400
+    )
 
 
 def test_deleting_a_vault_takes_its_secrets(client, auth):
     scoped = vault_headers(auth, "taxes")
     client.post(
-        "/api/secrets/import", json={"environment": "local", "entries": {"K": "v"}},
+        "/api/secrets/import",
+        json={"environment": "local", "entries": {"K": "v"}},
         headers=scoped,
     )
     client.post(
-        "/api/secrets/import", json={"environment": "production", "entries": {"K": "v"}},
+        "/api/secrets/import",
+        json={"environment": "production", "entries": {"K": "v"}},
         headers=scoped,
     )
     assert client.delete("/api/secrets/vault/taxes", headers=auth).json()["removed"] == 2
     assert client.get("/api/secrets", headers=scoped).json() == []
     # The vault it was called from is untouched.
     client.put("/api/secrets/item/MINE", json={"value": "v", "environment": "local"}, headers=auth)
-    assert [v["vault"] for v in client.get("/api/secrets/vaults", headers=auth).json()] == [
-        "verticore"
-    ]
+    assert [v["vault"] for v in client.get("/api/secrets/vaults", headers=auth).json()] == ["verticore"]
 
 
 def test_an_agent_token_cannot_read_secrets(client, auth):
-    token = client.post(
-        "/api/agents/enroll-token", json={"label": "nas", "ttl_minutes": 60}, headers=auth
-    ).json()["enrollment_token"]
-    enrolled = client.post(
-        "/api/agent/enroll", json={"enrollment_token": token, "name": "nas"}
-    ).json()
+    token = client.post("/api/agents/enroll-token", json={"label": "nas", "ttl_minutes": 60}, headers=auth).json()[
+        "enrollment_token"
+    ]
+    enrolled = client.post("/api/agent/enroll", json={"enrollment_token": token, "name": "nas"}).json()
     agent_auth = {"Authorization": f"Bearer {enrolled['agent_token']}"}
     refused = client.get("/api/secrets", params={"env": "local"}, headers=agent_auth)
     assert refused.status_code == 401
@@ -245,7 +226,8 @@ def test_admin_is_not_a_master_key(client, auth):
     """Being admin lets you manage users, not read their secrets."""
     guest = {"Authorization": f"Bearer {token_for(client, *GUEST)}"}
     client.post(
-        "/api/secrets/import", json={"environment": "local", "entries": {"K": "guest's"}},
+        "/api/secrets/import",
+        json={"environment": "local", "entries": {"K": "guest's"}},
         headers=guest,
     )
     assert ADMIN[0] != GUEST[0]

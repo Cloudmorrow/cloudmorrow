@@ -18,8 +18,7 @@ def test_without_done_the_last_lane_is_done_as_on_the_web():
 
 
 def test_record_lanes_are_done_by_what_the_finished_one_says():
-    rows = [{"id": "r1", "fields": {"won": False}}, {"id": "r2", "fields": {"won": True}},
-            {"id": "r3", "fields": {}}]
+    rows = [{"id": "r1", "fields": {"won": False}}, {"id": "r2", "fields": {"won": True}}, {"id": "r3", "fields": {}}]
     lanes = [(row["id"], row["id"]) for row in rows]
     assert screens.done_lane({"done": {"won": True}}, lanes, rows) == "r2"
 
@@ -47,7 +46,6 @@ def test_a_space_is_called_by_its_title_or_by_the_others_in_it():
 def test_calendar_and_grid_fields_come_from_the_screen():
     model = {"title": "summary", "fields": [{"name": "calendar", "kind": "link", "to": "calendar"}]}
     bound = screens.calendar_fields({"starts": "from", "ends": "to", "space": "calendar"}, model)
-    assert (bound["starts"], bound["ends"], bound["space"], bound["title"]) == (
-        "from", "to", "calendar", "summary")
+    assert (bound["starts"], bound["ends"], bound["space"], bound["title"]) == ("from", "to", "calendar", "summary")
     grid = screens.grid_fields({"folder": "dir", "kind": "type", "size": "bytes"}, {"title": "name"})
     assert (grid["folder"], grid["kind"], grid["size"], grid["title"]) == ("dir", "type", "bytes", "name")

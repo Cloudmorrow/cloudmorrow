@@ -205,9 +205,7 @@ class SearchModal(Modal[str | None]):
         for result in payload.get("results", []):
             first = result["matches"][0]["text"] if result["matches"] else ""
             self._paths.append(result["path"])
-            await results_view.append(
-                ListItem(Static(f"[b]{result['path']}[/]\n[dim]{first[:120]}[/]"))
-            )
+            await results_view.append(ListItem(Static(f"[b]{result['path']}[/]\n[dim]{first[:120]}[/]")))
 
     def on_input_submitted(self) -> None:
         results_view = self.query_one("#search-results", ListView)

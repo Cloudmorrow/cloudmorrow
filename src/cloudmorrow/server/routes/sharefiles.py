@@ -60,8 +60,11 @@ def _http(exc: FileOpError) -> HTTPException:
 
 def _out(entry: fileops.Entry) -> EntryOut:
     return EntryOut(
-        name=entry.name, is_dir=entry.is_dir, size=entry.size,
-        modified=entry.modified, mime=entry.mime,
+        name=entry.name,
+        is_dir=entry.is_dir,
+        size=entry.size,
+        modified=entry.modified,
+        mime=entry.mime,
     )
 
 
@@ -73,14 +76,11 @@ def _server_share(state: AppState, user: User, name: str) -> Share:
     try:
         share = state.shares.require(user.username, name)
     except UnknownShareError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"no such share: {name}"
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"no such share: {name}") from exc
     if share.kind != SERVER:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"{share.name} is on one of your machines, not the server — "
-            "mount it to browse it",
+            detail=f"{share.name} is on one of your machines, not the server — mount it to browse it",
         )
     return share
 

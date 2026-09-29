@@ -114,16 +114,12 @@ class UserModal(Modal[dict | None]):
             yield Static(f"[{MUTED}]role[/]", classes="pane-title")
             with RadioSet(id="user-role"):
                 for key, label in ROLES:
-                    yield RadioButton(
-                        label, id=f"role-{key}", value=self._role() == key
-                    )
+                    yield RadioButton(label, id=f"role-{key}", value=self._role() == key)
             yield Static(f"[{MUTED}]{ROLE_NOTE}[/]", id="user-role-note")
             yield Static(f"[{MUTED}]type[/]", classes="pane-title")
             with RadioSet(id="user-type"):
                 for key, label in USER_TYPES:
-                    yield RadioButton(
-                        label, id=f"type-{key}", value=self._type() == key
-                    )
+                    yield RadioButton(label, id=f"type-{key}", value=self._type() == key)
             yield Static(f"[{MUTED}]{TYPE_NOTE}[/]", id="user-type-note")
             if self.editing:
                 yield Checkbox(
@@ -327,9 +323,7 @@ class UsersView(Pane):
         if user is None:
             self.status("No account selected.", error=True)
             return
-        wanted = await self.app.push_screen_wait(
-            UserModal(f"Edit {user['username']}", user=user)
-        )
+        wanted = await self.app.push_screen_wait(UserModal(f"Edit {user['username']}", user=user))
         if wanted is None:
             return
         fields: dict[str, object] = {
@@ -392,8 +386,7 @@ class FeaturesView(Pane):
 
     def content(self) -> ComposeResult:
         yield Static(
-            f"[{MUTED}]Switching a feature off takes its tab out of every client "
-            f"and closes its part of the API.[/]",
+            f"[{MUTED}]Switching a feature off takes its tab out of every client and closes its part of the API.[/]",
             id="admin-features-note",
         )
         yield VerticalScroll(id="admin-feature-list")
@@ -422,14 +415,9 @@ class FeaturesView(Pane):
         turned = ""
         if feature.get("changed_by"):
             state = "on" if feature["enabled"] else "off"
-            turned = (
-                f"  ·  switched {state} by {feature['changed_by']}"
-                f" {short_stamp(feature.get('updated_at'))}"
-            )
+            turned = f"  ·  switched {state} by {feature['changed_by']} {short_stamp(feature.get('updated_at'))}"
         row = Vertical(
-            Checkbox(
-                feature["label"], value=feature["enabled"], id=f"feature-{feature['key']}"
-            ),
+            Checkbox(feature["label"], value=feature["enabled"], id=f"feature-{feature['key']}"),
             Static(f"[{MUTED}]{feature['description']}{turned}[/]", classes="feature-note"),
             classes="feature-row",
         )
@@ -456,10 +444,7 @@ class FeaturesView(Pane):
             self.reload()
             return
         self._features[key] = feature
-        self.status(
-            f"{feature['label']} is "
-            + ("on." if feature["enabled"] else "off — its tab is gone everywhere.")
-        )
+        self.status(f"{feature['label']} is " + ("on." if feature["enabled"] else "off — its tab is gone everywhere."))
         # The tab strip behind this panel follows. It is asked for again
         # rather than set from this list: the strip is what *this account*
         # has, and an account can have switched off for itself something
@@ -501,9 +486,7 @@ class AdminPanel(Vertical):
     @property
     def current(self) -> str:
         """The section showing: users, circles, features or quills."""
-        return (self.query_one("#admin-views", ContentSwitcher).current or "")[
-            len("admin-view-") :
-        ]
+        return (self.query_one("#admin-views", ContentSwitcher).current or "")[len("admin-view-") :]
 
     @property
     def active_view(self) -> Pane | None:

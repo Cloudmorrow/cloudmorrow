@@ -19,6 +19,10 @@ def seed(state: AppState, principal: Principal, model: str) -> None:
             state.records.seed_spaces(principal, model, dataset["records"], writer=manifest.id)
             continue
         state.records.seed(
-            principal, model, dataset["records"], writer=manifest.id,
-            once=dataset["seed"] == "once", scope=dataset.get("scope"),
+            principal,
+            model,
+            dataset["records"],
+            writer=manifest.id,
+            once=dataset["seed"] == "once",
+            scope=dataset.get("scope"),
         )

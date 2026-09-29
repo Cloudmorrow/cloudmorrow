@@ -157,8 +157,7 @@ class ShareModal(Modal[dict | None]):
             )
             path.placeholder = "the directory to share, e.g. ~/Music"
             lines = [
-                "[dim]Served from this machine by its agent, while the agent runs. "
-                "Nothing is copied to the server.[/]"
+                "[dim]Served from this machine by its agent, while the agent runs. Nothing is copied to the server.[/]"
             ]
             if not self.enrolled:
                 lines.append(

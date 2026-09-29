@@ -58,12 +58,8 @@ def test_setup_names_the_cloud_and_makes_the_administrator(config):
 
 def test_setup_is_over_once_anybody_exists(config):
     with fresh(config) as client:
-        client.post(
-            "/api/setup", json={"name": "Home", "username": "alice", "password": "longenough"}
-        )
-        again = client.post(
-            "/api/setup", json={"name": "Mine", "username": "mallory", "password": "longenough"}
-        )
+        client.post("/api/setup", json={"name": "Home", "username": "alice", "password": "longenough"})
+        again = client.post("/api/setup", json={"name": "Mine", "username": "mallory", "password": "longenough"})
         assert again.status_code == 409
         assert client.get("/setup", follow_redirects=False).headers["location"] == "/app"
         assert client.get("/", follow_redirects=False).status_code == 200
@@ -72,18 +68,12 @@ def test_setup_is_over_once_anybody_exists(config):
 
 def test_setup_refuses_what_the_server_would(config):
     with fresh(config) as client:
-        bad_name = client.post(
-            "/api/setup", json={"name": "   ", "username": "alice", "password": "longenough"}
-        )
+        bad_name = client.post("/api/setup", json={"name": "   ", "username": "alice", "password": "longenough"})
         assert bad_name.status_code in (400, 422)
-        bad_user = client.post(
-            "/api/setup", json={"name": "Home", "username": "-alice", "password": "longenough"}
-        )
+        bad_user = client.post("/api/setup", json={"name": "Home", "username": "-alice", "password": "longenough"})
         assert bad_user.status_code == 400
         assert "username" in bad_user.json()["detail"]
-        short = client.post(
-            "/api/setup", json={"name": "Home", "username": "alice", "password": "short"}
-        )
+        short = client.post("/api/setup", json={"name": "Home", "username": "alice", "password": "short"})
         assert short.status_code == 422
         # Nothing was made along the way, so setup is still open.
         assert UserStore(config.db_path).count() == 0

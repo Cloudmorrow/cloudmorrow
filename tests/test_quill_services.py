@@ -114,9 +114,7 @@ def live(config, users, monkeypatch):
     monkeypatch.setattr(Clock, "start", lambda self: None)
     config.port = free_port()
     app = create_app(config)
-    server = uvicorn.Server(
-        uvicorn.Config(app, host="127.0.0.1", port=config.port, log_level="warning")
-    )
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=config.port, log_level="warning"))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
     wait_for(lambda: server.started, what="the server")
@@ -136,8 +134,7 @@ def test_a_service_starts_and_writes_with_its_own_token(live):
     # Written as the Quill, into the records of the admin who installed it.
     assert ping["written_by"] == "relay" and ping["owner"] == ADMIN[0]
     assert ping["fields"]["text"] == "hello from the service"
-    log = live.http.get("/api/quillservices/relay/logs", params={"service": "web"},
-                        headers=live.admin).json()["web"]
+    log = live.http.get("/api/quillservices/relay/logs", params={"service": "web"}, headers=live.admin).json()["web"]
     assert any("started python services/web.py" in line for line in log)
     assert any(line.startswith("wrote ") for line in log)
     log_file = live.config.data_dir / "logs" / "quills" / "relay" / "web.log"
@@ -153,8 +150,15 @@ def test_a_service_is_given_what_it_needs_and_nothing_of_the_servers(live, monke
     assert answer.status_code == 200, answer.text
     env = answer.json()
     assert set(env) - {"PWD", "LC_CTYPE", "SHLVL", "_"} == {
-        "PATH", "LANG", "HOME", "PYTHONUNBUFFERED", "CLOUDMORROW_URL",
-        "CLOUDMORROW_TOKEN", "CLOUDMORROW_QUILL", "CLOUDMORROW_SERVICE", "PORT",
+        "PATH",
+        "LANG",
+        "HOME",
+        "PYTHONUNBUFFERED",
+        "CLOUDMORROW_URL",
+        "CLOUDMORROW_TOKEN",
+        "CLOUDMORROW_QUILL",
+        "CLOUDMORROW_SERVICE",
+        "PORT",
     }
     assert env["CLOUDMORROW_URL"] == f"http://127.0.0.1:{live.config.port}"
     assert env["CLOUDMORROW_QUILL"] == "relay" and env["CLOUDMORROW_SERVICE"] == "web"
@@ -222,16 +226,25 @@ def test_a_quill_token_opens_the_record_api_for_its_own_models_only(live):
     live.running()
     token = live.quill_token()
     assert live.http.get("/api/records/relay.ping", headers=token).status_code == 200
-    made = live.http.post("/api/records/relay.ping", json={"fields": {"text": "by hand"}},
-                          headers=token)
+    made = live.http.post("/api/records/relay.ping", json={"fields": {"text": "by hand"}}, headers=token)
     assert made.status_code == 201 and made.json()["written_by"] == "relay"
     # Not a datamodel it declared.
     refused = live.http.get("/api/records/task", headers=token)
     assert refused.status_code == 403 and "did not ask for task" in refused.text
     # And nothing else the server has: to every other door it is nobody.
-    for path in ("/api/notes/tree", "/api/secrets", "/api/users", "/api/auth/me", "/api/quills",
-                 "/api/datamodels", "/api/people", "/api/quillservices", "/api/today",
-                 "/api/shares", "/api/me/features"):
+    for path in (
+        "/api/notes/tree",
+        "/api/secrets",
+        "/api/users",
+        "/api/auth/me",
+        "/api/quills",
+        "/api/datamodels",
+        "/api/people",
+        "/api/quillservices",
+        "/api/today",
+        "/api/shares",
+        "/api/me/features",
+    ):
         assert live.http.get(path, headers=token).status_code == 401, path
     assert live.http.get("/api/secrets", headers=live.admin).status_code == 200
     assert live.http.post("/mcp", json={}, headers=token).status_code == 401
@@ -264,8 +277,14 @@ def test_an_api_is_proxied_with_who_is_asking_and_not_their_token(live):
     )
     assert answer.status_code == 200, answer.text
     seen = answer.json()
-    assert seen == {"path": "/whoami?x=1", "user": GUEST[0], "quill": None, "api": "api",
-                    "authorization": None, "cookie": None}
+    assert seen == {
+        "path": "/whoami?x=1",
+        "user": GUEST[0],
+        "quill": None,
+        "api": "api",
+        "authorization": None,
+        "cookie": None,
+    }
     # A service does not set cookies on the cloud's own address.
     assert "set-cookie" not in answer.headers
     assert live.http.get("/api/q/relay/whoami").status_code == 401
@@ -294,13 +313,11 @@ def test_a_webhook_makes_a_record_from_its_body_with_the_secret(live):
     record = live.http.get(f"/api/records/relay.ping/{made.json()['id']}", headers=live.admin).json()
     assert record["fields"] == {"text": "from outside", "count": 7, "source": "stripe"}
     assert record["written_by"] == "relay"
-    by_header = live.http.post("/hooks/relay/inbound", json=body,
-                               headers={"X-Cloudmorrow-Webhook-Token": secret})
+    by_header = live.http.post("/hooks/relay/inbound", json=body, headers={"X-Cloudmorrow-Webhook-Token": secret})
     assert by_header.status_code == 201
     # A body the map finds nothing in is a record the datamodel refuses.
     assert live.http.post(f"/hooks/relay/inbound?token={secret}", json={}).status_code == 400
-    assert live.http.post(f"/hooks/relay/inbound?token={secret}",
-                          content=b"x" * (1024 * 1024 + 1)).status_code == 413
+    assert live.http.post(f"/hooks/relay/inbound?token={secret}", content=b"x" * (1024 * 1024 + 1)).status_code == 413
 
 
 def test_a_webhook_may_be_signed_instead(live):
@@ -309,18 +326,17 @@ def test_a_webhook_may_be_signed_instead(live):
     body = json.dumps({"text": "signed"}).encode()
     good = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     bad = "sha256=" + hmac.new(b"nope", body, hashlib.sha256).hexdigest()
-    assert live.http.post("/hooks/relay/signed", content=body,
-                          headers={"X-Hub-Signature-256": bad}).status_code == 401
-    assert live.http.post("/hooks/relay/signed", content=body,
-                          headers={"X-Hub-Signature-256": good}).status_code == 201
+    assert live.http.post("/hooks/relay/signed", content=body, headers={"X-Hub-Signature-256": bad}).status_code == 401
+    assert live.http.post("/hooks/relay/signed", content=body, headers={"X-Hub-Signature-256": good}).status_code == 201
 
 
 def test_a_forwarding_webhook_reaches_the_service_without_its_secret(live):
     live.install()
     live.running()
     secret = live.state.quill_tokens.webhook_secret("relay", "raw")
-    answer = live.http.post("/hooks/relay/raw?token=" + secret, content=b"hello",
-                            headers={"X-Cloudmorrow-Webhook-Token": secret})
+    answer = live.http.post(
+        "/hooks/relay/raw?token=" + secret, content=b"hello", headers={"X-Cloudmorrow-Webhook-Token": secret}
+    )
     assert answer.status_code == 200, answer.text
     assert answer.json() == {"path": "/hooks/raw", "body": "hello", "webhook": "raw", "token": None}
 
@@ -346,8 +362,11 @@ def test_a_run_job_starts_its_service_once_when_due(live):
     wait_for(lambda: live.pings(source="job"), what="the job's ping")
     assert live.supervisor.run_due() == []  # not due again for an hour
     job = wait_for(
-        lambda: (j := next(j for j in live.http.get("/api/quillservices", headers=live.admin)
-                           .json()[0]["jobs"])) and j["last_exit"] is not None and j,
+        lambda: (
+            (j := next(j for j in live.http.get("/api/quillservices", headers=live.admin).json()[0]["jobs"]))
+            and j["last_exit"] is not None
+            and j
+        ),
         what="the job to finish",
     )
     assert job["last_exit"] == 0 and job["last_started"]
@@ -418,8 +437,10 @@ def test_a_rate_limit_slows_a_noisy_sender():
 
 
 def _manifest(**extra) -> dict:
-    data = {"quill": {"id": "relay", "name": "Relay", "version": "1.0.0"},
-            "services": [{"id": "web", "command": ["python", "web.py"]}]}
+    data = {
+        "quill": {"id": "relay", "name": "Relay", "version": "1.0.0"},
+        "services": [{"id": "web", "command": ["python", "web.py"]}],
+    }
     data.update(extra)
     return data
 
@@ -466,9 +487,7 @@ def test_the_command_line_shows_services_and_logs(client, monkeypatch):
 
     def api_for():
         api = CloudmorrowClient(ClientConfig(api_url="http://testserver"), token=token)
-        api._client = httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=client.app), base_url="http://testserver"
-        )
+        api._client = httpx.AsyncClient(transport=httpx.ASGITransport(app=client.app), base_url="http://testserver")
         return None, api
 
     monkeypatch.setattr(quill_cli, "client", api_for)

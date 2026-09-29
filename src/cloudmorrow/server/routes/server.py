@@ -38,9 +38,7 @@ router = APIRouter(prefix="/api/server", tags=["server"])
 
 
 @router.get("/settings", response_model=ServerSettingsOut)
-def read_settings(
-    state: AppState = Depends(get_state), _: User = Depends(get_current_user)
-) -> ServerSettingsOut:
+def read_settings(state: AppState = Depends(get_state), _: User = Depends(get_current_user)) -> ServerSettingsOut:
     return ServerSettingsOut(name=state.cloud_name())
 
 

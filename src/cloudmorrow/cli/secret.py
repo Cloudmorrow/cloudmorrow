@@ -69,9 +69,7 @@ def print_import(result: dict) -> None:
     )
     for name, colour, keys in rows:
         if keys:
-            console.print(
-                f"    [{colour}]{name:<9}[/] {len(keys):>3}  [dim]{', '.join(keys)}[/]"
-            )
+            console.print(f"    [{colour}]{name:<9}[/] {len(keys):>3}  [dim]{', '.join(keys)}[/]")
     if not any(keys for _, _, keys in rows):
         console.print("    [dim]nothing to do[/]")
 
@@ -82,16 +80,10 @@ def _mask(secret: dict) -> str:
 
 async def _hint_other_environments(api, chosen: str, vault: str) -> None:
     """When an environment is empty, say which ones are not."""
-    others = [
-        environment
-        for environment in await api.secret_environments()
-        if environment["environment"] != chosen
-    ]
+    others = [environment for environment in await api.secret_environments() if environment["environment"] != chosen]
     if not others:
         return
-    listed = ", ".join(
-        f"{environment['environment']} ({environment['secrets']})" for environment in others
-    )
+    listed = ", ".join(f"{environment['environment']} ({environment['secrets']})" for environment in others)
     console.print(f"[dim]Other environments in {vault}: {listed}[/]")
 
 
@@ -99,15 +91,9 @@ async def _hint_other_environments(api, chosen: str, vault: str) -> None:
 def list_secrets(
     vault: VaultOption = None,
     environment: EnvOption = None,
-    every: Annotated[
-        bool, typer.Option("--all", "-a", help="Every environment, not just one.")
-    ] = False,
-    reveal: Annotated[
-        bool, typer.Option("--reveal", help="Print the values. They go to your terminal.")
-    ] = False,
-    plain: Annotated[
-        bool, typer.Option("--plain", help="One key per line, for scripts.")
-    ] = False,
+    every: Annotated[bool, typer.Option("--all", "-a", help="Every environment, not just one.")] = False,
+    reveal: Annotated[bool, typer.Option("--reveal", help="Print the values. They go to your terminal.")] = False,
+    plain: Annotated[bool, typer.Option("--plain", help="One key per line, for scripts.")] = False,
 ) -> None:
     """List the keys in an environment. Values stay hidden unless you ask."""
 
@@ -119,9 +105,7 @@ def list_secrets(
             if not secrets:
                 if plain:
                     return
-                console.print(
-                    f"[dim]No secrets in {where(chosen_vault, None if every else chosen)}.[/]"
-                )
+                console.print(f"[dim]No secrets in {where(chosen_vault, None if every else chosen)}.[/]")
                 if not every:
                     await _hint_other_environments(api, chosen, chosen_vault)
                 return
@@ -227,21 +211,15 @@ def remove(
 
 @app.command("import")
 def import_secrets(
-    file: Annotated[
-        Path, typer.Option("--file", "-f", help="The .env file to read, or '-' for stdin.")
-    ],
+    file: Annotated[Path, typer.Option("--file", "-f", help="The .env file to read, or '-' for stdin.")],
     vault: VaultOption = None,
     environment: EnvOption = None,
-    prune: Annotated[
-        bool, typer.Option("--prune", help="Delete keys the file does not mention.")
-    ] = False,
+    prune: Annotated[bool, typer.Option("--prune", help="Delete keys the file does not mention.")] = False,
     overwrite: Annotated[
         bool,
         typer.Option("--overwrite/--no-overwrite", help="Replace values that already exist."),
     ] = True,
-    dry_run: Annotated[
-        bool, typer.Option("--dry-run", help="Show what would change, and write nothing.")
-    ] = False,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Show what would change, and write nothing.")] = False,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip the confirmation.")] = False,
 ) -> None:
     """Import one .env file into an environment."""
@@ -258,9 +236,7 @@ def import_secrets(
         config, api, chosen_vault = in_vault(vault)
         chosen = environment_for(config, environment)
         async with api:
-            result = await api.import_secrets(
-                entries, chosen, prune=prune, overwrite=overwrite, dry_run=dry_run
-            )
+            result = await api.import_secrets(entries, chosen, prune=prune, overwrite=overwrite, dry_run=dry_run)
         console.print(
             f"[dim]{'would import' if dry_run else 'imported'} "
             f"{plural(len(entries), 'key')} from {file} into[/] "
@@ -273,9 +249,7 @@ def import_secrets(
 
 @app.command("export")
 def export(
-    file: Annotated[
-        Path, typer.Option("--file", "-f", help="File to write, or '-' for stdout.")
-    ] = Path(STDIO),
+    file: Annotated[Path, typer.Option("--file", "-f", help="File to write, or '-' for stdout.")] = Path(STDIO),
     vault: VaultOption = None,
     environment: EnvOption = None,
     fmt: Annotated[str, typer.Option("--format", help="env, shell or json.")] = "env",
@@ -298,9 +272,7 @@ def export(
         if fmt == "json":
             rendered = json.dumps(entries, indent=2) + "\n"
         elif fmt == "shell":
-            rendered = "".join(
-                f"export {key}={dotenv.quote(value)}\n" for key, value in entries.items()
-            )
+            rendered = "".join(f"export {key}={dotenv.quote(value)}\n" for key, value in entries.items())
         else:
             rendered = dotenv.dump(
                 entries,
@@ -310,10 +282,7 @@ def export(
             emit(rendered)
             return
         write_private(file, rendered)
-        console.print(
-            f"[green]Wrote[/] {plural(len(entries), 'secret')} to {file} "
-            f"[dim]from {place}, mode 600[/]"
-        )
+        console.print(f"[green]Wrote[/] {plural(len(entries), 'secret')} to {file} [dim]from {place}, mode 600[/]")
         warn_if_tracked(file)
 
     run(_export())
@@ -401,9 +370,7 @@ def purge(
                 result = await api.delete_vault(chosen_vault)
             else:
                 result = await api.delete_environment(chosen)
-        console.print(
-            f"[green]Deleted[/] {plural(result['removed'], 'secret')} [dim]from {place}[/]"
-        )
+        console.print(f"[green]Deleted[/] {plural(result['removed'], 'secret')} [dim]from {place}[/]")
 
     run(_purge())
 
@@ -412,9 +379,7 @@ def purge(
     "run",
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )
-def run_with(
-    ctx: typer.Context, vault: VaultOption = None, environment: EnvOption = None
-) -> None:
+def run_with(ctx: typer.Context, vault: VaultOption = None, environment: EnvOption = None) -> None:
     """Run a command with an environment's secrets in its environment.
 
     `cloudmorrow secret run -e production -- npm start`. Nothing is written to

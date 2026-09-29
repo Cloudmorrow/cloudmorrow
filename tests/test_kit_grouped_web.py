@@ -30,7 +30,7 @@ def test_it_is_served_and_wired_in(client):
     # A list with a group, or a hidden field, is drawn there; the rest as before.
     assert 'kit === "list" && drawsHere(' in KIT_JS
     # The address carries a group and a subgroup: everything after the screen.
-    assert "const [quillId, screenId, ...rest] = arg.split(\"/\");" in QUILLS_JS
+    assert 'const [quillId, screenId, ...rest] = arg.split("/");' in QUILLS_JS
 
 
 def test_nothing_in_it_is_named_for_one_quill():
@@ -43,7 +43,7 @@ def test_nothing_in_it_is_named_for_one_quill():
 def test_a_hidden_field_is_dots_until_one_record_is_asked_for():
     # In a row: the mask, and the value only from reading that one record.
     assert 'export const MASK = "••••••••";' in GROUPED_JS
-    assert "api(\"GET\", recordsUrl(model.id, id))" in GROUPED_JS
+    assert 'api("GET", recordsUrl(model.id, id))' in GROUPED_JS
     # On the sheet: a password box with an eye, for every surface's same promise.
     assert 'type="password"' in GROUPED_JS
     assert "if (f.secret) return secretWidget(f, value);" in KIT_JS

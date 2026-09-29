@@ -59,8 +59,7 @@ def test_a_new_day_starts_again():
 
 
 def test_a_line_with_brackets_in_it_is_not_markup():
-    drawn = render_lines([line_row("a", "s", "guest", "[b]not bold[/b]", "2026-09-19T14:00:00+00:00")],
-                         "body", "bram")
+    drawn = render_lines([line_row("a", "s", "guest", "[b]not bold[/b]", "2026-09-19T14:00:00+00:00")], "body", "bram")
     assert r"\[b]not bold\[/b]" in drawn
 
 
@@ -141,7 +140,8 @@ async def test_what_arrives_while_open_is_drawn_on_the_next_poll(app):
     async with app.run_test(size=(120, 36)) as pilot:
         _, pane = await open_chat(app, pilot)
         app.client.record_store["message"].append(
-            line_row("r_new", "r_general", "guest", "you there?", "2026-09-21T09:00:00+00:00"))
+            line_row("r_new", "r_general", "guest", "you there?", "2026-09-21T09:00:00+00:00")
+        )
         pane.catch_up()
         await settle(app, pilot)
         assert "you there?" in text_of(pane, "#conversation-text")
@@ -252,7 +252,8 @@ async def test_a_public_or_direct_space_is_not_added_to_or_left(app):
 
 async def test_leaving_a_private_space_confirms_first(app):
     app.client.record_store["channel"].append(
-        space_row("r_club", "club", "private", owner="guest", members=["bram"], at="2026-09-25T09:00:00+00:00"))
+        space_row("r_club", "club", "private", owner="guest", members=["bram"], at="2026-09-25T09:00:00+00:00")
+    )
     async with app.run_test(size=(120, 36)) as pilot:
         _, pane = await open_chat(app, pilot)
         assert pane.space["id"] == "r_club"
@@ -267,7 +268,8 @@ async def test_leaving_a_private_space_confirms_first(app):
 
 async def test_adding_somebody_offers_only_who_is_not_in_it(app):
     app.client.record_store["channel"].append(
-        space_row("r_club", "club", "private", members=["guest"], at="2026-09-25T09:00:00+00:00"))
+        space_row("r_club", "club", "private", members=["guest"], at="2026-09-25T09:00:00+00:00")
+    )
     async with app.run_test(size=(120, 36)) as pilot:
         _, pane = await open_chat(app, pilot)
         pane.focus()
@@ -296,4 +298,3 @@ def test_the_new_space_dialog_names_scopes_after_the_screen():
     modal = NewSpaceModal(CHAT_MODELS["channel"], [], screen=CHAT_SCREEN)
     assert modal.scopes == ["public", "shared"]
     assert [f["name"] for f in modal.extra] == ["topic"], "kind is made_as's to set, not a field to type"
-

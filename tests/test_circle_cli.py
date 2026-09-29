@@ -22,12 +22,8 @@ def cm(tasks_quill, monkeypatch):
     tokens = {who[0]: token_for(client, *who) for who in (ADMIN, GUEST)}
 
     def api_for():
-        api = CloudmorrowClient(
-            ClientConfig(api_url="http://testserver"), token=tokens[invoke.who]
-        )
-        api._client = httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=client.app), base_url="http://testserver"
-        )
+        api = CloudmorrowClient(ClientConfig(api_url="http://testserver"), token=tokens[invoke.who])
+        api._client = httpx.AsyncClient(transport=httpx.ASGITransport(app=client.app), base_url="http://testserver")
         return None, api
 
     monkeypatch.setattr(circle_cli, "client", api_for)
@@ -103,4 +99,3 @@ def test_somebody_in_no_circle_is_told_so(cm):
     cm.who = GUEST[0]
     mine = cm("access")
     assert mine.exit_code == 0 and "no circle" in mine.output
-

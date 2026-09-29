@@ -96,8 +96,9 @@ class SharesBackend:
     def _is_share(model: Datamodel) -> bool:
         return model.id == "share"
 
-    def list(self, principal: Principal, model: Datamodel, where: dict, *, q: str = "",
-             previews: bool = False) -> list[Record]:
+    def list(
+        self, principal: Principal, model: Datamodel, where: dict, *, q: str = "", previews: bool = False
+    ) -> list[Record]:
         if self._is_share(model):
             found = self._list_shares(principal, model, where)
         else:
@@ -105,8 +106,12 @@ class SharesBackend:
         # A search here is by name, in what is listed: a folder at a time.
         if q:
             needle = q.casefold()
-            found = [r for r in found if needle in str(r.fields.get("name", "")).casefold()
-                     or needle in str(r.fields.get("label", "")).casefold()]
+            found = [
+                r
+                for r in found
+                if needle in str(r.fields.get("name", "")).casefold()
+                or needle in str(r.fields.get("label", "")).casefold()
+            ]
         return found
 
     def get(self, principal: Principal, model: Datamodel, record_id: str) -> Record:
@@ -120,12 +125,9 @@ class SharesBackend:
             return self._make_share(principal, model, fields)
         return self._make_folder(principal, model, fields)
 
-    def update(self, principal: Principal, model: Datamodel, record_id: str, fields: dict,
-               rev: object) -> Record:
+    def update(self, principal: Principal, model: Datamodel, record_id: str, fields: dict, rev: object) -> Record:
         if self._is_share(model):
-            raise RecordError(
-                "a share is not changed once it is made: remove it and make it again"
-            )
+            raise RecordError("a share is not changed once it is made: remove it and make it again")
         return self._move_file(principal, model, record_id, fields, rev)
 
     def delete(self, principal: Principal, model: Datamodel, record_id: str) -> int:
@@ -162,8 +164,7 @@ class SharesBackend:
     def _agents(self, username: str) -> dict:
         return {agent.id: agent for agent in self._agents_of(username)}
 
-    def _share_record(self, model: Datamodel, owner: str, share: Share,
-                      agents: dict | None = None) -> Record:
+    def _share_record(self, model: Datamodel, owner: str, share: Share, agents: dict | None = None) -> Record:
         base = self._base_url().rstrip("/")
         url = f"{base}/dav/{share.name}/" if base else ""
         online = True
@@ -211,8 +212,7 @@ class SharesBackend:
             raise RecordError(f"shares have no field {', '.join(sorted(unknown))}")
         agents = self._agents(principal.username)
         records = [
-            self._share_record(model, principal.username, share, agents)
-            for share in self._all_shares(principal)
+            self._share_record(model, principal.username, share, agents) for share in self._all_shares(principal)
         ]
         return [r for r in records if _matches(r.fields, where)]
 
@@ -237,7 +237,11 @@ class SharesBackend:
             )
         try:
             share = self._shares.create(
-                principal.username, name, kind=kind, path=path, agent_id=agent_id,
+                principal.username,
+                name,
+                kind=kind,
+                path=path,
+                agent_id=agent_id,
                 description=str(fields.get("description") or ""),
             )
         except ShareExistsError:
@@ -254,8 +258,7 @@ class SharesBackend:
             raise RecordError(f"no such share: {name}") from None
         if share.kind == MACHINE:
             record = self._share_record(_SHARE_ONLY, principal.username, share)
-            raise RecordError(f"{share.name} is {record.fields['about'][0].lower()}"
-                              f"{record.fields['about'][1:]}")
+            raise RecordError(f"{share.name} is {record.fields['about'][0].lower()}{record.fields['about'][1:]}")
         return share
 
     # -- files ---------------------------------------------------------------------
@@ -275,9 +278,7 @@ class SharesBackend:
             target = fileops.inside(share, path)
         except fileops.FileOpError:
             raise UnknownRecordError(record_id) from None
-        if not target.exists() or target.is_symlink() or any(
-            part.startswith(".") for part in Path(path).parts
-        ):
+        if not target.exists() or target.is_symlink() or any(part.startswith(".") for part in Path(path).parts):
             raise UnknownRecordError(record_id)
         return target
 
@@ -315,8 +316,7 @@ class SharesBackend:
         name = str(where.pop("share", "") or "").strip()
         if not name:
             raise RecordError(
-                f"files are listed a share at a time: share={DRIVE_NAME} for your own, "
-                "and folder= for a folder in it"
+                f"files are listed a share at a time: share={DRIVE_NAME} for your own, and folder= for a folder in it"
             )
         share = self._server_side(principal, name)
         folder = str(where.pop("folder", "") or "").strip("/ ")
@@ -386,8 +386,7 @@ class SharesBackend:
             raise RecordError(f"the server cannot make {name}: {exc.strerror or exc}") from None
         return self._file_record(model, share, _join(folder, name), target)
 
-    def _move_file(self, principal: Principal, model: Datamodel, record_id: str, fields: dict,
-                   rev: object) -> Record:
+    def _move_file(self, principal: Principal, model: Datamodel, record_id: str, fields: dict, rev: object) -> Record:
         unknown = set(fields) - {"name", "folder", "path", "share"}
         if unknown:
             raise RecordError(f"a file's {', '.join(sorted(unknown))} is not written directly")
@@ -457,6 +456,12 @@ class SharesBackend:
 
 # A stand-in datamodel, for saying where a share is when no record is wanted.
 _SHARE_ONLY = Datamodel(
-    id="share", version=1, label="Share", description="", domain="files",
-    scopes=("personal",), fields=(), title="label",
+    id="share",
+    version=1,
+    label="Share",
+    description="",
+    domain="files",
+    scopes=("personal",),
+    fields=(),
+    title="label",
 )

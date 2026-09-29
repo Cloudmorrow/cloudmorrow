@@ -117,7 +117,9 @@ def _lines(node: dict, actions: dict) -> list[str]:
         return out
     if kind == "month":
         records = sorted(node["records"], key=lambda r: value_text(r, node["date"]))
-        return [f"{value_text(r, node['date'])[:16]}  {value_text(r, node['title'])}" for r in records] or ["(nothing this month)"]
+        return [f"{value_text(r, node['date'])[:16]}  {value_text(r, node['title'])}" for r in records] or [
+            "(nothing this month)"
+        ]
     return [f"[{kind}]"]
 
 

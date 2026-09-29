@@ -27,8 +27,7 @@ def lane_filter(lane_model: dict, group_model_id: str, group_id: str | None) -> 
     if not group_model_id or not group_id:
         return {}
     by = next(
-        (f["name"] for f in lane_model.get("fields", [])
-         if f.get("kind") == "link" and f.get("to") == group_model_id),
+        (f["name"] for f in lane_model.get("fields", []) if f.get("kind") == "link" and f.get("to") == group_model_id),
         None,
     )
     return {by: group_id} if by else {}
@@ -52,8 +51,7 @@ def done_lane(screen: dict, lanes: list[tuple[str, str]], rows: list[dict] | Non
         return done
     if isinstance(done, dict) and rows:
         found = next(
-            (row["id"] for row in rows
-             if all((row.get("fields") or {}).get(k) == v for k, v in done.items())),
+            (row["id"] for row in rows if all((row.get("fields") or {}).get(k) == v for k, v in done.items())),
             None,
         )
         if found is not None:

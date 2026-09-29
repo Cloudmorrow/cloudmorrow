@@ -64,7 +64,7 @@ def command() -> str:
 
 def _quote(argument: str) -> str:
     """An argument as the Exec line of a .desktop file wants it."""
-    if not any(char in argument for char in ' \t"\'\\$`<>~|&;*?#()'):
+    if not any(char in argument for char in " \t\"'\\$`<>~|&;*?#()"):
         return argument
     escaped = argument.replace("\\", "\\\\").replace('"', '\\"').replace("`", "\\`")
     return '"' + escaped.replace("$", "\\$") + '"'
@@ -88,9 +88,7 @@ def entry(name: str = "Cloudmorrow") -> str:
 def install(name: str = "Cloudmorrow") -> list[Path]:
     """Write the launcher and its icon. Safe to run again: it just writes them anew."""
     if system.os_name() != system.LINUX:
-        raise LauncherError(
-            "a launcher is only made on Linux so far — run `cm app` to open the desktop app"
-        )
+        raise LauncherError("a launcher is only made on Linux so far — run `cm app` to open the desktop app")
     icon = icon_file()
     icon.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(system.ICON, icon)

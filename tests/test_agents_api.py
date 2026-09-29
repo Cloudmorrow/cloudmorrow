@@ -11,9 +11,7 @@ from tests.conftest import GUEST, token_for
 
 
 def enroll_agent(client, auth, name="testbox") -> dict:
-    token = client.post(
-        "/api/agents/enroll-token", json={"label": name}, headers=auth
-    ).json()["enrollment_token"]
+    token = client.post("/api/agents/enroll-token", json={"label": name}, headers=auth).json()["enrollment_token"]
     response = client.post(
         "/api/agent/enroll",
         json={
@@ -49,9 +47,7 @@ def runner_for(test_client, enrolled: dict, tmp_path) -> AgentRunner:
 
 
 def test_enrollment_token_is_single_use(client, auth):
-    token = client.post("/api/agents/enroll-token", json={}, headers=auth).json()[
-        "enrollment_token"
-    ]
+    token = client.post("/api/agents/enroll-token", json={}, headers=auth).json()["enrollment_token"]
     body = {"enrollment_token": token, "name": "box-a"}
     assert client.post("/api/agent/enroll", json=body).status_code == 200
     again = client.post("/api/agent/enroll", json={**body, "name": "box-b"})
@@ -60,9 +56,7 @@ def test_enrollment_token_is_single_use(client, auth):
 
 
 def test_enrollment_rejects_an_unknown_token(client):
-    response = client.post(
-        "/api/agent/enroll", json={"enrollment_token": "bce_nope", "name": "box"}
-    )
+    response = client.post("/api/agent/enroll", json={"enrollment_token": "bce_nope", "name": "box"})
     assert response.status_code == 403
 
 
@@ -185,21 +179,13 @@ def test_agent_can_be_removed(client, auth):
 
 def test_duplicate_agent_name_is_refused(client, auth):
     enroll_agent(client, auth, name="dup")
-    token = client.post("/api/agents/enroll-token", json={}, headers=auth).json()[
-        "enrollment_token"
-    ]
-    response = client.post(
-        "/api/agent/enroll", json={"enrollment_token": token, "name": "dup"}
-    )
+    token = client.post("/api/agents/enroll-token", json={}, headers=auth).json()["enrollment_token"]
+    response = client.post("/api/agent/enroll", json={"enrollment_token": token, "name": "dup"})
     assert response.status_code == 409
 
 
 @pytest.mark.parametrize("name", ["", "has space", "-", "a" * 65])
 def test_invalid_agent_names(client, auth, name):
-    token = client.post("/api/agents/enroll-token", json={}, headers=auth).json()[
-        "enrollment_token"
-    ]
-    response = client.post(
-        "/api/agent/enroll", json={"enrollment_token": token, "name": name}
-    )
+    token = client.post("/api/agents/enroll-token", json={}, headers=auth).json()["enrollment_token"]
+    response = client.post("/api/agent/enroll", json={"enrollment_token": token, "name": name})
     assert response.status_code == 400

@@ -44,14 +44,14 @@ model = "vehicle"       # what it is about: someone whose circles hide vehicles 
 ```python
 from cloudmorrow.quill import ui, view
 
+
 @view("garage")
 def garage(ctx):
     vans = ctx.records.list("vehicle")
     due = [v for v in vans if (v.get("fleet.odometer") or 0) > 30000]
     return ui.stack(
         ui.row(ui.stat("Vans", len(vans)), ui.stat("Due a service", len(due), tone="warn")),
-        ui.table(vans, columns=["name", ("Odometer", "fleet.odometer")],
-                 actions=["log-service"], empty="No vans yet."),
+        ui.table(vans, columns=["name", ("Odometer", "fleet.odometer")], actions=["log-service"], empty="No vans yet."),
         ui.button("Add a van", action="add-van", tone="primary"),
     )
 ```

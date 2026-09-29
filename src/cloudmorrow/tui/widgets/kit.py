@@ -94,8 +94,7 @@ class RecordCard(Static, can_focus=True):
             super().__init__()
 
     def __init__(
-        self, record: dict, *, title: str, body: str | None = None, movable: bool = True,
-        subtitle: str = "", **kwargs
+        self, record: dict, *, title: str, body: str | None = None, movable: bool = True, subtitle: str = "", **kwargs
     ) -> None:
         super().__init__(**kwargs)
         # The screen's subtitle fields, already said: "Acme · 12000".
@@ -134,10 +133,12 @@ class RecordCard(Static, can_focus=True):
         if left is not None:
             # A record an expire job will take is on a clock, and saying so is
             # the difference between tidy and lost.
-            meta.append((
-                "goes today" if left == 0 else f"{left}d left",
-                WARN if left <= 1 else MUTED,
-            ))
+            meta.append(
+                (
+                    "goes today" if left == 0 else f"{left}d left",
+                    WARN if left <= 1 else MUTED,
+                )
+            )
         if meta:
             text.append("\n")
             for index, (label, style) in enumerate(meta):
@@ -215,7 +216,12 @@ class Lane(Vertical):
         return self.query_one(f"#lane-body-{self._key}", VerticalScroll)
 
     async def show(
-        self, records: list[dict], *, title: str, body: str | None, movable: bool = True,
+        self,
+        records: list[dict],
+        *,
+        title: str,
+        body: str | None,
+        movable: bool = True,
         said=None,
     ) -> None:
         """Redraw this lane's cards, in the order the server gave them.
@@ -241,7 +247,6 @@ class Lane(Vertical):
                 movable=movable,
                 subtitle=said(record) if said else "",
                 id=f"card-{safe_id(record['id'])}",
-
                 classes="record-card",
             )
             for record in records
@@ -286,8 +291,7 @@ def settle_widths(table: DataTable) -> None:
     was is the public way to make it draw afresh.
     """
     if table.row_count:
-        table.update_cell_at(Coordinate(0, 0), table.get_cell_at(Coordinate(0, 0)),
-                             update_width=True)
+        table.update_cell_at(Coordinate(0, 0), table.get_cell_at(Coordinate(0, 0)), update_width=True)
 
 
 def neighbour_lane(values: list[str], value: str, delta: int) -> str:

@@ -55,7 +55,7 @@ def test_both_of_its_screens_are_registered():
 def test_the_way_in_is_drawn_only_for_an_administrator():
     """Me asks; it does not decide for itself."""
     me = (WEB / "me.js").read_text(encoding="utf-8")
-    assert "isAdmin(me) ? adminRow() : \"\"" in me
+    assert 'isAdmin(me) ? adminRow() : ""' in me
     assert "is_admin" in ADMIN_JS, "and isAdmin reads the server's own answer"
 
 
@@ -70,9 +70,7 @@ def test_those_endpoints_turn_an_ordinary_account_away(client):
     """The redirect in the browser is a courtesy; this is the guard."""
     guest = {"Authorization": f"Bearer {token_for(client, *GUEST)}"}
     assert client.get("/api/users", headers=guest).status_code == 403
-    assert client.patch(
-        "/api/server/features/notes", json={"enabled": False}, headers=guest
-    ).status_code == 403
+    assert client.patch("/api/server/features/notes", json={"enabled": False}, headers=guest).status_code == 403
 
 
 # -- circles ---------------------------------------------------------------------
@@ -106,7 +104,8 @@ def test_the_circle_calls_answer_an_administrator(tasks_quill, auth):
         assert client.get(path, headers=auth).status_code == 200, path
     # What a circle's page sends on save.
     changed = client.patch(
-        "/api/circles/members", json={"name": "Everyone", "rules": {"*": "read"}, "default": True},
+        "/api/circles/members",
+        json={"name": "Everyone", "rules": {"*": "read"}, "default": True},
         headers=auth,
     )
     assert changed.status_code == 200 and changed.json()["name"] == "Everyone"
@@ -114,7 +113,8 @@ def test_the_circle_calls_answer_an_administrator(tasks_quill, auth):
     # to shelve it under.
     models = client.get("/api/datamodels", headers=auth).json()
     assert {m["id"]: m["domain"] for m in models if m["id"] in ("task", "board")} == {
-        "task": "tasks", "board": "tasks",
+        "task": "tasks",
+        "board": "tasks",
     }
 
 
@@ -130,5 +130,6 @@ def test_the_install_sheet_gives_ticked_circles_the_new_data(client, auth):
         put = client.put(f"/api/circles/kids/rules/{model}", json={"access": "write"}, headers=auth)
         assert put.status_code == 200
     assert client.get("/api/circles/kids", headers=auth).json()["rules"] == {
-        "calendar": "write", "event": "write",
+        "calendar": "write",
+        "event": "write",
     }

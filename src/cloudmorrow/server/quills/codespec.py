@@ -102,9 +102,7 @@ def parse_code(
         raise CodeSpecError(f"{where}: [quill] code is the file its handlers are in, like quill.py")
     sdk = str(head.get("sdk", SDK_MAJOR if code else ""))
     if code and sdk != SDK_MAJOR:
-        raise CodeSpecError(
-            f"{where}: it is written for SDK {sdk}; this server runs SDK {SDK_MAJOR}"
-        )
+        raise CodeSpecError(f"{where}: it is written for SDK {sdk}; this server runs SDK {SDK_MAJOR}")
     if code:
         if not re.match(r"^[a-z_][a-z0-9_]*(\.py)?$", code):
             raise CodeSpecError(f"{where}: code {code!r} is a module in the Quill's folder, like quill.py")
@@ -160,7 +158,7 @@ def parse_code(
         item.setdefault("id", f"hook-{i + 1}")
         thing = f"hook {item['id']!r}"
         if not item.get("on") or not isinstance(item["on"], str):
-            raise CodeSpecError(f"{where}: {thing} is on a datamodel: on = \"task\"")
+            raise CodeSpecError(f'{where}: {thing} is on a datamodel: on = "task"')
         when = item.get("when", list(HOOK_WHEN))
         when = [when] if isinstance(when, str) else when
         if not isinstance(when, list) or not when or any(w not in HOOK_WHEN for w in when):
@@ -177,7 +175,7 @@ def parse_code(
             thing = f"job {job.get('id')!r}"
             job["handler"] = _handler(job.get("handler"), where, thing)
             if not job.get("every"):
-                raise CodeSpecError(f"{where}: {thing} calls its handler every so often: every = \"1h\"")
+                raise CodeSpecError(f'{where}: {thing} calls its handler every so often: every = "1h"')
             needs["job"].add(job["handler"])
 
     for hook in webhooks:
@@ -238,13 +236,13 @@ def parse_code(
                 raise CodeSpecError(f"{where}: {thing} folder {name} access is read or write")
         run = needs_table.get("run", [])
         if not isinstance(run, list) or not all(isinstance(r, str) and PROGRAM_RE.match(r) for r in run):
-            raise CodeSpecError(f"{where}: {thing} needs.run is a list of program names, like [\"lp\"]")
+            raise CodeSpecError(f'{where}: {thing} needs.run is a list of program names, like ["lp"]')
         item["folders"] = folders
         item["run"] = run
 
     if any(needs.values()) and not code:
         kinds = ", ".join(k for k, v in needs.items() if v)
-        raise CodeSpecError(f"{where}: it names {kinds} handlers, so [quill] says where they are: code = \"quill.py\"")
+        raise CodeSpecError(f'{where}: it names {kinds} handlers, so [quill] says where they are: code = "quill.py"')
 
     return CodeSpec(
         code=code,
@@ -297,7 +295,7 @@ def check_handlers(folder: Path, spec: CodeSpec, where: str) -> dict[str, set[st
     have = scan_handlers(folder, spec.code)
     missing = [f"{kind} {name!r}" for kind, names in spec.needs.items() for name in sorted(names - have[kind])]
     if missing:
-        raise CodeSpecError(
-            f"{where}: the manifest names handlers {spec.code} does not have: {', '.join(missing)}"
-        )
-    return {kind: names - spec.needs.get(kind, set()) for kind, names in have.items() if names - spec.needs.get(kind, set())}
+        raise CodeSpecError(f"{where}: the manifest names handlers {spec.code} does not have: {', '.join(missing)}")
+    return {
+        kind: names - spec.needs.get(kind, set()) for kind, names in have.items() if names - spec.needs.get(kind, set())
+    }

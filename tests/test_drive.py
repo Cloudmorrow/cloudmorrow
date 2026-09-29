@@ -56,9 +56,7 @@ def test_the_drive_is_mounted_over_dav_under_its_name(client, guest_auth, config
     put = client.put("/dav/my-files/hello.txt", content=b"hi", headers=basic("guest", token))
     assert put.status_code in (201, 204), put.text
     assert (config.notes_dir / "guest" / "files" / "hello.txt").read_bytes() == b"hi"
-    listing = client.request(
-        "PROPFIND", "/dav/", headers={**basic("guest", token), "Depth": "1"}
-    )
+    listing = client.request("PROPFIND", "/dav/", headers={**basic("guest", token), "Depth": "1"})
     assert listing.status_code == 207
     assert "/dav/my-files/" in listing.text
 

@@ -61,10 +61,17 @@ class EditorPane(KitPane):
         ("f7", "fire('export_file')", "Export"),
         ("ctrl+p", "fire('insert_image')", "Photo"),
     ]
-    WRITING = frozenset({
-        "save", "new_page", "new_folder", "rename", "delete_record", "import_file",
-        "insert_image",
-    })
+    WRITING = frozenset(
+        {
+            "save",
+            "new_page",
+            "new_folder",
+            "rename",
+            "delete_record",
+            "import_file",
+            "insert_image",
+        }
+    )
 
     def __init__(self, quill: dict, screen: dict, **kwargs) -> None:
         super().__init__(quill, screen, **kwargs)
@@ -88,9 +95,7 @@ class EditorPane(KitPane):
             Action("export_file", "Export", "f7", hint="Write the open page back out to a file"),
         ]
         if self.attaches:
-            actions.append(
-                Action("insert_image", "Photo", "^p", hint="Put a picture from this machine in the page")
-            )
+            actions.append(Action("insert_image", "Photo", "^p", hint="Put a picture from this machine in the page"))
         self.ACTIONS = self.offer(actions)
         # The page that is open: its id, its path in the tree, and its rev.
         self.current_id: str | None = None
@@ -185,9 +190,7 @@ class EditorPane(KitPane):
             await self.went_wrong(exc)
             return
         self.loaded = True
-        self.query_one(NoteTree).load_tree(
-            self._tree(self.records, folders), select=select or self.current_path
-        )
+        self.query_one(NoteTree).load_tree(self._tree(self.records, folders), select=select or self.current_path)
         # Opened again after a rename elsewhere: what is open may have moved.
         if self.current_path and self.current_path in self._ids:
             self.current_id = self._ids[self.current_path]
@@ -281,7 +284,9 @@ class EditorPane(KitPane):
         record_id = self.current_id
         try:
             saved = await self.api.update_record(
-                self.model_id, record_id, {self.body_field: content},
+                self.model_id,
+                record_id,
+                {self.body_field: content},
                 rev=None if force else self.current_rev,
             )
         except AuthError as exc:
@@ -438,9 +443,7 @@ class EditorPane(KitPane):
         if is_dir and not self.keeps_folders:
             self.status("A folder here is renamed by moving what is in it.", error=True)
             return
-        new_path = await self.app.push_screen_wait(
-            PromptModal("Rename / move", value=path, placeholder="new path")
-        )
+        new_path = await self.app.push_screen_wait(PromptModal("Rename / move", value=path, placeholder="new path"))
         if not new_path or new_path == path:
             return
         try:
@@ -449,11 +452,9 @@ class EditorPane(KitPane):
                 moved_to = result["path"]
                 open_path = self.current_path or ""
                 if open_path.startswith(path + "/"):
-                    self.current_path = moved_to + open_path[len(path):]
+                    self.current_path = moved_to + open_path[len(path) :]
             else:
-                record = await self.api.update_record(
-                    self.model_id, self._ids[path], self._fields_for(new_path)
-                )
+                record = await self.api.update_record(self.model_id, self._ids[path], self._fields_for(new_path))
                 moved_to = self.path_of(record)
                 if self.current_path == path:
                     self.current_id = str(record["id"])
@@ -474,7 +475,6 @@ class EditorPane(KitPane):
     def on_note_tree_delete_requested(self, event: NoteTree.DeleteRequested) -> None:
         if "delete_record" not in self.refused:
             self.delete(event.path, event.is_dir)
-
 
     @work(group="ui")
     async def delete(self, path: str, is_dir: bool) -> None:
@@ -516,18 +516,11 @@ class EditorPane(KitPane):
     async def _search(self, query: str) -> dict:
         """The record API's `?q=`, in the shape the search box lists."""
         found = await self.api.records(self.model_id, q=query)
-        return {
-            "results": [
-                {"path": self.path_of(r), "matches": [{"text": r.get("preview") or ""}]}
-                for r in found
-            ]
-        }
+        return {"results": [{"path": self.path_of(r), "matches": [{"text": r.get("preview") or ""}]} for r in found]}
 
     @work(group="ui")
     async def search(self) -> None:
-        path = await self.app.push_screen_wait(
-            SearchModal(self._search, title=f"Search {self.TAB_LABEL.lower()}")
-        )
+        path = await self.app.push_screen_wait(SearchModal(self._search, title=f"Search {self.TAB_LABEL.lower()}"))
         if not path:
             return
         found = next((r for r in self.records if self.path_of(r) == path), None)
@@ -573,9 +566,7 @@ class EditorPane(KitPane):
                 return
             call = self.api.update_record(self.model_id, self._ids[path], {self.body_field: content})
         else:
-            call = self.api.create_record(
-                self.model_id, {**self._fields_for(path), self.body_field: content}
-            )
+            call = self.api.create_record(self.model_id, {**self._fields_for(path), self.body_field: content})
         try:
             record = await call
         except ApiError as exc:
@@ -621,7 +612,4 @@ class EditorPane(KitPane):
             return f"[{MUTED}]no {self.noun} open[/]"
         editor = self.query_one(LiveMarkdownEditor)
         state = "●  unsaved" if self.dirty else "✓  saved"
-        return (
-            f"[{MUTED}]{state}  ·  ln {editor.cursor_row + 1}/{editor.line_count}"
-            f"  ·  {editor.word_count()} words[/]"
-        )
+        return f"[{MUTED}]{state}  ·  ln {editor.cursor_row + 1}/{editor.line_count}  ·  {editor.word_count()} words[/]"

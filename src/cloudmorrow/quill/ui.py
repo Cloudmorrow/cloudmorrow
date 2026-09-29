@@ -248,9 +248,7 @@ def cards(
     )
 
 
-def lanes(
-    records, *, field: str, title: str, body: str | None = None, lanes=None, model: str | None = None
-) -> dict:  # noqa: A002
+def lanes(records, *, field: str, title: str, body: str | None = None, lanes=None, model: str | None = None) -> dict:  # noqa: A002
     """Records in columns by an enum *field*; dragging a card moves it to another lane.
 
     *lanes* is the order of the columns, `[(value, label), ...]`; left out,
@@ -291,24 +289,45 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
     "field": {"record": (dict, True), "name": (str, True), "label": (str, False), "edit": (bool, False)},
     "form": {"action": (str, True), "values": (dict, False), "record": (dict, False), "submit": (str, False)},
     "button": {
-        "label": (str, True), "action": (str, False), "record": (dict, False), "args": (dict, False),
-        "open": (dict, False), "go": (str, False), "params": (dict, False), "tone": (str, False),
+        "label": (str, True),
+        "action": (str, False),
+        "record": (dict, False),
+        "args": (dict, False),
+        "open": (dict, False),
+        "go": (str, False),
+        "params": (dict, False),
+        "tone": (str, False),
     },
     "menu": {"label": (str, True), "items": (list, True)},
     "table": {
-        "records": (list, True), "columns": (list, True), "open": (bool, False),
-        "actions": (list, False), "empty": (str, False),
+        "records": (list, True),
+        "columns": (list, True),
+        "open": (bool, False),
+        "actions": (list, False),
+        "empty": (str, False),
     },
     "cards": {
-        "records": (list, True), "title": (str, True), "subtitle": (str, False), "body": (str, False),
-        "badge": (str, False), "open": (bool, False), "empty": (str, False),
+        "records": (list, True),
+        "title": (str, True),
+        "subtitle": (str, False),
+        "body": (str, False),
+        "badge": (str, False),
+        "open": (bool, False),
+        "empty": (str, False),
     },
     "lanes": {
-        "records": (list, True), "field": (str, True), "title": (str, True), "body": (str, False),
-        "lanes": (list, False), "model": (str, False),
+        "records": (list, True),
+        "field": (str, True),
+        "title": (str, True),
+        "body": (str, False),
+        "lanes": (list, False),
+        "model": (str, False),
     },
     "month": {
-        "records": (list, True), "date": (str, True), "title": (str, True), "ends": (str, False),
+        "records": (list, True),
+        "date": (str, True),
+        "title": (str, True),
+        "ends": (str, False),
         "start": (str, False),
     },
 }

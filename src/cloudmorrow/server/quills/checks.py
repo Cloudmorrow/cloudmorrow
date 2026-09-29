@@ -34,9 +34,7 @@ def _assemble(
     for manifest in quills.values():
         for model_id, fields in manifest.extends.items():
             if model_id not in models:
-                problems.setdefault(
-                    manifest.id, f"{manifest.id} extends {model_id}, which is not installed"
-                )
+                problems.setdefault(manifest.id, f"{manifest.id} extends {model_id}, which is not installed")
                 continue
             try:
                 models[model_id] = models[model_id].with_extension(manifest.id, fields)
@@ -58,14 +56,15 @@ def _assemble(
                     else next((q.id for q in quills.values() if model.id in q.models), "")
                 )
                 if owner:
-                    problems.setdefault(
-                        owner, f"{model.id}.{f.name} links to {f.to}, which is not installed"
-                    )
+                    problems.setdefault(owner, f"{model.id}.{f.name} links to {f.to}, which is not installed")
         if model.in_space:
             target = models.get(model.get_field(model.in_space).to)
             if target is not None and not target.space:
-                owner = model.source if model.source != "foundation" else next(
-                    (q.id for q in quills.values() if model.id in q.models), "")
+                owner = (
+                    model.source
+                    if model.source != "foundation"
+                    else next((q.id for q in quills.values() if model.id in q.models), "")
+                )
                 if owner:
                     problems.setdefault(owner, f"{model.id} is in_space {target.id}, which is not a space")
     return models, problems
@@ -78,9 +77,7 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
 
     def model_of(thing: str, model_id: str) -> Datamodel:
         if model_id not in mine:
-            raise QuillError(
-                f"{where}: {thing} uses {model_id}, which the Quill does not declare in [uses]"
-            )
+            raise QuillError(f"{where}: {thing} uses {model_id}, which the Quill does not declare in [uses]")
         return models[model_id]
 
     def need(model: Datamodel, thing: str, name: object, kinds: tuple[str, ...] = ()) -> None:
@@ -106,9 +103,7 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
             if lane.kind == "link":
                 _check_link_lanes(where, thing, screen, lane, model_of(thing + " lane", lane.to), need)
             elif screen.get("done") and screen["done"] not in lane.values:
-                raise QuillError(
-                    f"{where}: {thing} done lane {screen['done']!r} is not a value of {lane.name}"
-                )
+                raise QuillError(f"{where}: {thing} done lane {screen['done']!r} is not a value of {lane.name}")
             if screen.get("group"):
                 need(model, thing + " group", screen["group"], ("link",))
             if screen.get("body"):
@@ -119,9 +114,7 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
             for name in [subtitle] if isinstance(subtitle, str) else (subtitle or []):
                 need(model, thing + " subtitle", name)
             if not model.ordered or screen["lane"] not in model.ordered_within:
-                raise QuillError(
-                    f"{where}: {thing} is a board, so {model.id} keeps order within its lanes"
-                )
+                raise QuillError(f"{where}: {thing} is a board, so {model.id} keeps order within its lanes")
         elif kit == "list":
             if screen.get("tick"):
                 need(model, thing + " tick", screen["tick"], ("bool",))
@@ -144,16 +137,13 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
         elif kit == "grid":
             # Files: folders and tiles, in groups (the shares) picked first.
             if not model.backend:
-                raise QuillError(
-                    f"{where}: {thing} is a grid, which shows files; {model.id} keeps no bytes"
-                )
+                raise QuillError(f"{where}: {thing} is a grid, which shows files; {model.id} keeps no bytes")
             need(model, thing + " group", screen.get("group"), ("link",))
             need(model, thing + " folder", screen.get("folder"), ("string",))
             need(model, thing + " kind", screen.get("kind"), ("enum",))
             if "folder" not in model.by_name[screen["kind"]].values:
                 raise QuillError(f"{where}: {thing} kind {screen['kind']!r} has no value 'folder'")
-            for binding, kinds in (("size", ("int",)), ("modified", ("datetime", "date")),
-                                   ("mime", ("string",))):
+            for binding, kinds in (("size", ("int",)), ("modified", ("datetime", "date")), ("mime", ("string",))):
                 if screen.get(binding):
                     need(model, f"{thing} {binding}", screen[binding], kinds)
             group_model = models.get(model.by_name[screen["group"]].to)
@@ -169,9 +159,7 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
             model = model_of(f"job {job['id']!r}", job["model"])
             need(model, f"job {job['id']!r}", job["field"], ("datetime", "date"))
             if not model.by_name[job["field"]].indexed:
-                raise QuillError(
-                    f"{where}: job {job['id']!r} expires on {job['field']}, which must be indexed"
-                )
+                raise QuillError(f"{where}: job {job['id']!r} expires on {job['field']}, which must be indexed")
     for hook in manifest.webhooks:
         if hook.get("model"):
             model = model_of(f"webhook {hook['id']!r}", hook["model"])
@@ -196,13 +184,9 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
         if dataset["seed"] == "per-space":
             # Once in every space that has none: the stages of each new book.
             if not model.in_space:
-                raise QuillError(
-                    f"{where}: dataset {dataset['id']!r} is seeded per space, and {model.id} is in none"
-                )
+                raise QuillError(f"{where}: dataset {dataset['id']!r} is seeded per space, and {model.id} is in none")
             if dataset.get("scope"):
-                raise QuillError(
-                    f"{where}: dataset {dataset['id']!r} is in a space, which has the scope"
-                )
+                raise QuillError(f"{where}: dataset {dataset['id']!r} is in a space, which has the scope")
 
 
 def _check_link_lanes(where: str, thing: str, screen: dict, lane, lanes: Datamodel, need) -> None:
@@ -215,8 +199,7 @@ def _check_link_lanes(where: str, thing: str, screen: dict, lane, lanes: Datamod
     """
     if not lanes.ordered:
         raise QuillError(
-            f"{where}: {thing} lanes are {lanes.id} records, so {lanes.id} keeps an order"
-            " (ordered_within)"
+            f"{where}: {thing} lanes are {lanes.id} records, so {lanes.id} keeps an order (ordered_within)"
         )
     done = screen.get("done")
     if done is None:
@@ -295,20 +278,17 @@ def _check_thread(manifest: Manifest, screen: dict, model: Datamodel, models: di
             if f.kind == "enum" and value not in f.values:
                 raise QuillError(f"{where}: {thing} made_as {how}: {value!r} is not a value of {name}")
             if how == "direct" and not f.indexed:
-                raise QuillError(
-                    f"{where}: {thing} made_as direct marks a space by {name}, which must be indexed"
-                )
-def _check_calendar(screen: dict, model: Datamodel, models: dict[str, Datamodel],
-                    thing: str, need, where: str) -> None:
+                raise QuillError(f"{where}: {thing} made_as direct marks a space by {name}, which must be indexed")
+
+
+def _check_calendar(screen: dict, model: Datamodel, models: dict[str, Datamodel], thing: str, need, where: str) -> None:
     """A calendar: two moments, whether it is all day, and the spaces it is drawn from."""
     moments = ("datetime", "date")
     need(model, thing + " starts", screen.get("starts"), moments)
     need(model, thing + " ends", screen.get("ends"), moments)
     for name in ("starts", "ends"):
         if not model.by_name[screen[name]].indexed:
-            raise QuillError(
-                f"{where}: {thing} {name} {screen[name]!r} must be indexed, to ask for a range of days"
-            )
+            raise QuillError(f"{where}: {thing} {name} {screen[name]!r} must be indexed, to ask for a range of days")
     if screen.get("all_day"):
         need(model, thing + " all_day", screen["all_day"], ("bool",))
     need(model, thing + " space", screen.get("space"), ("link",))

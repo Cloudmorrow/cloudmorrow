@@ -62,20 +62,15 @@ def list_secrets(
 
 
 @router.get("/vaults", response_model=list[VaultOut])
-def list_vaults(
-    state: AppState = Depends(get_state), user: User = Depends(get_current_user)
-) -> list[VaultOut]:
+def list_vaults(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> list[VaultOut]:
     """The vaults that hold something. Not scoped: this is the list to pick from."""
     return [VaultOut(**vault.to_dict()) for vault in state.secrets.vaults(user.username)]
 
 
 @router.get("/environments", response_model=list[EnvironmentOut])
-def list_environments(
-    state: AppState = Depends(get_state), scope: Scope = Depends(get_scope)
-) -> list[EnvironmentOut]:
+def list_environments(state: AppState = Depends(get_state), scope: Scope = Depends(get_scope)) -> list[EnvironmentOut]:
     return [
-        EnvironmentOut(**environment.to_dict())
-        for environment in state.secrets.environments(scope.owner, scope.vault)
+        EnvironmentOut(**environment.to_dict()) for environment in state.secrets.environments(scope.owner, scope.vault)
     ]
 
 
@@ -90,9 +85,7 @@ def export_secrets(
     entries = state.secrets.export(scope.owner, scope.vault, environment)
     if format == "json":
         return JSONResponse(entries, headers=_no_store())
-    header = (
-        f"{scope.vault} · {environment}\nWritten by cloudmorrow. Keep it out of version control."
-    )
+    header = f"{scope.vault} · {environment}\nWritten by cloudmorrow. Keep it out of version control."
     return PlainTextResponse(dotenv.dump(entries, header=header), headers=_no_store())
 
 
@@ -143,9 +136,7 @@ def write_secret(
     scope: Scope = Depends(get_scope),
 ) -> SecretOut:
     try:
-        secret, _ = state.secrets.set(
-            scope.owner, scope.vault, payload.environment, key, payload.value
-        )
+        secret, _ = state.secrets.set(scope.owner, scope.vault, payload.environment, key, payload.value)
     except (InvalidEnvironmentError, InvalidSecretNameError) as exc:
         raise _bad_request(exc) from exc
     return SecretOut(**secret.to_dict())
