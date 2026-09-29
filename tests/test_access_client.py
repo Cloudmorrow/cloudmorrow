@@ -528,7 +528,7 @@ def test_the_released_installer_is_for_whichever_cloud_it_is_given(tmp_path) -> 
     from release_installer import render
 
     text = render("v9.9.9", "cloudmorrow-9.9.9-py3-none-any.whl")
-    assert "__" not in text.replace("in __*)", "")
+    assert "__" not in text
     assert (
         'PACKAGE="cloudmorrow[tui,agent] @ '
         'https://github.com/Cloudmorrow/cloudmorrow/releases/download/v9.9.9/cloudmorrow-9.9.9-py3-none-any.whl"'
