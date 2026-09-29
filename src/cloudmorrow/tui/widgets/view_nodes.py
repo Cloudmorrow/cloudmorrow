@@ -51,10 +51,10 @@ from cloudmorrow.tui.kitdata import (
     read_only,
     shown,
 )
-from cloudmorrow.tui.quill_actions import ActionFields, FormProblem
+from cloudmorrow.tui.quill_actions import ActionFields
 from cloudmorrow.tui.screens.modals import Modal
-from cloudmorrow.tui.screens.record_sheet import field_widget, read_field
 from cloudmorrow.tui.theme import ACCENT, BAD, MUTED, TEXT, variant_for
+from cloudmorrow.tui.widgets.fields import FormProblem, field_widget, read_field
 from cloudmorrow.tui.widgets.kit import (
     Lane,
     RecordCard,

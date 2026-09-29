@@ -44,7 +44,6 @@ from cloudmorrow.tui.kitdata import (
     SESSION_EXPIRED,
     all_models,
     failure,
-    field_label,
     find_action,
     installed,
     link_choices,
@@ -52,9 +51,9 @@ from cloudmorrow.tui.kitdata import (
     title_of,
 )
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
-from cloudmorrow.tui.screens.record_sheet import LONG_KINDS, RecordSheet, field_widget, read_field
+from cloudmorrow.tui.screens.record_sheet import RecordSheet
 from cloudmorrow.tui.theme import BAD, variant_for
-from cloudmorrow.tui.widgets.kit import safe_id
+from cloudmorrow.tui.widgets.fields import FieldRows, FormProblem, field_widget
 from cloudmorrow.tui.words import escape
 
 
@@ -77,15 +76,7 @@ async def press(
 
 
 # -- an action's form -------------------------------------------------------------
-class FormProblem(ValueError):
-    """What is wrong with a form as filled in, and the widget it is wrong in."""
-
-    def __init__(self, message: str, widget: Widget | None) -> None:
-        super().__init__(message)
-        self.widget = widget
-
-
-class ActionFields(Vertical):
+class ActionFields(FieldRows):
     """An action's fields, a row each, with the record sheet's widget for each kind."""
 
     def __init__(
@@ -97,50 +88,21 @@ class ActionFields(Vertical):
         prefix: str = "action",
         **kwargs: Any,
     ) -> None:
-        super().__init__(**kwargs)
-        self.fields = list(fields)
+        super().__init__(fields, prefix=prefix, **kwargs)
         self.values = dict(values or {})
         self.choices = choices or {}
-        self.prefix = prefix
         self.add_class("action-fields")
 
-    def wid(self, field: dict) -> str:
-        return f"{self.prefix}-{safe_id(field['name'])}"
-
-    def compose(self) -> ComposeResult:
-        for field in self.fields:
-            long = field.get("kind") in LONG_KINDS
-            with Horizontal(classes="sheet-row" + (" -long" if long else "")):
-                label = field_label(field) + (" *" if field.get("required") else "")
-                yield Static(label, classes="sheet-label")
-                name = field["name"]
-                value = self.values.get(name, field.get("default"))
-                yield field_widget(field, value, self.wid(field), choices=self.choices.get(name))
-
-    def first(self) -> Widget | None:
-        for field in self.fields:
-            widget = self._widget(field)
-            if widget is not None and widget.focusable:
-                return widget
-        return None
-
-    def _widget(self, field: dict) -> Widget | None:
-        try:
-            return self.query_one(f"#{self.wid(field)}")
-        except Exception:
-            return None
+    def widget(self, field: dict) -> Widget:
+        name = field["name"]
+        value = self.values.get(name, field.get("default"))
+        return field_widget(field, value, self.wid(field), choices=self.choices.get(name))
 
     def collect(self) -> dict:
         """The fields as the action wants them; FormProblem when one is wrong or missing."""
         out: dict = {}
         for field in self.fields:
-            widget = self._widget(field)
-            try:
-                value = read_field(widget, field)
-            except ValueError as exc:
-                raise FormProblem(str(exc), widget) from None
-            if field.get("required") and value in (None, ""):
-                raise FormProblem(f"{field_label(field)} is needed.", widget)
+            value = self.value(field)
             if value in (None, ""):
                 continue  # left empty: the handler's default decides
             out[field["name"]] = value
