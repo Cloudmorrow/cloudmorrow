@@ -36,6 +36,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import DataTable, Static
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.quill.screens import calendar_fields
 from cloudmorrow.tui.dates import days_of, month_start, shift_month, wall, weeks_of
 from cloudmorrow.tui.kitdata import can_write, field_of, title_of
 from cloudmorrow.tui.panes.kit import KitPane
@@ -233,15 +234,7 @@ class CalendarPane(KitPane):
     def __init__(self, quill: dict, screen: dict, **kwargs) -> None:
         super().__init__(quill, screen, **kwargs)
         space = field_of(self.model, screen.get("space")) or {}
-        self.b = {
-            "starts": screen.get("starts") or "starts",
-            "ends": screen.get("ends") or "ends",
-            "all_day": screen.get("all_day") or "",
-            "space": space.get("name") or "",
-            "colour": screen.get("colour") or "",
-            "title": screen.get("title") or self.model.get("title") or "title",
-            "subtitle": screen.get("subtitle") or "",
-        }
+        self.b = calendar_fields(screen, self.model)
         self.space_model_id: str = space.get("to") or ""
         self.space_model: dict = self.models.get(self.space_model_id) or {}
         if not can_write(self.space_model):

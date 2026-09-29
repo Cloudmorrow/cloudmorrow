@@ -14,6 +14,7 @@ from cloudmorrow.cli import quillrun
 from cloudmorrow.cli.common import fail
 from cloudmorrow.client.api import CloudmorrowClient
 from cloudmorrow.console import TITLE
+from cloudmorrow.quill.screens import calendar_fields
 
 # What a secret field says until it is asked for.
 MASK = "••••••••"
@@ -57,7 +58,8 @@ class Screen:
         """A calendar's two moment fields, which a list asks for a range of."""
         if self.kit != "calendar":
             return None
-        return self.spec["starts"], self.spec["ends"]
+        bound = calendar_fields(self.spec, self.models[self.model])
+        return bound["starts"], bound["ends"]
 
     def group_title(self, record: dict) -> str:
         target = self.models[self.group["to"]]

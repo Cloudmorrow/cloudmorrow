@@ -15,6 +15,7 @@ from cloudmorrow.cli.quillrun.screen import (
 )
 from cloudmorrow.client.api import CloudmorrowClient
 from cloudmorrow.console import TITLE
+from cloudmorrow.quill import screens
 
 # How much of a conversation `show` prints.
 PAGE = 50
@@ -22,12 +23,8 @@ PAGE = 50
 
 def space_name(space: dict, me: str, screen: Screen) -> str:
     """What a space is called to *me*: its title, or, made between people, who else is in it."""
-    marks = (screen.spec.get("made_as") or {}).get("direct") or {}
-    if marks and all(space["fields"].get(k) == v for k, v in marks.items()):
-        others = [who for who in [space["owner"], *(space.get("members") or [])] if who != me]
-        return ", ".join(others) or me
     target = screen.models[screen.fields[screen.spec["space"]]["to"]]
-    return str(space["fields"].get(target["title"]) or space["id"])
+    return screens.space_name(space, target["title"], screen.spec, me)
 
 
 def _find_space(spaces: list[dict], key: str, me: str, screen: Screen) -> dict:

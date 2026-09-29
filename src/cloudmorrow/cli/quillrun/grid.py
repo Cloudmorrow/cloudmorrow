@@ -18,6 +18,7 @@ from cloudmorrow.cli.quillrun.screen import (
 )
 from cloudmorrow.client.api import CloudmorrowClient
 from cloudmorrow.console import TITLE
+from cloudmorrow.quill.screens import grid_fields
 
 
 def _size(value: object) -> str:
@@ -40,12 +41,13 @@ class _Grid:
         self.screen = screen
         self.group = spec["group"]
         self.group_model = screen.models[screen.fields[self.group]["to"]]
-        self.folder = spec["folder"]
-        self.kind = spec["kind"]
+        bound = grid_fields(spec, screen.models[screen.model])
+        self.folder = bound["folder"]
+        self.kind = bound["kind"]
         self.name = screen.title
-        self.size = spec.get("size") or ""
-        self.modified = spec.get("modified") or ""
-        self.subtitle = spec.get("group_subtitle") or ""
+        self.size = bound["size"]
+        self.modified = bound["modified"]
+        self.subtitle = bound["subtitle"]
 
     def where(self, group: str, folder: str) -> dict:
         return {self.group: group, self.folder: folder.strip("/")}

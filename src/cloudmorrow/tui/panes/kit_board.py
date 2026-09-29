@@ -35,6 +35,7 @@ from textual.containers import Horizontal
 from textual.widgets import Tab, Tabs
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.quill.screens import done_lane, in_order, lane_filter
 from cloudmorrow.tui.kitdata import (
     can_write,
     enum_options,
@@ -84,10 +85,8 @@ class BoardPane(KitPane):
                           ([names] if isinstance(names, str) else names)) if f]
         body = field_of(self.model, screen.get("body"))
         self.body_field: str | None = body["name"] if body else None
-        done = screen.get("done")
-        # For record lanes, `done` is what the finished lane's record says.
-        self.done_when: dict | None = done if isinstance(done, dict) else None
-        self.done: str | None = done if isinstance(done, str) and done in self.lane_values else None
+        # The lane a tick moves a card to; for record lanes, known once they are read.
+        self.done: str | None = done_lane(screen, self.lanes)
         group = field_of(self.model, screen.get("group"))
         self.group_field: str | None = group["name"] if group and group.get("to") else None
         self.group_model_id: str | None = group["to"] if self.group_field else None
@@ -213,22 +212,10 @@ class BoardPane(KitPane):
 
     async def load_lanes(self) -> None:
         """The lanes, when they are records: the group's own, in their order."""
-        group = self.group_model_id
-        by = next(
-            (f["name"] for f in self.lane_model.get("fields", [])
-             if f.get("kind") == "link" and group and f.get("to") == group),
-            None,
-        )
-        where = {by: self.group} if by and self.group else {}
-        rows = sorted(await self.api.records(self.lane_model_id, **where),
-                      key=lambda row: row.get("position") or 0)
-        if self.done_when:
-            self.done = next(
-                (row["id"] for row in rows
-                 if all((row.get("fields") or {}).get(k) == v for k, v in self.done_when.items())),
-                None,
-            )
+        where = lane_filter(self.lane_model, self.group_model_id or "", self.group)
+        rows = in_order(await self.api.records(self.lane_model_id, **where))
         lanes = [(row["id"], title_of(row, self.lane_model)) for row in rows]
+        self.done = done_lane(self.spec, lanes, rows)
         if lanes == self.lanes:
             return
         self.lanes = lanes

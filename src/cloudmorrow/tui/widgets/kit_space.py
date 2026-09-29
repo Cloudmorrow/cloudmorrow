@@ -45,6 +45,8 @@ from textual.widgets import (
 from textual.widgets.option_list import Option
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.quill import screens
+from cloudmorrow.quill.screens import is_between, made_as, people_in
 from cloudmorrow.tui.kitdata import can_write, title_of
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
 from cloudmorrow.tui.theme import BAD, MUTED, SECOND
@@ -62,30 +64,9 @@ TYPED_KINDS = ("text", "markdown")
 
 
 # -- reading a space ---------------------------------------------------------------------
-def made_as(screen: dict | None) -> dict[str, dict]:
-    """How the screen says spaces are made: scope (or `direct`) → the fields it sets."""
-    return dict((screen or {}).get("made_as") or {})
-
-
-def is_between(screen: dict | None, space: dict | None) -> bool:
-    """Is this a space made between people, named for whoever else is in it?"""
-    marks = made_as(screen).get("direct") or {}
-    fields = (space or {}).get("fields") or {}
-    return bool(marks) and space is not None and all(fields.get(k) == v for k, v in marks.items())
-
-
-def people_in(space: dict) -> list[str]:
-    """Everybody in a space: its owner, then the people added to it."""
-    return [space.get("owner", ""), *(space.get("members") or [])]
-
-
 def space_name(model: dict, space: dict, screen: dict | None, me: str) -> str:
-    """What a space is called, to whoever is looking."""
-    if is_between(screen, space):
-        others = [who for who in people_in(space) if who != me]
-        return ", ".join(others) or me
-    fields = space.get("fields") or {}
-    return str(fields.get(model.get("title") or "name") or "").strip() or "Untitled"
+    """What a space is called, to whoever is looking (quill/screens.py)."""
+    return screens.space_name(space, model.get("title") or "name", screen, me)
 
 
 def scope_said(record: dict) -> str:

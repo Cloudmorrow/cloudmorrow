@@ -46,6 +46,7 @@ from textual.message import Message
 from textual.widgets import Button, ContentSwitcher, DataTable, Static
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.quill.screens import grid_fields
 from cloudmorrow.tui.kitdata import can_write, field_of
 from cloudmorrow.tui.panes.kit import KitPane
 from cloudmorrow.tui.screens.modals import ConfirmModal, PromptModal
@@ -422,12 +423,13 @@ class GridPane(KitPane):
         self.group_title: str = self.group_model.get("title") or "title"
         self.group_subtitle: str = screen.get("group_subtitle") or ""
         self.group_open: str = screen.get("group_open") or ""
-        self.title_field: str = screen.get("title") or self.model.get("title") or "name"
-        self.folder_field: str = screen.get("folder") or "folder"
-        self.kind_field: str = screen.get("kind") or "kind"
-        self.size_field: str = screen.get("size") or ""
-        self.modified_field: str = screen.get("modified") or ""
-        self.mime_field: str = screen.get("mime") or ""
+        bound = grid_fields(screen, self.model)
+        self.title_field: str = bound["title"]
+        self.folder_field: str = bound["folder"]
+        self.kind_field: str = bound["kind"]
+        self.size_field: str = bound["size"]
+        self.modified_field: str = bound["modified"]
+        self.mime_field: str = bound["mime"]
         self.extensions = [ext for ext in EXTENSIONS if ext.applies(self.group_model)]
         if not can_write(self.group_model):
             # What an extension's other actions do is its own business; a

@@ -13,6 +13,7 @@ from cloudmorrow.cli.quillrun.screen import (
 )
 from cloudmorrow.client.api import CloudmorrowClient
 from cloudmorrow.console import TITLE
+from cloudmorrow.quill.screens import done_lane, in_order, lane_filter
 
 
 async def _lanes(api: CloudmorrowClient, screen: Screen, group_id: str | None) -> tuple[list[tuple[str, str]], str | None]:
@@ -22,20 +23,15 @@ async def _lanes(api: CloudmorrowClient, screen: Screen, group_id: str | None) -
     their order, and on a board with groups only the group's own.
     """
     lane = screen.lane
-    done = screen.spec.get("done")
     if lane.get("kind") != "link":
         values = lane["values"]
         lanes = list(zip(values, lane.get("labels") or values, strict=True))
-        return lanes, done if isinstance(done, str) else values[-1]
+        return lanes, done_lane(screen.spec, lanes)
     target = screen.models[lane["to"]]
-    by = next((f["name"] for f in target["fields"] if f.get("kind") == "link" and screen.group
-               and f.get("to") == screen.group["to"]), None)
-    rows = sorted(await api.records(target["id"], **({by: group_id} if by and group_id else {})),
-                  key=lambda r: r.get("position") or 0)
+    where = lane_filter(target, (screen.group or {}).get("to", ""), group_id)
+    rows = in_order(await api.records(target["id"], **where))
     lanes = [(r["id"], str(r["fields"].get(target["title"]) or r["id"])) for r in rows]
-    finished = next((r["id"] for r in rows if isinstance(done, dict)
-                     and all(r["fields"].get(k) == v for k, v in done.items())), None)
-    return lanes, finished or (lanes[-1][0] if lanes else None)
+    return lanes, done_lane(screen.spec, lanes, rows)
 
 
 def _lane_named(lanes: list[tuple[str, str]], wanted: str) -> str:
