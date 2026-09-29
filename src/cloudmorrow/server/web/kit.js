@@ -17,8 +17,8 @@
    {quill, screen, tab, base}, where base is the screen's own hash. */
 
 import {
-  SAVE_DELAY, api, app, back, esc, formatDate, heading, icons, nav, occupy, renderRoute,
-  replace, seconds, setStatus, store, tabs, toast, vacate, wireShell,
+  SAVE_DELAY, api, app, back, esc, formatDate, heading, icons, localMinute, nav, occupy,
+  recordsUrl, renderRoute, replace, seconds, setStatus, store, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
 import { drawsHere, renderGroupedList, secretWidget, wireSecretWidgets } from "./kit_grouped.js";
@@ -39,8 +39,6 @@ const own = {
 };
 
 // -- reading a datamodel -----------------------------------------------------------
-export const recordsUrl = (model, id) =>
-  "/api/records/" + encodeURIComponent(model) + (id ? "/" + encodeURIComponent(id) : "");
 export const fieldOf = (model, name) => model.fields.find((f) => f.name === name);
 export const titleField = (at, model) => (model.id === at.screen.model && at.screen.title) || model.title;
 export const titleOf = (model, record, name = model.title) => String(record.fields[name] || "").trim() || "Untitled";
@@ -68,6 +66,7 @@ const stillTick = (state, label) =>
 
 // "Add a task", "Add an entry": the label is the model's, the article is ours.
 export const aOr = (label) => (/^[aeiou]/i.test(label) ? "an " : "a ") + label.toLowerCase();
+export const plural = (label) => (/s$/i.test(label) ? label : label + "s");
 
 /** The lanes of an enum field, as [value, label] pairs. */
 const lanesOf = (f) => f.values.map((value, i) => [value, (f.labels && f.labels[i]) || value]);
@@ -131,7 +130,7 @@ export const circle = (state) => `<span class="check ${state}">${state === "done
 // Whether a card is worth making draggable. A phone has the circle and the
 // lane control and no way to drag anything, and `draggable` on a touch
 // screen is only something for a long press to catch on.
-const canDrag = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
+export const canDrag = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
 
 // The kit elements this file draws. The server refuses to install a screen
 // of any other kind until every surface draws it, and a test holds this
@@ -558,9 +557,7 @@ function localMoment(iso) {
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(text)) return text.slice(0, 16);
   const ms = Date.parse(text);
   if (Number.isNaN(ms)) return "";
-  const d = new Date(ms);
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return localMinute(new Date(ms));
 }
 
 export function widget(f, value, links, own = null) {

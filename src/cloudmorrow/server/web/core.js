@@ -42,19 +42,16 @@ export class ApiError extends Error {
   }
 }
 
-export const authHeaders = () => (session.token ? { Authorization: "Bearer " + session.token } : {});
+const authHeaders = () => (session.token ? { Authorization: "Bearer " + session.token } : {});
 
-export async function api(method, path, body, { keepalive = false } = {}) {
-  const headers = authHeaders();
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+// One request with the token on it. A server that cannot be reached is an
+// ApiError like any other, and a 401 while signed in means the session is
+// over: everything that asks the server goes through here, so each screen
+// need not know that.
+async function send(path, init) {
   let res;
   try {
-    res = await fetch(path, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      keepalive,
-    });
+    res = await fetch(path, { ...init, headers: { ...authHeaders(), ...init.headers } });
   } catch {
     throw new ApiError(0, "Could not reach the server");
   }
@@ -62,6 +59,16 @@ export async function api(method, path, body, { keepalive = false } = {}) {
     signOut("Your session ended. Sign in again.");
     throw new ApiError(401, "signed out");
   }
+  return res;
+}
+
+export async function api(method, path, body, { keepalive = false } = {}) {
+  const res = await send(path, {
+    method,
+    headers: body === undefined ? {} : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    keepalive,
+  });
   if (res.status === 204) return null;
   const text = await res.text();
   let data = null;
@@ -70,7 +77,30 @@ export async function api(method, path, body, { keepalive = false } = {}) {
   return data;
 }
 
+/** The same for what is not JSON: a file going up, a picture coming down.
+    `body` goes as it is, with `type` as its Content-Type, and the Response
+    comes back for the caller to read as a blob or as JSON. A refusal says
+    what the server said, or `fail` when it said nothing; `fail` as a
+    function of the status says it in the screen's own words instead. */
+export async function apiRaw(method, path, { body, type, fail = "request failed" } = {}) {
+  const res = await send(path, { method, headers: type ? { "Content-Type": type } : {}, body });
+  if (res.ok) return res;
+  if (typeof fail === "function") throw new ApiError(res.status, fail(res.status));
+  const data = await res.json().catch(() => null);
+  throw new ApiError(res.status, data && data.detail !== undefined ? data.detail : fail);
+}
+
 export const encodePath = (path) => path.split("/").map(encodeURIComponent).join("/");
+// A path's folder and its last part, and the path of a name in a folder
+// ("" being the top).
+export const folderOf = (path) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
+export const baseName = (path) => path.slice(path.lastIndexOf("/") + 1);
+export const joinPath = (folder, name) => (folder ? folder + "/" + name : name);
+
+// Where a datamodel's records are, or one of them, and anything past it:
+// recordsUrl(model, id, "/move"), or recordsUrl(model, "", "/_folders").
+export const recordsUrl = (model, id = "", rest = "") =>
+  "/api/records/" + encodeURIComponent(model) + (id ? "/" + encodeURIComponent(id) : "") + rest;
 
 // -- helpers --------------------------------------------------------------------
 export const esc = (s) => String(s)
@@ -88,6 +118,12 @@ export function fileStem(title) {
     .slice(0, 80)
     .trim();
 }
+
+// A Date as the clock here reads it, the way an ISO date and a
+// datetime-local box spell it: 2026-03-07, 2026-03-07T09:05.
+export const pad2 = (n) => String(n).padStart(2, "0");
+export const localDay = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+export const localMinute = (d) => `${localDay(d)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 
 export function formatDate(seconds, { long = false } = {}) {
   const date = new Date(seconds * 1000);

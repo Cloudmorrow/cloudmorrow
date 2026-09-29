@@ -20,9 +20,13 @@
    dragged to another lane moves at once, and the server agrees or it goes
    back when the view is drawn again. */
 
-import { api, app, authHeaders, esc, go, heading, nav, tabs, toast, wireShell } from "./core.js";
-import { fieldOf, mayWrite, read, recordsUrl, segments, sheetHash, spoken, titleOf, widget } from "./kit.js";
-import { addDays, addMonths, dateOf, longDay, monthOf, today, weeksOf } from "./kit_calendar.js";
+import {
+  api, apiRaw, app, esc, go, heading, nav, recordsUrl, tabs, toast, wireShell,
+} from "./core.js";
+import { canDrag, fieldOf, mayWrite, read, segments, sheetHash, spoken, titleOf, widget } from "./kit.js";
+import {
+  WEEKDAYS, addDays, addMonths, dateOf, longDay, monthOf, today, weeksOf,
+} from "./kit_calendar.js";
 import {
   ask, choose, findAction, formFields, hideFromBar, linksFor, onRedrawHere, press, readFields, run,
   said, screenAt, wireFields,
@@ -36,8 +40,6 @@ const glyphs = {
 };
 
 // The same test the board uses: a phone has no way to drag anything.
-const canDrag = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export async function renderView(at, arg) {
   const params = Object.fromEntries(new URLSearchParams(arg || ""));
@@ -618,11 +620,9 @@ async function loadThumbs(v) {
     const key = `${el.dataset.thumbModel}/${el.dataset.thumbId}`;
     try {
       if (!v.thumbs.has(key)) {
-        v.thumbs.set(key, fetch(recordsUrl(el.dataset.thumbModel, el.dataset.thumbId) + "/thumb?size=" + size,
-          { headers: authHeaders() }).then(async (res) => {
-          if (!res.ok) throw new Error("no picture");
-          return URL.createObjectURL(await res.blob());
-        }));
+        const path = recordsUrl(el.dataset.thumbModel, el.dataset.thumbId, "/thumb?size=" + size);
+        v.thumbs.set(key, apiRaw("GET", path, { fail: "no picture" })
+          .then(async (res) => URL.createObjectURL(await res.blob())));
       }
       const url = await v.thumbs.get(key);
       const img = document.createElement("img");

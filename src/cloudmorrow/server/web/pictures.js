@@ -16,24 +16,16 @@
    a picture and never see the line that stands for it. Saving joins the
    boxes and the lines back into the one body. */
 
-import { ApiError, authHeaders, esc, fileStem, setStatus, toast } from "./core.js";
+import { ApiError, apiRaw, esc, fileStem, setStatus, toast } from "./core.js";
 
 const photoIcon = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-8 8"/></svg>';
 const closeIcon = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m2 2 8 8M10 2l-8 8"/></svg>';
 
 async function uploadImage(base, file) {
-  const headers = { ...authHeaders(), "Content-Type": file.type || "application/octet-stream" };
-  let res;
-  try {
-    res = await fetch(base + "?filename=" + encodeURIComponent(file.name || ""), {
-      method: "POST", headers, body: file,
-    });
-  } catch {
-    throw new ApiError(0, "Could not reach the server");
-  }
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, data && data.detail !== undefined ? data.detail : "upload failed");
-  return data;
+  const res = await apiRaw("POST", base + "?filename=" + encodeURIComponent(file.name || ""), {
+    body: file, type: file.type || "application/octet-stream", fail: "upload failed",
+  });
+  return res.json().catch(() => null);
 }
 
 const imageURLs = new Map();
@@ -41,8 +33,7 @@ async function imageURL(base, name) {
   const key = base + "/" + name;
   if (imageURLs.has(key)) return imageURLs.get(key);
   if (!base) throw new ApiError(404, "no such image");
-  const res = await fetch(base + "/" + encodeURIComponent(name), { headers: authHeaders() });
-  if (!res.ok) throw new ApiError(res.status, "no such image");
+  const res = await apiRaw("GET", base + "/" + encodeURIComponent(name), { fail: "no such image" });
   const url = URL.createObjectURL(await res.blob());
   imageURLs.set(key, url);
   return url;

@@ -32,10 +32,11 @@
    still opens, and is still sent on or saved. */
 
 import {
-  ApiError, api, app, authHeaders, encodePath, esc, formatDate, heading, icons, nav, onSignOut,
-  renderRoute, replace, route, seconds, store, tabs, toast, wireShell, back,
+  api, apiRaw, app, baseName, encodePath, esc, folderOf, formatDate, heading, icons, joinPath,
+  localDay, nav, onSignOut, pad2, recordsUrl, renderRoute, replace, route, seconds, store, tabs,
+  toast, wireShell, back,
 } from "./core.js";
-import { mayWrite } from "./kit.js";
+import { mayWrite, plural } from "./kit.js";
 
 const own = {
   place: '<svg width="22" height="20" viewBox="0 0 22 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="2" width="19" height="6" rx="1.5"/><rect x="1.5" y="12" width="19" height="6" rx="1.5"/><path d="M5 5h.01M5 15h.01" stroke-linecap="round" stroke-width="2.4"/></svg>',
@@ -94,13 +95,8 @@ function bind(at) {
   };
 }
 
-const baseName = (path) => path.slice(path.lastIndexOf("/") + 1);
-const folderOf = (path) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
-const join = (folder, name) => (folder ? folder + "/" + name : name);
 const extOf = (name) => (name.includes(".") ? name.slice(name.lastIndexOf(".") + 1).toLowerCase() : "");
 
-const recordsUrl = (model, id) =>
-  "/api/records/" + encodeURIComponent(model) + (id ? "/" + encodeURIComponent(id) : "");
 const folderHash = (at, group, folder) =>
   `${at.base}/${encodeURIComponent(group)}` + (folder ? "/" + encodePath(folder) : "");
 const itemHash = (at, b, id) =>
@@ -255,8 +251,6 @@ async function renderGroups(at, b) {
 }
 
 // "Share" → "Shares", for the label over the rest of them.
-const plural = (label) => (/s$/i.test(label) ? label : label + "s");
-
 // -- a folder ------------------------------------------------------------------------------
 async function listFolder(b, group, folder) {
   const query = `?${encodeURIComponent(b.group)}=${encodeURIComponent(group)}` +
@@ -307,7 +301,7 @@ async function renderFolder(at, b, group, folder) {
   const row = (entry) => {
     const kind = kindOf(entry);
     if (entry.is_dir) {
-      return `<a class="row has-icon" href="${folderHash(at, group, join(folder, entry.name))}">
+      return `<a class="row has-icon" href="${folderHash(at, group, joinPath(folder, entry.name))}">
         <span class="icon">${own.folder}</span>
         <span class="main"><span class="title">${esc(entry.name)}</span></span>
         <span class="chevron">${icons.chevronRight}</span></a>`;
@@ -324,7 +318,7 @@ async function renderFolder(at, b, group, folder) {
   // tile scrolls into view, not before.
   const tile = (entry) => {
     const kind = kindOf(entry);
-    const href = entry.is_dir ? folderHash(at, group, join(folder, entry.name)) : itemHash(at, b, entry.id);
+    const href = entry.is_dir ? folderHash(at, group, joinPath(folder, entry.name)) : itemHash(at, b, entry.id);
     const thumb = kind === "image" ? ` data-thumb="${esc(entry.id)}" data-stamp="${esc(entry.rev)}"` : "";
     return `<a class="tile ${kind}" href="${href}"${thumb}>
       <span class="thumb"><span class="icon">${own[kind] || own.file}</span></span>
@@ -470,27 +464,19 @@ addEventListener("paste", async (event) => {
 
 function photoName(file) {
   const now = new Date();
-  const pad = (n) => String(n).padStart(2, "0");
-  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ` +
-    `${pad(now.getHours())}.${pad(now.getMinutes())}.${pad(now.getSeconds())}`;
+  const stamp = `${localDay(now)} ${pad2(now.getHours())}.${pad2(now.getMinutes())}.${pad2(now.getSeconds())}`;
   const ext = (file.type.split("/")[1] || "jpg").replace("jpeg", "jpg");
   return `Photo ${stamp}.${ext}`;
 }
 
 async function uploadOne({ b, group, folder }, file, name) {
-  const headers = { ...authHeaders(), "Content-Type": file.type || "application/octet-stream" };
   const query = `?${encodeURIComponent(b.group)}=${encodeURIComponent(group)}` +
     `&${encodeURIComponent(b.folder)}=${encodeURIComponent(folder)}` +
     `&${encodeURIComponent(b.title)}=${encodeURIComponent(name)}`;
-  let res;
-  try {
-    res = await fetch(recordsUrl(b.model.id) + "/upload" + query, { method: "POST", headers, body: file });
-  } catch {
-    throw new ApiError(0, "Could not reach the server");
-  }
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, data && data.detail !== undefined ? data.detail : "upload failed");
-  return data;
+  const res = await apiRaw("POST", recordsUrl(b.model.id) + "/upload" + query, {
+    body: file, type: file.type || "application/octet-stream", fail: "upload failed",
+  });
+  return res.json().catch(() => null);
 }
 
 // One after another, with the bar saying which; a failure says why and
@@ -562,7 +548,7 @@ async function folderAction(at, { b, group, folder }, what) {
     return;
   }
   const moved = entryOf(b, done);
-  replace(folderHash(at, group, join(moved.folder, moved.name)));
+  replace(folderHash(at, group, joinPath(moved.folder, moved.name)));
   renderRoute();
 }
 
@@ -601,13 +587,9 @@ onSignOut(() => {
 async function contentBlob(b, entry) {
   const key = entry.id + "@" + entry.rev;
   if (blobs.has(key)) return blobs.get(key);
-  let res;
-  try {
-    res = await fetch(recordsUrl(b.model.id, entry.id) + "/content", { headers: authHeaders() });
-  } catch {
-    throw new ApiError(0, "Could not reach the server");
-  }
-  if (!res.ok) throw new ApiError(res.status, res.status === 404 ? `That ${b.model.label.toLowerCase()} is gone` : "Could not fetch it");
+  const res = await apiRaw("GET", recordsUrl(b.model.id, entry.id) + "/content", {
+    fail: (status) => (status === 404 ? `That ${b.model.label.toLowerCase()} is gone` : "Could not fetch it"),
+  });
   const blob = await res.blob();
   blobs.set(key, blob);
   return blob;
@@ -628,8 +610,7 @@ const THUMB_SIZE = (window.devicePixelRatio || 1) > 2 ? 512 : 256;
 async function thumbURL(b, id, stamp) {
   const key = id + "@" + stamp;
   if (thumbURLs.has(key)) return thumbURLs.get(key);
-  const res = await fetch(recordsUrl(b.model.id, id) + "/thumb?size=" + THUMB_SIZE, { headers: authHeaders() });
-  if (!res.ok) throw new ApiError(res.status, "no thumbnail");
+  const res = await apiRaw("GET", recordsUrl(b.model.id, id) + "/thumb?size=" + THUMB_SIZE, { fail: "no thumbnail" });
   const url = URL.createObjectURL(await res.blob());
   thumbURLs.set(key, url);
   return url;
