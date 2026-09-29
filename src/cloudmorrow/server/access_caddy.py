@@ -57,10 +57,16 @@ def upstream_host(config: ServerConfig) -> str:
 # from an email address, which it needs.
 ZEROSSL = "https://acme.zerossl.com/v2/DV90"
 
-# Where Caddy checks that the challenge record is out. Not the box's own
-# resolver: a container's resolv.conf can list servers it cannot reach (a
-# tailnet's fd7a:…::53 in an LXC), and Caddy gives up on the first of them.
+# Where Caddy looks names up for the challenge. Not the box's own resolver:
+# a container's resolv.conf can list servers it cannot reach (a tailnet's
+# fd7a:…::53 in an LXC), and Caddy gives up on the first of them.
 RESOLVERS = ("1.1.1.1", "8.8.8.8")
+# And no waiting to see the record from here at all: a home router that
+# intercepts DNS, whatever server was asked, keeps answering "no such
+# record" from its cache long after the relay has published it. The relay
+# answers only once the record is at Cloudflare, which serves it within
+# seconds; Let's Encrypt looks from its own side. So: a fixed wait.
+PROPAGATION_DELAY = "30s"
 
 
 def _issuer(acme: dict, control: str, *, directory: str = "", email: str = "") -> list[str]:
@@ -79,6 +85,8 @@ def _issuer(acme: dict, control: str, *, directory: str = "", email: str = "") -
         f"\t\t\t\tserver_url {_quote(acme.get('server_url') or control.rstrip('/') + '/v1/acme-dns')}",
         "\t\t\t}",
         f"\t\t\tresolvers {' '.join(RESOLVERS)}",
+        f"\t\t\tpropagation_delay {PROPAGATION_DELAY}",
+        "\t\t\tpropagation_timeout -1",
         "\t\t}",
     ]
     return lines

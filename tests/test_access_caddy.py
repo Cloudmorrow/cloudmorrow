@@ -58,6 +58,8 @@ def test_every_issuer_checks_the_challenge_with_public_resolvers(config):
     config.access_acme_email = "owner@example.org"
     site = site_block(CLOUD, config, CONTROL)
     assert site.count("resolvers 1.1.1.1 8.8.8.8") == site.count("issuer acme {") == 2
+    # And never waits on the box's own view of DNS, which a home router may cache stale.
+    assert site.count("propagation_timeout -1") == site.count("propagation_delay 30s") == 2
 
 
 def test_the_upstream_is_where_the_server_listens(config):
