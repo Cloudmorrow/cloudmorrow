@@ -39,8 +39,12 @@ async def breathe(pilot) -> None:
     await pilot.pause()
 
 
-async def until(pilot, check, *, tries: int = 100) -> None:
-    """Pause until *check()* holds: a dialog's own call to the server is no worker to wait on."""
+async def until(pilot, check, *, tries: int = 500) -> None:
+    """Pause until *check()* holds: a dialog's own call to the server is no worker to wait on.
+
+    Up to ten seconds: on a machine running the whole suite, a palette can
+    take well over the two it takes alone.
+    """
     for _ in range(tries):
         if check():
             return
@@ -71,9 +75,7 @@ def fleet(config, users, tmp_path, monkeypatch):
     client_config = ClientConfig(api_url="http://testserver")
     app = CloudmorrowApp(client_config)
     api = CloudmorrowClient(client_config, token=token)
-    api._client = httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=server.app), base_url="http://testserver"
-    )
+    api._client = httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url="http://testserver")
     app.client = api
     app.username = ADMIN[0]
     app.server = server
@@ -270,15 +272,19 @@ async def test_the_palette_has_the_actions_on_no_record(fleet):
         assert "Add a van" in names
         assert "Log a service" not in names
         await pilot.press("ctrl+e")
-        await breathe(pilot)
         from textual.command import CommandPalette
 
-        assert isinstance(app.screen, CommandPalette)
+        await until(pilot, lambda: isinstance(app.screen, CommandPalette))
         assert QuillCommands in app.screen._provider_classes
         await pilot.press(*"add a van")
-        await until(pilot, lambda: "Add a van" in str(app.screen.query("CommandList").first()
-                                                        .get_option_at_index(0).prompt)
-                    if app.screen.query("CommandList").first().option_count else False)
+        await until(
+            pilot,
+            lambda: (
+                "Add a van" in str(app.screen.query("CommandList").first().get_option_at_index(0).prompt)
+                if app.screen.query("CommandList").first().option_count
+                else False
+            ),
+        )
         await pilot.press("enter")
         await until(pilot, lambda: isinstance(app.screen, ActionModal))
         assert app.screen.action["id"] == "add-van"
@@ -288,22 +294,25 @@ async def test_the_palette_has_the_actions_on_no_record(fleet):
 
 def every_primitive(van: dict) -> dict:
     """One tree with each primitive in it, about one real van."""
-    return ui.check(ui.stack(
-        ui.text("Everything", style="title"),
-        ui.row(ui.stat("Vans", 1, hint="in the yard", tone="good"), ui.badge("new", tone="info")),
-        ui.columns(ui.markdown("**Bold** words"),
-                   ui.image("https://example.com/van.png", alt="A van")),
-        ui.tabs(("Lanes", ui.lanes([van], field="fuel", title="name")),
-                ("Month", ui.month([van], date="registration", title="name", start="2026-09"))),
-        ui.divider(),
-        ui.field(van, "name", edit=True),
-        ui.field(van, "fleet.odometer"),
-        ui.form("log-service", record=van, values={"km": 10}, submit="Log it"),
-        ui.menu("More", ui.button("Open it", open=van), ui.button("Vans", go="vans")),
-        ui.cards([van], title="name", subtitle="registration", badge="fuel"),
-        ui.table([], columns=["name"], empty="No vans here."),
-        ui.empty("Nothing else.", action="add-van"),
-    ))
+    return ui.check(
+        ui.stack(
+            ui.text("Everything", style="title"),
+            ui.row(ui.stat("Vans", 1, hint="in the yard", tone="good"), ui.badge("new", tone="info")),
+            ui.columns(ui.markdown("**Bold** words"), ui.image("https://example.com/van.png", alt="A van")),
+            ui.tabs(
+                ("Lanes", ui.lanes([van], field="fuel", title="name")),
+                ("Month", ui.month([van], date="registration", title="name", start="2026-09")),
+            ),
+            ui.divider(),
+            ui.field(van, "name", edit=True),
+            ui.field(van, "fleet.odometer"),
+            ui.form("log-service", record=van, values={"km": 10}, submit="Log it"),
+            ui.menu("More", ui.button("Open it", open=van), ui.button("Vans", go="vans")),
+            ui.cards([van], title="name", subtitle="registration", badge="fuel"),
+            ui.table([], columns=["name"], empty="No vans here."),
+            ui.empty("Nothing else.", action="add-van"),
+        )
+    )
 
 
 async def test_every_primitive_is_drawn_and_what_can_be_changed_is_saved(fleet):
@@ -324,8 +333,10 @@ async def test_every_primitive_is_drawn_and_what_can_be_changed_is_saved(fleet):
                 continue  # a menu's items are in the dialog it opens
             assert pane.query(f"#{path}"), f"{node['ui']} at {path} is not drawn"
         assert "No vans here." in pane.query_one("#v-10").query_one(Static).visual.plain
-        assert "https://example.com/van.png" in pane.query_one("#v-2-1").query_one(
-            ".view-image-caption", Static).visual.plain
+        assert (
+            "https://example.com/van.png"
+            in pane.query_one("#v-2-1").query_one(".view-image-caption", Static).visual.plain
+        )
         # The form is the action's, filled in with its values, under its own submit.
         assert pane.query_one("#v-7-f-km", Input).value == "10"
         assert str(pane.query_one("#v-7-submit", Button).label) == "Log it"
@@ -343,8 +354,7 @@ async def test_a_card_in_a_lane_moves_with_the_keys(fleet):
     async with app.run_test(size=(120, 50)) as pilot:
         pane = await open_garage(app, pilot)
         van = vans(app)[0]
-        app.server.patch(f"/api/records/vehicle/{van['id']}", json={"fields": {"fuel": "petrol"}},
-                         headers=app.auth)
+        app.server.patch(f"/api/records/vehicle/{van['id']}", json={"fields": {"fuel": "petrol"}}, headers=app.auth)
         van = vans(app)[0]
         pane.view_tree = ui.check(ui.lanes([van], field="fuel", title="name"))
         await pane.draw()
