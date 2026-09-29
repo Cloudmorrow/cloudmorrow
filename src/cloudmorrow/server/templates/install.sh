@@ -66,8 +66,9 @@ run() {
 }
 
 # The released copy of this script (a GitHub Release asset) comes from no
-# cloud in particular: the landing page of one runs it with --server.
-case "$CLOUDMORROW_URL" in __*) CLOUDMORROW_URL="" ;; esac
+# cloud in particular: the landing page of one runs it with --server. An
+# address that is not one is no address.
+case "$CLOUDMORROW_URL" in http://* | https://*) ;; *) CLOUDMORROW_URL="" ;; esac
 TTY=""
 if ( : </dev/tty ) 2>/dev/null; then TTY="/dev/tty"; fi
 if [ -z "$CLOUDMORROW_URL" ]; then
