@@ -12,7 +12,8 @@ from __future__ import annotations
 RULE = "─"
 
 
-def _value(record: dict, name: str) -> str:
+def value_text(record: dict, name: str) -> str:
+    """A field of *record* as plain words: nothing for nothing, yes or no for a tick."""
     value = record.get("fields", {}).get(name)
     if value is None or value == "":
         return ""
@@ -30,7 +31,7 @@ def _table(node: dict, actions: dict) -> list[str]:
     if not records:
         return [f"({node.get('empty') or 'nothing yet'})"]
     heads = [c.get("label") or _label(c["field"]) for c in node["columns"]]
-    rows = [[_value(r, c["field"]) for c in node["columns"]] for r in records]
+    rows = [[value_text(r, c["field"]) for c in node["columns"]] for r in records]
     widths = [max(len(h), *(len(row[i]) for row in rows)) for i, h in enumerate(heads)]
     lines = ["  ".join(h.ljust(w) for h, w in zip(heads, widths, strict=True)).rstrip()]
     lines.append("  ".join(RULE * w for w in widths))
@@ -77,7 +78,7 @@ def _lines(node: dict, actions: dict) -> list[str]:
     if kind == "divider":
         return [RULE * 20]
     if kind == "field":
-        return [f"{node.get('label') or _label(node['name'])}: {_value(node['record'], node['name'])}"]
+        return [f"{node.get('label') or _label(node['name'])}: {value_text(node['record'], node['name'])}"]
     if kind == "form":
         return [f"[{node.get('submit') or actions.get(node['action'], node['action'])}…]"]
     if kind == "button":
@@ -92,31 +93,31 @@ def _lines(node: dict, actions: dict) -> list[str]:
             return [f"({node.get('empty') or 'nothing yet'})"]
         out = []
         for record in node["records"]:
-            head = _value(record, node["title"])
-            if node.get("subtitle") and _value(record, node["subtitle"]):
-                head += f" — {_value(record, node['subtitle'])}"
-            if node.get("badge") and _value(record, node["badge"]):
-                head += f" [{_value(record, node['badge'])}]"
+            head = value_text(record, node["title"])
+            if node.get("subtitle") and value_text(record, node["subtitle"]):
+                head += f" — {value_text(record, node['subtitle'])}"
+            if node.get("badge") and value_text(record, node["badge"]):
+                head += f" [{value_text(record, node['badge'])}]"
             out.append(f"• {head}")
-            if node.get("body") and _value(record, node["body"]):
-                out += ["  " + line for line in _value(record, node["body"]).splitlines()[:3]]
+            if node.get("body") and value_text(record, node["body"]):
+                out += ["  " + line for line in value_text(record, node["body"]).splitlines()[:3]]
         return out
     if kind == "lanes":
         order = [lane["value"] for lane in node.get("lanes") or []]
         names = {lane["value"]: lane["label"] for lane in node.get("lanes") or []}
         for record in node["records"]:
-            value = _value(record, node["field"])
+            value = value_text(record, node["field"])
             if value not in order:
                 order.append(value)
         out = []
         for value in order:
-            inside = [r for r in node["records"] if _value(r, node["field"]) == value]
+            inside = [r for r in node["records"] if value_text(r, node["field"]) == value]
             out.append(f"{names.get(value, value or '—')} ({len(inside)})")
-            out += [f"  • {_value(r, node['title'])}" for r in inside]
+            out += [f"  • {value_text(r, node['title'])}" for r in inside]
         return out
     if kind == "month":
-        records = sorted(node["records"], key=lambda r: _value(r, node["date"]))
-        return [f"{_value(r, node['date'])[:16]}  {_value(r, node['title'])}" for r in records] or ["(nothing this month)"]
+        records = sorted(node["records"], key=lambda r: value_text(r, node["date"]))
+        return [f"{value_text(r, node['date'])[:16]}  {value_text(r, node['title'])}" for r in records] or ["(nothing this month)"]
     return [f"[{kind}]"]
 
 

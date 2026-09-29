@@ -24,9 +24,10 @@ from cloudmorrow.client.config import ClientConfig
 from cloudmorrow.quill import ui
 from cloudmorrow.server.app import create_app
 from cloudmorrow.tui.panes.kit import pane_for
-from cloudmorrow.tui.panes.kit_view import RENDERERS, Drawer, TableNode, ViewPane
+from cloudmorrow.tui.panes.kit_view import ViewPane
 from cloudmorrow.tui.quill_actions import ActionModal
 from cloudmorrow.tui.screens.record_sheet import RecordSheet
+from cloudmorrow.tui.widgets.view_nodes import RENDERERS, Drawer, TableNode
 from tests.conftest import ADMIN, token_for
 from tests.tui_harness import PRESS_ANIMATION, settle, start
 
@@ -316,7 +317,7 @@ async def test_every_primitive_is_drawn_and_what_can_be_changed_is_saved(fleet):
         await pane.draw()
         await settle(app, pilot)
 
-        from cloudmorrow.tui.panes.kit_view import walk
+        from cloudmorrow.tui.widgets.view_nodes import walk
 
         for node, path in walk(pane.view_tree):
             if path.startswith("v-8-"):
