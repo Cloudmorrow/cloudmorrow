@@ -80,7 +80,10 @@ __PAGE_CSS__
       try {
         await navigator.clipboard.writeText(text);
       } catch {
-        // No clipboard access: select the command so it can be copied by hand.
+        // navigator.clipboard only exists on https or localhost; a server
+        // reached on its address over plain http still allows execCommand.
+        if (copyByCommand(text)) return flash(button, label);
+        // No clipboard access at all: select the command to copy by hand.
         const range = document.createRange();
         range.selectNodeContents(source);
         const selection = getSelection();
@@ -88,14 +91,31 @@ __PAGE_CSS__
         selection.addRange(range);
         label = "Selected";
       }
-      const original = button.textContent;
-      button.textContent = label;
-      button.classList.add("copied");
-      setTimeout(() => {
-        button.textContent = original;
-        button.classList.remove("copied");
-      }, 1400);
+      flash(button, label);
     });
+  }
+  function copyByCommand(text) {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    let copied = false;
+    try { copied = document.execCommand("copy"); } catch {}
+    area.remove();
+    return copied;
+  }
+  function flash(button, label) {
+    const original = button.dataset.label ??= button.textContent;
+    button.textContent = label;
+    button.classList.add("copied");
+    clearTimeout(button.flashTimer);
+    button.flashTimer = setTimeout(() => {
+      button.textContent = original;
+      button.classList.remove("copied");
+    }, 1400);
   }
 </script>
 </body>

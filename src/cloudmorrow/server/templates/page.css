@@ -34,7 +34,7 @@ body {
   font: 400 17px/1.55 var(--body);
   -webkit-font-smoothing: antialiased;
 }
-main { max-width: 36rem; margin: 0 auto; display: grid; gap: 1.75rem; }
+main { max-width: 54rem; margin: 0 auto; display: grid; gap: 1.75rem; }
 .brand { display: grid; justify-items: center; gap: .5rem; text-align: center; }
 .brand img { width: 132px; height: auto; image-rendering: auto; }
 .brand .word {
