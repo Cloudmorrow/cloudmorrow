@@ -34,7 +34,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Static
 
 from cloudmorrow.client.api import ApiError
-from cloudmorrow.tui.kitdata import can_write, field_label, field_of, shown, title_of
+from cloudmorrow.tui.kitdata import can_write, field_label, field_of, link_rows, shown, title_of
 from cloudmorrow.tui.panes.kit import KitPane, ListPane
 from cloudmorrow.tui.screens.modals import PromptModal
 from cloudmorrow.tui.theme import MUTED
@@ -169,10 +169,7 @@ class GroupedListPane(ListPane):
     async def _choices(self, field: dict, records: list[dict]) -> list[tuple[str, str]]:
         if field.get("kind") == "link":
             target = self.models.get(field.get("to")) or {}
-            try:
-                rows = await self.api.records(field["to"])
-            except ApiError:
-                rows = []
+            rows = await link_rows(self.api, field["to"], self.linked) or []
             return [(str(r["id"]), title_of(r, target)) for r in rows]
         if field.get("kind") == "enum":
             labels = field.get("labels") or field.get("values") or []
@@ -228,6 +225,7 @@ class GroupedListPane(ListPane):
     async def reload(self, message: str = "", keep: str | None = None) -> None:
         if self.api is None:
             return
+        self.forget_links()
         try:
             self.all = await self.api.records(self.model_id)
             await self.load_link_titles([self.subtitle])
@@ -348,6 +346,8 @@ class GroupedListPane(ListPane):
                 await self.signed_out(exc)
                 return
             value = str(made["id"])
+            # One more of them than was read: the level reads them again.
+            self.linked.pop(field["to"], None)
         self.stand(index, value)
 
     # -- the records -----------------------------------------------------------

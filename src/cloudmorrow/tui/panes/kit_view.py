@@ -931,18 +931,20 @@ class ViewPane(KitPane):
         """For every link a field or form in the tree can point at: what it may point at."""
         self.choices = {}
         models = self.all_models
+        # Each datamodel a link points at is read once for the whole tree.
+        read: dict[str, list[dict]] = {}
         for node, path in walk(self.view_tree or {}):
             if node.get("ui") == "field" and node.get("edit"):
                 model = models.get((node.get("record") or {}).get("model", "")) or {}
                 field = field_of(model, str(node.get("name") or ""))
                 if field and field.get("kind") == "link":
-                    found = await link_choices(self.api, models, {"fields": [field]})
+                    found = await link_choices(self.api, models, {"fields": [field]}, cache=read)
                     self.choices[path] = found.get(field["name"], [])
             elif node.get("ui") == "form":
                 action = find_action(self.quill, str(node.get("action") or ""))
                 if action and any(f.get("kind") == "link" for f in action.get("fields") or []):
                     self.choices[path] = await link_choices(
-                        self.api, models, {"fields": action["fields"]}
+                        self.api, models, {"fields": action["fields"]}, cache=read
                     )
 
     async def draw(self) -> None:

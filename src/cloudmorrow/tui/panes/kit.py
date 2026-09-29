@@ -40,12 +40,22 @@ they may only read, which each pane refuses itself.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from textual import work
 from textual.app import ComposeResult
 from textual.widgets import DataTable
 
 from cloudmorrow.client.api import ApiError, AuthError
-from cloudmorrow.tui.kitdata import can_write, field_label, field_of, link_choices, shown, title_of
+from cloudmorrow.tui.kitdata import (
+    can_write,
+    field_label,
+    field_of,
+    link_choices,
+    link_rows,
+    shown,
+    title_of,
+)
 from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.quill_actions import run_action
 from cloudmorrow.tui.screens.modals import ConfirmModal
@@ -102,15 +112,22 @@ class KitPane(Pane):
             self.SUMMARY = f"{self.SUMMARY} · read only" if self.SUMMARY else "read only"
         # What the records a link field points at are called, by field and id.
         self.link_titles: dict[str, dict[str, str]] = {}
+        # The records links point at, by datamodel, as read since the pane
+        # last loaded: the rows' titles, a level's values and a sheet's
+        # drop-downs are one read of each, not one apiece.
+        self.linked: dict[str, list[dict]] = {}
+
+    def forget_links(self) -> None:
+        """What links point at is read afresh: the pane is loading, or a sheet changed something."""
+        self.linked.clear()
 
     async def load_link_titles(self, fields: list[dict | None]) -> None:
         """Read the titles for *fields* that are links, so a row says "Acme", not an id."""
         for field in fields:
             if not field or field.get("kind") != "link" or field.get("to") not in self.models:
                 continue
-            try:
-                rows = await self.api.records(field["to"])
-            except ApiError:
+            rows = await link_rows(self.api, field["to"], self.linked)
+            if rows is None:
                 continue
             target = self.models[field["to"]]
             self.link_titles[field["name"]] = {str(r["id"]): title_of(r, target) for r in rows}
@@ -160,35 +177,66 @@ class KitPane(Pane):
         self.status(str(exc), error=True)
         return False
 
+    # What this kit knows about its screen's records that the datamodel does
+    # not, as a sheet's `adjust`: given the fields about to be sent and the
+    # record as it was, what to send instead. None when it knows nothing more.
+    settle: Callable[[dict, dict | None], dict] | None = None
+
     async def open_sheet(
-        self, record: dict | None = None, *, preset: dict | None = None
+        self,
+        record: dict | None = None,
+        *,
+        preset: dict | None = None,
+        model_id: str = "",
+        models: dict | None = None,
+        only: list[str] | None = None,
+        adjust: Callable[[dict, dict | None], dict] | None = None,
     ) -> dict | str | None:
         """The record sheet for *record*, or for a new one starting from *preset*.
 
+        Of the screen's own datamodel unless *model_id* says another — a
+        board's groups, a calendar's spaces. On its own, the screen's
+        `fields` are what the sheet shows and `settle` has its say in what is
+        sent; *only* and *adjust* say those for another. *models* stands in
+        for the Quill's when the pane draws a datamodel its own way: the
+        calendar's colour as the five there are.
+
+        Every sheet a kit pane opens comes through here, so each has its
+        links' drop-downs filled, its secrets read, and a Quill's actions.
         Called from a worker: it waits for the sheet to be answered.
         """
-        choices = await link_choices(self.api, self.models, self.model)
-        # A screen that names its fields shows those on the sheet, in that order.
-        only = self.spec.get("fields") or None
-        if record is not None and any(f.get("secret") for f in self.model.get("fields", [])):
+        model_id = model_id or self.model_id
+        models = models if models is not None else self.models
+        model = models[model_id]
+        if model_id == self.model_id:
+            # A screen that names its fields shows those on the sheet, in that order.
+            only = only or self.spec.get("fields") or None
+            adjust = adjust or self.settle
+        choices = await link_choices(self.api, models, model, cache=self.linked)
+        if record is not None and any(f.get("secret") for f in model.get("fields", [])):
             # A listing never carries a secret field; the record itself does.
             try:
-                record = await self.api.record(self.model_id, record["id"])
+                record = await self.api.record(model_id, record["id"])
             except ApiError as exc:
                 await self.signed_out(exc)
                 return None
-        return await self.app.push_screen_wait(
+        result = await self.app.push_screen_wait(
             RecordSheet(
                 self.api,
-                self.models,
-                self.model_id,
+                models,
+                model_id,
                 record=record,
                 preset=preset,
                 only=only,
                 choices=choices,
+                adjust=adjust,
                 run_action=run_action,
             )
         )
+        if result is not None:
+            # Saved, deleted or acted on: what a link may point at may be different now.
+            self.forget_links()
+        return result
 
     async def confirm_delete(self, record: dict) -> bool:
         """Ask, then delete. True when it went."""
@@ -259,6 +307,7 @@ class ListPane(KitPane):
 
     async def _fetch(self) -> bool:
         """The records again, and what their links are called. False when it failed."""
+        self.forget_links()
         try:
             self.records = await self.api.records(self.model_id)
             await self.load_link_titles([self.subtitle])

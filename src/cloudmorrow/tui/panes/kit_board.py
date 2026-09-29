@@ -40,13 +40,10 @@ from cloudmorrow.tui.kitdata import (
     enum_options,
     field_of,
     how_long,
-    link_choices,
     title_of,
 )
 from cloudmorrow.tui.panes.kit import KitPane
-from cloudmorrow.tui.quill_actions import run_action
 from cloudmorrow.tui.screens.modals import ConfirmModal, PromptModal
-from cloudmorrow.tui.screens.record_sheet import RecordSheet
 from cloudmorrow.tui.theme import MUTED
 from cloudmorrow.tui.widgets.kit import Lane, RecordCard, lane_under, neighbour_lane, safe_id
 from cloudmorrow.tui.widgets.toolbar import Action
@@ -201,6 +198,7 @@ class BoardPane(KitPane):
                             note=True)
             return
         where = {self.group_field: self.group} if self.group_field else {}
+        self.forget_links()
         try:
             if self.lane_model_id:
                 await self.load_lanes()
@@ -343,11 +341,7 @@ class BoardPane(KitPane):
                 await self.signed_out(exc)
                 return
         else:
-            choices = await link_choices(self.api, self.models, self.group_model)
-            made = await self.app.push_screen_wait(
-                RecordSheet(self.api, self.models, self.group_model_id, choices=choices,
-                            run_action=run_action)
-            )
+            made = await self.open_sheet(None, model_id=self.group_model_id)
             if not isinstance(made, dict):
                 return
         self.group = made["id"]

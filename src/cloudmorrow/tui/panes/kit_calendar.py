@@ -37,10 +37,8 @@ from textual.widgets import DataTable, Static
 
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.dates import days_of, month_start, shift_month, wall, weeks_of
-from cloudmorrow.tui.kitdata import can_write, field_of, link_choices, title_of
+from cloudmorrow.tui.kitdata import can_write, field_of, title_of
 from cloudmorrow.tui.panes.kit import KitPane
-from cloudmorrow.tui.quill_actions import run_action
-from cloudmorrow.tui.screens.record_sheet import RecordSheet
 from cloudmorrow.tui.theme import ACCENT, BAD, GOOD, LENS, MUTED, TEXT
 from cloudmorrow.tui.widgets.kit_space import NewSpaceModal, SpaceModal, make_space, scope_said
 from cloudmorrow.tui.widgets.toolbar import Action
@@ -326,6 +324,7 @@ class CalendarPane(KitPane):
     async def reload(self) -> None:
         if self.api is None:
             return
+        self.forget_links()
         try:
             spaces = await self.api.records(self.space_model_id)
         except ApiError as exc:
@@ -463,15 +462,9 @@ class CalendarPane(KitPane):
         self.reload()
 
     # -- the things on it ---------------------------------------------------------
-    def _adjust(self, fields: dict, record: dict | None) -> dict:
+    def settle(self, fields: dict, record: dict | None) -> dict:
+        """A thing's sheet keeps its length when its start moves (see `settle_times`)."""
         return settle_times(self.b, fields, record)
-
-    async def open_sheet(self, record: dict | None = None, *, preset: dict | None = None):
-        choices = await link_choices(self.api, self.models, self.model)
-        return await self.app.push_screen_wait(
-            RecordSheet(self.api, self.models, self.model_id, record=record, preset=preset,
-                        choices=choices, adjust=self._adjust, run_action=run_action)
-        )
 
     def act_open_record(self) -> None:
         record = self.selected
@@ -596,9 +589,7 @@ class CalendarPane(KitPane):
             fields.append(f)
         model["fields"] = fields
         models[self.space_model_id] = model
-        result = await self.app.push_screen_wait(
-            RecordSheet(self.api, models, self.space_model_id, record=space, run_action=run_action)
-        )
+        result = await self.open_sheet(space, model_id=self.space_model_id, models=models)
         if result == "deleted":
             self.space_id = ""
         if result is not None:
