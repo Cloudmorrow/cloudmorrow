@@ -185,4 +185,4 @@ def test_unmount_on_a_mac_uses_diskutil(macos, monkeypatch):
 
 
 def test_a_quote_in_the_secret_does_not_break_the_script():
-    assert mounts._applescript_string('a"b\\c') == '"a\\"b\\\\c"'
+    assert mounts.applescript_string('a"b\\c') == '"a\\"b\\\\c"'

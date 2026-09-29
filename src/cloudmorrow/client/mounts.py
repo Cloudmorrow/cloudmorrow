@@ -213,7 +213,8 @@ def _failed(what: str, result: subprocess.CompletedProcess, log: Path | None = N
 
 
 # -- macOS: Finder ------------------------------------------------------------
-def _applescript_string(value: str) -> str:
+def applescript_string(value: str) -> str:
+    """*value* as an AppleScript string literal, quotes and backslashes escaped."""
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
@@ -223,9 +224,9 @@ def _mount_finder(name: str, url: str, username: str, secret: str) -> Mount:
     # The script goes in on stdin rather than as an argument, so the token
     # never shows in `ps`.
     script = (
-        f"mount volume {_applescript_string(url)} "
-        f"as user name {_applescript_string(username)} "
-        f"with password {_applescript_string(secret)}"
+        f"mount volume {applescript_string(url)} "
+        f"as user name {applescript_string(username)} "
+        f"with password {applescript_string(secret)}"
     )
     result = _run(["osascript"], input=script)
     if result.returncode != 0:

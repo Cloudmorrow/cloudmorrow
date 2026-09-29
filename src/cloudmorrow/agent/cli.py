@@ -7,7 +7,7 @@ import logging
 import platform
 import socket
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, NoReturn
 
 import typer
 from rich.table import Table
@@ -33,6 +33,17 @@ ConfigOption = Annotated[
 
 def _load(config_path: Path | None) -> AgentConfig:
     return AgentConfig.load(config_path)
+
+
+def fail(message: str) -> NoReturn:
+    console.print(f"[red]{message}[/]")
+    raise typer.Exit(code=1)
+
+
+def _require_enrolled(config: AgentConfig) -> None:
+    if not config.server_url or not config.agent_token:
+        console.print("[red]This agent is not enrolled.[/] Run `cloudmorrow-agent enroll` first.")
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -89,9 +100,7 @@ def run(
         format="%(asctime)s %(levelname)-7s %(message)s",
     )
     config = _load(config_path)
-    if not config.server_url or not config.agent_token:
-        console.print("[red]This agent is not enrolled.[/] Run `cloudmorrow-agent enroll` first.")
-        raise typer.Exit(code=1)
+    _require_enrolled(config)
     # An update restarts the agent onto the new code before anyone types
     # anything, so this is the earliest a new command can be put on the PATH.
     ensure_commands_linked()
@@ -150,8 +159,7 @@ def try_task(
     try:
         result = run_task(job_type, json.loads(payload), config)
     except (TaskError, ValueError) as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(code=1) from None
+        fail(str(exc))
     console.print_json(json.dumps(result))
 
 
@@ -174,9 +182,7 @@ def sync(
     doing what you expected.
     """
     config = _load(config_path)
-    if not config.server_url or not config.agent_token:
-        console.print("[red]This agent is not enrolled.[/] Run `cloudmorrow-agent enroll` first.")
-        raise typer.Exit(code=1)
+    _require_enrolled(config)
     bundles = list(bundle) if bundle else sorted(BUNDLES)
     if reset:
         for name in bundles:
@@ -187,8 +193,7 @@ def sync(
         try:
             outcomes = sync_all(client, config, bundles)
         except AgentApiError as exc:
-            console.print(f"[red]{exc}[/]")
-            raise typer.Exit(code=1) from None
+            fail(str(exc))
 
     for outcome in outcomes:
         colour = {

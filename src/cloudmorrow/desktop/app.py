@@ -72,6 +72,9 @@ def gui() -> str | None:
 def cloud_name(config: ClientConfig, *, timeout: float = 3.0) -> str:
     """What this cloud is called, for the window's title. Cloudmorrow if it will not say."""
     try:
+        # Asked before the window's own check, so it is refused here first:
+        # a plain-http address to elsewhere is not asked anything, even this.
+        check_url(config.api_url, allow_insecure=config.allow_insecure_http)
         response = httpx.get(
             config.api_url.rstrip("/") + "/api/health", timeout=timeout, verify=config.verify_tls
         )
