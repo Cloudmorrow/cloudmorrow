@@ -57,11 +57,14 @@ def _is_local(request: Request) -> bool:
 
 
 def install(app: FastAPI, config: ServerConfig) -> None:
-    if not config.tls_required:
-        return
+    # Asked on every request rather than once here: claiming a public or
+    # private name (access_control) moves public_url to https while the
+    # server runs, and TLS is required from that moment, not the next boot.
 
     @app.middleware("http")
     async def require_tls(request: Request, call_next):
+        if not config.tls_required:
+            return await call_next(request)
         if request.url.scheme != "https" and not _is_local(request):
             return JSONResponse(
                 {"detail": "this server is reached over https only"},

@@ -10,6 +10,7 @@ import httpx
 from cloudmorrow.client.config import ClientConfig, StoredCredentials
 from cloudmorrow.httpcommon import ServerError
 from cloudmorrow.httpcommon import detail as _detail
+from cloudmorrow.client.localroute import local_transport
 
 TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 # A deploy is a git fetch, a pip install and a wheel build. It is the one call
@@ -55,11 +56,16 @@ class CloudmorrowClient:
         # `vault=` where it means one — there is no selected vault there.
         self.vault = vault
         ApiError.refuse_insecure(config.api_url, allow_insecure=config.allow_insecure_http)
+        # At home, straight to the box, still checked against the real name.
+        self.local = local_transport(
+            config.api_url, getattr(config, "local_address", ""), config.verify_tls
+        )
         self._client = httpx.AsyncClient(
             base_url=config.api_url,
             timeout=TIMEOUT,
             verify=config.verify_tls,
             headers={"User-Agent": "cloudmorrow-tui"},
+            transport=self.local,
         )
 
     async def aclose(self) -> None:
@@ -708,6 +714,54 @@ class CloudmorrowClient:
     async def mark_notifications_read(self, ids: list[int] | None = None) -> dict:
         return (await self._request("POST", "/api/notifications/read", json={"ids": ids})).json()
 
+
+    # -- reaching the cloud (routes/access.py) ------------------------------
+    async def access(self) -> dict:
+        """How the cloud is reached. An administrator gets the workings too."""
+        return (await self._request("GET", "/api/access")).json()
+
+    async def claim_name(self, name: str, *, public: bool = True, private: bool = False) -> dict:
+        """Claim a name (or move to another), with the ways asked for. Admin."""
+        return (
+            await self._request(
+                "POST",
+                "/api/access/name",
+                json={"name": name, "public": public, "private": private},
+            )
+        ).json()
+
+    async def rename_access(self, name: str) -> dict:
+        return (await self._request("PATCH", "/api/access/name", json={"name": name})).json()
+
+    async def release_name(self) -> dict:
+        return (await self._request("DELETE", "/api/access/name")).json()
+
+    async def set_public(self, on: bool) -> dict:
+        return (await self._request("PUT", "/api/access/public", json={"on": on})).json()
+
+    async def set_private(self, on: bool) -> dict:
+        return (await self._request("PUT", "/api/access/private", json={"on": on})).json()
+
+    async def mesh_key(self, device: str = "") -> dict:
+        """A one-time key for one of your computers: {key, login_server, expires_at, hostname}."""
+        return (
+            await self._request("POST", "/api/access/mesh/key", json={"device": device})
+        ).json()
+
+    async def mesh_pair(self, device: str = "") -> dict:
+        """A pairing code for a phone: {code, login_server, expires_at, hostname}."""
+        return (
+            await self._request("POST", "/api/access/mesh/pair", json={"device": device})
+        ).json()
+
+    async def mesh_devices(self, *, everyone: bool = False) -> list[dict]:
+        response = await self._request(
+            "GET", "/api/access/mesh/devices", params={"everyone": everyone}
+        )
+        return response.json()["devices"]
+
+    async def remove_mesh_device(self, device_id: str) -> None:
+        await self._request("DELETE", f"/api/access/mesh/devices/{device_id}")
 
 def client_from_credentials(config: ClientConfig, credentials: StoredCredentials | None) -> CloudmorrowClient:
     token = credentials.access_token if credentials else None

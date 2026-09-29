@@ -31,6 +31,9 @@ ENV PYTHONUNBUFFERED=1 \
     # A container is updated by replacing the image, not by pulling git
     # into it, so the API deploy is off.
     CLOUDMORROW_ALLOW_API_UPDATE=false \
+    # A container has no home network of its own to announce itself on;
+    # set it true for one run with host networking on a box at home.
+    CLOUDMORROW_ACCESS_LAN=false \
     # The reverse proxy is another container, not the loopback, so uvicorn
     # must believe its X-Forwarded-Proto or every request behind TLS would
     # be refused as plain http.

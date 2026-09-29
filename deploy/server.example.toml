@@ -81,3 +81,21 @@ service_name = "cloudmorrow"
 # "latitude,longitude" when the name is ambiguous. Looked up on Open-Meteo,
 # which needs no key. Leave it empty and the page shows no weather.
 weather_place = "Copenhagen"
+
+# Reaching your cloud (docs/HOSTING.md, "Reaching your cloud"). The name,
+# public and private are chosen in Administration -> Access and kept in the
+# database; these are the plumbing under them.
+#
+# Announce <name>.local and _cloudmorrow._tcp on the home network.
+access_lan = true
+# The control server a public or private name is claimed at. Run your own
+# (the Cloudmorrow/relay repository) and point this at it.
+access_control = "https://relay.cloudmorrow.com"
+# Where the relay's streams are spliced to on this box: Caddy.
+access_upstream_443 = "127.0.0.1:443"
+access_upstream_80 = "127.0.0.1:80"
+# The directory Caddy imports the name's site from, Caddy's admin endpoint,
+# and the Caddyfile that imports it (install-server.sh sets all three up).
+access_caddy_dir = "/var/lib/cloudmorrow-caddy"
+access_caddy_admin = "http://127.0.0.1:2019"
+access_caddyfile = "/etc/caddy/Caddyfile"

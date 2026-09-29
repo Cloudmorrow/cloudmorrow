@@ -519,6 +519,80 @@ The wheel keeps the same version number between commits, so `/install.sh`
 installs with `--force-reinstall` — otherwise pip would decide the old copy
 already satisfied it.
 
+## Reaching your cloud
+
+Three ways, any mix of them, chosen by the installer's second question (or
+the same question on the setup page) and changed afterwards in
+**Administration → Access**, with `cm access`, or on the box with
+`cloudmorrow-server access`. [HOSTING.md](HOSTING.md#reaching-your-cloud)
+has the protocol and the control server's API; this is what an owner sees.
+
+**Home network.** Always on unless `access_lan = false`. The box announces
+itself over multicast DNS as `<name>.local` and as a `_cloudmorrow._tcp`
+service carrying its name, version and address. `cm login` with no server
+configured lists what it finds and signs in to the one you pick; a cloud
+with only the home network is `http://<name>.local:8787` (the installer
+makes it listen beyond the loopback for that), and a cloud with a real name
+is reached at its local address with the certificate still checked against
+the real name, so nothing crosses the internet to cross the living room. A
+box listening only on the loopback with no name says nothing: there is
+nothing a neighbour could reach.
+
+**Public.** Pick a name and the cloud is `https://<name>.cloudmorrow.com`
+for anybody with the address; the sign-in page is the door. The box claims
+the name at the control server (`access_control`, `https://relay.cloudmorrow.com`
+unless you run your own), keeps the token it gets sealed in the database,
+and holds one outbound connection open to the relay, reconnecting on its
+own. Visitors' TLS comes down that connection untouched and ends in Caddy
+on the box, which gets the Let's Encrypt certificate for the name by the
+ordinary HTTP challenge. `public_url` follows the name while it is in use,
+and with it `require_tls`: once a name is on, plain http from another
+machine is refused. Administration → Access shows the tunnel's state, since
+when it has been up, how often it has had to reconnect, and the bytes
+through it.
+
+**Private.** Only devices you enroll reach it, from anywhere, over
+WireGuard, using Tailscale's open-source client pointed at the cloud's own
+coordination server (Headscale, run by the control server; each cloud is
+its own user, so nobody else's devices ever see yours). The box joins when
+private access is turned on. Each person enrolls their own devices:
+
+- a computer: `curl -fsSL https://<name>.cloudmorrow.com/install.sh | sh -s -- --private`,
+  which signs in, asks the cloud for a one-time key, installs Tailscale with
+  your say-so and joins; or the desktop app's offer to do the same;
+- a phone: the Tailscale app, told to use the cloud's login server (the QR
+  code in **Me → Pair a device** carries it), and the six-character code
+  the same screen gives, which works once, for ten minutes.
+
+Keys and codes are labelled `<username>: <device>`, so everybody sees and
+removes their own devices, and an administrator sees all of them. With
+public access off, nothing on the internet can reach the box for the
+certificate, so Caddy proves the name by DNS instead, through the control
+server's acme-dns endpoint; that needs Caddy built with the `acmedns`
+module, which the installer fetches from caddyserver.com. With both on,
+the name points at the relay for everybody and straight at the box for
+enrolled devices.
+
+**What runs where, and who may do what.** The service itself never needs
+root: it writes the name's Caddy site into `/var/lib/cloudmorrow-caddy`
+(which `/etc/caddy/Caddyfile` imports) and reloads Caddy through its admin
+endpoint on localhost:2019, and it is tailscale's `--operator`, so it may
+bring the box up and down. Installing Caddy and Tailscale, the first
+`tailscale up`, and the Caddyfile import are root's, and the installer does
+them, asking first (`--yes` to not ask). A box whose Caddy or Tailscale is
+missing says so on the Access screen, with the command that fixes it.
+
+```bash
+cloudmorrow-server access status                # all three, from the box
+cloudmorrow-server access claim larsens --private
+cm access status                                # from anywhere, signed in
+cm access pair                                  # a code for your phone
+```
+
+Giving the name back (Administration → Access, or `cloudmorrow-server
+access release`) ends public and private access at once and forgets every
+enrolled device; the home network carries on.
+
 ## Notes on the phone
 
 The install page is for machines. A phone gets the other thing on it: **Sign

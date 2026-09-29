@@ -1,0 +1,142 @@
+/* Access (Administration) and Pair a device (Me).
+
+   Facts in rows, switches like the features', and the one amber button
+   drawn by .row.primary in admin.css. The small buttons are ghosts — a
+   line, no fill — and Remove is a red ghost: it is undone only by
+   enrolling again. The pairing code is the thing a person copies off the
+   screen by eye, so it is set large, spaced, and in the monospace face. */
+
+.row.access-fact .value,
+.row.access-way .value { font-family: var(--mono); font-size: 14px; color: var(--muted); text-align: right; min-width: 0; overflow-wrap: anywhere; white-space: normal; max-width: 62%; }
+.access-fact .value.good { color: var(--good); }
+.access-fact .value.warn { color: var(--warn); }
+.access-fact .value.bad { color: var(--bad); }
+.access-way .meta, .access-way .preview { white-space: normal; overflow: visible; }
+.access-host { font-family: var(--mono); font-weight: 600; overflow-wrap: anywhere; white-space: normal; }
+
+.access-chip {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line-bright);
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.access-chip.on { border-color: var(--good); color: var(--good); }
+
+/* The name, and the zone after it, on one line: typed where it will read. */
+.row.access-name { gap: 6px; }
+.row.access-name .main { flex: none; }
+.row.access-name input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--ink);
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 16px;
+  text-align: right;
+}
+.row.access-name .zone { flex: none; font-family: var(--mono); font-size: 14px; color: var(--muted); }
+@media (max-width: 420px) {
+  .row.access-name { flex-wrap: wrap; }
+  .row.access-name .main { flex-basis: 100%; }
+  .row.access-name input { text-align: left; }
+}
+.access-claim .choices input[type="checkbox"] {
+  flex: none;
+  margin: 15px 0 0;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+.access-claim .choices .row { align-items: flex-start; }
+
+.row.access-buttons { flex-wrap: wrap; gap: 8px; min-height: 0; }
+.access-button {
+  flex: none;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.access-button.ghost { border: 1px solid var(--line-bright); color: var(--ink); }
+.access-button.ghost.bad { color: var(--bad); }
+.access-button:disabled { opacity: .5; }
+@media (hover: hover) {
+  .access-button.ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+}
+button.row.ghost-row { justify-content: center; color: var(--accent); font-weight: 600; }
+
+.row.access-device .dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--line-bright);
+}
+.row.access-device .dot.on { background: var(--good); }
+
+/* -- pair a device ---------------------------------------------------------- */
+.pair .note { margin: 0 4px 6px; color: var(--muted); line-height: 1.45; }
+.pair .note b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+.pair-steps .row { align-items: flex-start; line-height: 1.45; }
+.pair-steps .step {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--fill);
+  color: var(--fill-ink);
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.pair-qr { display: block; margin: 12px 0 8px; }
+.pair-qr .qr { display: block; width: 184px; height: 184px; border-radius: 6px; }
+.pair-url, .pair-command {
+  display: block;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--card-2);
+  font-family: var(--mono);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.pair-computer { line-height: 1.45; }
+.row.pair-device input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  text-align: right;
+}
+.pair-code { text-align: center; margin: 4px 0 12px; }
+.pair-code .code {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: .28em;
+  color: var(--ink);
+  user-select: all;
+}
+.pair-code .expires { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+.pair .empty { padding-top: 8px; }

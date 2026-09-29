@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from cloudmorrow.server.agents import AgentStore, JobStore
 from cloudmorrow.server.circles import CircleStore
@@ -30,6 +31,9 @@ from cloudmorrow.server.settings import SettingsStore
 from cloudmorrow.server.shares import ShareStore
 from cloudmorrow.server.today import Weather
 from cloudmorrow.server.webpush import PushStore
+
+if TYPE_CHECKING:
+    from cloudmorrow.server.access_ways import Access
 
 
 @dataclass(slots=True)
@@ -67,6 +71,8 @@ class AppState:
     circles: CircleStore | None = None
     # What runs a Quill's Python, in its sandbox (quills/code.py).
     code: object | None = None
+    # How the cloud is reached: home network, and the mesh once linked (access_ways).
+    access: Access | None = None
 
     def cloud_name(self) -> str:
         """What this cloud is called: set from the app, else from the config."""

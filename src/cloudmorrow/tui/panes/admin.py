@@ -22,6 +22,8 @@ Four sections so far:
   hidden button.
 - **Quills.** The catalog by category: install one after reading what it
   adds, or remove one, keeping its records. In admin_quills.py.
+- **Access.** How the cloud is reached: home network, a public name through
+  the relay, private through the mesh. In admin_access.py.
 """
 
 from __future__ import annotations
@@ -44,6 +46,7 @@ from textual.widgets import (
 
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.panes.admin_circles import CirclesView, circles_by_person
+from cloudmorrow.tui.panes.admin_access import AccessView
 from cloudmorrow.tui.panes.admin_quills import QuillsView
 from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
@@ -468,7 +471,7 @@ class AdminPanel(Vertical):
     class Closed(Message):
         """Back to the workspace."""
 
-    VIEWS: tuple[type[Pane], ...] = (UsersView, CirclesView, FeaturesView, QuillsView)
+    VIEWS: tuple[type[Pane], ...] = (UsersView, CirclesView, FeaturesView, QuillsView, AccessView)
 
     def compose(self) -> ComposeResult:
         with ContentSwitcher(id="admin-views", initial="admin-view-users"):

@@ -15,6 +15,7 @@ than the installed client; see `cloudmorrow.cli.dev`.
 from __future__ import annotations
 
 import getpass
+import os
 import sys
 from typing import Annotated
 
@@ -22,6 +23,7 @@ import typer
 
 from cloudmorrow.agent.setup import ensure_agent, stop_agent
 from cloudmorrow.cli import (
+    access,
     agent,
     circle,
     desktop,
@@ -36,11 +38,13 @@ from cloudmorrow.cli import (
     update,
 )
 from cloudmorrow.cli.common import client, console, run
+from cloudmorrow.client import discover
 from cloudmorrow.client.api import CloudmorrowClient
 from cloudmorrow.client.config import (
     ClientConfig,
     StoredCredentials,
     clear_credentials,
+    config_path,
     credentials_path,
 )
 from cloudmorrow.links import ensure_commands_linked
@@ -58,8 +62,9 @@ app.add_typer(settings.app, name="config")
 app.add_typer(update.app, name="update")
 app.add_typer(quill.app, name="quill")
 app.add_typer(circle.app, name="circle")
-# Your own access: what your circles give you, per datamodel.
-app.command("access")(circle.access)
+# `cm access` alone is your own access (what your circles give you, per
+# datamodel); its subcommands are how this cloud is reached: link, invite, join.
+app.add_typer(access.app, name="access")
 # The way out: `cloudmorrow uninstall`, in its own file beside the way in.
 app.command("uninstall")(uninstall.uninstall)
 # The desktop app: the web app in a window, with this computer behind it.
@@ -107,6 +112,9 @@ def login(
     if server:
         config.api_url = server.rstrip("/")
         config.save()
+    elif not config_path().exists() and not os.environ.get("CLOUDMORROW_API_URL"):
+        # Nothing given and nothing configured: look on the home network.
+        choose_cloud(config)
     username = username or input("Username: ").strip()
     password = getpass.getpass("Password: ")
 
@@ -123,6 +131,7 @@ def login(
                 f"[green]Signed in[/] as [b]{session.username}[/] on {config.api_url}\n"
                 f"[dim]token stored in {credentials_path()}[/]"
             )
+            remember_local_address(config)
             if agent_setup:
                 result = await ensure_agent(api)
                 if result.enrolled and result.started:
@@ -133,6 +142,60 @@ def login(
                     )
 
     run(_login())
+
+
+def choose_cloud(config: ClientConfig, found: list[discover.Found] | None = None) -> None:
+    """List the clouds on this network and let the person pick one, or type an address."""
+    if found is None:
+        console.print("[dim]looking for clouds on this network…[/]")
+        found = discover.browse()
+    address = ""
+    if found:
+        for number, cloud in enumerate(found, 1):
+            console.print(f"  [b]{number}[/]  {cloud.describe()}")
+        answer = input(f"Which one? [1-{len(found)}, or an address]: ").strip() or "1"
+        if answer.isdigit() and 1 <= int(answer) <= len(found):
+            use_found(config, found[int(answer) - 1])
+            return
+        address = answer
+    else:
+        console.print("[dim]none found here[/]")
+        address = input("Server address (https://…): ").strip()
+    if not address:
+        raise typer.Exit(code=1)
+    if "://" not in address:
+        address = f"https://{address}"
+    config.api_url = address.rstrip("/")
+    config.local_address = ""
+    config.save()
+
+
+def use_found(config: ClientConfig, cloud: discover.Found) -> None:
+    """Point this computer at a cloud found on the network."""
+    config.api_url = cloud.api_url
+    config.local_address = cloud.local_address
+    if cloud.plain:
+        # Picking a home-only cloud from the list is saying it is meant to be plain.
+        config.allow_insecure_http = True
+        console.print(
+            "[yellow]note:[/] this cloud has no public or private name, so it is plain http "
+            "on your home network; an administrator can give it one in Administration → Access."
+        )
+    config.save()
+
+
+def remember_local_address(config: ClientConfig) -> None:
+    """At home, note where the box is, so requests go straight to it from now on."""
+    if not config.api_url.startswith("https://"):
+        return
+    try:
+        here = discover.matching(discover.browse(1.5), config.api_url)
+    except Exception:  # finding it is a convenience, never a failed sign-in
+        return
+    if here is not None and here.local_address and here.local_address != config.local_address:
+        config.local_address = here.local_address
+        config.save()
+        console.print(f"[dim]found it on this network at {here.local_address}: going there directly[/]")
 
 
 @app.command()
