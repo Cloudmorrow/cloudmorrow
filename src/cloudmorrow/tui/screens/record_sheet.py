@@ -72,6 +72,7 @@ from cloudmorrow.tui.kitdata import (
     enum_options,
     field_label,
     installed,
+    is_conflict,
     read_only,
     shown,
     title_of,
@@ -497,7 +498,7 @@ class RecordSheet(Modal[dict | str | None]):
                     self.model_id, self.record["id"], fields, rev=self.record.get("rev")
                 )
         except ApiError as exc:
-            if exc.status_code == 409 and self.record is not None:
+            if is_conflict(exc, stale=True) and self.record is not None:
                 await self._reload_theirs()
                 return
             self._say(str(exc))

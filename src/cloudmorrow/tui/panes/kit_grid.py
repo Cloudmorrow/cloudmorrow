@@ -556,7 +556,7 @@ class GridPane(KitPane):
                 self.group, self.folder = None, ""
                 self.load(str(exc))
                 return
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         self.loaded = True
         self.draw()
@@ -979,13 +979,8 @@ class GridPane(KitPane):
                 self.model_id, entry["id"], fields, rev=entry["rev"] or None
             )
         except ApiError as exc:
-            self.status(
-                "That changed somewhere else — here it is as it is now."
-                if exc.status_code == 409
-                else str(exc),
-                error=True,
-            )
-            self.reload()
+            if await self.went_wrong(exc, stale=True) != "auth":
+                self.reload()
             return
         self.status(
             "Renamed" if what == "rename" else f"Moved to {answer.strip('/ ') or 'the top'}"

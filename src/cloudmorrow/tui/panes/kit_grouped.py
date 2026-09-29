@@ -230,7 +230,7 @@ class GroupedListPane(ListPane):
             self.all = await self.api.records(self.model_id)
             await self.load_link_titles([self.subtitle])
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         self.loaded = True
         if keep is not None:
@@ -343,7 +343,7 @@ class GroupedListPane(ListPane):
             try:
                 made = await self.api.create_record(field["to"], {target.get("title", "title"): text})
             except ApiError as exc:
-                await self.signed_out(exc)
+                await self.went_wrong(exc)
                 return
             value = str(made["id"])
             # One more of them than was read: the level reads them again.
@@ -424,6 +424,6 @@ class GroupedListPane(ListPane):
         try:
             full = await self.api.record(self.model_id, record["id"])
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return None
         return str((full.get("fields") or {}).get(self.hidden["name"]) or "")

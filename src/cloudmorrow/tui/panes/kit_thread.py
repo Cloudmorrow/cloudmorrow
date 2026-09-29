@@ -212,7 +212,7 @@ class ThreadPane(KitPane):
         try:
             self.spaces = await self._fetch_spaces()
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         self.loaded = True
         table = self.query_one("#space-table", DataTable)
@@ -273,7 +273,7 @@ class ThreadPane(KitPane):
         try:
             lines = await self.api.records(self.model_id, last=PAGE, **{self.link: space_id})
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         if space_id != self._open:
             return   # moved on while this was in the air

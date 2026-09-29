@@ -328,7 +328,7 @@ class CalendarPane(KitPane):
         try:
             spaces = await self.api.records(self.space_model_id)
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         self.spaces = sorted(spaces, key=space_order)
         if self.space is None:
@@ -538,7 +538,7 @@ class CalendarPane(KitPane):
         try:
             made = await make_space(self.api, self.space_model, answers, extra)
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         self.space_id = made["id"]
         self.status(f"{title_of(made, self.space_model)} is made. Press p for who is in it.")
@@ -555,7 +555,7 @@ class CalendarPane(KitPane):
             everyone = await self.api.people()
             space = await self.api.record(self.space_model_id, self.space_id)
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         result = await self.app.push_screen_wait(
             SpaceModal(self.api, self.space_model, space, everyone, me=self.me)

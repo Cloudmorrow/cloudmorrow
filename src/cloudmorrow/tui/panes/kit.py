@@ -48,9 +48,12 @@ from textual.widgets import DataTable
 
 from cloudmorrow.client.api import ApiError, AuthError
 from cloudmorrow.tui.kitdata import (
+    CONFLICT,
+    SESSION_EXPIRED,
     can_write,
     field_label,
     field_of,
+    is_conflict,
     link_choices,
     link_rows,
     shown,
@@ -169,13 +172,24 @@ class KitPane(Pane):
     def on_show(self) -> None:
         self.reload()
 
-    async def signed_out(self, exc: Exception) -> bool:
-        """An expired session sends you to sign in; anything else is said here."""
+    async def went_wrong(self, exc: ApiError, *, stale: bool = False) -> str:
+        """Say what the server refused, each kind of refusal in its one way.
+
+        An expired session sends you to sign in. Somebody else's change
+        winning over a write that carried its revision — *stale* says it did
+        — is said as that, the same everywhere; anything else is said in the
+        server's own words. Which it was, "auth", "conflict" or "other", is
+        for a caller that does more about one of them: draws again after a
+        conflict, and does nothing at all once signed out.
+        """
         if isinstance(exc, AuthError):
-            await self.app.sign_out(message="Session expired — sign in again.")
-            return True
+            await self.app.sign_out(message=SESSION_EXPIRED)
+            return "auth"
+        if is_conflict(exc, stale=stale):
+            self.status(CONFLICT, error=True)
+            return "conflict"
         self.status(str(exc), error=True)
-        return False
+        return "other"
 
     # What this kit knows about its screen's records that the datamodel does
     # not, as a sheet's `adjust`: given the fields about to be sent and the
@@ -218,7 +232,7 @@ class KitPane(Pane):
             try:
                 record = await self.api.record(model_id, record["id"])
             except ApiError as exc:
-                await self.signed_out(exc)
+                await self.went_wrong(exc)
                 return None
         result = await self.app.push_screen_wait(
             RecordSheet(
@@ -251,7 +265,7 @@ class KitPane(Pane):
         try:
             await self.api.delete_record(self.model_id, record["id"])
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return False
         return True
 
@@ -312,7 +326,7 @@ class ListPane(KitPane):
             self.records = await self.api.records(self.model_id)
             await self.load_link_titles([self.subtitle])
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return False
         return True
 
@@ -429,11 +443,8 @@ class ListPane(KitPane):
                 self.model_id, record["id"], {name: value}, rev=record.get("rev")
             )
         except ApiError as exc:
-            if exc.status_code == 409:
-                self.status("That changed somewhere else — here it is as it is now.", error=True)
-            else:
-                await self.signed_out(exc)
-            self.reload()
+            if await self.went_wrong(exc, stale=True) != "auth":
+                self.reload()
             return
         if await self._fetch():
             self.draw(keep=record["id"])

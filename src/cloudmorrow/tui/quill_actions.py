@@ -41,6 +41,7 @@ from textual.widgets import Button, Input, Label, Static
 
 from cloudmorrow.client.api import ApiError, AuthError
 from cloudmorrow.tui.kitdata import (
+    SESSION_EXPIRED,
     all_models,
     failure,
     field_label,
@@ -231,7 +232,7 @@ class ActionModal(Modal[list | None]):
             )
         except AuthError:
             self.dismiss(None)
-            await self.app.sign_out(message="Session expired — sign in again.")
+            await self.app.sign_out(message=SESSION_EXPIRED)
             return
         except ApiError as exc:
             self.say(str(exc))
@@ -299,7 +300,7 @@ async def run_action(
                 record=str((record or {}).get("id") or ""), fields=values,
             )
         except AuthError:
-            await app.sign_out(message="Session expired — sign in again.")
+            await app.sign_out(message=SESSION_EXPIRED)
             return False
         except ApiError as exc:
             app.say(f"{action.get('label') or ''}: {exc}", error=True)
@@ -356,7 +357,7 @@ async def open_record(app: Any, quill: dict, model_id: str, record_id: str) -> d
     try:
         record = await api.record(model_id, record_id)
     except AuthError:
-        await app.sign_out(message="Session expired — sign in again.")
+        await app.sign_out(message=SESSION_EXPIRED)
         return None
     except ApiError as exc:
         app.say(str(exc), error=True)

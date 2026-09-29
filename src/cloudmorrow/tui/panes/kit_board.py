@@ -150,7 +150,7 @@ class BoardPane(KitPane):
             try:
                 self.groups = await self.api.records(self.group_model_id)
             except ApiError as exc:
-                await self.signed_out(exc)
+                await self.went_wrong(exc)
                 return
             ids = {row["id"] for row in self.groups}
             if self.group not in ids:
@@ -205,7 +205,7 @@ class BoardPane(KitPane):
             self.records = await self.api.records(self.model_id, **where)
             await self.load_link_titles(self.subtitles)
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         self.loaded = True
         await self.draw_lanes()
@@ -338,7 +338,7 @@ class BoardPane(KitPane):
                     self.group_model_id, {self.group_model.get("title") or "title": title}
                 )
             except ApiError as exc:
-                await self.signed_out(exc)
+                await self.went_wrong(exc)
                 return
         else:
             made = await self.open_sheet(None, model_id=self.group_model_id)
@@ -370,12 +370,8 @@ class BoardPane(KitPane):
                 self.group_model_id, current["id"], {title_field: title}, rev=current.get("rev")
             )
         except ApiError as exc:
-            if exc.status_code == 409:
-                self.status(f"That {self.group_noun} changed somewhere else — try again.",
-                            error=True)
+            if await self.went_wrong(exc, stale=True) == "conflict":
                 self.reload()
-                return
-            await self.signed_out(exc)
             return
         self.reload()
 
@@ -403,7 +399,7 @@ class BoardPane(KitPane):
         try:
             await self.api.delete_record(self.group_model_id, current["id"])
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         self.group = None
         self.reload()
@@ -510,7 +506,7 @@ class BoardPane(KitPane):
         try:
             await self.api.move_record(self.model_id, record["id"], {self.lane_field: lane}, index)
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             # The board on screen no longer matches the server; ask again.
             await self.load_records()
             return

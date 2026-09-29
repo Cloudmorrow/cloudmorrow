@@ -914,7 +914,7 @@ class ViewPane(KitPane):
         try:
             answer = await fetch_view(self.api, str(self.quill["id"]), self.screen_id, self.params)
         except AuthError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         except ApiError as exc:
             self.failed, self.view_tree = str(exc) or "it failed", None
@@ -1041,7 +1041,7 @@ class ViewPane(KitPane):
                 record=str((record or {}).get("id") or ""), fields=fields,
             )
         except AuthError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         except ApiError as exc:
             form.say(str(exc))
@@ -1064,15 +1064,9 @@ class ViewPane(KitPane):
             saved = await self.api.update_record(
                 str(record["model"]), str(record["id"]), {node.name_: value}, rev=record.get("rev")
             )
-        except AuthError as exc:
-            await self.signed_out(exc)
-            return
         except ApiError as exc:
-            if exc.status_code == 409:
-                self.status("That changed somewhere else — here it is as it is now.", error=True)
-            else:
-                self.status(str(exc), error=True)
-            self.reload()
+            if await self.went_wrong(exc, stale=True) != "auth":
+                self.reload()
             return
         # The next save carries the new revision; the rest of the view is as it was.
         record["rev"] = saved.get("rev", record.get("rev"))
@@ -1088,10 +1082,8 @@ class ViewPane(KitPane):
         try:
             await self.api.move_record(str(record["model"]), str(record["id"]), {field: lane},
                                        index)
-        except AuthError as exc:
-            await self.signed_out(exc)
-            return
         except ApiError as exc:
-            self.status(str(exc), error=True)
+            if await self.went_wrong(exc) == "auth":
+                return
         # Either way the lanes are drawn as the server has them now.
         self.reload()
