@@ -45,8 +45,8 @@ from textual.widgets import (
 )
 
 from cloudmorrow.client.api import ApiError
-from cloudmorrow.tui.panes.admin_circles import CirclesView, circles_by_person
 from cloudmorrow.tui.panes.admin_access import AccessView
+from cloudmorrow.tui.panes.admin_circles import CirclesView, circles_by_person
 from cloudmorrow.tui.panes.admin_quills import QuillsView
 from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal

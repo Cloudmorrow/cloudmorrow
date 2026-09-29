@@ -1,10 +1,10 @@
-/* Access (Administration) and Pair a device (Me).
+/* Access (Administration) and Invite a device (Me).
 
-   Facts in rows, switches like the features', and the one amber button
-   drawn by .row.primary in admin.css. The small buttons are ghosts — a
-   line, no fill — and Remove is a red ghost: it is undone only by
-   enrolling again. The pairing code is the thing a person copies off the
-   screen by eye, so it is set large, spaced, and in the monospace face. */
+   Facts in rows, and the one amber button drawn by .row.primary in
+   admin.css. The small buttons are ghosts — a line, no fill — and Remove
+   is a red ghost: it is undone only by inviting again. The link code and
+   the invite code are what a person copies off the screen by eye, so they
+   are set large, spaced, and in the monospace face. */
 
 .row.access-fact .value,
 .row.access-way .value { font-family: var(--mono); font-size: 14px; color: var(--muted); text-align: right; min-width: 0; overflow-wrap: anywhere; white-space: normal; max-width: 62%; }
@@ -25,36 +25,6 @@
   font-weight: 600;
 }
 .access-chip.on { border-color: var(--good); color: var(--good); }
-
-/* The name, and the zone after it, on one line: typed where it will read. */
-.row.access-name { gap: 6px; }
-.row.access-name .main { flex: none; }
-.row.access-name input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: none;
-  outline: none;
-  color: var(--ink);
-  font: inherit;
-  font-family: var(--mono);
-  font-size: 16px;
-  text-align: right;
-}
-.row.access-name .zone { flex: none; font-family: var(--mono); font-size: 14px; color: var(--muted); }
-@media (max-width: 420px) {
-  .row.access-name { flex-wrap: wrap; }
-  .row.access-name .main { flex-basis: 100%; }
-  .row.access-name input { text-align: left; }
-}
-.access-claim .choices input[type="checkbox"] {
-  flex: none;
-  margin: 15px 0 0;
-  width: 20px;
-  height: 20px;
-  accent-color: var(--accent);
-}
-.access-claim .choices .row { align-items: flex-start; }
 
 .row.access-buttons { flex-wrap: wrap; gap: 8px; min-height: 0; }
 .access-button {
@@ -83,12 +53,23 @@ button.row.ghost-row { justify-content: center; color: var(--accent); font-weigh
   background: var(--line-bright);
 }
 .row.access-device .dot.on { background: var(--good); }
+.row.access-device .meta, .row.access-device .preview { white-space: normal; overflow: visible; }
+.row.access-device .title.unlabelled { color: var(--muted); font-style: italic; }
+.access-device-buttons { flex: none; display: flex; gap: 6px; }
 
-/* -- pair a device ---------------------------------------------------------- */
-.pair .note { margin: 0 4px 6px; color: var(--muted); line-height: 1.45; }
-.pair .note b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
-.pair-steps .row { align-items: flex-start; line-height: 1.45; }
-.pair-steps .step {
+/* -- a link code, waiting ------------------------------------------------------ */
+.access-link-steps { line-height: 1.45; }
+.access-link-steps a { color: var(--accent); }
+.access-code { text-align: center; padding: 6px 12px 14px; }
+.access-qr { display: block; margin: 10px auto 6px; }
+.access-qr .qr { display: block; width: 168px; height: 168px; margin: 0 auto; border-radius: 6px; }
+.access-code .expires, .invite-code .expires { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+
+/* -- invite a device -------------------------------------------------------- */
+.invite .note { margin: 0 4px 6px; color: var(--muted); line-height: 1.45; }
+.invite .note b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+.invite-steps .row { align-items: flex-start; line-height: 1.45; }
+.invite-steps .step {
   flex: none;
   width: 24px;
   height: 24px;
@@ -103,9 +84,9 @@ button.row.ghost-row { justify-content: center; color: var(--accent); font-weigh
   align-items: center;
   justify-content: center;
 }
-.pair-qr { display: block; margin: 12px 0 8px; }
-.pair-qr .qr { display: block; width: 184px; height: 184px; border-radius: 6px; }
-.pair-url, .pair-command {
+.invite-qr { display: block; margin: 12px 0 8px; }
+.invite-qr .qr { display: block; width: 184px; height: 184px; border-radius: 6px; }
+.invite-url, .invite-command {
   display: block;
   margin-top: 8px;
   padding: 8px 10px;
@@ -116,20 +97,9 @@ button.row.ghost-row { justify-content: center; color: var(--accent); font-weigh
   overflow-wrap: anywhere;
   user-select: all;
 }
-.pair-computer { line-height: 1.45; }
-.row.pair-device input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: none;
-  outline: none;
-  color: var(--ink);
-  font: inherit;
-  font-size: 16px;
-  text-align: right;
-}
-.pair-code { text-align: center; margin: 4px 0 12px; }
-.pair-code .code {
+.invite-computer { line-height: 1.45; }
+.invite-code { text-align: center; margin: 4px 0 12px; }
+.access-code .code, .invite-code .code {
   margin: 0;
   font-family: var(--mono);
   font-size: 40px;
@@ -138,5 +108,4 @@ button.row.ghost-row { justify-content: center; color: var(--accent); font-weigh
   color: var(--ink);
   user-select: all;
 }
-.pair-code .expires { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
-.pair .empty { padding-top: 8px; }
+.invite .empty { padding-top: 8px; }

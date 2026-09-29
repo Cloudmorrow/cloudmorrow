@@ -16,14 +16,13 @@ from __future__ import annotations
 
 import html
 import threading
-from urllib.parse import urlsplit
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from cloudmorrow import __version__
 from cloudmorrow.logo import LOGO_LARGE
-from cloudmorrow.server.access_control import suggest_name
 from cloudmorrow.server.access_ways import AccessError
 from cloudmorrow.server.db import InvalidUsernameError, UserExistsError
 from cloudmorrow.server.deps import AppState, get_state
@@ -38,6 +37,9 @@ router = APIRouter(tags=["setup"])
 
 # Two first visits at the same moment must not both make an administrator.
 _first_account = threading.Lock()
+# Until when the page that just set the cloud up may follow its link code.
+_link_window = {"until": 0.0}
+LINK_WINDOW_SECONDS = 20 * 60
 
 
 def needs_setup(state: AppState) -> bool:
@@ -70,22 +72,22 @@ def standard_quills(state: AppState = Depends(get_state)) -> dict:
     }
 
 
-@router.get("/api/setup/access", include_in_schema=False)
-def access_choice(state: AppState = Depends(get_state)) -> dict:
-    """What the page needs to ask how the cloud is reached, while there is a page.
+@router.get("/api/setup/link", include_in_schema=False)
+def link_progress(state: AppState = Depends(get_state)) -> dict:
+    """Whether the code the page shows was entered yet: for twenty minutes after setup, no more.
 
-    The zone is not known until a name is claimed; the control server's own
-    host without its first label (relay.cloudmorrow.com → cloudmorrow.com)
-    is what it will be for the control server everyone uses, and is only
-    shown as a hint.
+    The page has no sign-in to ask with, so this says only what the page
+    shows anyway: waiting, linked (and as what), or expired.
     """
-    if not needs_setup(state):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="already set up")
-    host = urlsplit(state.config.access_control).hostname or ""
+    access = state.access
+    if access is None or time.monotonic() > _link_window["until"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="nothing to follow here")
+    shown = access.status(admin=True)
     return {
-        "suggested_name": suggest_name(state.cloud_name()),
-        "zone": host.split(".", 1)[1] if host.count(".") >= 2 else host,
-        "control": state.config.access_control,
+        "state": shown["link_state"] or "none",
+        "host": shown["host"],
+        "on_mesh": shown["mesh"]["on"],
+        "error": shown["setup_error"],
     }
 
 
@@ -122,21 +124,14 @@ def first_account(payload: SetupRequest, state: AppState = Depends(get_state)) -
             )
         except QuillError as exc:
             note = f"{exc}. Add it later from Administration, Quills."
-    # How it is reached, last: a name that is taken or a control server that
-    # cannot be reached leaves a cloud that is set up and reached at home,
-    # with a line saying where to try again.
-    address = ""
-    choice = payload.access
-    if choice is not None and choice.way != "home" and state.access is not None:
-        wanted = choice.name or suggest_name(name)
+    # Linking, last: a relay that cannot be reached leaves a cloud that is
+    # set up and reached at home, with a line saying where to try again.
+    link = None
+    if payload.link and state.access is not None:
         try:
-            cloud = state.access.claim(
-                wanted,
-                public=choice.way in ("public", "both"),
-                private=choice.way in ("private", "both"),
-            )
-            address = f"https://{cloud.host}"
+            link = state.access.link()
+            _link_window["until"] = time.monotonic() + LINK_WINDOW_SECONDS
         except AccessError as exc:
-            said = f"The name could not be set up: {exc}. Try again from Administration, Access."
+            said = f"It could not be linked yet: {exc}. Try again from Administration, Access."
             note = f"{note} {said}".strip()
-    return SetupOut(name=name, username=user.username, note=note, address=address)
+    return SetupOut(name=name, username=user.username, note=note, link=link)

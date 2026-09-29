@@ -317,13 +317,6 @@ class JobOut(BaseModel):
     finished_at: str | None = None
 
 
-class SetupAccess(BaseModel):
-    # home (the local network only), public, private, or both.
-    way: str = Field(default="home", pattern="^(home|public|private|both)$")
-    # The name to claim for public or private: larsens → larsens.<zone>.
-    name: str = Field(default="", max_length=64)
-
-
 class SetupRequest(BaseModel):
     """The first visit to a server with nobody on it: a name and an administrator."""
 
@@ -333,9 +326,10 @@ class SetupRequest(BaseModel):
     # The standard quills to have, by id. Left out, the server's own boot
     # work installs the catalog's foundation quills, as before.
     quills: list[str] | None = None
-    # How people should reach it: the installer's question, asked again for
-    # a box that was never installed by hand. Left out, home network only.
-    access: SetupAccess | None = None
+    # Link it to a cloudmorrow.com account, so its devices reach it from
+    # anywhere: the installer's question, asked again for a box that was
+    # never installed by hand. Left out, the home network only.
+    link: bool = False
 
 
 class SetupOut(BaseModel):
@@ -343,9 +337,10 @@ class SetupOut(BaseModel):
     username: str
     # Said when a chosen quill could not be installed; empty otherwise.
     note: str = ""
-    # Where the cloud is now, when a public or private name was claimed:
-    # the page goes there. Empty for home network only, or when it failed.
-    address: str = ""
+    # The code to enter at cloudmorrow.com/link, when linking was asked
+    # for: {code, url, link, place, expires_at}. None otherwise, or when the
+    # relay could not be reached (the note says so).
+    link: dict | None = None
 
 
 class ServerSettingsOut(BaseModel):

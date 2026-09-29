@@ -7,41 +7,51 @@ import copy
 from cloudmorrow.client.api import ApiError
 
 ZONE = "cloudmorrow.test"
+LINK = {
+    "code": "KXRT-4829",
+    "url": "https://cloudmorrow.test/link",
+    "link": "https://cloudmorrow.test/link?code=KXRT-4829",
+    "place": "cloudmorrow.test/link",
+    "expires_at": "2026-09-29T12:15:00+00:00",
+}
 
 
-def access_status(name: str = "", *, public: bool = False, private: bool = False) -> dict:
+def access_status(name: str = "", *, waiting: bool = False, on_mesh: bool = True) -> dict:
+    """What an administrator sees: not linked, a code waiting, or linked as *name*."""
     host = f"{name}.{ZONE}" if name else ""
+    linked = bool(name)
+    mesh_on = linked and on_mesh
     return {
-        "address": f"https://{host}" if host and (public or private) else "",
+        "address": f"https://{host}" if mesh_on else "",
+        "linked": linked,
         "name": name,
         "host": host,
-        "lan": {"on": True, "hostname": f"{name or 'cloudmorrow'}.local", "url": "",
-                "addresses": ["192.168.1.20"], "error": ""},
-        "public": {
-            "on": public,
-            "tunnel": {
-                "state": "connected" if public else "off",
-                "host": host,
-                "connected_since": "2026-09-27T12:00:00+00:00" if public else "",
-                "reconnects": 2 if public else 0,
-                "bytes_in": 1_234_567 if public else 0,
-                "bytes_out": 45_678_901 if public else 0,
-                "streams": 1 if public else 0,
-                "error": "",
-            },
-        },
-        "private": {
-            "on": private,
-            "login_server": "https://mesh.cloudmorrow.test" if private else "",
-            "mesh": {"installed": True, "state": "Running" if private else "Stopped",
-                     "address": "100.64.0.7" if private else "", "hostname": "cloud", "error": ""},
-            "address": "100.64.0.7" if private else "",
+        "lan": {
+            "on": True,
+            "announced": True,
+            "hostname": f"{name or 'the-larsens'}.local",
+            "url": "",
+            "addresses": ["192.168.1.20"],
             "error": "",
         },
+        "mesh": {
+            "on": mesh_on,
+            "login_server": "https://mesh.cloudmorrow.test" if mesh_on else "",
+            "box": {
+                "installed": True,
+                "state": "Running" if mesh_on else "NeedsLogin",
+                "address": "100.64.0.7" if mesh_on else "",
+                "hostname": "cloud",
+                "error": "",
+            },
+            "address": "100.64.0.7" if mesh_on else "",
+        },
         "control": "https://relay.cloudmorrow.test",
-        "enrolled": bool(name),
-        "zone": ZONE if name else "",
-        "suggested_name": "cloudmorrow",
+        "zone": ZONE if linked else "",
+        "link": dict(LINK) if waiting and not linked else None,
+        "link_state": "linked" if linked else ("waiting" if waiting else ""),
+        "link_error": "",
+        "setup_error": "" if mesh_on or not linked else "tailscale up failed: access denied",
         "caddy": {"configured": True, "site": "", "error": ""},
     }
 
@@ -53,46 +63,77 @@ class FakeAccess:
         self.access_state = access_status()
         self.access_calls: list[tuple] = []
         self.device_list: list[dict] = [
-            {"id": "d1", "name": "annas-phone", "for": "anna: phone", "owner": "anna",
-             "address": "100.64.0.9", "online": True, "last_seen": ""},
+            {
+                "id": "d1",
+                "label": "anna: phone",
+                "owner": "anna",
+                "device": "phone",
+                "box": False,
+                "address": "100.64.0.9",
+                "online": True,
+                "last_seen": "",
+            },
+            {
+                "id": "d2",
+                "label": "",
+                "owner": "",
+                "device": "",
+                "box": False,
+                "address": "100.64.0.10",
+                "online": False,
+                "last_seen": "2026-09-28T10:00:00+00:00",
+            },
         ]
 
     async def access(self) -> dict:
         return copy.deepcopy(self.access_state)
 
-    def _reshape(self) -> dict:
-        s = self.access_state
-        self.access_state = access_status(
-            s["name"], public=s["public"]["on"], private=s["private"]["on"]
-        )
-        return copy.deepcopy(self.access_state)
-
-    async def claim_name(self, name: str, *, public: bool = True, private: bool = False) -> dict:
-        self.access_calls.append(("claim", name, public, private))
-        if name == "taken":
-            raise ApiError("taken is taken; try another name", status_code=409)
-        self.access_state = access_status(name, public=public, private=private)
+    async def start_link(self) -> dict:
+        self.access_calls.append(("link",))
+        if self.access_state["linked"]:
+            raise ApiError("this cloud is already linked", status_code=409)
+        self.access_state = access_status(waiting=True)
         return await self.access()
 
-    async def rename_access(self, name: str) -> dict:
-        self.access_calls.append(("rename", name))
-        self.access_state["name"] = name
-        return self._reshape()
+    def code_entered(self, name: str = "larsens") -> None:
+        """Somebody entered the code on the website; the box linked itself."""
+        self.access_state = access_status(name)
 
-    async def release_name(self) -> dict:
-        self.access_calls.append(("release",))
+    async def cancel_link(self) -> dict:
+        self.access_calls.append(("cancel",))
         self.access_state = access_status()
         return await self.access()
 
-    async def set_public(self, on: bool) -> dict:
-        self.access_calls.append(("public", on))
-        self.access_state["public"]["on"] = on
-        return self._reshape()
+    async def unlink(self) -> dict:
+        self.access_calls.append(("unlink",))
+        self.access_state = access_status()
+        return await self.access()
 
-    async def set_private(self, on: bool) -> dict:
-        self.access_calls.append(("private", on))
-        self.access_state["private"]["on"] = on
-        return self._reshape()
+    async def access_setup(self) -> dict:
+        self.access_calls.append(("setup",))
+        self.access_state = access_status(self.access_state["name"])
+        return await self.access()
+
+    async def mesh_invite(self) -> dict:
+        self.access_calls.append(("invite",))
+        if not self.access_state["mesh"]["on"]:
+            raise ApiError("this cloud is not linked to a cloudmorrow.com account", status_code=409)
+        host = self.access_state["host"]
+        return {
+            "code": "7QX2MP",
+            "expires_at": "2026-09-29T12:10:00+00:00",
+            "login_server": "https://mesh.cloudmorrow.test",
+            "host": host,
+            "command": f"curl -fsSL https://{host}/install.sh | sh",
+        }
 
     async def mesh_devices(self, *, everyone: bool = False) -> list[dict]:
         return [dict(d) for d in self.device_list]
+
+    async def label_mesh_device(self, device_id: str, owner: str, device: str) -> dict:
+        self.access_calls.append(("label", device_id, owner, device))
+        for d in self.device_list:
+            if d["id"] == device_id:
+                d.update(owner=owner, device=device, label=f"{owner}: {device}")
+                return dict(d)
+        raise ApiError("no such device", status_code=404)

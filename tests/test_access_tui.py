@@ -1,11 +1,12 @@
-"""Administration → Access in the terminal app."""
+"""Administration → Access and Invite a device, in the terminal app."""
 
 from __future__ import annotations
 
 from rich.text import Text
-from textual.widgets import Button, Input, Static
+from textual.widgets import Input, Static
 
 from cloudmorrow.tui.panes.admin_access import access_text
+from cloudmorrow.tui.screens.invite import invite_text
 from tests.tui_access import access_status
 from tests.tui_harness import said, settle, start
 
@@ -27,73 +28,120 @@ async def dialog(pilot) -> None:
     await pilot.pause()
 
 
-def test_the_text_says_all_three_ways() -> None:
-    plain = Text.from_markup(access_text(access_status("larsens", public=True, private=True), [
-        {"name": "annas-phone", "address": "100.64.0.9", "for": "anna: phone", "online": True},
-    ])).plain
-    assert "Home network  on" in plain and "larsens.local" in plain
-    assert "Public  on  larsens.cloudmorrow.test" in plain
-    assert "tunnel connected since 2026-09-27 12:00 UTC" in plain and "2 reconnects" in plain
-    assert "43.6 MB out" in plain
-    assert "Private  on" in plain and "100.64.0.7" in plain and "annas-phone" in plain
-    fresh = Text.from_markup(access_text(access_status())).plain
-    assert "no name yet" in fresh and "(cloudmorrow, say)" in fresh
+def plain(markup: str) -> str:
+    return Text.from_markup(markup).plain
 
 
-async def test_an_admin_claims_a_name_and_switches_the_ways(app):
-    async with app.run_test(size=(120, 40)) as pilot:
+def test_the_text_says_the_home_network_and_the_mesh() -> None:
+    fresh = plain(access_text(access_status()))
+    assert "Home network  on" in fresh and "the-larsens.local" in fresh
+    assert "The mesh  not linked" in fresh and "cloudmorrow.com account" in fresh
+
+    waiting = plain(access_text(access_status(waiting=True)))
+    assert "Open cloudmorrow.test/link and enter" in waiting and "KXRT-4829" in waiting
+    assert "https://cloudmorrow.test/link?code=KXRT-4829" in waiting
+    # The QR code: half-blocks, a few dozen of them across.
+    assert "▀" in waiting and "▄" in waiting
+
+    devices = [
+        {"id": "d1", "label": "anna: phone", "address": "100.64.0.9", "online": True},
+        {"id": "d2", "label": "", "address": "100.64.0.10", "online": False},
+    ]
+    linked = plain(access_text(access_status("larsens"), devices))
+    assert "The mesh  on  larsens.cloudmorrow.test" in linked and "100.64.0.7" in linked
+    assert "anna: phone" in linked and "nobody's yet" in linked
+    assert "My Clouds" in linked
+    halfway = plain(access_text(access_status("larsens", on_mesh=False)))
+    assert "not on its mesh yet" in halfway and "access denied" in halfway
+
+
+def test_the_invite_text() -> None:
+    assert "home network only" in plain(invite_text(access_status()))
+    status = access_status("larsens")
+    before = plain(invite_text(status))
+    assert "Make an invite" in before
+    assert "curl -fsSL https://larsens.cloudmorrow.test/install.sh | sh" in before
+    assert "https://mesh.cloudmorrow.test" in before and "▀" in before
+    after = plain(invite_text(status, {"code": "7QX2MP", "expires_at": "2026-09-29T12:10:00+00:00"}))
+    assert "7QX2MP" in after and "until 12:10 UTC" in after
+
+
+async def test_an_admin_links_the_cloud_and_the_pane_follows(app):
+    async with app.run_test(size=(120, 60)) as pilot:
         screen = await open_access(app, pilot)
-        assert "no name yet" in shown(screen)
-        # One amber action: the name.
+        assert "not linked" in shown(screen)
+        # One amber action: Link.
         primaries = [b for b in screen.query("#admin-view-access Button") if b.variant == "primary"]
-        assert [b.id for b in primaries] == ["do-name"]
+        assert [b.id for b in primaries] == ["do-link"]
 
-        await pilot.click("#do-name")
-        await dialog(pilot)
-        field = app.screen.query_one("#prompt-input", Input)
-        assert field.value == "cloudmorrow"
-        field.value = "larsens"
-        await pilot.click("#ok")
+        await pilot.click("#do-link")
         await settle(app, pilot)
-        assert app.client.access_calls[-1] == ("claim", "larsens", True, False)
-        assert "Public  on  larsens.cloudmorrow.test" in shown(screen)
-        assert "Claimed larsens" in said(screen)
+        assert app.client.access_calls[-1] == ("link",)
+        assert "KXRT-4829" in shown(screen)
+        assert "waiting for the code" in said(screen)
 
-        await pilot.click("#do-private")
+        # The code is entered on the website; the pane looks again by itself.
+        app.client.code_entered("larsens")
+        pane = screen.query_one("#admin-view-access")
+        pane.reload()
         await settle(app, pilot)
-        assert app.client.access_calls[-1] == ("private", True)
-        assert "annas-phone" in shown(screen)
-
-        # Off asks first.
-        await pilot.click("#do-public")
-        await dialog(pilot)
-        await pilot.click("#confirm")
-        await settle(app, pilot)
-        assert app.client.access_calls[-1] == ("public", False)
-        assert "Public  off" in shown(screen)
+        assert "The mesh  on  larsens.cloudmorrow.test" in shown(screen)
+        assert "anna: phone" in shown(screen)
+        assert pane._timer is None
 
 
-async def test_giving_the_name_back_asks_and_a_refusal_is_said(app):
-    app.client.access_state = access_status("larsens", public=True)
-    async with app.run_test(size=(120, 40)) as pilot:
+async def test_unlinking_asks_first(app):
+    app.client.access_state = access_status("larsens")
+    async with app.run_test(size=(120, 60)) as pilot:
         screen = await open_access(app, pilot)
-        await pilot.click("#do-release")
+        await pilot.click("#do-unlink")
         await dialog(pilot)
         await pilot.click("#cancel")
         await settle(app, pilot)
-        assert ("release",) not in app.client.access_calls
-        await pilot.click("#do-release")
+        assert ("unlink",) not in app.client.access_calls
+        await pilot.click("#do-unlink")
         await dialog(pilot)
         await pilot.click("#confirm")
         await settle(app, pilot)
-        assert app.client.access_calls[-1] == ("release",)
-        assert "no name yet" in shown(screen)
+        assert app.client.access_calls[-1] == ("unlink",)
+        assert "not linked" in shown(screen)
+        # Linking twice is refused with the server's sentence.
+        app.client.access_state = access_status("larsens")
+        await pilot.click("#do-link")
+        await settle(app, pilot)
+        assert "already linked" in said(screen).lower()
 
-        # A name that is taken: the server's sentence, in the log.
-        await pilot.click("#do-name")
+
+async def test_an_admin_says_whose_a_phone_is(app):
+    app.client.access_state = access_status("larsens")
+    async with app.run_test(size=(120, 60)) as pilot:
+        await open_access(app, pilot)
+        await pilot.click("#do-label")
         await dialog(pilot)
-        app.screen.query_one("#prompt-input", Input).value = "taken"
+        app.screen.query_one("#prompt-input", Input).value = "d2"
+        await pilot.click("#ok")
+        await dialog(pilot)
+        app.screen.query_one("#prompt-input", Input).value = "bram"
+        await pilot.click("#ok")
+        await dialog(pilot)
+        app.screen.query_one("#prompt-input", Input).value = "tablet"
         await pilot.click("#ok")
         await settle(app, pilot)
-        assert "taken is taken" in said(screen)
-        assert isinstance(screen.query_one("#do-name"), Button)
+        assert app.client.access_calls[-1] == ("label", "d2", "bram", "tablet")
+
+
+async def test_invite_a_device_from_settings(app):
+    app.client.access_state = access_status("larsens")
+    async with app.run_test(size=(120, 60)) as pilot:
+        await start(app, pilot)
+        await pilot.press("ctrl+g")
+        await dialog(pilot)
+        await pilot.click("#open-invite")
+        await dialog(pilot)
+        text = app.screen.query_one("#invite-text", Static)
+        await pilot.click("#make-invite")
+        await dialog(pilot)
+        assert app.client.access_calls[-1] == ("invite",)
+        assert "7QX2MP" in plain(str(text.content))
+        await pilot.click("#close")
+        await dialog(pilot)

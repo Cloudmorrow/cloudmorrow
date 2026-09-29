@@ -7,13 +7,13 @@
 <link rel="icon" href="/app/favicon-32.png" sizes="32x32">
 <style>
 __PAGE_CSS__
-/* How people reach it: the same four answers as the installer's question. */
-.ways input { accent-color: var(--cloud); }
-.reach-name { display: flex; align-items: center; gap: .4rem; }
-.reach-name input { flex: 1; min-width: 0; font-family: var(--mono); }
-.reach-name .zone { flex: none; font-family: var(--mono); color: var(--muted); font-size: .95rem; }
+/* Linking, and the code to enter afterwards. */
+.link-choice { display: flex; gap: .7rem; align-items: flex-start; }
+.link-choice input { accent-color: var(--cloud); margin-top: .3rem; flex: none; }
 .done { display: grid; gap: 1rem; }
-.done b { font-family: var(--mono); overflow-wrap: anywhere; }
+.done .code { font-family: var(--mono); font-size: 2rem; letter-spacing: .12em; text-align: center; margin: 0; }
+.done .qr { width: 11rem; height: 11rem; justify-self: center; border-radius: 6px; }
+.done a.plain { overflow-wrap: anywhere; }
 [hidden] { display: none !important; }
 </style>
 </head>
@@ -59,25 +59,13 @@ __PAGE_CSS__
       <small id="quill-note">All of them, unless you untick some. Add or remove any later from Administration.</small>
     </fieldset>
 
-    <fieldset class="field" id="reach-field" style="border:0;margin:0;padding:0">
-      <legend class="label">How should people reach it?</legend>
-      <div class="quills ways">
-        <label class="quill"><input type="radio" name="way" value="home" checked>
-          <b>Home network only</b><span>Phones and computers in this house, at <code id="home-at">cloudmorrow.local</code>. Nothing leaves it.</span></label>
-        <label class="quill"><input type="radio" name="way" value="public">
-          <b>A public name</b><span>From anywhere, at a name of your own with a real certificate. The sign-in page is the door.</span></label>
-        <label class="quill"><input type="radio" name="way" value="private">
-          <b>Private</b><span>From anywhere, but only on devices you enroll. Needs tailscale on this box.</span></label>
-        <label class="quill"><input type="radio" name="way" value="both">
-          <b>Public and private</b><span>Both: one name, and the shortest way for each device.</span></label>
-      </div>
-      <div class="field" id="reach-name" hidden>
-        <label for="reach">The name</label>
-        <div class="reach-name"><input id="reach" name="reach" autocapitalize="none" autocorrect="off"
-          spellcheck="false" maxlength="40" pattern="[a-z0-9][a-z0-9\-]{1,38}[a-z0-9]"><span class="zone" id="zone"></span></div>
-        <small>Lowercase letters, digits and dashes. Change it later from Administration, Access.</small>
-      </div>
-    </fieldset>
+    <div class="field">
+      <label class="link-choice" for="link"><input type="checkbox" id="link" name="link">
+        <span><b>Link this cloud to a cloudmorrow.com account</b>, so its devices reach it
+        from anywhere. You can do it later, from Administration, Access.</span></label>
+      <small>Without it, the cloud is reached on this network only, at
+        <code id="home-at">cloudmorrow.local</code>, and never talks to cloudmorrow.com.</small>
+    </div>
 
     <button class="action" type="submit">Create my cloud</button>
     <p class="error" id="error" role="alert"></p>
@@ -85,44 +73,29 @@ __PAGE_CSS__
 
   <div class="group done" id="done" hidden>
     <h2>Your cloud is set up.</h2>
-    <p id="done-said"></p>
-    <a class="action" id="done-go" href="/">Open it</a>
+    <p id="done-said">Now link it: open <a class="plain" id="done-link" href="#" target="_blank" rel="noopener"></a>
+      and enter this code.</p>
+    <p class="code" id="done-code"></p>
+    <div id="done-qr"></div>
+    <p id="done-state">Waiting for the code…</p>
+    <a class="action" href="/">Open it</a>
   </div>
 
   <footer>Cloudmorrow __VERSION__ · free software under the AGPL</footer>
 </main>
-<script>
+<script type="module">
+  import { qrSvg } from "/app/qr.js";
+
   const form = document.getElementById("setup");
   const error = document.getElementById("error");
   const field = document.getElementById("quill-field");
   const list = document.getElementById("quills");
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   let offered = false;
-  const reachName = document.getElementById("reach-name");
-  const reach = document.getElementById("reach");
   const slug = (s) => s.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-{2,}/g, "-").replace(/^-|-$/g, "");
-  let nameTouched = false;
-
-  // The name to claim, and the zone it will be in, from this server's
-  // control server. Without an answer the home network is still offered.
-  fetch("/api/setup/access").then((r) => (r.ok ? r.json() : null)).then((data) => {
-    if (!data) return;
-    document.getElementById("zone").textContent = "." + data.zone;
-    if (!nameTouched) reach.value = data.suggested_name;
-  }).catch(() => {});
-  reach.addEventListener("input", () => { nameTouched = true; });
-  // Until somebody types one, the name follows what the cloud is called.
   form.name.addEventListener("input", () => {
-    const label = slug(form.name.value) || "cloudmorrow";
-    document.getElementById("home-at").textContent = label + ".local";
-    if (!nameTouched) reach.value = label.slice(0, 40);
+    document.getElementById("home-at").textContent = (slug(form.name.value) || "cloudmorrow") + ".local";
   });
-  for (const radio of form.querySelectorAll("input[name=way]")) {
-    radio.addEventListener("change", () => {
-      reachName.hidden = form.way.value === "home";
-      reach.required = !reachName.hidden;
-    });
-  }
 
   // The standard quills, from this server's catalog. Without them the form
   // still works: the server then starts with its foundation quills.
@@ -155,7 +128,7 @@ __PAGE_CSS__
       password: form.password.value,
     };
     if (offered) body.quills = [...list.querySelectorAll("input:checked")].map((i) => i.value);
-    body.access = { way: form.way.value, name: form.way.value === "home" ? "" : reach.value.trim() };
+    body.link = form.link.checked;
     try {
       const response = await fetch("/api/setup", {
         method: "POST",
@@ -167,27 +140,51 @@ __PAGE_CSS__
         throw new Error(typeof made.detail === "string" ? made.detail : "That did not work.");
       }
       if (made.note) sessionStorage.setItem("cloudmorrow.setup-note", made.note);
-      if (!made.address) {
+      if (!made.link) {
         location.replace("/");
         return;
       }
-      // A name: the cloud lives there now. Its certificate can take a
-      // minute to arrive, so the address is shown rather than jumped to.
-      form.hidden = true;
-      document.getElementById("done-said").innerHTML =
-        `From now on it is at <b>${esc(made.address)}</b>. The certificate can take a minute; `
-        + "if the page does not open at once, give it that minute."
-        + (made.note ? ` ${esc(made.note)}` : "");
-      const go = document.getElementById("done-go");
-      go.href = made.address;
-      go.textContent = "Open " + made.address.replace(/^https:\/\//, "");
-      document.getElementById("done").hidden = false;
+      showLink(made.link);
     } catch (err) {
       error.textContent = err.message;
       button.disabled = false;
       button.textContent = "Create my cloud";
     }
   });
+
+  // The code to enter at cloudmorrow.com/link, and whether it has been: the
+  // box waits for it on its own, and this only follows along.
+  function showLink(link) {
+    form.hidden = true;
+    const place = document.getElementById("done-link");
+    place.href = link.link;
+    place.textContent = link.place;
+    document.getElementById("done-code").textContent = link.code;
+    document.getElementById("done-qr").innerHTML = qrSvg(link.link, "The link page, with the code filled in");
+    document.getElementById("done").hidden = false;
+    follow();
+  }
+
+  async function follow() {
+    const said = document.getElementById("done-state");
+    try {
+      const response = await fetch("/api/setup/link");
+      if (!response.ok) return;
+      const now = await response.json();
+      if (now.state === "linked") {
+        said.textContent = now.on_mesh
+          ? `Linked. From now on its devices reach it at ${now.host}, from anywhere.`
+          : `Linked as ${now.host}. It is joining its mesh${now.error ? ": " + now.error : "…"}`;
+        if (now.on_mesh) return;
+      } else if (now.state === "expired" || now.state === "none") {
+        said.textContent = "The code ran out. Link it later, from Administration, Access.";
+        return;
+      }
+    } catch {
+      // The next look may work.
+    }
+    setTimeout(follow, 3000);
+  }
 </script>
 </body>
 </html>

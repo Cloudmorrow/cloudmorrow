@@ -25,6 +25,8 @@ tui = [
     "tomli-w>=1.0",
     # `cm login` finds clouds on the home network (client/discover.py).
     "zeroconf>=0.131",
+    # QR codes on a terminal: a link code, a login server (qrtext.py). Pure Python.
+    "segno>=1.6",
 ]
 agent = [
     "httpx>=0.27",
