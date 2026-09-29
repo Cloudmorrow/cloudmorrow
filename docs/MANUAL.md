@@ -348,7 +348,8 @@ Three places, and only the first two matter for a normal setup:
   The server listens on every address by default, so
   `http://<its IP>:8787` answers on the network too, and a proxy on a
   *different* machine reaches it directly (`--host 127.0.0.1` keeps it to
-  a proxy on the same box):
+  a proxy on the same box; `--host "127.0.0.1, 192.168.1.5"` answers on
+  both, and the installer offers the machine's addresses as boxes to tick):
 
   ```
   cm.hl.bramlabs.io {

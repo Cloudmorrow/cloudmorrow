@@ -1,9 +1,10 @@
 #!/bin/sh
 # Install (or re-install) the Cloudmorrow server on this machine.
 #
-# One command, four questions — what your cloud is called, the address
+# One command, five questions — what your cloud is called, the address
 # people will reach it on, who its first account (the administrator) is,
-# and which of the standard quills it has — and it is running:
+# which of this machine's addresses it answers on, and which of the
+# standard quills it has — and it is running:
 #
 #   curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
 #
@@ -43,9 +44,10 @@ NO_SSH_KEY=""
 QUILLS=""
 DRY_RUN=""
 UPDATE=""
+HOST_GIVEN=""
 
 usage() {
-	sed -n '2,23p' "$0"
+	sed -n '2,24p' "$0"
 	cat <<EOF
 
 Options:
@@ -62,7 +64,8 @@ Options:
   --prefix DIR        checkout + venv live here         (default: $PREFIX)
   --notes-dir DIR     where notes and files are stored  (default: $NOTES_DIR)
   --data-dir DIR      database and keys                 (default: $DATA_DIR)
-  --host ADDR         bind address                      (default: $HOST)
+  --host ADDR         address(es) to answer on, comma-separated
+                      (asked if not given; default: $HOST, every address)
   --port N            bind port                         (default: $PORT)
   --service-user NAME system user to run as             (default: $SERVICE_USER)
   --admin USER        unix user allowed to update and restart (default: \$SUDO_USER)
@@ -85,7 +88,7 @@ while [ $# -gt 0 ]; do
 	--prefix) PREFIX="$2"; shift 2 ;;
 	--notes-dir) NOTES_DIR="$2"; shift 2 ;;
 	--data-dir) DATA_DIR="$2"; shift 2 ;;
-	--host) HOST="$2"; shift 2 ;;
+	--host) HOST="$2"; HOST_GIVEN="1"; shift 2 ;;
 	--port) PORT="$2"; shift 2 ;;
 	--service-user) SERVICE_USER="$2"; shift 2 ;;
 	--service-name) SERVICE_NAME="$2"; shift 2 ;;
@@ -102,6 +105,45 @@ done
 say() { printf '\033[36m::\033[0m %s\n' "$*"; }
 warn() { printf '\033[33mnote:\033[0m %s\n' "$*"; }
 die() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+
+# The finished page's colours: the brand's sky for headings, its muted grey
+# for the words beside them. None when nobody is looking, or NO_COLOR says so.
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+	HEAD='\033[1;38;2;90;166;224m'
+	SOFT='\033[38;2;153;161;179m'
+	GOOD='\033[1;38;2;92;232;155m'
+	OFF='\033[0m'
+else
+	HEAD='' SOFT='' GOOD='' OFF=''
+fi
+heading() { printf "\n  ${HEAD}%s${OFF}\n" "$*"; }
+# line TEXT: one line under a heading. item LABEL TEXT: the same, after a
+# short grey label; labels are a word, so they line up at any width.
+line() { printf '    %s\n' "$1"; }
+item() { printf "    ${SOFT}%-9s${OFF} %s\n" "$1" "$2"; }
+
+term_width() {
+	width="$(stty size </dev/tty 2>/dev/null | awk '{print $2}')"
+	echo "${width:-${COLUMNS:-80}}"
+}
+
+# --- the wordmark (scripts/installer_banner.py draws this) ---------------
+wordmark() {
+	if [ "$1" -ge 67 ]; then
+		printf '  \033[1;38;2;18;86;145m▄▀▀▀▄ \033[1;38;2;21;93;154m█     \033[1;38;2;24;101;163m▄▀▀▀▄ \033[1;38;2;27;108;172m█   █ \033[1;38;2;33;116;181m█▀▀▄  \033[1;38;2;42;124;188m█▄ ▄█ \033[1;38;2;52;133;195m▄▀▀▀▄ \033[1;38;2;61;141;202m█▀▀▀▄ \033[1;38;2;71;149;210m█▀▀▀▄ \033[1;38;2;80;158;217m▄▀▀▀▄ \033[1;38;2;90;166;224m█   █\033[0m\n'
+		printf '  \033[1;38;2;18;86;145m█     \033[1;38;2;21;93;154m█     \033[1;38;2;24;101;163m█   █ \033[1;38;2;27;108;172m█   █ \033[1;38;2;33;116;181m█   █ \033[1;38;2;42;124;188m█ █ █ \033[1;38;2;52;133;195m█   █ \033[1;38;2;61;141;202m█▄▄▄▀ \033[1;38;2;71;149;210m█▄▄▄▀ \033[1;38;2;80;158;217m█   █ \033[1;38;2;90;166;224m█ ▄ █\033[0m\n'
+		printf '  \033[1;38;2;18;86;145m█   ▄ \033[1;38;2;21;93;154m█     \033[1;38;2;24;101;163m█   █ \033[1;38;2;27;108;172m█   █ \033[1;38;2;33;116;181m█  ▄▀ \033[1;38;2;42;124;188m█   █ \033[1;38;2;52;133;195m█   █ \033[1;38;2;61;141;202m█ ▀▄  \033[1;38;2;71;149;210m█ ▀▄  \033[1;38;2;80;158;217m█   █ \033[1;38;2;90;166;224m█▄▀▄█\033[0m\n'
+		printf '  \033[1;38;2;18;86;145m ▀▀▀  \033[1;38;2;21;93;154m▀▀▀▀▀ \033[1;38;2;24;101;163m ▀▀▀  \033[1;38;2;27;108;172m ▀▀▀  \033[1;38;2;33;116;181m▀▀▀   \033[1;38;2;42;124;188m▀   ▀ \033[1;38;2;52;133;195m ▀▀▀  \033[1;38;2;61;141;202m▀   ▀ \033[1;38;2;71;149;210m▀   ▀ \033[1;38;2;80;158;217m ▀▀▀  \033[1;38;2;90;166;224m▀   ▀\033[0m\n'
+	else
+		printf '  \033[1;38;2;18;86;145mC \033[1;38;2;21;93;154mL \033[1;38;2;24;101;163mO \033[1;38;2;27;108;172mU \033[1;38;2;33;116;181mD \033[1;38;2;42;124;188mM \033[1;38;2;52;133;195mO \033[1;38;2;61;141;202mR \033[1;38;2;71;149;210mR \033[1;38;2;80;158;217mO \033[1;38;2;90;166;224mW\033[0m\n'
+	fi
+	printf '  \033[38;2;153;161;179mown your data, choose your apps\033[0m\n\n'
+}
+# --- end of the wordmark -------------------------------------------------
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+	printf '\n'
+	wordmark "$(term_width)"
+fi
 run() {
 	if [ -n "$DRY_RUN" ]; then
 		printf '   \033[2mwould run:\033[0m %s\n' "$*"
@@ -275,22 +317,32 @@ esac
 # the branch, the packages reinstalled, the unit rewritten, the service
 # restarted. That mends almost everything short of lost data.
 config_value() { sed -n "s/^$1 = \"\{0,1\}\([^\"]*\)\"\{0,1\}\$/\1/p" "$CONFIG" 2>/dev/null | head -n 1; }
-HEALTH_HOST="$HOST"
+# listening_on "HOST, HOST": sets HEALTH_HOST, how this machine reaches the
+# server (loopback when it listens there or everywhere, else the first
+# address), and LAN_HOST, how the network does (the machine's own IP when
+# it listens everywhere, else the first address that is not loopback).
+listening_on() {
+	loop="" first="" lan=""
+	for h in $(printf '%s' "$1" | tr ',' ' '); do
+		case "$h" in
+		0.0.0.0 | ::) loop="127.0.0.1"; lan="${lan:-$(hostname -I 2>/dev/null | awk '{print $1}')}" ;;
+		127.* | localhost) loop="${loop:-$h}" ;;
+		::1) loop="${loop:-[::1]}" ;;
+		*:*) first="${first:-[$h]}"; lan="${lan:-[$h]}" ;;
+		*) first="${first:-$h}"; lan="${lan:-$h}" ;;
+		esac
+	done
+	HEALTH_HOST="${loop:-${first:-127.0.0.1}}"
+	LAN_HOST="${lan:-$HEALTH_HOST}"
+}
 HEALTH_PORT="$PORT"
 if [ -f "$CONFIG" ]; then
-	HEALTH_HOST="$(config_value host)"
+	listening_on "$(config_value host)"
 	HEALTH_PORT="$(config_value port)"
+else
+	listening_on "$HOST"
 fi
-case "$HEALTH_HOST" in
-"" | 0.0.0.0 | ::) HEALTH_HOST="127.0.0.1" ;;
-esac
 HEALTH_URL="http://$HEALTH_HOST:${HEALTH_PORT:-8787}/api/health"
-# Where people on the network reach it: the machine's own IP when it
-# listens on every address, the bind address otherwise.
-case "$HOST" in
-"" | 0.0.0.0 | ::) LAN_HOST="$(hostname -I 2>/dev/null | awk '{print $1}')"; LAN_HOST="${LAN_HOST:-127.0.0.1}" ;;
-*) LAN_HOST="$HOST" ;;
-esac
 HAS_SYSTEMD=""
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
 	HAS_SYSTEMD="1"
@@ -344,19 +396,14 @@ if [ -z "$UPDATE" ] && [ -z "$DRY_RUN" ] && [ -f "$CONFIG" ] && [ -x "$VENV/bin/
 		NAME_NOW="$(config_value name)"
 		URL_NOW="$(config_value public_url)"
 		LOCAL_NOW="${HEALTH_URL%/api/health}"
-		say "${NAME_NOW:-Cloudmorrow} is already installed here, running and answering"
-		cat <<EOF
-
-    web app    ${URL_NOW:-$LOCAL_NOW}/app
-    API        ${URL_NOW:-$LOCAL_NOW}
-
-  Nothing to do. To update it anyway:
-
-    cloudmorrow-update                  here
-    cloudmorrow update server           from any of your computers
-    ... | sudo sh -s -- --update        this installer, the whole way
-
-EOF
+		printf "\n  ${GOOD}✓${OFF} %s is already here, running and answering.\n" "${NAME_NOW:-Cloudmorrow}"
+		heading "Open it"
+		line "${URL_NOW:-$LOCAL_NOW}/app"
+		heading "Nothing to do. To update it anyway"
+		item "here" "cloudmorrow-update"
+		item "anywhere" "cloudmorrow update server"
+		item "all again" "... | sudo sh -s -- --update"
+		printf '\n'
 		exit 0
 	fi
 	warn "Cloudmorrow is installed here, but $problem"
@@ -431,7 +478,7 @@ if [ -f "$CONFIG" ] && [ -x "$VENV/bin/cloudmorrow-server" ]; then
 fi
 
 if [ -n "$TTY" ]; then
-	printf '\n  Four questions, and your cloud is running. Three now, and one once\n  the software is in: which of the standard quills it should have.\n\n' >/dev/tty
+	printf '  A few questions, and your cloud is running.\n\n' >/dev/tty
 fi
 ask CLOUD_NAME "What is your cloud called?" "Cloudmorrow"
 ask PUBLIC_URL "What address will people use?" "https://$(hostname -f 2>/dev/null || hostname)"
@@ -592,6 +639,53 @@ run sudo -u "$SERVICE_USER" "$VENV/bin/python" -m pip install --quiet --editable
 
 run ln -sf "$VENV/bin/cloudmorrow-server" /usr/local/bin/cloudmorrow-server
 
+
+# --- where it answers -----------------------------------------------------
+# Asked once the software is in, because the question is a list of boxes to
+# tick that the checkout brings (cloudmorrow.checklist). A config that
+# exists already has its answer, and so does --host.
+
+# interfaces: "name=address" for each IPv4 address on this machine but
+# loopback, which the list offers on a line of its own.
+interfaces() {
+	if command -v ip >/dev/null 2>&1; then
+		ip -o -4 addr show 2>/dev/null | awk '$2 != "lo" { sub("/.*", "", $4); print $2 "=" $4 }'
+	else
+		for address in $(hostname -I 2>/dev/null); do
+			case "$address" in *:*) ;; *) echo "=$address" ;; esac
+		done
+	fi
+}
+
+ask_addresses() {
+	set -- --title "Which addresses should it answer on?" --need-one \
+		--item 0.0.0.0 "Every address" "all networks, now and later" --on 0.0.0.0 --alone 0.0.0.0 \
+		--item 127.0.0.1 "This machine only" "for a proxy on this box"
+	for pair in $(interfaces); do
+		set -- "$@" --item "${pair#*=}" "${pair#*=}" "${pair%%=*}"
+	done
+	set -- "$@" --other "Other" --other-hint "type an address or a host name" \
+		--other-pattern '[A-Za-z0-9._:-]+'
+	status=0
+	chosen="$("$VENV/bin/python" -m cloudmorrow.checklist "$@")" || status=$?
+	case "$status" in
+	0) HOST="$(printf '%s\n' "$chosen" | paste -sd, - | sed 's/,/, /g')" ;;
+	130) die "stopped. Run this again to carry on where it left off." ;;
+	*) warn "could not ask, so it answers on every address (--host chooses)" ;;
+	esac
+}
+
+if [ -z "$HOST_GIVEN" ] && [ ! -f "$CONFIG" ]; then
+	if [ -n "$DRY_RUN" ]; then
+		printf '   \033[2mwould ask:\033[0m which addresses to answer on\n'
+	elif [ -n "$TTY" ]; then
+		ask_addresses
+	fi
+fi
+if [ ! -f "$CONFIG" ]; then
+	listening_on "$HOST"
+	HEALTH_URL="http://$HEALTH_HOST:$PORT/api/health"
+fi
 
 # --- configuration ---------------------------------------------------------
 if [ -f "$CONFIG" ]; then
@@ -805,67 +899,70 @@ fi
 rm -f /tmp/cloudmorrow-agent-install.$$
 
 # --- what to do next -------------------------------------------------------
+# Headings with short lines under them, never columns: a narrow terminal
+# wraps a long line wherever it likes, and columns lined up past its edge
+# read as noise.
 PUBLIC_HOST="$(printf '%s' "$PUBLIC_URL" | sed -e 's|^[a-z]*://||' -e 's|[:/].*$||')"
-
-cat <<EOF
-
-  $CLOUD_NAME is installed.
-
-    address    ${PUBLIC_URL:-http://$LAN_HOST:$PORT}   (listening on $HOST:$PORT)
-    config     $CONFIG
-    notes      $NOTES_DIR
-    checkout   $SRC   ($BRANCH)
-EOF
-if [ -n "$ACCOUNT_MADE" ]; then
-	printf '    account    %s   (administrator)\n' "$ACCOUNT"
+ADDRESS="${PUBLIC_URL:-http://$LAN_HOST:$PORT}"
+LISTENING="$HOST"
+if [ -f "$CONFIG" ] && [ -z "$DRY_RUN" ]; then
+	LISTENING="$(config_value host)"
 fi
-printf '\n'
+
+if [ -n "$DRY_RUN" ]; then
+	printf '\n  %s would be installed.\n' "$CLOUD_NAME"
+else
+	printf "\n  ${GOOD}✓${OFF} %s is installed.\n" "$CLOUD_NAME"
+fi
 
 case "$PUBLIC_URL" in
 https://*)
-	cat <<EOF
-  Put a reverse proxy in front of it for TLS. With Caddy, this is the whole file:
-
-    $PUBLIC_HOST {
-        reverse_proxy $HEALTH_HOST:$PORT
-    }
-
-EOF
+	heading "First, a proxy in front, for TLS"
+	line "With Caddy, this is the whole file:"
+	printf '\n      %s {\n          reverse_proxy %s:%s\n      }\n' "$PUBLIC_HOST" "$HEALTH_HOST" "$PORT"
 	;;
 esac
 
-if [ "$EXISTING_USERS" = "0" ] && [ -z "$ACCOUNT_MADE" ] && [ -z "$DRY_RUN" ]; then
-	cat <<EOF
-  There is no account yet. The first one becomes the administrator:
-
-    sudo -u $SERVICE_USER $VENV/bin/cloudmorrow-server user create alice
-
-EOF
+heading "Open it in a browser"
+line "$ADDRESS"
+if [ -n "$ACCOUNT_MADE" ]; then
+	line "and sign in as $ACCOUNT"
 fi
 
-ADDRESS="${PUBLIC_URL:-http://$LAN_HOST:$PORT}"
-cat <<EOF
-  Next:
+if [ "$EXISTING_USERS" = "0" ] && [ -z "$ACCOUNT_MADE" ] && [ -z "$DRY_RUN" ]; then
+	heading "Make the first account, the administrator"
+	line "sudo -u $SERVICE_USER \\"
+	line "  $VENV/bin/cloudmorrow-server \\"
+	line "  user create alice"
+fi
 
-    1. Open $ADDRESS in a browser and sign in${ACCOUNT_MADE:+ as $ACCOUNT}.
-    2. On each computer, install the terminal app and the desktop app:
+heading "Put it on your computers"
+line "curl -fsSL $ADDRESS/install.sh | sh"
 
-         curl -fsSL $ADDRESS/install.sh | sh
+heading "Put it on your phone"
+line "Open $ADDRESS/app"
+line "and add it to the home screen."
 
-       The front page at $ADDRESS shows the same line, ready to copy.
-    3. On a phone, open $ADDRESS/app and add it to the home screen.
+heading "It answers on"
+for h in $(printf '%s' "$LISTENING" | tr ',' ' '); do
+	case "$h" in
+	0.0.0.0 | ::) line "every address, port $PORT" ;;
+	*) line "$h, port $PORT" ;;
+	esac
+done
 
-  Later, after a change is pushed:  cloudmorrow update server   (from any machine)
-                                    cloudmorrow-update          (here)
+heading "Where things are"
+item "settings" "$CONFIG"
+item "notes" "$NOTES_DIR"
+item "code" "$SRC ($BRANCH)"
 
-EOF
+heading "To update it later"
+item "anywhere" "cloudmorrow update server"
+item "here" "cloudmorrow-update"
 
 if [ -z "$AGENT_INSTALLED" ] && [ -z "$DRY_RUN" ]; then
-	cat <<EOF
-  Once an account exists, give the server an agent of its own — it is the
-  machine that holds everything, so it should be in the list with the rest:
-
-    sudo $VENV/bin/cloudmorrow-server agent-install --run-as $SERVICE_USER
-
-EOF
+	heading "Once there is an account, give the server an agent"
+	line "sudo $VENV/bin/cloudmorrow-server \\"
+	line "  agent-install --run-as $SERVICE_USER"
 fi
+printf '\n'

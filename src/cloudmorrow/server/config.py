@@ -38,6 +38,7 @@ class ServerConfig:
     # it. Empty puts it in the Cloudmorrow directory: `<notes_dir>/Shares`.
     shares_dir: Path | None = None
     # Every address: the machine's own IP answers, as well as a proxy in front.
+    # Several, comma-separated ("127.0.0.1, 192.168.1.5"), answers on each.
     host: str = "0.0.0.0"
     port: int = 8787
     # Signing key for access tokens. Generated into data_dir/secret.key when empty.
@@ -95,6 +96,13 @@ class ServerConfig:
         if self.require_tls is not None:
             return self.require_tls
         return self.public_url.lower().startswith("https://")
+
+    @property
+    def hosts(self) -> list[str]:
+        """Every address it listens on; a wildcard among them is the only one."""
+        found = [h.strip() for h in self.host.split(",") if h.strip()] or ["0.0.0.0"]
+        wildcard = [h for h in found if h in ("0.0.0.0", "::")]
+        return wildcard[:1] or list(dict.fromkeys(found))
 
     @property
     def db_path(self) -> Path:
@@ -240,6 +248,8 @@ def load_config(path: Path | None = None) -> ServerConfig:
                 value = section[key]
                 if key in {"notes_dir", "data_dir", "shares_dir", "key_file"}:
                     value = Path(str(value)).expanduser()
+                if key == "host" and isinstance(value, list):
+                    value = ", ".join(str(v) for v in value)
                 setattr(config, key, value)
         config.config_path = source
 

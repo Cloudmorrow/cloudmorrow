@@ -7,6 +7,7 @@ import getpass
 import os
 import platform
 import shutil
+import socket
 import sys
 from pathlib import Path
 from typing import Annotated
@@ -95,6 +96,7 @@ def serve(
         f"  notes dir : [cyan]{config.notes_dir}[/]\n"
         f"  data dir  : [cyan]{config.data_dir}[/]\n"
         f"  per-user  : [cyan]{config.per_user_dirs}[/]\n"
+        f"  listening : [cyan]{', '.join(f'{h}:{config.port}' for h in config.hosts)}[/]\n"
         f"  public url: [cyan]{config.public_url or 'derived from each request'}[/]\n"
         f"  config    : [cyan]{config.config_path or 'defaults + environment'}[/]\n"
     )
@@ -107,20 +109,38 @@ def serve(
     if reload:
         uvicorn.run(
             "cloudmorrow.server.asgi:app",
-            host=host or config.host,
-            port=port or config.port,
+            host=config.hosts[0],
+            port=config.port,
             reload=True,
             timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
         )
     else:
         from cloudmorrow.server.app import create_app
 
-        uvicorn.run(
-            create_app(config),
-            host=host or config.host,
-            port=port or config.port,
-            timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
-        )
+        hosts = config.hosts
+        if len(hosts) == 1:
+            uvicorn.run(
+                create_app(config),
+                host=hosts[0],
+                port=config.port,
+                timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
+            )
+            return
+        # Several addresses: uvicorn takes one host, but serves any sockets
+        # it is handed, so each is bound here.
+        server = uvicorn.Server(uvicorn.Config(create_app(config), timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS))
+        server.run(sockets=[_listen(h, config.port) for h in hosts])
+
+
+def _listen(host: str, port: int) -> socket.socket:
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    sock = socket.socket(family, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    if family == socket.AF_INET6:
+        sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+    sock.bind((host, port))
+    sock.set_inheritable(True)
+    return sock
 
 
 @app.command()

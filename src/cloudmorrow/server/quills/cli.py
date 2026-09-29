@@ -16,12 +16,14 @@ and needs no restart.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.table import Table
 
+from cloudmorrow.checklist import Checklist, Item, pick
 from cloudmorrow.console import TITLE
 from cloudmorrow.console import console as make_console
 from cloudmorrow.server.config import ServerConfig, load_config
@@ -64,30 +66,10 @@ def standard(config_path: ConfigOption = None) -> None:
 
 
 def _ask(options: list, terminal: str = "/dev/tty") -> set[str]:
-    """The question, on the terminal: every one of them, unless you say otherwise.
-
-    One handle to read and one to write: a terminal opened "r+" in text mode
-    is a buffered random-access file to Python, which wants to seek, and a
-    terminal cannot.
-    """
-    with open(terminal, encoding="utf-8") as keys, open(terminal, "w", encoding="utf-8") as tty:
-        tty.write("\n  Which standard quills should your cloud have? All of them, unless you say.\n\n")
-        width = max(len(o.name) for o in options)
-        for number, option in enumerate(options, 1):
-            tty.write(f"    {number}  {option.name:<{width}}  {option.summary}\n")
-        while True:
-            tty.write("\n\033[1mNumbers to leave out, or Enter for all\033[0m: ")
-            tty.flush()
-            answer = keys.readline().replace(",", " ").split()
-            try:
-                out = {int(a) for a in answer}
-            except ValueError:
-                tty.write("Numbers only, like: 3 5\n")
-                continue
-            if any(n < 1 or n > len(options) for n in out):
-                tty.write(f"Between 1 and {len(options)}, please.\n")
-                continue
-            return {o.id for n, o in enumerate(options, 1) if n not in out}
+    """The question, on the terminal: a box for each, every one ticked to begin with."""
+    items = [Item(o.id, o.name, o.summary, on=True) for o in options]
+    title = "Which software should your cloud start with?"
+    return set(pick(Checklist(title, items, colour="NO_COLOR" not in os.environ), terminal))
 
 
 @app.command("choose")
@@ -123,8 +105,14 @@ def choose_cmd(
         console.print(
             "switched off: " + ", ".join(names[i] for i in done["off"]) + " [dim](on again from Administration)[/]"
         )
-    kept = [names[o.id] for o in options if o.id in wanted]
-    console.print("[green]Your cloud has:[/] " + (", ".join(kept) or "none of them"))
+    kept = [o for o in options if o.id in wanted]
+    if ask and not only:
+        # The ticked list is on the screen already, as the question left it.
+        console.print("[dim]Change it any time in Administration, Quills.[/]")
+        return
+    console.print("[green]Your cloud has:[/]" + ("" if kept else " none of them"))
+    for option in kept:
+        console.print(f"  [green]✓[/] {option.name}", overflow="ellipsis", no_wrap=True)
 
 
 @app.command("list")

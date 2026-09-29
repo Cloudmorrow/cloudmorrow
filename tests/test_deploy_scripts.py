@@ -1,4 +1,4 @@
-"""The server installer: one command, three questions, and a dry run that
+"""The server installer: one command, a few questions, and a dry run that
 says what it would do without asking any of them."""
 
 from __future__ import annotations
@@ -70,6 +70,8 @@ def test_dry_run_with_every_answer_asks_nothing():
         "alice",
         "--quills",
         "all",
+        "--host",
+        "0.0.0.0",
         env={"CLOUDMORROW_ADMIN_PASSWORD": "longenough"},
     )
     assert result.returncode == 0, result.stderr + result.stdout
@@ -125,3 +127,56 @@ def test_the_script_installs_from_the_cloudmorrow_organisation():
     text = INSTALLER.read_text()
     assert 'DEFAULT_REPO="https://github.com/Cloudmorrow/cloudmorrow.git"' in text
     assert "bramlabs-io" not in text
+
+
+def test_the_addresses_to_answer_on_are_asked_unless_given():
+    asked = dry_run("--name", "T", "--public-url", "https://cloud.test", "--user", "alice")
+    assert "would ask: which addresses to answer on" in asked.stdout
+    given = dry_run(
+        "--name",
+        "T",
+        "--public-url",
+        "https://cloud.test",
+        "--user",
+        "alice",
+        "--host",
+        "127.0.0.1, 10.0.0.2",
+    )
+    assert "would ask: which addresses" not in given.stdout
+    # Every one is listed at the end, and the proxy is pointed at loopback.
+    assert "127.0.0.1, port 8787" in given.stdout
+    assert "10.0.0.2, port 8787" in given.stdout
+    assert "reverse_proxy 127.0.0.1:8787" in given.stdout
+
+
+def test_the_address_given_is_the_one_a_proxy_and_the_network_use():
+    result = dry_run("--name", "T", "--user", "alice", "--host", "10.0.0.2", "--public-url", "https://c.test")
+    assert "reverse_proxy 10.0.0.2:8787" in result.stdout
+
+
+def test_the_closing_page_fits_a_narrow_terminal():
+    """Short lines under headings: only the lines that carry a URL or a path run long."""
+    result = dry_run(
+        "--name",
+        "The Larsens",
+        "--public-url",
+        "https://cloud.example.com",
+        "--user",
+        "alice",
+        "--quills",
+        "all",
+        env={"CLOUDMORROW_ADMIN_PASSWORD": "longenough"},
+    )
+    page = result.stdout[result.stdout.index("would be installed") :]
+    for text in page.splitlines():
+        if "/" not in text:
+            assert len(text) <= 48, text
+
+
+def test_the_installer_draws_the_wordmark_its_script_draws():
+    import sys
+
+    sys.path.insert(0, str(DEPLOY.parent / "scripts"))
+    from installer_banner import block
+
+    assert block() in INSTALLER.read_text()

@@ -91,7 +91,7 @@ the plan for the rest is [docs/PLATFORM.md](docs/PLATFORM.md).
 
 ## Two ways to get one
 
-- **Your own machine.** The installer below: one command, four questions.
+- **Your own machine.** The installer below: one command, five questions.
 - **A hosted tenant.** The same server as a container, one per customer, on
   a service we run at a low monthly price. The server side is built; the
   shop is not yet.
@@ -110,10 +110,12 @@ that would. One command:
 curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
 ```
 
-It asks four questions: what your cloud is called, the address people will
+It asks five questions: what your cloud is called, the address people will
 use, a username and password for the first account, which becomes the
-administrator, and which of the standard quills it should have (Notes,
-Tasks, Calendar, Chat, Files, Secrets; all of them unless you say). Then it creates a service user, clones the code into
+administrator, which of the machine's addresses it answers on (every one
+unless you tick others, or type your own), and which of the standard
+quills it should have (Notes, Tasks, Calendar, Chat, Files, Secrets; all of
+them unless you untick some). Then it creates a service user, clones the code into
 `/opt/cloudmorrow`, builds a virtualenv, writes the config and the systemd
 unit, generates the encryption key, starts the service and makes your
 account. Run it again any time: if the server is running and answering, it

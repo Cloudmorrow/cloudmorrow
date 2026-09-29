@@ -105,8 +105,10 @@ def free_port() -> int:
 
 def loopback_url(config: ServerConfig) -> str:
     """This server as a process on the same machine reaches it."""
-    host = config.host
-    if host in ("", "0.0.0.0", "::", "localhost"):
+    hosts = config.hosts
+    # Loopback when it listens there, or everywhere; else the first it names.
+    host = next((h for h in hosts if h in ("127.0.0.1", "::1", "localhost")), hosts[0])
+    if host in ("0.0.0.0", "::", "localhost"):
         host = "127.0.0.1"
     if ":" in host:
         host = f"[{host}]"
