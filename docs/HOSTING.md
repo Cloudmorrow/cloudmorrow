@@ -290,12 +290,12 @@ Accounts are opaque to the relay: the website's account id, nothing else.
 | call | what it does |
 | --- | --- |
 | `GET /admin/v1/names/{name}` | `{available, problem}`: whether a name can be taken. |
-| `GET /admin/v1/links/{code}` | Whether a link code is waiting: `{waiting, expires_at}`. |
+| `GET /admin/v1/links/{code}` | Whether a link code is waiting: `{waiting, expires_at}`; 404 unknown, 410 expired or used. Codes are read without regard to case, dashes or spaces. |
 | `POST /admin/v1/links/{code}/approve` `{account, name}` | Makes the cloud, owned by `account`, and hands its token to the waiting box. 409 if the name is taken, 410 if the code is gone. |
 | `POST /admin/v1/links/{code}/refuse` | The person said no. |
-| `GET /admin/v1/accounts/{account}/clouds` | `[{cloud_id, name, created, online, online_since, uptime_30d, show_name, show_logo, display_name, has_logo}]`. |
+| `GET /admin/v1/accounts/{account}/clouds` | `[{cloud_id, name, created, online, online_since, uptime_30d, show_name, show_logo, display_name, has_logo}]`: `online_since` is when the current state began, online or offline; `uptime_30d` a fraction, `0.998`. |
 | `PATCH /admin/v1/clouds/{id}` `{account, name?, display_name?, show_name?, show_logo?}` | Rename, and the landing page's switches. The cloud must be the account's. |
-| `PUT` / `DELETE /admin/v1/clouds/{id}/logo?account=…` | The logo, as the request body with its content type. |
+| `GET` / `PUT` / `DELETE /admin/v1/clouds/{id}/logo?account=…` | The logo, as the body with its content type (404 when there is none). |
 | `DELETE /admin/v1/clouds/{id}?account=…` | Unlink. |
 
 ### What the relay knows, and what it cannot
