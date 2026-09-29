@@ -1,0 +1,46 @@
+# A release is a tag (scripts/release.py). This makes the tag a GitHub
+# Release as well, with two assets a linked cloud's landing page links to
+# (docs/HOSTING.md, "The landing page"):
+#
+#   install.sh  the client installer for no cloud in particular, which the
+#               landing page runs with --server <the cloud> --invite
+#               (scripts/release_installer.py)
+#   *.whl       the client itself, which that installer installs
+#
+# At releases/latest/download/<name>, so the relay never has to know a
+# version and costs nothing to serve them.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The version comes from the tag (hatch-vcs).
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build --wheel
+      - name: The client installer, pointed at this release's wheel
+        run: |
+          wheel="$(ls dist/*.whl | head -n 1)"
+          python scripts/release_installer.py --tag "$GITHUB_REF_NAME" --wheel "$wheel" --out dist/install.sh
+          sh -n dist/install.sh
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.whl dist/install.sh \
+            --title "$GITHUB_REF_NAME" \
+            --notes "$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")" \
+            --verify-tag

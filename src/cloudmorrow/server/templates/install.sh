@@ -4,12 +4,14 @@
 #   curl -fsSL __BASE_URL__/install.sh | sh
 #   curl -fsSL __BASE_URL__/install.sh | sh -s -- --agent-token bce_xxx --allow-shell
 #   curl -fsSL __BASE_URL__/install.sh | sh -s -- --no-desktop
-#   curl -fsSL __BASE_URL__/install.sh | sh -s -- --private
+#   curl -fsSL __BASE_URL__/install.sh | sh -s -- --invite
 #
-# --private also signs you in and puts this computer on your cloud's private
-# mesh: it asks the cloud for a one-time key, installs Tailscale if it is not
-# here (asking first; --yes not to ask), and joins with the key.
-# --dry-run says what it would do, and does none of it.
+# --invite [CODE] puts this computer on your cloud's mesh first, so it
+# reaches the cloud from anywhere: it asks for the invite code somebody made
+# in Me -> Invite a device (unless given), trades it at the relay for a
+# one-time key, installs Tailscale if it is not here (asking first; --yes
+# not to ask), joins, and then signs you in.
+# --server URL is the cloud; --dry-run says what it would do, and does none of it.
 #
 set -eu
 
@@ -22,7 +24,9 @@ AGENT_NAME=""
 ALLOW_SHELL=""
 NO_AGENT=""
 NO_DESKTOP=""
-PRIVATE=""
+INVITE=""
+INVITE_CODE=""
+ACCESS_CONTROL=""
 YES=""
 DRY_RUN=""
 
@@ -33,12 +37,17 @@ while [ $# -gt 0 ]; do
 	--allow-shell) ALLOW_SHELL="--allow-shell"; shift ;;
 	--no-agent) NO_AGENT="1"; shift ;;
 	--no-desktop) NO_DESKTOP="1"; shift ;;
-	--private) PRIVATE="1"; shift ;;
+	--invite)
+		INVITE="1"
+		# The code is optional: asked for on the terminal when it is not here.
+		if [ $# -ge 2 ] && [ "${2#-}" = "$2" ]; then INVITE_CODE="$2"; shift 2; else shift; fi
+		;;
+	--access-control) ACCESS_CONTROL="$2"; shift 2 ;;
 	--yes) YES="--yes"; shift ;;
 	--dry-run) DRY_RUN="1"; shift ;;
 	--server) CLOUDMORROW_URL="$2"; shift 2 ;;
 	-h | --help)
-		sed -n '2,13p' "$0" 2>/dev/null || echo "see ${CLOUDMORROW_URL}"
+		sed -n '2,15p' "$0" 2>/dev/null || echo "see ${CLOUDMORROW_URL}"
 		exit 0
 		;;
 	*) echo "unknown option: $1" >&2; exit 2 ;;
@@ -55,6 +64,19 @@ run() {
 		"$@"
 	fi
 }
+
+# The released copy of this script (a GitHub Release asset) comes from no
+# cloud in particular: the landing page of one runs it with --server.
+case "$CLOUDMORROW_URL" in __*) CLOUDMORROW_URL="" ;; esac
+TTY=""
+if ( : </dev/tty ) 2>/dev/null; then TTY="/dev/tty"; fi
+if [ -z "$CLOUDMORROW_URL" ]; then
+	[ -n "$TTY" ] || die "which cloud? run it with --server https://<your cloud>"
+	printf 'Your cloud'"'"'s address (https://...): ' >/dev/tty
+	read -r CLOUDMORROW_URL </dev/tty || CLOUDMORROW_URL=""
+	[ -n "$CLOUDMORROW_URL" ] || die "no address given"
+fi
+CLOUDMORROW_URL="$(printf '%s' "$CLOUDMORROW_URL" | sed 's|/*$||')"
 
 # --- where to install ------------------------------------------------------
 if [ "$(id -u)" = "0" ]; then
@@ -144,27 +166,44 @@ if [ -n "$AGENT_TOKEN" ] && [ -z "$NO_AGENT" ]; then
 	run "$BINDIR/cloudmorrow-agent" enroll "$@"
 fi
 
-# --- optionally, this computer on the private mesh ------------------------
-# Signed in first, because the key is asked for as you. Then `cloudmorrow
-# access join`: a key labelled with this computer's name, Tailscale (only
-# once you say yes, or --yes), and `sudo tailscale up --login-server …
-# --authkey … --hostname …`. Asked on the terminal, not stdin: through
-# `curl | sh`, stdin is this script.
+# --- optionally, this computer on the cloud's mesh -----------------------
+# With an invite, before anything talks to the cloud: away from home, the
+# cloud is reachable only on its mesh. `cloudmorrow access join --invite`
+# trades the code at the relay (only the cloud's name and the code go
+# there), installs Tailscale once you say yes (or --yes), and runs `sudo
+# tailscale up --login-server ... --authkey ... --hostname cm-<6 hex>`. Then
+# sign in, and tell the cloud this computer is yours. Asked on the terminal,
+# not stdin: through `curl | sh`, stdin is this script.
 MESH=""
-if [ -n "$PRIVATE" ]; then
-	say "putting this computer on the cloud's private mesh"
+join_args() {
+	set -- --invite "$1" --server "$CLOUDMORROW_URL"
+	[ -z "$ACCESS_CONTROL" ] || set -- "$@" --access-control "$ACCESS_CONTROL"
+	[ -z "$YES" ] || set -- "$@" "$YES"
+	printf '%s\n' "$@"
+}
+if [ -n "$INVITE" ]; then
+	say "putting this computer on the cloud's mesh"
 	if [ -n "$DRY_RUN" ]; then
+		[ -n "$INVITE_CODE" ] || printf '   \033[2mwould ask:\033[0m the invite code (Me -> Invite a device, on the cloud)\n'
+		run "$BINDIR/cloudmorrow" access join $(join_args "${INVITE_CODE:-CODE}")
 		run "$BINDIR/cloudmorrow" login --server "$CLOUDMORROW_URL"
-		run "$BINDIR/cloudmorrow" access join $YES
-	elif ( : </dev/tty ) 2>/dev/null; then
-		if "$BINDIR/cloudmorrow" login --server "$CLOUDMORROW_URL" </dev/tty \
-			&& "$BINDIR/cloudmorrow" access join $YES </dev/tty; then
+		run "$BINDIR/cloudmorrow" access mine
+	elif [ -n "$TTY" ]; then
+		if [ -z "$INVITE_CODE" ]; then
+			printf 'Invite code (Me -> Invite a device, on the cloud): ' >/dev/tty
+			read -r INVITE_CODE </dev/tty || INVITE_CODE=""
+		fi
+		INVITE_CODE="$(printf '%s' "$INVITE_CODE" | tr -cd 'A-Za-z0-9')"
+		if [ -n "$INVITE_CODE" ] && "$BINDIR/cloudmorrow" access join $(join_args "$INVITE_CODE") </dev/tty; then
 			MESH="1"
+			if "$BINDIR/cloudmorrow" login --server "$CLOUDMORROW_URL" </dev/tty; then
+				"$BINDIR/cloudmorrow" access mine </dev/tty || note "tell the cloud later: cloudmorrow access mine"
+			fi
 		else
-			note "not on the mesh yet; when you are ready: cloudmorrow access join"
+			note "not on the mesh yet; ask for a new invite, then: cloudmorrow access join --invite"
 		fi
 	else
-		note "no terminal to sign in on; afterwards: cloudmorrow login && cloudmorrow access join"
+		note "no terminal to ask on; afterwards: cloudmorrow access join --invite CODE"
 	fi
 fi
 
@@ -188,15 +227,17 @@ EOF
 
 if [ -n "$MESH" ]; then
 	cat <<EOF
-  This computer is on your cloud's private mesh: it reaches the cloud from
+  This computer is on your cloud's mesh: it reaches the cloud from
   anywhere, and nobody else's device can.
 
 EOF
-elif [ -z "$PRIVATE" ]; then
+elif [ -z "$INVITE" ]; then
 	cat <<EOF
-  If your cloud is private (reached only by enrolled devices):
+  To reach a linked cloud from anywhere, put this computer on its mesh:
 
-    cloudmorrow access join        put this computer on its mesh
+    cloudmorrow access join        at home, signed in
+    cloudmorrow access join --invite CODE
+                                   anywhere, with an invite from Me -> Invite a device
 
 EOF
 fi
