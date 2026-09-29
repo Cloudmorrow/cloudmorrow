@@ -35,22 +35,20 @@ from textual.containers import Horizontal
 from textual.widgets import Tab, Tabs
 
 from cloudmorrow.client.api import ApiError
-from cloudmorrow.tui.panes.kit import KitPane
-from cloudmorrow.tui.screens.modals import ConfirmModal, PromptModal
-from cloudmorrow.tui.screens.record_sheet import RecordSheet, link_choices
-from cloudmorrow.tui.theme import MUTED
-from cloudmorrow.tui.widgets.kit import (
-    Lane,
-    RecordCard,
+from cloudmorrow.tui.kitdata import (
     can_write,
     enum_options,
     field_of,
     how_long,
-    lane_under,
-    neighbour_lane,
-    safe_id,
+    link_choices,
     title_of,
 )
+from cloudmorrow.tui.panes.kit import KitPane
+from cloudmorrow.tui.quill_actions import run_action
+from cloudmorrow.tui.screens.modals import ConfirmModal, PromptModal
+from cloudmorrow.tui.screens.record_sheet import RecordSheet
+from cloudmorrow.tui.theme import MUTED
+from cloudmorrow.tui.widgets.kit import Lane, RecordCard, lane_under, neighbour_lane, safe_id
 from cloudmorrow.tui.widgets.toolbar import Action
 
 # A group's tab is `group-<record id>`. Record ids are `r_…`, so `new` can
@@ -347,7 +345,8 @@ class BoardPane(KitPane):
         else:
             choices = await link_choices(self.api, self.models, self.group_model)
             made = await self.app.push_screen_wait(
-                RecordSheet(self.api, self.models, self.group_model_id, choices=choices)
+                RecordSheet(self.api, self.models, self.group_model_id, choices=choices,
+                            run_action=run_action)
             )
             if not isinstance(made, dict):
                 return

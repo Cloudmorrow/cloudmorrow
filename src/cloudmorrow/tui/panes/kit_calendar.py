@@ -27,7 +27,6 @@ how the family calendar is somebody's to put events on but not to make.
 
 from __future__ import annotations
 
-import calendar as cal
 import datetime as dt
 
 from textual import work
@@ -37,10 +36,12 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import DataTable, Static
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.tui.dates import days_of, month_start, shift_month, wall, weeks_of
+from cloudmorrow.tui.kitdata import can_write, field_of, link_choices, title_of
 from cloudmorrow.tui.panes.kit import KitPane
-from cloudmorrow.tui.screens.record_sheet import RecordSheet, link_choices
+from cloudmorrow.tui.quill_actions import run_action
+from cloudmorrow.tui.screens.record_sheet import RecordSheet
 from cloudmorrow.tui.theme import ACCENT, BAD, GOOD, LENS, MUTED, TEXT
-from cloudmorrow.tui.widgets.kit import can_write, field_of, title_of
 from cloudmorrow.tui.widgets.kit_space import NewSpaceModal, SpaceModal, make_space, scope_said
 from cloudmorrow.tui.widgets.toolbar import Action
 from cloudmorrow.tui.words import escape
@@ -66,38 +67,6 @@ DOTS = 3
 
 def colour_for(name: object) -> str:
     return COLOURS.get(str(name or ""), COLOURS["cyan"])
-
-
-def month_start(day: dt.date) -> dt.date:
-    return day.replace(day=1)
-
-
-def shift_month(day: dt.date, months: int) -> dt.date:
-    """The same day-of-month, a month or two along, clamped to a real date."""
-    total = (day.year * 12 + day.month - 1) + months
-    year, month = divmod(total, 12)
-    last = cal.monthrange(year, month + 1)[1]
-    return dt.date(year, month + 1, min(day.day, last))
-
-
-def weeks_of(day: dt.date) -> list[list[dt.date]]:
-    """The month *day* is in, as whole weeks — the ends belong to its neighbours."""
-    return cal.Calendar(firstweekday=0).monthdatescalendar(day.year, day.month)
-
-
-def wall(value: object) -> str:
-    """A stored moment as the wall clock here says it: a zone converted; the
-    wall clock, and a bare date, exactly as they are."""
-    text = str(value or "")
-    if len(text) <= 16:
-        return text
-    try:
-        moment = dt.datetime.fromisoformat(text)
-    except ValueError:
-        return text[:16]
-    if moment.tzinfo is not None:
-        moment = moment.astimezone().replace(tzinfo=None)
-    return moment.strftime("%Y-%m-%dT%H:%M")
 
 
 def clock(stamp: str) -> str:
@@ -135,13 +104,6 @@ def when_said(event: dict) -> str:
     if event["ends"][:10] != event["starts"][:10]:
         return f"{start} → {event['ends'][:10]} {end}"
     return start if end == start else f"{start}–{end}"
-
-
-def days_of(event: dict) -> list[dt.date]:
-    """Every day a thing is on, so a month can draw it on each of them."""
-    first = dt.date.fromisoformat(event["starts"][:10])
-    last = max(first, dt.date.fromisoformat(event["ends"][:10]))
-    return [first + dt.timedelta(days=step) for step in range((last - first).days + 1)]
 
 
 def by_day(events: list[dict]) -> dict[dt.date, list[dict]]:
@@ -508,7 +470,7 @@ class CalendarPane(KitPane):
         choices = await link_choices(self.api, self.models, self.model)
         return await self.app.push_screen_wait(
             RecordSheet(self.api, self.models, self.model_id, record=record, preset=preset,
-                        choices=choices, adjust=self._adjust)
+                        choices=choices, adjust=self._adjust, run_action=run_action)
         )
 
     def act_open_record(self) -> None:
@@ -635,7 +597,7 @@ class CalendarPane(KitPane):
         model["fields"] = fields
         models[self.space_model_id] = model
         result = await self.app.push_screen_wait(
-            RecordSheet(self.api, models, self.space_model_id, record=space)
+            RecordSheet(self.api, models, self.space_model_id, record=space, run_action=run_action)
         )
         if result == "deleted":
             self.space_id = ""
@@ -648,13 +610,9 @@ __all__ = [
     "CalendarPane",
     "by_day",
     "cell_text",
-    "days_of",
     "event_line",
     "occasion",
     "settle_times",
-    "shift_month",
     "space_row",
-    "wall",
-    "weeks_of",
     "when_said",
 ]

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from textual.widgets import Button, Input, Static, Tabs
 
+from cloudmorrow.tui.kitdata import can_write
 from cloudmorrow.tui.panes.kit import ListPane
 from cloudmorrow.tui.panes.kit_board import NEW_GROUP_TAB, BoardPane
 from cloudmorrow.tui.panes.kit_editor import EditorPane
@@ -26,7 +27,6 @@ from cloudmorrow.tui.panes.kit_grid import GridPane
 from cloudmorrow.tui.panes.kit_thread import ThreadPane
 from cloudmorrow.tui.screens.record_sheet import RecordSheet
 from cloudmorrow.tui.widgets.editor import LiveMarkdownEditor
-from cloudmorrow.tui.widgets.kit import can_write
 from cloudmorrow.tui.widgets.kit_space import SpaceModal
 from cloudmorrow.tui.widgets.note_tree import NoteTree
 from tests.test_board import drag, titles

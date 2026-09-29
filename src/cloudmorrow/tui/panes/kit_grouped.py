@@ -34,12 +34,12 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Static
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.tui.kitdata import can_write, field_label, field_of, shown, title_of
 from cloudmorrow.tui.panes.kit import KitPane, ListPane
 from cloudmorrow.tui.screens.modals import PromptModal
-from cloudmorrow.tui.screens.record_sheet import shown
 from cloudmorrow.tui.theme import MUTED
 from cloudmorrow.tui.widgets.group_list import GroupList
-from cloudmorrow.tui.widgets.kit import can_write, field_label, field_of, safe_id, title_of
+from cloudmorrow.tui.widgets.kit import safe_id
 from cloudmorrow.tui.widgets.toolbar import Action
 from cloudmorrow.tui.words import plural
 

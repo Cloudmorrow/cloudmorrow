@@ -46,10 +46,10 @@ from textual.message import Message
 from textual.widgets import Button, ContentSwitcher, DataTable, Static
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.tui.kitdata import can_write, field_of
 from cloudmorrow.tui.panes.kit import KitPane
 from cloudmorrow.tui.screens.modals import ConfirmModal, PromptModal
 from cloudmorrow.tui.theme import MUTED
-from cloudmorrow.tui.widgets.kit import can_write, field_of
 from cloudmorrow.tui.widgets.picture import Picture, TerminalImage
 from cloudmorrow.tui.widgets.toolbar import Action
 from cloudmorrow.tui.words import plural

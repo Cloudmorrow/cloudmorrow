@@ -45,11 +45,13 @@ from textual.app import ComposeResult
 from textual.widgets import DataTable
 
 from cloudmorrow.client.api import ApiError, AuthError
+from cloudmorrow.tui.kitdata import can_write, field_label, field_of, link_choices, shown, title_of
 from cloudmorrow.tui.panes.base import Pane
+from cloudmorrow.tui.quill_actions import run_action
 from cloudmorrow.tui.screens.modals import ConfirmModal
-from cloudmorrow.tui.screens.record_sheet import RecordSheet, link_choices, shown
+from cloudmorrow.tui.screens.record_sheet import RecordSheet
 from cloudmorrow.tui.theme import GOOD, MUTED
-from cloudmorrow.tui.widgets.kit import can_write, field_label, field_of, settle_widths, title_of
+from cloudmorrow.tui.widgets.kit import settle_widths
 from cloudmorrow.tui.widgets.toolbar import Action
 from cloudmorrow.tui.words import plural
 
@@ -184,6 +186,7 @@ class KitPane(Pane):
                 preset=preset,
                 only=only,
                 choices=choices,
+                run_action=run_action,
             )
         )
 

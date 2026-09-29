@@ -12,16 +12,10 @@ from __future__ import annotations
 import pytest
 from textual.widgets import Tab, Tabs
 
+from cloudmorrow.tui.kitdata import days_left, how_long, subtask_progress
 from cloudmorrow.tui.panes.kit_board import NEW_GROUP_TAB, BoardPane
 from cloudmorrow.tui.screens.record_sheet import RecordSheet
-from cloudmorrow.tui.widgets.kit import (
-    Lane,
-    RecordCard,
-    days_left,
-    how_long,
-    neighbour_lane,
-    subtask_progress,
-)
+from cloudmorrow.tui.widgets.kit import Lane, RecordCard, neighbour_lane
 from tests.tui_harness import settle, start
 
 

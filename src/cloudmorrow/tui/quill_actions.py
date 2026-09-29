@@ -40,65 +40,21 @@ from textual.widget import Widget
 from textual.widgets import Button, Input, Label, Static
 
 from cloudmorrow.client.api import ApiError, AuthError
-from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
-from cloudmorrow.tui.screens.record_sheet import (
-    LONG_KINDS,
-    RecordSheet,
-    field_widget,
+from cloudmorrow.tui.kitdata import (
+    all_models,
+    failure,
+    field_label,
+    find_action,
+    installed,
     link_choices,
-    read_field,
+    loose_actions,
+    title_of,
 )
-from cloudmorrow.tui.theme import BAD
-from cloudmorrow.tui.widgets.kit import field_label, safe_id, title_of
+from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
+from cloudmorrow.tui.screens.record_sheet import LONG_KINDS, RecordSheet, field_widget, read_field
+from cloudmorrow.tui.theme import BAD, variant_for
+from cloudmorrow.tui.widgets.kit import safe_id
 from cloudmorrow.tui.words import escape
-
-# A button's look for each tone an action or a view's button may have: the
-# amber primary action, the red one that cannot be taken back, and the rest.
-VARIANTS = {"primary": "primary", "danger": "error"}
-
-
-def variant_for(tone: object) -> str:
-    return VARIANTS.get(str(tone or ""), "default")
-
-
-# -- which actions there are --------------------------------------------------
-def installed(app: Any) -> list[dict]:
-    """The Quills as the server last said, fitted to this person (see the workspace)."""
-    return [q for q in (getattr(app, "quills", None) or []) if q.get("enabled", True)]
-
-
-def actions_on(quills: list[dict], model_id: str) -> list[tuple[dict, dict]]:
-    """Every (Quill, action) `on` *model_id*, in the Quills' order: the sheet's buttons."""
-    return [
-        (quill, action)
-        for quill in quills
-        for action in quill.get("actions") or []
-        if action.get("on") == model_id
-    ]
-
-
-def loose_actions(quills: list[dict]) -> list[tuple[dict, dict]]:
-    """Every (Quill, action) not on a record: the palette's."""
-    return [
-        (quill, action)
-        for quill in quills
-        for action in quill.get("actions") or []
-        if not action.get("on")
-    ]
-
-
-def find_action(quill: dict, action_id: str) -> dict | None:
-    return next((a for a in quill.get("actions") or [] if a.get("id") == action_id), None)
-
-
-def all_models(app: Any, quill: dict | None = None) -> dict:
-    """Every datamodel any installed Quill brought, *quill*'s own winning."""
-    models: dict = {}
-    for other in installed(app):
-        models.update(other.get("models") or {})
-    if quill is not None:
-        models.update(quill.get("models") or {})
-    return models
 
 
 # -- talking to the server ------------------------------------------------------
@@ -117,14 +73,6 @@ async def press(
     A refusal is the client's ApiError, in the Quill's own words.
     """
     return list(await api.quill_action(quill_id, action_id, record=record, fields=fields) or [])
-
-
-def failure(effects: list[dict]) -> str | None:
-    """What an `error` effect says, if the action answered with one."""
-    for effect in effects:
-        if effect.get("effect") == "error":
-            return str(effect.get("text") or "That did not work.")
-    return None
 
 
 # -- an action's form -------------------------------------------------------------
@@ -415,7 +363,7 @@ async def open_record(app: Any, quill: dict, model_id: str, record_id: str) -> d
         return None
     choices = await link_choices(api, models, models[model_id])
     return await app.push_screen_wait(
-        RecordSheet(api, models, model_id, record=record, choices=choices)
+        RecordSheet(api, models, model_id, record=record, choices=choices, run_action=run_action)
     )
 
 

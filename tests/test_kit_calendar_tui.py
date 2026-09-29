@@ -12,16 +12,14 @@ import datetime as dt
 
 from textual.widgets import Checkbox, DataTable, Input, Select, Static
 
+from cloudmorrow.tui.dates import shift_month, wall, weeks_of
 from cloudmorrow.tui.panes.kit_calendar import (
     CalendarPane,
     by_day,
     cell_text,
     event_line,
     settle_times,
-    shift_month,
     space_row,
-    wall,
-    weeks_of,
     when_said,
 )
 from cloudmorrow.tui.screens.modals import ConfirmModal

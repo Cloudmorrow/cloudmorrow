@@ -64,35 +64,38 @@ from textual.widgets import (
 )
 
 from cloudmorrow.client.api import ApiError, AuthError
+from cloudmorrow.tui.dates import month_start, shift_month, span, weeks_of
+from cloudmorrow.tui.kitdata import (
+    all_models,
+    can_write,
+    enum_options,
+    failure,
+    field_label,
+    field_of,
+    find_action,
+    link_choices,
+    read_only,
+    shown,
+)
 from cloudmorrow.tui.panes.kit import KitPane
-from cloudmorrow.tui.panes.kit_calendar import month_start, shift_month, weeks_of
 from cloudmorrow.tui.quill_actions import (
     ActionFields,
     FormProblem,
-    all_models,
     apply_effects,
-    failure,
     fetch_view,
-    find_action,
     go_to,
     open_record,
     press,
     run_action,
-    variant_for,
 )
 from cloudmorrow.tui.screens.modals import Modal
-from cloudmorrow.tui.screens.record_sheet import field_widget, link_choices, read_field, shown
-from cloudmorrow.tui.theme import ACCENT, BAD, MUTED, TEXT
+from cloudmorrow.tui.screens.record_sheet import field_widget, read_field
+from cloudmorrow.tui.theme import ACCENT, BAD, MUTED, TEXT, variant_for
 from cloudmorrow.tui.widgets.kit import (
     Lane,
     RecordCard,
-    can_write,
-    enum_options,
-    field_label,
-    field_of,
     lane_under,
     neighbour_lane,
-    read_only,
     safe_id,
     settle_widths,
 )
@@ -643,10 +646,11 @@ class MonthNode(Vertical):
         last = first
         if self.node.get("ends"):
             try:
-                last = max(first, dt.date.fromisoformat(str(fields.get(self.node["ends"]))[:10]))
+                last = dt.date.fromisoformat(str(fields.get(self.node["ends"]))[:10])
             except ValueError:
                 pass
-        return [first + dt.timedelta(days=n) for n in range(min((last - first).days, 366) + 1)]
+        # Somebody else's code chose the end: a year of dots is plenty.
+        return span(first, last, most=366)
 
     def in_month(self) -> list[tuple[dt.date, dict]]:
         """The records on a day of the month shown, by their first day in it."""

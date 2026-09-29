@@ -57,10 +57,11 @@ from cloudmorrow.client.api import ApiError
 
 # Shares on this machine: mounted here or not, on any grid of shares.
 from cloudmorrow.tui import sharemounts  # noqa: F401
+from cloudmorrow.tui.kitdata import loose_actions
 from cloudmorrow.tui.panes.admin import AdminPanel
 from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.panes.kit import pane_for, screen_key
-from cloudmorrow.tui.quill_actions import QuillCommands, loose_actions, run_action
+from cloudmorrow.tui.quill_actions import QuillCommands, run_action
 from cloudmorrow.tui.screens.modals import PasswordModal
 from cloudmorrow.tui.screens.notifications import (
     NOTIFICATIONS,

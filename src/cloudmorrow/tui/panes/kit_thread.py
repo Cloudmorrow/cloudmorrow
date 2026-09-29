@@ -31,11 +31,12 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import DataTable, Input, Static
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.tui.kitdata import can_write, field_of, link_choices
 from cloudmorrow.tui.panes.kit import KitPane
+from cloudmorrow.tui.quill_actions import run_action
 from cloudmorrow.tui.screens.modals import ConfirmModal
-from cloudmorrow.tui.screens.record_sheet import RecordSheet, link_choices
+from cloudmorrow.tui.screens.record_sheet import RecordSheet
 from cloudmorrow.tui.theme import ACCENT, BAD, MUTED, SECOND
-from cloudmorrow.tui.widgets.kit import can_write, field_of
 from cloudmorrow.tui.widgets.kit_space import (
     NewSpaceModal,
     PickPersonModal,
@@ -527,7 +528,8 @@ class ThreadPane(KitPane):
         only = [f["name"] for f in self.space_model.get("fields", []) if f["name"] not in taken]
         choices = await link_choices(self.api, self.models, self.space_model)
         result = await self.app.push_screen_wait(
-            RecordSheet(self.api, self.models, self.space_model_id, record=space, only=only, choices=choices)
+            RecordSheet(self.api, self.models, self.space_model_id, record=space, only=only, choices=choices,
+                        run_action=run_action)
         )
         if result is None:
             return

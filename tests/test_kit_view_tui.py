@@ -231,7 +231,8 @@ async def test_a_refusal_is_said_in_the_quills_words(fleet):
     app = fleet
     async with app.run_test(size=(120, 40)) as pilot:
         await start(app, pilot)
-        from cloudmorrow.tui.quill_actions import find_action, run_action
+        from cloudmorrow.tui.kitdata import find_action
+        from cloudmorrow.tui.quill_actions import run_action
 
         quill = next(q for q in app.quills if q["id"] == "fleet")
         ran = []
@@ -258,7 +259,8 @@ async def test_a_view_that_fails_says_why_where_it_would_be(fleet):
 
 
 async def test_the_palette_has_the_actions_on_no_record(fleet):
-    from cloudmorrow.tui.quill_actions import QuillCommands, installed, loose_actions
+    from cloudmorrow.tui.kitdata import installed, loose_actions
+    from cloudmorrow.tui.quill_actions import QuillCommands
 
     app = fleet
     async with app.run_test(size=(120, 40)) as pilot:

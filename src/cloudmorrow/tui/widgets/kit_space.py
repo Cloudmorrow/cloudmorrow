@@ -45,9 +45,10 @@ from textual.widgets import (
 from textual.widgets.option_list import Option
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.tui.kitdata import can_write, title_of
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
 from cloudmorrow.tui.theme import BAD, MUTED, SECOND
-from cloudmorrow.tui.widgets.kit import can_write, safe_id, title_of
+from cloudmorrow.tui.widgets.kit import safe_id
 
 # What each scope is called, and means, to the person choosing it.
 SCOPE_WORDS = {

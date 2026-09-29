@@ -1,10 +1,10 @@
-"""The kit's pieces in the terminal: reading a datamodel, and the board's cards.
+"""The kit's pieces in the terminal: the board's lanes and cards.
 
 A Quill never ships a screen of its own (docs/QUILLS.md), so everything the
 terminal draws for one is decided from two things the server hands over: the
 screen's bindings (`model`, `lane`, `title`, …) and the datamodels behind
-them. The helpers at the top read those; nothing in here knows what a task or
-a board is.
+them. Reading those is tui/kitdata.py's; nothing in here knows what a task
+or a board is.
 
 The board itself: lanes, and the cards you drag between them. A card is
 picked up by pressing the mouse on it and dropped wherever the pointer is when
@@ -19,8 +19,6 @@ mouse is a first-class way to use this, not the only one.
 
 from __future__ import annotations
 
-import datetime as dt
-import math
 import re
 
 from rich.text import Text
@@ -30,10 +28,9 @@ from textual.coordinate import Coordinate
 from textual.message import Message
 from textual.widgets import DataTable, Static
 
+from cloudmorrow.tui.kitdata import days_left, subtask_progress
 from cloudmorrow.tui.theme import ACCENT, GOOD, MUTED, SECOND, TEXT, WARN
 
-# A subtask is a checkbox line in the body, the same one the note editor ticks.
-_SUBTASK_RE = re.compile(r"^\s*[-*+]\s+\[([ xX])\]\s", re.MULTILINE)
 # How far the pointer must travel before a press becomes a drag rather than a
 # click. Without it, a twitchy click would move the card a lane.
 DRAG_THRESHOLD = 1
@@ -44,97 +41,6 @@ _UNSAFE_ID = re.compile(r"[^A-Za-z0-9_-]")
 
 def safe_id(value: object) -> str:
     return _UNSAFE_ID.sub("_", str(value))
-
-
-# -- reading a datamodel -----------------------------------------------------
-
-
-def field_of(model: dict, name: str | None) -> dict | None:
-    """The definition of *name* in *model*, or None when it has no such field."""
-    if not name:
-        return None
-    return next((f for f in model.get("fields", []) if f["name"] == name), None)
-
-
-def field_label(field: dict) -> str:
-    return str(field.get("label") or field["name"].replace("_", " ").capitalize())
-
-
-def enum_options(field: dict) -> list[tuple[str, str]]:
-    """An enum's values with what each is called on screen, in declared order."""
-    values = [str(v) for v in field.get("values") or []]
-    labels = [str(v) for v in field.get("labels") or []]
-    return [
-        (value, labels[index] if index < len(labels) else value.replace("_", " ").capitalize())
-        for index, value in enumerate(values)
-    ]
-
-
-def title_of(record: dict, model: dict | None) -> str:
-    """What a record is called in a list: its model's title field, or its id."""
-    name = (model or {}).get("title") or "title"
-    value = (record.get("fields") or {}).get(name)
-    return str(value) if value not in (None, "") else f"({record.get('id', '?')})"
-
-
-def read_only(field: dict) -> bool:
-    """A stamped field is the server's to set: shown, never typed into."""
-    return bool(field.get("stamp"))
-
-
-def can_write(model: dict | None) -> bool:
-    """Whether the person may make, change and delete *model*'s records.
-
-    The server fits every Quill to whoever asks (docs/CIRCLES.md): each
-    datamodel comes with their `access`, and one they may only read is drawn
-    as read — the same screen, without its writing. A datamodel that is not
-    there at all is not theirs to write either. A server without circles
-    sends no `access`, and there everybody has everything.
-    """
-    return bool(model) and model.get("access", "write") != "read"
-
-
-# -- what a card says ----------------------------------------------------------
-
-
-def subtask_progress(body: str) -> tuple[int, int]:
-    """How many of a body's `- [ ]` lines are ticked, and how many there are."""
-    marks = _SUBTASK_RE.findall(body or "")
-    return sum(1 for mark in marks if mark.lower() == "x"), len(marks)
-
-
-def days_left(expires_at: str | None) -> int | None:
-    """Days before a record is swept by its Quill's expire job, or None.
-
-    Rounded up, because part of a day is still a day you have: something
-    that goes in a day and a half has two days left, and saying "1d left"
-    would be the truncation talking rather than the truth.
-    """
-    if not expires_at:
-        return None
-    try:
-        expiry = dt.datetime.fromisoformat(expires_at)
-    except (TypeError, ValueError):
-        return None
-    if expiry.tzinfo is None:
-        expiry = expiry.replace(tzinfo=dt.UTC)
-    remaining = (expiry - dt.datetime.now(tz=dt.UTC)).total_seconds()
-    if remaining <= 0:
-        return 0
-    return math.ceil(remaining / 86400)
-
-
-def how_long(after: str) -> str:
-    """An expire job's `after` ("7d", "12h") as a person would say it."""
-    match = re.fullmatch(r"(\d+)([mhdw])", (after or "").strip())
-    if not match:
-        return after
-    count, unit = int(match.group(1)), match.group(2)
-    if unit == "d" and count == 7:
-        return "a week"
-    names = {"m": "minute", "h": "hour", "d": "day", "w": "week"}
-    word = names[unit]
-    return f"{count} {word}" + ("" if count == 1 else "s")
 
 
 class RecordCard(Static, can_focus=True):

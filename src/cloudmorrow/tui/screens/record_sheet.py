@@ -47,7 +47,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from textual.app import ComposeResult
@@ -65,16 +65,20 @@ from textual.widgets import (
 )
 
 from cloudmorrow.client.api import ApiError
-from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
-from cloudmorrow.tui.theme import BAD, MUTED, WARN
-from cloudmorrow.tui.widgets.kit import (
+from cloudmorrow.tui.dates import as_local
+from cloudmorrow.tui.kitdata import (
+    actions_on,
     can_write,
     enum_options,
     field_label,
+    installed,
     read_only,
-    safe_id,
+    shown,
     title_of,
 )
+from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
+from cloudmorrow.tui.theme import BAD, MUTED, WARN, variant_for
+from cloudmorrow.tui.widgets.kit import safe_id
 
 # Kinds that take more than a line, drawn below the short ones so the sheet
 # reads as a form and then a body — the way a task was always drawn.
@@ -90,56 +94,6 @@ PLACEHOLDERS = {
     "int": "a whole number",
     "decimal": "a number",
 }
-
-
-async def link_choices(client: Any, models: dict, model: dict) -> dict[str, list[tuple[str, str]]]:
-    """For every link field of *model*: the records it may point at, titled.
-
-    Fetched before the sheet opens rather than by it, so the sheet has its
-    drop-downs filled the moment it is on screen and never shows a link as
-    empty while it waits.
-    """
-    choices: dict[str, list[tuple[str, str]]] = {}
-    for field in model.get("fields", []):
-        if field.get("kind") != "link" or not field.get("to"):
-            continue
-        target = models.get(field["to"]) or {}
-        try:
-            rows = await client.records(field["to"])
-        except ApiError:
-            rows = []
-        choices[field["name"]] = [(title_of(row, target), str(row["id"])) for row in rows]
-    return choices
-
-
-def _as_local(value: str) -> str:
-    """A stored moment as the minute it is here: a zone converted, the wall
-    clock left as it is, and a whole day a date."""
-    if len(str(value or "")) == 10:
-        return str(value)
-    try:
-        moment = dt.datetime.fromisoformat(value)
-    except (TypeError, ValueError):
-        return str(value or "")
-    if moment.tzinfo is not None:
-        moment = moment.astimezone()
-    return moment.strftime("%Y-%m-%d %H:%M")
-
-
-def shown(field: dict, value: Any) -> str:
-    """A value as the sheet writes it where it cannot be edited."""
-    if value in (None, ""):
-        return "—"
-    kind = field.get("kind")
-    if kind == "datetime":
-        return _as_local(str(value))
-    if kind == "enum":
-        return dict(enum_options(field)).get(str(value), str(value))
-    if kind == "bool":
-        return "yes" if value else "no"
-    if kind == "json":
-        return json.dumps(value)
-    return str(value)
 
 
 def field_widget(
@@ -210,7 +164,7 @@ def field_widget(
         )
     text = str(value) if value not in (None, "") else ""
     if kind == "datetime" and text:
-        text = _as_local(text)
+        text = as_local(text)
     input_type = {"int": "integer", "decimal": "number"}.get(kind or "", "text")
     return Input(
         text,
@@ -319,6 +273,7 @@ class RecordSheet(Modal[dict | str | None]):
         choices: dict[str, list[tuple[str, str]]] | None = None,
         heading: str = "",
         adjust: Callable[[dict, dict | None], dict] | None = None,
+        run_action: Callable[..., Awaitable[bool]] | None = None,
     ) -> None:
         super().__init__()
         self.client = client
@@ -333,6 +288,10 @@ class RecordSheet(Modal[dict | str | None]):
         # datamodel says: a calendar keeps an event's length when its start
         # moves. Given the fields to send and the record as it was.
         self.adjust = adjust
+        # How a Quill's action on the record is pressed: tui/quill_actions.py's
+        # `run_action`, handed in by whoever opens the sheet, since pressing
+        # one may open another sheet. Without it the sheet has no actions.
+        self.run_action = run_action
         label = self.model.get("label") or model_id
         self.heading = heading or (label if record else f"New {label.lower()}")
         self.fields = self._ordered(only)
@@ -384,9 +343,7 @@ class RecordSheet(Modal[dict | str | None]):
                             label += " *"
                         yield Static(label, classes="sheet-label")
                         yield self._widget(field)
-            if self.record is not None:
-                from cloudmorrow.tui.quill_actions import actions_on, installed, variant_for
-
+            if self.record is not None and self.run_action is not None:
                 self.actions = actions_on(installed(self.app), self.model_id)
             if self.actions:
                 with Horizontal(id="sheet-actions"):
@@ -592,8 +549,6 @@ class RecordSheet(Modal[dict | str | None]):
 
     # -- a Quill's actions on it --------------------------------------------------
     async def _act(self, quill: dict, action: dict) -> None:
-        from cloudmorrow.tui.quill_actions import run_action
-
         left = False
 
         def leave() -> None:
@@ -602,7 +557,7 @@ class RecordSheet(Modal[dict | str | None]):
                 left = True
                 self.dismiss(self.record)
 
-        ran = await run_action(self.app, quill, action, record=self.record, leave=leave)
+        ran = await self.run_action(self.app, quill, action, record=self.record, leave=leave)
         if not ran or left or self.record is None:
             return
         self.acted = True
