@@ -521,77 +521,80 @@ already satisfied it.
 
 ## Reaching your cloud
 
-Three ways, any mix of them, chosen by the installer's second question (or
-the same question on the setup page) and changed afterwards in
-**Administration → Access**, with `cm access`, or on the box with
-`cloudmorrow-server access`. [HOSTING.md](HOSTING.md#reaching-your-cloud)
-has the protocol and the control server's API; this is what an owner sees.
+Two ways. The home network is always there; the mesh is there once the box
+is linked to a cloudmorrow.com account, which the installer asks about
+(`--link`), the setup page offers, and **Administration → Access** does any
+time after, as do `cm access link` and, on the box, `cloudmorrow-server
+access link`. [HOSTING.md](HOSTING.md#reaching-your-cloud) has the protocol
+and the relay's API; this is what an owner sees.
 
-**Home network.** Always on unless `access_lan = false`. The box announces
-itself over multicast DNS as `<name>.local` and as a `_cloudmorrow._tcp`
-service carrying its name, version and address. `cm login` with no server
+**Home network.** Always on unless `access_lan = false`, and also for a
+linked cloud. The box announces itself over multicast DNS as `<name>.local`
+and as a `_cloudmorrow._tcp` service carrying its name, version, the
+address to open and, once linked, its mesh name. `cm login` with no server
 configured lists what it finds and signs in to the one you pick; a cloud
-with only the home network is `http://<name>.local:8787` (the installer
-makes it listen beyond the loopback for that), and a cloud with a real name
-is reached at its local address with the certificate still checked against
-the real name, so nothing crosses the internet to cross the living room. A
-box listening only on the loopback with no name says nothing: there is
+that is not linked is `http://<name>.local:8787`, and a linked one is
+reached at its local address with the certificate still checked against
+its real name, so nothing crosses the internet to cross the living room. A
+box listening only on the loopback and not linked says nothing: there is
 nothing a neighbour could reach.
 
-**Public.** Pick a name and the cloud is `https://<name>.cloudmorrow.com`
-for anybody with the address; the sign-in page is the door. The box claims
-the name at the control server (`access_control`, `https://relay.cloudmorrow.com`
-unless you run your own), keeps the token it gets sealed in the database,
-and holds one outbound connection open to the relay, reconnecting on its
-own. Visitors' TLS comes down that connection untouched and ends in Caddy
-on the box, which gets the Let's Encrypt certificate for the name by the
-ordinary HTTP challenge. `public_url` follows the name while it is in use,
-and with it `require_tls`: once a name is on, plain http from another
-machine is refused. Administration → Access shows the tunnel's state, since
-when it has been up, how often it has had to reconnect, and the bytes
-through it.
+**Linking.** The box asks the relay (`access_control`,
+`https://relay.cloudmorrow.tech` unless you run your own) for a code and
+shows it: *Open cloudmorrow.com/link and enter KXRT-4829*, with the link
+and a QR code of it on the screens. On the website you sign in or make an
+account, enter the code, and pick the cloud's name: 5 to 40 lowercase
+letters, digits or dashes. The box, which has been waiting, gets its token
+(kept sealed in the database), joins its mesh, gets its certificate, and is
+`https://<name>.cloudmorrow.tech` from then on. A server restarted while a
+code waits picks the code up again; one restarted halfway through setting
+up finishes it. The name is renamed on the website, in **My Clouds**; the
+box reads its record every ten minutes and follows. Unlinking, here or on
+the website, gives the name back and takes the mesh and every device on it
+away; the home network carries on.
 
-**Private.** Only devices you enroll reach it, from anywhere, over
-WireGuard, using Tailscale's open-source client pointed at the cloud's own
-coordination server (Headscale, run by the control server; each cloud is
-its own user, so nobody else's devices ever see yours). The box joins when
-private access is turned on. Each person enrolls their own devices:
+**The mesh.** WireGuard between the box and the devices you invite, using
+Tailscale's open-source client pointed at the cloud's own coordination
+server (Headscale, run by the relay; each cloud is its own user, so nobody
+else's devices ever see yours). Nothing on the internet reaches the box:
+off the mesh, the name shows a landing page with the client downloads,
+served by the relay. Anybody on the cloud invites a device in **Me → Invite
+a device** (in the terminal: Settings, *Invite a device*; or `cm access
+invite`): a six-character code, good once, for ten minutes.
 
-- a computer: `curl -fsSL https://<name>.cloudmorrow.com/install.sh | sh -s -- --private`,
-  which signs in, asks the cloud for a one-time key, installs Tailscale with
-  your say-so and joins; or the desktop app's offer to do the same;
-- a phone: the Tailscale app, told to use the cloud's login server (the QR
-  code in **Me → Pair a device** carries it), and the six-character code
-  the same screen gives, which works once, for ten minutes.
+- a computer runs `curl -fsSL https://<name>.cloudmorrow.tech/install.sh | sh`,
+  which asks for the code, trades it at the relay for a key, installs
+  Tailscale with your say-so, joins as `cm-<6 hex>`, and signs you in; at
+  home and signed in, `cm access join` does the same without a code, and
+  the desktop app offers it too;
+- a phone uses the Tailscale app, told to use the cloud's login server (the
+  QR code on Invite a device carries it), and the page it opens asks for
+  the code.
 
-Keys and codes are labelled `<username>: <device>`, so everybody sees and
-removes their own devices, and an administrator sees all of them. With
-public access off, nothing on the internet can reach the box for the
-certificate, so Caddy proves the name by DNS instead, through the control
-server's acme-dns endpoint; that needs Caddy built with the `acmedns`
-module, which the installer fetches from caddyserver.com. With both on,
-the name points at the relay for everybody and straight at the box for
-enrolled devices.
+The relay is never told whose a device is. The box keeps that: a computer
+tells its cloud it is yours once it has joined (`cm access mine`, which the
+installer and `cm access join` run for you), and an administrator says
+whose a phone is on the Access screen. Everybody sees and removes their own
+devices; an administrator sees all of them.
 
 **What runs where, and who may do what.** The service itself never needs
 root: it writes the name's Caddy site into `/var/lib/cloudmorrow-caddy`
 (which `/etc/caddy/Caddyfile` imports) and reloads Caddy through its admin
 endpoint on localhost:2019, and it is tailscale's `--operator`, so it may
-bring the box up and down. Installing Caddy and Tailscale, the first
-`tailscale up`, and the Caddyfile import are root's, and the installer does
-them, asking first (`--yes` to not ask). A box whose Caddy or Tailscale is
-missing says so on the Access screen, with the command that fixes it.
+bring the box up and down. The certificate is Let's Encrypt's, by the DNS
+challenge through the relay's acme-dns endpoint, so Caddy is built with the
+`acmedns` module. Installing Caddy and Tailscale and making the service
+tailscale's operator are root's, and the installer does them, asking first
+(`--yes` to not ask). A box whose Caddy or Tailscale is missing says so on
+the Access screen.
 
 ```bash
-cloudmorrow-server access status                # all three, from the box
-cloudmorrow-server access claim larsens --private
+cloudmorrow-server access status                # from the box
+cloudmorrow-server access link                  # a code, and wait for it
 cm access status                                # from anywhere, signed in
-cm access pair                                  # a code for your phone
+cm access invite                                # a code for a device
+cm access join --invite 7QX2MP --server https://larsens.cloudmorrow.tech
 ```
-
-Giving the name back (Administration → Access, or `cloudmorrow-server
-access release`) ends public and private access at once and forgets every
-enrolled device; the home network carries on.
 
 ## Notes on the phone
 

@@ -97,12 +97,12 @@ the plan for the rest is [docs/PLATFORM.md](docs/PLATFORM.md).
   shop is not yet.
 
 [docs/HOSTING.md](docs/HOSTING.md) has the plan for the hosted tenant, and
-for certificates and public access that just work.
+how a cloud is reached: at home, and from anywhere once it is linked.
 
 ## Install a server
 
-You need a Linux machine with systemd and Python 3.11 or newer, and a name it
-can be reached by, such as `cloud.example.com`. The installer adds `git`,
+You need a Linux machine with systemd and Python 3.11 or newer. No domain,
+no port forwarding, no certificate to arrange. The installer adds `git`,
 `sudo` and Python's venv module if they are missing, or says the command
 that would. One command:
 
@@ -110,8 +110,9 @@ that would. One command:
 curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
 ```
 
-It asks five questions: what your cloud is called, the address people will
-use, a username and password for the first account, which becomes the
+It asks five questions: what your cloud is called, whether to link it to a
+cloudmorrow.com account so its devices reach it from anywhere (you can do
+it later), a username and password for the first account, which becomes the
 administrator, which of the machine's addresses it answers on (every one
 unless you tick others, or type your own), and which of the standard
 quills it should have (Notes, Tasks, Calendar, Chat, Files, Secrets; all of
@@ -127,13 +128,30 @@ Every answer can be a flag instead, for a script or a machine with no
 terminal, and `--dry-run` says what it would do without doing any of it:
 
 ```bash
-sudo sh install-server.sh --name "The Larsens" --public-url https://cloud.example.com \
-  --user alice --quills all
+sudo sh install-server.sh --name "The Larsens" --link --yes --user alice --quills all
 ```
 
-The server listens on the loopback and expects a reverse proxy in front of
-it for TLS. Caddy is the easy choice: it fetches and renews the certificate
-itself, and the whole config is what the installer prints at the end.
+**How it is reached** is one of two ways, and the first is always there:
+
+| way | who reaches it | what you do |
+| --- | --- | --- |
+| **Home network** | devices on the same network | nothing: the box announces itself as `<name>.local`, and `cm login` finds it |
+| **Linked** | the devices you invite, from anywhere | link it once: the installer (or the setup page, or **Administration → Access**) shows a code to enter at cloudmorrow.com/link, where you pick its name, `larsens.cloudmorrow.tech`; then invite each device once from **Me → Invite a device** |
+
+A linked box joins a private mesh of its own (WireGuard, with Tailscale's
+open-source client; the installer asks before installing it) and gets a
+certificate for its name (Caddy, asked the same way). Nothing on the
+internet reaches it, and nothing about its people leaves it: the relay
+knows the name and the mesh, not who is on it. The relay and the mesh's
+coordination server are free software too
+([Cloudmorrow/relay](https://github.com/Cloudmorrow/relay)): run your own
+and pass `--access-control https://relay.example.org`.
+[docs/HOSTING.md](docs/HOSTING.md#reaching-your-cloud) says how it works.
+
+Have a domain and a reverse proxy of your own already? Give
+`--public-url https://cloud.example.com` instead of linking. Caddy is the
+easy choice: it fetches and renews the certificate itself, and the whole
+config is what the installer prints at the end.
 
 ```
 cloud.example.com {
@@ -143,20 +161,23 @@ cloud.example.com {
 
 An nginx example is in [deploy/nginx.conf.example](deploy/nginx.conf.example).
 
-Then:
+Then, with `larsens.cloudmorrow.tech` standing for your cloud's address
+(or `http://<name>.local:8787` at home):
 
-1. Open `https://cloud.example.com` in a browser and sign in.
+1. Open it in a browser and sign in.
 2. On each computer, install the terminal app (`cm`) and the desktop app,
    which also mounts your fileshares, with the line that page shows:
-   `curl -fsSL https://cloud.example.com/install.sh | sh`.
-3. On a phone, open `https://cloud.example.com/app` and use **Add to Home
-   Screen**: it opens like any other app, with your cloud's name under the
-   icon.
+   `curl -fsSL https://larsens.cloudmorrow.tech/install.sh | sh`. Away from
+   home it asks for an invite code, from **Me → Invite a device**.
+3. On a phone, open `https://larsens.cloudmorrow.tech/app` and use **Add to
+   Home Screen**: it opens like any other app, with your cloud's name under
+   the icon. Away from home, the Tailscale app and an invite put it on the
+   mesh first.
 
 No terminal at hand? Skip the account question. A server with no accounts
 shows a setup page on its first visit instead: name the cloud, choose a
-username and password, tick the standard quills, and it is yours. That page
-is how a hosted tenant is set up too.
+username and password, tick the standard quills, say whether to link it,
+and it is yours. That page is how a hosted tenant is set up too.
 
 Rather run it as a container? `deploy/docker/` has the image, a compose
 file and a Caddyfile:
@@ -171,13 +192,14 @@ and the encryption key in `/etc/cloudmorrow/cloudmorrow.key`. Every key in the
 config, the cloud's name included, is explained in
 [deploy/server.example.toml](deploy/server.example.toml).
 
-### No domain name yet?
+### Only at home?
 
-Answer the address question with a plain `http://` address and the server
-stops insisting on TLS. Each client then has to opt in with
-`cloudmorrow config set allow_insecure_http true`, because talking to a
-server in the clear should be a decision rather than a default. A private
-network with its own certificates, such as Tailscale, is the better answer.
+Not linked, the cloud is plain `http://<name>.local:8787` on your network,
+and never talks to cloudmorrow.com. Picking it from the list `cm login`
+shows is saying that is how it is meant to be; a client given the address
+by hand opts in with `cloudmorrow config set allow_insecure_http true`,
+because talking to a server in the clear should be a decision rather than
+a default. Linking it gives it a real name and certificate.
 
 ## Install on your computers
 
@@ -276,8 +298,8 @@ server, so a change to the terminal app needs no deploy to try.
 - [docs/PLATFORM.md](docs/PLATFORM.md): the plan for Cloudmorrow as a
   platform: your data, guarded access, one kit of screens on every device,
   and apps you build by talking to an assistant.
-- [docs/HOSTING.md](docs/HOSTING.md): a hosted tenant, and how
-  certificates and public access are meant to just work.
+- [docs/HOSTING.md](docs/HOSTING.md): a hosted tenant, and how a cloud is
+  reached: the home network, and the mesh once it is linked.
 - [deploy/](deploy): the installer, the container, the systemd unit, and
   Caddy, nginx, server and agent examples.
 
