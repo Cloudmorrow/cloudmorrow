@@ -492,7 +492,7 @@ A service is any program. The core starts it and it talks to the record API
 exactly as the clients do, over loopback HTTP, through the gate, bound by the
 Quill's grants. The server never imports a Quill's code.
 
-**How it runs** (`server/quillservices.py`). Every service of every installed
+**How it runs** (`server/quills/services.py`). Every service of every installed
 Quill that is switched on for the server is a process of its own, started in
 the Quill's folder (`<data_dir>/quills/<id>/`) with an environment built from
 nothing:
@@ -547,7 +547,7 @@ field out. With `forward`, the request goes to the service as
   administrator, the code acts for nobody and does not run until the Quill
   is installed again. The install sheet says it: *Runs code on this server:
   … It runs as bram, and can read and write only: …*
-- *What its token opens.* A Quill's token (`cmq_…`, `server/quilltokens.py`)
+- *What its token opens.* A Quill's token (`cmq_…`, `server/quills/tokens.py`)
   is kept only as a hash. It is `Principal("quill", <that account>,
   quill=<id>, models=<used, introduced, extended, granted>)`, and the gate
   refuses it every datamodel it did not declare. It opens the record API
@@ -645,19 +645,19 @@ manifest written, checked and installed in one conversation.
 | datamodel definitions, validation | `server/datamodels.py` |
 | records, sealing, positions, stamps, the gate | `server/records.py` |
 | circles: who may use which datamodels, and fitting a Quill to its person | `server/circles.py`, `server/routes/circles.py`, `fitted` in `server/routes/quills.py` |
-| manifests, sources, install, catalog | `server/quills.py`, `server/routes/quills.py` |
+| manifests, sources, install, catalog | `server/quills/` (`manifest`, `catalog`, `registry`, `checks`), `server/routes/quills.py` |
 | the record API | `server/routes/records.py` |
-| jobs, and the boot work (foundation Quills, built-ins that became Quills, old tables into records: `move_legacy_tasks`, `move_legacy_calendar`, `move_legacy_chat`) | `server/quilljobs.py` |
+| jobs, and the boot work (foundation Quills, built-ins that became Quills, old tables into records: `move_legacy_tasks`, `move_legacy_calendar`, `move_legacy_chat`) | `server/quills/jobs.py` |
 | spaces: who is told what, the badge, the people there are | `server/spacenotify.py`, `server/routes/push.py` (`badge_for`), `GET /api/people` in `server/routes/records.py` |
-| backends: notes (their folders and pictures), shares and files, secrets | `server/backends.py`; a share's files in `server/fileops.py` |
+| backends: notes (their folders and pictures), shares and files, secrets | `server/backends/`; a share's files in `server/fileops.py` |
 | the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; the grid in `kit_grid.js`, `kit_grid.css` (with `registerGridHook`, which the desktop app's mount lines come in by); the editor in `kit_editor.js`, `kit_editor.css` and `pictures.js`; the calendar in `kit_calendar.js`, `kit_calendar.css`; the thread in `kit_thread.js`, `kit_thread.css`; spaces (their list, making one, writing to somebody, their people) in `kit_space.js`, `kit_space.css`, shared by calendar and thread; a grouped list and hidden fields in `kit_grouped.js`, `kit_grouped.css`; the catalog and install sheet in `quillsadmin.js` |
 | the kit in the terminal | `tui/panes/kit.py` (list), `tui/panes/kit_grouped.py` + `kit_grouped.tcss` (a grouped list, hidden fields) with `tui/widgets/group_list.py`, `tui/panes/kit_board.py`, `tui/panes/kit_editor.py` + `kit_editor.tcss` (with `widgets/editor.py`, `note_tree.py`, `picture.py`), `tui/panes/kit_grid.py` (with `register_group_extension`; the mount column and buttons for shares are `tui/sharemounts.py`), `tui/panes/kit_calendar.py` + `kit_calendar.tcss`, `tui/panes/kit_thread.py`, `tui/widgets/kit_space.py` + `kit_space.tcss` (spaces: `NewSpaceModal`, `SpaceModal`, `PickPersonModal`), `tui/widgets/kit.py`, `tui/screens/record_sheet.py`; a Quill's own view in `tui/panes/kit_view.py` + `kit_view.tcss`, and its actions (the sheet's buttons, their forms, the ctrl+e palette, and every effect) in `tui/quill_actions.py`; the catalog in `tui/panes/admin_quills.py` |
 | the kit on the command line | `cli/quillrun.py` (`cm <quill> …`) |
 | building one | `cli/quill.py` (`cm quill new/check/dev/add`), `quill_reference.md`, `quill_template/` |
 | the kit to an assistant | `server/mcptools.py` (generic record tools) |
-| a Quill's code: running it | `server/quillservices.py` (the supervisor, run jobs, logs), started with the app; `run` jobs asked for by the Clock in `server/quilljobs.py` |
-| a Quill's token and webhook secrets, who it runs as | `server/quilltokens.py`; `get_principal` in `server/deps.py` |
-| APIs, webhooks, and their administration | `server/routes/quillcode.py`, with `server/quillproxy.py` (to a service's port) and `server/quillhooks.py` (map paths, signatures, the rate) |
+| a Quill's code: running it | `server/quills/services.py` (the supervisor, run jobs, logs), started with the app; `run` jobs asked for by the Clock in `server/quills/jobs.py` |
+| a Quill's token and webhook secrets, who it runs as | `server/quills/tokens.py`; `get_principal` in `server/deps.py` |
+| APIs, webhooks, and their administration | `server/routes/quillcode.py`, with `server/quills/proxy.py` (to a service's port) and `server/quills/hooks.py` (map paths, signatures, the rate) |
 | watching it run | web `quillservices.js`, `quillservices.css`; terminal `tui/panes/admin_quill_services.py`; `cm quill services`, `cm quill logs` |
 | a Quill's Python: the SDK, the sandbox, views, actions, hooks, machines, the harness | see *Where the code is* in [QUILLCODE.md](QUILLCODE.md) |
 

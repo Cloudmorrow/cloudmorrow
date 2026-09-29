@@ -50,12 +50,13 @@ from typing import TYPE_CHECKING
 from cloudmorrow.quill import context as sdk
 from cloudmorrow.quill import ui
 from cloudmorrow.sandbox import CALL_TIMEOUT, Failed, Guest, InProcessGuest, SandboxError
-from cloudmorrow.server.codespec import action_fields
 from cloudmorrow.server.datamodels import parse_duration
 from cloudmorrow.server.db import connect
 from cloudmorrow.server.quills import Manifest
-from cloudmorrow.server.quillservices import ServiceLog
-from cloudmorrow.server.quilltokens import runs_as
+from cloudmorrow.server.quills.codespec import action_fields
+from cloudmorrow.server.quills.services import ServiceLog
+from cloudmorrow.server.quills.tokens import runs_as
+from cloudmorrow.server.recordfields import coerce
 from cloudmorrow.server.records import (
     DATASET,
     NEVER_FOR_ASSISTANTS,
@@ -66,7 +67,6 @@ from cloudmorrow.server.records import (
     Refused,
     UnknownModelError,
     UnknownRecordError,
-    _coerce,
 )
 from cloudmorrow.server.secrets import DEFAULT_ENVIRONMENT, DEFAULT_VAULT
 
@@ -526,7 +526,7 @@ class QuillCode:
                     out[f.name] = value
                 continue
             try:
-                value = _coerce(shape, f, value)
+                value = coerce(shape, f, value)
             except RecordError as exc:
                 raise CodeError("invalid", str(exc)) from exc
             if f.kind == "link":

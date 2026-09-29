@@ -28,14 +28,8 @@ from pydantic import BaseModel, Field
 from cloudmorrow.server.backends import AttachmentTooBig
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_current_user, get_principal, get_state
-from cloudmorrow.server.records import (
-    Principal,
-    RecordConflictError,
-    RecordError,
-    Refused,
-    UnknownModelError,
-    UnknownRecordError,
-)
+from cloudmorrow.server.records import Principal, RecordError, UnknownRecordError
+from cloudmorrow.server.routes.errors import ERRORS, http_error
 from cloudmorrow.server.seeding import seed
 
 router = APIRouter(prefix="/api/records", tags=["records"])
@@ -70,26 +64,6 @@ class RecordChange(BaseModel):
 class RecordMove(BaseModel):
     fields: dict[str, Any] = Field(default_factory=dict)
     index: int | None = None
-
-
-def _refused(exc: Exception) -> HTTPException:
-    if isinstance(exc, UnknownModelError):
-        return HTTPException(status.HTTP_404_NOT_FOUND, f"no such datamodel: {exc}")
-    if isinstance(exc, UnknownRecordError):
-        return HTTPException(status.HTTP_404_NOT_FOUND, "no such record")
-    if isinstance(exc, Refused):
-        return HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
-    if isinstance(getattr(exc, "status", None), int):
-        return HTTPException(exc.status, str(exc))
-    if isinstance(exc, RecordConflictError):
-        return HTTPException(
-            status.HTTP_409_CONFLICT,
-            {"message": "changed since you read it", "current": exc.current.to_dict()},
-        )
-    return HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
-
-
-ERRORS = (UnknownModelError, UnknownRecordError, Refused, RecordConflictError, RecordError)
 
 
 def switched_on(state: AppState, model: str) -> None:
@@ -152,7 +126,7 @@ def list_records(
             principal, model, where, last=_whole(last), since=since or None
         )
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
     return [record.to_dict() for record in records]
 
 
@@ -186,7 +160,7 @@ def list_folders(
     try:
         return state.records.folders(principal, model)
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.post("/{model}/_folders", status_code=status.HTTP_201_CREATED)
@@ -200,7 +174,7 @@ def make_folder(
     try:
         return state.records.make_folder(principal, model, payload.path)
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.patch("/{model}/_folders")
@@ -215,7 +189,7 @@ def move_folder(
     try:
         return state.records.move_folder(principal, model, payload.path, payload.to)
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.delete("/{model}/_folders", status_code=status.HTTP_204_NO_CONTENT)
@@ -230,7 +204,7 @@ def delete_folder(
     try:
         state.records.delete_folder(principal, model, path)
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.post("/{model}/_attachments", status_code=status.HTTP_201_CREATED)
@@ -251,9 +225,9 @@ async def attach(
     try:
         return state.records.attach(principal, model, data, filename)
     except AttachmentTooBig as exc:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, str(exc)) from exc
+        raise HTTPException(413, str(exc)) from exc
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.get("/{model}/_attachments/{name}")
@@ -269,7 +243,7 @@ def attachment(
     except UnknownRecordError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no such attachment") from exc
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
     # A name is never reused for another file, so it may be kept for good.
     return Response(
         data, media_type=content_type,
@@ -314,7 +288,7 @@ def create_record(
             announce=not payload.unique,
         )
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
     return record.to_dict()
 
 
@@ -329,7 +303,7 @@ def get_record(
     try:
         return state.records.get(principal, model, record_id).to_dict()
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.patch("/{model}/{record_id}")
@@ -346,7 +320,7 @@ def change_record(
             principal, model, record_id, payload.fields, rev=payload.rev
         )
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
     return record.to_dict()
 
 
@@ -365,7 +339,7 @@ def move_record(
             principal, model, record_id, payload.fields, payload.index
         )
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
     return record.to_dict()
 
 
@@ -380,7 +354,7 @@ def delete_record(
     try:
         state.records.delete(principal, model, record_id)
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
 
 
 # -- content: the bytes beside a record -------------------------------------------
@@ -402,7 +376,7 @@ def record_content(
     try:
         path, media_type = state.records.content(principal, model, record_id)
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
     # Someone's files: nobody's cache but the browser's own, and asked about
     # again next time — a cheap 304 when nothing changed.
     return FileResponse(path, media_type=media_type, headers=PRIVATE)
@@ -422,7 +396,7 @@ def record_thumb(
     try:
         path = state.records.thumbnail(principal, model, record_id, size)
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
     return FileResponse(path, media_type="image/jpeg", headers=PRIVATE)
 
 
@@ -444,7 +418,7 @@ async def upload_record(
         if not state.records.has_content(model):
             raise RecordError(f"{model} records are not made from bytes")
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
     spool = state.config.data_dir / "uploads"
     spool.mkdir(parents=True, exist_ok=True)
     handle = tempfile.NamedTemporaryFile(dir=spool, prefix=".upload-", delete=False)
@@ -456,7 +430,7 @@ async def upload_record(
         try:
             record = state.records.put(principal, model, dict(request.query_params), part)
         except ERRORS as exc:
-            raise _refused(exc) from exc
+            raise http_error(exc) from exc
     finally:
         part.unlink(missing_ok=True)
     return record.to_dict()
@@ -482,7 +456,7 @@ def add_member(
     try:
         return state.records.add_member(principal, model, record_id, payload.username).to_dict()
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.delete("/{model}/{record_id}/members/{username}", status_code=status.HTTP_204_NO_CONTENT)
@@ -498,7 +472,7 @@ def remove_member(
     try:
         state.records.remove_member(principal, model, record_id, username)
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
 
 
 @router.post("/{model}/{record_id}/seen", status_code=status.HTTP_204_NO_CONTENT)
@@ -512,7 +486,7 @@ def seen(
     try:
         state.records.mark_seen(principal, model, record_id)
     except ERRORS as exc:
-        raise _refused(exc) from exc
+        raise http_error(exc) from exc
 
 
 # -- who a space could be shared with ------------------------------------------------

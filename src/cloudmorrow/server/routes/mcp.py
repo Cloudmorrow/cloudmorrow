@@ -12,8 +12,9 @@ Three things live here, and a client meets them in this order:
    say yes — and trades the code that comes back at `/oauth/token`.
    Nothing to configure first: adding the server's address to Claude is
    the whole setup.
-3. MCP itself, at `/mcp`: JSON-RPC over HTTP, one request per POST, with
-   the tools in `mcptools`. Every call runs as the person who said yes.
+3. MCP itself, at `/mcp`: JSON-RPC over HTTP, one request per POST,
+   answered by `mcpserver` with the tools in `mcptools`. Every call runs
+   as the person who said yes.
 
 `/api/mcp/connections` is the person's view of it: which assistants they
 have let in, and a way to cut one off.
@@ -31,26 +32,16 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from cloudmorrow import __version__
-from cloudmorrow.server import mcptools
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_current_user, get_state
 from cloudmorrow.server.mcp import SCOPE, GrantError, MCPStore, RegistrationError
+from cloudmorrow.server.mcpserver import PARSE_ERROR, handle_message, rpc_error
 from cloudmorrow.server.routes.install import TEMPLATES, base_url
 from cloudmorrow.server.security import TokenError, decode_access_token, verify_password
 
 router = APIRouter(tags=["mcp"])
 
 MCP_PATH = "/mcp"
-# The protocol revisions this server speaks. A client names the one it
-# wants; it gets that one back if it is here, and the newest otherwise.
-PROTOCOL_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26")
-
-# JSON-RPC's own error codes.
-PARSE_ERROR = -32700
-INVALID_REQUEST = -32600
-METHOD_NOT_FOUND = -32601
-INVALID_PARAMS = -32602
-
 # Metadata is public by design, and a browser-based client reads it from
 # another origin. The MCP endpoint itself is not opened this way: that is
 # what `cors_origins` in the server config is for.
@@ -405,62 +396,6 @@ def mcp_user(request: Request, state: AppState = Depends(get_state)) -> User:
     return user
 
 
-def _rpc_error(request_id: Any, code: int, message: str) -> dict[str, Any]:
-    return {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
-
-
-def _rpc_result(request_id: Any, result: Any) -> dict[str, Any]:
-    return {"jsonrpc": "2.0", "id": request_id, "result": result}
-
-
-def handle_message(state: AppState, user: User, message: Any) -> dict[str, Any] | None:
-    """One JSON-RPC message in, one out — or nothing, for a notification."""
-    if not isinstance(message, dict) or message.get("jsonrpc") != "2.0":
-        return _rpc_error(None, INVALID_REQUEST, "not a JSON-RPC 2.0 message")
-    method = message.get("method")
-    request_id = message.get("id")
-    params = message.get("params") or {}
-    if not isinstance(method, str):
-        # A response, or nothing we understand: there is no one to answer.
-        return None if "result" in message or "error" in message else _rpc_error(
-            request_id, INVALID_REQUEST, "no method"
-        )
-    if request_id is None:
-        # A notification. `notifications/initialized` and the like: noted.
-        return None
-    if not isinstance(params, dict):
-        return _rpc_error(request_id, INVALID_PARAMS, "params must be an object")
-    if method == "initialize":
-        wanted = params.get("protocolVersion")
-        version = wanted if wanted in PROTOCOL_VERSIONS else PROTOCOL_VERSIONS[0]
-        return _rpc_result(
-            request_id,
-            {
-                "protocolVersion": version,
-                "capabilities": {"tools": {"listChanged": False}},
-                "serverInfo": {"name": "cloudmorrow", "title": "Cloudmorrow", "version": __version__},
-                "instructions": mcptools.INSTRUCTIONS,
-            },
-        )
-    if method == "ping":
-        return _rpc_result(request_id, {})
-    if method == "tools/list":
-        return _rpc_result(
-            request_id, {"tools": [tool.to_dict() for tool in mcptools.available(state, user)]}
-        )
-    if method == "tools/call":
-        name = params.get("name")
-        if not isinstance(name, str) or mcptools.find(state, name, user) is None:
-            return _rpc_error(request_id, INVALID_PARAMS, f"unknown tool: {name!r}")
-        return _rpc_result(request_id, mcptools.call(state, user, name, params.get("arguments")))
-    if method in {"resources/list", "resources/templates/list"}:
-        key = "resourceTemplates" if method.endswith("templates/list") else "resources"
-        return _rpc_result(request_id, {key: []})
-    if method == "prompts/list":
-        return _rpc_result(request_id, {"prompts": []})
-    return _rpc_error(request_id, METHOD_NOT_FOUND, f"unknown method: {method}")
-
-
 @router.post(MCP_PATH, include_in_schema=False)
 async def mcp_post(
     request: Request, state: AppState = Depends(get_state), user: User = Depends(mcp_user)
@@ -468,7 +403,7 @@ async def mcp_post(
     try:
         body = json.loads(await request.body())
     except ValueError:
-        return JSONResponse(_rpc_error(None, PARSE_ERROR, "the body is not JSON"), status_code=400)
+        return JSONResponse(rpc_error(None, PARSE_ERROR, "the body is not JSON"), status_code=400)
     if isinstance(body, list):
         answers = [a for a in (handle_message(state, user, m) for m in body) if a is not None]
         if not answers:

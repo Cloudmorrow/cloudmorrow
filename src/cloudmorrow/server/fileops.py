@@ -23,7 +23,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from cloudmorrow.paths import UnsafePathError, resolve_within
+from cloudmorrow.server.paths import UnsafePathError, resolve_within
 from cloudmorrow.server.shares import Share
 
 __all__ = [

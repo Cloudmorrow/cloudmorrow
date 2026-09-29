@@ -28,7 +28,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
-from cloudmorrow.paths import UnsafePathError, normalise_rel_path, resolve_within
+from cloudmorrow.server.paths import UnsafePathError, normalise_rel_path, resolve_within
 from cloudmorrow.server.sealed import Sealer, is_sealed_file, plain_size
 
 NOTE_SUFFIX = ".md"

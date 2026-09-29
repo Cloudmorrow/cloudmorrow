@@ -291,7 +291,7 @@ class Harness:
 
     def act(self, action: str, record=None, *, via: str = "person", **fields) -> Result:
         """Press an action, as the person, with its form filled in with *fields*."""
-        from cloudmorrow.server.quillhandlers import CodeError
+        from cloudmorrow.server.quills.code import CodeError
 
         record_id = getattr(record, "id", record) or ""
         try:
@@ -306,7 +306,7 @@ class Harness:
         return Result(effects)
 
     def view(self, screen: str, record=None, **params) -> View:
-        from cloudmorrow.server.quillhandlers import CodeError
+        from cloudmorrow.server.quills.code import CodeError
 
         try:
             tree = self.state.code.view(
@@ -319,7 +319,7 @@ class Harness:
         return View(tree, {a["id"]: a["label"] for a in self.manifest.actions})
 
     def run_job(self, job: str) -> None:
-        from cloudmorrow.server.quillhandlers import CodeError
+        from cloudmorrow.server.quills.code import CodeError
 
         try:
             self.state.code.run_job(self.quill, job)
@@ -359,7 +359,7 @@ class Harness:
         return self._answer(lambda: self.state.code.api(self.manifest, found, self.user, request, as_quill=False))
 
     def _answer(self, call) -> dict:
-        from cloudmorrow.server.quillhandlers import CodeError
+        from cloudmorrow.server.quills.code import CodeError
 
         try:
             answer = call()
@@ -379,7 +379,7 @@ class Harness:
         """Run a machine handler here, given *folders*, as the person: what it returned."""
         from cloudmorrow.quill import context as sdk
         from cloudmorrow.sandbox import Failed, Guest, InProcessGuest
-        from cloudmorrow.server.quillhandlers import HostCalls
+        from cloudmorrow.server.quills.code import HostCalls
 
         spec = next((m for m in self.manifest.machine if m["id"] == handler), None)
         if spec is None:

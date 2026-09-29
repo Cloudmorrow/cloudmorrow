@@ -169,7 +169,7 @@ def agent_push_bundle(
         ) from exc
     except BundleTooBigError as exc:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)
+            status_code=413, detail=str(exc)
         ) from exc
 
     if first_claim:

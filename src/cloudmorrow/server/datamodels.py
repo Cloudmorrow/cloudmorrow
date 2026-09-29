@@ -61,7 +61,7 @@ SUPPORTED_SCOPES = frozenset({"personal", "shared", "public"})
 
 # Where a datamodel's records live, when not in the record store. Each is a
 # store the core has always had and other things reach directly; see
-# `server/backends.py`.
+# `server/backends/`.
 BACKENDS = frozenset({"notes", "shares", "vaults"})
 
 NOTIFY_WHEN = frozenset({"created"})

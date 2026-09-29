@@ -11,8 +11,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from cloudmorrow.server.agents import Agent
 from cloudmorrow.server.db import User
 from cloudmorrow.server.notes import NoteStore
-from cloudmorrow.server.quilltokens import PREFIX as QUILL_TOKEN_PREFIX
-from cloudmorrow.server.quilltokens import runs_as
+from cloudmorrow.server.quills.tokens import PREFIX as QUILL_TOKEN_PREFIX
+from cloudmorrow.server.quills.tokens import runs_as
 from cloudmorrow.server.records import Principal
 from cloudmorrow.server.secrets import (
     DEFAULT_ENVIRONMENT,

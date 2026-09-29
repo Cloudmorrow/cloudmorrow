@@ -13,7 +13,8 @@ import pytest
 
 from cloudmorrow.server.db import connect
 from cloudmorrow.server.features import FEATURE_KEYS, Feature, FeatureStore
-from cloudmorrow.server.quilljobs import (
+from cloudmorrow.server.quills import KIT_READY, QuillError, QuillRegistry
+from cloudmorrow.server.quills.jobs import (
     SEEDED,
     adopt_builtins,
     adopted_key,
@@ -21,9 +22,8 @@ from cloudmorrow.server.quilljobs import (
     read_meta,
     write_meta,
 )
-from cloudmorrow.server.quills import KIT_READY, QuillError, QuillRegistry
+from cloudmorrow.server.quills.standard import choices, choose
 from cloudmorrow.server.records import RecordStore
-from cloudmorrow.server.standard import choices, choose
 from tests.conftest import GUEST, QUILL_CATALOG, token_for
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 40

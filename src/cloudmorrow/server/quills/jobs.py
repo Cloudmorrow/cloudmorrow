@@ -34,7 +34,7 @@ next boot.
 On the clock: every `expire` job, swept every few minutes. Reads sweep too,
 so this is only for a server nobody is looking at. And every half minute,
 the `run` jobs whose `every` has come round, which the supervisor starts
-(`quillservices.Supervisor.run_due`) — never one still running from before.
+(`quills.services.Supervisor.run_due`) — never one still running from before.
 """
 
 from __future__ import annotations
@@ -490,7 +490,7 @@ class Clock:
         self.db_path = db_path
         self.registry = registry
         self.records = records
-        # Asked every TICK: the `run` jobs whose time has come (quillservices).
+        # Asked every TICK: the `run` jobs whose time has come (quills.services).
         self.on_tick = on_tick
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None

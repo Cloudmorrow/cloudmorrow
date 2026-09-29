@@ -74,8 +74,8 @@ def test_a_picture_is_read_back_by_name_only(store):
     info = store.save_image(GIF)
     data, content_type = store.image(info.name)
     assert data == GIF and content_type == "image/gif"
-    from cloudmorrow.paths import UnsafePathError
     from cloudmorrow.server.notes import NoteNotFoundError
+    from cloudmorrow.server.paths import UnsafePathError
 
     with pytest.raises(NoteNotFoundError):
         store.image("20260101-000000-abcdef.png")

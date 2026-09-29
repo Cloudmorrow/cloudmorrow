@@ -24,7 +24,8 @@ from dataclasses import dataclass
 
 from cloudmorrow.server.config import ServerConfig
 from cloudmorrow.server.features import FEATURES, FeatureStore
-from cloudmorrow.server.quilljobs import (
+from cloudmorrow.server.quills import Catalog, QuillError, QuillRegistry, load_catalog
+from cloudmorrow.server.quills.jobs import (
     FILES_QUILL,
     MOVED_BUILTINS,
     SECRETS_QUILL,
@@ -33,7 +34,6 @@ from cloudmorrow.server.quilljobs import (
     read_meta,
     write_meta,
 )
-from cloudmorrow.server.quills import Catalog, QuillError, QuillRegistry, load_catalog
 
 
 @dataclass(frozen=True, slots=True)

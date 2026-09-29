@@ -72,11 +72,11 @@ def serve(folder: Path, *, port: int, sandbox: bool, host: str) -> int:
 
     from cloudmorrow.client.config import ClientConfig, StoredCredentials
     from cloudmorrow.quill.testing import datamodels_folder
-    from cloudmorrow.server import quilljobs
     from cloudmorrow.server.app import create_app
     from cloudmorrow.server.config import ServerConfig
     from cloudmorrow.server.db import UserStore
     from cloudmorrow.server.quills import QuillError
+    from cloudmorrow.server.quills import jobs as quilljobs
     from cloudmorrow.server.security import create_access_token, hash_password
 
     base = Path(tempfile.mkdtemp(prefix="quill-dev-"))

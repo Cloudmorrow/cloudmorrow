@@ -22,12 +22,12 @@ import httpx
 import pytest
 import uvicorn
 
-from cloudmorrow.server import quillservices
 from cloudmorrow.server.app import create_app
-from cloudmorrow.server.quillhooks import PathError, RateLimit, apply_map, parse_path
-from cloudmorrow.server.quilljobs import Clock
 from cloudmorrow.server.quills import QuillError, parse_manifest
-from cloudmorrow.server.quillservices import Supervisor, free_port
+from cloudmorrow.server.quills import services as quillservices
+from cloudmorrow.server.quills.hooks import PathError, RateLimit, apply_map, parse_path
+from cloudmorrow.server.quills.jobs import Clock
+from cloudmorrow.server.quills.services import Supervisor, free_port
 from tests.conftest import ADMIN, GUEST
 
 RELAY = Path(__file__).parent / "fixtures" / "quill-relay"

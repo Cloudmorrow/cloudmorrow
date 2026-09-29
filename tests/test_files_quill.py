@@ -17,7 +17,8 @@ import os
 
 import pytest
 
-from cloudmorrow.server.quilljobs import (
+from cloudmorrow.server.quills import QuillError, QuillRegistry
+from cloudmorrow.server.quills.jobs import (
     FILES_QUILL,
     SEEDED,
     boot,
@@ -25,7 +26,6 @@ from cloudmorrow.server.quilljobs import (
     read_meta,
     write_meta,
 )
-from cloudmorrow.server.quills import QuillError, QuillRegistry
 from cloudmorrow.server.records import RecordStore
 from tests.conftest import ADMIN, GUEST, QUILL_CATALOG, token_for
 
@@ -302,7 +302,7 @@ def test_a_server_that_had_files_built_in_gets_the_quill_once(config, users, reg
 
 
 def test_a_server_that_chose_without_files_is_left_without(config, users, registry_with_files):
-    from cloudmorrow.server.standard import choose
+    from cloudmorrow.server.quills.standard import choose
 
     choose(config, {"tasks"}, registry=registry_with_files)
     assert install_files(config.db_path, registry_with_files) is False

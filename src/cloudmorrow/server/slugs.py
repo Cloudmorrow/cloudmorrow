@@ -1,7 +1,8 @@
 """Slugs: the id a board or a share goes by.
 
 A slug is a thing's id everywhere: in the API, in a directory name, and as
-the argument you type. Both sides of Cloudmorrow derive them the same way.
+the argument you type. The server derives them, here; a client uses the
+one it is given.
 """
 
 from __future__ import annotations

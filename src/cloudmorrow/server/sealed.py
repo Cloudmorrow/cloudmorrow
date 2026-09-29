@@ -92,7 +92,7 @@ SEALED: dict[int, tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...]] = {
     # The record store, where every Quill's data lives. Born sealed, so the
     # migration finds nothing to do; listed so a new key re-seals it.
     2: (("records", ("model", "owner", "id"), ("body",)),),
-    # A Quill's webhook secrets (quilltokens): born sealed, listed so a new
+    # A Quill's webhook secrets (quills.tokens): born sealed, listed so a new
     # key re-seals them.
     3: (("quill_webhooks", ("quill", "hook"), ("secret",)),),
 }

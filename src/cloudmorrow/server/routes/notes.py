@@ -7,7 +7,6 @@ from dataclasses import asdict
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 
-from cloudmorrow.paths import UnsafePathError
 from cloudmorrow.server.deps import get_note_store
 from cloudmorrow.server.notes import (
     InvalidImageError,
@@ -16,6 +15,7 @@ from cloudmorrow.server.notes import (
     NoteNotFoundError,
     NoteStore,
 )
+from cloudmorrow.server.paths import UnsafePathError
 from cloudmorrow.server.schemas import ImageOut, NoteCreate, NoteMove, NoteOut, NoteWrite
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
@@ -51,7 +51,7 @@ async def upload_image(
         info = store.save_image(await request.body(), filename=filename)
     except InvalidImageError as exc:
         code = (
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+            413
             if "too big" in str(exc)
             else status.HTTP_400_BAD_REQUEST
         )

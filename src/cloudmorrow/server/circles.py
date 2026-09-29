@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from cloudmorrow.server.db import connect
-from cloudmorrow.slugs import slugify
+from cloudmorrow.server.slugs import slugify
 
 WRITE = "write"
 READ = "read"

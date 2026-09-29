@@ -12,10 +12,10 @@ from __future__ import annotations
 import pytest
 
 from cloudmorrow.server.datamodels import DatamodelError, parse_datamodel
-from cloudmorrow.server.quilljobs import SECRETS_QUILL, boot, read_meta
 from cloudmorrow.server.quills import QuillRegistry
+from cloudmorrow.server.quills.jobs import SECRETS_QUILL, boot, read_meta
+from cloudmorrow.server.quills.standard import choices, choose
 from cloudmorrow.server.records import Principal, RecordStore, Refused
-from cloudmorrow.server.standard import choices, choose
 from tests.conftest import ADMIN, GUEST, QUILL_CATALOG, token_for
 from tests.test_mcp import call, connect
 
@@ -195,7 +195,7 @@ def test_secrets_is_a_standard_catalog_quill_now(config):
 def test_a_server_from_before_the_quill_gets_it_at_boot_once(config, users):
     registry = QuillRegistry(config.quills_dir, config.datamodels_dir, config.quill_catalog)
     # Chosen at install, from before the Quill: Tasks installed, Secrets built in.
-    from cloudmorrow.server.quilljobs import SEEDED, write_meta
+    from cloudmorrow.server.quills.jobs import SEEDED, write_meta
 
     write_meta(config.db_path, SEEDED, "tasks")
     registry.install_from_catalog("tasks")

@@ -1,34 +1,27 @@
-"""The kinds of data there are, and who provides and reaches each.
+"""The kinds of data the server itself keeps, and who reaches each.
 
-This is the foundation the platform is being built on: data is the
-person's, not an app's. A note is a *note* whichever app wrote it; a
-contact an app introduces tomorrow is a *contact*, there for every other
-app the person lets at it. So the kinds are catalogued here, in one place,
-with their fields, their scopes, and which app stores them today —
-because until the record store exists, each is still kept by the app that
-grew it, and the catalogue is the truth about that.
+Data is the person's, not an app's. Most of it is records of a datamodel
+now — boards and tasks, calendars and events, notes, channels and messages
+— kept in the record store (records.py) whichever Quill wrote them, and
+listed at `/api/datamodels` with every other Quill's. Chat's own tables
+were moved into records once, at boot (`quills.jobs.move_legacy_chat`),
+as the tasks' and the calendar's were.
 
-Two kinds of entry:
+What is catalogued here is the rest: the **foundation**, the types the
+server itself owns — users, secrets, files, shares, machines,
+notifications. No Quill may switch these off; one that wants one says so
+(`uses`, in features.py), and `/api/types` lists who does. Secrets, shares
+and files are served through the record API as well, by a backend
+(backends/), in the same envelope as every other record.
 
-* **Foundation** types the server itself owns: users, secrets, files,
-  machines, notifications. No app may switch these off; every app that
-  wants one asks for it.
-* **App** types an included app provides — channels and messages.
-  (Boards, tasks, calendars, events and notes are datamodels now, served
-  through the record API — notes by their backend — and listed at
-  `/api/datamodels` with every other Quill's.) Switching the app off takes
-  its type with it, for now. When the same type is stored by the platform
-  rather than by the app, that stops being true, and this catalogue is
-  where the change shows.
-
-Everything here is metadata. Nothing enforces yet; `used_by` and
-`assistant` say what reaches what, so that when the gate arrives it has
-something to be checked against.
+Everything here is metadata, for that listing. What a principal may reach
+is decided by the gate (`principal.check`); `assistant` says the same thing
+here for a person reading the list — secrets never.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 FOUNDATION = "foundation"
 
@@ -39,8 +32,8 @@ FIELD_KINDS = frozenset(
 )
 
 # Who may see a record of the type: exactly one person, a named set of
-# members, or everybody on the server. The three that chat and calendar
-# already use, made the rule for everything.
+# members, or everybody on the server: the three a space in the record
+# store has, made the rule for everything.
 SCOPES = frozenset({"personal", "shared", "public"})
 
 
@@ -64,8 +57,8 @@ class DataType:
     key: str
     label: str
     description: str
-    # Which app stores it today, by feature key, or FOUNDATION for the
-    # server's own.
+    # FOUNDATION for the server's own, which every type is now; an app that
+    # kept a type of its own would be named here by its feature key.
     provided_by: str
     scopes: tuple[str, ...]
     fields: tuple[Field, ...]
@@ -198,13 +191,6 @@ def _check() -> None:
 
 
 _check()
-
-
-@dataclass(frozen=True, slots=True)
-class Access:
-    """Who reaches a type today: the apps that use it, and the assistant."""
-
-    used_by: tuple[str, ...] = field(default_factory=tuple)
 
 
 def catalogue(uses: dict[str, tuple[str, ...]]) -> list[dict]:

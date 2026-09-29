@@ -27,8 +27,8 @@ from pydantic import BaseModel
 from cloudmorrow.server.circles import NONE, Access
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_admin_user, get_current_user, get_state
-from cloudmorrow.server.quillhandlers import CodeError
 from cloudmorrow.server.quills import MANIFEST, MAX_DOWNLOAD, QuillError, fetch, load_catalog
+from cloudmorrow.server.quills.code import CodeError
 
 router = APIRouter(prefix="/api/quills", tags=["quills"])
 
@@ -229,7 +229,7 @@ async def upload(
     data = await request.body()
     if len(data) > MAX_DOWNLOAD:
         raise HTTPException(
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "bigger than a Quill should be"
+            413, "bigger than a Quill should be"
         )
     with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
         root = Path(tmp) / "q"
