@@ -1,0 +1,5 @@
+# Commits git blame should look through: layout only, no change in what the code does.
+# Use with: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Format the code with ruff format
+f4b4ecd4afad862fb3920b18747eab46c5d4be2c
