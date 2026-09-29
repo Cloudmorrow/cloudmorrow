@@ -447,5 +447,5 @@ WebAssembly.
 | actions as MCP tools | `server/mcptools.py` (`action_tools`) |
 | actions and views on the command line | `cli/quillrun.py` (`dispatch`, `_press`, `_view`) |
 | views and actions in the web app | `server/web/kit_view.js` + `kit_view.css` (the primitives), `actions.js` + `actions.css` (forms, effects, the sheet's actions, the action bar), `kit.js` |
-| views and actions in the terminal | `tui/panes/kit_view.py` + `tui/kit_view.tcss` (the primitives), `tui/quill_actions.py` (forms, effects, the ctrl+e palette), `tui/screens/record_sheet.py` |
+| views and actions in the terminal | `tui/panes/kit_view.py`, `tui/widgets/view_nodes.py` + `tui/kit_view.tcss` (the primitives), `tui/quill_actions.py` (forms, effects, the ctrl+e palette), `tui/screens/record_sheet.py` |
 | the template, and its skills | `quill_template/`, `quill_template/claude/skills/` |

@@ -26,7 +26,7 @@ task board has to go on as much as a list of car services does.
 - `thread` is in kit_thread.py: spaces on the left, what is said in the one
   you are on to the right, and a line to write in.
 - `view` is not the kit's: the Quill's own code draws it, as a tree of
-  primitives, and kit_view.py turns the tree into widgets.
+  primitives, and kit_view.py turns the tree into widgets (widgets/view_nodes.py).
 
 Every one of them opens a record in the record sheet, where every field has
 the widget its kind calls for.
