@@ -31,13 +31,8 @@ from cloudmorrow.client import mounts, rclone
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.panes.kit_grid import GridPane, GroupExtension, register_group_extension
 from cloudmorrow.tui.screens.install import InstallRcloneModal
-from cloudmorrow.tui.screens.modals import (
-    CommandModal,
-    ConfirmModal,
-    NoticeModal,
-    PromptModal,
-    ShareModal,
-)
+from cloudmorrow.tui.screens.modals import ConfirmModal, PromptModal
+from cloudmorrow.tui.screens.share_modals import CommandModal, NoticeModal, ShareModal
 from cloudmorrow.tui.theme import GOOD, MUTED, WARN
 from cloudmorrow.tui.widgets.toolbar import Action
 

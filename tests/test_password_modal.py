@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from textual.widgets import Button, Input, Static
 
-from cloudmorrow.tui.screens.modals import PasswordModal
+from cloudmorrow.tui.screens.password import PasswordModal
 from tests.tui_harness import PRESS_ANIMATION, said, settle, start
 
 
