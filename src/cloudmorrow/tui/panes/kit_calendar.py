@@ -27,7 +27,6 @@ how the family calendar is somebody's to put events on but not to make.
 
 from __future__ import annotations
 
-import calendar as cal
 import datetime as dt
 
 from textual import work
@@ -37,12 +36,13 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import DataTable, Static
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.tui.dates import days_of, month_start, shift_month, wall, weeks_of
+from cloudmorrow.tui.kitdata import can_write, field_of, title_of
 from cloudmorrow.tui.panes.kit import KitPane
-from cloudmorrow.tui.screens.record_sheet import RecordSheet, link_choices
 from cloudmorrow.tui.theme import ACCENT, BAD, GOOD, LENS, MUTED, TEXT
-from cloudmorrow.tui.widgets.kit import can_write, field_of, title_of
 from cloudmorrow.tui.widgets.kit_space import NewSpaceModal, SpaceModal, make_space, scope_said
 from cloudmorrow.tui.widgets.toolbar import Action
+from cloudmorrow.tui.words import escape
 
 # The days across the top, starting on Monday, which is where a week starts.
 WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
@@ -65,38 +65,6 @@ DOTS = 3
 
 def colour_for(name: object) -> str:
     return COLOURS.get(str(name or ""), COLOURS["cyan"])
-
-
-def month_start(day: dt.date) -> dt.date:
-    return day.replace(day=1)
-
-
-def shift_month(day: dt.date, months: int) -> dt.date:
-    """The same day-of-month, a month or two along, clamped to a real date."""
-    total = (day.year * 12 + day.month - 1) + months
-    year, month = divmod(total, 12)
-    last = cal.monthrange(year, month + 1)[1]
-    return dt.date(year, month + 1, min(day.day, last))
-
-
-def weeks_of(day: dt.date) -> list[list[dt.date]]:
-    """The month *day* is in, as whole weeks — the ends belong to its neighbours."""
-    return cal.Calendar(firstweekday=0).monthdatescalendar(day.year, day.month)
-
-
-def wall(value: object) -> str:
-    """A stored moment as the wall clock here says it: a zone converted; the
-    wall clock, and a bare date, exactly as they are."""
-    text = str(value or "")
-    if len(text) <= 16:
-        return text
-    try:
-        moment = dt.datetime.fromisoformat(text)
-    except ValueError:
-        return text[:16]
-    if moment.tzinfo is not None:
-        moment = moment.astimezone().replace(tzinfo=None)
-    return moment.strftime("%Y-%m-%dT%H:%M")
 
 
 def clock(stamp: str) -> str:
@@ -136,13 +104,6 @@ def when_said(event: dict) -> str:
     return start if end == start else f"{start}–{end}"
 
 
-def days_of(event: dict) -> list[dt.date]:
-    """Every day a thing is on, so a month can draw it on each of them."""
-    first = dt.date.fromisoformat(event["starts"][:10])
-    last = max(first, dt.date.fromisoformat(event["ends"][:10]))
-    return [first + dt.timedelta(days=step) for step in range((last - first).days + 1)]
-
-
 def by_day(events: list[dict]) -> dict[dt.date, list[dict]]:
     """The things, filed under each day they cover."""
     filed: dict[dt.date, list[dict]] = {}
@@ -177,11 +138,6 @@ def cell_text(day: dt.date, events: list[dict], *, shown: dt.date, today: dt.dat
     return f"{number}\n {dots}{more}"
 
 
-def _escape(text: object) -> str:
-    """Whatever somebody typed is text, not markup."""
-    return str(text or "").replace("[", r"\[")
-
-
 def event_line(event: dict, *, me: str) -> str:
     """One thing, on one line: when, what, the subtitle, and whose space.
 
@@ -190,15 +146,15 @@ def event_line(event: dict, *, me: str) -> str:
     """
     parts = [
         f"[{colour_for(event['colour'])}]●[/] [{MUTED}]{when_said(event):>13}[/]",
-        f"[{TEXT}]{_escape(event['title'])}[/]",
+        f"[{TEXT}]{escape(event['title'])}[/]",
     ]
     if event["subtitle"]:
-        parts.append(f"[{MUTED}]{_escape(event['subtitle'])}[/]")
+        parts.append(f"[{MUTED}]{escape(event['subtitle'])}[/]")
     whose = event["space_name"]
     if event["owner"] and event["owner"] != me:
         whose = f"{whose} · {event['owner']}"
     if whose:
-        parts.append(f"[{MUTED}]{_escape(whose)}[/]")
+        parts.append(f"[{MUTED}]{escape(whose)}[/]")
     return "  ".join(parts)
 
 
@@ -208,7 +164,7 @@ def space_row(space: dict, model: dict, colour: str, *, me: str) -> tuple[str, s
     who = scope_said(space)
     if space.get("scope") == "personal" and space.get("owner") != me:
         who = space.get("owner", "")
-    return f"[{dot}]●[/] {_escape(title_of(space, model))}", f"[{MUTED}]{who}[/]"
+    return f"[{dot}]●[/] {escape(title_of(space, model))}", f"[{MUTED}]{who}[/]"
 
 
 def space_order(space: dict) -> tuple:
@@ -314,10 +270,6 @@ class CalendarPane(KitPane):
     def space_noun(self) -> str:
         return str(self.space_model.get("label") or self.space_model_id or "space").lower()
 
-    @property
-    def me(self) -> str:
-        return getattr(self.app, "username", "") or ""
-
     # -- layout --------------------------------------------------------------
     def content(self) -> ComposeResult:
         with Horizontal(id="calendar-body"):
@@ -349,7 +301,7 @@ class CalendarPane(KitPane):
             return f"[{MUTED}]no {self.space_noun}s[/]"
         colour = colour_for((space.get("fields") or {}).get(self.b["colour"]))
         return (
-            f"new go in [{colour}]{_escape(title_of(space, self.space_model))}[/]  "
+            f"new go in [{colour}]{escape(title_of(space, self.space_model))}[/]  "
             f"[{MUTED}]{len(self.events)} this month[/]"
         )
 
@@ -372,10 +324,11 @@ class CalendarPane(KitPane):
     async def reload(self) -> None:
         if self.api is None:
             return
+        self.forget_links()
         try:
             spaces = await self.api.records(self.space_model_id)
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         self.spaces = sorted(spaces, key=space_order)
         if self.space is None:
@@ -509,15 +462,9 @@ class CalendarPane(KitPane):
         self.reload()
 
     # -- the things on it ---------------------------------------------------------
-    def _adjust(self, fields: dict, record: dict | None) -> dict:
+    def settle(self, fields: dict, record: dict | None) -> dict:
+        """A thing's sheet keeps its length when its start moves (see `settle_times`)."""
         return settle_times(self.b, fields, record)
-
-    async def open_sheet(self, record: dict | None = None, *, preset: dict | None = None):
-        choices = await link_choices(self.api, self.models, self.model)
-        return await self.app.push_screen_wait(
-            RecordSheet(self.api, self.models, self.model_id, record=record, preset=preset,
-                        choices=choices, adjust=self._adjust)
-        )
 
     def act_open_record(self) -> None:
         record = self.selected
@@ -591,7 +538,7 @@ class CalendarPane(KitPane):
         try:
             made = await make_space(self.api, self.space_model, answers, extra)
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         self.space_id = made["id"]
         self.status(f"{title_of(made, self.space_model)} is made. Press p for who is in it.")
@@ -608,7 +555,7 @@ class CalendarPane(KitPane):
             everyone = await self.api.people()
             space = await self.api.record(self.space_model_id, self.space_id)
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         result = await self.app.push_screen_wait(
             SpaceModal(self.api, self.space_model, space, everyone, me=self.me)
@@ -642,9 +589,7 @@ class CalendarPane(KitPane):
             fields.append(f)
         model["fields"] = fields
         models[self.space_model_id] = model
-        result = await self.app.push_screen_wait(
-            RecordSheet(self.api, models, self.space_model_id, record=space)
-        )
+        result = await self.open_sheet(space, model_id=self.space_model_id, models=models)
         if result == "deleted":
             self.space_id = ""
         if result is not None:
@@ -656,13 +601,9 @@ __all__ = [
     "CalendarPane",
     "by_day",
     "cell_text",
-    "days_of",
     "event_line",
     "occasion",
     "settle_times",
-    "shift_month",
     "space_row",
-    "wall",
-    "weeks_of",
     "when_said",
 ]

@@ -40,64 +40,21 @@ from textual.widget import Widget
 from textual.widgets import Button, Input, Label, Static
 
 from cloudmorrow.client.api import ApiError, AuthError
-from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
-from cloudmorrow.tui.screens.record_sheet import (
-    LONG_KINDS,
-    RecordSheet,
-    field_widget,
+from cloudmorrow.tui.kitdata import (
+    SESSION_EXPIRED,
+    all_models,
+    failure,
+    find_action,
+    installed,
     link_choices,
-    read_field,
+    loose_actions,
+    title_of,
 )
-from cloudmorrow.tui.theme import BAD
-from cloudmorrow.tui.widgets.kit import field_label, safe_id, title_of
-
-# A button's look for each tone an action or a view's button may have: the
-# amber primary action, the red one that cannot be taken back, and the rest.
-VARIANTS = {"primary": "primary", "danger": "error"}
-
-
-def variant_for(tone: object) -> str:
-    return VARIANTS.get(str(tone or ""), "default")
-
-
-# -- which actions there are --------------------------------------------------
-def installed(app: Any) -> list[dict]:
-    """The Quills as the server last said, fitted to this person (see the workspace)."""
-    return [q for q in (getattr(app, "quills", None) or []) if q.get("enabled", True)]
-
-
-def actions_on(quills: list[dict], model_id: str) -> list[tuple[dict, dict]]:
-    """Every (Quill, action) `on` *model_id*, in the Quills' order: the sheet's buttons."""
-    return [
-        (quill, action)
-        for quill in quills
-        for action in quill.get("actions") or []
-        if action.get("on") == model_id
-    ]
-
-
-def loose_actions(quills: list[dict]) -> list[tuple[dict, dict]]:
-    """Every (Quill, action) not on a record: the palette's."""
-    return [
-        (quill, action)
-        for quill in quills
-        for action in quill.get("actions") or []
-        if not action.get("on")
-    ]
-
-
-def find_action(quill: dict, action_id: str) -> dict | None:
-    return next((a for a in quill.get("actions") or [] if a.get("id") == action_id), None)
-
-
-def all_models(app: Any, quill: dict | None = None) -> dict:
-    """Every datamodel any installed Quill brought, *quill*'s own winning."""
-    models: dict = {}
-    for other in installed(app):
-        models.update(other.get("models") or {})
-    if quill is not None:
-        models.update(quill.get("models") or {})
-    return models
+from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
+from cloudmorrow.tui.screens.record_sheet import RecordSheet
+from cloudmorrow.tui.theme import BAD, variant_for
+from cloudmorrow.tui.widgets.fields import FieldRows, FormProblem, field_widget
+from cloudmorrow.tui.words import escape
 
 
 # -- talking to the server ------------------------------------------------------
@@ -118,24 +75,8 @@ async def press(
     return list(await api.quill_action(quill_id, action_id, record=record, fields=fields) or [])
 
 
-def failure(effects: list[dict]) -> str | None:
-    """What an `error` effect says, if the action answered with one."""
-    for effect in effects:
-        if effect.get("effect") == "error":
-            return str(effect.get("text") or "That did not work.")
-    return None
-
-
 # -- an action's form -------------------------------------------------------------
-class FormProblem(ValueError):
-    """What is wrong with a form as filled in, and the widget it is wrong in."""
-
-    def __init__(self, message: str, widget: Widget | None) -> None:
-        super().__init__(message)
-        self.widget = widget
-
-
-class ActionFields(Vertical):
+class ActionFields(FieldRows):
     """An action's fields, a row each, with the record sheet's widget for each kind."""
 
     def __init__(
@@ -147,50 +88,21 @@ class ActionFields(Vertical):
         prefix: str = "action",
         **kwargs: Any,
     ) -> None:
-        super().__init__(**kwargs)
-        self.fields = list(fields)
+        super().__init__(fields, prefix=prefix, **kwargs)
         self.values = dict(values or {})
         self.choices = choices or {}
-        self.prefix = prefix
         self.add_class("action-fields")
 
-    def wid(self, field: dict) -> str:
-        return f"{self.prefix}-{safe_id(field['name'])}"
-
-    def compose(self) -> ComposeResult:
-        for field in self.fields:
-            long = field.get("kind") in LONG_KINDS
-            with Horizontal(classes="sheet-row" + (" -long" if long else "")):
-                label = field_label(field) + (" *" if field.get("required") else "")
-                yield Static(label, classes="sheet-label")
-                name = field["name"]
-                value = self.values.get(name, field.get("default"))
-                yield field_widget(field, value, self.wid(field), choices=self.choices.get(name))
-
-    def first(self) -> Widget | None:
-        for field in self.fields:
-            widget = self._widget(field)
-            if widget is not None and widget.focusable:
-                return widget
-        return None
-
-    def _widget(self, field: dict) -> Widget | None:
-        try:
-            return self.query_one(f"#{self.wid(field)}")
-        except Exception:
-            return None
+    def widget(self, field: dict) -> Widget:
+        name = field["name"]
+        value = self.values.get(name, field.get("default"))
+        return field_widget(field, value, self.wid(field), choices=self.choices.get(name))
 
     def collect(self) -> dict:
         """The fields as the action wants them; FormProblem when one is wrong or missing."""
         out: dict = {}
         for field in self.fields:
-            widget = self._widget(field)
-            try:
-                value = read_field(widget, field)
-            except ValueError as exc:
-                raise FormProblem(str(exc), widget) from None
-            if field.get("required") and value in (None, ""):
-                raise FormProblem(f"{field_label(field)} is needed.", widget)
+            value = self.value(field)
             if value in (None, ""):
                 continue  # left empty: the handler's default decides
             out[field["name"]] = value
@@ -260,7 +172,7 @@ class ActionModal(Modal[list | None]):
 
     def say(self, message: str) -> None:
         self.query_one("#action-complaint", Static).update(
-            f"[{BAD}]{_escape(message)}[/]" if message else ""
+            f"[{BAD}]{escape(message)}[/]" if message else ""
         )
 
     async def action_submit(self) -> None:
@@ -282,7 +194,7 @@ class ActionModal(Modal[list | None]):
             )
         except AuthError:
             self.dismiss(None)
-            await self.app.sign_out(message="Session expired — sign in again.")
+            await self.app.sign_out(message=SESSION_EXPIRED)
             return
         except ApiError as exc:
             self.say(str(exc))
@@ -307,10 +219,6 @@ class ActionModal(Modal[list | None]):
 
     def action_cancel(self) -> None:
         self.dismiss(None)
-
-
-def _escape(text: object) -> str:
-    return str(text or "").replace("[", r"\[")
 
 
 # -- pressing one, and what comes of it -------------------------------------------------
@@ -354,7 +262,7 @@ async def run_action(
                 record=str((record or {}).get("id") or ""), fields=values,
             )
         except AuthError:
-            await app.sign_out(message="Session expired — sign in again.")
+            await app.sign_out(message=SESSION_EXPIRED)
             return False
         except ApiError as exc:
             app.say(f"{action.get('label') or ''}: {exc}", error=True)
@@ -411,14 +319,14 @@ async def open_record(app: Any, quill: dict, model_id: str, record_id: str) -> d
     try:
         record = await api.record(model_id, record_id)
     except AuthError:
-        await app.sign_out(message="Session expired — sign in again.")
+        await app.sign_out(message=SESSION_EXPIRED)
         return None
     except ApiError as exc:
         app.say(str(exc), error=True)
         return None
     choices = await link_choices(api, models, models[model_id])
     return await app.push_screen_wait(
-        RecordSheet(api, models, model_id, record=record, choices=choices)
+        RecordSheet(api, models, model_id, record=record, choices=choices, run_action=run_action)
     )
 
 

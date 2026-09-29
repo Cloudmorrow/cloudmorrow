@@ -34,13 +34,14 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Static
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.tui.kitdata import can_write, field_label, field_of, link_rows, shown, title_of
 from cloudmorrow.tui.panes.kit import KitPane, ListPane
 from cloudmorrow.tui.screens.modals import PromptModal
-from cloudmorrow.tui.screens.record_sheet import shown
 from cloudmorrow.tui.theme import MUTED
 from cloudmorrow.tui.widgets.group_list import GroupList
-from cloudmorrow.tui.widgets.kit import can_write, field_label, field_of, safe_id, title_of
+from cloudmorrow.tui.widgets.kit import safe_id
 from cloudmorrow.tui.widgets.toolbar import Action
+from cloudmorrow.tui.words import plural
 
 MASK = "••••••••"
 
@@ -168,10 +169,7 @@ class GroupedListPane(ListPane):
     async def _choices(self, field: dict, records: list[dict]) -> list[tuple[str, str]]:
         if field.get("kind") == "link":
             target = self.models.get(field.get("to")) or {}
-            try:
-                rows = await self.api.records(field["to"])
-            except ApiError:
-                rows = []
+            rows = await link_rows(self.api, field["to"], self.linked) or []
             return [(str(r["id"]), title_of(r, target)) for r in rows]
         if field.get("kind") == "enum":
             labels = field.get("labels") or field.get("values") or []
@@ -227,11 +225,12 @@ class GroupedListPane(ListPane):
     async def reload(self, message: str = "", keep: str | None = None) -> None:
         if self.api is None:
             return
+        self.forget_links()
         try:
             self.all = await self.api.records(self.model_id)
             await self.load_link_titles([self.subtitle])
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         self.loaded = True
         if keep is not None:
@@ -273,11 +272,11 @@ class GroupedListPane(ListPane):
         if not self.loaded:
             return None
         count = len(self.all)
-        said = f"{count} {self.noun}{'' if count == 1 else 's'}"
+        said = plural(count, self.noun)
         if self.levels:
             groups = len([g for g in self.offered[0] if g[2]])
             noun = field_label(self.levels[0]).lower()
-            said = f"{groups} {noun}{'' if groups == 1 else 's'}, {said}"
+            said = f"{plural(groups, noun)}, {said}"
         return "ok", said
 
     # -- picking -------------------------------------------------------------
@@ -344,9 +343,11 @@ class GroupedListPane(ListPane):
             try:
                 made = await self.api.create_record(field["to"], {target.get("title", "title"): text})
             except ApiError as exc:
-                await self.signed_out(exc)
+                await self.went_wrong(exc)
                 return
             value = str(made["id"])
+            # One more of them than was read: the level reads them again.
+            self.linked.pop(field["to"], None)
         self.stand(index, value)
 
     # -- the records -----------------------------------------------------------
@@ -423,6 +424,6 @@ class GroupedListPane(ListPane):
         try:
             full = await self.api.record(self.model_id, record["id"])
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return None
         return str((full.get("fields") or {}).get(self.hidden["name"]) or "")

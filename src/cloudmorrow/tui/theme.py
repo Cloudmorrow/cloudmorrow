@@ -41,6 +41,7 @@ from cloudmorrow.palette import (
 )
 
 __all__ = [
+    "VARIANTS",
     "ACCENT",
     "ACTION",
     "ACTION_INK",
@@ -63,7 +64,17 @@ __all__ = [
     "SURFACE",
     "TEXT",
     "WARN",
+    "variant_for",
 ]
+
+# A button's look for each tone an action or a view's button may have: the
+# amber primary action, the red one that cannot be taken back, and the rest.
+VARIANTS = {"primary": "primary", "danger": "error"}
+
+
+def variant_for(tone: object) -> str:
+    return VARIANTS.get(str(tone or ""), "default")
+
 
 CLOUDMORROW_THEME = Theme(
     name="cloudmorrow",

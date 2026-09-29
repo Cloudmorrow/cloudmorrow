@@ -49,6 +49,7 @@ from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
 from cloudmorrow.tui.theme import ACCENT, BAD, MUTED, SECOND, WARN
 from cloudmorrow.tui.widgets.toolbar import Action
+from cloudmorrow.tui.words import short_stamp
 
 # What the server stores, and what it is called on screen.
 ROLES: tuple[tuple[str, str], ...] = (
@@ -73,10 +74,6 @@ TYPE_NOTE = (
 )
 # The server asks for this much; saying so here beats a 422 from the API.
 MIN_PASSWORD = 8
-
-
-def _short(value: str | None, width: int = 16) -> str:
-    return (value or "—")[:width].replace("T", " ")
 
 
 class UserModal(Modal[dict | None]):
@@ -291,7 +288,7 @@ class UsersView(Pane):
             f"[{colours.get(kind, MUTED)}]{LABELS.get(kind, kind)}[/]",
             within,
             "yes" if user.get("is_active", True) else f"[{BAD}]no[/]",
-            _short(user.get("created_at")),
+            short_stamp(user.get("created_at")),
         )
 
     # -- actions -----------------------------------------------------------
@@ -427,7 +424,7 @@ class FeaturesView(Pane):
             state = "on" if feature["enabled"] else "off"
             turned = (
                 f"  ·  switched {state} by {feature['changed_by']}"
-                f" {_short(feature.get('updated_at'))}"
+                f" {short_stamp(feature.get('updated_at'))}"
             )
         row = Vertical(
             Checkbox(

@@ -24,9 +24,10 @@ from cloudmorrow.client.config import ClientConfig
 from cloudmorrow.quill import ui
 from cloudmorrow.server.app import create_app
 from cloudmorrow.tui.panes.kit import pane_for
-from cloudmorrow.tui.panes.kit_view import RENDERERS, Drawer, TableNode, ViewPane
+from cloudmorrow.tui.panes.kit_view import ViewPane
 from cloudmorrow.tui.quill_actions import ActionModal
 from cloudmorrow.tui.screens.record_sheet import RecordSheet
+from cloudmorrow.tui.widgets.view_nodes import RENDERERS, Drawer, TableNode
 from tests.conftest import ADMIN, token_for
 from tests.tui_harness import PRESS_ANIMATION, settle, start
 
@@ -231,7 +232,8 @@ async def test_a_refusal_is_said_in_the_quills_words(fleet):
     app = fleet
     async with app.run_test(size=(120, 40)) as pilot:
         await start(app, pilot)
-        from cloudmorrow.tui.quill_actions import find_action, run_action
+        from cloudmorrow.tui.kitdata import find_action
+        from cloudmorrow.tui.quill_actions import run_action
 
         quill = next(q for q in app.quills if q["id"] == "fleet")
         ran = []
@@ -258,7 +260,8 @@ async def test_a_view_that_fails_says_why_where_it_would_be(fleet):
 
 
 async def test_the_palette_has_the_actions_on_no_record(fleet):
-    from cloudmorrow.tui.quill_actions import QuillCommands, installed, loose_actions
+    from cloudmorrow.tui.kitdata import installed, loose_actions
+    from cloudmorrow.tui.quill_actions import QuillCommands
 
     app = fleet
     async with app.run_test(size=(120, 40)) as pilot:
@@ -314,7 +317,7 @@ async def test_every_primitive_is_drawn_and_what_can_be_changed_is_saved(fleet):
         await pane.draw()
         await settle(app, pilot)
 
-        from cloudmorrow.tui.panes.kit_view import walk
+        from cloudmorrow.tui.widgets.view_nodes import walk
 
         for node, path in walk(pane.view_tree):
             if path.startswith("v-8-"):

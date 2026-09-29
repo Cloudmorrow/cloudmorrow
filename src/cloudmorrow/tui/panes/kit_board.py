@@ -35,22 +35,17 @@ from textual.containers import Horizontal
 from textual.widgets import Tab, Tabs
 
 from cloudmorrow.client.api import ApiError
-from cloudmorrow.tui.panes.kit import KitPane
-from cloudmorrow.tui.screens.modals import ConfirmModal, PromptModal
-from cloudmorrow.tui.screens.record_sheet import RecordSheet, link_choices
-from cloudmorrow.tui.theme import MUTED
-from cloudmorrow.tui.widgets.kit import (
-    Lane,
-    RecordCard,
+from cloudmorrow.tui.kitdata import (
     can_write,
     enum_options,
     field_of,
     how_long,
-    lane_under,
-    neighbour_lane,
-    safe_id,
     title_of,
 )
+from cloudmorrow.tui.panes.kit import KitPane
+from cloudmorrow.tui.screens.modals import ConfirmModal, PromptModal
+from cloudmorrow.tui.theme import MUTED
+from cloudmorrow.tui.widgets.kit import Lane, RecordCard, lane_under, neighbour_lane, safe_id
 from cloudmorrow.tui.widgets.toolbar import Action
 
 # A group's tab is `group-<record id>`. Record ids are `r_…`, so `new` can
@@ -155,7 +150,7 @@ class BoardPane(KitPane):
             try:
                 self.groups = await self.api.records(self.group_model_id)
             except ApiError as exc:
-                await self.signed_out(exc)
+                await self.went_wrong(exc)
                 return
             ids = {row["id"] for row in self.groups}
             if self.group not in ids:
@@ -203,13 +198,14 @@ class BoardPane(KitPane):
                             note=True)
             return
         where = {self.group_field: self.group} if self.group_field else {}
+        self.forget_links()
         try:
             if self.lane_model_id:
                 await self.load_lanes()
             self.records = await self.api.records(self.model_id, **where)
             await self.load_link_titles(self.subtitles)
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         self.loaded = True
         await self.draw_lanes()
@@ -342,13 +338,10 @@ class BoardPane(KitPane):
                     self.group_model_id, {self.group_model.get("title") or "title": title}
                 )
             except ApiError as exc:
-                await self.signed_out(exc)
+                await self.went_wrong(exc)
                 return
         else:
-            choices = await link_choices(self.api, self.models, self.group_model)
-            made = await self.app.push_screen_wait(
-                RecordSheet(self.api, self.models, self.group_model_id, choices=choices)
-            )
+            made = await self.open_sheet(None, model_id=self.group_model_id)
             if not isinstance(made, dict):
                 return
         self.group = made["id"]
@@ -377,12 +370,8 @@ class BoardPane(KitPane):
                 self.group_model_id, current["id"], {title_field: title}, rev=current.get("rev")
             )
         except ApiError as exc:
-            if exc.status_code == 409:
-                self.status(f"That {self.group_noun} changed somewhere else — try again.",
-                            error=True)
+            if await self.went_wrong(exc, stale=True) == "conflict":
                 self.reload()
-                return
-            await self.signed_out(exc)
             return
         self.reload()
 
@@ -410,7 +399,7 @@ class BoardPane(KitPane):
         try:
             await self.api.delete_record(self.group_model_id, current["id"])
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         self.group = None
         self.reload()
@@ -517,7 +506,7 @@ class BoardPane(KitPane):
         try:
             await self.api.move_record(self.model_id, record["id"], {self.lane_field: lane}, index)
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             # The board on screen no longer matches the server; ask again.
             await self.load_records()
             return

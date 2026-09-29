@@ -15,6 +15,7 @@ from textual.binding import Binding
 
 from cloudmorrow.client.api import ApiError, AuthError, CloudmorrowClient, client_from_credentials
 from cloudmorrow.client.config import ClientConfig, StoredCredentials, clear_credentials
+from cloudmorrow.tui.kitdata import SESSION_EXPIRED
 from cloudmorrow.tui.screens.login import LoginScreen
 from cloudmorrow.tui.screens.splash import SplashScreen
 from cloudmorrow.tui.screens.workspace import WorkspaceScreen
@@ -168,7 +169,7 @@ class CloudmorrowApp(App):
         except AuthError:
             await client.aclose()
             clear_credentials()
-            await self._show_login("Session expired — sign in again.")
+            await self._show_login(SESSION_EXPIRED)
             return
         except ApiError as exc:
             await client.aclose()

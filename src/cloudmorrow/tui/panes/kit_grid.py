@@ -46,12 +46,13 @@ from textual.message import Message
 from textual.widgets import Button, ContentSwitcher, DataTable, Static
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.tui.kitdata import can_write, field_of
 from cloudmorrow.tui.panes.kit import KitPane
 from cloudmorrow.tui.screens.modals import ConfirmModal, PromptModal
 from cloudmorrow.tui.theme import MUTED
-from cloudmorrow.tui.widgets.kit import can_write, field_of
 from cloudmorrow.tui.widgets.picture import Picture, TerminalImage
 from cloudmorrow.tui.widgets.toolbar import Action
+from cloudmorrow.tui.words import plural
 
 # -- what a file is ----------------------------------------------------------------
 # The same kinds, by the same extensions, as the web app's kit_grid.js: the
@@ -555,7 +556,7 @@ class GridPane(KitPane):
                 self.group, self.folder = None, ""
                 self.load(str(exc))
                 return
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         self.loaded = True
         self.draw()
@@ -712,7 +713,7 @@ class GridPane(KitPane):
             return None
         count = len(self.groups)
         noun = str(self.group_model.get("label") or "group").lower()
-        return "ok", f"{count} {noun}{'' if count == 1 else 's'}"
+        return "ok", plural(count, noun)
 
     def status_detail(self) -> str:
         entry = self.highlighted
@@ -978,13 +979,8 @@ class GridPane(KitPane):
                 self.model_id, entry["id"], fields, rev=entry["rev"] or None
             )
         except ApiError as exc:
-            self.status(
-                "That changed somewhere else — here it is as it is now."
-                if exc.status_code == 409
-                else str(exc),
-                error=True,
-            )
-            self.reload()
+            if await self.went_wrong(exc, stale=True) != "auth":
+                self.reload()
             return
         self.status(
             "Renamed" if what == "rename" else f"Moved to {answer.strip('/ ') or 'the top'}"

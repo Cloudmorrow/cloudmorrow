@@ -23,11 +23,15 @@ surface sees it.
 from __future__ import annotations
 
 __all__ = [
+    "CONTAINERS",
+    "GAPS",
     "PRIMITIVES",
+    "TONES",
     "badge",
     "button",
     "cards",
     "check",
+    "children",
     "columns",
     "divider",
     "empty",
@@ -310,6 +314,21 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
 }
 
 CONTAINERS = {"stack": "children", "row": "children", "columns": "children", "menu": "items"}
+
+
+def children(node) -> list:
+    """What a node holds, in order: a container's children, a menu's items, each tab's child.
+
+    The one reading of a tree's shape, for anything that walks one — `check`
+    here, and every surface that draws it.
+    """
+    if not isinstance(node, dict):
+        return []
+    kind = node.get("ui")
+    if kind == "tabs":
+        return [tab.get("child") or {} for tab in node.get("tabs") or [] if isinstance(tab, dict)]
+    key = CONTAINERS.get(kind)
+    return list(node.get(key) or []) if key else []
 
 
 def check(tree, *, actions=None, screens=None) -> dict:

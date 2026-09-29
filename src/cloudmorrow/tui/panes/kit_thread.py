@@ -31,11 +31,10 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import DataTable, Input, Static
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.tui.kitdata import can_write, field_of
 from cloudmorrow.tui.panes.kit import KitPane
 from cloudmorrow.tui.screens.modals import ConfirmModal
-from cloudmorrow.tui.screens.record_sheet import RecordSheet, link_choices
 from cloudmorrow.tui.theme import ACCENT, BAD, MUTED, SECOND
-from cloudmorrow.tui.widgets.kit import can_write, field_of
 from cloudmorrow.tui.widgets.kit_space import (
     NewSpaceModal,
     PickPersonModal,
@@ -45,6 +44,7 @@ from cloudmorrow.tui.widgets.kit_space import (
     space_name,
 )
 from cloudmorrow.tui.widgets.toolbar import Action
+from cloudmorrow.tui.words import escape, plural
 
 # How often an open conversation asks for what it has not got.
 POLL_SECONDS = 5.0
@@ -59,10 +59,6 @@ def _clock(stamp: str | None) -> str:
 
 def _day(stamp: str | None) -> str:
     return (stamp or "")[:10]
-
-
-def _escape(text: str) -> str:
-    return text.replace("[", r"\[")
 
 
 def render_lines(lines: list[dict], body: str, me: str) -> str:
@@ -85,12 +81,12 @@ def render_lines(lines: list[dict], body: str, me: str) -> str:
             author = str(line.get("owner") or "")
             colour = ACCENT if author == me else SECOND
             who = "you" if author == me else author
-            out.append(f"[{colour}]{_escape(who)}[/] [{MUTED}]{_clock(when)}[/]")
+            out.append(f"[{colour}]{escape(who)}[/] [{MUTED}]{_clock(when)}[/]")
         edited = f" [{MUTED}](edited)[/]" if line.get("updated_at") not in (None, when) else ""
         # Whatever somebody typed is text, not markup: square brackets in a
         # message are square brackets.
         for text in str((line.get("fields") or {}).get(body) or "").splitlines() or [""]:
-            out.append(f"  {_escape(text)}{edited}")
+            out.append(f"  {escape(text)}{edited}")
             edited = ""
     return "\n".join(out)
 
@@ -184,10 +180,6 @@ class ThreadPane(KitPane):
             self._timer.pause()
 
     @property
-    def me(self) -> str:
-        return getattr(self.app, "username", "") or ""
-
-    @property
     def space(self) -> dict | None:
         return next((s for s in self.spaces if s["id"] == self._open), None)
 
@@ -198,7 +190,7 @@ class ThreadPane(KitPane):
 
     def _row(self, space: dict) -> tuple[str, str]:
         waiting = space.get("unread") or 0
-        label = _escape(self.label(space))
+        label = escape(self.label(space))
         return (f"[{ACCENT}]{label}[/]" if waiting else label, f"[{ACCENT}]{waiting}[/]" if waiting else "")
 
     # -- the spaces ------------------------------------------------------------
@@ -216,10 +208,11 @@ class ThreadPane(KitPane):
     async def reload(self) -> None:
         if self.api is None:
             return
+        self.forget_links()
         try:
             self.spaces = await self._fetch_spaces()
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         self.loaded = True
         table = self.query_one("#space-table", DataTable)
@@ -280,7 +273,7 @@ class ThreadPane(KitPane):
         try:
             lines = await self.api.records(self.model_id, last=PAGE, **{self.link: space_id})
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return
         if space_id != self._open:
             return   # moved on while this was in the air
@@ -289,7 +282,7 @@ class ThreadPane(KitPane):
         space = self.space or {}
         about = "" if is_between(self.spec, space) else str((space.get("fields") or {}).get(self.about) or "")
         self.query_one("#conversation-title", Static).update(
-            f"[{ACCENT}]{_escape(self.label(space))}[/]" + (f"  [{MUTED}]{_escape(about)}[/]" if about else "")
+            f"[{ACCENT}]{escape(self.label(space))}[/]" + (f"  [{MUTED}]{escape(about)}[/]" if about else "")
         )
         self._draw()
         await self._seen()
@@ -532,10 +525,7 @@ class ThreadPane(KitPane):
             return
         taken = {name for fields in made_as(self.spec).values() for name in fields}
         only = [f["name"] for f in self.space_model.get("fields", []) if f["name"] not in taken]
-        choices = await link_choices(self.api, self.models, self.space_model)
-        result = await self.app.push_screen_wait(
-            RecordSheet(self.api, self.models, self.space_model_id, record=space, only=only, choices=choices)
-        )
+        result = await self.open_sheet(space, model_id=self.space_model_id, only=only)
         if result is None:
             return
         if result == "deleted":
@@ -552,7 +542,7 @@ class ThreadPane(KitPane):
             return "news", f"{waiting} unread"
         count = len(self.spaces)
         noun = str(self.space_model.get("label") or "space").lower()
-        return "ok", f"{count} {noun}{'' if count == 1 else 's'}, all read"
+        return "ok", f"{plural(count, noun)}, all read"
 
     def status_detail(self) -> str:
         waiting = sum(s.get("unread") or 0 for s in self.spaces)

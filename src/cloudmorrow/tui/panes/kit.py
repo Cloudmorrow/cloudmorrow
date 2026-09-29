@@ -26,7 +26,7 @@ task board has to go on as much as a list of car services does.
 - `thread` is in kit_thread.py: spaces on the left, what is said in the one
   you are on to the right, and a line to write in.
 - `view` is not the kit's: the Quill's own code draws it, as a tree of
-  primitives, and kit_view.py turns the tree into widgets.
+  primitives, and kit_view.py turns the tree into widgets (widgets/view_nodes.py).
 
 Every one of them opens a record in the record sheet, where every field has
 the widget its kind calls for.
@@ -40,18 +40,33 @@ they may only read, which each pane refuses itself.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from textual import work
 from textual.app import ComposeResult
-from textual.coordinate import Coordinate
 from textual.widgets import DataTable
 
 from cloudmorrow.client.api import ApiError, AuthError
+from cloudmorrow.tui.kitdata import (
+    CONFLICT,
+    SESSION_EXPIRED,
+    can_write,
+    field_label,
+    field_of,
+    is_conflict,
+    link_choices,
+    link_rows,
+    shown,
+    title_of,
+)
 from cloudmorrow.tui.panes.base import Pane
+from cloudmorrow.tui.quill_actions import run_action
 from cloudmorrow.tui.screens.modals import ConfirmModal
-from cloudmorrow.tui.screens.record_sheet import RecordSheet, link_choices, shown
+from cloudmorrow.tui.screens.record_sheet import RecordSheet
 from cloudmorrow.tui.theme import GOOD, MUTED
-from cloudmorrow.tui.widgets.kit import can_write, field_label, field_of, title_of
+from cloudmorrow.tui.widgets.kit import settle_widths
 from cloudmorrow.tui.widgets.toolbar import Action
+from cloudmorrow.tui.words import plural
 
 
 def screen_key(quill: dict, screen: dict) -> str:
@@ -100,15 +115,22 @@ class KitPane(Pane):
             self.SUMMARY = f"{self.SUMMARY} · read only" if self.SUMMARY else "read only"
         # What the records a link field points at are called, by field and id.
         self.link_titles: dict[str, dict[str, str]] = {}
+        # The records links point at, by datamodel, as read since the pane
+        # last loaded: the rows' titles, a level's values and a sheet's
+        # drop-downs are one read of each, not one apiece.
+        self.linked: dict[str, list[dict]] = {}
+
+    def forget_links(self) -> None:
+        """What links point at is read afresh: the pane is loading, or a sheet changed something."""
+        self.linked.clear()
 
     async def load_link_titles(self, fields: list[dict | None]) -> None:
         """Read the titles for *fields* that are links, so a row says "Acme", not an id."""
         for field in fields:
             if not field or field.get("kind") != "link" or field.get("to") not in self.models:
                 continue
-            try:
-                rows = await self.api.records(field["to"])
-            except ApiError:
+            rows = await link_rows(self.api, field["to"], self.linked)
+            if rows is None:
                 continue
             target = self.models[field["to"]]
             self.link_titles[field["name"]] = {str(r["id"]): title_of(r, target) for r in rows}
@@ -118,6 +140,11 @@ class KitPane(Pane):
         if field.get("kind") == "link" and value:
             return self.link_titles.get(field["name"], {}).get(str(value), "—")
         return shown(field, value)
+
+    @property
+    def me(self) -> str:
+        """Who is signed in: whose a space or a line is, said by name."""
+        return getattr(self.app, "username", "") or ""
 
     @property
     def noun(self) -> str:
@@ -145,42 +172,85 @@ class KitPane(Pane):
     def on_show(self) -> None:
         self.reload()
 
-    async def signed_out(self, exc: Exception) -> bool:
-        """An expired session sends you to sign in; anything else is said here."""
+    async def went_wrong(self, exc: ApiError, *, stale: bool = False) -> str:
+        """Say what the server refused, each kind of refusal in its one way.
+
+        An expired session sends you to sign in. Somebody else's change
+        winning over a write that carried its revision — *stale* says it did
+        — is said as that, the same everywhere; anything else is said in the
+        server's own words. Which it was, "auth", "conflict" or "other", is
+        for a caller that does more about one of them: draws again after a
+        conflict, and does nothing at all once signed out.
+        """
         if isinstance(exc, AuthError):
-            await self.app.sign_out(message="Session expired — sign in again.")
-            return True
+            await self.app.sign_out(message=SESSION_EXPIRED)
+            return "auth"
+        if is_conflict(exc, stale=stale):
+            self.status(CONFLICT, error=True)
+            return "conflict"
         self.status(str(exc), error=True)
-        return False
+        return "other"
+
+    # What this kit knows about its screen's records that the datamodel does
+    # not, as a sheet's `adjust`: given the fields about to be sent and the
+    # record as it was, what to send instead. None when it knows nothing more.
+    settle: Callable[[dict, dict | None], dict] | None = None
 
     async def open_sheet(
-        self, record: dict | None = None, *, preset: dict | None = None
+        self,
+        record: dict | None = None,
+        *,
+        preset: dict | None = None,
+        model_id: str = "",
+        models: dict | None = None,
+        only: list[str] | None = None,
+        adjust: Callable[[dict, dict | None], dict] | None = None,
     ) -> dict | str | None:
         """The record sheet for *record*, or for a new one starting from *preset*.
 
+        Of the screen's own datamodel unless *model_id* says another — a
+        board's groups, a calendar's spaces. On its own, the screen's
+        `fields` are what the sheet shows and `settle` has its say in what is
+        sent; *only* and *adjust* say those for another. *models* stands in
+        for the Quill's when the pane draws a datamodel its own way: the
+        calendar's colour as the five there are.
+
+        Every sheet a kit pane opens comes through here, so each has its
+        links' drop-downs filled, its secrets read, and a Quill's actions.
         Called from a worker: it waits for the sheet to be answered.
         """
-        choices = await link_choices(self.api, self.models, self.model)
-        # A screen that names its fields shows those on the sheet, in that order.
-        only = self.spec.get("fields") or None
-        if record is not None and any(f.get("secret") for f in self.model.get("fields", [])):
+        model_id = model_id or self.model_id
+        models = models if models is not None else self.models
+        model = models[model_id]
+        if model_id == self.model_id:
+            # A screen that names its fields shows those on the sheet, in that order.
+            only = only or self.spec.get("fields") or None
+            adjust = adjust or self.settle
+        choices = await link_choices(self.api, models, model, cache=self.linked)
+        if record is not None and any(f.get("secret") for f in model.get("fields", [])):
             # A listing never carries a secret field; the record itself does.
             try:
-                record = await self.api.record(self.model_id, record["id"])
+                record = await self.api.record(model_id, record["id"])
             except ApiError as exc:
-                await self.signed_out(exc)
+                await self.went_wrong(exc)
                 return None
-        return await self.app.push_screen_wait(
+        result = await self.app.push_screen_wait(
             RecordSheet(
                 self.api,
-                self.models,
-                self.model_id,
+                models,
+                model_id,
                 record=record,
                 preset=preset,
                 only=only,
                 choices=choices,
+                adjust=adjust,
+                run_action=run_action,
             )
         )
+        if result is not None:
+            # Saved, deleted or acted on: what a link may point at may be different now.
+            self.forget_links()
+        return result
 
     async def confirm_delete(self, record: dict) -> bool:
         """Ask, then delete. True when it went."""
@@ -195,7 +265,7 @@ class KitPane(Pane):
         try:
             await self.api.delete_record(self.model_id, record["id"])
         except ApiError as exc:
-            await self.signed_out(exc)
+            await self.went_wrong(exc)
             return False
         return True
 
@@ -244,14 +314,21 @@ class ListPane(KitPane):
     async def reload(self) -> None:
         if self.api is None:
             return
+        if not await self._fetch():
+            return
+        self.loaded = True
+        self.draw()
+
+    async def _fetch(self) -> bool:
+        """The records again, and what their links are called. False when it failed."""
+        self.forget_links()
         try:
             self.records = await self.api.records(self.model_id)
             await self.load_link_titles([self.subtitle])
         except ApiError as exc:
-            await self.signed_out(exc)
-            return
-        self.loaded = True
-        self.draw()
+            await self.went_wrong(exc)
+            return False
+        return True
 
     def draw(self, *, keep: str | None = None) -> None:
         table = self.query_one("#kit-table", DataTable)
@@ -265,26 +342,12 @@ class ListPane(KitPane):
             )
         if self.records:
             table.move_cursor(row=min(max(row, 0), len(self.records) - 1))
-            table.call_after_refresh(self._settle_widths, table)
+            table.call_after_refresh(settle_widths, table)
         empty = "Nothing here."
         if self.writes:
             empty = f"Nothing here yet — New {self.noun} starts one."
 
         self.status("" if self.records else empty, note=True)
-
-
-    @staticmethod
-    def _settle_widths(table: DataTable) -> None:
-        """Draw the table again once its columns know how wide they are.
-
-        A DataTable measures new rows when it is next idle, but a frame
-        drawn before then is cached at the old widths — which, after a table
-        that was empty, is the width of the header: "Middl". Writing one cell
-        back as it was is the public way to make it draw afresh.
-        """
-        if table.row_count:
-            table.update_cell_at(Coordinate(0, 0), table.get_cell_at(Coordinate(0, 0)),
-                                 update_width=True)
 
     def _row(self, record: dict) -> tuple[str, ...]:
         fields = record.get("fields") or {}
@@ -306,11 +369,11 @@ class ListPane(KitPane):
             waiting = sum(1 for r in self.records if not (r.get("fields") or {}).get(name))
             return ("news", f"{waiting} open") if waiting else ("ok", "all done")
         count = len(self.records)
-        return "ok", f"{count} {self.noun}{'' if count == 1 else 's'}"
+        return "ok", plural(count, self.noun)
 
     def status_detail(self) -> str:
         count = len(self.records)
-        return f"[{MUTED}]{count} {self.noun}{'' if count == 1 else 's'}[/]"
+        return f"[{MUTED}]{plural(count, self.noun)}[/]"
 
     @property
     def selected(self) -> dict | None:
@@ -347,12 +410,7 @@ class ListPane(KitPane):
     async def new_record(self) -> None:
         preset = {self.tick["name"]: False} if self.tick else None
         saved = await self.open_sheet(None, preset=preset)
-        if not isinstance(saved, dict):
-            return
-        try:
-            self.records = await self.api.records(self.model_id)
-        except ApiError as exc:
-            await self.signed_out(exc)
+        if not isinstance(saved, dict) or not await self._fetch():
             return
         self.draw(keep=saved["id"])
         self.status(f"Added {title_of(saved, self.model)}.")
@@ -385,18 +443,11 @@ class ListPane(KitPane):
                 self.model_id, record["id"], {name: value}, rev=record.get("rev")
             )
         except ApiError as exc:
-            if exc.status_code == 409:
-                self.status("That changed somewhere else — here it is as it is now.", error=True)
-            else:
-                await self.signed_out(exc)
-            self.reload()
+            if await self.went_wrong(exc, stale=True) != "auth":
+                self.reload()
             return
-        try:
-            self.records = await self.api.records(self.model_id)
-        except ApiError as exc:
-            await self.signed_out(exc)
-            return
-        self.draw(keep=record["id"])
+        if await self._fetch():
+            self.draw(keep=record["id"])
 
 
 def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:

@@ -29,6 +29,7 @@ from textual.timer import Timer
 from textual.widgets import Static
 
 from cloudmorrow.client.api import ApiError, AuthError
+from cloudmorrow.tui.kitdata import is_conflict
 from cloudmorrow.tui.panes.kit import KitPane
 from cloudmorrow.tui.screens.modals import (
     ConfirmModal,
@@ -41,6 +42,7 @@ from cloudmorrow.tui.widgets.editor import LiveMarkdownEditor
 from cloudmorrow.tui.widgets.note_tree import NoteTree
 from cloudmorrow.tui.widgets.picture import IMAGE_REF, Picture, image_refs
 from cloudmorrow.tui.widgets.toolbar import Action
+from cloudmorrow.tui.words import plural
 
 
 def _folder_of(path: str) -> str:
@@ -118,7 +120,7 @@ class EditorPane(KitPane):
         if not self.loaded:
             return None
         count = len(self.records)
-        return "ok", f"{count} {self.noun}{'' if count == 1 else 's'}"
+        return "ok", plural(count, self.noun)
 
     # -- what a record is called here -------------------------------------------
     def path_of(self, record: dict) -> str:
@@ -179,11 +181,8 @@ class EditorPane(KitPane):
             folders: list[str] = []
             if self.keeps_folders:
                 folders = [f["path"] for f in await client.record_folders(self.model_id)]
-        except AuthError:
-            await self.app.sign_out(message="Session expired — sign in again.")
-            return
         except ApiError as exc:
-            self.status(str(exc), error=True)
+            await self.went_wrong(exc)
             return
         self.loaded = True
         self.query_one(NoteTree).load_tree(
@@ -211,11 +210,8 @@ class EditorPane(KitPane):
             await self._save()
         try:
             record = await self.api.record(self.model_id, record_id)
-        except AuthError:
-            await self.app.sign_out(message="Session expired — sign in again.")
-            return
         except ApiError as exc:
-            self.status(str(exc), error=True)
+            await self.went_wrong(exc)
             return
         self._show(record)
 
@@ -288,11 +284,11 @@ class EditorPane(KitPane):
                 self.model_id, record_id, {self.body_field: content},
                 rev=None if force else self.current_rev,
             )
-        except AuthError:
-            await self.app.sign_out(message="Session expired — sign in again.")
+        except AuthError as exc:
+            await self.went_wrong(exc)
             return
         except ApiError as exc:
-            if exc.status_code != 409:
+            if not is_conflict(exc, stale=True):
                 self.status(f"Save failed: {exc}", error=True)
                 return
             choice = await self.app.push_screen_wait(ConflictModal(self.current_path or ""))

@@ -14,7 +14,7 @@ from cloudmorrow.client import mounts, rclone
 from cloudmorrow.tui.app import CloudmorrowApp
 from cloudmorrow.tui.panes.kit_grid import GridPane
 from cloudmorrow.tui.screens.install import InstallRcloneModal
-from cloudmorrow.tui.screens.modals import NoticeModal
+from cloudmorrow.tui.screens.share_modals import NoticeModal
 from tests.tui_harness import agent_row, said, settle, start
 
 
