@@ -86,6 +86,7 @@ FETCH_TIMEOUT = 30.0
 FETCH_MAX = 10 * 1024 * 1024
 FETCH_METHODS = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"})
 
+# Made by schema.py, step 1. A change to it is a new step there.
 TABLE = """
 CREATE TABLE IF NOT EXISTS quill_call_runs (
     -- When each `call` job last ran, so a restart does not run a daily one again.
@@ -306,9 +307,7 @@ class QuillCode:
         self._running_jobs: set[tuple[str, str]] = set()
         self._stop = threading.Event()
         self._worker: threading.Thread | None = None
-        with connect(self.config.db_path) as conn:
-            conn.executescript(TABLE)
-        conn.close()
+        connect(self.config.db_path).close()
         state.records.on_change.append(self._on_change)
         state.quills.listeners.append(self.reconcile)
 

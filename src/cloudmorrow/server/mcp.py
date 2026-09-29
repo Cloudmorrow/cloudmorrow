@@ -30,6 +30,7 @@ from urllib.parse import urlsplit
 
 from cloudmorrow.server.db import connect
 
+# Made by schema.py, step 1. A change to it is a new step there.
 TABLES = """
 CREATE TABLE IF NOT EXISTS mcp_clients (
     -- A client that registered itself, and what it said it was.
@@ -221,8 +222,7 @@ class MCPStore:
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
-            conn.executescript(TABLES)
+        self._connect().close()
 
     def _connect(self) -> sqlite3.Connection:
         return connect(self.db_path)

@@ -43,6 +43,7 @@ __all__ = ["PREFIX", "QuillTokenStore", "runs_as"]
 
 PREFIX = "cmq_"
 
+# Made by schema.py, step 1. A change to it is a new step there.
 TABLES = """
 CREATE TABLE IF NOT EXISTS quill_tokens (
     -- One live token per installed Quill that runs code. Only the hash:
@@ -89,9 +90,7 @@ class QuillTokenStore:
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
-            conn.executescript(TABLES)
-        conn.close()
+        self._connect().close()
 
     def _connect(self) -> sqlite3.Connection:
         return connect(self.db_path)

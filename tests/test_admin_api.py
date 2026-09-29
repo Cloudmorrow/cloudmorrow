@@ -83,6 +83,8 @@ def test_an_account_from_before_roles_existed_keeps_its_rights(config, tmp_path)
     # Put the database back the way it looked before the column existed.
     with connect(config.db_path) as conn:
         conn.execute("ALTER TABLE users DROP COLUMN role")
+        # And as old as that: from before the database carried a version.
+        conn.execute("PRAGMA user_version = 0")
     reopened = UserStore(config.db_path)
     user = reopened.require("bram")
     assert user.role == "administrator"

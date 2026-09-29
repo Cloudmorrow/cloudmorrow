@@ -80,6 +80,7 @@ __all__ = [
     "parse_duration",
 ]
 
+# Made by schema.py, step 1. A change to it is a new step there.
 TABLE = """
 CREATE TABLE IF NOT EXISTS records (
     id         TEXT    PRIMARY KEY,
@@ -290,9 +291,8 @@ class RecordStore:
         self.access: Callable[[str], Access] | None = None
         # Seeding per space asks and then writes; two lookers at once write once.
         self._seeding = threading.Lock()
-        with connect(self.db_path) as conn:
-            conn.executescript(TABLE)
-        conn.close()
+        # Its table is made with the rest (schema.py), when it is first opened.
+        connect(self.db_path).close()
 
     # -- the gate ----------------------------------------------------------------
     def _check(self, principal: Principal, action: str, model_id: str) -> None:

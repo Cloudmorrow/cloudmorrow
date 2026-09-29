@@ -74,6 +74,7 @@ MAX_PAYLOAD = RECORD_SIZE - 17
 # A subscription that has failed this many times in a row is not coming back.
 MAX_FAILURES = 5
 
+# Made by schema.py, step 1. A change to it is a new step there.
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS push_subscriptions (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -261,8 +262,7 @@ class PushStore:
         self.key_path = key_path
         self.subject = subject
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
-            conn.executescript(SCHEMA)
+        self._connect().close()
         self._key: ec.EllipticCurvePrivateKey | None = None
 
     def _connect(self) -> sqlite3.Connection:

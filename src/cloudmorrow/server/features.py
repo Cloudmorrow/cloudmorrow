@@ -33,6 +33,7 @@ from pathlib import Path
 
 from cloudmorrow.server.db import connect
 
+# Made by schema.py, step 1. A change to it is a new step there.
 TABLE = """
 CREATE TABLE IF NOT EXISTS features (
     -- One row per feature somebody has switched off or on again. A feature
@@ -97,8 +98,7 @@ class FeatureStore:
         # call, because installing one changes the answer.
         self._quills = quills or (lambda: ())
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
-            conn.executescript(TABLE)
+        self._connect().close()
 
     def _connect(self) -> sqlite3.Connection:
         return connect(self.db_path)

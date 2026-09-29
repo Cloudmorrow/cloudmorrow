@@ -75,6 +75,7 @@ __all__ = ["Supervisor"]
 
 log = logging.getLogger("cloudmorrow.quills")
 
+# Made by schema.py, step 1. A change to it is a new step there.
 TABLE = """
 CREATE TABLE IF NOT EXISTS quill_job_runs (
     -- When each `run` job last started, so a restart of the server does
@@ -240,9 +241,7 @@ class Supervisor:
         self._changed = True
         self._stopping = False
         self._thread: threading.Thread | None = None
-        with connect(config.db_path) as conn:
-            conn.executescript(TABLE)
-        conn.close()
+        connect(config.db_path).close()
         registry.listeners.append(self.changed)
 
     # -- the thread ---------------------------------------------------------------

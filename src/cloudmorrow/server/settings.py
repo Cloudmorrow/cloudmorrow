@@ -19,6 +19,7 @@ from pathlib import Path
 
 from cloudmorrow.server.db import connect
 
+# Made by schema.py, step 1. A change to it is a new step there.
 TABLE = """
 CREATE TABLE IF NOT EXISTS settings (
     key        TEXT PRIMARY KEY,
@@ -55,8 +56,7 @@ class SettingsStore:
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
-            conn.executescript(TABLE)
+        self._connect().close()
 
     def _connect(self) -> sqlite3.Connection:
         return connect(self.db_path)
