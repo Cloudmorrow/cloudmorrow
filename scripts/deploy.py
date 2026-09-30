@@ -9,7 +9,7 @@
     make deploy WHAT=website        cloudmorrow.com, from ../cloudmorrow-web
     make deploy WHAT=relay          the relay and its landing pages, on the Hetzner box
     make deploy WHAT=mail           the Worker behind certs@ and hi@cloudmorrow.com
-    make deploy WHAT=all            every one of those that is behind, in order
+    make deploy WHAT=all            every one of those that is behind: core, relay, website, mail
 
 Every step says what it will do and asks first (YES=1 to not ask). It never
 touches anybody's own cloud: those update themselves, or with
@@ -351,7 +351,9 @@ def mail_state() -> State:
     return state
 
 
-COMPONENTS = {"core": core_state, "website": website_state, "relay": relay_state, "mail": mail_state}
+# In the order `all` deploys them: the relay before the website, which calls
+# the relay's admin API and may need what a new relay adds.
+COMPONENTS = {"core": core_state, "relay": relay_state, "website": website_state, "mail": mail_state}
 TITLES = {
     "core": "Core release (the version people download)",
     "website": "cloudmorrow.com",

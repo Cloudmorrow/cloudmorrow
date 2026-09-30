@@ -50,3 +50,8 @@ def test_explain_says_how_it_fits_without_touching_anything():
 def test_an_unknown_step_is_refused_plainly():
     done = subprocess.run([sys.executable, str(ROOT / "scripts" / "deploy.py"), "prod"], capture_output=True, text=True)
     assert done.returncode == 1 and "unknown: prod" in done.stderr
+
+
+def test_all_deploys_the_relay_before_the_website_that_calls_it():
+    order = list(deploy.COMPONENTS)
+    assert order.index("relay") < order.index("website")
