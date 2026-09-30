@@ -311,6 +311,15 @@ Run `pytest` and `ruff check src tests` before you push. If you add something
 that stores what a person wrote, seal it; the last section of
 [docs/ENCRYPTION.md](docs/ENCRYPTION.md) says how.
 
+## Releasing and deploying
+
+`make deploy` shows what is released and live — the core's version, and
+the commits live on cloudmorrow.com, the relay and the mail Worker — and
+offers to release or deploy whatever is behind. A release is a git tag on
+main (`vX.Y.Z`), and the only version number there is:
+`make deploy WHAT=explain` says how the pieces fit together, and the top
+of [scripts/deploy.py](scripts/deploy.py) lists every step.
+
 ## License
 
 Cloudmorrow is free software under the [GNU Affero General Public License,

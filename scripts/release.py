@@ -11,6 +11,7 @@ thing anyone has to decide.
 
     python scripts/release.py            # 0.6.0 -> v0.7.0, tagged and pushed
     python scripts/release.py --major    # 0.6.0 -> v1.0.0
+    python scripts/release.py --patch    # 0.6.0 -> v0.6.1, a fix on its own
     python scripts/release.py --dry-run  # say what it would do
 
 Run it after committing and before pushing; it pushes the commits and the tag
@@ -44,14 +45,20 @@ def latest() -> tuple[int, int, int]:
     return max(tuple(int(part) for part in TAG.match(tag).groups()) for tag in tags)
 
 
-def nxt(current: tuple[int, int, int], *, major: bool) -> str:
-    big, small, _ = current
-    return f"v{big + 1}.0.0" if major else f"v{big}.{small + 1}.0"
+def nxt(current: tuple[int, int, int], *, major: bool = False, patch: bool = False) -> str:
+    big, small, tiny = current
+    if major:
+        return f"v{big + 1}.0.0"
+    if patch:
+        return f"v{big}.{small}.{tiny + 1}"
+    return f"v{big}.{small + 1}.0"
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--major", action="store_true", help="Take the next major.")
+    bump = parser.add_mutually_exclusive_group()
+    bump.add_argument("--major", action="store_true", help="Take the next major.")
+    bump.add_argument("--patch", action="store_true", help="Take the next patch: a fix, nothing new.")
     parser.add_argument("--dry-run", action="store_true", help="Say it, do nothing.")
     parser.add_argument("--remote", default="origin")
     args = parser.parse_args()
@@ -63,7 +70,7 @@ def main() -> None:
         sys.exit("the working tree has changes — commit them first, then release.")
 
     current = latest()
-    tag = nxt(current, major=args.major)
+    tag = nxt(current, major=args.major, patch=args.patch)
     if git("tag", "--list", tag):
         sys.exit(f"{tag} already exists.")
     # A tag on a commit that is already released says the push had nothing in
