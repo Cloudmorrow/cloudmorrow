@@ -94,7 +94,9 @@ def test_no_place_means_no_weather_and_no_call(calls):
 def test_a_failure_after_a_success_hands_out_the_last_answer_marked_stale(monkeypatch, calls):
     weather = Weather("Copenhagen")
     weather.current()
-    weather._fetched = 0.0  # ten minutes pass
+    # Ten minutes pass. Not `= 0.0`: the monotonic clock starts at boot, and a
+    # CI runner up for less than ten minutes reads 0.0 as recent.
+    weather._fetched -= today.FORECAST_TTL + 1
 
     def down(url: str) -> dict:
         raise WeatherError("could not reach api.open-meteo.com")
