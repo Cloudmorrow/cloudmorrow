@@ -1,5 +1,5 @@
-"""The server uninstaller: it lists what it would remove, keeps the data when
-asked, and refuses to delete a directory the system needs."""
+"""The server uninstaller: it lists what it would remove, keeps the data unless
+told to delete it, and refuses to delete a directory the system needs."""
 
 from __future__ import annotations
 
@@ -47,8 +47,8 @@ def test_uninstaller_is_valid_posix_shell():
     subprocess.run(["sh", "-n", str(UNINSTALLER)], check=True)
 
 
-def test_dry_run_lists_everything_and_removes_nothing(tmp_path):
-    result = dry_run(*made(tmp_path))
+def test_delete_data_lists_everything_and_removes_nothing(tmp_path):
+    result = dry_run(*made(tmp_path), "--delete-data")
     assert result.returncode == 0, result.stderr + result.stdout
     for name in ("opt", "notes", "data"):
         assert f"- {tmp_path / name}" in result.stdout
@@ -58,18 +58,25 @@ def test_dry_run_lists_everything_and_removes_nothing(tmp_path):
     assert "nothing was removed" in result.stdout
 
 
-def test_keep_data_takes_only_the_software(tmp_path):
-    result = dry_run(*made(tmp_path), "--keep-data")
+def test_by_default_it_takes_only_the_software(tmp_path):
+    result = dry_run(*made(tmp_path))
     assert result.returncode == 0, result.stderr + result.stdout
+    assert "Add --delete-data to delete them too." in result.stdout
     assert f"would run: rm -rf {tmp_path / 'opt'}" in result.stdout
     assert f"rm -rf {tmp_path / 'notes'}" not in result.stdout
     assert f"rm -rf {tmp_path / 'data'}" not in result.stdout
     assert "userdel" not in result.stdout
 
 
+def test_keep_data_is_still_accepted(tmp_path):
+    result = dry_run(*made(tmp_path), "--keep-data")
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert f"rm -rf {tmp_path / 'notes'}" not in result.stdout
+
+
 def test_refuses_to_delete_a_system_directory(tmp_path):
     paths = made(tmp_path)
     for bad in ("/", "/var/lib", "/srv/", "relative/notes"):
-        result = dry_run(*paths, "--notes-dir", bad)
+        result = dry_run(*paths, "--delete-data", "--notes-dir", bad)
         assert result.returncode != 0
         assert "rm -rf" not in result.stdout

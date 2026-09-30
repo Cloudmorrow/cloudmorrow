@@ -5,11 +5,12 @@
 #
 # It finds what the installer made — from the systemd unit and the config,
 # so custom paths are found too — lists all of it, and asks before it
-# touches anything. By default everything goes: the services, the code, the
-# config and the sealing key, the database, and every note and file. To take
-# the software away but leave the data for a later install, add --keep-data:
+# touches anything. By default it takes the software away — the services,
+# the code, the commands — and leaves the config and the sealing key, the
+# database and every note and file, so a later install picks up where this
+# one was. To delete all of that too, add --delete-data:
 #
-#   curl -fsSL …/uninstall-server.sh | sudo sh -s -- --keep-data
+#   curl -fsSL …/uninstall-server.sh | sudo sh -s -- --delete-data
 #
 # Computers that used this cloud keep their own copy of Cloudmorrow; take it
 # off each of them with `cm uninstall`.
@@ -22,17 +23,17 @@ SERVICE_USER=""
 SERVICE_NAME="cloudmorrow"
 AGENT_NAME="cloudmorrow-agent"
 CONFIG_DIR="/etc/cloudmorrow"
-KEEP_DATA=""
+DELETE_DATA=""
 YES=""
 DRY_RUN=""
 
 usage() {
-	sed -n '2,15p' "$0"
+	sed -n '2,16p' "$0"
 	cat <<EOF
 
 Options:
-  --keep-data         leave the config, the key, the database and the notes,
-                      and the service user that owns them
+  --delete-data       also delete the config, the key, the database and the
+                      notes, and the service user that owns them
   --yes               do not ask first
   --dry-run           print what would be removed, change nothing
   --prefix DIR        where the checkout and venv are (default: from the unit)
@@ -45,7 +46,8 @@ EOF
 
 while [ $# -gt 0 ]; do
 	case "$1" in
-	--keep-data) KEEP_DATA="1"; shift ;;
+	--delete-data) DELETE_DATA="1"; shift ;;
+	--keep-data) DELETE_DATA=""; shift ;; # the default now; still accepted
 	--yes | -y) YES="1"; shift ;;
 	--dry-run) DRY_RUN="1"; shift ;;
 	--prefix) PREFIX="$2"; shift 2 ;;
@@ -113,7 +115,7 @@ check_dir() {
 	esac
 }
 check_dir "$PREFIX"
-if [ -z "$KEEP_DATA" ]; then
+if [ -n "$DELETE_DATA" ]; then
 	check_dir "$NOTES_DIR"
 	check_dir "$DATA_DIR"
 fi
@@ -129,13 +131,13 @@ add "$UNIT"
 grep -qs "install-server.sh" /usr/local/bin/cloudmorrow-update && add /usr/local/bin/cloudmorrow-update
 grep -qs "install-server.sh" /etc/sudoers.d/cloudmorrow && add /etc/sudoers.d/cloudmorrow
 add "$PREFIX"
-if [ -z "$KEEP_DATA" ]; then
+if [ -n "$DELETE_DATA" ]; then
 	add "$CONFIG_DIR"
 	add "$DATA_DIR"
 	add "$NOTES_DIR"
 fi
 USER_GOES=""
-if [ -z "$KEEP_DATA" ] && id "$SERVICE_USER" >/dev/null 2>&1; then
+if [ -n "$DELETE_DATA" ] && id "$SERVICE_USER" >/dev/null 2>&1; then
 	USER_GOES="1"
 fi
 
@@ -147,11 +149,12 @@ fi
 printf '\n  This removes the Cloudmorrow server%s from this machine:\n\n' "${CLOUD_NAME:+ \"$CLOUD_NAME\"}"
 printf '%s\n' "$REMOVE" | sed '/^$/d; s/^/    - /'
 [ -z "$USER_GOES" ] || printf '    - the system user %s\n' "$SERVICE_USER"
-if [ -n "$KEEP_DATA" ]; then
+if [ -z "$DELETE_DATA" ]; then
 	printf '\n  and keeps %s, %s and %s,\n  so installing again picks up where it was.\n' "$CONFIG_DIR" "$DATA_DIR" "$NOTES_DIR"
+	printf '  Add --delete-data to delete them too.\n'
 else
 	printf '\n  \033[1mEvery account, note, file and secret on it goes too.\033[0m\n'
-	printf '  Add --keep-data to keep them.\n'
+	printf '  Leave out --delete-data to keep them.\n'
 fi
 printf '\n'
 
@@ -161,7 +164,7 @@ if [ -n "$DRY_RUN" ]; then
 	:
 elif [ -z "$YES" ]; then
 	( : </dev/tty ) 2>/dev/null || die "nobody to ask; run it again with --yes"
-	if [ -n "$KEEP_DATA" ]; then
+	if [ -z "$DELETE_DATA" ]; then
 		printf '\033[1mGo ahead?\033[0m [y/N]: ' >/dev/tty
 		read -r answer </dev/tty || answer=""
 		case "$answer" in y | Y | yes) ;; *) die "nothing was removed" ;; esac
@@ -206,7 +209,7 @@ if [ -e "$PREFIX" ]; then
 fi
 
 # --- the data -------------------------------------------------------------------
-if [ -z "$KEEP_DATA" ]; then
+if [ -n "$DELETE_DATA" ]; then
 	for dir in "$CONFIG_DIR" "$DATA_DIR" "$NOTES_DIR"; do
 		if [ -e "$dir" ]; then
 			say "removing $dir"
@@ -240,3 +243,10 @@ cat <<EOF
     - Cloudmorrow on each computer that used this cloud: run  cm uninstall  there
 
 EOF
+if [ -z "$DELETE_DATA" ]; then
+	cat <<EOF
+  Kept, for the next install: $CONFIG_DIR, $DATA_DIR, $NOTES_DIR
+  and the system user $SERVICE_USER. To delete them, run this again with --delete-data.
+
+EOF
+fi
