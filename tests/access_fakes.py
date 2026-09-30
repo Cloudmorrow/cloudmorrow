@@ -43,6 +43,8 @@ class FakeCloud:
     devices: list[dict] = field(default_factory=list)
     keys: list[str] = field(default_factory=list)
     invites: list[str] = field(default_factory=list)
+    # Whether the relay passes visitors through to the box.
+    public: bool = True
 
 
 @dataclass
@@ -174,7 +176,16 @@ class FakeControl:
                 "zone": ZONE,
                 "mesh_address": cloud.mesh_address,
                 "login_server": LOGIN_SERVER,
+                "public": cloud.public,
+                "relay_addresses": ["100.64.0.2"],
             }
+
+        @app.patch("/v1/clouds/me")
+        async def patch_me(request: Request, cloud: FakeCloud = Depends(me)) -> dict:
+            body = await request.json()
+            if "public" in body:
+                cloud.public = bool(body["public"])
+            return get_me(cloud)
 
         @app.delete("/v1/clouds/me", status_code=204)
         def delete_me(cloud: FakeCloud = Depends(me)) -> None:

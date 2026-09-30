@@ -32,6 +32,8 @@ import httpx
 
 from cloudmorrow.server.access_control import Cloud
 from cloudmorrow.server.config import ServerConfig
+from cloudmorrow.server.public_way import HEADER as WAY_HEADER
+from cloudmorrow.server.public_way import PORT as PUBLIC_PORT
 
 log = logging.getLogger("cloudmorrow.access.caddy")
 
@@ -92,31 +94,44 @@ def _issuer(acme: dict, control: str, *, directory: str = "", email: str = "") -
     return lines
 
 
-def site_block(cloud: Cloud, config: ServerConfig, control: str) -> str:
-    """The Caddyfile site for the cloud's real name, reverse-proxying to the server.
+def site_block(cloud: Cloud, config: ServerConfig, control: str, *, public: bool = True) -> str:
+    """The Caddyfile sites for the cloud's real name, reverse-proxying to the server.
 
     Two issuers, tried in order, both by the DNS challenge: Let's Encrypt,
     then ZeroSSL (`access_acme_fallback`, which needs `access_acme_email`).
     Every linked cloud's name is under one zone, and Let's Encrypt allows a
     zone only so many new certificates a week; the second keeps new clouds
     getting one when that runs out.
+
+    One site on 443, for the home network and the mesh, and, when the cloud
+    is reachable from anywhere, one on 8443 for what the relay passes
+    through (public_way). Each says which it is in `Cloudmorrow-Way`,
+    over whatever the request said. They are two sites and not one with a
+    port matcher because the PROXY header the relay sends replaces the
+    connection's local address too, so a request on 8443 would look as if
+    it came in on 443. The installer's global options make Caddy read that
+    header on 8443.
     """
     upstream = f"{upstream_host(config)}:{config.port}"
     email = (config.access_acme_email or "").strip()
+    tls: list[str] = []
+    if cloud.acme:
+        tls.append("\ttls {")
+        tls += _issuer(cloud.acme, control, email=email)
+        if config.access_acme_fallback and email:
+            tls += _issuer(cloud.acme, control, directory=ZEROSSL, email=email)
+        elif config.access_acme_fallback:
+            tls.append("\t\t# ZeroSSL, the fallback, needs an email: access_acme_email in server.toml.")
+        tls.append("\t}")
     lines = [
         "# Written by Cloudmorrow (Administration -> Access). It is rewritten when",
         "# the name changes; edit /etc/caddy/Caddyfile instead.",
-        f"{cloud.host} {{",
     ]
-    if cloud.acme:
-        lines.append("\ttls {")
-        lines += _issuer(cloud.acme, control, email=email)
-        if config.access_acme_fallback and email:
-            lines += _issuer(cloud.acme, control, directory=ZEROSSL, email=email)
-        elif config.access_acme_fallback:
-            lines.append("\t\t# ZeroSSL, the fallback, needs an email: access_acme_email in server.toml.")
-        lines.append("\t}")
-    lines += [f"\treverse_proxy {upstream}", "}", ""]
+    sites = [(cloud.host, "home")]
+    if public:
+        sites.append((f"{cloud.host}:{PUBLIC_PORT}", "public"))
+    for address, way in sites:
+        lines += [f"{address} {{", *tls, f"\trequest_header {WAY_HEADER} {way}", f"\treverse_proxy {upstream}", "}", ""]
     return "\n".join(lines)
 
 
@@ -143,7 +158,7 @@ class Caddy:
             "error": self.error,
         }
 
-    def apply(self, cloud: Cloud | None, control: str) -> bool:
+    def apply(self, cloud: Cloud | None, control: str, *, public: bool = True) -> bool:
         """Make the site file say what *cloud* needs (nothing, for None), and reload."""
         if not self.available():
             if cloud is None:
@@ -155,7 +170,7 @@ class Caddy:
                 "is missing); the server installer does it: sudo sh install-server.sh --link"
             )
             return False
-        wanted = site_block(cloud, self.config, control) if cloud is not None else ""
+        wanted = site_block(cloud, self.config, control, public=public) if cloud is not None else ""
         try:
             current = self.site_path.read_text(encoding="utf-8") if self.site_path.exists() else ""
             if wanted == current:

@@ -335,8 +335,12 @@ class Control:
 
     # -- the cloud ----------------------------------------------------------------------
     def me(self) -> dict:
-        """`GET /v1/clouds/me`: {cloud_id, name, zone, mesh_address, login_server}."""
+        """`GET /v1/clouds/me`: {cloud_id, name, zone, mesh_address, login_server, public, relay_addresses}."""
         return self._call("GET", "/v1/clouds/me")
+
+    def set_public(self, public: bool) -> dict:
+        """`PATCH /v1/clouds/me {public}`: whether the relay passes visitors through to the box."""
+        return self._call("PATCH", "/v1/clouds/me", json={"public": public})
 
     def unlink(self) -> None:
         self._call("DELETE", "/v1/clouds/me")

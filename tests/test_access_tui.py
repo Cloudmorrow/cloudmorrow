@@ -6,7 +6,7 @@ from rich.text import Text
 from textual.widgets import Input, Static
 
 from cloudmorrow.tui.panes.admin_access import access_text
-from cloudmorrow.tui.screens.invite import invite_text
+from cloudmorrow.tui.screens.adddevice import add_device_text
 from tests.tui_access import access_status
 from tests.tui_harness import said, settle, start
 
@@ -55,15 +55,15 @@ def test_the_text_says_the_home_network_and_the_mesh() -> None:
     assert "not on its mesh yet" in halfway and "access denied" in halfway
 
 
-def test_the_invite_text() -> None:
-    assert "home network only" in plain(invite_text(access_status()))
-    status = access_status("larsens")
-    before = plain(invite_text(status))
-    assert "Make an invite" in before
-    assert "curl -fsSL https://larsens.cloudmorrow.test/install.sh | sh" in before
-    assert "https://mesh.cloudmorrow.test" in before and "▀" in before
-    after = plain(invite_text(status, {"code": "7QX2MP", "expires_at": "2026-09-29T12:10:00+00:00"}))
-    assert "7QX2MP" in after and "until 12:10 UTC" in after
+def test_the_add_device_text() -> None:
+    at_home = plain(add_device_text(access_status(), "http://cloudmorrow.local:8787"))
+    assert "curl -fsSL http://cloudmorrow.local:8787/install.sh | sh" in at_home
+    assert "once an administrator links it" in at_home
+    linked = plain(add_device_text(access_status("larsens"), "http://cloudmorrow.local:8787"))
+    assert "curl -fsSL https://larsens.cloudmorrow.test/install.sh | sh" in linked
+    assert "https://larsens.cloudmorrow.test/app" in linked and "▀" in linked
+    assert "joins the cloud's mesh by itself" in linked
+    assert "code" not in linked.lower().replace("cloudmorrow", "")
 
 
 async def test_an_admin_links_the_cloud_and_the_pane_follows(app):
@@ -130,18 +130,15 @@ async def test_an_admin_says_whose_a_phone_is(app):
         assert app.client.access_calls[-1] == ("label", "d2", "bram", "tablet")
 
 
-async def test_invite_a_device_from_settings(app):
+async def test_add_a_device_from_settings(app):
     app.client.access_state = access_status("larsens")
     async with app.run_test(size=(120, 60)) as pilot:
         await start(app, pilot)
         await pilot.press("ctrl+g")
         await dialog(pilot)
-        await pilot.click("#open-invite")
+        await pilot.click("#open-add-device")
         await dialog(pilot)
-        text = app.screen.query_one("#invite-text", Static)
-        await pilot.click("#make-invite")
-        await dialog(pilot)
-        assert app.client.access_calls[-1] == ("invite",)
-        assert "7QX2MP" in plain(str(text.content))
+        text = app.screen.query_one("#add-device-text", Static)
+        assert "larsens.cloudmorrow.test/install.sh" in plain(str(text.content))
         await pilot.click("#close")
         await dialog(pilot)

@@ -63,6 +63,7 @@ from cloudmorrow.server.sealed import seal_tree, use_key
 from cloudmorrow.server.secrets import SecretStore
 from cloudmorrow.server.settings import SettingsStore
 from cloudmorrow.server.shares import ShareStore
+from cloudmorrow.server.signin_limits import SigninLimits
 from cloudmorrow.server.state import AppState
 from cloudmorrow.server.today import Weather
 from cloudmorrow.server.transport import install as require_tls
@@ -94,13 +95,15 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     # Shares made when each account had its own shares folder come into the
     # one Shares folder, so there is one place to look.
     share_store.relocate()
-    credential_check = CredentialCheck(user_store, config.ensure_secret_key())
+    signin_limits = SigninLimits()
+    credential_check = CredentialCheck(user_store, config.ensure_secret_key(), signin_limits)
     # What is installed, and the one table every Quill's records live in.
     quill_registry = QuillRegistry(config.quills_dir, config.datamodels_dir, config.quill_catalog)
     record_store = RecordStore(config.db_path, quill_registry.models, quill_registry.expiries)
     # Who may use which datamodels: asked by the gate on every read and write.
     circle_store = CircleStore(config.db_path)
     record_store.access = circle_store.access_for
+    app.state.signin_limits = signin_limits
     app.state.cloudmorrow = AppState(
         config=config,
         users=user_store,

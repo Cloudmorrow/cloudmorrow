@@ -4,7 +4,7 @@
     cm access status                 home network, linked or not, the mesh
     cm access link                   a code to enter at cloudmorrow.com/link (admin)
     cm access unlink                 give the name back; the mesh goes (admin)
-    cm access invite                 an invite code for a device
+    cm access invite                 an invite code (retired: signing in joins the mesh)
     cm access join                   put this computer on the mesh (signed in, at home)
     cm access join --invite CODE --server https://larsens.cloudmorrow.tech
                                      the same with an invite, from anywhere, no sign-in

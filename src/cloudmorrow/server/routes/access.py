@@ -1,4 +1,4 @@
-"""Administration → Access, and Me → Invite a device.
+"""Administration → Access, and Me → Add a device.
 
 An administrator sees how the cloud is reached and links it to a
 cloudmorrow.com account (a code to enter on the website) or unlinks it.
@@ -29,6 +29,10 @@ class MineRequest(BaseModel):
     address: str = Field(min_length=1, max_length=64)
     # What the person calls it: "laptop", "Anna's desktop".
     device: str = Field(default="", max_length=60)
+
+
+class PublicRequest(BaseModel):
+    public: bool
 
 
 class LabelRequest(BaseModel):
@@ -92,6 +96,16 @@ def set_up(state: AppState = Depends(get_state), _: User = Depends(get_admin_use
     except AccessError as exc:
         raise _fail(exc) from exc
     return access.status(admin=True)
+
+
+@router.put("/public")
+def set_public(
+    payload: PublicRequest,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_admin_user),
+) -> dict:
+    """Reachable from anywhere, through the relay, or only at home and on the mesh."""
+    return _access(state).set_reachable(payload.public, changed_by=user.username)
 
 
 @router.post("/mesh/key")

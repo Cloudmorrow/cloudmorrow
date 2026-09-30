@@ -1,4 +1,4 @@
-"""Access in the browser: Administration → Access, Me → Invite a device, and the setup page.
+"""Access in the browser: Administration → Access, Me → Add a device, and the setup page.
 
 The screens are driven in a browser (screenshots), not from here. What a
 test can hold on to is the wiring — the files are listed and served, the
@@ -19,16 +19,16 @@ from tests.access_fakes import ZONE, wire
 from tests.conftest import ADMIN, GUEST, token_for
 
 ACCESS_JS = (WEB / "accessadmin.js").read_text(encoding="utf-8")
-INVITE_JS = (WEB / "invitedevice.js").read_text(encoding="utf-8")
+ADD_JS = (WEB / "adddevice.js").read_text(encoding="utf-8")
 QR_JS = (WEB / "qr.js").read_text(encoding="utf-8")
 
 
 def test_the_files_are_listed_and_served(client):
     app_js = (WEB / "app.js").read_text(encoding="utf-8")
-    assert 'import "./accessadmin.js";' in app_js and 'import "./invitedevice.js";' in app_js
+    assert 'import "./accessadmin.js";' in app_js and 'import "./adddevice.js";' in app_js
     assert '@import "./access.css";' in (WEB / "app.css").read_text(encoding="utf-8")
     version = asset_version()
-    for name in ("accessadmin.js", "invitedevice.js", "qr.js", "qrcode.js", "access.css"):
+    for name in ("accessadmin.js", "adddevice.js", "qr.js", "qrcode.js", "access.css"):
         assert client.get(f"/app/{version}/{name}").status_code == 200, name
     # The setup page, which is not the app, imports the QR drawing unversioned.
     assert client.get("/app/qr.js").status_code == 200
@@ -38,19 +38,19 @@ def test_access_is_a_side_of_administration_and_inviting_is_on_me():
     admin = (WEB / "admin.js").read_text(encoding="utf-8")
     assert 'data-side="access"' in admin and "drawAccess(panel)" in admin
     me = (WEB / "me.js").read_text(encoding="utf-8")
-    assert "${inviteRow()}" in me
-    assert 'registerScreen("invite"' in INVITE_JS
+    assert "${addDeviceRow()}" in me
+    assert 'registerScreen("add-device"' in ADD_JS
     assert not (WEB / "pairdevice.js").exists()
 
 
 def test_the_qr_encoder_is_vendored_with_its_licence():
     assert 'import qrcode from "./qrcode.js";' in QR_JS
-    assert 'from "./qr.js"' in ACCESS_JS and 'from "./qr.js"' in INVITE_JS
+    assert 'from "./qr.js"' in ACCESS_JS and 'from "./qr.js"' in ADD_JS
     source = (WEB / "qrcode.js").read_text(encoding="utf-8")
     assert "Kazuhiko Arase" in source and "export default qrcode" in source
     licence = (WEB / "MIT-qrcode-generator.txt").read_text(encoding="utf-8")
     assert "MIT License" in licence and "Kazuhiko Arase" in licence
-    for text in (ACCESS_JS, INVITE_JS, QR_JS):
+    for text in (ACCESS_JS, ADD_JS, QR_JS):
         assert "https://cdn" not in text and "unpkg" not in text
 
 
@@ -59,12 +59,13 @@ def test_one_amber_action_per_view():
     for view in ("function unlinked", "function linked"):
         body = ACCESS_JS.split(view, 1)[1].split("\nfunction ", 1)[0]
         assert len(re.findall(r'class="row primary"', body)) == 1, view
-    assert INVITE_JS.count('class="row primary') == 1
+    # Add a device is things to read and copy, not a next step.
+    assert ADD_JS.count('class="row primary') == 0
 
 
-def test_nothing_public_is_left():
-    for text in (ACCESS_JS, INVITE_JS, (WEB / "access.css").read_text(encoding="utf-8")):
-        for gone in ("tunnel", "/api/access/public", "/api/access/name", "mesh/pair", "Pair a device"):
+def test_no_tunnel_and_no_codes_are_left():
+    for text in (ACCESS_JS, ADD_JS, (WEB / "access.css").read_text(encoding="utf-8")):
+        for gone in ("tunnel", "/api/access/name", "mesh/pair", "Pair a device", "mesh/invite", "invite code"):
             assert gone not in text, gone
 
 
@@ -76,12 +77,13 @@ def test_the_paths_they_call_exist(config, users, tmp_path):
     guest = {"Authorization": f"Bearer {token_for(client, *GUEST)}"}
     for path in ("/api/access/link", "/api/access/unlink", "/api/access/setup", "/api/access/mesh/devices"):
         assert path in ACCESS_JS, path
-    assert "/api/access/mesh/invite" in INVITE_JS
+    assert "/api/access/public" in ACCESS_JS
     assert client.get("/api/access", headers=guest).status_code == 200
     link = client.post("/api/access/link", headers=admin).json()["link"]
     fakes.control.approve(link["code"], "larsens")
     app.state.cloudmorrow.access.poll_once()
-    assert client.post("/api/access/mesh/invite", headers=guest).status_code == 200
+    assert client.put("/api/access/public", json={"public": False}, headers=admin).json()["public"]["on"] is False
+    assert client.put("/api/access/public", json={"public": True}, headers=guest).status_code == 403
     assert client.get("/api/access/mesh/devices?everyone=true", headers=admin).status_code == 200
 
 

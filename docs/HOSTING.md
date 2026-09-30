@@ -294,7 +294,7 @@ The mesh is the technology Tailscale is made of — WireGuard between devices,
 direct where the networks allow it (on the same network: over it) and
 through a DERP relay where they do not — using
 [Headscale](https://github.com/juanfont/headscale), the open-source
-coordination server (0.26 or newer), and Tailscale's own open-source apps on
+coordination server (0.28 or newer: the policy needs `autogroup:self` and tags of their own), and Tailscale's own open-source apps on
 every device. Each cloud is one Headscale user, `cloud-<cloud_id>`, and the
 policy is `autogroup:self`: a cloud's box and devices reach each other, and
 nobody else's. The one exception is the rule above for `tag:relay` and port

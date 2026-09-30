@@ -10,6 +10,11 @@ is the administrator, and chooses the standard quills it starts with.
 The moment an account exists the page is gone: `/setup` answers with a
 redirect to the app, and `/api/setup` answers 409. There is nothing to
 guess and nothing to race for after that.
+
+Before then, nobody on the internet gets it. A box linked at install,
+before it had an account, is reached at its name from anywhere through
+the relay; a visit that came that way (public_way) is told to set the
+cloud up from the home network instead, so a stranger cannot claim it.
 """
 
 from __future__ import annotations
@@ -26,6 +31,7 @@ from cloudmorrow.logo import LOGO_LARGE
 from cloudmorrow.server.access_ways import AccessError
 from cloudmorrow.server.db import InvalidUsernameError, UserExistsError
 from cloudmorrow.server.deps import AppState, get_state
+from cloudmorrow.server.public_way import from_anywhere
 from cloudmorrow.server.quills import QuillError
 from cloudmorrow.server.quills.standard import choices, choose
 from cloudmorrow.server.routes.install import TEMPLATES, page_css
@@ -46,23 +52,34 @@ def needs_setup(state: AppState) -> bool:
     return state.users.count() == 0
 
 
+AT_HOME_ONLY = "this cloud is set up from its home network, not from the internet"
+
+
+def _at_home_only(request: Request) -> None:
+    if from_anywhere(request):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=AT_HOME_ONLY)
+
+
 @router.get("/setup", response_class=HTMLResponse, include_in_schema=False)
 def setup_page(request: Request, state: AppState = Depends(get_state)) -> Response:
     if not needs_setup(state):
         return RedirectResponse("/app", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
-    page = (TEMPLATES / "setup.html").read_text(encoding="utf-8")
+    template = "setup-at-home.html" if from_anywhere(request) else "setup.html"
+    page = (TEMPLATES / template).read_text(encoding="utf-8")
     page = (
         page.replace("__PAGE_CSS__", page_css())
         .replace("__LOGO__", html.escape(LOGO_LARGE.strip("\n")))
         .replace("__NAME__", html.escape(state.cloud_name()))
         .replace("__VERSION__", __version__)
     )
-    return HTMLResponse(page, headers={"Cache-Control": "no-store"})
+    code = status.HTTP_404_NOT_FOUND if from_anywhere(request) else status.HTTP_200_OK
+    return HTMLResponse(page, status_code=code, headers={"Cache-Control": "no-store"})
 
 
 @router.get("/api/setup/quills", include_in_schema=False)
-def standard_quills(state: AppState = Depends(get_state)) -> dict:
+def standard_quills(request: Request, state: AppState = Depends(get_state)) -> dict:
     """The standard quills to offer on the page, while there is a page."""
+    _at_home_only(request)
     if not needs_setup(state):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="already set up")
     options, _, problem = choices(state.config)
@@ -73,12 +90,13 @@ def standard_quills(state: AppState = Depends(get_state)) -> dict:
 
 
 @router.get("/api/setup/link", include_in_schema=False)
-def link_progress(state: AppState = Depends(get_state)) -> dict:
+def link_progress(request: Request, state: AppState = Depends(get_state)) -> dict:
     """Whether the code the page shows was entered yet: for twenty minutes after setup, no more.
 
     The page has no sign-in to ask with, so this says only what the page
     shows anyway: waiting, linked (and as what), or expired.
     """
+    _at_home_only(request)
     access = state.access
     if access is None or time.monotonic() > _link_window["until"]:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="nothing to follow here")
@@ -92,8 +110,9 @@ def link_progress(state: AppState = Depends(get_state)) -> dict:
 
 
 @router.post("/api/setup", response_model=SetupOut, status_code=status.HTTP_201_CREATED)
-def first_account(payload: SetupRequest, state: AppState = Depends(get_state)) -> SetupOut:
+def first_account(payload: SetupRequest, request: Request, state: AppState = Depends(get_state)) -> SetupOut:
     """Name the cloud and make its administrator. Once, ever."""
+    _at_home_only(request)
     with _first_account:
         if not needs_setup(state):
             raise HTTPException(

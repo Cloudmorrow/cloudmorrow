@@ -40,6 +40,7 @@ from cloudmorrow.cli import (
 from cloudmorrow.cli.common import client, console, run
 from cloudmorrow.client import discover
 from cloudmorrow.client.api import CloudmorrowClient
+from cloudmorrow.client.autojoin import join_after_signin
 from cloudmorrow.client.config import (
     ClientConfig,
     StoredCredentials,
@@ -106,8 +107,13 @@ def login(
         bool,
         typer.Option("--agent/--no-agent", help="Set this machine up as an agent (runs as you)."),
     ] = True,
+    mesh: Annotated[
+        bool,
+        typer.Option("--mesh/--no-mesh", help="Join a linked cloud's mesh after signing in."),
+    ] = True,
+    yes: Annotated[bool, typer.Option("--yes", help="Install Tailscale for the mesh without asking.")] = False,
 ) -> None:
-    """Sign in and store an access token."""
+    """Sign in and store an access token; on a linked cloud, join its mesh too."""
     config = ClientConfig.load()
     if server:
         config.api_url = server.rstrip("/")
@@ -140,6 +146,21 @@ def login(
                     console.print(
                         f"[dim]registered as '{result.agent_name}', but it is not running: {result.detail}[/]"
                     )
+            if mesh:
+                joined = await join_after_signin(
+                    api,
+                    config,
+                    ask_install=lambda: (
+                        yes
+                        or typer.confirm(
+                            "This cloud has a private mesh, which needs Tailscale. Install it now from tailscale.com?",
+                            default=True,
+                        )
+                    ),
+                )
+                if joined.outcome:
+                    tone = "green" if joined.outcome in ("joined", "already") else "yellow"
+                    console.print(f"[{tone}]{joined.sentence()}[/]")
 
     run(_login())
 

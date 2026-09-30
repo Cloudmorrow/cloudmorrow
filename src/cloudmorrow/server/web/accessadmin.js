@@ -2,12 +2,13 @@
 
    The fifth section of Administration. The home network is always there
    and only reported: the box announces itself as <name>.local whenever the
-   config lets it. The mesh needs the box linked to a cloudmorrow.com
-   account, once: before that the section is one amber button, then a code
-   to enter at cloudmorrow.com/link (with the link and a QR code of it,
-   for the phone in your hand), and after it the name, the box on its
-   mesh, and the devices on it — labelled here, on the box, and nowhere
-   else. The name itself is chosen, and changed, on the website.
+   config lets it. Everything else needs the box linked to a
+   cloudmorrow.com account, once: before that the section is one amber
+   button, then a code to enter at cloudmorrow.com/link (with the link and
+   a QR code of it, for the phone in your hand), and after it the name,
+   whether it is reachable from anywhere (a switch), the box on its mesh,
+   and the devices on it — labelled here, on the box, and nowhere else.
+   The name itself is chosen, and changed, on the website.
 
    Every change goes to /api/access and the panel is drawn again from the
    answer, so what is on screen is what the server did, never what was
@@ -94,11 +95,12 @@ function unlinked(status) {
       </div>
       ${status.link_error ? `<p class="shelf-note warn">${esc(status.link_error)}</p>` : ""}`;
   }
-  return `<p class="group-label">The mesh</p>
-    <p class="note">Link this cloud to a cloudmorrow.com account, and the devices you
-      invite reach it from anywhere, at a name of its own with a real certificate,
-      over a private mesh only they are on. Nothing on the internet reaches it, and
-      nothing about its people leaves it. Without it, the home network is all.</p>
+  return `<p class="group-label">From anywhere</p>
+    <p class="note">Link this cloud to a cloudmorrow.com account, and it opens from anywhere
+      at a name of its own with a real certificate: its sign-in page, through a relay that
+      passes it on without being able to read it. Its apps join a private mesh by themselves
+      and go straight to it. Nothing about its people leaves it. Without it, the home network
+      is all.</p>
     ${status.link_state === "expired" ? `<p class="shelf-note warn">The last code ran out before it was entered.</p>` : ""}
     <div class="group"><button class="row primary" type="button" data-do="link">Link to a cloudmorrow.com account</button></div>
     <p class="shelf-note">Through ${esc(status.control || "")}.</p>`;
@@ -112,9 +114,21 @@ function linked(status) {
     : MESH[box.state] || [box.state || "Not answering", "warn"];
   const caddy = status.caddy || {};
   const said = mesh.on
-    ? `Its devices reach it at https://${status.host}, from anywhere.`
+    ? `Its apps reach it at https://${status.host}, straight to the box.`
     : "Linked, and joining its mesh.";
-  return `<p class="group-label">The mesh</p>
+  const pub = status.public || {};
+  const reach = pub.on
+    ? (pub.live ? `Anyone can open https://${status.host} and sign in. The relay passes it through unread.`
+      : "Once it is on its mesh.")
+    : "Only the home network and devices on its mesh reach it. Elsewhere the name shows that it is offline.";
+  return `<p class="group-label">From anywhere</p>
+    <div class="group">
+      <div class="row access-way"><span class="main"><span class="title">Reachable from anywhere</span>
+        <span class="meta"><span class="preview">${esc(reach)}</span></span></span>
+        <span class="access-chip${pub.on ? " on" : ""}">${pub.on ? "On" : "Off"}</span></div>
+      <div class="row access-buttons"><button class="access-button ghost" type="button" data-do="public">${pub.on ? "Turn off" : "Turn on"}</button></div>
+    </div>
+    <p class="group-label">The mesh</p>
     <div class="group">
       <div class="row access-way"><span class="main"><span class="title access-host">${esc(status.host)}</span>
         <span class="meta"><span class="preview">${esc(said)}</span></span></span>
@@ -127,7 +141,7 @@ function linked(status) {
       ${mesh.on ? "" : `<div class="row access-buttons"><button class="access-button ghost" type="button" data-do="setup">Try again</button></div>`}
     </div>
     ${mesh.on ? `<p class="group-label">Devices on the mesh</p><div class="group access-devices"><p class="note">…</p></div>
-      <div class="group"><a class="row primary" href="#/invite">Invite a device</a></div>` : ""}
+      <div class="group"><a class="row primary" href="#/add-device">Add a device</a></div>` : ""}
     <p class="shelf-note">The name is chosen, and changed, on cloudmorrow.com, in My Clouds.
       Whose each device is stays on this box.</p>
     <div class="group"><button class="row bad" type="button" data-do="unlink">Unlink ${esc(status.host)}</button></div>`;
@@ -161,9 +175,22 @@ function wire(panel, status) {
     button.textContent = "Trying…";
     change(button, "POST", "/api/access/setup", "On the mesh.");
   });
+  on("public", async (button) => {
+    const want = !(status.public && status.public.on);
+    if (!want && !confirm(`Take ${status.host} off the internet?\n\nThe home network and devices on its mesh `
+      + "keep reaching it. A browser anywhere else gets a page saying it cannot be reached.")) return;
+    button.disabled = true;
+    try {
+      await api("PUT", "/api/access/public", { public: want });
+      toast(want ? "Reachable from anywhere." : "Only at home and on the mesh.");
+    } catch (err) {
+      toast(err.message, 4000);
+    }
+    await redraw();
+  });
   on("unlink", (button) => {
     if (!confirm(`Unlink ${status.host}?\n\nThe name goes back, and every device on the mesh loses `
-      + "its way in. The home network keeps working.")) return;
+      + "its way in, and it is no longer reachable from anywhere. The home network keeps working.")) return;
     change(button, "POST", "/api/access/unlink", "Unlinked. It is reached on the home network.");
   });
 
@@ -181,7 +208,7 @@ function wire(panel, status) {
 // -- devices on the mesh -------------------------------------------------------------
 /** The devices on this cloud's mesh, with a way to remove each: everybody's
     for an administrator (Access), who can also say whose one is; the
-    person's own on Invite a device. */
+    person's own on Add a device. */
 export async function drawDevices(group, everyone = false) {
   let found;
   try {
@@ -210,7 +237,7 @@ export async function drawDevices(group, everyone = false) {
   }).join("");
   for (const button of group.querySelectorAll("button[data-id]")) {
     button.addEventListener("click", async () => {
-      if (!confirm(`Remove ${button.dataset.name}?\n\nIt can no longer reach this cloud until it is invited again.`)) return;
+      if (!confirm(`Remove ${button.dataset.name}?\n\nIt goes off the mesh until it signs in again.`)) return;
       button.disabled = true;
       try {
         await api("DELETE", "/api/access/mesh/devices/" + encodeURIComponent(button.dataset.id));
@@ -236,7 +263,7 @@ export async function drawDevices(group, everyone = false) {
   }
 }
 
-/** Open Administration on its Access side (Invite a device points here). */
+/** Open Administration on its Access side. */
 export function toAccess() {
   store.set("admin.side", "access");
   location.hash = "#/admin";

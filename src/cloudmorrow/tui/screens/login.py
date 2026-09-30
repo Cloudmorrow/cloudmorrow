@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from textual import work
-from textual.app import ComposeResult
+from textual.app import ComposeResult, SuspendNotSupported
 from textual.containers import Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Input, Static
 
 from cloudmorrow.agent.setup import ensure_agent
+from cloudmorrow.client import autojoin
 from cloudmorrow.client.api import ApiError, CloudmorrowClient
 from cloudmorrow.client.config import StoredCredentials
 from cloudmorrow.logo import TAGLINE, mark_for_width, wordmark
@@ -96,4 +97,31 @@ class LoginScreen(Screen):
         # Registering this machine is part of signing in, not a chore.
         self._status("Setting up this machine…")
         await ensure_agent(client)
+        await self._join_mesh(client)
         await self.app.start_session(client, session.username)
+
+    async def _join_mesh(self, client: CloudmorrowClient) -> None:
+        """A linked cloud's mesh, as `cloudmorrow login` joins it (client/autojoin.py).
+
+        tailscale up needs sudo, and sudo needs the terminal, so the TUI
+        steps aside while it asks, and comes back after.
+        """
+        config = self.app.client_config
+        if not await autojoin.wanted(client, config):
+            return
+        self._status("Joining the cloud's mesh…")
+        try:
+            with self.app.suspend():
+                print("\nThis cloud has a private mesh: this computer joins it, and then goes straight to the cloud.")
+                joined = await autojoin.join_after_signin(
+                    client,
+                    config,
+                    ask_install=lambda: (
+                        input("It needs Tailscale. Install it now from tailscale.com? [Y/n] ").strip().lower()
+                        in ("", "y", "yes")
+                    ),
+                )
+        except SuspendNotSupported:
+            # No terminal to give up (a test, a web-served TUI): cloudmorrow access join does it later.
+            return
+        self.notify(joined.sentence(), severity="information" if joined.outcome in ("joined", "already") else "warning")

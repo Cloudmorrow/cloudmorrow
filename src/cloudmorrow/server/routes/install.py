@@ -12,6 +12,7 @@ from cloudmorrow import __version__
 from cloudmorrow.desktop.extra import with_extra
 from cloudmorrow.logo import LOGO_LARGE
 from cloudmorrow.server.deps import AppState, get_state
+from cloudmorrow.server.public_way import from_anywhere
 
 TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
 VENV_HINT = "~/.local/share/cloudmorrow/venv"
@@ -44,6 +45,13 @@ def _render(name: str, replacements: dict[str, str]) -> str:
 
 
 @router.get("/", response_class=HTMLResponse, include_in_schema=False)
+def front_door(request: Request, state: AppState = Depends(get_state)) -> Response:
+    """From anywhere, the name opens on the sign-in; at home, on this page."""
+    if from_anywhere(request) and state.users.count() > 0:
+        return RedirectResponse("/app", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    return install_page(request, state)
+
+
 @router.get("/install", response_class=HTMLResponse, include_in_schema=False)
 def install_page(request: Request, state: AppState = Depends(get_state)) -> Response:
     if state.users.count() == 0:

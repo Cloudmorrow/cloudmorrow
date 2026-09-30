@@ -45,6 +45,9 @@ class ClientConfig:
     # requests go to it directly, still checked against api_url's real name
     # (client/localroute.py); away from home, api_url is used as it is.
     local_address: str = ""
+    # Join a linked cloud's mesh after signing in (client/autojoin.py).
+    # False keeps this computer off it, and is what declining Tailscale sets.
+    mesh: bool = True
 
     @classmethod
     def load(cls) -> ClientConfig:
@@ -62,6 +65,7 @@ class ClientConfig:
                 "environment",
                 "server_host",
                 "local_address",
+                "mesh",
             ):
                 if key in section:
                     setattr(config, key, section[key])
@@ -88,6 +92,7 @@ class ClientConfig:
                 "environment": self.environment,
                 "server_host": self.server_host,
                 "local_address": self.local_address,
+                "mesh": self.mesh,
             }
         }
         path.write_text(tomli_w.dumps(payload), encoding="utf-8")

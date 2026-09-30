@@ -30,6 +30,7 @@ from cloudmorrow.server.circles import Access
 from cloudmorrow.server.db import UserStore
 from cloudmorrow.server.security import TokenError, decode_access_token, verify_password
 from cloudmorrow.server.shares import DRIVE_NAME, SERVER, Share, ShareStore
+from cloudmorrow.server.signin_limits import SigninLimits
 from cloudmorrow.webdav import MOUNT_PATH, build_app
 
 __all__ = ["MOUNT_PATH", "CredentialCheck", "ServerShares", "build_dav_app"]
@@ -45,9 +46,12 @@ PASSWORD_CACHE_MAX = 256
 class CredentialCheck:
     """Is this the account's password, or a token it was issued?"""
 
-    def __init__(self, users: UserStore, secret_key: str) -> None:
+    def __init__(self, users: UserStore, secret_key: str, limits: SigninLimits | None = None) -> None:
         self._users = users
         self._secret_key = secret_key
+        # Wrong passwords count against the account, as at sign-in; the
+        # address is not known here.
+        self._limits = limits
         self._cache: dict[tuple[str, str], tuple[str, float]] = {}
         self._lock = threading.Lock()
 
@@ -67,7 +71,11 @@ class CredentialCheck:
             # Still the same hash on file: a changed password empties its cache.
             if cached and cached[0] == user.password_hash and cached[1] > now:
                 return True
+        if self._limits is not None and self._limits.retry_after(None, user.username):
+            return False
         if not verify_password(password, user.password_hash):
+            if self._limits is not None:
+                self._limits.failed(None, user.username)
             return False
         with self._lock:
             if len(self._cache) >= PASSWORD_CACHE_MAX:

@@ -85,9 +85,9 @@ def access_text(status: dict, devices: list[dict] | None = None) -> str:
             lines += link_text(link)
         else:
             lines.append(
-                f"  [{MUTED}]Link this cloud to a cloudmorrow.com account (Link), and the devices you\n"
-                f"  invite reach it from anywhere, over a private mesh. Nothing about its people\n"
-                f"  leaves it. Without it, the home network is all.[/]"
+                f"  [{MUTED}]Link this cloud to a cloudmorrow.com account (Link), and it opens from\n"
+                f"  anywhere at a name of its own; its apps join a private mesh by themselves.\n"
+                f"  Nothing about its people leaves it. Without it, the home network is all.[/]"
             )
             if status.get("link_state") == "expired":
                 lines.append(f"  [{WARN}]the last code ran out before it was entered[/]")
@@ -96,6 +96,17 @@ def access_text(status: dict, devices: list[dict] | None = None) -> str:
         return "\n".join(lines)
 
     host = escape(status.get("host") or "")
+    public = status.get("public") or {}
+    lines.append(f"[b {ACCENT}]From anywhere[/]  {_on(bool(public.get('on')))}  [b]https://{host}[/]")
+    lines.append(
+        f"  [{MUTED}]"
+        + (
+            "anyone can open it and sign in; the relay passes it through unread"
+            if public.get("on")
+            else "only the home network and the mesh reach it (Administration → Access in the web app turns it on)"
+        )
+        + "[/]"
+    )
     lines.append(f"[b {ACCENT}]The mesh[/]  {_on(bool(mesh.get('on')))}  [b]{host}[/]")
     box = mesh.get("box") or {}
     if not box.get("installed", True):
@@ -116,7 +127,7 @@ def access_text(status: dict, devices: list[dict] | None = None) -> str:
     if devices is not None and mesh.get("on"):
         lines += ["", f"  [{MUTED}]devices on the mesh[/]"]
         if not devices:
-            lines.append(f"    [{MUTED}]none yet: Invite a device, from Settings[/]")
+            lines.append(f"    [{MUTED}]none yet: Add a device, from Settings[/]")
         for device in devices:
             dot = f"[{GOOD}]●[/]" if device.get("online") else f"[{MUTED}]○[/]"
             label = escape(device.get("label") or "") or f"[{MUTED}]nobody's yet[/]"

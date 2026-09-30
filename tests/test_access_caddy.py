@@ -29,7 +29,7 @@ def issuers(site: str) -> list[str]:
 
 def test_lets_encrypt_first_then_zerossl_both_by_dns(config):
     config.access_acme_email = "owner@example.org"
-    site = site_block(CLOUD, config, CONTROL)
+    site = site_block(CLOUD, config, CONTROL, public=False)
     assert site.splitlines()[2] == "larsens.cloudmorrow.test {"
     assert issuers(site) == ["issuer acme {", "issuer acme {", f"dir {ZEROSSL}"]
     assert site.count("dns acmedns {") == 2
@@ -40,12 +40,26 @@ def test_lets_encrypt_first_then_zerossl_both_by_dns(config):
 
 
 def test_without_an_email_there_is_no_fallback_and_it_says_why(config):
-    site = site_block(CLOUD, config, CONTROL)
+    site = site_block(CLOUD, config, CONTROL, public=False)
     assert issuers(site) == ["issuer acme {"]
     assert "access_acme_email" in site and "zerossl" not in site.replace("ZeroSSL", "")
     config.access_acme_email = "owner@example.org"
     config.access_acme_fallback = False
-    assert issuers(site_block(CLOUD, config, CONTROL)) == ["issuer acme {"]
+    assert issuers(site_block(CLOUD, config, CONTROL, public=False)) == ["issuer acme {"]
+
+
+def test_from_anywhere_is_a_second_site_on_8443_that_says_so(config):
+    """Two sites, each marking its requests, the same certificate for both."""
+    site = site_block(CLOUD, config, CONTROL)
+    blocks = [b for b in site.split("\n}\n") if "reverse_proxy" in b]
+    assert len(blocks) == 2
+    home, public = blocks
+    assert "larsens.cloudmorrow.test {" in home and "request_header Cloudmorrow-Way home" in home
+    assert "larsens.cloudmorrow.test:8443 {" in public and "request_header Cloudmorrow-Way public" in public
+    assert issuers(home) == issuers(public)
+    # Off: the one site, still marking its requests as from home.
+    alone = site_block(CLOUD, config, CONTROL, public=False)
+    assert ":8443" not in alone and "Cloudmorrow-Way home" in alone
 
 
 def test_the_relays_own_endpoint_when_the_link_names_none(config):
@@ -56,7 +70,7 @@ def test_the_relays_own_endpoint_when_the_link_names_none(config):
 def test_every_issuer_checks_the_challenge_with_public_resolvers(config):
     """Not the box's resolv.conf, which in a container can list servers it cannot reach."""
     config.access_acme_email = "owner@example.org"
-    site = site_block(CLOUD, config, CONTROL)
+    site = site_block(CLOUD, config, CONTROL, public=False)
     assert site.count("resolvers 1.1.1.1 8.8.8.8") == site.count("issuer acme {") == 2
     # And never waits on the box's own view of DNS, which a home router may cache stale.
     assert site.count("propagation_timeout -1") == site.count("propagation_delay 30s") == 2

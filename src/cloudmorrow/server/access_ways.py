@@ -42,6 +42,7 @@ from typing import Any
 import httpx
 
 from cloudmorrow import __version__
+from cloudmorrow.server import public_way
 from cloudmorrow.server.access_caddy import Caddy
 from cloudmorrow.server.access_control import (
     AccessStore,
@@ -58,6 +59,7 @@ from cloudmorrow.server.access_labels import LabelStore, clean_device
 from cloudmorrow.server.access_lan import Announcement, LanAnnouncer, hostname_label, local_addresses
 from cloudmorrow.server.access_mesh import Mesh, MeshError
 from cloudmorrow.server.config import ServerConfig
+from cloudmorrow.server.settings import SettingsStore
 
 log = logging.getLogger("cloudmorrow.access")
 
@@ -114,6 +116,8 @@ class Access:
         self.http = http
         self.mesh = mesh or Mesh()
         self.caddy = caddy or Caddy(config)
+        # Reachable from anywhere (public_way): the owner's switch, kept here.
+        self.settings = SettingsStore(config.db_path)
         self.addresses = addresses
         self.lan = LanAnnouncer(self.announcement, zeroconf_factory)
         # What the config file said, to go back to when the box is unlinked.
@@ -182,7 +186,7 @@ class Access:
         """Put the address, Caddy and the announcement where *cloud* says."""
         self.follow(cloud)
         control = (cloud.control if cloud else "") or self.config.access_control
-        self.caddy.apply(cloud if cloud is not None and cloud.set_up else None, control)
+        self.caddy.apply(cloud if cloud is not None and cloud.set_up else None, control, public=self.reachable())
         if self._started and self.config.access_lan:
             threading.Thread(target=self.lan.refresh, daemon=True).start()
 
@@ -242,6 +246,8 @@ class Access:
                 "on": on_mesh,
                 "login_server": cloud.login_server if on_mesh else "",
             },
+            # Reachable from anywhere: the owner's switch, and whether it is in force.
+            "public": {"on": self.reachable(), "live": on_mesh and self.reachable()},
         }
         if not admin:
             return out
@@ -433,6 +439,9 @@ class Access:
             cloud.login_server = str(record.get("login_server") or cloud.login_server)
             cloud.mesh_address = str(record.get("mesh_address") or cloud.mesh_address)
             self.store.save(cloud)
+        if "public" in record and bool(record["public"]) != self.reachable():
+            # The box's switch is the one that counts; the relay follows it.
+            self._tell_relay(cloud)
         if not cloud.set_up:
             try:
                 cloud = self.set_up()
@@ -440,6 +449,27 @@ class Access:
                 log.info("not set up yet: %s", exc)
         self.apply(cloud)
         return cloud
+
+    # -- reachable from anywhere ------------------------------------------------------
+    def reachable(self) -> bool:
+        return public_way.reachable(self.settings)
+
+    def set_reachable(self, on: bool, *, changed_by: str = "") -> dict:
+        """Turn *Reachable from anywhere* on or off: Caddy's 8443 site, and the relay."""
+        public_way.set_reachable(self.settings, on, changed_by=changed_by)
+        cloud = self.cloud()
+        self.apply(cloud)
+        if cloud is not None:
+            self._tell_relay(cloud)
+        return self.status(admin=True)
+
+    def _tell_relay(self, cloud: Cloud) -> None:
+        """Say whether the relay should pass visitors through. A relay that cannot hear it yet is logged."""
+        try:
+            with self.control(cloud) as control:
+                control.set_public(self.reachable())
+        except ControlError as exc:
+            log.info("could not tell the relay whether this cloud is reachable from anywhere: %s", exc)
 
     # -- unlinking --------------------------------------------------------------------
     def unlink(self) -> None:

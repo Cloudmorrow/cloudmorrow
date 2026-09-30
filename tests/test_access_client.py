@@ -532,11 +532,14 @@ def test_the_installer_takes_the_code_and_a_relay_of_its_own(client, tmp_path) -
     )
 
 
-def test_the_installer_without_an_invite_mentions_joining(client, tmp_path) -> None:
+def test_the_installer_signs_in_and_asks_for_no_code(client, tmp_path) -> None:
+    """Signing in is what joins the mesh now (client/autojoin.py): no invite, no code."""
     result = dry_run(client.get("/install.sh").text, tmp_path)
     assert result.returncode == 0, result.stderr
-    assert "access join --invite CODE" in result.stdout
-    assert "access join --invite" not in result.stdout.split("Installed.")[0]
+    assert "cloudmorrow login --server http://testserver" in result.stdout
+    assert "invite" not in result.stdout.lower()
+    skipped = dry_run(client.get("/install.sh").text, tmp_path, "--no-login")
+    assert "cloudmorrow login --server" not in skipped.stdout
 
 
 def test_the_released_installer_is_for_whichever_cloud_it_is_given(tmp_path) -> None:

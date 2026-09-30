@@ -277,6 +277,52 @@ WantedBy=multi-user.target
 EOF
 }
 
+# Caddy's global options for what the relay passes through from anywhere:
+# it arrives on 8443 with a PROXY header saying who the visitor is, which
+# Caddy believes only from the mesh and this machine (the relay's node is
+# on the mesh; a userspace tailscaled hands connections over on loopback).
+# The service writes the 8443 site itself; this part is server-wide, so it
+# lives in /etc/caddy/Caddyfile, which only root may change.
+CADDY_OPTIONS_MARK="# Cloudmorrow: from anywhere, through the relay"
+caddy_options() {
+	cat <<EOF
+$CADDY_OPTIONS_MARK (install-server.sh).
+{
+	servers :8443 {
+		listener_wrappers {
+			proxy_protocol {
+				timeout 5s
+				allow 100.64.0.0/10 fd7a:115c:a1e0::/48 127.0.0.1/32 ::1/128
+			}
+			tls
+		}
+	}
+}
+EOF
+}
+
+# The options go first in the Caddyfile, where Caddy wants them; a Caddyfile
+# with global options of its own already is not ours to merge into.
+wire_caddy_options() {
+	grep -q "$CADDY_OPTIONS_MARK" "$CADDYFILE" && return 0
+	first="$(sed -e 's/#.*//' "$CADDYFILE" | grep -v '^[[:space:]]*$' | head -n 1)"
+	case "$first" in
+	"{"*)
+		warn "$CADDYFILE has global options already; add these to them, for the cloud to open from anywhere:"
+		caddy_options | sed '1d; 2d; $d' >&2
+		return 0
+		;;
+	esac
+	say "adding the options for visits from anywhere to $CADDYFILE"
+	if [ -n "$DRY_RUN" ]; then
+		printf '   \033[2mwould put first:\033[0m servers :8443 { proxy_protocol … }\n'
+		return 0
+	fi
+	{ caddy_options; printf '\n'; cat "$CADDYFILE"; } >"$CADDYFILE.new"
+	chmod 0644 "$CADDYFILE.new"
+	mv "$CADDYFILE.new" "$CADDYFILE"
+}
+
 wire_caddy() {
 	# The service writes its site into CADDY_DIR, which Caddy imports; the
 	# group is caddy's so the site (with an acme-dns password in it) is
@@ -301,6 +347,7 @@ EOF
 			printf '\n# Cloudmorrow: the site for this cloud'"'"'s name.\nimport %s/*.caddy\n' "$CADDY_DIR" >>"$CADDYFILE"
 		fi
 	fi
+	wire_caddy_options
 	if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
 		run systemctl daemon-reload
 		run systemctl enable --now caddy
@@ -384,27 +431,13 @@ link_now() {
 		sed -n 's/^  "host": "\(.*\)",$/https:\/\/\1/p' | head -n 1)"
 }
 
-# The first device's invite, made as the installer ends: nothing is on the
-# mesh yet to open Me -> Invite a device from. Prints the code, or nothing.
-first_invite() {
-	[ -n "$DRY_RUN" ] && return 0
-	sudo -u "$SERVICE_USER" -H env CLOUDMORROW_SERVER_CONFIG="$CONFIG" \
-		"$VENV/bin/cloudmorrow-server" access invite 2>/dev/null | head -n 1
-}
-
-say_invite() {
-	INVITE="$(first_invite)"
-	if [ -n "$INVITE" ]; then
-		line "Invite the first one with"
-		line "$INVITE (once, for ten minutes):"
-		line "curl -fsSL $1/install.sh | sh -s -- $INVITE"
-		line "Then Me -> Invite a device, or"
-		line "My Clouds on cloudmorrow.com."
-	else
-		line "Invite each one once:"
-		line "Me -> Invite a device, or"
-		line "My Clouds on cloudmorrow.com."
-	fi
+# How a linked cloud's first devices come: its name opens from anywhere, on
+# its sign-in, and Me -> Add a device installs the rest. No code to pass on.
+say_address() {
+	line "Open $1"
+	line "anywhere and sign in. Then"
+	line "Me -> Add a device puts it"
+	line "on your computers and phones."
 }
 
 [ -n "$DRY_RUN" ] || [ "$(id -u)" = "0" ] || die "run this with sudo"
@@ -636,7 +669,7 @@ if [ -z "$UPDATE" ] && [ -z "$DRY_RUN" ] && [ -f "$CONFIG" ] && [ -x "$VENV/bin/
 		run systemctl restart "$SERVICE_NAME"
 		heading "Linked"
 		line "${LINKED_URL:-see Administration -> Access}"
-		[ -n "$LINKED_URL" ] && say_invite "$LINKED_URL"
+		[ -n "$LINKED_URL" ] && say_address "$LINKED_URL"
 		printf '\n'
 		exit 0
 	fi
@@ -1118,6 +1151,9 @@ fi
 # Before the service starts, so it starts linked, on its mesh, at its name.
 if [ "$LINK" = "yes" ]; then
 	link_now || true
+elif [ -d "$CADDY_DIR" ] && command -v caddy >/dev/null 2>&1; then
+	# Linked before: Caddy's side may be older than this installer.
+	wire_caddy
 fi
 
 # --- start it --------------------------------------------------------------
@@ -1212,9 +1248,8 @@ if [ -n "$ACCOUNT_MADE" ]; then
 fi
 
 if [ -n "$LINKED_URL" ]; then
-	heading "Linked, and on its mesh"
-	line "Its devices reach it from anywhere."
-	say_invite "$LINKED_URL"
+	heading "Linked"
+	say_address "$LINKED_URL"
 elif [ "$LINK" = "yes" ] && [ -n "$DRY_RUN" ]; then
 	heading "Linked, and on its mesh"
 	line "once the code is entered"

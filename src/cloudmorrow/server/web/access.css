@@ -1,10 +1,10 @@
-/* Access (Administration) and Invite a device (Me).
+/* Access (Administration) and Add a device (Me).
 
    Facts in rows, and the one amber button drawn by .row.primary in
    admin.css. The small buttons are ghosts — a line, no fill — and Remove
-   is a red ghost: it is undone only by inviting again. The link code and
-   the invite code are what a person copies off the screen by eye, so they
-   are set large, spaced, and in the monospace face. */
+   is a red ghost: the device is back only when it signs in again. The
+   link code is what a person copies off the screen by eye, so it is set
+   large, spaced, and in the monospace face. */
 
 .row.access-fact .value,
 .row.access-way .value { font-family: var(--mono); font-size: 14px; color: var(--muted); text-align: right; min-width: 0; overflow-wrap: anywhere; white-space: normal; max-width: 62%; }
@@ -63,13 +63,13 @@ button.row.ghost-row { justify-content: center; color: var(--accent); font-weigh
 .access-code { text-align: center; padding: 6px 12px 14px; }
 .access-qr { display: block; margin: 10px auto 6px; }
 .access-qr .qr { display: block; width: 168px; height: 168px; margin: 0 auto; border-radius: 6px; }
-.access-code .expires, .invite-code .expires { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+.access-code .expires { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
 
-/* -- invite a device -------------------------------------------------------- */
-.invite .note { margin: 0 4px 6px; color: var(--muted); line-height: 1.45; }
-.invite .note b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
-.invite-steps .row { align-items: flex-start; line-height: 1.45; }
-.invite-steps .step {
+/* -- add a device ---------------------------------------------------------- */
+.add-device .note { margin: 0 4px 6px; color: var(--muted); line-height: 1.45; }
+.add-device .note b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+.add-steps .row { align-items: flex-start; line-height: 1.45; }
+.add-steps .step {
   flex: none;
   width: 24px;
   height: 24px;
@@ -84,9 +84,9 @@ button.row.ghost-row { justify-content: center; color: var(--accent); font-weigh
   align-items: center;
   justify-content: center;
 }
-.invite-qr { display: block; margin: 12px 0 8px; }
-.invite-qr .qr { display: block; width: 184px; height: 184px; border-radius: 6px; }
-.invite-url, .invite-command {
+.add-qr { display: block; margin: 12px 0 8px; }
+.add-qr .qr { display: block; width: 184px; height: 184px; border-radius: 6px; }
+.add-url, .add-command {
   display: block;
   margin-top: 8px;
   padding: 8px 10px;
@@ -97,9 +97,9 @@ button.row.ghost-row { justify-content: center; color: var(--accent); font-weigh
   overflow-wrap: anywhere;
   user-select: all;
 }
-.invite-computer { line-height: 1.45; }
-.invite-code { text-align: center; margin: 4px 0 12px; }
-.access-code .code, .invite-code .code {
+.add-computer { line-height: 1.45; }
+
+.access-code .code {
   margin: 0;
   font-family: var(--mono);
   font-size: 40px;
@@ -108,4 +108,4 @@ button.row.ghost-row { justify-content: center; color: var(--accent); font-weigh
   color: var(--ink);
   user-select: all;
 }
-.invite .empty { padding-top: 8px; }
+.add-device .empty { padding-top: 8px; }

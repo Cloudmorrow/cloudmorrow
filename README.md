@@ -136,13 +136,16 @@ sudo sh install-server.sh --name "The Larsens" --link --yes --user alice --quill
 | way | who reaches it | what you do |
 | --- | --- | --- |
 | **Home network** | devices on the same network | nothing: the box announces itself as `<name>.local`, and `cm login` finds it |
-| **Linked** | the devices you invite, from anywhere | link it once: the installer (or the setup page, or **Administration → Access**) shows a code to enter at cloudmorrow.com/link, where you pick its name, `larsens.cloudmorrow.tech`; then invite each device once from **Me → Invite a device** |
+| **Linked** | anyone who signs in, from anywhere | link it once: the installer (or the setup page, or **Administration → Access**) shows a code to enter at cloudmorrow.com/link, where you pick its name, `larsens.cloudmorrow.tech` |
 
-A linked box joins a private mesh of its own (WireGuard, with Tailscale's
-open-source client; the installer asks before installing it) and gets a
-certificate for its name (Caddy, asked the same way). Nothing on the
-internet reaches it, and nothing about its people leaves it: the relay
-knows the name and the mesh, not who is on it. The relay and the mesh's
+A linked box gets a certificate for its name (Caddy; the installer asks
+before installing it) and joins a private mesh of its own (WireGuard, with
+Tailscale's open-source client, asked the same way). Its name opens its
+sign-in page from anywhere: the relay passes the connection on to the box
+still encrypted, so it cannot read it, and the apps on your computers join
+the mesh by themselves after signing in and go straight to the box.
+Nothing about its people leaves it: the relay knows the name and the mesh,
+not who is on it. The relay and the mesh's
 coordination server are free software too
 ([Cloudmorrow/relay](https://github.com/Cloudmorrow/relay)): run your own
 and pass `--access-control https://relay.example.org`.
@@ -166,15 +169,12 @@ Then, with `larsens.cloudmorrow.tech` standing for your cloud's address
 
 1. Open it in a browser and sign in.
 2. On each computer, install the terminal app (`cm`) and the desktop app,
-   which also mounts your fileshares, with the line that page shows:
-   `curl -fsSL https://larsens.cloudmorrow.tech/install.sh | sh`. Away from
-   home it asks for an invite code, from **Me → Invite a device**. For the
-   first device away from home, the installer printed one, and **My
-   Clouds** on cloudmorrow.com makes more.
-3. On a phone, open `https://larsens.cloudmorrow.tech/app` and use **Add to
-   Home Screen**: it opens like any other app, with your cloud's name under
-   the icon. Away from home, the Tailscale app and an invite put it on the
-   mesh first.
+   which also mounts your fileshares, with the line **Me → Add a device**
+   shows: `curl -fsSL https://larsens.cloudmorrow.tech/install.sh | sh`. It
+   signs you in, and on a linked cloud puts the computer on its mesh.
+3. On a phone, open `https://larsens.cloudmorrow.tech/app`, sign in, and use
+   **Add to Home Screen**: it opens like any other app, with your cloud's
+   name under the icon.
 
 No terminal at hand? Skip the account question. A server with no accounts
 shows a setup page on its first visit instead: name the cloud, choose a

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_current_user, get_state
@@ -31,14 +31,26 @@ def user_out(user: User) -> UserOut:
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, state: AppState = Depends(get_state)) -> TokenResponse:
+def login(payload: LoginRequest, request: Request, state: AppState = Depends(get_state)) -> TokenResponse:
+    # Too many wrong passwords from here, or for this account (signin_limits).
+    limits = request.app.state.signin_limits
+    address = request.client.host if request.client else ""
+    wait = limits.retry_after(address, payload.username)
+    if wait:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"too many wrong passwords; try again in {max(1, round(wait / 60))} minutes",
+            headers={"Retry-After": str(wait)},
+        )
     user = state.users.get(payload.username)
     invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid username or password")
     if user is None or not user.is_active:
         # Spend the time anyway so a missing user is not obviously faster.
         hash_password("not-a-real-password")
+        limits.failed(address, payload.username)
         raise invalid
     if not verify_password(payload.password, user.password_hash):
+        limits.failed(address, payload.username)
         raise invalid
     if needs_rehash(user.password_hash):
         state.users.update(user.username, password_hash=hash_password(payload.password))

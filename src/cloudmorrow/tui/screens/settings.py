@@ -33,7 +33,7 @@ from textual.widgets import Button, Checkbox, Label, Static
 from cloudmorrow.agent.omarchy import BUNDLE, PATHS, describe, is_omarchy
 from cloudmorrow.agent.setup import machine_name
 from cloudmorrow.client.api import ApiError
-from cloudmorrow.tui.screens.invite import InviteModal
+from cloudmorrow.tui.screens.adddevice import AddDeviceModal
 from cloudmorrow.tui.screens.modals import Modal
 from cloudmorrow.tui.theme import ACCENT, BAD, GOOD, MUTED, SECOND, WARN
 from cloudmorrow.tui.words import short_stamp
@@ -78,8 +78,8 @@ class SettingsScreen(Modal[None]):
 
             with Horizontal(classes="modal-buttons"):
                 yield Button("Close", variant="primary", id="close")
-                # Me → Invite a device, in the terminal (screens/invite.py).
-                yield Button("Invite a device", id="open-invite")
+                # Me → Add a device, in the terminal (screens/adddevice.py).
+                yield Button("Add a device", id="open-add-device")
 
     def on_mount(self) -> None:
         # The tick box and the buttons are what there is to reach, so the
@@ -278,8 +278,8 @@ class SettingsScreen(Modal[None]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         event.stop()
-        if event.button.id == "open-invite":
-            self.app.push_screen(InviteModal())
+        if event.button.id == "open-add-device":
+            self.app.push_screen(AddDeviceModal())
             return
         self.dismiss(None)
 
