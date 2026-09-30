@@ -384,6 +384,29 @@ link_now() {
 		sed -n 's/^  "host": "\(.*\)",$/https:\/\/\1/p' | head -n 1)"
 }
 
+# The first device's invite, made as the installer ends: nothing is on the
+# mesh yet to open Me -> Invite a device from. Prints the code, or nothing.
+first_invite() {
+	[ -n "$DRY_RUN" ] && return 0
+	sudo -u "$SERVICE_USER" -H env CLOUDMORROW_SERVER_CONFIG="$CONFIG" \
+		"$VENV/bin/cloudmorrow-server" access invite 2>/dev/null | head -n 1
+}
+
+say_invite() {
+	INVITE="$(first_invite)"
+	if [ -n "$INVITE" ]; then
+		line "Invite the first one with"
+		line "$INVITE (once, for ten minutes):"
+		line "curl -fsSL $1/install.sh | sh -s -- $INVITE"
+		line "Then Me -> Invite a device, or"
+		line "My Clouds on cloudmorrow.com."
+	else
+		line "Invite each one once:"
+		line "Me -> Invite a device, or"
+		line "My Clouds on cloudmorrow.com."
+	fi
+}
+
 [ -n "$DRY_RUN" ] || [ "$(id -u)" = "0" ] || die "run this with sudo"
 # --- what it needs ----------------------------------------------------------
 # Checked before anything is asked or changed, so a missing package shows up
@@ -613,7 +636,7 @@ if [ -z "$UPDATE" ] && [ -z "$DRY_RUN" ] && [ -f "$CONFIG" ] && [ -x "$VENV/bin/
 		run systemctl restart "$SERVICE_NAME"
 		heading "Linked"
 		line "${LINKED_URL:-see Administration -> Access}"
-		line "Invite each device: Me -> Invite a device."
+		[ -n "$LINKED_URL" ] && say_invite "$LINKED_URL"
 		printf '\n'
 		exit 0
 	fi
@@ -1191,8 +1214,7 @@ fi
 if [ -n "$LINKED_URL" ]; then
 	heading "Linked, and on its mesh"
 	line "Its devices reach it from anywhere."
-	line "Invite each one once:"
-	line "Me -> Invite a device."
+	say_invite "$LINKED_URL"
 elif [ "$LINK" = "yes" ] && [ -n "$DRY_RUN" ]; then
 	heading "Linked, and on its mesh"
 	line "once the code is entered"

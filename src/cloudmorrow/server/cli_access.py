@@ -5,6 +5,7 @@
     cloudmorrow-server access link --no-wait # shows a code; the server waits
     cloudmorrow-server access unlink
     cloudmorrow-server access set-up         # try the mesh and Caddy again
+    cloudmorrow-server access invite         # an invite code for a device
 
 What the installer runs, as the service user, and what an administrator
 without a browser runs. It goes through the same `access_ways.Access` as
@@ -15,7 +16,8 @@ systemctl restart cloudmorrow`).
 
 `link` prints what to do on stdout, where the installer's terminal shows
 it: *Open cloudmorrow.com/link and enter KXRT-4829*, and the page with the
-code filled in. Joining the mesh needs this user to be tailscale's
+code filled in. `invite` prints the code alone on stdout, the rest on
+stderr, so the installer can show it at the end. Joining the mesh needs this user to be tailscale's
 operator, which the installer arranges as root before it links.
 """
 
@@ -158,6 +160,26 @@ def set_up(config_path: ConfigOption = None) -> None:
     """Put a linked cloud on its mesh and give Caddy its site, again."""
     _set_up(_access(config_path))
     _restart_note()
+
+
+@app.command("invite")
+def invite(config_path: ConfigOption = None) -> None:
+    """An invite code for a device: good once, for ten minutes (stdout: the code).
+
+    The first device's way onto the mesh when nothing is on it yet to open
+    Me → Invite a device from.
+    """
+    try:
+        data = _access(config_path).invite()
+    except AccessError as exc:
+        _fail(exc)
+    typer.echo(data["code"])
+    console.print(
+        f"[dim]A computer:  curl -fsSL https://{data['host']}/install.sh | sh -s -- {data['code']}\n"
+        f"A phone:     the Tailscale app, log in with another server: {data['login_server']}\n"
+        f"             then enter the code. Until {data['expires_at'] or 'ten minutes from now'}.[/]",
+        soft_wrap=True,  # the command stays one line, to copy
+    )
 
 
 @app.command("unlink")

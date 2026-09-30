@@ -83,6 +83,19 @@ def test_a_code_that_runs_out_fails_the_command(wired, monkeypatch) -> None:
     assert "ran out" in result.output
 
 
+def test_invite(wired) -> None:
+    access, fakes = wired
+    result = CliRunner().invoke(cli_access.app, ["invite"])
+    assert result.exit_code == 1 and "link" in result.output.lower()
+    fakes.control.approve(access.link()["code"], "larsens")
+    access.poll_once()
+    result = CliRunner().invoke(cli_access.app, ["invite"])
+    assert result.exit_code == 0, result.output
+    code = result.stdout.strip()
+    assert len(code) == 6 and code.isalnum()
+    assert f"curl -fsSL https://larsens.{ZONE}/install.sh | sh -s -- {code}" in result.stderr
+
+
 def test_unlink_asks_unless_told(wired) -> None:
     access, fakes = wired
     fakes.control.approve(access.link()["code"], "larsens")

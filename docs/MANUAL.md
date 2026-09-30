@@ -560,7 +560,11 @@ else's devices ever see yours). Nothing on the internet reaches the box:
 off the mesh, the name shows a landing page with the client downloads,
 served by the relay. Anybody on the cloud invites a device in **Me → Invite
 a device** (in the terminal: Settings, *Invite a device*; or `cm access
-invite`): a six-character code, good once, for ten minutes.
+invite`): a six-character code, good once, for ten minutes. For the first
+device, with nothing on the mesh yet: the installer prints a code once it
+has linked the box, the owner makes one in **My Clouds** on
+cloudmorrow.com, and `cloudmorrow-server access invite` makes one from the
+box's shell.
 
 - a computer runs `curl -fsSL https://<name>.cloudmorrow.tech/install.sh | sh`,
   which asks for the code, trades it at the relay for a key, installs
@@ -593,6 +597,7 @@ cloudmorrow-server access status                # from the box
 cloudmorrow-server access link                  # a code, and wait for it
 cm access status                                # from anywhere, signed in
 cm access invite                                # a code for a device
+cloudmorrow-server access invite                # the same, from the box
 cm access join --invite 7QX2MP --server https://larsens.cloudmorrow.tech
 ```
 

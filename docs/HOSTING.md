@@ -210,11 +210,16 @@ endpoint and Caddy's `acmedns` module. The relay publishes the
 never leaves the box. The service keeps Caddy in step with the name through
 `/var/lib/cloudmorrow-caddy/*.caddy` and Caddy's admin endpoint.
 
-**Inviting a device.** Someone already on the cloud — on the mesh, at home,
-or the owner at the end of the install — makes an invite in **Me → Invite a
-device** (`POST /api/access/mesh/invite`, which calls `POST
-/v1/clouds/me/mesh/invites`). An invite is a six-character code, valid ten
-minutes, once. It works two ways:
+**Inviting a device.** Someone already on the cloud — on the mesh or at
+home — makes an invite in **Me → Invite a device** (`POST
+/api/access/mesh/invite`, which calls `POST /v1/clouds/me/mesh/invites`).
+The first device has nothing on the mesh to make one from, so there are two
+more ways: the installer prints one when it has linked the box
+(`cloudmorrow-server access invite`, from the box's shell at any time), and
+the owner makes one in **My Clouds** on cloudmorrow.com (`POST
+/admin/v1/clouds/{id}/invites`). An invite is a six-character code, valid
+ten minutes, once, and only puts a device on the mesh: it still signs in to
+the cloud itself. It works two ways:
 
 - **A computer:** the client installer from the landing page asks for it
   (`--invite <code>`), trades it at the relay for a one-time key (`POST
@@ -296,6 +301,7 @@ Accounts are opaque to the relay: the website's account id, nothing else.
 | `GET /admin/v1/accounts/{account}/clouds` | `[{cloud_id, name, created, online, online_since, uptime_30d, show_name, show_logo, display_name, has_logo}]`: `online_since` is when the current state began, online or offline; `uptime_30d` a fraction, `0.998`. |
 | `PATCH /admin/v1/clouds/{id}` `{account, name?, display_name?, show_name?, show_logo?}` | Rename, and the landing page's switches. The cloud must be the account's. |
 | `GET` / `PUT` / `DELETE /admin/v1/clouds/{id}/logo?account=…` | The logo, as the body with its content type (404 when there is none). |
+| `POST /admin/v1/clouds/{id}/invites` `{account}` | An invite code for a device, as the box makes: `{code, expires_at, login_server}`. It counts against the cloud's invites per hour (429). |
 | `DELETE /admin/v1/clouds/{id}?account=…` | Unlink. |
 
 ### What the relay knows, and what it cannot

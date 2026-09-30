@@ -168,7 +168,9 @@ Then, with `larsens.cloudmorrow.tech` standing for your cloud's address
 2. On each computer, install the terminal app (`cm`) and the desktop app,
    which also mounts your fileshares, with the line that page shows:
    `curl -fsSL https://larsens.cloudmorrow.tech/install.sh | sh`. Away from
-   home it asks for an invite code, from **Me → Invite a device**.
+   home it asks for an invite code, from **Me → Invite a device**. For the
+   first device away from home, the installer printed one, and **My
+   Clouds** on cloudmorrow.com makes more.
 3. On a phone, open `https://larsens.cloudmorrow.tech/app` and use **Add to
    Home Screen**: it opens like any other app, with your cloud's name under
    the icon. Away from home, the Tailscale app and an invite put it on the
