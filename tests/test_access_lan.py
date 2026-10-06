@@ -8,11 +8,11 @@ from cloudmorrow.server.access_lan import (
     SERVICE_TYPE,
     Announcement,
     LanAnnouncer,
+    announcer,
     hostname_label,
     local_addresses,
 )
-from cloudmorrow.server.access_ways import Access
-from tests.access_fakes import ZONE, wire
+from cloudmorrow.server.app import create_app
 
 
 class FakeZeroconf:
@@ -39,7 +39,7 @@ def test_hostname_labels() -> None:
     assert len(hostname_label("x" * 100)) == 63
 
 
-def test_local_addresses_leave_out_loopback_and_the_mesh() -> None:
+def test_local_addresses_leave_out_loopback_and_shared_address_space() -> None:
     for address in local_addresses():
         assert not address.startswith("127.") and not address.startswith("100.64.")
 
@@ -63,19 +63,13 @@ def test_the_announcer_registers_updates_and_withdraws() -> None:
     assert lan.status()["hostname"] == "larsens.local"
 
     wanted[0] = Announcement(
-        "larsens",
-        "The Larsens",
-        "0.4.0",
-        443,
-        f"https://larsens.{ZONE}",
-        mesh=f"larsens.{ZONE}",
-        addresses=["192.168.1.20"],
+        "larsens", "The Larsens", "0.4.0", 8787, "https://cloud.example.com", addresses=["192.168.1.20"]
     )
     lan.refresh()
     kind, info = zc.calls[1]
-    assert kind == "update" and info.port == 443
-    assert info.properties[b"mesh"] == f"larsens.{ZONE}".encode()
-    assert set(info.properties) == {b"name", b"version", b"url", b"mesh"}
+    assert kind == "update"
+    assert info.properties[b"url"] == b"https://cloud.example.com"
+    assert set(info.properties) == {b"name", b"version", b"url"}
 
     wanted[0] = None
     lan.refresh()
@@ -97,30 +91,21 @@ def test_a_failing_network_is_a_status_not_a_crash() -> None:
     assert lan.status()["error"] == "no multicast here"
 
 
-def test_what_the_cloud_announces(config, users, tmp_path) -> None:
-    access = Access(config, lambda: "The Larsens", addresses=lambda: ["192.168.1.20"])
-    # Listening on loopback only, not linked: nothing a neighbour could reach.
+def test_what_the_cloud_announces(config) -> None:
+    lan = announcer(config, lambda: "The Larsens", addresses=lambda: ["192.168.1.20"])
+    # Listening on loopback only, with no address of its own: nothing a neighbour could reach.
     config.host = "127.0.0.1, ::1"
-    assert access.announcement() is None
+    assert lan.describe() is None
     config.host = "0.0.0.0"
-    home = access.announcement()
+    home = lan.describe()
     assert (home.label, home.port, home.url) == ("the-larsens", 8787, "http://the-larsens.local:8787")
-    assert home.mesh == "" and set(home.properties()) == {"name", "version", "url"}
-    # Linked, the box is reached at 443 on the network, by its real name.
-    fakes = wire(access, tmp_path)
-    fakes.control.approve(access.link()["code"], "larsens")
-    access.poll_once()
-    named = access.announcement()
-    assert named.label == "larsens" and named.port == 443
-    assert named.url == f"https://larsens.{ZONE}"
-    assert named.mesh == f"larsens.{ZONE}"
+    assert home.addresses == ["192.168.1.20"] and set(home.properties()) == {"name", "version", "url"}
+    # With an address of its own, that is the one to open.
+    config.public_url = "https://cloud.example.com/"
+    assert lan.describe().url == "https://cloud.example.com"
 
 
-def test_access_lan_false_announces_nothing(config, users, tmp_path) -> None:
+def test_access_lan_false_announces_nothing(config, users) -> None:
+    assert create_app(config).state.cloudmorrow.lan is not None
     config.access_lan = False
-    config.host = "0.0.0.0"
-    zc = FakeZeroconf()
-    access = Access(config, lambda: "X", zeroconf_factory=lambda: zc, addresses=lambda: ["10.0.0.2"])
-    access.start()
-    access.stop()
-    assert zc.calls == []
+    assert create_app(config).state.cloudmorrow.lan is None

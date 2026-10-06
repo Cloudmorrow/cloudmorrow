@@ -406,7 +406,7 @@ WebAssembly.
 ## What it costs, honestly
 
 - **A round trip per click.** On loopback and a home network that is
-  nothing; over the relay it is noticeable. Nothing a view draws works
+  nothing; over a slow link it is noticeable. Nothing a view draws works
   offline.
 - **An interpreter per busy Quill.** CPython in WebAssembly takes tens of
   megabytes; on a Pi with many Quills, idle ones are stopped and started

@@ -268,6 +268,4 @@ def test_nothing_private_is_handed_to_the_page():
         "session",
         "signed_in",
         "signed_out",
-        "mesh_status",
-        "mesh_join",
     }

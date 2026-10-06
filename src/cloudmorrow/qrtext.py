@@ -1,10 +1,9 @@
 """A QR code in a terminal: two rows of modules to a line of half-blocks.
 
-For the link code (Administration → Access, `cm access link`) and the login
-server a phone's Tailscale app is pointed at (Invite a device), where the web
-app draws the same codes as SVG (web/qr.js). segno does the encoding; it is
-pure Python and in the `tui` extra, and without it there is no picture, only
-the text beside it, which says the same.
+For the cloud's address in Add a device, where the web app draws the same
+code as SVG (web/qr.js). segno does the encoding; it is pure Python and in
+the `tui` extra, and without it there is no picture, only the text beside
+it, which says the same.
 
 Dark modules are drawn dark on a light ground whatever the theme, with the
 quiet zone the standard asks for, because a camera reads contrast.

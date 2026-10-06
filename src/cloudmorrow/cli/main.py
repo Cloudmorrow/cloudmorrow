@@ -23,7 +23,6 @@ import typer
 
 from cloudmorrow.agent.setup import ensure_agent, stop_agent
 from cloudmorrow.cli import (
-    access,
     agent,
     circle,
     desktop,
@@ -40,7 +39,6 @@ from cloudmorrow.cli import (
 from cloudmorrow.cli.common import client, console, run
 from cloudmorrow.client import discover
 from cloudmorrow.client.api import CloudmorrowClient
-from cloudmorrow.client.autojoin import join_after_signin
 from cloudmorrow.client.config import (
     ClientConfig,
     StoredCredentials,
@@ -63,9 +61,8 @@ app.add_typer(settings.app, name="config")
 app.add_typer(update.app, name="update")
 app.add_typer(quill.app, name="quill")
 app.add_typer(circle.app, name="circle")
-# `cm access` alone is your own access (what your circles give you, per
-# datamodel); its subcommands are how this cloud is reached: link, invite, join.
-app.add_typer(access.app, name="access")
+# Your own access: what your circles give you, per datamodel.
+app.command("access")(circle.access)
 # The way out: `cloudmorrow uninstall`, in its own file beside the way in.
 app.command("uninstall")(uninstall.uninstall)
 # The desktop app: the web app in a window, with this computer behind it.
@@ -107,13 +104,8 @@ def login(
         bool,
         typer.Option("--agent/--no-agent", help="Set this machine up as an agent (runs as you)."),
     ] = True,
-    mesh: Annotated[
-        bool,
-        typer.Option("--mesh/--no-mesh", help="Join a linked cloud's mesh after signing in."),
-    ] = True,
-    yes: Annotated[bool, typer.Option("--yes", help="Install Tailscale for the mesh without asking.")] = False,
 ) -> None:
-    """Sign in and store an access token; on a linked cloud, join its mesh too."""
+    """Sign in and store an access token."""
     config = ClientConfig.load()
     if server:
         config.api_url = server.rstrip("/")
@@ -137,7 +129,6 @@ def login(
                 f"[green]Signed in[/] as [b]{session.username}[/] on {config.api_url}\n"
                 f"[dim]token stored in {credentials_path()}[/]"
             )
-            remember_local_address(config)
             if agent_setup:
                 result = await ensure_agent(api)
                 if result.enrolled and result.started:
@@ -146,21 +137,6 @@ def login(
                     console.print(
                         f"[dim]registered as '{result.agent_name}', but it is not running: {result.detail}[/]"
                     )
-            if mesh:
-                joined = await join_after_signin(
-                    api,
-                    config,
-                    ask_install=lambda: (
-                        yes
-                        or typer.confirm(
-                            "This cloud has a private mesh, which needs Tailscale. Install it now from tailscale.com?",
-                            default=True,
-                        )
-                    ),
-                )
-                if joined.outcome:
-                    tone = "green" if joined.outcome in ("joined", "already") else "yellow"
-                    console.print(f"[{tone}]{joined.sentence()}[/]")
 
     run(_login())
 
@@ -187,36 +163,17 @@ def choose_cloud(config: ClientConfig, found: list[discover.Found] | None = None
     if "://" not in address:
         address = f"https://{address}"
     config.api_url = address.rstrip("/")
-    config.local_address = ""
     config.save()
 
 
 def use_found(config: ClientConfig, cloud: discover.Found) -> None:
     """Point this computer at a cloud found on the network."""
     config.api_url = cloud.api_url
-    config.local_address = cloud.local_address
     if cloud.plain:
-        # Picking a home-only cloud from the list is saying it is meant to be plain.
+        # Picking a plain-http cloud from the list is saying it is meant to be plain.
         config.allow_insecure_http = True
-        console.print(
-            "[yellow]note:[/] this cloud is not linked, so it is plain http on your home network; "
-            "an administrator can link it in Administration → Access."
-        )
+        console.print("[yellow]note:[/] this cloud is plain http, which is for a home network only.")
     config.save()
-
-
-def remember_local_address(config: ClientConfig) -> None:
-    """At home, note where the box is, so requests go straight to it from now on."""
-    if not config.api_url.startswith("https://"):
-        return
-    try:
-        here = discover.matching(discover.browse(1.5), config.api_url)
-    except Exception:  # finding it is a convenience, never a failed sign-in
-        return
-    if here is not None and here.local_address and here.local_address != config.local_address:
-        config.local_address = here.local_address
-        config.save()
-        console.print(f"[dim]found it on this network at {here.local_address}: going there directly[/]")
 
 
 @app.command()

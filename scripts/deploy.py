@@ -7,9 +7,8 @@
     make deploy WHAT=release        tag the next minor of the core: v0.14.0 -> v0.15.0
     make deploy WHAT=release BUMP=patch   (or BUMP=major)
     make deploy WHAT=website        cloudmorrow.com, from ../cloudmorrow-web
-    make deploy WHAT=relay          the relay and its landing pages, on the Hetzner box
     make deploy WHAT=mail           the Worker behind certs@ and hi@cloudmorrow.com
-    make deploy WHAT=all            every one of those that is behind: core, relay, website, mail
+    make deploy WHAT=all            every one of those that is behind: core, website, mail
 
 Every step says what it will do and asks first (YES=1 to not ask). It never
 touches anybody's own cloud: those update themselves, or with
@@ -34,9 +33,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 WEB = Path(os.environ.get("CLOUDMORROW_WEB_DIR", ROOT.parent / "cloudmorrow-web"))
 HOST = os.environ.get("CLOUDMORROW_DEPLOY_HOST", "root@178.105.27.139")
-RELAY_DIR = "/srv/cloudmorrow-relay/relay"
 CORE_REPO = "Cloudmorrow/cloudmorrow"
-RELAY_REPO = "Cloudmorrow/relay"
 ACCOUNT_ID = "ef65820d931a60652e1d853651358bac"
 WORKER = "cloudmorrow-mail"
 TAG = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
@@ -60,13 +57,12 @@ commit is live".
                        at the wheel) and publishes them as a GitHub Release.
 
   Who gets it          - New computers: the client installer from
-                         releases/latest (the relay's landing pages link it).
+                         releases/latest.
                        - Clouds: the `cm` client and desktop app update from
                          their own cloud, which serves its own install.sh.
 
   Deployed by commit   These have no version; what matters is the commit:
                        - cloudmorrow.com (Cloudmorrow/cloudmorrow-web)
-                       - the relay and landing pages (Cloudmorrow/relay)
                        - the mail Worker (cloudmorrow-web/mail-worker)
 
   The one loose end    The SERVER installer (install-server.sh) and
@@ -284,32 +280,6 @@ def website_state() -> State:
     return state
 
 
-def relay_state() -> State:
-    state = State("relay", "?")
-    try:
-        latest = json.loads(gh("api", f"repos/{RELAY_REPO}/commits/main"))
-        latest_sha, subject = latest["sha"][:7], latest["commit"]["message"].splitlines()[0]
-    except Failed as exc:
-        latest_sha, subject = "", ""
-        state.notes.append(bad(f"cannot read GitHub: {exc}"))
-    try:
-        deployed = ssh(f"git -C {RELAY_DIR} rev-parse --short HEAD").strip()
-        state.what = f"{deployed} live"
-    except Failed as exc:
-        deployed = ""
-        state.notes.append(bad(f"cannot read what is live: {exc}"))
-    if latest_sha and deployed and latest_sha != deployed:
-        state.behind = True
-        state.notes.append(warn(f"GitHub main is {latest_sha}: {subject}"))
-    elif deployed:
-        state.notes.append(ok("live is the latest commit"))
-    admin = http_status("https://relay.cloudmorrow.tech/admin/v1/names/health-check")
-    state.notes.append(
-        ok("relay answers (admin API on)") if admin == 401 else bad(f"relay admin API answers {admin} (401 expected)")
-    )
-    return state
-
-
 def cloudflare_token() -> str:
     env = WEB / ".env"
     for line in env.read_text().splitlines() if env.exists() else []:
@@ -351,13 +321,11 @@ def mail_state() -> State:
     return state
 
 
-# In the order `all` deploys them: the relay before the website, which calls
-# the relay's admin API and may need what a new relay adds.
-COMPONENTS = {"core": core_state, "relay": relay_state, "website": website_state, "mail": mail_state}
+# In the order `all` deploys them.
+COMPONENTS = {"core": core_state, "website": website_state, "mail": mail_state}
 TITLES = {
     "core": "Core release (the version people download)",
     "website": "cloudmorrow.com",
-    "relay": "Relay + landing pages (cloudmorrow.tech)",
     "mail": "Mail Worker (certs@, hi@)",
 }
 
@@ -473,39 +441,6 @@ def website(yes: bool) -> None:
     say(ok("cloudmorrow.com is live on " + head))
 
 
-def relay(yes: bool) -> None:
-    state = relay_state()
-    if not state.behind and not confirm("The relay is up to date. Rebuild it anyway?", yes):
-        return
-    print(f"\n  relay: {state.what} → GitHub main")
-    print("  Backs up its database, pulls, rebuilds the container. Clouds stay on their")
-    print("  mesh while it restarts; cloudmorrow.com blinks for a few seconds.")
-    if not confirm("Deploy the relay?", yes):
-        return
-    stamp = dt.datetime.now().strftime("%Y-%m-%d-%H%M")
-    ssh(
-        f"mkdir -p /srv/backups/pre-relay-deploy-{stamp} && chmod 700 /srv/backups/pre-relay-deploy-{stamp} && "
-        "sqlite3 /srv/cloudmorrow-relay/state/relay.sqlite"
-        f" '.backup /srv/backups/pre-relay-deploy-{stamp}/relay.sqlite'"
-    )
-    say(f"relay database backed up in /srv/backups/pre-relay-deploy-{stamp}")
-    out = ssh(
-        f"cd {RELAY_DIR} && git pull -q --ff-only && git log --oneline -1 && "
-        "cd deploy/hetzner && docker compose up -d --build relay 2>&1 | tail -1",
-        timeout=900,
-    )
-    print(dim("   " + out.replace("\n", "\n   ")))
-    wait_for(
-        "the relay to answer",
-        lambda: http_status("https://relay.cloudmorrow.tech/admin/v1/names/health-check") == 401,
-        120,
-    )
-    say(
-        ok("the relay is back")
-        + ("" if http_status("https://cloudmorrow.com/") == 200 else bad(" but cloudmorrow.com does not answer"))
-    )
-
-
 def mail(yes: bool) -> None:
     state = mail_state()
     if not state.behind and not confirm("The mail Worker is up to date. Deploy it again anyway?", yes):
@@ -532,7 +467,6 @@ def everything(bump: str, yes: bool) -> None:
     steps = {
         "core": lambda: release(bump, yes),
         "website": lambda: website(yes),
-        "relay": lambda: relay(yes),
         "mail": lambda: mail(yes),
     }
     for key in waiting:
@@ -545,7 +479,6 @@ def menu(bump: str, yes: bool) -> None:
     choices = [
         ("release", f"Release the core ({bump}: {bumped(parse(latest_tag() or 'v0.0.0'), bump)})"),  # type: ignore[arg-type]
         ("website", "Deploy cloudmorrow.com"),
-        ("relay", "Deploy the relay"),
         ("mail", "Deploy the mail Worker"),
         ("all", "Everything that is waiting, in order"),
         ("explain", "How versions fit together"),
@@ -569,19 +502,17 @@ def act(what: str, bump: str, yes: bool) -> None:
         release(bump, yes)
     elif what == "website":
         website(yes)
-    elif what == "relay":
-        relay(yes)
     elif what == "mail":
         mail(yes)
     elif what == "all":
         everything(bump, yes)
     else:
-        raise Failed(f"unknown: {what} (status, explain, release, website, relay, mail, all)")
+        raise Failed(f"unknown: {what} (status, explain, release, website, mail, all)")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("what", nargs="?", default="", help="status, explain, release, website, relay, mail or all")
+    parser.add_argument("what", nargs="?", default="", help="status, explain, release, website, mail or all")
     parser.add_argument("--bump", choices=("minor", "major", "patch"), default="minor")
     parser.add_argument("--yes", action="store_true", help="do not ask")
     args = parser.parse_args()

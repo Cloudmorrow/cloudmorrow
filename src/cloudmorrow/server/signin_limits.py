@@ -1,18 +1,17 @@
 """A brake on guessing passwords: failed sign-ins, counted and limited.
 
-A linked cloud's sign-in page is on the internet (docs/HOSTING.md, "From
-anywhere"), so somebody can try passwords against it for as long as they
-like. Failures are counted per visitor address and per account, in a
-sliding window each; past either limit, sign-in answers 429 with
-`Retry-After` for that address or that account until the oldest failure in
-the window has aged out. A right password does not get through a limit
-either, or the limit would tell a guesser when they had it.
+A cloud's sign-in page may well be on the internet, so somebody can try
+passwords against it for as long as they like. Failures are counted per
+visitor address and per account, in a sliding window each; past either
+limit, sign-in answers 429 with `Retry-After` for that address or that
+account until the oldest failure in the window has aged out. A right
+password does not get through a limit either, or the limit would tell a
+guesser when they had it.
 
-The address is the one the server sees: the visitor's own through Caddy,
-which puts it in X-Forwarded-For (from the relay's PROXY header, for a
-visit from anywhere), and uvicorn believes that header only from the box's
-loopback. Kept in memory: a restart forgets it, which costs a guesser
-nothing they could not get from waiting.
+The address is the one the server sees: the visitor's own through the
+reverse proxy, which puts it in X-Forwarded-For, and uvicorn believes that
+header only from the box's loopback. Kept in memory: a restart forgets it,
+which costs a guesser nothing they could not get from waiting.
 """
 
 from __future__ import annotations

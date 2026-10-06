@@ -33,9 +33,9 @@ HSTS = "max-age=31536000; includeSubDomains"
 # What a call from this machine looks like: the loopback addresses, and the
 # name Starlette's test client gives itself.
 LOCAL_CLIENTS = {"127.0.0.1", "::1", "localhost", "testclient", None}
-# A tailnet's addresses (100.64.0.0/10) are not "private" to Python, but they
-# are as local as the LAN: only the mesh's own machines have them.
-MESH = ip_network("100.64.0.0/10")
+# Carrier-grade NAT space (100.64.0.0/10) is not "private" to Python, but a
+# VPN such as Tailscale hands it out, and then it is as local as the LAN.
+SHARED = ip_network("100.64.0.0/10")
 
 
 def _on_local_network(host: str | None) -> bool:
@@ -47,7 +47,7 @@ def _on_local_network(host: str | None) -> bool:
         return False
     if address.version == 6 and address.ipv4_mapped:
         address = address.ipv4_mapped
-    return address.is_private or address.is_link_local or address in MESH
+    return address.is_private or address.is_link_local or address in SHARED
 
 
 def _is_local(request: Request) -> bool:
@@ -57,10 +57,6 @@ def _is_local(request: Request) -> bool:
 
 
 def install(app: FastAPI, config: ServerConfig) -> None:
-    # Asked on every request rather than once here: claiming a public or
-    # private name (access_control) moves public_url to https while the
-    # server runs, and TLS is required from that moment, not the next boot.
-
     @app.middleware("http")
     async def require_tls(request: Request, call_next):
         if not config.tls_required:

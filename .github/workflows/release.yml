@@ -1,14 +1,11 @@
 # A release is a tag (scripts/release.py). This makes the tag a GitHub
-# Release as well, with two assets a linked cloud's landing page links to
-# (docs/HOSTING.md, "The landing page"):
+# Release as well, with two assets:
 #
-#   install.sh  the client installer for no cloud in particular, which the
-#               landing page runs with --server <the cloud> --invite
-#               (scripts/release_installer.py)
+#   install.sh  the client installer for no cloud in particular, run with
+#               --server <the cloud> (scripts/release_installer.py)
 #   *.whl       the client itself, which that installer installs
 #
-# At releases/latest/download/<name>, so the relay never has to know a
-# version and costs nothing to serve them.
+# At releases/latest/download/<name>, so nobody has to know a version.
 name: Release
 
 on:

@@ -15,7 +15,6 @@ from textual.worker import WorkerCancelled
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.app import CloudmorrowApp
 from cloudmorrow.tui.screens.workspace import WorkspaceScreen
-from tests.tui_access import FakeAccess
 from tests.tui_chat import CHAT_QUILL, FakeSpaces
 from tests.tui_circles import FakeCircles
 from tests.tui_files import FILES_QUILL, FakeFiles
@@ -154,7 +153,7 @@ def _one_pixel_png() -> bytes:
 PNG_1PX = _one_pixel_png()
 
 
-class FakeClient(FakeSpaces, FakeNotes, FakeFiles, FakeQuills, FakeCircles, FakeAccess):
+class FakeClient(FakeSpaces, FakeNotes, FakeFiles, FakeQuills, FakeCircles):
     """Enough of the API for the workspace, with a record of what was asked.
 
     The Quills and the record store behind them are in tui_quills.py; the
@@ -171,7 +170,6 @@ class FakeClient(FakeSpaces, FakeNotes, FakeFiles, FakeQuills, FakeCircles, Fake
         self.vault: str | None = None
         self.setup_quills()
         self.setup_notes()
-        self.setup_access()
         # Files is a Quill, installed the way a server that had it built in
         # gets it: after Tasks.
         self.quill_list.append(copy.deepcopy(FILES_QUILL))

@@ -38,7 +38,7 @@ def test_setup_names_the_cloud_and_makes_the_administrator(config):
             json={"name": "  The   Larsens ", "username": "alice", "password": "longenough"},
         )
         assert response.status_code == 201, response.text
-        assert response.json() == {"name": "The Larsens", "username": "alice", "note": "", "link": None}
+        assert response.json() == {"name": "The Larsens", "username": "alice", "note": ""}
 
         store = UserStore(config.db_path)
         assert store.require("alice").is_admin

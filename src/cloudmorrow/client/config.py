@@ -40,14 +40,6 @@ class ClientConfig:
     environment: str = "local"
     # ssh target for `cloudmorrow update server`. Empty derives it from api_url.
     server_host: str = ""
-    # The cloud's address on the home network ("192.168.1.20:443"), found by
-    # `cm login` when the cloud announces itself there. While it answers,
-    # requests go to it directly, still checked against api_url's real name
-    # (client/localroute.py); away from home, api_url is used as it is.
-    local_address: str = ""
-    # Join a linked cloud's mesh after signing in (client/autojoin.py).
-    # False keeps this computer off it, and is what declining Tailscale sets.
-    mesh: bool = True
 
     @classmethod
     def load(cls) -> ClientConfig:
@@ -64,8 +56,6 @@ class ClientConfig:
                 "vault",
                 "environment",
                 "server_host",
-                "local_address",
-                "mesh",
             ):
                 if key in section:
                     setattr(config, key, section[key])
@@ -91,8 +81,6 @@ class ClientConfig:
                 "vault": self.vault,
                 "environment": self.environment,
                 "server_host": self.server_host,
-                "local_address": self.local_address,
-                "mesh": self.mesh,
             }
         }
         path.write_text(tomli_w.dumps(payload), encoding="utf-8")

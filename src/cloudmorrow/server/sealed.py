@@ -95,13 +95,9 @@ SEALED: dict[int, tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...]] = {
     # A Quill's webhook secrets (quills.tokens): born sealed, listed so a new
     # key re-seals them.
     3: (("quill_webhooks", ("quill", "hook"), ("secret",)),),
-    # The cloud's credential at the relay, the acme-dns account its
-    # certificate is renewed through, and the secret a link code is polled
-    # with (access_control): born sealed, listed so a new key re-seals them.
-    4: (
-        ("access_cloud", ("cloud_id",), ("token", "acme")),
-        ("access_link", ("code",), ("poll",)),
-    ),
+    # Tables that are gone. The number stays, so a database that got this
+    # far is not migrated again.
+    4: (),
 }
 SEALED_VERSION = max(SEALED)
 

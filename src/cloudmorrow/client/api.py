@@ -7,9 +7,7 @@ from typing import Any
 
 import httpx
 
-from cloudmorrow.client.api_access import AccessCalls
 from cloudmorrow.client.config import ClientConfig, StoredCredentials
-from cloudmorrow.client.localroute import local_transport
 from cloudmorrow.httpcommon import ServerError
 from cloudmorrow.httpcommon import detail as _detail
 
@@ -45,7 +43,7 @@ class Session:
     expires_at: str = ""
 
 
-class CloudmorrowClient(AccessCalls):
+class CloudmorrowClient:
     """Everything the TUI needs to talk to the server."""
 
     def __init__(self, config: ClientConfig, token: str | None = None, vault: str | None = None) -> None:
@@ -57,14 +55,11 @@ class CloudmorrowClient(AccessCalls):
         # `vault=` where it means one — there is no selected vault there.
         self.vault = vault
         ApiError.refuse_insecure(config.api_url, allow_insecure=config.allow_insecure_http)
-        # At home, straight to the box, still checked against the real name.
-        self.local = local_transport(config.api_url, getattr(config, "local_address", ""), config.verify_tls)
         self._client = httpx.AsyncClient(
             base_url=config.api_url,
             timeout=TIMEOUT,
             verify=config.verify_tls,
             headers={"User-Agent": "cloudmorrow-tui"},
-            transport=self.local,
         )
 
     async def aclose(self) -> None:

@@ -1,26 +1,20 @@
 #!/bin/sh
 # Install (or re-install) the Cloudmorrow server on this machine.
 #
-# One command, five questions — what your cloud is called, whether to link
-# it to a cloudmorrow.com account so its devices reach it from anywhere,
-# who its first account (the administrator) is, which of this machine's
-# addresses it answers on, and which of the standard quills it has — and it
-# is running:
+# One command, four questions — what your cloud is called, who its first
+# account (the administrator) is, which of this machine's addresses it
+# answers on, and which of the standard quills it has — and it is running:
 #
 #   curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
 #
 # Or from a checkout: `sudo sh deploy/install-server.sh`. Every answer can be
 # given as a flag instead, for a script or a re-run that should ask nothing:
 #
-#   sudo sh install-server.sh --name "The Larsens" --link --yes \
-#     --user alice --quills all
+#   sudo sh install-server.sh --name "The Larsens" --user alice --quills all
 #
-# Not linked, the cloud is reached on the home network, at <name>.local,
-# and never talks to cloudmorrow.com. Linked, it shows a code to enter at
-# cloudmorrow.com/link, where you pick its name, and waits; then it joins
-# its own private mesh (Tailscale's client, which it asks before
-# installing) and gets a certificate for <name>.cloudmorrow.tech (Caddy,
-# the same). Nothing on the internet reaches it either way.
+# The cloud is reached at this machine's address, and on a home network at
+# <name>.local. Reaching it from outside is your own setup: a domain and a
+# reverse proxy of your own (--public-url), or a VPN such as Tailscale.
 #
 # Run it again on a machine that already has Cloudmorrow and it checks the
 # server first: running and answering, it says so and changes nothing;
@@ -53,28 +47,15 @@ QUILLS=""
 DRY_RUN=""
 UPDATE=""
 HOST_GIVEN=""
-# Linking: yes, no, or empty until asked. --access-control is the relay,
-# for somebody who runs their own; --yes installs Caddy and Tailscale
-# without asking.
-LINK=""
-ACCESS_CONTROL=""
-ASSUME_YES=""
-CADDY_DIR="/var/lib/cloudmorrow-caddy"
 
 usage() {
-	sed -n '2,24p' "$0"
+	sed -n '2,17p' "$0"
 	cat <<EOF
 
 Options:
   --name TEXT         what your cloud is called         (asked if not given)
-  --link              link it to a cloudmorrow.com account: show a code,
-                      wait for it, then join the mesh    (asked if not given)
-  --no-link           the home network only; link later from Administration
-  --access-control URL the relay to link through        (default:
-                      https://relay.cloudmorrow.tech)
-  --yes               install Caddy and Tailscale for linking without asking
   --public-url URL    an address of your own, behind a reverse proxy of your
-                      own, instead of linking
+                      own
   --user NAME         the first account, an administrator (asked if not given;
                       its password is asked for, or read from
                       \$CLOUDMORROW_ADMIN_PASSWORD)
@@ -103,10 +84,6 @@ while [ $# -gt 0 ]; do
 	case "$1" in
 	--name) CLOUD_NAME="$2"; shift 2 ;;
 	--public-url) PUBLIC_URL="$2"; shift 2 ;;
-	--link) LINK="yes"; shift ;;
-	--no-link) LINK="no"; shift ;;
-	--access-control) ACCESS_CONTROL="$2"; shift 2 ;;
-	--yes | -y) ASSUME_YES="1"; shift ;;
 	--user) ACCOUNT="$2"; shift 2 ;;
 	--quills) QUILLS="$2"; shift 2 ;;
 	--repo) REPO="$2"; shift 2 ;;
@@ -193,252 +170,6 @@ VENV="$PREFIX/venv"
 CONFIG_DIR="/etc/cloudmorrow"
 CONFIG="$CONFIG_DIR/server.toml"
 KEY_FILE="$CONFIG_DIR/cloudmorrow.key"
-
-# --- linking: Tailscale, Caddy, and the code -------------------------------
-# Root's part of linking, done here once: Tailscale's client (the box on its
-# mesh) with the service user as its operator, so the service can bring the
-# box up and down itself; and Caddy built with the acmedns module (the
-# certificate by the DNS challenge, since nothing on the internet reaches
-# the box), importing the site the service writes. Then the service user
-# asks the relay for a code, shows it, and waits (`cloudmorrow-server access
-# link`), which seals the token and puts the box on its mesh.
-consent() {
-	# consent "question": yes with --yes; otherwise asked on the terminal,
-	# and no without one. A dry run says what it would ask.
-	[ -z "$ASSUME_YES" ] || return 0
-	if [ -n "$DRY_RUN" ]; then
-		printf '   \033[2mwould ask:\033[0m %s\n' "$1"
-		return 0
-	fi
-	( : </dev/tty ) 2>/dev/null || return 1
-	printf '\033[1m%s\033[0m [Y/n]: ' "$1" >/dev/tty
-	read -r answer </dev/tty || answer=""
-	case "$answer" in n* | N*) return 1 ;; *) return 0 ;; esac
-}
-
-as_server() {
-	run sudo -u "$SERVICE_USER" -H env CLOUDMORROW_SERVER_CONFIG="$CONFIG" \
-		"$VENV/bin/cloudmorrow-server" "$@"
-}
-
-caddy_arch() {
-	case "$(uname -m)" in
-	x86_64 | amd64) echo amd64 ;;
-	aarch64 | arm64) echo arm64 ;;
-	armv7* | armhf) echo "arm&arm=7" ;;
-	armv6*) echo "arm&arm=6" ;;
-	*) uname -m ;;
-	esac
-}
-
-install_caddy() {
-	# Caddy's own build service, with the acmedns module compiled in, and
-	# the unit Caddy ships. A Caddy that is here already gets the module
-	# added when it lacks it.
-	module="github.com/caddy-dns/acmedns"
-	if command -v caddy >/dev/null 2>&1; then
-		say "caddy is here: $(caddy version 2>/dev/null | head -n 1)"
-		if ! caddy list-modules 2>/dev/null | grep -q '^dns.providers.acmedns'; then
-			consent "Add the acmedns module to Caddy, for the certificate?" ||
-				{ warn "no acmedns module: the name gets no certificate"; return 1; }
-			run caddy add-package "$module"
-		fi
-		return 0
-	fi
-	consent "Install Caddy, which gets and holds the certificate for the cloud's name?" ||
-		{ warn "no Caddy: the name has no certificate until it is installed (run this again with --link)"; return 1; }
-	url="https://caddyserver.com/api/download?os=linux&arch=$(caddy_arch)&p=$module"
-	say "downloading Caddy with $module from caddyserver.com"
-	run curl -fsSL -o /usr/bin/caddy "$url"
-	run chmod 755 /usr/bin/caddy
-	id caddy >/dev/null 2>&1 || run useradd --system --home-dir /var/lib/caddy --create-home \
-		--shell /usr/sbin/nologin caddy
-	run mkdir -p /etc/caddy
-	write_file /etc/systemd/system/caddy.service 0644 <<EOF
-[Unit]
-Description=Caddy
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=notify
-User=caddy
-Group=caddy
-ExecStart=/usr/bin/caddy run --environ --config /etc/caddy/Caddyfile
-ExecReload=/usr/bin/caddy reload --config /etc/caddy/Caddyfile --force
-TimeoutStopSec=5s
-LimitNOFILE=1048576
-PrivateTmp=true
-ProtectSystem=full
-AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
-
-[Install]
-WantedBy=multi-user.target
-EOF
-}
-
-# Caddy's global options for what the relay passes through from anywhere:
-# it arrives on 8443 with a PROXY header saying who the visitor is, which
-# Caddy believes only from the mesh and this machine (the relay's node is
-# on the mesh; a userspace tailscaled hands connections over on loopback).
-# The service writes the 8443 site itself; this part is server-wide, so it
-# lives in /etc/caddy/Caddyfile, which only root may change.
-CADDY_OPTIONS_MARK="# Cloudmorrow: from anywhere, through the relay"
-caddy_options() {
-	cat <<EOF
-$CADDY_OPTIONS_MARK (install-server.sh).
-{
-	servers :8443 {
-		listener_wrappers {
-			proxy_protocol {
-				timeout 5s
-				allow 100.64.0.0/10 fd7a:115c:a1e0::/48 127.0.0.1/32 ::1/128
-			}
-			tls
-		}
-	}
-}
-EOF
-}
-
-# The options go first in the Caddyfile, where Caddy wants them; a Caddyfile
-# with global options of its own already is not ours to merge into.
-wire_caddy_options() {
-	grep -q "$CADDY_OPTIONS_MARK" "$CADDYFILE" && return 0
-	first="$(sed -e 's/#.*//' "$CADDYFILE" | grep -v '^[[:space:]]*$' | head -n 1)"
-	case "$first" in
-	"{"*)
-		warn "$CADDYFILE has global options already; add these to them, for the cloud to open from anywhere:"
-		caddy_options | sed '1d; 2d; $d' >&2
-		return 0
-		;;
-	esac
-	say "adding the options for visits from anywhere to $CADDYFILE"
-	if [ -n "$DRY_RUN" ]; then
-		printf '   \033[2mwould put first:\033[0m servers :8443 { proxy_protocol … }\n'
-		return 0
-	fi
-	{ caddy_options; printf '\n'; cat "$CADDYFILE"; } >"$CADDYFILE.new"
-	chmod 0644 "$CADDYFILE.new"
-	mv "$CADDYFILE.new" "$CADDYFILE"
-}
-
-wire_caddy() {
-	# The service writes its site into CADDY_DIR, which Caddy imports; the
-	# group is caddy's so the site (with an acme-dns password in it) is
-	# readable by Caddy and nobody else.
-	run mkdir -p "$CADDY_DIR"
-	run chown "$SERVICE_USER:caddy" "$CADDY_DIR"
-	run chmod 2750 "$CADDY_DIR"
-	CADDYFILE="/etc/caddy/Caddyfile"
-	if [ ! -f "$CADDYFILE" ] || grep -q '/usr/share/caddy' "$CADDYFILE"; then
-		say "writing $CADDYFILE (it imports the site Cloudmorrow keeps in $CADDY_DIR)"
-		write_file "$CADDYFILE" 0644 <<EOF
-# Written by install-server.sh. Cloudmorrow writes the site for this cloud's
-# name into $CADDY_DIR and reloads Caddy through its admin endpoint
-# (localhost:2019). Add sites of your own below; this file is not rewritten.
-import $CADDY_DIR/*.caddy
-EOF
-	elif ! grep -q "$CADDY_DIR" "$CADDYFILE"; then
-		say "adding the Cloudmorrow import to $CADDYFILE"
-		if [ -n "$DRY_RUN" ]; then
-			printf '   \033[2mwould append:\033[0m import %s/*.caddy\n' "$CADDY_DIR"
-		else
-			printf '\n# Cloudmorrow: the site for this cloud'"'"'s name.\nimport %s/*.caddy\n' "$CADDY_DIR" >>"$CADDYFILE"
-		fi
-	fi
-	wire_caddy_options
-	if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
-		run systemctl daemon-reload
-		run systemctl enable --now caddy
-		run systemctl reload-or-restart caddy
-	fi
-}
-
-install_tailscale() {
-	if command -v tailscale >/dev/null 2>&1; then
-		say "tailscale is here: $(tailscale version 2>/dev/null | head -n 1)"
-	else
-		consent "Install Tailscale's client, which puts this box on its own private mesh?" ||
-			{ warn "no Tailscale: the cloud is linked, but not on its mesh (run this again with --link)"; return 1; }
-		say "installing Tailscale's client from tailscale.com"
-		if [ -n "$DRY_RUN" ]; then
-			printf '   \033[2mwould run:\033[0m curl -fsSL https://tailscale.com/install.sh | sh\n'
-		else
-			curl -fsSL https://tailscale.com/install.sh | sh
-		fi
-	fi
-	tailscale_started || return 1
-	# The service joins the mesh itself, after linking: it may, as operator.
-	run tailscale set --operator="$SERVICE_USER"
-}
-
-# A container (Proxmox LXC, some VPSes) often has no /dev/net/tun, and
-# tailscaled will not start without one. Its userspace mode needs none, and
-# the box's mesh address still reaches the services listening here, Caddy
-# among them.
-TUN_DEVICE="${CLOUDMORROW_TUN_DEVICE:-/dev/net/tun}"
-TAILSCALED_DEFAULTS="/etc/default/tailscaled"
-tailscale_started() {
-	if [ ! -e "$TUN_DEVICE" ]; then
-		say "no $TUN_DEVICE here (a container?): tailscaled runs in userspace mode"
-		if [ -n "$DRY_RUN" ]; then
-			printf '   \033[2mwould set:\033[0m FLAGS="--tun=userspace-networking" in %s\n' "$TAILSCALED_DEFAULTS"
-		elif [ -f "$TAILSCALED_DEFAULTS" ] && grep -q '^FLAGS=' "$TAILSCALED_DEFAULTS"; then
-			grep -q 'userspace-networking' "$TAILSCALED_DEFAULTS" ||
-				sed -i 's/^FLAGS="\(.*\)"$/FLAGS="\1 --tun=userspace-networking"/' "$TAILSCALED_DEFAULTS"
-		else
-			echo 'FLAGS="--tun=userspace-networking"' >>"$TAILSCALED_DEFAULTS"
-		fi
-	fi
-	if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
-		run systemctl reset-failed tailscaled 2>/dev/null || true
-		run systemctl enable --quiet tailscaled
-		run systemctl restart tailscaled
-	fi
-	[ -n "$DRY_RUN" ] && return 0
-	# Setting the operator talks to the daemon: wait for it to answer.
-	tries=0
-	until tailscale debug prefs >/dev/null 2>&1; do
-		tries=$((tries + 1))
-		if [ "$tries" -ge 20 ]; then
-			warn "tailscaled did not start; see: journalctl -u tailscaled -n 30"
-			return 1
-		fi
-		sleep 1
-	done
-}
-
-LINKED_URL=""
-link_now() {
-	# Root's part, then the service user's: the code, the wait, the mesh.
-	install_tailscale || true
-	if install_caddy; then
-		wire_caddy
-	fi
-	say "linking through ${ACCESS_CONTROL:-https://relay.cloudmorrow.tech}"
-	if [ -n "$DRY_RUN" ]; then
-		as_server access link
-		printf '   \033[2mwould show:\033[0m Open cloudmorrow.com/link and enter a code, and wait for it\n'
-		return 0
-	fi
-	if ! as_server access link </dev/null; then
-		warn "not linked; link it later in Administration -> Access, or run this again with --link"
-		return 1
-	fi
-	LINKED_URL="$(sudo -u "$SERVICE_USER" -H env CLOUDMORROW_SERVER_CONFIG="$CONFIG" \
-		"$VENV/bin/cloudmorrow-server" access status --json 2>/dev/null |
-		sed -n 's/^  "host": "\(.*\)",$/https:\/\/\1/p' | head -n 1)"
-}
-
-# How a linked cloud's first devices come: its name opens from anywhere, on
-# its sign-in, and Me -> Add a device installs the rest. No code to pass on.
-say_address() {
-	line "Open $1"
-	line "anywhere and sign in. Then"
-	line "Me -> Add a device puts it"
-	line "on your computers and phones."
-}
 
 [ -n "$DRY_RUN" ] || [ "$(id -u)" = "0" ] || die "run this with sudo"
 # --- what it needs ----------------------------------------------------------
@@ -664,15 +395,6 @@ wait_healthy() {
 }
 
 if [ -z "$UPDATE" ] && [ -z "$DRY_RUN" ] && [ -f "$CONFIG" ] && [ -x "$VENV/bin/cloudmorrow-server" ]; then
-	if [ "$LINK" = "yes" ] && health >/dev/null; then
-		link_now || exit 1
-		run systemctl restart "$SERVICE_NAME"
-		heading "Linked"
-		line "${LINKED_URL:-see Administration -> Access}"
-		[ -n "$LINKED_URL" ] && say_address "$LINKED_URL"
-		printf '\n'
-		exit 0
-	fi
 	if problem="$(health)"; then
 		NAME_NOW="$(config_value name)"
 		URL_NOW="$(config_value public_url)"
@@ -762,18 +484,6 @@ if [ -n "$TTY" ]; then
 	printf '  A few questions, and your cloud is running.\n\n' >/dev/tty
 fi
 ask CLOUD_NAME "What is your cloud called?" "Cloudmorrow"
-# Linking is asked on a first install only, and not of a cloud given an
-# address of its own: a re-run keeps what the server has (Administration ->
-# Access links it from then on), and --link or --no-link answer it.
-if [ -z "$LINK" ] && [ -z "$PUBLIC_URL" ] && [ ! -f "$CONFIG" ]; then
-	if [ -n "$DRY_RUN" ]; then
-		printf '   \033[2mwould ask:\033[0m whether to link this cloud to a cloudmorrow.com account\n'
-	elif [ -n "$TTY" ]; then
-		ask LINK "Link this cloud to a cloudmorrow.com account so its devices reach it from anywhere? (you can do it later) [y/N]" "no"
-		case "$LINK" in y* | Y*) LINK="yes" ;; *) LINK="no" ;; esac
-	fi
-fi
-[ -n "$LINK" ] || LINK="no"
 if [ "$EXISTING_USERS" = "0" ]; then
 	ask ACCOUNT "Username for the first account (the administrator)" "${SUDO_USER:-admin}"
 	if [ -n "$ACCOUNT" ]; then
@@ -981,13 +691,6 @@ if [ ! -f "$CONFIG" ]; then
 fi
 
 # --- configuration ---------------------------------------------------------
-ACCESS_LINES=""
-if [ -n "$ACCESS_CONTROL" ]; then
-	ACCESS_LINES="
-# The relay this cloud is linked through (Cloudmorrow/relay, run by you).
-access_control = \"$ACCESS_CONTROL\"
-"
-fi
 if [ -f "$CONFIG" ]; then
 	say "keeping the existing $CONFIG"
 else
@@ -1011,11 +714,11 @@ port = $PORT
 # with the data, never instead of it: lose it and everything is gone.
 key_file = "$KEY_FILE"
 
-# The URL clients reach this server on, baked into the install page. Empty
-# for a cloud on the home network: the page uses the address it was opened
-# at. A linked cloud's name takes its place (Administration -> Access).
+# The URL clients reach this server on, baked into the install page: your
+# own domain, behind your own reverse proxy. Empty, the page uses the
+# address it was opened at.
 public_url = "$PUBLIC_URL"
-$ACCESS_LINES
+
 token_ttl_hours = 720
 cors_origins = []
 EOF
@@ -1067,9 +770,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-# The Caddy site for a linked cloud's name is written into $CADDY_DIR
-# (optional: only a linked box has it).
-ReadWritePaths=$NOTES_DIR $DATA_DIR $PREFIX -$CADDY_DIR
+ReadWritePaths=$NOTES_DIR $DATA_DIR $PREFIX
 
 [Install]
 WantedBy=multi-user.target
@@ -1147,15 +848,6 @@ else
 		warn "the standard quills were not all installed; add them later from Administration, Quills"
 fi
 
-# --- linking ----------------------------------------------------------------
-# Before the service starts, so it starts linked, on its mesh, at its name.
-if [ "$LINK" = "yes" ]; then
-	link_now || true
-elif [ -d "$CADDY_DIR" ] && command -v caddy >/dev/null 2>&1; then
-	# Linked before: Caddy's side may be older than this installer.
-	wire_caddy
-fi
-
 # --- start it --------------------------------------------------------------
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
 	run systemctl daemon-reload
@@ -1216,7 +908,7 @@ rm -f /tmp/cloudmorrow-agent-install.$$
 # wraps a long line wherever it likes, and columns lined up past its edge
 # read as noise.
 PUBLIC_HOST="$(printf '%s' "$PUBLIC_URL" | sed -e 's|^[a-z]*://||' -e 's|[:/].*$||')"
-ADDRESS="${LINKED_URL:-${PUBLIC_URL:-http://$LAN_HOST:$PORT}}"
+ADDRESS="${PUBLIC_URL:-http://$LAN_HOST:$PORT}"
 LISTENING="$HOST"
 if [ -f "$CONFIG" ] && [ -z "$DRY_RUN" ]; then
 	LISTENING="$(config_value host)"
@@ -1228,10 +920,8 @@ else
 	printf "\n  ${GOOD}✓${OFF} %s is installed.\n" "$CLOUD_NAME"
 fi
 
-# A linked cloud has its name and certificate already: no proxy to set up.
-case "$LINK:$LINKED_URL:$PUBLIC_URL" in
-yes:* | *:https://*:*) ;;
-*:*:https://*)
+case "$PUBLIC_URL" in
+https://*)
 	heading "First, a proxy in front, for TLS"
 	line "With Caddy, this is the whole file:"
 	printf '\n      %s {\n          reverse_proxy %s:%s\n      }\n' "$PUBLIC_HOST" "$HEALTH_HOST" "$PORT"
@@ -1247,18 +937,12 @@ if [ -n "$ACCOUNT_MADE" ]; then
 	line "and sign in as $ACCOUNT"
 fi
 
-if [ -n "$LINKED_URL" ]; then
-	heading "Linked"
-	say_address "$LINKED_URL"
-elif [ "$LINK" = "yes" ] && [ -n "$DRY_RUN" ]; then
-	heading "Linked, and on its mesh"
-	line "once the code is entered"
-elif [ -z "$PUBLIC_URL" ]; then
-	heading "From anywhere, too"
-	line "Link it to a cloudmorrow.com"
-	line "account: Administration ->"
-	line "Access, or run this again"
-	line "with --link."
+if [ -z "$PUBLIC_URL" ]; then
+	heading "From outside your network"
+	line "That is yours to set up: a"
+	line "domain and a reverse proxy"
+	line "(public_url in the settings),"
+	line "or a VPN such as Tailscale."
 fi
 
 if [ "$EXISTING_USERS" = "0" ] && [ -z "$ACCOUNT_MADE" ] && [ -z "$DRY_RUN" ]; then

@@ -100,8 +100,7 @@ platform hosting its own catalogue and the best test it could have.
 
 ## Two ways to have one
 
-- **Your own machine.** One command, three questions. Public access and a
-  certificate through a relay that never sees your traffic.
+- **Your own machine.** One command, four questions.
 - **A tenant we host**, cheap, with the assistant included.
 
 The delivery plan is [docs/HOSTING.md](docs/HOSTING.md).

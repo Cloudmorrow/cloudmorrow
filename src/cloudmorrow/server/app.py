@@ -12,7 +12,7 @@ from fastapi.responses import PlainTextResponse, RedirectResponse
 from cloudmorrow import __version__
 from cloudmorrow.server import spacenotify
 from cloudmorrow.server.access import is_allowed, parse_rules
-from cloudmorrow.server.access_ways import Access
+from cloudmorrow.server.access_lan import announcer
 from cloudmorrow.server.agents import AgentStore, JobStore
 from cloudmorrow.server.backends import NotesBackend, SharesBackend, VaultsBackend
 from cloudmorrow.server.circles import CircleStore
@@ -30,9 +30,6 @@ from cloudmorrow.server.quills.jobs import Clock
 from cloudmorrow.server.quills.services import Supervisor
 from cloudmorrow.server.quills.tokens import QuillTokenStore
 from cloudmorrow.server.records import RecordStore
-from cloudmorrow.server.routes import (
-    access as access_routes,
-)
 from cloudmorrow.server.routes import (
     agentquills,
     agents,
@@ -84,10 +81,6 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     # The key, before the first connection: every store seals through it.
     sealer = use_key(config.db_path, config.secrets_key_path)
     user_store = UserStore(config.db_path)
-    # How the cloud is reached. public_url follows a claimed name from here
-    # on, so it is settled before anything below reads it.
-    access = Access(config, lambda: app.state.cloudmorrow.cloud_name())
-    access.follow(access.cloud())
     # Notes written before they were sealed. Idempotent, and quick once done.
     for user in user_store.list():
         seal_tree(config.notes_root(user.username), sealer)
@@ -171,9 +164,10 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.router.on_shutdown.append(clock.stop)
     app.router.on_shutdown.append(state.services.stop)
     app.router.on_shutdown.append(state.code.stop)
-    state.access = access
-    app.router.on_startup.append(state.access.start)
-    app.router.on_shutdown.append(state.access.stop)
+    if config.access_lan:
+        state.lan = announcer(config, state.cloud_name)
+        app.router.on_startup.append(state.lan.start)
+        app.router.on_shutdown.append(state.lan.stop)
 
     require_tls(app, config)
     allowed_clients = parse_rules(config.allowed_client_ips)
@@ -259,7 +253,6 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.include_router(install.router)
     app.include_router(web.router)
     app.include_router(server_routes.router)
-    app.include_router(access_routes.router)
 
     # The fileshares, spoken WebDAV. A WSGI app, because that is what WsgiDAV
     # is; a2wsgi streams bodies through rather than buffering a whole upload.

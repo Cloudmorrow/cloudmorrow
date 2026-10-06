@@ -326,10 +326,6 @@ class SetupRequest(BaseModel):
     # The standard quills to have, by id. Left out, the server's own boot
     # work installs the catalog's foundation quills, as before.
     quills: list[str] | None = None
-    # Link it to a cloudmorrow.com account, so its devices reach it from
-    # anywhere: the installer's question, asked again for a box that was
-    # never installed by hand. Left out, the home network only.
-    link: bool = False
 
 
 class SetupOut(BaseModel):
@@ -337,10 +333,6 @@ class SetupOut(BaseModel):
     username: str
     # Said when a chosen quill could not be installed; empty otherwise.
     note: str = ""
-    # The code to enter at cloudmorrow.com/link, when linking was asked
-    # for: {code, url, link, place, expires_at}. None otherwise, or when the
-    # relay could not be reached (the note says so).
-    link: dict | None = None
 
 
 class ServerSettingsOut(BaseModel):

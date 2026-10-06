@@ -14,9 +14,8 @@
 
    Two screens. The panel, which is the sections under a switch, and one
    account's page, which is the same form whether it is a new account or one
-   that already exists. The circles (circlesadmin.js), the Quills
-   (quillsadmin.js, with its install sheet) and how the cloud is reached
-   (accessadmin.js) are files of their own. */
+   that already exists. The circles (circlesadmin.js) and the Quills
+   (quillsadmin.js, with its install sheet) are files of their own. */
 
 import {
   api, app, esc, formatDate, heading, icons, nav, onSignOut, registerScreen, renderRoute,
@@ -25,7 +24,6 @@ import {
 import { loadFeatures } from "./features.js";
 import { circlesByPerson, drawCircles } from "./circlesadmin.js";
 import { drawQuills } from "./quillsadmin.js";
-import { drawAccess } from "./accessadmin.js";
 
 // What the server stores, and what it is called on screen. The same words
 // the terminal app uses, so a role means one thing across the two.
@@ -78,7 +76,7 @@ export function adminRow() {
 async function renderAdmin() {
   if (!(await requireAdmin())) return;
   const side = store.get("admin.side");
-  const which = ["circles", "features", "quills", "access"].includes(side) ? side : "users";
+  const which = ["circles", "features", "quills"].includes(side) ? side : "users";
   // The + beside the heading makes whatever this side lists.
   const making = { users: ["#/adminuser", "New account"], circles: ["#/admincircle", "New circle"] }[which];
   app.innerHTML = nav({ back: "#/me", backLabel: "Me", title: "Administration" }) + `
@@ -91,7 +89,6 @@ async function renderAdmin() {
         <button data-side="circles"${which === "circles" ? ' class="active"' : ""}>Circles</button>
         <button data-side="features"${which === "features" ? ' class="active"' : ""}>Features</button>
         <button data-side="quills"${which === "quills" ? ' class="active"' : ""}>Quills</button>
-        <button data-side="access"${which === "access" ? ' class="active"' : ""}>Access</button>
       </div>
       <div class="panel"><p class="empty"><b>…</b></p></div>
     </main>`;
@@ -110,8 +107,7 @@ async function renderAdmin() {
   if (which === "users") await drawUsers(panel);
   else if (which === "circles") await drawCircles(panel);
   else if (which === "features") await drawFeatures(panel);
-  else if (which === "quills") await drawQuills(panel);
-  else await drawAccess(panel);
+  else await drawQuills(panel);
 }
 
 // -- the accounts -----------------------------------------------------------------------

@@ -44,7 +44,7 @@ def test_a_call_from_this_machine_with_no_proxy_header_is_let_through(strict):
 
 @pytest.mark.parametrize("peer", ["192.168.10.122", "10.0.0.5", "172.16.3.4", "100.71.157.19", "fd00::7", "fe80::1"])
 def test_a_browser_on_the_local_network_opens_the_ip_directly(strict, peer):
-    # http://192.168.10.195:8787 from the LAN or the mesh: no proxy, no TLS, answered.
+    # http://192.168.10.195:8787 from the LAN or a VPN: no proxy, no TLS, answered.
     direct = TestClient(strict.app, client=(peer, 50000))
     assert direct.get("/api/health").status_code == 200
 

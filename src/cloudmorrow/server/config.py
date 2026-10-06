@@ -17,7 +17,6 @@ DEFAULT_CONFIG_PATHS = (
 
 ENV_PREFIX = "CLOUDMORROW_"
 
-DEFAULT_ACCESS_CONTROL = "https://relay.cloudmorrow.tech"
 
 DEFAULT_QUILL_CATALOG = "https://raw.githubusercontent.com/Cloudmorrow/quill-catalog/main/catalog.toml"
 
@@ -91,25 +90,9 @@ class ServerConfig:
     # only thing a server should use), or "trusted" — in the server's own
     # interpreter, with no wall — for tests and `cm quill dev --local`.
     quill_code: str = "sandbox"
-    # Reaching the cloud (access_lan, access_control, access_mesh,
-    # access_caddy). Announce `<name>.local` and `_cloudmorrow._tcp` on the
-    # home network; off for a box that should stay quiet there.
+    # Announce `<name>.local` and `_cloudmorrow._tcp` on the home network
+    # (access_lan); off for a box that should stay quiet there.
     access_lan: bool = True
-    # The relay a box is linked through, and its mesh coordinated by.
-    # Anybody can run their own (the Cloudmorrow/relay repository).
-    access_control: str = DEFAULT_ACCESS_CONTROL
-    # Where the site file for the linked name is written for Caddy to
-    # import, Caddy's admin endpoint, which reloads it, and the Caddyfile
-    # that imports it. The installer makes the directory and the import.
-    access_caddy_dir: Path = Path("/var/lib/cloudmorrow-caddy")
-    access_caddy_admin: str = "http://127.0.0.1:2019"
-    access_caddyfile: Path = Path("/etc/caddy/Caddyfile")
-    # The certificate for a linked name: Let's Encrypt, then ZeroSSL when
-    # Let's Encrypt says no (its weekly limit for the zone, say). ZeroSSL
-    # needs an email address to make its account with; without one there is
-    # no fallback. The address goes to the certificate authorities only.
-    access_acme_fallback: bool = True
-    access_acme_email: str = ""
     config_path: Path | None = None
 
     @property
@@ -265,12 +248,6 @@ def load_config(path: Path | None = None) -> ServerConfig:
             "quill_catalog",
             "quill_code",
             "access_lan",
-            "access_control",
-            "access_caddy_dir",
-            "access_caddy_admin",
-            "access_caddyfile",
-            "access_acme_fallback",
-            "access_acme_email",
         ):
             if key in section:
                 value = section[key]
@@ -279,8 +256,6 @@ def load_config(path: Path | None = None) -> ServerConfig:
                     "data_dir",
                     "shares_dir",
                     "key_file",
-                    "access_caddy_dir",
-                    "access_caddyfile",
                 }:
                     value = Path(str(value)).expanduser()
                 if key == "host" and isinstance(value, list):
@@ -314,12 +289,6 @@ def load_config(path: Path | None = None) -> ServerConfig:
         "QUILL_CATALOG": ("quill_catalog", str),
         "QUILL_CODE": ("quill_code", str),
         "ACCESS_LAN": ("access_lan", _env_bool),
-        "ACCESS_CONTROL": ("access_control", str),
-        "ACCESS_CADDY_DIR": ("access_caddy_dir", lambda v: Path(v).expanduser()),
-        "ACCESS_CADDY_ADMIN": ("access_caddy_admin", str),
-        "ACCESS_CADDYFILE": ("access_caddyfile", lambda v: Path(v).expanduser()),
-        "ACCESS_ACME_FALLBACK": ("access_acme_fallback", _env_bool),
-        "ACCESS_ACME_EMAIL": ("access_acme_email", str),
     }
     for env_suffix, (attr, caster) in env_map.items():
         raw = os.environ.get(ENV_PREFIX + env_suffix)

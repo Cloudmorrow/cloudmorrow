@@ -2,13 +2,12 @@
 """The client installer as a release asset: install.sh for no cloud in particular.
 
 A cloud serves its own installer at `/install.sh`, with its address and its
-package baked in (server/routes/install.py). A linked cloud's landing page,
-served by the relay while the cloud itself is out of reach, cannot ask the
-cloud for it: it fetches this one instead, from the latest GitHub Release,
+package baked in (server/routes/install.py). Somebody who has no cloud's
+page open gets this one instead, from the latest GitHub Release,
 
     https://github.com/Cloudmorrow/cloudmorrow/releases/latest/download/install.sh
 
-and runs it with `--server https://<name>.<zone> --invite`. So this is the same
+and runs it with `--server https://<their cloud>`. So this is the same
 template with the package pointed at the wheel published beside it in the
 same release, and no address: the script asks for one when --server is not
 given.

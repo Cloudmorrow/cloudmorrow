@@ -1,0 +1,55 @@
+/* Add a device (Me).
+
+   Steps in rows, the address and the command in the monospace face, set
+   apart so they can be selected whole, and one small ghost button — a
+   line, no fill — to copy the command. */
+
+.row.add-buttons { flex-wrap: wrap; gap: 8px; min-height: 0; }
+.add-button {
+  flex: none;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-bright);
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+@media (hover: hover) {
+  .add-button:hover { border-color: var(--accent); color: var(--accent); }
+}
+
+.add-device .note { margin: 0 4px 6px; color: var(--muted); line-height: 1.45; }
+.add-device .note b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+.add-steps .row { align-items: flex-start; line-height: 1.45; }
+.add-steps .step {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--fill);
+  color: var(--fill-ink);
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.add-qr { display: block; margin: 12px 0 8px; }
+.add-qr .qr { display: block; width: 184px; height: 184px; border-radius: 6px; }
+.add-url, .add-command {
+  display: block;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--card-2);
+  font-family: var(--mono);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.add-computer { line-height: 1.45; }

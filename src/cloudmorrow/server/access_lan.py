@@ -4,23 +4,16 @@ Multicast DNS, which every phone and computer already speaks: the box
 answers to `<name>.local` (the cloud's name made into a hostname, or
 `cloudmorrow.local` before it has one) and announces a service,
 `_cloudmorrow._tcp`, whose TXT record carries what a client needs to pick
-it from a list:
+it from a list (`client/discover.py`):
 
     name     what the cloud is called ("The Larsens")
     version  the server's version
-    url      what to open on this network — https://<name>.<zone> when the
-             box is linked, else http://<name>.local:<port>
-    mesh     <name>.<zone>, when the box is linked
+    url      what to open: `public_url` when the config has one, else
+             http://<name>.local:<port>
 
-Linked, the service's port is 443, where Caddy answers with the
-certificate for that name, so a client on the same network connects to
-the box's local address and still checks the certificate against the real
-name (`client/discover.py`). Not linked, it is the server's own port, and
-plain http, which is only for a home network.
-
-A box whose server listens only on loopback and has no real name has
-nothing to offer the network, so it says nothing. `access_lan = false`
-turns it off entirely.
+A box whose server listens only on loopback has nothing to offer the
+network at its own port, so without a `public_url` it says nothing.
+`access_lan = false` turns it off entirely.
 
 python-zeroconf is pure Python and needs no daemon; it shares port 5353
 with Avahi where Avahi is running. It runs on its own thread (registering
@@ -37,13 +30,20 @@ import socket
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+from cloudmorrow import __version__
+
+if TYPE_CHECKING:
+    from cloudmorrow.server.config import ServerConfig
 
 log = logging.getLogger("cloudmorrow.access.lan")
 
 SERVICE_TYPE = "_cloudmorrow._tcp.local."
 DEFAULT_LABEL = "cloudmorrow"
-# The mesh's addresses (CGNAT space, which Tailscale uses) and link-local
-# ones are no use to a device on the same network.
+LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+# Loopback, link-local and carrier-grade NAT addresses are no use to a
+# device on the same network.
 _SKIP = (
     ipaddress.ip_network("127.0.0.0/8"),
     ipaddress.ip_network("169.254.0.0/16"),
@@ -67,14 +67,10 @@ class Announcement:
     version: str
     port: int
     url: str
-    mesh: str = ""
     addresses: list[str] = field(default_factory=list)
 
     def properties(self) -> dict[str, str]:
-        props = {"name": self.name, "version": self.version, "url": self.url}
-        if self.mesh:
-            props["mesh"] = self.mesh
-        return props
+        return {"name": self.name, "version": self.version, "url": self.url}
 
 
 def local_addresses() -> list[str]:
@@ -108,8 +104,8 @@ class LanAnnouncer:
     """Announces the box with python-zeroconf, and changes what it says when asked.
 
     *describe* is called for the announcement each time: it reads the
-    cloud's name and access state, which change while the server runs.
-    None from it means "say nothing now".
+    cloud's name, which can change while the server runs. None from it
+    means "say nothing now".
     """
 
     def __init__(
@@ -196,3 +192,32 @@ class LanAnnouncer:
             except Exception:  # shutting down; nothing to be done
                 pass
             self._zc = None
+
+
+def announcer(
+    config: ServerConfig,
+    cloud_name: Callable[[], str],
+    zeroconf_factory: Callable[[], object] | None = None,
+    addresses: Callable[[], list[str]] = local_addresses,
+) -> LanAnnouncer:
+    """The announcer for this server: its name, and the address to open."""
+
+    def describe() -> Announcement | None:
+        name = cloud_name()
+        label = hostname_label(name)
+        url = config.public_url.rstrip("/")
+        if not url:
+            if all(host in LOOPBACK for host in config.hosts):
+                # Nothing listens where a neighbour could reach it.
+                return None
+            url = f"http://{label}.local:{config.port}"
+        return Announcement(
+            label=label,
+            name=name,
+            version=__version__,
+            port=config.port,
+            url=url,
+            addresses=addresses(),
+        )
+
+    return LanAnnouncer(describe, zeroconf_factory)

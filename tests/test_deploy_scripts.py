@@ -182,114 +182,32 @@ def test_the_installer_draws_the_wordmark_its_script_draws():
     assert block() in INSTALLER.read_text()
 
 
-# -- linking --------------------------------------------------------------------
+# -- reaching it ----------------------------------------------------------------
 ANSWERS = {"CLOUDMORROW_ADMIN_PASSWORD": "longenough"}
 
 
-def test_without_an_answer_it_asks_whether_to_link_and_stays_home():
+def test_reaching_it_from_outside_is_the_owners_own_setup():
     result = dry_run("--name", "The Larsens", "--user", "alice", "--quills", "all", env=ANSWERS)
     assert result.returncode == 0, result.stderr + result.stdout
     out = result.stdout
-    assert "would ask: whether to link this cloud to a cloudmorrow.com account" in out
-    # Nobody said yes: nothing is installed for it, and the relay is never asked.
-    assert "access link" not in out and "tailscale" not in out.lower() and "caddy" not in out.lower()
+    # Nothing is installed or asked for it.
+    for gone in ("tailscale.com", "tailscaled", "caddy", "cloudmorrow.com", "would ask: whether to link"):
+        assert gone not in out.lower(), gone
     assert "http://the-larsens.local:8787, at home" in out
-    assert "From anywhere, too" in out and "--link" in out
+    assert "From outside your network" in out
     # No address of its own, so no proxy to put in front.
     assert "reverse_proxy" not in out
 
 
-def test_linking_installs_what_it_needs_and_waits_for_the_code_as_the_service_user():
-    result = dry_run(
-        "--name",
-        "The Larsens",
-        "--link",
-        "--yes",
-        "--host",
-        "0.0.0.0",
-        "--user",
-        "alice",
-        "--quills",
-        "all",
-        env=ANSWERS,
-    )
+def test_an_address_of_its_own_gets_the_proxy_to_put_in_front():
+    result = dry_run("--name", "X", "--public-url", "https://c.test", "--user", "alice", "--quills", "all", env=ANSWERS)
     assert result.returncode == 0, result.stderr + result.stdout
-    out = result.stdout
-    assert "would ask" not in out
-    assert "would run: tailscale set --operator=cloudmorrow" in out
-    if "caddy is here" not in out:
-        assert "p=github.com/caddy-dns/acmedns" in out
-    assert "chown cloudmorrow:caddy /var/lib/cloudmorrow-caddy" in out
-    link = next(line for line in out.splitlines() if "access link" in line and "would run" in line)
-    assert link.strip().startswith("would run: sudo -u cloudmorrow") and link.endswith("access link")
-    assert "Open cloudmorrow.com/link and enter a code" in out
-    assert "linking through https://relay.cloudmorrow.tech" in out
-    # Linked before the service starts, so it starts at its name.
-    assert out.index("access link") < out.index("systemctl restart cloudmorrow")
-    assert "Linked, and on its mesh" in out
+    assert "First, a proxy in front" in result.stdout and "reverse_proxy" in result.stdout
+    assert "From outside your network" not in result.stdout
 
 
-def test_a_box_without_a_tun_device_runs_tailscale_in_userspace(tmp_path):
-    """An LXC container has no /dev/net/tun; tailscaled only starts in userspace mode there."""
-    args = (
-        "--name",
-        "X",
-        "--link",
-        "--yes",
-        "--host",
-        "0.0.0.0",
-        "--user",
-        "alice",
-        "--quills",
-        "all",
-        "--public-url",
-        "https://c.test",
-    )
-    without = dry_run(*args, env={**ANSWERS, "CLOUDMORROW_TUN_DEVICE": str(tmp_path / "no-tun")}).stdout
-    assert "tailscaled runs in userspace mode" in without
-    assert 'FLAGS="--tun=userspace-networking"' in without
-    # The daemon is started before the operator is set: that call needs it.
-    assert without.index("systemctl restart tailscaled") < without.index("tailscale set --operator")
-    with_tun = dry_run(*args, env={**ANSWERS, "CLOUDMORROW_TUN_DEVICE": str(tmp_path)}).stdout
-    assert "userspace" not in with_tun
-    # Linked, there is no proxy to put in front.
-    assert "First, a proxy in front" not in without
-
-
-def test_linking_asks_before_installing_anything():
-    result = dry_run("--name", "X", "--link", "--user", "alice", "--quills", "all", env=ANSWERS)
-    assert result.returncode == 0, result.stderr + result.stdout
-    if "tailscale is here" not in result.stdout:
-        assert "would ask: Install Tailscale's client" in result.stdout
-    if "caddy is here" not in result.stdout:
-        assert "would ask: Install Caddy" in result.stdout
-
-
-def test_a_relay_of_ones_own_and_no_link():
-    own = dry_run(
-        "--name",
-        "X",
-        "--link",
-        "--yes",
-        "--access-control",
-        "https://relay.example.org",
-        "--user",
-        "alice",
-        "--quills",
-        "all",
-        env=ANSWERS,
-    )
-    assert "linking through https://relay.example.org" in own.stdout
-    home = dry_run("--name", "X", "--no-link", "--user", "alice", "--quills", "all", env=ANSWERS)
-    assert "would ask: whether to link" not in home.stdout and "access link" not in home.stdout
-
-
-def test_the_unit_may_write_the_caddy_site():
+def test_no_linking_is_left_in_it():
     text = INSTALLER.read_text()
-    assert "ReadWritePaths=$NOTES_DIR $DATA_DIR $PREFIX -$CADDY_DIR" in text
-    # Caddy imports the site the service writes, and nothing else is replaced.
-    assert "import $CADDY_DIR/*.caddy" in text
-    assert "grep -q '/usr/share/caddy'" in text
-    # No public mode is left in it.
-    for gone in ("cmtunnel", "--public-name", "access claim", "--private"):
-        assert gone not in text
+    assert "ReadWritePaths=$NOTES_DIR $DATA_DIR $PREFIX\n" in text
+    for gone in ("--link", "access link", "tailscale ", "acmedns", "CADDY_DIR", "relay", "cmtunnel"):
+        assert gone not in text, gone

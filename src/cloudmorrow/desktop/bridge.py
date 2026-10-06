@@ -25,7 +25,6 @@ import functools
 import logging
 import platform as _platform
 import socket
-import threading
 from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlsplit
@@ -35,9 +34,8 @@ from cloudmorrow.agent import service
 from cloudmorrow.agent.config import AgentConfig
 from cloudmorrow.agent.config import default_config_path as agent_config_path
 from cloudmorrow.agent.setup import ensure_agent, machine_name
-from cloudmorrow.client import meshjoin, mounts
+from cloudmorrow.client import mounts
 from cloudmorrow.client.api import CloudmorrowClient, client_from_credentials
-from cloudmorrow.client.autojoin import join_after_signin
 from cloudmorrow.client.config import ClientConfig, StoredCredentials, clear_credentials
 from cloudmorrow.desktop import system
 
@@ -79,15 +77,12 @@ class Bridge:
         *,
         api_factory: Callable[[ClientConfig], CloudmorrowClient] | None = None,
         enrol: Callable[..., Any] | None = None,
-        run: Callable[..., Any] | None = None,
     ) -> None:
         self._config = config or ClientConfig.load()
         # How a call that talks to the server gets a client: the stored
         # sign-in, read afresh each time, since the page may just have changed it.
         self._api_factory = api_factory or (lambda config: client_from_credentials(config, StoredCredentials.load()))
         self._enrol = enrol or ensure_agent
-        # How tailscale is run (meshjoin): a test hands in its own.
-        self._run = run or meshjoin._run
         self._window = None
 
     def _attach(self, window) -> None:
@@ -199,55 +194,6 @@ class Bridge:
             return {"error": str(exc)}
         return {"name": mounted.name, "mounted": False, "path": str(mounted.path)}
 
-    # -- this computer on the cloud's mesh --------------------------------------------
-    @bridged
-    def mesh_status(self) -> dict:
-        """Whether this computer is on the cloud's mesh, and whether it could be.
-
-        `available` is the cloud being linked and on its mesh; `enrolled` is
-        tailscale running here, on the cloud's login server where tailscale
-        says which one it is on.
-        """
-        status = self._server(lambda api: api.access())
-        mesh = status.get("mesh") or {}
-        here = meshjoin.state(self._run)
-        login = str(mesh.get("login_server") or "")
-        return {
-            "available": bool(mesh.get("on")),
-            "login_server": login,
-            "hostname": status.get("host", ""),
-            "enrolled": here.on(login),
-            "device": meshjoin.device_name(),
-            **{f"tailscale_{key}": value for key, value in here.as_dict().items()},
-        }
-
-    @bridged
-    def mesh_join(self) -> dict:
-        """Put this computer on the mesh: a key from the cloud, then `tailscale up`, then say it is ours.
-
-        Tailscale itself is not installed from here — that is a download and
-        root, which is the installer's or the person's to do; the answer says
-        how. `tailscale up` asks for the password through pkexec, a dialog,
-        since there is no terminal. The computer joins as `cm-<6 hex>`; what
-        it is called ("annas-laptop") is told to the cloud, not the relay.
-        """
-        if meshjoin.tailscale_binary() is None:
-            try:
-                command = meshjoin.install_command()
-                how = "Install it first: " + " ".join(command[2:])
-            except meshjoin.JoinError as exc:
-                how = str(exc)
-            return {"error": f"Tailscale is not on this computer. {how}", "install": True}
-        key = self._server(lambda api: api.mesh_key())
-        try:
-            joined = meshjoin.join(key, graphical=True, run=self._run)
-        except meshjoin.JoinError as exc:
-            return {"error": str(exc)}
-        name = meshjoin.device_name()
-        if joined.address:
-            self._server(lambda api: api.claim_mesh_device(joined.address, name))
-        return {"enrolled": joined.running, "address": joined.address, "device": name}
-
     # -- one sign-in for the machine ----------------------------------------------
     @bridged
     def session(self) -> dict:
@@ -266,9 +212,7 @@ class Bridge:
         """The window signed in: store it, so the terminal app is signed in too.
 
         And, as `cloudmorrow login` does, make this machine an agent if it is
-        not one yet — once; a sign-in after that leaves the agent alone —
-        and put it on a linked cloud's mesh, in the background, so the
-        window does not wait on the password dialog.
+        not one yet — once; a sign-in after that leaves the agent alone.
         """
         StoredCredentials(
             api_url=self._config.api_url,
@@ -276,29 +220,11 @@ class Bridge:
             access_token=str(token),
             expires_at=str(expires_at or ""),
         ).save()
-        threading.Thread(target=self._join_mesh, name="mesh-join", daemon=True).start()
         path = agent_config_path()
         if path.exists() and AgentConfig.load(path).agent_token:
             return {"saved": True, "agent": ""}
         result = self._server(lambda api: self._enrol(api))
         return {"saved": True, "agent": result.agent_name if result.enrolled else ""}
-
-    def _join_mesh(self) -> None:
-        """Onto the cloud's mesh after signing in (client/autojoin.py), when Tailscale is here.
-
-        Installing Tailscale is a download and root, which a window cannot
-        do quietly: without it, the mesh row on the desktop page says how.
-        """
-        if meshjoin.tailscale_binary() is None:
-            return
-        try:
-            joined = self._server(
-                lambda api: join_after_signin(api, self._config, ask_install=None, graphical=True, run=self._run)
-            )
-            if joined.outcome:
-                log.info("desktop: %s", joined.sentence())
-        except Exception:
-            log.exception("desktop: joining the mesh after signing in")
 
     @bridged
     def signed_out(self, token: str) -> dict:

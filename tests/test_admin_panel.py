@@ -48,7 +48,6 @@ async def test_an_admin_has_the_menu_and_a_user_does_not(app):
             "Circles",
             "Features",
             "Quills",
-            "Access",
         ]
 
 
