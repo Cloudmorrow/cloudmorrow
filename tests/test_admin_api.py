@@ -108,7 +108,7 @@ def test_a_switched_off_feature_closes_its_api(tasks_quill, auth):
     assert refused.status_code == 403
     assert refused.json()["detail"] == "Tasks is switched off on this server"
     # The rest of the server is untouched.
-    assert client.get("/api/notes/tree", headers=auth).status_code == 200
+    assert client.get("/api/shares", headers=auth).status_code == 200
 
     client.patch("/api/server/features/tasks", headers=auth, json={"enabled": True})
     assert client.get("/api/records/board", headers=auth).status_code == 200

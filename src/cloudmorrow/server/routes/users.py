@@ -44,7 +44,7 @@ def create_user(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="user exists") from exc
     except (InvalidUsernameError, InvalidRoleError, ValueError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    state.note_store(user)
+    state.ensure_drive(user.username)
     return user_out(user)
 
 

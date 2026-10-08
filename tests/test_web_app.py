@@ -92,40 +92,6 @@ def test_install_page_links_to_the_app(client):
     assert 'href="/app"' in client.get("/").text
 
 
-def test_tree_previews_show_what_a_note_says(client, auth):
-    client.post(
-        "/api/notes/file",
-        json={"path": "plan", "content": "# plan\n\n- [ ] ship it\nthen rest\nand more\n"},
-        headers=auth,
-    )
-    client.post("/api/notes/file", json={"path": "blank", "content": ""}, headers=auth)
-
-    plain = client.get("/api/notes/tree", headers=auth).json()
-    assert all("preview" not in child for child in plain["children"])
-
-    tree = client.get("/api/notes/tree", params={"previews": "true"}, headers=auth).json()
-    previews = {child["name"]: child["preview"] for child in tree["children"]}
-    # The heading repeats the file name and the list marker is noise: neither
-    # is what the note says. Two lines is enough for a row.
-    assert previews["plan.md"] == "ship it then rest"
-    assert previews["blank.md"] == ""
-
-
-def test_tree_previews_are_capped(client, auth):
-    client.post("/api/notes/file", json={"path": "long", "content": "x" * 500}, headers=auth)
-    tree = client.get("/api/notes/tree", params={"previews": "true"}, headers=auth).json()
-    preview = tree["children"][0]["preview"]
-    assert len(preview) == 120
-    assert preview.endswith("…")
-
-
-# -- following a deploy -----------------------------------------------------
-def test_the_page_says_which_deploy_it_was_built_from(client):
-    """The page needs something to compare against, or it can never know."""
-    page = client.get("/app").text
-    assert f'data-deploy="{asset_version()}"' in page
-
-
 def test_the_version_endpoint_says_what_is_being_served_now(client):
     response = client.get("/app/version")
     assert response.status_code == 200

@@ -81,7 +81,7 @@ def test_heartbeat_marks_the_agent_online(client, auth):
 
 def test_agent_token_cannot_read_notes(client, auth):
     enrolled = enroll_agent(client, auth)
-    assert client.get("/api/notes/tree", headers=agent_headers(enrolled)).status_code == 401
+    assert client.get("/api/records/file?share=my-files", headers=agent_headers(enrolled)).status_code == 401
 
 
 def test_user_token_cannot_claim_jobs(client, auth):

@@ -42,7 +42,7 @@ def test_the_flag_needs_a_checkout_to_point_at(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     with pytest.raises(SystemExit) as exit:
-        dev.handle(["--dev", "note", "list"])
+        dev.handle(["--dev", "notes", "list"])
 
     assert "not inside one" in str(exit.value)
 
@@ -53,10 +53,10 @@ def test_it_hands_over_to_the_checkout_venv_when_there_is_one(tmp_path):
     venv.mkdir(parents=True)
     (venv / "python").write_text("")
 
-    python, arguments, env = dev.command(root, ["note", "list"])
+    python, arguments, env = dev.command(root, ["notes", "list"])
 
     assert python == str(venv / "python")
-    assert arguments == [python, "-m", "cloudmorrow.cli.main", "note", "list"]
+    assert arguments == [python, "-m", "cloudmorrow.cli.main", "notes", "list"]
     # The working tree ahead of whatever is installed, and a marker saying so.
     assert env["PYTHONPATH"].split(os.pathsep)[0] == str(root / "src")
     assert env[dev.ENV] == str(root)
@@ -86,7 +86,7 @@ def test_the_handed_over_process_parses_rather_than_handing_over_again(monkeypat
     # Would raise rather than exec: nothing here should reach execve.
     monkeypatch.setattr(dev.os, "execve", lambda *a: pytest.fail("handed over twice"))
 
-    assert dev.handle(["--dev", "note", "list"]) == ["note", "list"]
+    assert dev.handle(["--dev", "notes", "list"]) == ["notes", "list"]
 
 
 def test_a_stale_marker_does_not_stop_the_hand_over(tmp_path, monkeypatch):
@@ -111,7 +111,7 @@ def test_without_the_flag_nothing_happens_at_all(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv(dev.ENV, raising=False)
 
-    assert dev.handle(["note", "list"]) == ["note", "list"]
+    assert dev.handle(["notes", "list"]) == ["notes", "list"]
 
 
 def test_running_from_source_only_sets_the_label(monkeypatch):

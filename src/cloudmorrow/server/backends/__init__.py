@@ -1,8 +1,8 @@
 """Backends: datamodels whose records live somewhere other than the record store.
 
 The protocol a backend keeps, and what every backend shares, is `base`; the
-three there are — notes, shares and their files, and the secrets' vaults —
-are a module each. See `base` for what a backend is.
+two there are — shares and their files, and the secrets' vaults — are a
+module each. See `base` for what a backend is.
 """
 
 from cloudmorrow.server.backends.base import (
@@ -11,7 +11,6 @@ from cloudmorrow.server.backends.base import (
     ContentBackend,
     ContentError,
 )
-from cloudmorrow.server.backends.notes import NotesBackend
 from cloudmorrow.server.backends.shares import SharesBackend
 from cloudmorrow.server.backends.vaults import VaultsBackend
 
@@ -20,7 +19,6 @@ __all__ = [
     "Backend",
     "ContentBackend",
     "ContentError",
-    "NotesBackend",
     "SharesBackend",
     "VaultsBackend",
 ]

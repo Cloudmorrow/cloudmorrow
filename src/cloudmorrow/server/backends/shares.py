@@ -3,7 +3,10 @@
 A share is a record of the share datamodel; a file or folder in one is a
 record of the file datamodel, whose id is its share and path. A file has
 content — its bytes, and a thumbnail when it is a picture — so this is a
-`ContentBackend`.
+`ContentBackend`. A text file's words are its `text` field as well, read a
+file at a time and written back the same way, which is what the editor kit
+draws: a note is a Markdown file in the Notes folder of a drive, and
+nothing more (`server/pages.py`).
 """
 
 from __future__ import annotations
@@ -13,8 +16,8 @@ import shutil
 from collections.abc import Callable
 from pathlib import Path
 
-from cloudmorrow.server import fileops
-from cloudmorrow.server.backends.base import ContentError, decode_id, encode_id, iso_stamp
+from cloudmorrow.server import fileops, pages
+from cloudmorrow.server.backends.base import AttachmentTooBig, ContentError, decode_id, encode_id, iso_stamp
 from cloudmorrow.server.datamodels import Datamodel
 from cloudmorrow.server.records import (
     Principal,
@@ -65,10 +68,18 @@ class SharesBackend:
 
     A **file** record is a file or a folder in one of them. Its id is the
     share and the path in it, encoded; its `share` is the share's id, so
-    `?share=my-files&folder=Photos` lists a folder. Making one is a new
-    folder; the bytes of a file are put with `put`, and read with
-    `content` and `thumbnail`. Changing its `name`, `folder` or `path`
-    renames or moves it inside its share.
+    `?share=my-files&folder=Photos` lists a folder, and
+    `?share=my-files&within=Notes` everything under one, folders and all
+    (`suffix=.md` keeps only the files called so). Making one is a new
+    folder, or a new text file when `text` is sent; the bytes of any other
+    file are put with `put`, and read with `content` and `thumbnail`.
+    Changing its `name`, `folder` or `path` renames or moves it inside its
+    share; changing a text file's `text` writes it, with `rev` to refuse
+    writing over somebody else's.
+
+    The folders and attachments the editor kit asks for are answered within
+    a root the query names (`share`, `within`): the folders under it, and
+    the pictures in its `img` folder, which no listing shows.
 
     A machine share is listed, and says whether its machine is serving it,
     but its files are on that machine and the server has nothing to show.
@@ -99,11 +110,10 @@ class SharesBackend:
     def list(
         self, principal: Principal, model: Datamodel, where: dict, *, q: str = "", previews: bool = False
     ) -> list[Record]:
-        if self._is_share(model):
-            found = self._list_shares(principal, model, where)
-        else:
-            found = self._list_files(principal, model, where)
-        # A search here is by name, in what is listed: a folder at a time.
+        if not self._is_share(model):
+            return self._list_files(principal, model, where, q=q, previews=previews)
+        found = self._list_shares(principal, model, where)
+        # A search among shares is by name.
         if q:
             needle = q.casefold()
             found = [
@@ -118,17 +128,20 @@ class SharesBackend:
         if self._is_share(model):
             return self._share_record(model, principal.username, self._find_share(principal, record_id))
         share, path = self._locate(principal, record_id)
-        return self._file_record(model, share, path, fileops.inside(share, path))
+        target = fileops.inside(share, path)
+        return self._file_record(model, share, path, target, text=self._text_of(target))
 
     def create(self, principal: Principal, model: Datamodel, fields: dict) -> Record:
         if self._is_share(model):
             return self._make_share(principal, model, fields)
+        if "text" in fields and fields.get("kind", "file") != "folder":
+            return self._write_new(principal, model, fields)
         return self._make_folder(principal, model, fields)
 
     def update(self, principal: Principal, model: Datamodel, record_id: str, fields: dict, rev: object) -> Record:
         if self._is_share(model):
             raise RecordError("a share is not changed once it is made: remove it and make it again")
-        return self._move_file(principal, model, record_id, fields, rev)
+        return self._change_file(principal, model, record_id, fields, rev)
 
     def delete(self, principal: Principal, model: Datamodel, record_id: str) -> int:
         if self._is_share(model):
@@ -282,7 +295,16 @@ class SharesBackend:
             raise UnknownRecordError(record_id)
         return target
 
-    def _file_record(self, model: Datamodel, share: Share, path: str, target: Path) -> Record:
+    def _file_record(
+        self,
+        model: Datamodel,
+        share: Share,
+        path: str,
+        target: Path,
+        *,
+        text: str | None = None,
+        preview: str | None = None,
+    ) -> Record:
         path = path.strip("/")
         if not target.exists() or target.is_symlink():
             raise UnknownRecordError(encode_id(self.FILE_PREFIX, f"{share.name}/{path}"))
@@ -305,13 +327,55 @@ class SharesBackend:
                 "size": entry.size,
                 "modified": stamp,
                 "mime": entry.mime,
+                "text": text,
             },
             written_by="files",
             created_at=stamp,
             updated_at=stamp,
+            preview=preview,
         )
 
-    def _list_files(self, principal: Principal, model: Datamodel, where: dict) -> list[Record]:
+    @staticmethod
+    def _is_text(target: Path) -> bool:
+        return target.is_file() and pages.is_text(target, fileops.mime_of(target))
+
+    def _text_of(self, target: Path) -> str | None:
+        """A text file's words; nothing for a folder, a picture, or a text too big to read whole."""
+        if not self._is_text(target) or target.stat().st_size > pages.MAX_TEXT_BYTES:
+            return None
+        try:
+            return pages.read_text(target)
+        except OSError:
+            return None
+
+    def _preview_of(self, target: Path) -> str:
+        if not self._is_text(target) or target.stat().st_size > pages.MAX_TEXT_BYTES:
+            return ""
+        try:
+            return pages.preview(pages.read_text(target), target.stem)
+        except OSError:
+            return ""
+
+    @staticmethod
+    def _hidden(folder: str) -> bool:
+        return any(part.startswith(".") for part in Path(folder).parts)
+
+    def _walk(self, rel: str, directory: Path, top: Path):
+        """Everything under *directory*, folders and all, as (path, target) in
+        folder order; the pictures beside the pages — `img` at the top — are
+        seen in the pages, never listed."""
+        for entry in fileops.entries(directory):
+            if directory == top and entry.is_dir and entry.name == pages.IMAGE_DIR:
+                continue
+            path = _join(rel, entry.name)
+            target = directory / entry.name
+            yield path, target
+            if entry.is_dir:
+                yield from self._walk(path, target, top)
+
+    def _list_files(
+        self, principal: Principal, model: Datamodel, where: dict, *, q: str = "", previews: bool = False
+    ) -> list[Record]:
         where = dict(where)
         name = str(where.pop("share", "") or "").strip()
         if not name:
@@ -319,23 +383,38 @@ class SharesBackend:
                 f"files are listed a share at a time: share={DRIVE_NAME} for your own, and folder= for a folder in it"
             )
         share = self._server_side(principal, name)
+        within = where.pop("within", None)
+        suffix = str(where.pop("suffix", "") or "").strip().lower()
         folder = str(where.pop("folder", "") or "").strip("/ ")
         if "path" in where and not folder:
             folder = str(where["path"]).strip("/ ").rpartition("/")[0]
         unknown = set(where) - set(model.by_name)
         if unknown:
             raise RecordError(f"files have no field {', '.join(sorted(unknown))}")
-        if any(part.startswith(".") for part in Path(folder).parts):
-            raise RecordError("no such folder")
         try:
-            found = fileops.entries(fileops.inside(share, folder))
+            if within is not None:
+                root = str(within or "").strip("/ ")
+                if self._hidden(root):
+                    raise RecordError("no such folder")
+                found = list(self._walk(root, self._folder_in(share, root), self._folder_in(share, root)))
+            else:
+                if self._hidden(folder):
+                    raise RecordError("no such folder")
+                parent = fileops.inside(share, folder)
+                found = [(_join(folder, e.name), parent / e.name) for e in fileops.entries(parent)]
         except fileops.FileOpError as exc:
             raise RecordError(str(exc)) from None
+        if suffix:
+            found = [(path, target) for path, target in found if target.is_file() and path.lower().endswith(suffix)]
+        # A search is through names, and through the lines of the text files.
+        hits = pages.search([(p, t, fileops.mime_of(t)) for p, t in found if t.is_file()], q) if q else None
         records = []
-        for entry in found:
-            path = _join(folder, entry.name)
+        for path, target in found:
+            if hits is not None and path not in hits:
+                continue
+            preview = hits[path] if hits is not None else (self._preview_of(target) if previews else None)
             try:
-                record = self._file_record(model, share, path, fileops.inside(share, path))
+                record = self._file_record(model, share, path, target, preview=preview)
             except (UnknownRecordError, fileops.FileOpError, OSError):
                 continue
             if _matches(record.fields, where):
@@ -386,8 +465,28 @@ class SharesBackend:
             raise RecordError(f"the server cannot make {name}: {exc.strerror or exc}") from None
         return self._file_record(model, share, _join(folder, name), target)
 
-    def _move_file(self, principal: Principal, model: Datamodel, record_id: str, fields: dict, rev: object) -> Record:
-        unknown = set(fields) - {"name", "folder", "path", "share"}
+    def _write_new(self, principal: Principal, model: Datamodel, fields: dict) -> Record:
+        """A new text file from its `text`: a page. The folders on its way are made."""
+        share, folder, name = self._destination(principal, fields)
+        try:
+            parent = fileops.inside(share, folder)
+        except fileops.FileOpError as exc:
+            raise RecordError(str(exc)) from None
+        target = parent / name
+        if target.exists():
+            raise RecordError(f"there is already something called {name} there")
+        if not pages.is_text(target, fileops.mime_of(target)):
+            raise RecordError(f"{name} is not a text file's name; a file that is not text is put with its bytes")
+        try:
+            parent.mkdir(parents=True, exist_ok=True)
+            pages.write_text(target, str(fields.get("text") or ""))
+        except OSError as exc:
+            raise RecordError(f"the server cannot write {name}: {exc.strerror or exc}") from None
+        return self._file_record(model, share, _join(folder, name), target, text=self._text_of(target))
+
+    def _change_file(self, principal: Principal, model: Datamodel, record_id: str, fields: dict, rev: object) -> Record:
+        """Write a text file's `text`, and rename or move it, in one change."""
+        unknown = set(fields) - {"name", "folder", "path", "share", "text"}
         if unknown:
             raise RecordError(f"a file's {', '.join(sorted(unknown))} is not written directly")
         current = self.get(principal, model, record_id)
@@ -396,13 +495,21 @@ class SharesBackend:
             raise RecordConflictError(current)
         if fields.get("share") not in (None, "", share.name):
             raise RecordError("a file moves inside its share; to another, download it and put it there")
+        if "text" in fields:
+            target = self._existing(share, path, record_id)
+            if not self._is_text(target):
+                raise RecordError(f"{current.fields['name']} is not a text file")
+            try:
+                pages.write_text(target, str(fields["text"] or ""))
+            except OSError as exc:
+                raise RecordError(f"the server cannot write {path}: {exc.strerror or exc}") from None
         if fields.get("path"):
             new_path = str(fields["path"]).strip("/ ")
         else:
             folder = str(fields.get("folder", current.fields["folder"]) or "").strip("/ ")
             new_path = _join(folder, str(fields.get("name", current.fields["name"]) or ""))
         if new_path == path:
-            return current
+            return self.get(principal, model, record_id) if "text" in fields else current
         new_folder, _, new_name = new_path.rpartition("/")
         try:
             new_name = fileops.file_name(new_name)
@@ -420,7 +527,124 @@ class SharesBackend:
             os.rename(source, target)
         except OSError as exc:
             raise RecordError(f"the server cannot move {path}: {exc.strerror or exc}") from None
-        return self._file_record(model, share, _join(new_folder, new_name), target)
+        return self._file_record(model, share, _join(new_folder, new_name), target, text=self._text_of(target))
+
+    # -- folders and pictures, within a root ------------------------------------------
+    # The editor kit asks for these with `share` and `within` on the query:
+    # the folders under a root, and the pictures kept in its `img` folder.
+    def _root(self, principal: Principal, where: dict | None) -> tuple[Share, str, Path]:
+        where = where or {}
+        share = self._server_side(principal, str(where.get("share") or DRIVE_NAME))
+        root = str(where.get("within") or "").strip("/ ")
+        if self._hidden(root):
+            raise RecordError("no such folder")
+        return share, root, self._folder_in(share, root)
+
+    def _folder_path(self, share: Share, raw: object) -> tuple[str, Path]:
+        rel = str(raw or "").strip("/ ")
+        if not rel or self._hidden(rel):
+            raise RecordError("not a usable folder")
+        try:
+            fileops.file_name(rel.rsplit("/", 1)[-1])
+            return rel, fileops.inside(share, rel)
+        except fileops.FileOpError as exc:
+            raise RecordError(str(exc)) from None
+
+    def folders(self, principal: Principal, model: Datamodel, where: dict | None = None) -> list[dict]:
+        """Every folder under the root, parents first, each with how many files
+        it holds directly (of the `suffix`, when one is asked for)."""
+        _share, root, top = self._root(principal, where)
+        suffix = str((where or {}).get("suffix") or "").strip().lower()
+        found: list[dict] = []
+
+        def walk(rel: str, directory: Path) -> None:
+            for entry in fileops.entries(directory):
+                if not entry.is_dir or (directory == top and entry.name == pages.IMAGE_DIR):
+                    continue
+                path, here = _join(rel, entry.name), directory / entry.name
+                count = sum(
+                    1 for e in fileops.entries(here) if not e.is_dir and (not suffix or e.name.lower().endswith(suffix))
+                )
+                found.append({"path": path, "name": entry.name, "count": count})
+                walk(path, here)
+
+        walk(root, top)
+        return found
+
+    def make_folder(self, principal: Principal, model: Datamodel, path: str, where: dict | None = None) -> dict:
+        share = self._server_side(principal, str((where or {}).get("share") or DRIVE_NAME))
+        rel, target = self._folder_path(share, path)
+        if target.exists():
+            raise RecordError(f"there is already something called {rel}")
+        try:
+            target.mkdir(parents=True)
+        except OSError as exc:
+            raise RecordError(f"the server cannot make {rel}: {exc.strerror or exc}") from None
+        return {"path": rel, "name": target.name}
+
+    def move_folder(
+        self, principal: Principal, model: Datamodel, path: str, to: str, where: dict | None = None
+    ) -> dict:
+        share = self._server_side(principal, str((where or {}).get("share") or DRIVE_NAME))
+        source_rel, source = self._folder_path(share, path)
+        target_rel, target = self._folder_path(share, to)
+        if not source.is_dir() or source.is_symlink():
+            raise RecordError(f"there is no folder called {source_rel}")
+        if target.exists():
+            raise RecordError(f"there is already something called {target_rel}")
+        if (target_rel + "/").startswith(source_rel + "/"):
+            raise RecordError("a folder cannot go inside itself")
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.rename(source, target)
+        except OSError as exc:
+            raise RecordError(f"the server cannot move {source_rel}: {exc.strerror or exc}") from None
+        return {"path": target_rel, "name": target.name}
+
+    def delete_folder(self, principal: Principal, model: Datamodel, path: str, where: dict | None = None) -> None:
+        share = self._server_side(principal, str((where or {}).get("share") or DRIVE_NAME))
+        rel, target = self._folder_path(share, path)
+        if not target.is_dir() or target.is_symlink():
+            raise RecordError(f"there is no folder called {rel}")
+        try:
+            shutil.rmtree(target)
+        except OSError as exc:
+            raise RecordError(f"the server cannot delete {rel}: {exc.strerror or exc}") from None
+
+    def attach(
+        self, principal: Principal, model: Datamodel, data: bytes, filename: str, where: dict | None = None
+    ) -> dict:
+        """A picture kept in the root's `img` folder, under a name that says when it arrived."""
+        _share, _root, top = self._root(principal, where)
+        if not data:
+            raise RecordError("the image is empty")
+        if len(data) > pages.MAX_IMAGE_BYTES:
+            raise AttachmentTooBig(f"the image is too big — {pages.MAX_IMAGE_BYTES // 1_000_000} MB at most")
+        content_type = pages.sniff_image(data)
+        if content_type is None:
+            raise RecordError("not a PNG, JPEG, GIF or WebP image")
+        name = pages.image_name(filename, content_type)
+        img = top / pages.IMAGE_DIR
+        try:
+            img.mkdir(exist_ok=True)
+            tmp = img / f".{name}.tmp"
+            tmp.write_bytes(data)
+            os.replace(tmp, img / name)
+        except OSError as exc:
+            raise RecordError(f"the server cannot keep the picture: {exc.strerror or exc}") from None
+        return {"name": name, "path": f"{pages.IMAGE_DIR}/{name}", "size": len(data), "content_type": content_type}
+
+    def attachment(
+        self, principal: Principal, model: Datamodel, name: str, where: dict | None = None
+    ) -> tuple[bytes, str]:
+        _share, _root, top = self._root(principal, where)
+        if not pages.is_image_name(name):
+            raise UnknownRecordError(name)
+        target = top / pages.IMAGE_DIR / name
+        if not target.is_file() or target.is_symlink():
+            raise UnknownRecordError(name)
+        data = target.read_bytes()
+        return data, pages.sniff_image(data) or "application/octet-stream"
 
     # -- the bytes -------------------------------------------------------------------
     def content(self, principal: Principal, model: Datamodel, record_id: str) -> tuple[Path, str]:

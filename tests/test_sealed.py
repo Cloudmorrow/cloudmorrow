@@ -8,11 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from cloudmorrow.server import sealed
+from cloudmorrow.server import pages, sealed
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.crypto import SealError, load_or_create_key
 from cloudmorrow.server.db import connect
-from cloudmorrow.server.notes import NoteStore
 from cloudmorrow.server.notifications import NotificationStore
 from cloudmorrow.server.quills import QuillRegistry
 from cloudmorrow.server.records import Principal, RecordStore
@@ -83,15 +82,16 @@ def test_a_database_from_before_sealing_is_sealed_on_first_connect(tmp_path):
 def test_a_note_is_a_plain_file_in_the_drive(tmp_path):
     """Files are not sealed: a note is Markdown on disk, in the person's drive."""
     config = ServerConfig(notes_dir=tmp_path / "trees", data_dir=tmp_path / "data")
-    store = NoteStore(config.notes_root("bram"))
-    store.write("plan", "# plan\n\nbuy milk\n")
+    root = config.notes_root("bram")
+    root.mkdir(parents=True)
+    pages.write_text(root / "plan.md", "# plan\n\nbuy milk\n")
     on_disk = config.files_root("bram") / "Notes" / "plan.md"
     assert on_disk.read_text(encoding="utf-8") == "# plan\n\nbuy milk\n"
-    assert store.read("plan").size == len("# plan\n\nbuy milk\n")
     # A file put there by hand, over WebDAV or with an editor, is a note too.
-    (store.root / "shopping.md").write_text("eggs\n", encoding="utf-8")
-    assert store.read("shopping").content == "eggs\n"
-    assert store.search("milk")[0]["path"] == "plan.md"
+    (root / "shopping.md").write_text("eggs\n", encoding="utf-8")
+    assert pages.read_text(root / "shopping.md") == "eggs\n"
+    files = [(p.name, p, "text/markdown") for p in sorted(root.glob("*.md"))]
+    assert pages.search(files, "milk") == {"plan.md": "buy milk"}
 
 
 def test_the_key_file_can_live_elsewhere(tmp_path, monkeypatch):

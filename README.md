@@ -210,7 +210,6 @@ with a desktop it adds the desktop app and puts it in the applications menu
 alone). Every `cloudmorrow` command reads `RESOURCE ACTION`:
 
 ```
-cloudmorrow note    list | show | add | edit | search | remove
 cloudmorrow secret  list | get | set | import | export | run | vaults | remove
 cloudmorrow share   list | add | mount | unmount | remove
 cloudmorrow agent   list | run | jobs

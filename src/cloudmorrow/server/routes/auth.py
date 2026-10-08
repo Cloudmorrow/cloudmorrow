@@ -54,8 +54,8 @@ def login(payload: LoginRequest, request: Request, state: AppState = Depends(get
         raise invalid
     if needs_rehash(user.password_hash):
         state.users.update(user.username, password_hash=hash_password(payload.password))
-    # Make sure the user's notes root exists the moment they log in.
-    state.note_store(user)
+    # Make sure the user's drive exists the moment they log in.
+    state.ensure_drive(user.username)
     issued = create_access_token(user.username, state.config.ensure_secret_key(), state.config.token_ttl_hours)
     return TokenResponse(access_token=issued.token, expires_at=issued.expires_at, user=user_out(user))
 

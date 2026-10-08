@@ -1,15 +1,16 @@
 """Backends: datamodels whose records live somewhere other than the record store.
 
 Three foundational datamodels keep living where they always have, because
-other things reach them there — WebDAV, the notes MCP tools, `cm secret run`,
-the desktop app's mounts. A backend serves one of them through the record
-API all the same, in the same envelope, so a Quill, `cm <quill>` and an
-assistant cannot tell the difference, and the Notes, Files and Secrets
-Quills carry nothing but their screens.
+other things reach them there — WebDAV, the desktop app's mounts, `cm
+secret run`. A backend serves one of them through the record API all the
+same, in the same envelope, so a Quill, `cm <quill>` and an assistant
+cannot tell the difference, and the Notes, Files and Secrets Quills carry
+nothing but their screens. A note is a file: the Notes Quill is an editor
+over `file` within the Notes folder of a drive.
 
 A backend is five methods — list, get, create, update, delete — each given
-the principal asking. It enforces its own ownership (a note is its owner's,
-because it is in their folder), and the record store's gate has already
+the principal asking. It enforces its own ownership (a file is its owner's,
+because it is in their drive), and the record store's gate has already
 said which kinds of principal may reach its datamodel at all. `list` also
 takes the two things a listing may ask besides filters: `q`, a text search,
 and `previews`, a line of each record's text on it.
@@ -24,10 +25,11 @@ under `/api/records/{model}/_folders` and `…/_attachments`):
   no rev, nothing to seal, and a listing of notes that had folders in it
   would be a listing of two things.
 * **attachments** — `attach`, `attachment`: files kept beside the records,
-  that the records' Markdown points at. A note's pictures.
+  that the records' Markdown points at: a page's pictures, in an `img`
+  folder beside it.
 
 A record's id in a backend is something the backend can find it by again,
-made safe for a URL: a note's is its path, base64url-encoded.
+made safe for a URL: a file's is its share and path, base64url-encoded.
 """
 
 from __future__ import annotations

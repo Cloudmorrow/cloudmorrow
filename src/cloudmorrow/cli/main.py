@@ -3,7 +3,7 @@
 Every command reads `cloudmorrow RESOURCE ACTION`:
 
     cloudmorrow secret get OPENAI_API_KEY
-    cloudmorrow note show "Architecture"
+    cm notes show ideas/garden
     cloudmorrow share mount media
 
 The resource is singular, and the actions are the same words everywhere.
@@ -27,7 +27,6 @@ from cloudmorrow.cli import (
     circle,
     desktop,
     dev,
-    note,
     quill,
     quillrun,
     secret,
@@ -54,7 +53,6 @@ app = typer.Typer(
     no_args_is_help=False,
 )
 app.add_typer(secret.app, name="secret")
-app.add_typer(note.app, name="note")
 app.add_typer(agent.app, name="agent")
 app.add_typer(share.app, name="share")
 app.add_typer(settings.app, name="config")

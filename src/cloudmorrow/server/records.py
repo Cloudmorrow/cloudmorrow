@@ -764,37 +764,45 @@ class RecordStore:
             raise RecordError(f"a {model.label.lower()} has no {capability}")
         return model, self._backend(model)
 
-    def folders(self, principal: Principal, model_id: str) -> list[dict]:
+    # *where* on each of these is the rest of the query: which root the folders
+    # or the pictures are under, for a backend whose records are in more than
+    # one place (`share` and `within` for a file); a backend with one place
+    # per person, like notes, ignores it.
+    def folders(self, principal: Principal, model_id: str, where: dict | None = None) -> list[dict]:
         """Every folder there is, empty ones too, as `{path, name}`, parents first."""
         model, backend = self._capable(principal, model_id, "read", "folders")
-        return backend.folders(principal, model)
+        return backend.folders(principal, model, where or {})
 
-    def make_folder(self, principal: Principal, model_id: str, path: str) -> dict:
+    def make_folder(self, principal: Principal, model_id: str, path: str, where: dict | None = None) -> dict:
         model, backend = self._capable(principal, model_id, "write", "folders")
-        return backend.make_folder(principal, model, path)
+        return backend.make_folder(principal, model, path, where or {})
 
-    def move_folder(self, principal: Principal, model_id: str, path: str, to: str) -> dict:
+    def move_folder(self, principal: Principal, model_id: str, path: str, to: str, where: dict | None = None) -> dict:
         """Rename or move a folder, and everything in it with it."""
         model, backend = self._capable(principal, model_id, "write", "folders")
-        return backend.move_folder(principal, model, path, to)
+        return backend.move_folder(principal, model, path, to, where or {})
 
-    def delete_folder(self, principal: Principal, model_id: str, path: str) -> None:
+    def delete_folder(self, principal: Principal, model_id: str, path: str, where: dict | None = None) -> None:
         """A folder and everything in it."""
         model, backend = self._capable(principal, model_id, "write", "folders")
-        backend.delete_folder(principal, model, path)
+        backend.delete_folder(principal, model, path, where or {})
 
-    def attach(self, principal: Principal, model_id: str, data: bytes, filename: str = "") -> dict:
+    def attach(
+        self, principal: Principal, model_id: str, data: bytes, filename: str = "", where: dict | None = None
+    ) -> dict:
         """Keep a file beside the records: `{name, path, size, content_type}`.
 
         `path` is what a record's Markdown writes to point at it.
         """
         model, backend = self._capable(principal, model_id, "write", "attachments")
-        return backend.attach(principal, model, data, filename)
+        return backend.attach(principal, model, data, filename, where or {})
 
-    def attachment(self, principal: Principal, model_id: str, name: str) -> tuple[bytes, str]:
+    def attachment(
+        self, principal: Principal, model_id: str, name: str, where: dict | None = None
+    ) -> tuple[bytes, str]:
         """A kept file's bytes and media type."""
         model, backend = self._capable(principal, model_id, "read", "attachments")
-        return backend.attachment(principal, model, name)
+        return backend.attachment(principal, model, name, where or {})
 
     def count(self, owner: str, model_id: str, *, scope: str | None = None) -> int:
         query = "SELECT COUNT(*) FROM records WHERE model = ? AND owner = ?"
@@ -1311,11 +1319,14 @@ class RecordStore:
         *,
         once: bool = False,
         scope: str | None = None,
+        where: dict | None = None,
     ) -> list[Record]:
         """Write *records* for *principal* if they have none of *model_id* yet.
 
         With *once*, if the server has none of it yet, from anybody: the public
-        calendar, `#general`. With *scope*, of that scope, for a space.
+        calendar, `#general`. With *scope*, of that scope, for a space. With
+        *where*, none that a listing filtered so would show: the pages under
+        a folder of a drive, for a datamodel kept outside the record store.
         """
         if once:
             with connect(self.db_path) as conn:
@@ -1327,8 +1338,13 @@ class RecordStore:
             if row is not None:
                 return []
         elif self.model(model_id).backend:
-            # Kept elsewhere, so counted there: a note is a file in your folder.
-            if self.list(principal, model_id):
+            # Kept elsewhere, so counted there: a page is a file in a folder of
+            # your drive — and none at all when the folder is not there yet.
+            try:
+                found = self.list(principal, model_id, dict(where or {}))
+            except RecordError:
+                found = []
+            if found:
                 return []
         elif self.count(principal.username, model_id, scope=scope):
             return []

@@ -1,12 +1,16 @@
 /* The kit's `editor`: pages of Markdown in folders, and the page you are on.
 
-   A screen binds a `model`, its `title`, its Markdown `body`, and — if the
+   A screen binds a `model`, its `title`, its text `body`, and — if the
    records have folders — a `path`: a string like `ideas/garden/beds`, whose
-   folders are the tree and whose last part is the title. Everything below
-   is read from those and from the datamodel's `can`: `folders` when its
-   backend keeps folders that exist empty, `attachments` when it keeps
-   pictures beside the pages, `search` when a listing answers `?q=`. Nothing
-   here knows what a note is.
+   folders are the tree and whose last part is the title. `where` is the
+   filters every listing, search and folder call is made with — a file's
+   share, and `within`, the folder the pages are under, which the tree shows
+   paths beneath — and `suffix` says which files are pages and what a new one
+   is called (`.md`), kept off every title. Everything else is read from the
+   datamodel's `can`: `folders` when its backend keeps folders that exist
+   empty, `attachments` when it keeps pictures beside the pages, `search`
+   when a listing answers `?q=`. Nothing here knows what a note is: a note is
+   a Markdown file in the Notes folder of a drive.
 
    On a phone it is the tree, then a list, then the page, one screen at a
    time. On a computer the list and the page are side by side.
@@ -52,12 +56,21 @@ function bind(at) {
   const { quill, screen } = at;
   const model = quill.models[screen.model];
   const can = new Set(model.can || []);
+  const where = Object.fromEntries(Object.entries(screen.where || {}).map(([k, v]) => [k, String(v)]));
+  const suffix = screen.suffix || "";
+  const filters = suffix ? { ...where, suffix } : where;
   return {
     at,
     model,
     title: screen.title || model.title,
     body: screen.body,
     path: screen.path || "",
+    where,
+    suffix,
+    root: trimSlashes(where.within || ""),
+    // On every listing, search and folder call; on the pictures, the root alone.
+    query: new URLSearchParams(filters).toString(),
+    attachQuery: new URLSearchParams(where).toString(),
     keepsFolders: !!screen.path && can.has("folders"),
     search: can.has("search"),
     attachments: can.has("attachments") ? recordsUrl(model.id, "", "/_attachments") : "",
@@ -66,6 +79,28 @@ function bind(at) {
     writes: mayWrite(model),
   };
 }
+
+// -- paths: under the root in the tree, whole in the record store ---------------------
+const trimSlashes = (s) => String(s || "").replace(/^\/+|\/+$/g, "");
+const withQuery = (b, rest) => rest + (b.query ? (rest.includes("?") ? "&" : "?") + b.query : "");
+const underRoot = (b, raw) => {
+  const path = trimSlashes(raw);
+  if (b.root && path.startsWith(b.root + "/")) return path.slice(b.root.length + 1);
+  return b.root && path === b.root ? "" : path;
+};
+const withoutSuffix = (b, s) =>
+  (b.suffix && s.toLowerCase().endsWith(b.suffix.toLowerCase()) ? s.slice(0, -b.suffix.length) : s);
+const withSuffix = (b, s) =>
+  (b.suffix && !s.toLowerCase().endsWith(b.suffix.toLowerCase()) ? s + b.suffix : s);
+const wholePath = (b, path) => (b.root ? b.root + "/" : "") + withSuffix(b, trimSlashes(path));
+const wholeFolder = (b, path) => {
+  const p = trimSlashes(path);
+  if (!b.root) return p;
+  return p ? b.root + "/" + p : b.root;
+};
+// The filters that are fields of the datamodel go on every page written: a file's share.
+const fixedFields = (b) => Object.fromEntries(
+  Object.entries(b.where).filter(([k]) => (b.model.fields || []).some((f) => f.name === k)));
 
 const listHash = (b, key) => b.at.base + (key ? "/" + encodePath(key) : "");
 const pageArg = (b, id) =>
@@ -77,13 +112,13 @@ const pageHash = (b, id) =>
 // [{id, path, title, folder, modified, preview}], and the folders in tree
 // order: [{path, name, depth, count}], the top first.
 async function load(b) {
-  const rows = await api("GET", recordsUrl(b.model.id, "", "?previews=true"));
+  const rows = await api("GET", recordsUrl(b.model.id, "", withQuery(b, "?previews=true")));
   const pages = rows.map((r) => {
-    const path = String(r.fields[b.path || b.title] || "");
+    const path = withoutSuffix(b, underRoot(b, r.fields[b.path || b.title]));
     return {
       id: r.id,
       path,
-      title: String(r.fields[b.title] || "").trim() || baseName(path) || "Untitled",
+      title: withoutSuffix(b, String(r.fields[b.title] || "").trim()) || baseName(path) || "Untitled",
       folder: b.path ? folderOf(path) : "",
       modified: seconds(r.updated_at) || 0,
       preview: r.preview || "",
@@ -93,7 +128,7 @@ async function load(b) {
   const add = (folder) => { while (folder) { known.add(folder); folder = folderOf(folder); } };
   for (const page of pages) add(page.folder);
   if (b.keepsFolders) {
-    try { for (const f of await api("GET", recordsUrl(b.model.id, "", "/_folders"))) add(f.path); }
+    try { for (const f of await api("GET", recordsUrl(b.model.id, "", withQuery(b, "/_folders")))) add(underRoot(b, f.path)); }
     catch { /* the folders there are pages in are still the tree */ }
   }
   const byPath = (x, y) => {
@@ -217,7 +252,7 @@ function listView(b, data, key, openId = "") {
         const request = ++latest;
         timer = setTimeout(async () => {
           let found;
-          try { found = await api("GET", recordsUrl(b.model.id, "", "?q=" + encodeURIComponent(query))); }
+          try { found = await api("GET", recordsUrl(b.model.id, "", withQuery(b, "?q=" + encodeURIComponent(query)))); }
           catch (err) { toast(err.message); return; }
           if (request !== latest) return;
           const hits = new Map(local.map((p) => [p.id, p]));
@@ -237,7 +272,7 @@ async function newFolder(b, parent) {
   const name = fileStem(prompt("Folder name") || "");
   if (!name) return;
   try {
-    await api("POST", recordsUrl(b.model.id, "", "/_folders"), { path: joinPath(parent, name) });
+    await api("POST", recordsUrl(b.model.id, "", withQuery(b, "/_folders")), { path: wholeFolder(b, joinPath(parent, name)) });
     renderRoute();
   } catch (err) {
     toast(err.message);
@@ -313,8 +348,9 @@ function splitHeading(content, stem) {
 const compose = (stem, body, withHeading) => (withHeading ? `# ${stem}\n\n${body}` : body);
 
 function pageState(b, record) {
-  const stem = String(record.fields[b.title] || "").trim() || baseName(String(record.fields[b.path] || ""));
-  const path = b.path ? String(record.fields[b.path] || "") : stem;
+  const stem = withoutSuffix(b, String(record.fields[b.title] || "").trim())
+    || baseName(withoutSuffix(b, underRoot(b, record.fields[b.path])));
+  const path = b.path ? withoutSuffix(b, underRoot(b, record.fields[b.path])) : stem;
   const { body, hadHeading } = splitHeading(String(record.fields[b.body] || ""), stem);
   return { id: record.id, stem, folder: b.path ? folderOf(path) : "", rev: record.rev, hadHeading, body,
            modified: seconds(record.updated_at) || Date.now() / 1000 };
@@ -326,7 +362,7 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
         modified: Date.now() / 1000 }
     : { isNew: false, created: false, ...pageState(b, record) };
   Object.assign(ed, { b, arg, dirty: false, saving: false, pending: false, timer: null,
-                      attachments: b.attachments });
+                      attachments: b.attachments, attachQuery: b.attachQuery });
   editor = ed;
   // The screen is this page's until it is left: a new one while the hash
   // says new, a saved one while the hash is its own.
@@ -498,9 +534,9 @@ async function createUnique(ed, stem, body) {
   for (let n = 1; n < 100; n += 1) {
     const name = n === 1 ? stem : `${stem} ${n}`;
     if (taken.has(name)) continue;
-    const fields = { [b.body]: compose(name, body, true) };
-    if (b.path) fields[b.path] = joinPath(ed.folder, name);
-    else fields[b.title] = name;
+    const fields = { ...fixedFields(b), [b.body]: compose(name, body, true) };
+    if (b.path) fields[b.path] = wholePath(b, joinPath(ed.folder, name));
+    else fields[b.title] = withSuffix(b, name);
     return api("POST", recordsUrl(b.model.id), { fields });
   }
   throw new Error(`Too many called ${stem}`);
@@ -510,7 +546,7 @@ async function renameTo(ed, stem) {
   const { b } = ed;
   try {
     const renamed = await api("PATCH", recordsUrl(b.model.id, ed.id),
-      { fields: { [b.title]: stem } });
+      { fields: { [b.title]: withSuffix(b, stem) } });
     ed.stem = pageState(b, renamed).stem;
     ed.rev = renamed.rev;
     moved(ed, renamed);

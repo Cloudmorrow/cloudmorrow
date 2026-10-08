@@ -29,6 +29,15 @@ from textual.timer import Timer
 from textual.widgets import Static
 
 from cloudmorrow.client.api import ApiError, AuthError
+from cloudmorrow.quill.screens import (
+    editor_fields,
+    listing_filters,
+    page_fields,
+    page_path,
+    page_title,
+    under_root,
+    whole_folder,
+)
 from cloudmorrow.tui.kitdata import is_conflict
 from cloudmorrow.tui.panes.kit import KitPane
 from cloudmorrow.tui.screens.modals import (
@@ -75,9 +84,15 @@ class EditorPane(KitPane):
 
     def __init__(self, quill: dict, screen: dict, **kwargs) -> None:
         super().__init__(quill, screen, **kwargs)
-        self.title_field: str = screen.get("title") or self.model.get("title") or "title"
-        self.body_field: str = screen.get("body") or "body"
-        self.path_field: str = screen.get("path") or ""
+        self.bound = editor_fields(screen, self.model)
+        self.title_field: str = self.bound["title"]
+        self.body_field: str = self.bound["body"]
+        self.path_field: str = self.bound["path"]
+        # What every listing, search and folder call is made with: the share
+        # and the folder the pages are under, and the suffix that says which
+        # files are pages. Paths in the tree are under that root.
+        self.filters: dict = listing_filters(self.bound)
+        self.where: dict = dict(self.bound["where"])
         can = set(self.model.get("can") or [])
         self.keeps_folders = bool(self.path_field) and "folders" in can
         self.searches = "search" in can
@@ -129,18 +144,14 @@ class EditorPane(KitPane):
 
     # -- what a record is called here -------------------------------------------
     def path_of(self, record: dict) -> str:
-        fields = record.get("fields") or {}
-        return str(fields.get(self.path_field or self.title_field) or "")
+        return page_path(self.bound, record)
 
     def title_of(self, record: dict) -> str:
-        fields = record.get("fields") or {}
-        return str(fields.get(self.title_field) or "") or self.path_of(record).rsplit("/", 1)[-1]
+        return page_title(self.bound, record)
 
     def _fields_for(self, path: str) -> dict:
         """What a record at *path* is written as: its path, or its title alone."""
-        if self.path_field:
-            return {self.path_field: path}
-        return {self.title_field: path.rsplit("/", 1)[-1]}
+        return page_fields(self.bound, path)
 
     # -- the tree ----------------------------------------------------------------
     def _tree(self, records: list[dict], folders: list[str]) -> dict:
@@ -182,10 +193,11 @@ class EditorPane(KitPane):
         if client is None:
             return
         try:
-            self.records = await client.records(self.model_id)
+            self.records = await client.records(self.model_id, **self.filters)
             folders: list[str] = []
             if self.keeps_folders:
-                folders = [f["path"] for f in await client.record_folders(self.model_id)]
+                found = await client.record_folders(self.model_id, **self.filters)
+                folders = [under_root(self.bound, f["path"]) for f in found]
         except ApiError as exc:
             await self.went_wrong(exc)
             return
@@ -334,7 +346,7 @@ class EditorPane(KitPane):
         if data is None:
             panel.say(f"fetching {name}…")
             try:
-                data = await self.api.attachment(self.model_id, name)
+                data = await self.api.attachment(self.model_id, name, **self.where)
             except ApiError as exc:
                 panel.say(f"{name}: {exc}")
                 return
@@ -366,7 +378,7 @@ class EditorPane(KitPane):
             self.status(f"cannot read {source}: {exc}", error=True)
             return
         try:
-            info = await self.api.attach(self.model_id, data, filename=source.name)
+            info = await self.api.attach(self.model_id, data, filename=source.name, **self.where)
         except ApiError as exc:
             self.status(str(exc), error=True)
             return
@@ -423,7 +435,7 @@ class EditorPane(KitPane):
             return
         path = (PurePosixPath(parent) / name).as_posix() if parent else name
         try:
-            await self.api.make_record_folder(self.model_id, path)
+            await self.api.make_record_folder(self.model_id, whole_folder(self.bound, path), **self.where)
         except ApiError as exc:
             self.status(str(exc), error=True)
             return
@@ -448,8 +460,10 @@ class EditorPane(KitPane):
             return
         try:
             if is_dir:
-                result = await self.api.move_record_folder(self.model_id, path, new_path)
-                moved_to = result["path"]
+                result = await self.api.move_record_folder(
+                    self.model_id, whole_folder(self.bound, path), whole_folder(self.bound, new_path), **self.where
+                )
+                moved_to = under_root(self.bound, result["path"])
                 open_path = self.current_path or ""
                 if open_path.startswith(path + "/"):
                     self.current_path = moved_to + open_path[len(path) :]
@@ -492,7 +506,7 @@ class EditorPane(KitPane):
             return
         try:
             if is_dir:
-                await self.api.delete_record_folder(self.model_id, path)
+                await self.api.delete_record_folder(self.model_id, whole_folder(self.bound, path), **self.where)
             else:
                 await self.api.delete_record(self.model_id, self._ids[path])
         except ApiError as exc:
@@ -515,7 +529,7 @@ class EditorPane(KitPane):
 
     async def _search(self, query: str) -> dict:
         """The record API's `?q=`, in the shape the search box lists."""
-        found = await self.api.records(self.model_id, q=query)
+        found = await self.api.records(self.model_id, q=query, **self.filters)
         return {"results": [{"path": self.path_of(r), "matches": [{"text": r.get("preview") or ""}]} for r in found]}
 
     @work(group="ui")

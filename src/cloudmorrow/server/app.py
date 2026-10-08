@@ -14,7 +14,7 @@ from cloudmorrow.server import changefeed, spacenotify
 from cloudmorrow.server.access import is_allowed, parse_rules
 from cloudmorrow.server.access_lan import announcer
 from cloudmorrow.server.agents import AgentStore, JobStore
-from cloudmorrow.server.backends import NotesBackend, SharesBackend, VaultsBackend
+from cloudmorrow.server.backends import SharesBackend, VaultsBackend
 from cloudmorrow.server.circles import CircleStore
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.configsync import ConfigStore
@@ -39,7 +39,6 @@ from cloudmorrow.server.routes import (
     features,
     install,
     mcp,
-    notes,
     notifications,
     push,
     quillcode,
@@ -131,9 +130,6 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.state.cloudmorrow.changes = changefeed.ChangeFeed(record_store)
     record_store.on_change.append(app.state.cloudmorrow.changes.listen)
     # Datamodels that live where they always have, served as records.
-    record_store.backends["notes"] = NotesBackend(
-        lambda username: app.state.cloudmorrow.note_store(user_store.require(username))
-    )
     record_store.backends["shares"] = SharesBackend(
         share_store,
         lambda username: user_drive(config, username),
@@ -212,13 +208,6 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.include_router(features.router)
     app.include_router(features.mine_router)
     app.include_router(features.types_router)
-    app.include_router(
-        notes.router,
-        dependencies=[
-            Depends(features.require_feature("notes")),
-            Depends(circles.require_data("note")),
-        ],
-    )
     app.include_router(
         secrets.router,
         dependencies=[

@@ -84,7 +84,7 @@ def first_account(payload: SetupRequest, state: AppState = Depends(get_state)) -
         except (InvalidNameError, InvalidUsernameError, UserExistsError, ValueError) as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
         state.settings.set_name(name, changed_by=user.username)
-        state.config.notes_root(user.username).mkdir(parents=True, exist_ok=True)
+        state.ensure_drive(user.username)
     # The standard quills, after the account: a download that fails leaves a
     # cloud that is set up, with a line saying what to add later.
     note = ""

@@ -1,10 +1,11 @@
 """What an assistant can do in Cloudmorrow: the MCP tools.
 
 Each tool is one thing a person could do themselves in the app — read a
-note, add a task, move it along — described plainly enough that a model
-picks the right one, and done with the same stores the API uses, as the
-signed-in user and nobody else. A feature an administrator switched off
-takes its tools off the list, and refuses them if called anyway.
+page, add a task, move it along — described plainly enough that a model
+picks the right one, and done with the same record store the API uses, as
+the signed-in user and nobody else, through the same gate. Notes are
+files: an assistant reads and writes them as `file` records, the way every
+Quill does.
 
 Secrets are not here on purpose. An assistant that can read your notes is
 useful; one that can read your production keys is a liability, and the
@@ -23,13 +24,6 @@ from typing import Any
 from cloudmorrow.quill_reference import quill_reference
 from cloudmorrow.server.circles import Access
 from cloudmorrow.server.db import User
-from cloudmorrow.server.notes import (
-    NoteConflictError,
-    NoteExistsError,
-    NoteNode,
-    NoteNotFoundError,
-    NoteStore,
-)
 from cloudmorrow.server.paths import UnsafePathError
 from cloudmorrow.server.quills import QuillError, load_catalog
 from cloudmorrow.server.records import (
@@ -108,87 +102,6 @@ def _bool(args: dict[str, Any], key: str, default: bool = False) -> bool:
     return value
 
 
-# -- notes -------------------------------------------------------------------
-def _notes(state: AppState, user: User) -> NoteStore:
-    return state.note_store(user)
-
-
-def _flatten(node: NoteNode, into: list[dict]) -> None:
-    for child in node.children:
-        entry = {"path": child.path, "is_dir": child.is_dir}
-        if child.is_dir:
-            into.append(entry)
-            _flatten(child, into)
-        else:
-            entry["size"] = child.size
-            if child.preview is not None:
-                entry["preview"] = child.preview
-            into.append(entry)
-
-
-def list_notes(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    folder = _str(args, "folder").strip("/")
-    tree = _notes(state, user).tree(previews=_bool(args, "previews"))
-    node = tree
-    for part in [p for p in folder.split("/") if p]:
-        node = next((c for c in node.children if c.is_dir and c.name == part), None)
-        if node is None:
-            raise ToolError(f"no such folder: {folder}")
-    entries: list[dict] = []
-    _flatten(node, entries)
-    return {"folder": folder, "entries": entries}
-
-
-def read_note(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    note = _notes(state, user).read(_str(args, "path", required=True))
-    return {"path": note.path, "content": note.content, "rev": note.rev}
-
-
-def search_notes(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    query = _str(args, "query", required=True)
-    return {"query": query, "results": _notes(state, user).search(query)}
-
-
-def create_note(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    note = _notes(state, user).create_note(_str(args, "path", required=True), _str(args, "content"))
-    return {"path": note.path, "rev": note.rev, "created": True}
-
-
-def write_note(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    rev = _str(args, "rev") or None
-    note = _notes(state, user).write(_str(args, "path", required=True), _str(args, "content", required=True), rev=rev)
-    return {"path": note.path, "rev": note.rev}
-
-
-def append_to_note(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    store = _notes(state, user)
-    path = _str(args, "path", required=True)
-    text = _str(args, "text", required=True)
-    current = store.read(path)
-    body = current.content
-    if body and not body.endswith("\n"):
-        body += "\n"
-    note = store.write(current.path, body + text.rstrip("\n") + "\n", rev=current.rev)
-    return {"path": note.path, "rev": note.rev}
-
-
-def move_note(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    moved = _notes(state, user).move(_str(args, "from", required=True), _str(args, "to", required=True))
-    return {"path": moved}
-
-
-def delete_note(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    path = _str(args, "path", required=True)
-    _notes(state, user).delete(path, recursive=False)
-    return {"path": path, "deleted": True}
-
-
-def create_folder(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    path = _notes(state, user).create_dir(_str(args, "path", required=True))
-    return {"path": path, "is_dir": True}
-
-
-# -- records, of any installed datamodel ---------------------------------------
 def _principal(user: User) -> Principal:
     return Principal.assistant(user.username, admin=user.is_admin)
 
@@ -366,10 +279,6 @@ def quill_dev_install(state: AppState, user: User, args: dict[str, Any]) -> Any:
 
 
 # -- the catalogue ------------------------------------------------------------
-_PATH = {
-    "type": "string",
-    "description": "Path under the notes root, e.g. 'ideas/garden.md'. The .md suffix is optional.",
-}
 _MODEL = {"type": "string", "description": "A datamodel id from list_datamodels, e.g. 'task'."}
 _RECORD_ID = {"type": "string", "description": "The record's id, e.g. 'r_1a2b3c4d5e'."}
 _FIELDS = {"type": "object", "description": "Field name to value, as list_datamodels describes them."}
@@ -380,104 +289,6 @@ _DATAMODELS = {
 }
 
 TOOLS: tuple[Tool, ...] = (
-    Tool(
-        "list_notes",
-        "List the user's notes and folders, optionally under one folder. Paths come back "
-        "relative to the notes root; use them with read_note.",
-        _schema(
-            {
-                "folder": {
-                    "type": "string",
-                    "description": "Only this folder and what is under it. Empty for everything.",
-                },
-                "previews": {
-                    "type": "boolean",
-                    "description": "Include the first line or two of each note.",
-                },
-            }
-        ),
-        "notes",
-        list_notes,
-    ),
-    Tool(
-        "read_note",
-        "Read one note: its Markdown content and its rev (a version stamp for write_note).",
-        _schema({"path": _PATH}, ("path",)),
-        "notes",
-        read_note,
-    ),
-    Tool(
-        "search_notes",
-        "Find notes whose name or text contains the words given (case-insensitive substring).",
-        _schema({"query": {"type": "string", "description": "What to look for."}}, ("query",)),
-        "notes",
-        search_notes,
-    ),
-    Tool(
-        "create_note",
-        "Make a new Markdown note. Fails if a note already exists at that path.",
-        _schema(
-            {"path": _PATH, "content": {"type": "string", "description": "The Markdown body."}},
-            ("path",),
-        ),
-        "notes",
-        create_note,
-    ),
-    Tool(
-        "write_note",
-        "Replace the whole content of a note (creating it if needed). Read it first and pass "
-        "its rev so a note changed elsewhere in the meantime is not overwritten.",
-        _schema(
-            {
-                "path": _PATH,
-                "content": {"type": "string", "description": "The full new Markdown body."},
-                "rev": {
-                    "type": "string",
-                    "description": "The rev from read_note. Optional, but recommended.",
-                },
-            },
-            ("path", "content"),
-        ),
-        "notes",
-        write_note,
-    ),
-    Tool(
-        "append_to_note",
-        "Add text to the end of an existing note, on a new line. Good for lists and logs.",
-        _schema(
-            {"path": _PATH, "text": {"type": "string", "description": "What to add."}},
-            ("path", "text"),
-        ),
-        "notes",
-        append_to_note,
-    ),
-    Tool(
-        "move_note",
-        "Move or rename a note or folder.",
-        _schema(
-            {"from": _PATH, "to": {"type": "string", "description": "The new path."}},
-            ("from", "to"),
-        ),
-        "notes",
-        move_note,
-    ),
-    Tool(
-        "delete_note",
-        "Delete one note, or an empty folder. This cannot be undone.",
-        _schema({"path": _PATH}, ("path",)),
-        "notes",
-        delete_note,
-    ),
-    Tool(
-        "create_folder",
-        "Make a folder for notes.",
-        _schema(
-            {"path": {"type": "string", "description": "Folder path under the notes root."}},
-            ("path",),
-        ),
-        "notes",
-        create_folder,
-    ),
     Tool(
         "list_datamodels",
         "List the kinds of data on this server (tasks, boards, and whatever Quills added), "
@@ -602,41 +413,25 @@ TOOLS: tuple[Tool, ...] = (
 BY_NAME: dict[str, Tool] = {tool.name: tool for tool in TOOLS}
 
 INSTRUCTIONS = (
-    "Cloudmorrow is the user's own cloud: Markdown notes in folders, and records of "
-    "datamodels the installed Quills use — task boards with todo/doing/done lanes, and "
-    "whatever else is installed (list_datamodels says). Everything here is the signed-in "
-    "user's own data. Read before you overwrite, and prefer append_to_note and "
-    "move_record over rewriting or deleting. To build a new Quill, read quill_schema first."
+    "Cloudmorrow is the user's own cloud: records of the datamodels the installed Quills "
+    "use — task boards with todo/doing/done lanes, contacts, calendars, files, and whatever "
+    "else is installed (list_datamodels says). Everything here is the signed-in user's own "
+    "data. Their notes are Markdown files in the Notes folder of their drive: list them "
+    'with list_records on the \'file\' datamodel and where {"share": "my-files", '
+    '"within": "Notes", "suffix": ".md"}; a file\'s words are its \'text\' when '
+    "read one at a time with get_record, and written back with update_record and its rev. "
+    "Read before you overwrite, and prefer move_record over rewriting or deleting. To build "
+    "a new Quill, read quill_schema first."
 )
 
 
-FEATURE_LABELS = {"notes": "Notes"}
+FEATURE_LABELS: dict[str, str] = {}
 
 
 def _enabled(state: AppState, feature: str) -> bool:
     """Is *feature* switched on? A server without the switchboard has everything on."""
     switches = getattr(state, "features", None)
     return switches is None or switches.enabled(feature)
-
-
-# The notes tools reach the notes folder itself, not the record store, so
-# the gate is asked here: these read, the rest of them write.
-NOTE_MODEL = "note"
-READS_NOTES = frozenset({"list_notes", "read_note", "search_notes"})
-
-
-def _notes_allowed(state: AppState, user: User | None, tool: Tool) -> str:
-    """Why *user*'s circles keep them from *tool*, or "" when they do not."""
-    if tool.feature != "notes" or user is None:
-        return ""
-    access = _access(state, user)
-    if access is None:
-        return ""
-    if not access.may("read", NOTE_MODEL):
-        return "notes are not yours to reach on this server"
-    if tool.name not in READS_NOTES and not access.may("write", NOTE_MODEL):
-        return "you may read notes here, not change them"
-    return ""
 
 
 # -- a Quill's actions, as tools -------------------------------------------------------
@@ -734,11 +529,10 @@ def find(state: AppState, name: str, user: User | None = None) -> Tool | None:
 
 
 def available(state: AppState, user: User | None = None) -> list[Tool]:
-    """The tools on offer right now: those whose feature is switched on, and —
-    for *user* — that their circles let them use; then every Quill's actions."""
-    return [
-        tool for tool in TOOLS if _enabled(state, tool.feature) and not _notes_allowed(state, user, tool)
-    ] + action_tools(state, user)
+    """The tools on offer right now: those whose feature is switched on, then
+    every Quill's actions the person may use. What the record tools reach is
+    the gate's business, as it is for everybody."""
+    return [tool for tool in TOOLS if _enabled(state, tool.feature)] + action_tools(state, user)
 
 
 def call(state: AppState, user: User, name: str, arguments: Any) -> dict[str, Any]:
@@ -755,9 +549,6 @@ def call(state: AppState, user: User, name: str, arguments: Any) -> dict[str, An
     if not _enabled(state, tool.feature):
         label = FEATURE_LABELS.get(tool.feature, tool.feature)
         return _error(f"{label} is switched off on this server")
-    refused = _notes_allowed(state, user, tool)
-    if refused:
-        return _error(f"not allowed: {refused}")
     if arguments is None:
         arguments = {}
     if not isinstance(arguments, dict):
@@ -766,14 +557,6 @@ def call(state: AppState, user: User, name: str, arguments: Any) -> dict[str, An
         result = tool.handler(state, user, arguments)
     except ToolError as exc:
         return _error(str(exc))
-    except NoteConflictError as exc:
-        return _error(
-            f"the note changed since it was read; read it again before writing. Its rev is now {exc.current_rev}"
-        )
-    except NoteNotFoundError as exc:
-        return _error(f"no such note or folder: {exc}")
-    except NoteExistsError as exc:
-        return _error(f"already there: {exc}")
     except RecordConflictError as exc:
         return _error(f"the record changed since it was read; its rev is now {exc.current.rev}. Read it again.")
     except Refused as exc:

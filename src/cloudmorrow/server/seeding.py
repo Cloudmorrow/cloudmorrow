@@ -25,4 +25,5 @@ def seed(state: AppState, principal: Principal, model: str) -> None:
             writer=manifest.id,
             once=dataset["seed"] == "once",
             scope=dataset.get("scope"),
+            where=dataset.get("where"),
         )

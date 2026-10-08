@@ -17,12 +17,17 @@ from cloudmorrow.cli.quillrun.screen import (
 )
 from cloudmorrow.client.api import ApiError, CloudmorrowClient
 from cloudmorrow.console import TITLE
+from cloudmorrow.quill.screens import editor_fields, listing_filters, page_fields, page_path
+
+
+def _bound(screen: Screen) -> dict:
+    return editor_fields(screen.spec, screen.models[screen.model])
 
 
 def _page_key(screen: Screen, record: dict) -> str:
-    """What a page is called on the command line: its path, else its title."""
-    fields = record["fields"]
-    return str(fields.get(screen.spec.get("path") or screen.title) or fields.get(screen.title) or "")
+    """What a page is called on the command line: its path under the root,
+    without the suffix, else its title."""
+    return page_path(_bound(screen), record)
 
 
 def _find_page(screen: Screen, records: list[dict], key: str) -> dict:
@@ -53,12 +58,14 @@ def _text(initial: str, *, what: str) -> str:
 
 
 async def _act_editor(api: CloudmorrowClient, screen: Screen, action: str, args: list[str], plain: bool) -> None:
-    body = screen.spec.get("body") or "body"
-    path = screen.spec.get("path")
+    bound = _bound(screen)
+    body = bound["body"]
+    path = bound["path"]
+    filters = listing_filters(bound)
     if action == "search":
         if not args:
             fail(f"search for what? cm {screen.quill['id']} search <text>")
-        found = await api.records(screen.model, q=" ".join(args))
+        found = await api.records(screen.model, q=" ".join(args), **filters)
         if plain:
             quillrun.emit(json.dumps(found, indent=2) + "\n")
             return
@@ -68,7 +75,7 @@ async def _act_editor(api: CloudmorrowClient, screen: Screen, action: str, args:
         if not found:
             quillrun.console.print("[dim]nothing matches[/]")
         return
-    records = await api.records(screen.model)
+    records = await api.records(screen.model, **filters)
     if action == "list":
         if plain:
             quillrun.emit(json.dumps(records, indent=2) + "\n")
@@ -91,7 +98,7 @@ async def _act_editor(api: CloudmorrowClient, screen: Screen, action: str, args:
         if any(_page_key(screen, r) == args[0].strip("/") for r in records):
             fail(f"there is already a page {args[0]!r}; edit it instead")
         text = " ".join(args[1:]) if len(args) > 1 else _text("", what="the page")
-        fields = {(path or screen.title): args[0].strip("/"), body: text}
+        fields = {**page_fields(bound, args[0].strip("/")), body: text}
         made = await api.create_record(screen.model, fields)
         quillrun.console.print(f"[green]Added[/] {escape(_page_key(screen, made))}")
         return

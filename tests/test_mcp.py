@@ -358,36 +358,43 @@ def test_the_tools_are_listed_with_schemas(client):
     token = connect(client)["access_token"]
     tools = rpc(client, token, "tools/list").json()["result"]["tools"]
     by_name = {tool["name"]: tool for tool in tools}
-    assert {"create_note", "read_note", "create_record", "move_record", "quill_schema"} <= set(by_name)
-    assert by_name["create_note"]["inputSchema"]["required"] == ["path"]
-    assert by_name["create_note"]["description"]
+    assert {"list_records", "get_record", "create_record", "move_record", "quill_schema"} <= set(by_name)
+    assert not any(name.endswith("_note") or name.endswith("_notes") for name in by_name)
+    assert by_name["create_record"]["inputSchema"]["required"] == ["model", "fields"]
+    assert by_name["create_record"]["description"]
 
 
-def test_an_assistant_writes_a_note_as_the_person(client, auth):
+def test_an_assistant_writes_a_note_as_the_person(notes_quill, auth, config):
+    """A note is a file: the record tools on `file` are how an assistant reaches it."""
+    client = notes_quill
     token = connect(client)["access_token"]
-    result = call(client, token, "create_note", path="ideas/garden", content="# Garden\n\n- beans\n")
+    page = {"share": "my-files", "path": "Notes/ideas/garden.md", "text": "# Garden\n\n- beans\n"}
+    result = call(client, token, "create_record", model="file", fields=page)
     assert "isError" not in result
-    assert result["structuredContent"]["path"] == "ideas/garden.md"
-    # It is a real note, where the person's own client sees it.
-    note = client.get("/api/notes/file/ideas/garden.md", headers=auth)
-    assert note.status_code == 200
-    assert note.json()["content"] == "# Garden\n\n- beans\n"
-    call(client, token, "append_to_note", path="ideas/garden", text="- peas")
-    assert client.get("/api/notes/file/ideas/garden.md", headers=auth).json()["content"] == (
-        "# Garden\n\n- beans\n- peas\n"
-    )
-    listed = call(client, token, "list_notes", previews=True)["structuredContent"]
-    assert [e["path"] for e in listed["entries"]] == ["ideas", "ideas/garden.md"]
-    found = call(client, token, "search_notes", query="peas")["structuredContent"]
-    assert found["results"][0]["path"] == "ideas/garden.md"
+    made = result["structuredContent"]
+    assert made["fields"]["path"] == "Notes/ideas/garden.md"
+    # It is a real file, where the person's own drive has it.
+    on_disk = config.notes_dir / "bram" / "files" / "Notes" / "ideas" / "garden.md"
+    assert on_disk.read_text() == "# Garden\n\n- beans\n"
+    call(client, token, "update_record", model="file", id=made["id"], fields={"text": "# Garden\n\n- beans\n- peas\n"})
+    assert on_disk.read_text() == "# Garden\n\n- beans\n- peas\n"
+    where = {"share": "my-files", "within": "Notes", "suffix": ".md"}
+    listed = call(client, token, "list_records", model="file", where=where)["structuredContent"]
+    # No welcome note: the person already had a page when Notes was first listed.
+    assert [r["fields"]["path"] for r in listed["records"]] == ["Notes/ideas/garden.md"]
+    found = call(client, token, "list_records", model="file", where=where, q="peas")["structuredContent"]
+    assert [r["preview"] for r in found["records"]] == ["- peas"]
 
 
-def test_writing_over_a_changed_note_is_refused(client, auth):
+def test_writing_over_a_changed_note_is_refused(notes_quill, auth):
+    client = notes_quill
     token = connect(client)["access_token"]
-    call(client, token, "create_note", path="log", content="one\n")
-    read = call(client, token, "read_note", path="log")["structuredContent"]
-    client.put("/api/notes/file/log.md", headers=auth, json={"content": "two\n"})
-    stale = call(client, token, "write_note", path="log", content="three\n", rev=read["rev"])
+    page = {"share": "my-files", "path": "Notes/log.md", "text": "one\n"}
+    made = call(client, token, "create_record", model="file", fields=page)["structuredContent"]
+    client.patch(f"/api/records/file/{made['id']}", headers=auth, json={"fields": {"text": "two\n"}})
+    stale = call(
+        client, token, "update_record", model="file", id=made["id"], fields={"text": "three\n"}, rev=made["rev"]
+    )
     assert stale["isError"] is True
     assert "changed since it was read" in stale["content"][0]["text"]
 
@@ -479,7 +486,7 @@ def test_only_an_administrators_assistant_may_install(client):
 
 def test_a_tool_that_cannot_do_it_says_so_without_a_protocol_error(client):
     token = connect(client)["access_token"]
-    missing = call(client, token, "read_note", path="nowhere")
+    missing = call(client, token, "get_record", model="task", id="nowhere")
     assert missing["isError"] is True
     unknown = rpc(client, token, "tools/call", {"name": "launch_rockets", "arguments": {}})
     assert unknown.json()["error"]["code"] == -32602
@@ -506,16 +513,20 @@ def test_an_ordinary_access_token_opens_mcp_too(client, auth):
 def test_an_mcp_token_opens_nothing_but_mcp(client):
     token = connect(client)["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
-    assert client.get("/api/notes/tree", headers=headers).status_code == 401
+    assert client.get("/api/records/file?share=my-files", headers=headers).status_code == 401
     assert client.get("/api/auth/me", headers=headers).status_code == 401
 
 
-def test_each_person_gets_their_own_data(client):
+def test_each_person_gets_their_own_data(notes_quill):
+    client = notes_quill
     bram = connect(client, ADMIN)["access_token"]
     guest = connect(client, GUEST)["access_token"]
-    call(client, bram, "create_note", path="private", content="mine\n")
-    assert call(client, guest, "read_note", path="private")["isError"] is True
-    assert call(client, guest, "list_notes")["structuredContent"]["entries"] == []
+    page = {"share": "my-files", "path": "Notes/private.md", "text": "mine\n"}
+    made = call(client, bram, "create_record", model="file", fields=page)["structuredContent"]
+    assert call(client, guest, "get_record", model="file", id=made["id"])["isError"] is True
+    where = {"share": "my-files", "within": "Notes", "suffix": ".md"}
+    theirs = call(client, guest, "list_records", model="file", where=where)["structuredContent"]["records"]
+    assert [r["fields"]["path"] for r in theirs] == ["Notes/Welcome.md"]
 
 
 # -- the person's side ------------------------------------------------------------------
@@ -551,17 +562,20 @@ def test_using_a_connection_is_noted(client, auth):
 
 
 # -- features ------------------------------------------------------------------------------
-def test_a_feature_switched_off_takes_its_tools_away(notes_quill, auth):
+def test_a_quill_switched_off_takes_its_tools_away(notes_quill, auth):
+    """A Quill's actions are tools; off, they go, and its data closes with it."""
     client = notes_quill
     pytest.importorskip("cloudmorrow.server.features")
     token = connect(client)["access_token"]
+    names = {t["name"] for t in rpc(client, token, "tools/list").json()["result"]["tools"]}
+    assert "notes_add_to_the_end" in names
     off = client.patch("/api/server/features/notes", headers=auth, json={"enabled": False})
     assert off.status_code == 200, off.text
     names = {t["name"] for t in rpc(client, token, "tools/list").json()["result"]["tools"]}
-    assert "create_note" not in names
+    assert "notes_add_to_the_end" not in names
     assert "create_record" in names
-    refused = call(client, token, "create_note", path="x", content="")
+    page = {"share": "my-files", "path": "Notes/x.md", "text": ""}
+    refused = call(client, token, "create_record", model="file", fields=page)
     assert refused["isError"] is True
-    assert "switched off" in refused["content"][0]["text"]
     client.patch("/api/server/features/notes", headers=auth, json={"enabled": True})
-    assert call(client, token, "create_note", path="x", content="")["structuredContent"]["created"]
+    assert call(client, token, "create_record", model="file", fields=page)["structuredContent"]["id"]

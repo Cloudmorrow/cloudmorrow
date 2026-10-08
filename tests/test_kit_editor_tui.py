@@ -1,6 +1,8 @@
 """The kit's `editor` in the terminal: the Notes Quill's tab, drawn from its screen.
 
-Everything the old Notes pane did, through the record API: the tree with
+A note is a Markdown file in the Notes folder of the drive, and the screen
+is an editor over `file` within it; the tree shows paths under that folder
+and without `.md`. Everything the old Notes pane did, through the record API: the tree with
 its folders (empty ones too), new pages and folders, renaming and moving,
 deleting a folder and what is in it, search, a page changed elsewhere, and
 the workspace opening on it. The modal waits are two `pilot.pause()`s:
@@ -37,7 +39,9 @@ async def _modal(pilot) -> None:
 def test_the_notes_screen_is_an_editor_pane():
     pane = pane_for(NOTES_QUILL, NOTES_QUILL["screens"][0], tab_key="f1", id="pane-notes")
     assert isinstance(pane, EditorPane)
-    assert (pane.title_field, pane.body_field, pane.path_field) == ("title", "body", "path")
+    assert (pane.title_field, pane.body_field, pane.path_field) == ("name", "text", "path")
+    # Within the Notes folder of the person's drive, the .md files as pages.
+    assert pane.filters == {"share": "my-files", "within": "Notes", "suffix": ".md"}
     assert pane.keeps_folders and pane.searches and pane.attaches
     assert [a.id for a in pane.ACTIONS][:3] == ["new_page", "new_folder", "search"]
 

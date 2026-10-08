@@ -1,7 +1,8 @@
 """Pictures in the TUI: shown beside the editor, and put there from a file.
 
-They are the note datamodel's attachments now: the kit editor fetches and
-keeps them through the record API, and the Markdown still says `img/<name>`."""
+They are the file datamodel's attachments, within the Notes folder: the kit
+editor fetches and keeps them through the record API, and the Markdown still
+says `img/<name>`."""
 
 from __future__ import annotations
 

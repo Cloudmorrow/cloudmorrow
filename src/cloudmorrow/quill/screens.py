@@ -123,3 +123,89 @@ def grid_fields(screen: dict, model: dict) -> dict[str, str]:
         "mime": screen.get("mime") or "",
         "subtitle": screen.get("group_subtitle") or "",
     }
+
+
+# -- editors -------------------------------------------------------------------
+# A screen binds a title, a body and, when the pages sit in folders, a path.
+# `where` is the filters every listing, search and folder call is made with
+# — a file's `share`, and `within`, the folder the pages are under — and
+# `suffix` says which files are pages and what a new one is called. The
+# tree shows paths under the root and without the suffix; the record store
+# keeps them whole. The web app does the same in kit_editor.js.
+
+
+def editor_fields(screen: dict, model: dict) -> dict:
+    """What an editor draws from, and the filters and root it works within."""
+    where = {str(k): str(v) for k, v in (screen.get("where") or {}).items()}
+    return {
+        "title": screen.get("title") or model.get("title") or "title",
+        "body": screen.get("body") or "body",
+        "path": screen.get("path") or "",
+        "where": where,
+        "root": where.get("within", "").strip("/"),
+        "suffix": str(screen.get("suffix") or ""),
+        "fields": {f.get("name") for f in model.get("fields", [])},
+    }
+
+
+def listing_filters(bound: dict) -> dict[str, str]:
+    """What every listing, search and folder call sends: `where`, and the suffix."""
+    filters = dict(bound["where"])
+    if bound["suffix"]:
+        filters["suffix"] = bound["suffix"]
+    return filters
+
+
+def under_root(bound: dict, raw: str) -> str:
+    """*raw* as the tree shows it: under the root, or "" for the root itself."""
+    path = str(raw or "").strip("/")
+    root = bound["root"]
+    if root and path.startswith(root + "/"):
+        return path[len(root) + 1 :]
+    if root and path == root:
+        return ""
+    return path
+
+
+def _without_suffix(bound: dict, text: str) -> str:
+    suffix = bound["suffix"]
+    return text[: -len(suffix)] if suffix and text.lower().endswith(suffix.lower()) else text
+
+
+def page_path(bound: dict, record: dict) -> str:
+    """A page's path in the tree: under the root, without the suffix."""
+    fields = record.get("fields") or {}
+    return _without_suffix(bound, under_root(bound, str(fields.get(bound["path"] or bound["title"]) or "")))
+
+
+def page_title(bound: dict, record: dict) -> str:
+    fields = record.get("fields") or {}
+    return _without_suffix(bound, str(fields.get(bound["title"]) or "")) or page_path(bound, record).rsplit("/", 1)[-1]
+
+
+def whole_path(bound: dict, path: str) -> str:
+    """A tree path as the record store keeps it: under the root, with the suffix."""
+    path = str(path or "").strip("/")
+    if bound["suffix"] and not path.lower().endswith(bound["suffix"].lower()):
+        path += bound["suffix"]
+    return f"{bound['root']}/{path}" if bound["root"] else path
+
+
+def whole_folder(bound: dict, path: str) -> str:
+    """A tree folder as the record store keeps it: under the root."""
+    path = str(path or "").strip("/")
+    if not bound["root"]:
+        return path
+    return f"{bound['root']}/{path}" if path else bound["root"]
+
+
+def page_fields(bound: dict, path: str) -> dict:
+    """What a page at tree *path* is written as: its path (or its title alone),
+    and the filters that are fields of the datamodel — a file's share."""
+    fields = {k: v for k, v in bound["where"].items() if k in bound["fields"]}
+    if bound["path"]:
+        fields[bound["path"]] = whole_path(bound, path)
+    else:
+        name = path.rsplit("/", 1)[-1]
+        fields[bound["title"]] = whole_path(bound, name) if not bound["root"] else name + bound["suffix"]
+    return fields

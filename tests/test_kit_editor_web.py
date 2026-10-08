@@ -65,7 +65,7 @@ def test_the_calls_it_makes_are_the_record_apis():
     assert "rev: ed.rev }" in code
     assert "err.status === 409 && err.detail && err.detail.current" in code
     # Pictures go where the datamodel keeps them, and nowhere without that.
-    assert "uploadImage(ed.attachments, file)" in PICTURES_JS
+    assert 'uploadImage(ed.attachments, file, ed.attachQuery || "")' in PICTURES_JS
     assert "if (!ed.attachments) return;" in PICTURES_JS
 
 
@@ -78,23 +78,27 @@ def test_side_by_side_is_the_computer_only(client):
 
 
 def test_the_record_calls_it_makes_exist(notes_quill, auth):
+    """What kit_editor.js asks of the record API, for the Notes screen's bindings:
+    files within my-files/Notes, .md as pages."""
     client = notes_quill
-    rows = client.get("/api/records/note?previews=true", headers=auth).json()
-    assert all("preview" in r for r in rows)
-    assert client.get("/api/records/note?q=welcome", headers=auth).status_code == 200
-    assert client.get("/api/records/note/_folders", headers=auth).status_code == 200
-    made = client.post(
-        "/api/records/note", headers=auth, json={"fields": {"path": "a/New note", "body": "# New note\n\n"}}
-    )
+    within = "share=my-files&within=Notes&suffix=.md"
+    rows = client.get(f"/api/records/file?previews=true&{within}", headers=auth).json()
+    assert rows and all("preview" in r for r in rows)
+    assert client.get(f"/api/records/file?q=welcome&{within}", headers=auth).status_code == 200
+    assert client.get(f"/api/records/file/_folders?{within}", headers=auth).status_code == 200
+    page = {"fields": {"share": "my-files", "path": "Notes/a/New note.md", "text": "# New note\n\n"}}
+    made = client.post("/api/records/file", headers=auth, json=page)
     assert made.status_code == 201
     note = made.json()
-    renamed = client.patch(f"/api/records/note/{note['id']}", headers=auth, json={"fields": {"title": "Better"}}).json()
-    assert renamed["fields"]["path"] == "a/Better" and renamed["id"] != note["id"]
+    renamed = client.patch(
+        f"/api/records/file/{note['id']}", headers=auth, json={"fields": {"name": "Better.md"}}
+    ).json()
+    assert renamed["fields"]["path"] == "Notes/a/Better.md" and renamed["id"] != note["id"]
     saved = client.patch(
-        f"/api/records/note/{renamed['id']}", headers=auth, json={"fields": {"body": "x"}, "rev": renamed["rev"]}
+        f"/api/records/file/{renamed['id']}", headers=auth, json={"fields": {"text": "x"}, "rev": renamed["rev"]}
     )
     assert saved.status_code == 200
     stale = client.patch(
-        f"/api/records/note/{renamed['id']}", headers=auth, json={"fields": {"body": "y"}, "rev": renamed["rev"]}
+        f"/api/records/file/{renamed['id']}", headers=auth, json={"fields": {"text": "y"}, "rev": renamed["rev"]}
     )
-    assert stale.status_code == 409 and stale.json()["detail"]["current"]["fields"]["body"] == "x"
+    assert stale.status_code == 409 and stale.json()["detail"]["current"]["fields"]["text"] == "x"

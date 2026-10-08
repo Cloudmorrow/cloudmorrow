@@ -1,6 +1,6 @@
 [datamodel]
 id = "file"
-version = 1
+version = 2
 label = "File"
 description = "A file or a folder in a share or in My Files: a real file on disk, reached over WebDAV and the desktop app's mounts as well."
 domain = "files"
@@ -19,3 +19,4 @@ kind = { kind = "enum", values = ["file", "folder"], labels = ["File", "Folder"]
 size = { kind = "int", indexed = true, description = "In bytes; 0 for a folder" }
 modified = { kind = "datetime", indexed = true }
 mime = { kind = "string", indexed = true, label = "Type", description = "A guess from the name; empty when there is none" }
+text = { kind = "text", label = "Text", description = "A text file's words — Markdown, plain text — read a file at a time and written back the same way; left out of a listing, and nothing for a file that is not text" }

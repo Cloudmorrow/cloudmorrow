@@ -178,14 +178,15 @@ def test_one_rule_is_set_and_the_others_are_kept(client, auth):
 
 
 # -- the doors that are not the record API -------------------------------------------
-def test_notes_follow_the_note_datamodel(notes_quill, circles):
+def test_notes_follow_the_file_datamodel(notes_quill, circles):
     guest = headers(notes_quill, GUEST)
-    kids(circles, {"note": "read"})
-    assert notes_quill.get("/api/notes/tree", headers=guest).status_code == 200
-    wrote = notes_quill.post("/api/notes/file", json={"path": "diary.md"}, headers=guest)
-    assert wrote.status_code == 403
+    kids(circles, {"file": "read"})
+    pages = "/api/records/file?share=my-files&within=Notes&suffix=.md"
+    assert notes_quill.get(pages, headers=guest).status_code == 200
+    diary = {"fields": {"share": "my-files", "path": "Notes/diary.md", "text": ""}}
+    assert notes_quill.post("/api/records/file", json=diary, headers=guest).status_code == 403
     circles.update("kids", rules={})
-    assert notes_quill.get("/api/notes/tree", headers=guest).status_code == 404
+    assert notes_quill.get(pages, headers=guest).status_code == 404
 
 
 def test_an_assistant_reaches_what_the_person_may(notes_quill, circles):
@@ -193,13 +194,12 @@ def test_an_assistant_reaches_what_the_person_may(notes_quill, circles):
 
     state = notes_quill.app.state.cloudmorrow
     guest = state.users.require(GUEST[0])
-    kids(circles, {"note": "read"})
-    names = {tool.name for tool in mcptools.available(state, guest)}
-    assert "read_note" in names and "create_note" not in names
-    refused = mcptools.call(state, guest, "create_note", {"path": "x.md"})
+    kids(circles, {"file": "read"})
+    page = {"model": "file", "fields": {"share": "my-files", "path": "Notes/x.md", "text": ""}}
+    refused = mcptools.call(state, guest, "create_record", page)
     assert refused["isError"] and "not change" in refused["content"][0]["text"]
     models = mcptools.call(state, guest, "list_datamodels", {})["structuredContent"]
-    assert [m["id"] for m in models["datamodels"]] == ["note"]
+    assert [m["id"] for m in models["datamodels"]] == ["file"]
 
 
 def test_a_mount_is_read_only_for_whoever_may_only_read_files(client, circles):

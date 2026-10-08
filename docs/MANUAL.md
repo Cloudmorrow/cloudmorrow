@@ -183,23 +183,23 @@ Everything reads `cloudmorrow RESOURCE ACTION`, with singular resource names:
 
 ```
 cloudmorrow secret  list | get | set | remove | import | export | run | vaults
-cloudmorrow note    list | show | add | edit | remove | search
 cloudmorrow agent   list | run | jobs | enroll-token
 cloudmorrow share   list | show | add | remove | mount | unmount
 cloudmorrow config  show | set
 cloudmorrow update  [server | all]
 ```
 
-`cm` is the same command in two letters — `cm note list`, or `cm` on its own
+`cm` is the same command in two letters — `cm notes list`, or `cm` on its own
 for the TUI — for the hundredth time in a day. An update never overwrites a
 `cm` that is somebody else's program.
 
 No invented syntax, no arrows. Data goes to stdout, status goes to stderr,
 and `-v`/`-e` are overrides on commands that have a sensible default without
-them. The old plural names (`cloudmorrow notes list`) still
+them. The old plural names (`cloudmorrow agents list`) still
 work, quietly, so old muscle memory and old scripts do not break — except
-`cloudmorrow secrets`, which is the Secrets Quill's now (`cm secrets list`,
-through the kit); `cloudmorrow secret` is as it always was.
+`cloudmorrow notes` and `cloudmorrow secrets`, which are the Notes and
+Secrets Quills' now (`cm notes list`, `cm secrets list`, through the kit);
+`cloudmorrow secret` is as it always was.
 
 ## Server, on the home box
 
@@ -1414,40 +1414,13 @@ things make sure that is the only plain hop:
 
 ## Notes
 
-A note is a title and some markdown. Titles may contain slashes, which makes
-them folders on the server.
-
-```bash
-cloudmorrow note list
-cloudmorrow note show "Architecture"
-cloudmorrow note add "Hetzner setup"        # opens $EDITOR
-cloudmorrow note edit "Hetzner setup"
-cloudmorrow note remove "Hetzner setup"
-cloudmorrow note search postgres
-cloudmorrow note rename old/plan new/plan
-```
-
-Text comes from stdin when there is any, and from `$EDITOR` when there is not.
-`note show` writes the raw text to stdout, so redirection and pipes work:
-
-```bash
-cat architecture.md | cloudmorrow note add "Architecture"
-cloudmorrow note show "Architecture" > architecture.md
-cloudmorrow note show README | less
-```
-
-Notes are yours, not a project's: there is one set per account, and no `-p`
-to think about. A title with slashes in it makes folders, which is how you
-group them:
-
-```bash
-cloudmorrow note add "verticore/deployment"
-cloudmorrow note list
-```
-
-`cm note` is the command notes always had, and it stays. The Notes Quill
-has its own, `cm notes`, drawn by the kit like every Quill's — the same
-notes, found by their path:
+A note is a Markdown file in the `Notes` folder of your drive: a plain file,
+in My Files, on WebDAV, in a backup of the directory, and open to any
+editor. The Notes Quill is an editor over those files and nothing more,
+drawn by the kit on the phone, the web app, the terminal and the command
+line from the `file` datamodel within that folder, with `.md` saying which
+files are pages (see *Backends* in [DATAMODELS.md](DATAMODELS.md)). A path
+with slashes in it is folders.
 
 ```bash
 cm notes list
@@ -1455,6 +1428,15 @@ cm notes show ideas/garden          # the Markdown, as it is
 cm notes add ideas/garden           # from stdin, or $EDITOR
 cm notes edit ideas/garden
 cm notes search tomatoes            # names and every line
+cm notes delete ideas/garden
+```
+
+Text comes from stdin when there is any, and from `$EDITOR` when there is
+not. `show` writes the raw text to stdout, so redirection and pipes work:
+
+```bash
+cat architecture.md | cm notes add architecture
+cm notes show architecture > architecture.md
 ```
 
 In the TUI, `f1` opens notes — the first card, and the one the workspace
@@ -1465,12 +1447,11 @@ is selected in the tree (a folder takes what is in it along), `d` deletes it,
 writes the open note back out.
 
 Everybody with no notes at all gets one the first time they open Notes, on
-how the editor works. Notes are still the files they were — WebDAV, `cm
-note` and an assistant's notes tools reach the same ones — and the screens
-reach them through the record API as the `note` datamodel (see *Backends* in
-[QUILLS.md](QUILLS.md)). A server that had Notes before it was a Quill gets
-the Quill at its first start on the new version, unless an administrator
-had switched Notes off; the switch keeps its meaning either way.
+how the editor works. An assistant reaches the same files through the
+record tools on `file`, and the Quill's *Add to the end* action. A server
+that had Notes before it was a Quill gets the Quill at its first start on
+the new version, unless an administrator had switched Notes off; the switch
+keeps its meaning either way.
 
 ### Pictures
 
@@ -1985,21 +1966,11 @@ the cursor still moves in an input and the selection still moves in a list.
 
 ## API
 
-All note paths are relative to the calling user's notes root.
-
 | method | path | |
 | --- | --- | --- |
 | `POST` | `/api/auth/login` | `{username, password}` → bearer token |
 | `GET` | `/api/auth/me` | the current user |
 | `POST` | `/api/auth/password` | change your own password |
-| `GET` | `/api/notes/tree` | the nested note list |
-| `GET`/`PUT` | `/api/notes/file/{path}` | read / write a note |
-| `POST` | `/api/notes/file`, `/api/notes/dir` | create |
-| `POST` | `/api/notes/move` | rename or move |
-| `DELETE` | `/api/notes/{path}` | delete (`?recursive=true` for folders) |
-| `GET` | `/api/notes/search?q=` | full-text search |
-| `POST` | `/api/notes/img` | keep a picture: the body is the image; `?filename=` names it |
-| `GET` | `/api/notes/img/{name}` | the picture back, as it is |
 | `GET` | `/api/secrets?env=` | the keys, without the values (`&reveal=true` for those) |
 | `GET` | `/api/secrets/vaults` | the vaults that hold something, with counts |
 | `GET` | `/api/secrets/environments` | environments that hold something, in this vault |

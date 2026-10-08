@@ -10,7 +10,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from cloudmorrow.server.agents import Agent
 from cloudmorrow.server.db import User
-from cloudmorrow.server.notes import NoteStore
 from cloudmorrow.server.quills.tokens import PREFIX as QUILL_TOKEN_PREFIX
 from cloudmorrow.server.quills.tokens import runs_as
 from cloudmorrow.server.records import Principal
@@ -104,14 +103,6 @@ def get_current_agent(
     if agent is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unknown agent token")
     return agent
-
-
-def get_note_store(
-    state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
-) -> NoteStore:
-    """Notes are the user's: one tree each, and nothing else scopes them."""
-    return state.note_store(user)
 
 
 @dataclass(slots=True)

@@ -233,7 +233,7 @@ def test_a_quill_token_opens_the_record_api_for_its_own_models_only(live):
     assert refused.status_code == 403 and "did not ask for task" in refused.text
     # And nothing else the server has: to every other door it is nobody.
     for path in (
-        "/api/notes/tree",
+        "/api/notifications",
         "/api/secrets",
         "/api/users",
         "/api/auth/me",

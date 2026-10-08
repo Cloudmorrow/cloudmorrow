@@ -16,10 +16,9 @@ from cloudmorrow.server.agents import AgentStore, JobStore
 from cloudmorrow.server.circles import CircleStore
 from cloudmorrow.server.config import ServerConfig
 from cloudmorrow.server.configsync import ConfigStore
-from cloudmorrow.server.db import User, UserStore
+from cloudmorrow.server.db import UserStore
 from cloudmorrow.server.features import FeatureStore
 from cloudmorrow.server.mcp import MCPStore
-from cloudmorrow.server.notes import NoteStore
 from cloudmorrow.server.notifications import NotificationStore
 from cloudmorrow.server.quills import QuillRegistry
 from cloudmorrow.server.quills.services import Supervisor
@@ -81,5 +80,6 @@ class AppState:
         """What this cloud is called: set from the app, else from the config."""
         return self.settings.name(self.config.name)
 
-    def note_store(self, user: User) -> NoteStore:
-        return NoteStore(self.config.notes_root(user.username))
+    def ensure_drive(self, username: str) -> None:
+        """The person's own drive, with its Notes folder, exists the moment they do."""
+        self.config.notes_root(username).mkdir(parents=True, exist_ok=True)

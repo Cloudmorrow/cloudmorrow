@@ -129,11 +129,24 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
         elif kit == "calendar":
             _check_calendar(screen, model, models, thing, need, where)
         elif kit == "editor":
-            # A page of Markdown with a title; `path`, when bound, is a string
+            # A page of text with a title; `path`, when bound, is a string
             # like `folder/sub/title` whose folders are the tree beside it.
-            need(model, thing + " body", screen.get("body"), ("markdown",))
+            # `where` is the filters every listing is made with — a file's
+            # share, and the folder the pages are under — and `suffix` says
+            # which files are pages, and what a new one is called.
+            need(model, thing + " body", screen.get("body"), ("markdown", "text"))
             if screen.get("path"):
                 need(model, thing + " path", screen["path"], ("string",))
+            filters = screen.get("where", {})
+            if not isinstance(filters, dict) or not all(
+                isinstance(k, str) and isinstance(v, (str, int, bool)) for k, v in filters.items()
+            ):
+                raise QuillError(
+                    f'{where}: {thing} where is a table of filters: where = {{ share = "my-files", within = "Notes" }}'
+                )
+            suffix = screen.get("suffix", "")
+            if not isinstance(suffix, str) or (suffix and not suffix.startswith(".")):
+                raise QuillError(f'{where}: {thing} suffix is a file suffix, like ".md"')
         elif kit == "grid":
             # Files: folders and tiles, in groups (the shares) picked first.
             if not model.backend:

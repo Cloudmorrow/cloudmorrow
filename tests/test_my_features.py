@@ -87,8 +87,7 @@ def test_it_hides_rather_than_forbids(notes_quill, auth):
     """
     client = notes_quill
     assert switch(client, auth, "notes", False).status_code == 200
-    assert client.get("/api/notes/tree", headers=auth).status_code == 200
-    assert client.get("/api/records/note", headers=auth).status_code == 200
+    assert client.get("/api/records/file?share=my-files", headers=auth).status_code == 200
 
 
 def test_the_server_switch_still_wins(tasks_quill, auth):

@@ -152,14 +152,24 @@ class FolderMove(BaseModel):
     to: str
 
 
+# The rest of the query on these says where: which root the folders or the
+# pictures are under, for a datamodel kept in more than one place (a file's
+# `share` and `within`). A backend with one place per person ignores it.
+def _where(request: Request, *own: str) -> dict:
+    return {k: v for k, v in request.query_params.items() if k not in own}
+
+
 @router.get("/{model}/_folders")
 def list_folders(
-    model: str, state: AppState = Depends(get_state), principal: Principal = Depends(get_principal)
+    model: str,
+    request: Request,
+    state: AppState = Depends(get_state),
+    principal: Principal = Depends(get_principal),
 ) -> list[dict]:
     """Every folder, empty ones too, parents before what is in them."""
     switched_on(state, model)
     try:
-        return state.records.folders(principal, model)
+        return state.records.folders(principal, model, _where(request))
     except ERRORS as exc:
         raise http_error(exc) from exc
 
@@ -168,12 +178,13 @@ def list_folders(
 def make_folder(
     model: str,
     payload: FolderIn,
+    request: Request,
     state: AppState = Depends(get_state),
     principal: Principal = Depends(get_principal),
 ) -> dict:
     switched_on(state, model)
     try:
-        return state.records.make_folder(principal, model, payload.path)
+        return state.records.make_folder(principal, model, payload.path, _where(request))
     except ERRORS as exc:
         raise http_error(exc) from exc
 
@@ -182,13 +193,14 @@ def make_folder(
 def move_folder(
     model: str,
     payload: FolderMove,
+    request: Request,
     state: AppState = Depends(get_state),
     principal: Principal = Depends(get_principal),
 ) -> dict:
     """Rename a folder, or move it into another: what is in it goes along."""
     switched_on(state, model)
     try:
-        return state.records.move_folder(principal, model, payload.path, payload.to)
+        return state.records.move_folder(principal, model, payload.path, payload.to, _where(request))
     except ERRORS as exc:
         raise http_error(exc) from exc
 
@@ -197,13 +209,14 @@ def move_folder(
 def delete_folder(
     model: str,
     path: str,
+    request: Request,
     state: AppState = Depends(get_state),
     principal: Principal = Depends(get_principal),
 ) -> None:
     """A folder, and everything in it."""
     switched_on(state, model)
     try:
-        state.records.delete_folder(principal, model, path)
+        state.records.delete_folder(principal, model, path, _where(request, "path"))
     except ERRORS as exc:
         raise http_error(exc) from exc
 
@@ -224,7 +237,7 @@ async def attach(
     switched_on(state, model)
     data = await request.body()
     try:
-        return state.records.attach(principal, model, data, filename)
+        return state.records.attach(principal, model, data, filename, _where(request, "filename"))
     except AttachmentTooBig as exc:
         raise HTTPException(413, str(exc)) from exc
     except ERRORS as exc:
@@ -235,12 +248,13 @@ async def attach(
 def attachment(
     model: str,
     name: str,
+    request: Request,
     state: AppState = Depends(get_state),
     principal: Principal = Depends(get_principal),
 ) -> Response:
     switched_on(state, model)
     try:
-        data, content_type = state.records.attachment(principal, model, name)
+        data, content_type = state.records.attachment(principal, model, name, _where(request))
     except UnknownRecordError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no such attachment") from exc
     except ERRORS as exc:

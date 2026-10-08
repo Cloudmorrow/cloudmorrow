@@ -296,7 +296,7 @@ async def test_events_on_calendars_you_may_only_read(app):
 
 
 async def test_pages_you_may_only_read_open_read_only(app):
-    only_read(app, "notes", "note")
+    only_read(app, "notes", "file")
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
         pane = screen.query_one(EditorPane)
