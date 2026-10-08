@@ -243,8 +243,24 @@ class CloudmorrowClient:
         return (await self._request("DELETE", f"/api/circles/{circle}/members/{username}")).json()
 
     async def my_access(self) -> dict:
-        """What you may do with each datamodel, and the circles that say so."""
+        """What you may do with each datamodel, and the circles — and rules of your own — that say so."""
         return (await self._request("GET", "/api/me/access")).json()
+
+    async def access_of(self, username: str) -> dict:
+        """One person's access: their circles, their own rules, and the most of both. Admin only."""
+        return (await self._request("GET", f"/api/access/{username}")).json()
+
+    async def set_person_rules(self, username: str, rules: dict[str, str]) -> dict:
+        """A person's own rules, replaced whole."""
+        return (await self._request("PUT", f"/api/access/{username}", json={"rules": rules})).json()
+
+    async def set_person_rule(self, username: str, model: str, access: str) -> dict:
+        """One rule of a person's own, the others kept: `write`, `read` or `none`."""
+        return (await self._request("PUT", f"/api/access/{username}/{model}", json={"access": access})).json()
+
+    async def clear_person_rule(self, username: str, model: str) -> dict:
+        """Take one of a person's own rules away: the datamodel follows their circles again."""
+        return (await self._request("DELETE", f"/api/access/{username}/{model}")).json()
 
     # -- secrets -----------------------------------------------------------
     async def secrets(

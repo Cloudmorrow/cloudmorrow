@@ -121,7 +121,7 @@ function menu(name, chosen, { follow = true, mixed = false, label = "" } = {}) {
       value === MIXED ? " disabled" : ""}>${esc(said)}</option>`).join("")}</select>`;
 }
 
-function rulesForm(rules, shelves) {
+export function rulesForm(rules, shelves) {
   const every = rules[EVERY] || "none";
   return `<div class="group rules">
       <div class="row rule-row"><span class="main"><span class="title">Everything</span>
@@ -139,6 +139,26 @@ function rulesForm(rules, shelves) {
         ${menu("rule:" + m.id, m.id in rules ? rules[m.id] : FOLLOW, { label: m.label || m.id })}</div>`).join("")}
     </details>`;
   }).join("");
+}
+
+/** A domain's menu sets every datamodel under it; a datamodel's own menu
+    puts the domain's at their one answer, or at mixed. */
+export function wireRulesForm(form, shelves) {
+  for (const details of form.querySelectorAll("details.domain")) {
+    const shelf = shelves.find((s) => s.id === details.dataset.domain);
+    const top = details.querySelector("summary select");
+    const own = [...details.querySelectorAll(".model-row select")];
+    // A menu inside a summary would open and shut the domain on every tap.
+    top.addEventListener("click", (event) => event.preventDefault());
+    top.addEventListener("change", () => {
+      for (const select of own) select.value = top.value;
+    });
+    for (const select of own) {
+      select.addEventListener("change", () => {
+        top.value = domainValue(rulesFrom(form, {}), shelf.models);
+      });
+    }
+  }
 }
 
 /** The rules the form says, over the ones it does not show (a datamodel from
@@ -221,24 +241,7 @@ async function renderCircle(id) {
   wireShell();
 
   const form = app.querySelector("form.circle-form");
-
-  // A domain's menu sets every datamodel under it; a datamodel's own menu
-  // puts the domain's at their one answer, or at mixed.
-  for (const details of form.querySelectorAll("details.domain")) {
-    const shelf = shelves.find((s) => s.id === details.dataset.domain);
-    const top = details.querySelector("summary select");
-    const own = [...details.querySelectorAll(".model-row select")];
-    // A menu inside a summary would open and shut the domain on every tap.
-    top.addEventListener("click", (event) => event.preventDefault());
-    top.addEventListener("change", () => {
-      for (const select of own) select.value = top.value;
-    });
-    for (const select of own) {
-      select.addEventListener("change", () => {
-        top.value = domainValue(rulesFrom(form, {}), shelf.models);
-      });
-    }
-  }
+  wireRulesForm(form, shelves);
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();

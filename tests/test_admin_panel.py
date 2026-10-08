@@ -399,3 +399,25 @@ async def test_the_install_sheet_asks_which_circles_get_the_new_data(app):
         await settle(app, pilot)
         assert ("install", "reading") in app.client.quill_calls
         assert app.client.circle_calls == [("rule", "kids", "reading.book", "write")]
+
+
+async def test_a_person_gets_rules_of_their_own_from_their_account(app):
+    """a on an account: the same data sheet a circle has, saved as their own rules."""
+    with_kids(app)
+    async with app.run_test(size=(140, 40)) as pilot:
+        screen = await open_admin(app, pilot)
+        table = screen.query_one("#admin-user-table", DataTable)
+        table.focus()
+        table.move_cursor(row=[row[0] for row in rows(screen)].index("guest"))
+        await pilot.press("a")
+        await pilot.pause()
+        await pilot.pause()
+        dialog = app.screen
+        assert "guest (own, beside Kids)" in dialog.query_one(".modal-title").visual.plain
+        sheet = dialog.query_one("#rules-table", DataTable)
+        labels = [Text.from_markup(str(sheet.get_row_at(i)[0])).plain.strip() for i in range(sheet.row_count)]
+        sheet.move_cursor(row=labels.index("▸ Tasks"))
+        await pilot.press("r")
+        await pilot.press("ctrl+s")
+        await settle(app, pilot)
+        assert ("own", "guest", {"board": "read", "task": "read"}) in app.client.circle_calls

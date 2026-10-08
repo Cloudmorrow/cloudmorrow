@@ -197,9 +197,13 @@ async function renderQuill(id) {
 function whoGetsIt(fresh, circles) {
   if (!fresh.length || !circles.length) return "";
   const what = listed(fresh.map((d) => d.label || d.id));
+  const everyone = circles.filter((c) => c.rules["*"] === "write").map((c) => c.name);
+  const lead = everyone.length
+    ? `Everyone in ${esc(listed(everyone))} can read and write ${esc(what)} the moment it is installed.`
+    : `No circle has everything, so nobody reaches ${esc(what)} until a circle is ticked here.`;
   return `<p class="group-label">Who gets it</p>
-    <p class="shelf-note">Which circles may use ${esc(what)}. Ticked, they may
-      read and write it; the rest do not see it until a circle is given it.</p>
+    <p class="shelf-note">${lead} Tick the other circles that should too; the rest do not
+      see it until a circle is given it, under Circles.</p>
     <div class="group choices who-gets-it">${circles.map((c) => {
       const already = c.rules["*"] === "write";
       return `<label class="row"><span class="main"><span class="title">${esc(c.name)}</span>

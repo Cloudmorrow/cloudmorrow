@@ -99,3 +99,21 @@ def test_somebody_in_no_circle_is_told_so(cm):
     cm.who = GUEST[0]
     mine = cm("access")
     assert mine.exit_code == 0 and "no circle" in mine.output
+
+
+def test_an_administrator_gives_one_person_a_rule_of_their_own(cm):
+    cm.circles.leave("members", GUEST[0])
+    given = cm("access", GUEST[0], "task", "read")
+    assert given.exit_code == 0, given.output
+    assert "own rules" in given.output and "task" in given.output and "read" in given.output
+    assert cm.circles.rules_of(GUEST[0]) == {"task": "read"}
+    theirs = cm("access", GUEST[0])
+    assert theirs.exit_code == 0 and "guest's access" in theirs.output
+    assert cm("access", GUEST[0], "task", "maybe").exit_code != 0
+    assert cm("access", GUEST[0], "task").exit_code != 0
+    taken = cm("access", GUEST[0], "task", "-")
+    assert taken.exit_code == 0 and "in no circle" in taken.output
+    assert cm.circles.rules_of(GUEST[0]) == {}
+    # Not for everybody: the guest may look at their own, not give.
+    cm.who = GUEST[0]
+    assert cm("access", ADMIN[0], "task", "read").exit_code != 0

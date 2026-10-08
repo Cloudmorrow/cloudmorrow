@@ -43,7 +43,7 @@ from textual.widgets import (
 )
 
 from cloudmorrow.client.api import ApiError
-from cloudmorrow.tui.panes.admin_circles import CirclesView, circles_by_person
+from cloudmorrow.tui.panes.admin_circles import CirclesView, RulesModal, circles_by_person
 from cloudmorrow.tui.panes.admin_quills import QuillsView
 from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
@@ -203,11 +203,13 @@ class UsersView(Pane):
     BINDINGS = [
         ("n", "fire('new')", "New user"),
         ("e", "fire('edit')", "Edit"),
+        ("a", "fire('access')", "Data of their own"),
         ("d", "fire('remove')", "Delete"),
     ]
     ACTIONS = (
         Action("new", "New user", "n", variant="primary", hint="Add an account"),
         Action("edit", "Edit", "e", hint="Name, password, role and type"),
+        Action("access", "Their data", "a", hint="Rules of their own, beside their circles"),
         Action("remove", "Delete", "d", variant="error"),
     )
 
@@ -341,6 +343,35 @@ class UsersView(Pane):
             self.status(str(exc), error=True)
             return
         self.status(f"Saved {user['username']}.")
+        self.reload()
+
+    def act_access(self) -> None:
+        self.person_access()
+
+    @work(group="ui")
+    async def person_access(self) -> None:
+        """Rules of one person's own, beside their circles: the same sheet a circle's data has."""
+        user = self.selected
+        if user is None:
+            self.status("No account selected.", error=True)
+            return
+        try:
+            found = await self.api.access_of(user["username"])
+            models = await self.api.datamodels()
+        except ApiError as exc:
+            self.status(str(exc), error=True)
+            return
+        within = ", ".join(found.get("circles") or []) or "no circle"
+        sheet = {"name": f"{user['username']} (own, beside {within})", "rules": found.get("own") or {}}
+        rules = await self.app.push_screen_wait(RulesModal(sheet, models))
+        if rules is None:
+            return
+        try:
+            await self.api.set_person_rules(user["username"], rules)
+        except ApiError as exc:
+            self.status(str(exc), error=True)
+            return
+        self.status(f"Saved {user['username']}'s own data.")
         self.reload()
 
     def act_remove(self) -> None:

@@ -22,7 +22,7 @@ import {
   replace, seconds, store, toast, wireShell,
 } from "./core.js";
 import { loadFeatures } from "./features.js";
-import { circlesByPerson, drawCircles } from "./circlesadmin.js";
+import { circlesByPerson, domainsOf, drawCircles, rulesForm, rulesFrom, rulesSaid, wireRulesForm } from "./circlesadmin.js";
 import { drawQuills } from "./quillsadmin.js";
 
 // What the server stores, and what it is called on screen. The same words
@@ -217,6 +217,17 @@ async function renderUser(username) {
   }
   // Deleting yourself is refused by the server, so the button is not drawn.
   const yourself = !making && user.username === (me && me.username);
+  // Their access: what their circles give, and rules of their own beside
+  // them — the one person who needs the budget without a circle for them.
+  let access = null;
+  let shelves = [];
+  if (!making) {
+    const [found, models] = await Promise.all([
+      api("GET", "/api/access/" + encodeURIComponent(user.username)), api("GET", "/api/datamodels"),
+    ]);
+    access = found;
+    shelves = domainsOf(models);
+  }
 
   app.innerHTML = nav({
     back: "#/admin",
@@ -253,6 +264,16 @@ async function renderUser(username) {
             <span class="meta"><span class="preview">Off keeps the account and its files,
               and turns away the password.</span></span></span>
             <input type="checkbox" name="is_active"${user.is_active ? " checked" : ""}></label></div>`}
+        ${access ? `
+          <p class="group-label">Data of their own</p>
+          <p class="shelf-note">${access.circles.length
+            ? `Beside their circles (${esc(access.circles.join(", "))}): what they reach is the most any of it gives.`
+            : "They are in no circle, so this is all they reach."} Nothing set here
+            follows their circles.</p>
+          ${rulesForm(access.own, shelves)}
+          <p class="shelf-note reaches">${Object.keys(access.access).length
+            ? "They reach: " + esc(rulesSaid(access.access, Object.fromEntries(shelves.flatMap((s) => s.models.map((m) => [m.id, m.label || m.id])))))
+            : "They reach no data."}</p>` : ""}
         <div class="group"><button class="row primary" type="submit">${
           making ? "Make the account" : "Save"}</button></div>
         ${yourself || making ? "" :
@@ -263,6 +284,7 @@ async function renderUser(username) {
 
   const form = app.querySelector("form.account");
   const say = (message) => toast(message);
+  if (access) wireRulesForm(form, shelves);
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -290,6 +312,9 @@ async function renderUser(username) {
         if (password) body.password = password;
         body.is_active = form.elements.is_active.checked;
         await api("PATCH", userUrl(user.username), body);
+        if (access) {
+          await api("PUT", "/api/access/" + encodeURIComponent(user.username), { rules: rulesFrom(form, access.own) });
+        }
       }
       toast(making ? "Account made" : "Saved");
       replace("#/admin");

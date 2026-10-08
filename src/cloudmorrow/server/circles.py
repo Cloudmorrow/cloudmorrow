@@ -1,10 +1,13 @@
 """Circles: who on this server may use which kinds of data.
 
 A circle is a named set of people — Parents, Kids, Sales — and, per
-datamodel, what they may do with it: `write`, `read`, or `none`. Your access
-to a datamodel is the most any of your circles gives; inside one circle a
-named rule beats `*`. There is no deny, so "why can't I see this?" always
-has one answer: none of your circles has it. See docs/CIRCLES.md.
+datamodel, what they may do with it: `write`, `read`, or `none`. A person
+may have rules of their own too, the same three words, for the one person
+who needs the budget without a circle made for them. Your access to a
+datamodel is the most any of your circles, or your own rules, gives;
+inside one set of rules a named rule beats `*`. There is no deny, so "why
+can't I see this?" always has one answer: nothing of yours has it. See
+docs/CIRCLES.md.
 
 This decides which *kinds* of data somebody reaches. Which *records* of
 them is the scope's business, as it always was (records.py): a circle with
@@ -59,6 +62,19 @@ CREATE TABLE IF NOT EXISTS circle_rules (
 );
 """
 
+# One person's own rules, beside their circles: the same shape as a circle's.
+OWN_TABLE = """
+CREATE TABLE IF NOT EXISTS person_rules (
+    username TEXT NOT NULL,
+    model    TEXT NOT NULL,
+    access   TEXT NOT NULL,
+    PRIMARY KEY (username, model)
+);
+"""
+
+# What a person's own rules are called among their circles, in `Access`.
+OWN = "(own)"
+
 
 class CircleError(ValueError):
     pass
@@ -90,11 +106,16 @@ def level(rules: Mapping[str, str], model: str) -> str:
 
 @dataclass(frozen=True, slots=True)
 class Access:
-    """What one person may do with each datamodel: the most any of their circles gives."""
+    """What one person may do with each datamodel: the most any of their circles,
+    or their own rules, gives."""
 
     username: str
-    # Each of their circles' rules, by circle name.
+    # Each of their circles' rules, by circle name — and their own, as OWN.
     circles: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
+
+    @property
+    def own(self) -> Mapping[str, str]:
+        return self.circles.get(OWN, {})
 
     def level(self, model: str) -> str:
         best = NONE
@@ -142,6 +163,7 @@ class Circle:
 
 def ensure(conn: sqlite3.Connection) -> None:
     """The tables, and — the first time they are made — Members, with everybody in it."""
+    conn.executescript(OWN_TABLE)
     present = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'circles'").fetchone()
     if present:
         return
@@ -224,7 +246,8 @@ class CircleStore:
             return [self._load(conn, row) for row in rows]
 
     def access_for(self, username: str) -> Access:
-        """What *username* may do with each datamodel. Asked on every read and write."""
+        """What *username* may do with each datamodel: their circles' rules, and
+        their own. Asked on every read and write."""
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT c.name, r.model, r.access FROM circle_members m"
@@ -233,12 +256,77 @@ class CircleStore:
                 " WHERE m.username = ?",
                 (username,),
             ).fetchall()
+            own = conn.execute("SELECT model, access FROM person_rules WHERE username = ?", (username,)).fetchall()
         circles: dict[str, dict[str, str]] = {}
         for row in rows:
             rules = circles.setdefault(row["name"], {})
             if row["model"] is not None:
                 rules[row["model"]] = row["access"]
+        if own:
+            circles[OWN] = {row["model"]: row["access"] for row in own}
         return Access(username, circles)
+
+    # -- a person's own rules ---------------------------------------------------
+    def rules_of(self, username: str) -> dict[str, str]:
+        """One person's own rules, beside whatever their circles give."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT model, access FROM person_rules WHERE username = ? ORDER BY model", (username.strip().lower(),)
+            ).fetchall()
+        return {row["model"]: row["access"] for row in rows}
+
+    def set_person_rule(self, username: str, model: str, access: str) -> dict[str, str]:
+        """One rule of a person's own, the others kept. `none` on a named datamodel
+        stays, because it beats a `*` of their own; `none` on `*` takes the line away."""
+        access = validate_access(access)
+        model = model.strip()
+        username = username.strip().lower()
+        if not model:
+            raise CircleError("a rule needs a datamodel, or * for every one")
+        with self._connect() as conn:
+            if conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone() is None:
+                raise CircleError(f"there is nobody called {username} on this server")
+            if model == EVERY and access == NONE:
+                conn.execute("DELETE FROM person_rules WHERE username = ? AND model = ?", (username, model))
+            else:
+                conn.execute(
+                    "INSERT INTO person_rules (username, model, access) VALUES (?, ?, ?)"
+                    " ON CONFLICT (username, model) DO UPDATE SET access = excluded.access",
+                    (username, model, access),
+                )
+        return self.rules_of(username)
+
+    def set_person_rules(self, username: str, rules: Mapping[str, str]) -> dict[str, str]:
+        """A person's own rules, replaced whole: what a sheet of them saves."""
+        username = username.strip().lower()
+        with self._connect() as conn:
+            if conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone() is None:
+                raise CircleError(f"there is nobody called {username} on this server")
+            conn.execute("DELETE FROM person_rules WHERE username = ?", (username,))
+            for model, access in rules.items():
+                model = str(model).strip()
+                if not model:
+                    raise CircleError("a rule needs a datamodel, or * for every one")
+                conn.execute(
+                    "INSERT INTO person_rules (username, model, access) VALUES (?, ?, ?)",
+                    (username, model, validate_access(access)),
+                )
+        return self.rules_of(username)
+
+    def clear_person_rule(self, username: str, model: str) -> dict[str, str]:
+        """Take one of a person's own rules away: the datamodel follows their circles again."""
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM person_rules WHERE username = ? AND model = ?", (username.strip().lower(), model.strip())
+            )
+        return self.rules_of(username)
+
+    def forget(self, username: str) -> None:
+        """An account that is gone: out of every circle, and its own rules with it."""
+        username = username.strip().lower()
+        with self._connect() as conn:
+            conn.execute("DELETE FROM circle_members WHERE username = ?", (username,))
+            conn.execute("DELETE FROM person_rules WHERE username = ?", (username,))
 
     # -- changing --------------------------------------------------------------
     def create(

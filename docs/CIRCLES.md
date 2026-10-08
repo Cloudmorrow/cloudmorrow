@@ -32,15 +32,16 @@ Nothing here widens what anybody sees; everything here narrows it.
 | **circle** | A named set of people on the server, and what they may do with each datamodel. `Parents`, `Kids`, `Sales`. |
 | **access** | What a circle gives on a datamodel: `write` (see, make, change, delete), `read` (see), or nothing. |
 | **rule** | One line of a circle: a datamodel and an access. `*` is every datamodel, including ones installed later. |
-| **your access** | The most any of your circles gives, per datamodel. |
+| **own rules** | Rules one person has beside their circles, the same three words: the one person who needs the budget without a circle made for them. |
+| **your access** | The most any of your circles, or your own rules, gives, per datamodel. |
 | **default circle** | Where a new account goes. |
 
 ## The rules
 
 1. **Circles only ever give.** Your access to a datamodel is the most any
-   of your circles gives. There is no deny: children are not given less,
-   parents are given more. "Why can't I see this?" always has one answer —
-   none of your circles has it.
+   of your circles, or your own rules, gives. There is no deny: children
+   are not given less, parents are given more. "Why can't I see this?"
+   always has one answer — nothing of yours has it.
 2. **A named rule beats `*`.** Inside one circle, `task = read` and
    `* = write` means read on tasks and write on everything else. Between
    circles, rule 1 holds.
@@ -118,7 +119,11 @@ anyway.
 
 | call | what it does |
 | --- | --- |
-| `GET /api/me/access` | your access: `{"task": "write", "event": "read", …}`, every datamodel you reach, and your circles |
+| `GET /api/me/access` | your access: `{"task": "write", "event": "read", …}`, every datamodel you reach, your circles, and your own rules |
+| `GET /api/access/{username}` | one person's access, their circles and their own rules (administrators) |
+| `PUT /api/access/{username}` | `{"rules": {…}}`: their own rules, replaced whole |
+| `PUT /api/access/{username}/{model}` | `{"access": "read"}`: one rule of their own, the others kept; `none` on `*` removes the `*` line |
+| `DELETE /api/access/{username}/{model}` | take one of their own rules away: the datamodel follows their circles again |
 | `GET /api/circles` | every circle, with its rules and its people (administrators) |
 | `POST /api/circles` | `{"name": …, "rules": {…}, "members": […]}`: make one (administrators) |
 | `PATCH /api/circles/{id}` | change its name, its rules (replaced whole), or make it the default |
@@ -130,7 +135,10 @@ anyway.
 On the command line: `cm circle list`, `cm circle add Kids`, `cm circle
 rule Kids task write`, `cm circle rule Kids expense none`, `cm circle
 join Kids alice`, `cm circle leave Kids alice`, `cm circle default Kids`,
-`cm circle delete Kids`, and `cm access` for your own.
+`cm circle delete Kids`, and `cm access` for your own. An administrator's
+`cm access alice` is hers, `cm access alice expense read` gives her a rule
+of her own, and `cm access alice expense -` takes it away. On the screens,
+a person's own rules are on their account, under *Data of their own*.
 
 ## Storage
 
@@ -140,6 +148,7 @@ In the accounts database, beside `users`:
 circles(id, name, is_default, created_at)
 circle_members(circle_id, username)
 circle_rules(circle_id, model, access)   -- model is a datamodel id or '*'
+person_rules(username, model, access)    -- one person's own, the same shape
 ```
 
 Plain, not sealed: who is in which circle is what the server needs to

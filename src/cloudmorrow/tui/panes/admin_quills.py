@@ -189,10 +189,15 @@ class QuillSheet(Modal[bool]):
                 yield Static(sheet_text(self.plan), id="quill-sheet-text")
                 if self.circles:
                     what = ", ".join(row.get("label") or row["id"] for row in self.fresh)
+                    everyone = [c["name"] for c in self.circles if has_everything(c)]
+                    lead = (
+                        f"everyone in {', '.join(everyone)} can read and write {what} the moment it is installed"
+                        if everyone
+                        else f"no circle has everything, so nobody reaches {what} until a circle is ticked"
+                    )
                     yield Static(
-                        f"\n[b {ACCENT}]Who gets it[/]  [{MUTED}]which circles may read and "
-                        f"write {escape(what)}; the rest do not see it until a circle is "
-                        f"given it[/]",
+                        f"\n[b {ACCENT}]Who gets it[/]  [{MUTED}]{escape(lead)}; tick the other circles "
+                        f"that should too — the rest do not see it until a circle is given it[/]",
                         id="sheet-circles-note",
                     )
                     with Vertical(id="sheet-circles"):

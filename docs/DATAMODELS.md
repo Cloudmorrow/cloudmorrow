@@ -314,9 +314,9 @@ or `path` renames or moves it inside its share.
 
 The whole of it, in six lines. The screens are in [CIRCLES.md](CIRCLES.md).
 
-- Access is **none, read or write**, on a datamodel, given to a circle.
-  Nothing finer: there is no rule on a field. A person's access is the most
-  any of their circles gives.
+- Access is **none, read or write**, on a datamodel, given to a circle or
+  to one person. Nothing finer: there is no rule on a field. A person's
+  access is the most any of their circles, or their own rules, gives.
 - **No access, no Quill.** A Quill over data you may not reach is not on
   your phone. Read only, and the Quill is the same screen looked at: no
   new, no edit, no dragging, no composer. Write, and it is yours to change.
@@ -338,8 +338,6 @@ The whole of it, in six lines. The screens are in [CIRCLES.md](CIRCLES.md).
   `get_record_history`. People act under responsibility, and
   responsibility is visible.
 
-Next, under *What is next*: the same three words given to one person
-without a circle.
 
 ## What is next
 
@@ -356,10 +354,7 @@ phase ends with something a person can use.
 The part of the claim people feel first, and the smallest set of controls
 that keeps it both delightful and safe.
 
-1. **Access for a person, not only a circle.** Beside circle rules, a rule
-   for one account: `PUT /api/access/{username}/{model}` with `none`,
-   `read` or `write`; shown on the accounts screen and in `cm access`. The
-   gate reads both and takes the most. No new vocabulary.
+1. **Access for a person, not only a circle** — built: see *Access* above.
 2. **The install sheet says the default.** A Quill bringing data new to the
    server shows *Everyone can read and write: vehicle, service visit* with
    the circles to narrow it to, before the yes. The same words on the

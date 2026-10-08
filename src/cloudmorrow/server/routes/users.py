@@ -83,5 +83,8 @@ def delete_user(
     except UnknownUserError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such user") from exc
     # Whatever they had switched off for themselves goes with them, so a
-    # later account of the same name starts with the whole app.
+    # later account of the same name starts with the whole app — and so do
+    # their circles and the rules of their own.
     state.features.forget(username)
+    if state.circles is not None:
+        state.circles.forget(username)

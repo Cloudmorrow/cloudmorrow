@@ -19,6 +19,8 @@ from cloudmorrow.server.deps import AppState, get_admin_user, get_current_user, 
 
 router = APIRouter(prefix="/api/circles", tags=["circles"])
 mine_router = APIRouter(prefix="/api/me/access", tags=["circles"])
+# One person's access, for an administrator: their own rules beside their circles.
+person_router = APIRouter(prefix="/api/access", tags=["circles"])
 
 READING = frozenset({"GET", "HEAD", "OPTIONS"})
 
@@ -74,15 +76,80 @@ def require_data(model: str) -> Callable[..., None]:
     return guard
 
 
+def _access_of(state: AppState, username: str) -> dict:
+    circles = _circles(state)
+    access = circles.access_for(username)
+    return {
+        "username": username,
+        "access": access.of(sorted(state.quills.datamodels)),
+        "circles": [c.name for c in circles.circles_of(username)],
+        # Their own rules, beside what their circles give; the most of all of it is `access`.
+        "own": dict(access.own),
+    }
+
+
 @mine_router.get("")
 def my_access(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> dict:
-    """What you may do with each datamodel on this server, and the circles that say so."""
-    circles = _circles(state)
-    access = circles.access_for(user.username)
-    return {
-        "access": access.of(sorted(state.quills.datamodels)),
-        "circles": [c.name for c in circles.circles_of(user.username)],
-    }
+    """What you may do with each datamodel on this server, and the circles — and
+    rules of your own — that say so."""
+    return _access_of(state, user.username)
+
+
+@person_router.get("/{username}")
+def access_of(username: str, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> dict:
+    """One person's access: what their circles give, their own rules, and the most of both."""
+    if state.users.get(username.strip().lower()) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"there is nobody called {username}")
+    return _access_of(state, username.strip().lower())
+
+
+class RulesIn(BaseModel):
+    rules: dict[str, str] = Field(default_factory=dict)
+
+
+@person_router.put("/{username}")
+def set_person_rules(
+    username: str,
+    payload: RulesIn,
+    state: AppState = Depends(get_state),
+    _: User = Depends(get_admin_user),
+) -> dict:
+    """A person's own rules, replaced whole: what the accounts screen saves."""
+    try:
+        _circles(state).set_person_rules(username, payload.rules)
+    except CircleError as exc:
+        raise _failed(exc) from exc
+    return _access_of(state, username.strip().lower())
+
+
+@person_router.put("/{username}/{model}")
+def set_person_rule(
+    username: str,
+    model: str,
+    payload: RuleIn,
+    state: AppState = Depends(get_state),
+    _: User = Depends(get_admin_user),
+) -> dict:
+    """One rule of a person's own, the others kept: the three words circles use.
+    `none` on `*` takes their `*` line away; a named `none` stays, since it
+    beats a `*` of their own."""
+    try:
+        _circles(state).set_person_rule(username, model, payload.access)
+    except CircleError as exc:
+        raise _failed(exc) from exc
+    return _access_of(state, username.strip().lower())
+
+
+@person_router.delete("/{username}/{model}")
+def clear_person_rule(
+    username: str,
+    model: str,
+    state: AppState = Depends(get_state),
+    _: User = Depends(get_admin_user),
+) -> dict:
+    """Take one of a person's own rules away: that datamodel follows their circles again."""
+    _circles(state).clear_person_rule(username, model)
+    return _access_of(state, username.strip().lower())
 
 
 @router.get("")

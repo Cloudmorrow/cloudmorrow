@@ -69,6 +69,17 @@ class FakeCircles:
             found["rules"][model] = access
         return copy.deepcopy(found)
 
+    # One person's own rules, beside their circles (docs/CIRCLES.md).
+    async def access_of(self, username: str) -> dict:
+        own = self.__dict__.setdefault("own_rules", {}).get(username, {})
+        within = [c["name"] for c in self.circle_list if username in c["members"]]
+        return {"username": username, "access": {}, "circles": within, "own": dict(own)}
+
+    async def set_person_rules(self, username: str, rules: dict) -> dict:
+        self.circle_calls.append(("own", username, dict(rules)))
+        self.__dict__.setdefault("own_rules", {})[username] = dict(rules)
+        return await self.access_of(username)
+
     async def delete_circle(self, circle: str) -> None:
         self.circle_calls.append(("delete", circle))
         found = self._circle(circle)

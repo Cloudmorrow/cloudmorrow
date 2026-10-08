@@ -104,7 +104,7 @@ def test_somebody_in_no_circle_reaches_nothing(tasks_quill, circles):
     circles.leave("members", GUEST[0])
     assert tasks_quill.get("/api/records/task", headers=guest).status_code == 404
     mine = tasks_quill.get("/api/me/access", headers=guest).json()
-    assert mine == {"access": {}, "circles": []}
+    assert mine == {"username": GUEST[0], "access": {}, "circles": [], "own": {}}
 
 
 def test_a_quill_is_fitted_to_the_person_asking(tasks_quill, circles):
@@ -229,3 +229,61 @@ def test_nobody_is_told_about_data_they_may_not_read(client, circles, tmp_path):
     assert added.status_code == 200, added.text
     bell = client.get("/api/notifications", headers=guest).json()
     assert not any("House" in n["title"] for n in bell)
+
+
+# -- a person's own rules --------------------------------------------------------
+def test_a_person_may_have_rules_of_their_own_beside_their_circles(circles):
+    """The one person who needs the budget, without a circle made for them."""
+    circles.leave("members", GUEST[0])
+    assert circles.access_for(GUEST[0]).level("task") == "none"
+    circles.set_person_rule(GUEST[0], "task", "read")
+    access = circles.access_for(GUEST[0])
+    assert access.level("task") == "read" and access.own == {"task": "read"}
+    assert access.may("read", "task") and not access.may("write", "task")
+    # The most of all of it: a circle's write beats their own read.
+    circles.create("Readers", {"task": "write"}, [GUEST[0]])
+    assert circles.access_for(GUEST[0]).level("task") == "write"
+    # A `*` of their own, and a named none that beats it; none on `*` takes it away.
+    circles.set_person_rule(GUEST[0], "*", "write")
+    circles.set_person_rule(GUEST[0], "board", "none")
+    assert circles.access_for(GUEST[0]).level("event") == "write"
+    assert circles.rules_of(GUEST[0]) == {"*": "write", "board": "none", "task": "read"}
+    circles.set_person_rule(GUEST[0], "*", "none")
+    assert circles.rules_of(GUEST[0]) == {"board": "none", "task": "read"}
+    circles.clear_person_rule(GUEST[0], "task")
+    assert circles.rules_of(GUEST[0]) == {"board": "none"}
+    with pytest.raises(CircleError):
+        circles.set_person_rule("nobody", "task", "read")
+    with pytest.raises(CircleError):
+        circles.set_person_rule(GUEST[0], "task", "maybe")
+    circles.forget(GUEST[0])
+    assert circles.rules_of(GUEST[0]) == {} and circles.circles_of(GUEST[0]) == []
+
+
+def test_a_rule_of_their_own_opens_the_data_through_the_gate(tasks_quill, circles):
+    client = tasks_quill
+    guest = headers(client, GUEST)
+    circles.leave("members", GUEST[0])
+    assert client.get("/api/records/board", headers=guest).status_code == 404
+    admin = headers(client, ADMIN)
+    given = client.put("/api/access/guest/board", json={"access": "read"}, headers=admin)
+    assert given.status_code == 200, given.text
+    assert given.json()["own"] == {"board": "read"} and given.json()["access"] == {"board": "read"}
+    assert client.get("/api/records/board", headers=guest).status_code == 200
+    assert client.post("/api/records/board", json={"fields": {"title": "x"}}, headers=guest).status_code == 403
+    # Their own access says so, and a Quill is fitted to it.
+    mine = client.get("/api/me/access", headers=guest).json()
+    assert mine["own"] == {"board": "read"} and mine["circles"] == [] and mine["access"] == {"board": "read"}
+    theirs = client.get("/api/access/guest", headers=admin).json()
+    assert theirs["username"] == "guest" and theirs["own"] == {"board": "read"}
+    # Only administrators give, and only to people there are.
+    assert client.put("/api/access/guest/task", json={"access": "write"}, headers=guest).status_code == 403
+    assert client.get("/api/access/nobody", headers=admin).status_code == 404
+    assert client.put("/api/access/guest/task", json={"access": "maybe"}, headers=admin).status_code == 400
+    whole = client.put("/api/access/guest", json={"rules": {"board": "read", "task": "write"}}, headers=admin)
+    assert whole.status_code == 200 and whole.json()["own"] == {"board": "read", "task": "write"}
+    assert client.put("/api/access/guest", json={"rules": {"task": "maybe"}}, headers=admin).status_code == 400
+    client.put("/api/access/guest", json={"rules": {"board": "read"}}, headers=admin)
+    cleared = client.delete("/api/access/guest/board", headers=admin)
+    assert cleared.status_code == 200 and cleared.json()["own"] == {}
+    assert client.get("/api/records/board", headers=guest).status_code == 404

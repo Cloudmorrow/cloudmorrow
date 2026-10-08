@@ -204,6 +204,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.include_router(users.router)
     app.include_router(circles.router)
     app.include_router(circles.mine_router)
+    app.include_router(circles.person_router)
     app.include_router(today.router)
     app.include_router(features.router)
     app.include_router(features.mine_router)

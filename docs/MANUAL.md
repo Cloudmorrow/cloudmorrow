@@ -1972,6 +1972,7 @@ the cursor still moves in an input and the selection still moves in a list.
 | `GET` | `/api/auth/me` | the current user |
 | `POST` | `/api/auth/password` | change your own password |
 | `GET` | `/api/records/{model}/{id}/history` | who did what to a record, newest first — which fields, never a value |
+| `GET`/`PUT` | `/api/access/{username}` | one person's access, and their own rules replaced whole (administrators) |
 | `GET` | `/api/secrets?env=` | the keys, without the values (`&reveal=true` for those) |
 | `GET` | `/api/secrets/vaults` | the vaults that hold something, with counts |
 | `GET` | `/api/secrets/environments` | environments that hold something, in this vault |

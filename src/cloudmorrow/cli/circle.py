@@ -9,7 +9,9 @@ gives. See docs/CIRCLES.md.
     cloudmorrow circle rule Kids task write
     cloudmorrow circle join Kids alice
 
-Only administrators change circles; `cloudmorrow access` is anybody's own.
+Only administrators change circles; `cloudmorrow access` is anybody's own,
+and an administrator's `cloudmorrow access alice expense read` gives one
+person a rule of their own, beside their circles.
 """
 
 from __future__ import annotations
@@ -167,23 +169,49 @@ def delete(circle: CircleArg) -> None:
     run(_delete())
 
 
-def access() -> None:
-    """What you may do with each datamodel, and the circles that say so."""
+def access(
+    username: Annotated[str, typer.Argument(help="Somebody else's access (administrators).")] = "",
+    model: Annotated[str, typer.Argument(help="With an access: a rule of their own on this datamodel.")] = "",
+    level: Annotated[str, typer.Argument(help="write, read or none; `-` takes their own rule away.")] = "",
+) -> None:
+    """What you may do with each datamodel, and the circles — and rules of your own — that say so.
+
+    `cm access alice` is hers (administrators); `cm access alice expense read`
+    gives her a rule of her own, beside her circles; `-` takes it away again.
+    """
+    if model and not level:
+        fail("a rule needs an access: write, read or none (or - to take it away)")
+    if level and level != "-" and level not in ACCESS:
+        fail(f"access is one of {', '.join(ACCESS)}, or - to take the rule away")
 
     async def _access() -> None:
         _, api = client()
         async with api:
-            mine = await api.my_access()
-        circles = mine.get("circles") or []
-        if not circles:
-            console.print("[yellow]You are in no circle, so you reach no data.[/]")
+            if username and model:
+                if level == "-":
+                    found = await api.clear_person_rule(username, model)
+                else:
+                    found = await api.set_person_rule(username, model, level)
+            elif username:
+                found = await api.access_of(username)
+            else:
+                found = await api.my_access()
+        whose = "your" if not username else f"{found.get('username', username)}'s"
+        circles = found.get("circles") or []
+        own = found.get("own") or {}
+        if not circles and not own:
+            who, they = ("You are", "you") if not username else (f"{username} is", "they")
+            console.print(f"[yellow]{who} in no circle, so {they} reach no data.[/]")
             return
-        console.print(f"[dim]your circles:[/] {', '.join(circles)}")
-        table = Table(title="your access", title_style=TITLE)
+        if circles:
+            console.print(f"[dim]{whose} circles:[/] {', '.join(circles)}")
+        if own:
+            console.print(f"[dim]{whose} own rules:[/] {said(own)}")
+        table = Table(title=f"{whose} access", title_style=TITLE)
         table.add_column("datamodel")
         table.add_column("access")
-        for model, level in sorted(mine["access"].items()):
-            table.add_row(model, f"[{COLOURS.get(level, 'dim')}]{level}[/]")
+        for name, found_level in sorted(found["access"].items()):
+            table.add_row(name, f"[{COLOURS.get(found_level, 'dim')}]{found_level}[/]")
         out.print(table)
 
     run(_access())
