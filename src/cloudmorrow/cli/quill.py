@@ -26,6 +26,7 @@ way a server would at install.
 from __future__ import annotations
 
 import io
+import os
 import re
 import tarfile
 import tempfile
@@ -93,9 +94,14 @@ def reference() -> None:
 
 # -- check -------------------------------------------------------------------------
 def _datamodels_folder(given: Path | None, tmp: Path) -> Path | None:
+    """A checkout of the foundational datamodels: *given*, else `$CLOUDMORROW_DATAMODELS`
+    — the folder a Quill's workflow checks out, which the test harness reads
+    too — else the release the catalog pins, fetched into *tmp*."""
     from cloudmorrow.server.config import DEFAULT_QUILL_CATALOG
     from cloudmorrow.server.quills import QuillError, fetch, load_catalog
 
+    if given is None and os.environ.get("CLOUDMORROW_DATAMODELS"):
+        given = Path(os.environ["CLOUDMORROW_DATAMODELS"]).expanduser()
     if given is not None:
         if not given.is_dir():
             fail(f"{given} is not a folder")

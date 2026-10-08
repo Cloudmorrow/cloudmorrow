@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 import pytest
+import typer
 from typer.testing import CliRunner
 
 from cloudmorrow.cli import quill as quill_cli
@@ -77,3 +78,15 @@ def test_the_references_own_example_is_a_quill_that_installs(tmp_path):
 )
 def test_a_word_that_is_not_a_command_is_a_quill(argv, routed):
     assert route(argv, {"note", "quill", "secret"}) == routed
+
+
+def test_the_datamodels_folder_in_the_environment_is_honoured(tmp_path, monkeypatch):
+    """What a Quill's workflow checks out, and the test harness reads: `cm quill check`
+    and `cm quill test` read it too, instead of fetching the release the catalog pins."""
+    from cloudmorrow.cli.quill import _datamodels_folder
+
+    monkeypatch.setenv("CLOUDMORROW_DATAMODELS", str(DATAMODELS))
+    assert _datamodels_folder(None, tmp_path) == DATAMODELS
+    monkeypatch.setenv("CLOUDMORROW_DATAMODELS", str(tmp_path / "nowhere"))
+    with pytest.raises(typer.Exit):
+        _datamodels_folder(None, tmp_path)
