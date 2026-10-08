@@ -178,18 +178,60 @@ async function renderQuill(id) {
 
   const remove = app.querySelector(".remove-quill");
   if (remove) remove.addEventListener("click", async () => {
-    const sure = confirm(
-      `Remove ${name}?\n\nIts tabs and jobs go, for everybody. Nothing anybody `
-      + "wrote is deleted: the records stay, and are there again if it comes back.",
-    );
-    if (!sure) return;
-    try {
-      await api("DELETE", quillUrl(id));
-      await refreshQuills();
-      toast(`${name} is removed; its records are kept`);
-      await backToCatalog();
-    } catch (err) { toast(err.message); }
+    let brought = [];
+    try { brought = await api("GET", quillUrl(id) + "/brought"); } catch (err) { toast(err.message); return; }
+    if (!brought.length) {
+      const sure = confirm(
+        `Remove ${name}?\n\nIts tabs and jobs go, for everybody. Nothing anybody `
+        + "wrote is deleted: the records stay, and are there again if it comes back.",
+      );
+      if (!sure) return;
+      return removeQuill(id, name, []);
+    }
+    // What it brought, each ticked to keep; the administrator unticks what goes.
+    remove.closest(".group").insertAdjacentHTML("afterend", removeSheet(name, brought));
+    remove.closest(".group").hidden = true;
+    const sheet = app.querySelector(".remove-sheet");
+    sheet.querySelector(".cancel").addEventListener("click", () => {
+      sheet.remove();
+      remove.closest(".group").hidden = false;
+    });
+    sheet.querySelector(".confirm").addEventListener("click", async () => {
+      const drop = [...sheet.querySelectorAll("input[type=checkbox]:not(:checked)")].map((b) => b.value);
+      await removeQuill(id, name, drop);
+    });
   });
+}
+
+async function removeQuill(id, name, drop) {
+  try {
+    const gone = await api("DELETE", quillUrl(id) + (drop.length ? "?drop=" + encodeURIComponent(drop.join(",")) : ""));
+    await refreshQuills();
+    const dropped = Object.values((gone && gone.dropped) || {}).reduce((a, b) => a + b, 0);
+    toast(dropped ? `${name} is removed, and ${dropped} record${dropped === 1 ? "" : "s"} with it`
+      : `${name} is removed; its records are kept`);
+    await backToCatalog();
+  } catch (err) { toast(err.message); }
+}
+
+/** What a Quill brought, a tick each to keep it: the datamodels it introduced
+    and the fields it added, with how many records hold each. Unticked goes
+    with the Quill, records and all. */
+function removeSheet(name, brought) {
+  const rows = brought.map((b) => `<label class="row"><span class="main">
+      <span class="title">${esc(b.label)}</span>
+      <span class="meta"><span class="preview">${esc(b.kind === "datamodel" ? "A datamodel it introduced" : "A field it added")} · ${
+        b.records} record${b.records === 1 ? "" : "s"}</span></span></span>
+      <input type="checkbox" value="${esc(b.id)}" checked aria-label="Keep ${esc(b.label)}"></label>`).join("");
+  return `<div class="remove-sheet">
+    <p class="group-label">Removing ${esc(name)}</p>
+    <p class="shelf-note">Its tabs and jobs go, for everybody. What it brought stays, ticked:
+      a datamodel's records are there again the day it comes back, and a field stays on the
+      records, read-only. Untick what should go with it — records and all, for good.</p>
+    <div class="group choices">${rows}</div>
+    <div class="group"><button class="row bad confirm" type="button">Remove ${esc(name)}</button></div>
+    <div class="group"><button class="row cancel" type="button">Keep it</button></div>
+  </div>`;
 }
 
 /** A tick per circle for the data the Quill brings; a `* = write` circle is

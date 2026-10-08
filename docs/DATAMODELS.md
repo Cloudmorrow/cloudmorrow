@@ -35,9 +35,9 @@ special things one Quill wants — never a second kind of something the
 foundation has, and never a shape a whole domain needs, which belongs in
 the foundation. A Quill reaches for a foundational datamodel first and
 extends only what is its own. Any later Quill may use either. They are declared in the Quill's repository and arrive with
-it. When the Quill goes they stay, by default: an administrator removing a
-Quill may choose to drop the datamodels it introduced and the fields it
-added, records and all, and the sheet says which. The datamodels
+it. When the Quill goes they stay, by default: the sheet lists what it
+brought with how many records hold each, ticked to keep, and the
+administrator unticks what should go with it, records and all. The datamodels
 repository and cloudmorrow.com/datamodels hold only the foundational ones;
 what a Quill brings is on the Quill's own page in the catalog.
 
@@ -165,6 +165,8 @@ The core serves every installed datamodel at the same API:
 | `GET /api/quills` | every installed Quill, with its manifest |
 | `GET /api/quills/catalog` | the catalog, with what is installed |
 | `POST /api/quills` | install, from the catalog or a source (admin) |
+| `GET /api/quills/{id}/brought` | what a Quill brought — datamodels it introduced, fields it added — and how many records hold each (admin) |
+| `DELETE /api/quills/{id}?drop=` | remove it; what `drop` names of what it brought goes with it, records and all (admin) |
 
 A plain listing answers with at most a thousand records, the first thousand
 in order, and says so with the header `X-Records-Capped: 1000` when it
@@ -349,31 +351,14 @@ the gaps are in the claim itself: who may change a record is only half
 said, reference data is free text, and the foundation is narrow. Each
 phase ends with something a person can use.
 
-### Phase 1 — Who may change it, said in full
+*Phase 1 — who may change it, said in full — was built on 8 October 2026:
+access for a person as well as a circle, the install sheet saying who gets
+a Quill's data, a record's history on every surface, and the remove sheet
+asking about what a Quill brought. All of it is under *Access* and *Two
+kinds* above. Left out on purpose: hiding one field from some people, a
+guardian reading a child's personal records, and access by time.*
 
-The part of the claim people feel first, and the smallest set of controls
-that keeps it both delightful and safe.
-
-1. **Access for a person, not only a circle** — built: see *Access* above.
-2. **The install sheet says the default.** A Quill bringing data new to the
-   server shows *Everyone can read and write: vehicle, service visit* with
-   the circles to narrow it to, before the yes. The same words on the
-   catalog page at cloudmorrow.com.
-3. **A record's log** — built: see *Access* above.
-4. **Removing a Quill asks about its data.** The sheet lists the
-   datamodels it introduced and the fields it added, with how many records
-   hold them, ticked to keep. An administrator unticks what should go with
-   it. Kept fields stay on the records, read-only, until another Quill
-   declares them or the person clears them.
-5. **Not in this, and said so:** hiding one field from some people; a
-   guardian reading a child's personal records; access by time.
-
-*Done when:* one person is given read on the budget without a circle made
-for them, a Quill's install sheet shows who gets its data before it is
-installed, removing a Quill offers to keep or drop what it brought, and a
-contact's sheet shows who changed what and when.
-
-### Phase 2 — Lists and kinds
+### Phase 1 — Lists and kinds
 
 Reference lists in the datamodels repository, `lists/<id>.toml`: a list of
 `{ value, label }` with an optional `deprecated` flag, versioned with the
@@ -391,7 +376,7 @@ shows what a decimal and a separate string cost in screens.
 *Done when:* a deal's currency is picked, not typed, and a list changes by
 pull request without a datamodel version.
 
-### Phase 3 — Broaden the foundation
+### Phase 2 — Broaden the foundation
 
 The foundation grows to every domain we know, in the datamodels
 repository, decided and written by us, each with a Quill of ours that uses

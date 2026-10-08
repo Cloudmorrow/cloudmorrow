@@ -584,8 +584,11 @@ class FakeQuills:
         self.quill_calls.append(("secret", quill_id, hook_id))
         return {"id": hook_id, "secret": "new"}
 
-    async def uninstall_quill(self, quill_id: str) -> None:
-        self.quill_calls.append(("uninstall", quill_id))
+    async def quill_brought(self, quill_id: str) -> list[dict]:
+        return list(self.__dict__.setdefault("brought", {}).get(quill_id, []))
+
+    async def uninstall_quill(self, quill_id: str, drop: list[str] | None = None) -> dict:
+        self.quill_calls.append(("uninstall", quill_id) if not drop else ("uninstall", quill_id, list(drop)))
         self.quill_list = [q for q in self.quill_list if q["id"] != quill_id]
         self.feature_list = [row for row in self.feature_list if row["key"] != quill_id]
 

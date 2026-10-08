@@ -231,6 +231,52 @@ class QuillSheet(Modal[bool]):
         self.dismiss(False)
 
 
+class RemoveSheet(Modal[list[str] | None]):
+    """Removing a Quill: what it brought, a tick each to keep it. Answers the
+    ids to drop — unticked — or None for not removing after all."""
+
+    BINDINGS = [("escape", "cancel", "Cancel")]
+
+    def __init__(self, name: str, brought: list[dict]) -> None:
+        super().__init__()
+        self.quill_name = name
+        self.brought = brought
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal modal-wide", id="remove-sheet"):
+            yield Label(f"Remove {self.quill_name}?", classes="modal-title")
+            yield Static(
+                f"[{MUTED}]Its tabs and jobs go, for everybody. What it brought stays, ticked: a "
+                "datamodel's records are there again the day it comes back, and a field stays on "
+                "the records, read-only. Untick what should go with it — records and all, for good.[/]",
+                classes="modal-detail",
+            )
+            with Vertical(id="remove-brought"):
+                for index, row in enumerate(self.brought):
+                    what = "a datamodel it introduced" if row.get("kind") == "datamodel" else "a field it added"
+                    count = int(row.get("records") or 0)
+                    label = f"{row.get('label') or row['id']}  ({what}, {count} record{'' if count == 1 else 's'})"
+                    yield Checkbox(label, value=True, id=f"remove-keep-{index}")
+            with Horizontal(classes="modal-buttons"):
+                yield Button("Keep it", id="cancel")
+                yield Button("Remove", variant="error", id="remove")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        event.stop()
+        if event.button.id != "remove":
+            self.dismiss(None)
+            return
+        drop = [
+            row["id"]
+            for index, row in enumerate(self.brought)
+            if not self.query_one(f"#remove-keep-{index}", Checkbox).value
+        ]
+        self.dismiss(drop)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class QuillsView(Pane):
     """The catalog by category, what is installed, install and remove."""
 
@@ -420,24 +466,36 @@ class QuillsView(Pane):
     @work(group="ui")
     async def remove(self, quill: dict) -> None:
         name = quill.get("name") or quill["id"]
-        confirmed = await self.app.push_screen_wait(
-            ConfirmModal(
-                f"Remove {name}?",
-                detail=(
-                    "[dim]Its tabs and its jobs go, for everybody on this server. Its "
-                    "records stay: install it again and they are all there.[/]"
-                ),
-                confirm_label="Remove",
-            )
-        )
-        if not confirmed:
-            return
         try:
-            await self.api.uninstall_quill(quill["id"])
+            brought = await self.api.quill_brought(quill["id"])
+        except ApiError:
+            brought = []
+        drop: list[str] = []
+        if brought:
+            answer = await self.app.push_screen_wait(RemoveSheet(name, brought))
+            if answer is None:
+                return
+            drop = answer
+        else:
+            confirmed = await self.app.push_screen_wait(
+                ConfirmModal(
+                    f"Remove {name}?",
+                    detail=(
+                        "[dim]Its tabs and its jobs go, for everybody on this server. Its "
+                        "records stay: install it again and they are all there.[/]"
+                    ),
+                    confirm_label="Remove",
+                )
+            )
+            if not confirmed:
+                return
+        try:
+            gone = await self.api.uninstall_quill(quill["id"], drop=drop)
         except ApiError as exc:
             self.status(str(exc), error=True)
             return
-        self.status(f"Removed {name}. Its records are kept.")
+        dropped = sum(int(n) for n in ((gone or {}).get("dropped") or {}).values())
+        self.status(f"Removed {name}. " + (f"{dropped} records went with it." if dropped else "Its records are kept."))
         self._workspace_follows()
         self.reload()
 

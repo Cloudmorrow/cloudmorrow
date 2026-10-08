@@ -221,7 +221,7 @@ def test_an_administrator_installs_from_the_catalog_and_the_tabs_follow(client, 
     # A Quill is one more feature to switch.
     mine = {row["key"] for row in client.get("/api/me/features", headers=auth).json()}
     assert "tasks" in mine
-    assert client.delete("/api/quills/tasks", headers=auth).status_code == 204
+    assert client.delete("/api/quills/tasks", headers=auth).status_code == 200
     assert client.get("/api/quills", headers=auth).json() == []
 
 

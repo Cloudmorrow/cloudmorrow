@@ -809,6 +809,73 @@ class RecordStore:
         model, backend = self._capable(principal, model_id, "read", "attachments")
         return backend.attachment(principal, model, name, where or {})
 
+    # -- what a Quill brought, for removing it (quills/removal.py) -------------
+    # No gate on these: they count and drop across every owner, which only an
+    # administrator removing a Quill does, and the route is theirs alone.
+    def count_all(self, model_id: str) -> int:
+        """Every record of *model_id* on the server, whoever's."""
+        with connect(self.db_path) as conn:
+            row = conn.execute("SELECT COUNT(*) FROM records WHERE model = ?", (model_id,)).fetchone()
+        conn.close()
+        return int(row[0])
+
+    def count_with_field(self, model_id: str, field: str) -> int:
+        """How many records of *model_id* hold *field* — a Quill's own field on
+        them, which lives in the sealed body, so each is opened to see."""
+        model = self.model(model_id)
+        found = 0
+        with connect(self.db_path) as conn:
+            for row in conn.execute("SELECT * FROM records WHERE model = ?", (model_id,)):
+                indexed = json.loads(row["indexed"] or "{}")
+                if indexed.get(field) is not None:
+                    found += 1
+                    continue
+                body = conn.unseal(
+                    "records", "body", self._seal_scope(model, row["owner"], row["id"], indexed), row["body"]
+                )
+                if body and json.loads(body).get(field) is not None:
+                    found += 1
+        conn.close()
+        return found
+
+    def drop_model(self, model_id: str) -> int:
+        """Every record of *model_id*, whoever's, and what hangs off them: gone.
+        What an administrator asked for when removing the Quill that brought it."""
+        with connect(self.db_path) as conn:
+            ids = [row["id"] for row in conn.execute("SELECT id FROM records WHERE model = ?", (model_id,))]
+            for record_id in ids:
+                conn.execute("DELETE FROM records WHERE id = ?", (record_id,))
+                conn.execute("DELETE FROM record_members WHERE space_id = ?", (record_id,))
+                conn.execute("DELETE FROM record_seen WHERE space_id = ?", (record_id,))
+                conn.execute("DELETE FROM record_changes WHERE record_id = ?", (record_id,))
+            conn.commit()
+        conn.close()
+        return len(ids)
+
+    def drop_field(self, model_id: str, field: str) -> int:
+        """Take *field* off every record of *model_id* that holds it: a Quill's own
+        field, dropped with the Quill. Returns how many records it came off."""
+        model = self.model(model_id)
+        changed = 0
+        with connect(self.db_path) as conn:
+            for row in conn.execute("SELECT * FROM records WHERE model = ?", (model_id,)).fetchall():
+                indexed = json.loads(row["indexed"] or "{}")
+                scope = self._seal_scope(model, row["owner"], row["id"], indexed)
+                body = conn.unseal("records", "body", scope, row["body"])
+                fields = {**indexed, **(json.loads(body) if body else {})}
+                if field not in fields:
+                    continue
+                fields.pop(field)
+                new_indexed, new_body = self._write_row(conn, model, row["owner"], row["id"], fields)
+                conn.execute(
+                    "UPDATE records SET indexed = ?, body = ?, updated_at = ? WHERE id = ?",
+                    (new_indexed, new_body, iso_stamp(), row["id"]),
+                )
+                changed += 1
+            conn.commit()
+        conn.close()
+        return changed
+
     def count(self, owner: str, model_id: str, *, scope: str | None = None) -> int:
         query = "SELECT COUNT(*) FROM records WHERE model = ? AND owner = ?"
         params: list[object] = [model_id, owner]

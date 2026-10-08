@@ -27,7 +27,7 @@ from pydantic import BaseModel
 from cloudmorrow.server.circles import NONE, Access
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_admin_user, get_current_user, get_state
-from cloudmorrow.server.quills import MANIFEST, MAX_DOWNLOAD, QuillError, fetch, load_catalog
+from cloudmorrow.server.quills import MANIFEST, MAX_DOWNLOAD, QuillError, fetch, load_catalog, removal
 from cloudmorrow.server.quills.code import CodeError
 
 router = APIRouter(prefix="/api/quills", tags=["quills"])
@@ -263,15 +263,32 @@ def get_quill(
     raise HTTPException(status.HTTP_404_NOT_FOUND, f"{quill_id} is not installed")
 
 
-@router.delete("/{quill_id}", status_code=status.HTTP_204_NO_CONTENT)
-def uninstall(
+@router.get("/{quill_id}/brought")
+def brought(
     quill_id: str,
     state: AppState = Depends(get_state),
     _: User = Depends(get_admin_user),
-) -> None:
-    """Take a Quill away. Its records stay: they were never its."""
+) -> list[dict]:
+    """What the Quill brought — the datamodels it introduced, the fields it
+    added — and how many records hold each: the remove sheet's list."""
     try:
-        state.quills.uninstall(quill_id)
+        return removal.brought(state.quills, state.records, quill_id)
+    except QuillError as exc:
+        raise _bad(exc) from exc
+
+
+@router.delete("/{quill_id}")
+def uninstall(
+    quill_id: str,
+    drop: str = "",
+    state: AppState = Depends(get_state),
+    _: User = Depends(get_admin_user),
+) -> dict:
+    """Take a Quill away. Its records stay: they were never its. What it brought
+    stays too, unless `?drop=` names it (from `…/brought`, comma-separated):
+    that goes, records and all."""
+    try:
+        return removal.remove(state.quills, state.records, quill_id, [d for d in drop.split(",") if d])
     except QuillError as exc:
         raise _bad(exc) from exc
 

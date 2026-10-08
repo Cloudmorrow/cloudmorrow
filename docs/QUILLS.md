@@ -38,10 +38,11 @@ pages win, and those remain the reasoning behind them.
    say something, they grow, and every surface grows with them.
 2. **Data is the person's.** Uninstalling a Quill removes its screens and
    its jobs, never a record. Its extension fields stay on the records, read-
-   only, until something else writes them or the person clears them; the
-   administrator removing it may choose instead to drop what it brought,
-   fields and introduced datamodels, records and all (planned: see
-   [DATAMODELS.md](DATAMODELS.md), *What is next*).
+   only, until something else writes them or the person clears them, and the
+   records of a datamodel it introduced are there again the day it comes
+   back. The administrator removing it sees what it brought, with how many
+   records hold each, ticked to keep, and may untick what should go with
+   it — records and all (`DELETE /api/quills/{id}?drop=`).
 3. **What a Quill adds is visible before it is added.** The catalog page and
    the install sheet list its datamodels (used, extended, introduced), its
    datasets, its screens, its jobs, webhooks, APIs and services, and every

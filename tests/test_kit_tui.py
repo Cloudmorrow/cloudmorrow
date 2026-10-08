@@ -378,3 +378,34 @@ async def test_the_sheet_shows_who_did_what_to_the_record(app):
         assert "Rack" not in said
         sheet.action_cancel()
         await settle(app, pilot)
+
+
+async def test_removing_a_quill_that_brought_data_asks_what_goes_with_it(app):
+    """What it brought, a tick each to keep: unticked goes with the Quill, records and all."""
+    app.client.brought = {
+        "tasks": [
+            {"id": "tasks.sprint", "kind": "datamodel", "label": "Sprint", "model": "tasks.sprint", "records": 4},
+            {"id": "tasks.effort", "kind": "field", "label": "Effort on Task", "model": "task", "records": 2},
+        ]
+    }
+    async with app.run_test(size=(120, 36)) as pilot:
+        screen, view = await open_quills(app, pilot)
+        table = view.query_one("#admin-quill-table")
+        table.focus()
+        table.move_cursor(row=1)
+        await pilot.press("d")
+        await breathe(pilot)
+        await breathe(pilot)
+        sheet = app.screen
+        assert sheet.__class__.__name__ == "RemoveSheet"
+        boxes = list(sheet.query(Checkbox))
+        assert [str(b.label) for b in boxes] == [
+            "Sprint  (a datamodel it introduced, 4 records)",
+            "Effort on Task  (a field it added, 2 records)",
+        ]
+        assert all(b.value for b in boxes)
+        boxes[1].value = False
+        await pilot.click("#remove")
+        await settle(app, pilot)
+        assert ("uninstall", "tasks", ["tasks.effort"]) in app.client.quill_calls
+        assert not screen.query("#nav-tasks")

@@ -403,8 +403,14 @@ class CloudmorrowClient:
         )
         return response.json()
 
-    async def uninstall_quill(self, quill_id: str) -> None:
-        await self._request("DELETE", f"/api/quills/{quill_id}")
+    async def quill_brought(self, quill_id: str) -> list[dict]:
+        """What the Quill brought — datamodels, fields — and how many records hold each."""
+        return (await self._request("GET", f"/api/quills/{quill_id}/brought")).json()
+
+    async def uninstall_quill(self, quill_id: str, drop: list[str] | None = None) -> dict:
+        """Take a Quill away. *drop* names what it brought that should go with it, records and all."""
+        params = {"drop": ",".join(drop)} if drop else {}
+        return (await self._request("DELETE", f"/api/quills/{quill_id}", params=params)).json()
 
     # -- a Quill's code, for an administrator --------------------------------
     async def quill_services(self) -> list[dict]:
