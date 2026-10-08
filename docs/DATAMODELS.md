@@ -16,9 +16,12 @@ a Quill that goes leaves every record behind.
 
 **Foundational datamodels** are the ones Cloudmorrow decides are
 foundational: the shapes in [`Cloudmorrow/datamodels`](https://github.com/Cloudmorrow/datamodels),
-grouped in **domains** — Tasks, Customers, Fleet, Calendars, Messaging,
-Secrets, Files — and chosen by domain when you install, with or without a
-Quill that uses them. They grow by our hand, by pull request to
+grouped in **domains** — eighteen of them, from Tasks and Calendars to
+Invoicing, Inventory and Membership — and chosen by domain when you
+install, with or without a Quill that uses them. Each domain is on a
+shelf, its **category** — Personal, Home, Business, Operations, Community,
+Developer — which is how the registry shows them and how people think of
+their data; the domain is what is installed. They grow by our hand, by pull request to
 that repository, when we judge a shape is one every Quill should agree on.
 A datamodel is foundational because we said so, not because enough Quills
 happened to want it. The foundation is meant to be broad: every domain we
@@ -379,11 +382,12 @@ pull request without a datamodel version.
 ### Phase 2 — Broaden the foundation
 
 The foundation grows to every domain we know, in the datamodels
-repository, decided and written by us, each with a Quill of ours that uses
-it so the shapes are proven on a screen before release. The breadth is the
-point: a freelancer, a shop, a household and an association should each
-find their domains here and need extended datamodels only for what is
-peculiar to them. In order of who asks:
+repository, decided and written by us. The breadth is the point: a
+freelancer, a shop, a household and an association should each find their
+domains here and need extended datamodels only for what is peculiar to
+them. The datamodels of all eleven domains below were written on 8 October
+2026 (datamodels v1.5.0); what remains is a Quill of ours for each, so the
+shapes are proven on a screen, Home first. In order of who asks:
 
 | domain | datamodels | reuses |
 | --- | --- | --- |
