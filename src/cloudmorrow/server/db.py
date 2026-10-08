@@ -48,6 +48,22 @@ class Connection(sqlite3.Connection):
 
     sealer: Sealer
 
+    def __exit__(self, exc_type, exc, tb) -> None:
+        """Commit or roll back, as a connection always did on leaving `with` — and close.
+
+        A connection is opened for each call, and the standard one is only
+        freed when the cyclic collector gets round to it (its statement
+        cache points back at it), so under load hundreds sat open, each
+        with its page cache: the server grew by the gigabyte until a
+        collection ran. Closed here, the native side goes at once. What
+        the caller still holds — rows, and `unseal` on the way out — works
+        without the database.
+        """
+        try:
+            super().__exit__(exc_type, exc, tb)
+        finally:
+            self.close()
+
     def seal(self, table: str, column: str, scope: Iterable[object], text: str | None) -> str | None:
         return self.sealer.seal(table, column, scope, text)
 
@@ -55,13 +71,52 @@ class Connection(sqlite3.Connection):
         return self.sealer.unseal(table, column, scope, blob)
 
 
+# How long a connection waits for another's write to finish before giving
+# up with "database is locked". Every route opens its own connection, so
+# under load a few are always waiting on one that is writing.
+BUSY_SECONDS = 10.0
+# How big the write-ahead log may stay after a checkpoint, in bytes.
+WAL_SIZE_LIMIT = 64 * 1024 * 1024
+
+
+def checkpoint(db_path: Path) -> bool:
+    """Fold the write-ahead log into the database and cut it back to nothing.
+
+    SQLite does this by itself every thousand pages, but can only truncate
+    the log when nobody is reading, and a busy server always has somebody
+    reading: left alone, the log grows and every read gets slower for it.
+    Called on the clock (quills/jobs.py). Returns whether it got the lock
+    in time; a miss is tried again next time.
+    """
+    conn = sqlite3.connect(db_path, timeout=2.0)
+    try:
+        busy, _log, _moved = conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+        return busy == 0
+    except sqlite3.OperationalError:
+        return False
+    finally:
+        conn.close()
+
+
 def connect(db_path: Path) -> Connection:
     """Open a connection with the schema applied, sane pragmas, and the key."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path, factory=Connection)
+    conn = sqlite3.connect(db_path, factory=Connection, timeout=BUSY_SECONDS)
     conn.sealer = sealer_for(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    # Write-ahead logging: a write no longer blocks every read, which is
+    # what lets the request threads overlap instead of queueing on one
+    # writer. It is a property of the file, so setting it again is free.
+    # NORMAL loses at most the last transactions to a power cut, never the
+    # file's integrity, and makes each write a fraction of the cost.
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
+    # The log is folded back into the file as it goes (SQLite's own
+    # checkpointing), but it can only be cut back when no connection is
+    # reading, which under load is seldom: `checkpoint` below is called on
+    # the clock for that. This keeps the file from staying large after one.
+    conn.execute(f"PRAGMA journal_size_limit = {WAL_SIZE_LIMIT}")
     # The tables, at the version this code expects: nothing to do once there.
     upgrade(conn)
     # Rows from before content was sealed. Versioned on its own, because a

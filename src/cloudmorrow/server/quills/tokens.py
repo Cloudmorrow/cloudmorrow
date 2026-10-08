@@ -145,22 +145,36 @@ class QuillTokenStore:
 
     # -- webhook secrets --------------------------------------------------------
     def webhook_secret(self, quill: str, hook: str) -> str:
-        """The secret of one webhook, made the first time it is asked for."""
+        """The secret of one webhook, made the first time it is asked for.
+
+        Made under the write lock: the supervisor handing a service its
+        secrets and a request checking one ask at the same moment on a
+        fresh install, and both finding nothing and both making one would
+        leave one of them holding a secret that no longer is.
+        """
         with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
                 "SELECT secret FROM quill_webhooks WHERE quill = ? AND hook = ?", (quill, hook)
             ).fetchone()
             value = conn.unseal("quill_webhooks", "secret", (quill, hook), row["secret"]) if row is not None else None
+            if value is None:
+                value = self._write_webhook(conn, quill, hook)
         conn.close()
-        return value if value is not None else self.rotate_webhook(quill, hook)
+        return value
+
+    @staticmethod
+    def _write_webhook(conn: sqlite3.Connection, quill: str, hook: str) -> str:
+        secret = secrets.token_urlsafe(24)
+        conn.execute(
+            "INSERT OR REPLACE INTO quill_webhooks (quill, hook, secret, issued_at) VALUES (?, ?, ?, ?)",
+            (quill, hook, conn.seal("quill_webhooks", "secret", (quill, hook), secret), _now()),
+        )
+        return secret
 
     def rotate_webhook(self, quill: str, hook: str) -> str:
-        secret = secrets.token_urlsafe(24)
         with self._connect() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO quill_webhooks (quill, hook, secret, issued_at) VALUES (?, ?, ?, ?)",
-                (quill, hook, conn.seal("quill_webhooks", "secret", (quill, hook), secret), _now()),
-            )
+            secret = self._write_webhook(conn, quill, hook)
         conn.close()
         return secret
 

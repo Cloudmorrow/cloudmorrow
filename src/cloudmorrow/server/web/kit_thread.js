@@ -26,9 +26,11 @@
    has no box to write in and your own lines are not yours to change;
    making a space, or writing to somebody, is the spaces' datamodel's.
 
-   There is no socket. An open conversation asks for what changed since the
-   newest thing it has, every few seconds, and a push asks at once — for a
-   household that is the whole of the real-time problem.
+   An open conversation listens to the change feed (changes.js) and asks
+   for what changed since the newest thing it has when it hears of a line
+   in its space; a push asks at once. While the feed is down it asks on a
+   timer instead, every few seconds — for a household that is the whole of
+   the real-time problem.
 
    Nothing in this file knows what a channel or a message is. */
 
@@ -42,10 +44,13 @@ import {
   spaceName,
 } from "./kit_space.js";
 import { mayWrite, plural } from "./kit.js";
+import { listenChanges } from "./changes.js";
 
-// How often an open conversation asks for what it has not got, and how
-// much of one is read when it opens.
+// How often an open conversation asks for what it has not got while the
+// change feed is down, how seldom while it is up (a safety net, not the
+// way news arrives), and how much of one is read when it opens.
 const POLL = 5000;
+const POLL_FED = 60000;
 const PAGE = 100;
 // Lines from one person this close together are one block with one name.
 const RUN = 5 * 60;
@@ -165,15 +170,24 @@ function drawList(at, s, spaces) {
       <div class="listing">${spaceGroups(at, s, spaces, "")}</div>
     </main>` + tabs(at.tab);
   wireShell();
-  const timer = setInterval(async () => {
+  let asked = Date.now();
+  const refresh = async () => {
     if (document.visibilityState !== "visible") return;
+    asked = Date.now();
     try {
       const fresh = await loadSpaces(at, s);
       const listing = app.querySelector(".kit-thread .listing");
       if (listing) listing.innerHTML = spaceGroups(at, s, fresh, "");
     } catch { /* offline: the next tick tries again */ }
+  };
+  const feed = listenChanges((change) => {
+    if (change.model === s.model.id || change.model === s.spaceModel.id) refresh();
+  });
+  const timer = setInterval(() => {
+    if (feed.live && Date.now() - asked < POLL_FED) return;
+    refresh();
   }, POLL * 3);
-  live = { stop: () => clearInterval(timer), catchUp: () => {} };
+  live = { stop: () => { clearInterval(timer); feed.stop(); }, catchUp: refresh };
   holdUntilLeft();
 }
 
@@ -295,7 +309,7 @@ async function drawConversation(at, s, spaces, id, { phone }) {
   try {
     lines = await api("GET", `${recordsUrl(s.model.id)}?${where}&_last=${PAGE}`);
   } catch (err) { toast(err.message); }
-  const state = { lines, stopped: false, timer: null, ticks: 0 };
+  const state = { lines, stopped: false, timer: null, ticks: 0, asked: Date.now() };
   const toBottom = () => { list.scrollTop = list.scrollHeight; };
   const paint = () => {
     const stuck = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
@@ -337,6 +351,7 @@ async function drawConversation(at, s, spaces, id, { phone }) {
   };
   const catchUp = async () => {
     if (state.stopped || document.visibilityState !== "visible") return;
+    state.asked = Date.now();
     const newest = state.lines.reduce((m, l) => (l.updated_at > m ? l.updated_at : m), "");
     try {
       const fresh = await api("GET", `${recordsUrl(s.model.id)}?${where}` +
@@ -353,8 +368,16 @@ async function drawConversation(at, s, spaces, id, { phone }) {
       }
     } catch { /* offline: the next tick tries again */ }
   };
-  state.timer = setInterval(catchUp, POLL);
-  live = { stop: () => { state.stopped = true; clearInterval(state.timer); }, catchUp };
+  // The feed says when a line was said here, or this space changed; the
+  // timer is for when the feed is down, and a slow check besides.
+  const feed = listenChanges((change) => {
+    if (change.space === id || change.id === id) catchUp();
+  });
+  state.timer = setInterval(() => {
+    if (feed.live && Date.now() - state.asked < POLL_FED) return;
+    catchUp();
+  }, POLL);
+  live = { stop: () => { state.stopped = true; clearInterval(state.timer); feed.stop(); }, catchUp };
   holdUntilLeft();
 
   // -- writing ------------------------------------------------------------------

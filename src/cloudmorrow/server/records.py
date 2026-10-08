@@ -80,6 +80,18 @@ __all__ = [
     "parse_duration",
 ]
 
+# How many records a plain listing answers with: the first so many in order.
+# No screen shows more, and without it one request could read, unseal and
+# send every record a datamodel has. `_last` and `_since` ask for a bounded
+# set already and are not capped; a listing that hit the cap says so in the
+# `X-Records-Capped` header (routes/records.py).
+LIST_CAP = 1000
+# How many matches a search (`?q=`) answers with. The scan stops at the last
+# of them, so a search that matches early never unseals the rest.
+SEARCH_CAP = 200
+# How long a line of the change feed is kept before the sweep takes it.
+CHANGES_KEPT = dt.timedelta(days=90)
+
 # Made by schema.py, step 1. A change to it is a new step there.
 TABLE = """
 CREATE TABLE IF NOT EXISTS records (
@@ -227,6 +239,11 @@ def _truthy(value: object) -> bool:
     return str(value).lower() in ("1", "true", "yes", "on")
 
 
+def _extract(field: str) -> str:
+    """The SQL that reads an indexed field: the same text in a query as in its index."""
+    return f"json_extract(indexed, '$.\"{field}\"')"
+
+
 def _matches(model: Datamodel, record: Record, query: str) -> bool:
     """Does any text of *record* hold *query*? The preview says where."""
     needle = query.casefold()
@@ -291,8 +308,36 @@ class RecordStore:
         self.access: Callable[[str], Access] | None = None
         # Seeding per space asks and then writes; two lookers at once write once.
         self._seeding = threading.Lock()
+        # The most a plain listing answers with. A test lowers it.
+        self.list_cap = LIST_CAP
+        # The datamodels whose expression indexes this process has made sure of.
+        self._indexed: set[str] = set()
         # Its table is made with the rest (schema.py), when it is first opened.
         connect(self.db_path).close()
+
+    # -- indexes ---------------------------------------------------------------
+    def ensure_indexes(self, model: Datamodel) -> None:
+        """The expression indexes *model*'s listings use, made if they are not there.
+
+        One per field a listing is narrowed by: the link that says which space
+        a record is in (the visibility clause asks it on every read), every
+        other link (`board=…`), and the fields a group is ordered within
+        (`lane`). A full scan of a datamodel's rows is fine for a thousand
+        of them and not for a hundred thousand; these make the difference.
+        Once per datamodel per process: after that it is one set lookup.
+        """
+        if model.id in self._indexed or model.backend:
+            return
+        fields = {model.in_space} if model.in_space else set()
+        fields |= {f.name for f in model.fields if f.kind == "link"}
+        fields |= set(model.ordered_within)
+        with connect(self.db_path) as conn:
+            for name in sorted(fields):
+                # Both are validated identifiers (datamodels.ID_RE, FIELD_RE).
+                index = f"records_{model.id.replace('.', '_')}_{name}"
+                conn.execute(f"CREATE INDEX IF NOT EXISTS {index} ON records (model, {_extract(name)})")
+        conn.close()
+        self._indexed.add(model.id)
 
     # -- the gate ----------------------------------------------------------------
     def _check(self, principal: Principal, action: str, model_id: str) -> None:
@@ -406,6 +451,14 @@ class RecordStore:
             is not None
         )
 
+    def may_see_space(self, principal: Principal, space_id: str) -> bool:
+        """May this principal see the space with this id? No such space is no."""
+        with connect(self.db_path) as conn:
+            row = conn.execute("SELECT * FROM records WHERE id = ?", (space_id,)).fetchone()
+            seen = row is not None and self._space_visible(conn, principal, row)
+        conn.close()
+        return seen
+
     def _space_of(self, conn: Connection, model: Datamodel, indexed: dict) -> sqlite3.Row | None:
         space_id = indexed.get(model.in_space)
         if not space_id:
@@ -459,7 +512,7 @@ class RecordStore:
             return f"id IN ({spaces})", [model.id, username, username]
         if model.in_space:
             space_model = model.get_field(model.in_space).to
-            link = f"json_extract(indexed, '$.\"{model.in_space}\"')"
+            link = _extract(model.in_space)
             return (
                 f"({link} IN ({spaces}) OR (COALESCE({link}, '') = '' AND owner = ?))",
                 [space_model, username, username, username],
@@ -598,10 +651,15 @@ class RecordStore:
         previews = _truthy(where.pop("previews", False))
         if model.backend:
             return self._backend(model).list(principal, model, where, q=query, previews=previews)
-        records = self._list_stored(principal, model, where, last=last, since=since)
         if query:
-            records = [r for r in records if _matches(model, r, query)]
-        elif previews:
+            # Every row is read, since the text is sealed, but reading stops
+            # at the last match wanted.
+            found = lambda r: _matches(model, r, query)  # noqa: E731
+            return self._list_stored(principal, model, where, last=last, since=since, keep=found, cap=SEARCH_CAP)
+        records = self._list_stored(
+            principal, model, where, last=last, since=since, cap=None if (last or since) else self.list_cap
+        )
+        if previews:
             for record in records:
                 record.preview = _preview_of(model, record)
         return records
@@ -614,9 +672,13 @@ class RecordStore:
         *,
         last: int | None = None,
         since: str | None = None,
+        keep: Callable[[Record], bool] | None = None,
+        cap: int | None = None,
     ) -> list[Record]:
+        """The rows, as records, in order; those *keep* says, at most *cap* of them."""
         model_id = model.id
         self.sweep(model_id, owner=None if (model.space or model.in_space) else principal.username)
+        self.ensure_indexes(model)
         plain = stored_indexed(model)
         clause, clause_params = self._visible_clause(model, principal.username)
         query = f"SELECT *, rowid AS seq FROM records WHERE model = ? AND {clause}"
@@ -626,8 +688,12 @@ class RecordStore:
             if name not in plain:
                 raise RecordError(f"{model.id} cannot be filtered by {name!r}: it is not indexed")
             coerced = coerce(model, model.get_field(name), value)
-            query += f" AND json_extract(indexed, ?) {operator} ?"
-            params += [f'$."{name}"', coerced if not isinstance(coerced, bool) else int(coerced)]
+            # The path is written into the SQL, not bound: SQLite uses an
+            # expression index only for the very expression it was made on
+            # (`ensure_indexes`). *name* is a field of the datamodel, so it
+            # is letters, digits and underscores (datamodels.FIELD_RE).
+            query += f" AND {_extract(name)} {operator} ?"
+            params.append(coerced if not isinstance(coerced, bool) else int(coerced))
         if since:
             # A `+` in a query string arrives as a space, if it was not escaped.
             moment = parse_moment(since.strip().replace(" ", "+"))
@@ -649,9 +715,15 @@ class RecordStore:
             )
         else:
             query += " ORDER BY position, created_at, seq"
+        records: list[Record] = []
         with connect(self.db_path) as conn:
-            rows = conn.execute(query, params).fetchall()
-            records = [self._record(conn, model, row, principal) for row in rows]
+            for row in conn.execute(query, params):
+                record = self._record(conn, model, row, principal)
+                if keep is not None and not keep(record):
+                    continue
+                records.append(record)
+                if cap is not None and len(records) >= cap:
+                    break
         conn.close()
         # A secret field is never in a listing: reading the one record is
         # how it is asked for (see backends/ for the store that has one).
@@ -1188,8 +1260,8 @@ class RecordStore:
                 pointing = [
                     r["id"]
                     for r in conn.execute(
-                        "SELECT id FROM records WHERE model = ? AND json_extract(indexed, ?) = ?",
-                        (other.id, f'$."{f.name}"', record_id),
+                        f"SELECT id FROM records WHERE model = ? AND {_extract(f.name)} = ?",
+                        (other.id, record_id),
                     )
                 ]
                 for child in pointing:
@@ -1311,6 +1383,19 @@ class RecordStore:
             ).fetchall()
         conn.close()
         return [dict(row) for row in rows]
+
+    def prune_changes(self, keep: dt.timedelta = CHANGES_KEPT) -> int:
+        """Take the change feed's lines older than *keep* out. Returns how many went.
+
+        The feed is an audit line and a sync cursor, and both have a horizon:
+        a client whose cursor is older than it reads the records themselves
+        instead. The sweep calls this (quills/jobs.py).
+        """
+        before = iso_stamp(utc_now() - keep)
+        with connect(self.db_path) as conn:
+            gone = conn.execute("DELETE FROM record_changes WHERE at < ?", (before,)).rowcount
+        conn.close()
+        return int(gone)
 
     def forget(self, owner: str) -> None:
         """Everything an account had, for when the account goes."""

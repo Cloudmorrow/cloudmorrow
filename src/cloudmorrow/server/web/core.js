@@ -90,6 +90,15 @@ export async function apiRaw(method, path, { body, type, fail = "request failed"
   throw new ApiError(res.status, data && data.detail !== undefined ? data.detail : fail);
 }
 
+/** A response that stays open — the change feed (changes.js). The Response
+    comes back for the caller to read as a stream; `signal` closes it. A
+    refusal is an ApiError, and a 401 signs out like everywhere else. */
+export async function apiStream(path, { signal } = {}) {
+  const res = await send(path, { method: "GET", headers: { Accept: "text/event-stream" }, cache: "no-store", signal });
+  if (!res.ok || !res.body) throw new ApiError(res.status, "stream refused");
+  return res;
+}
+
 export const encodePath = (path) => path.split("/").map(encodeURIComponent).join("/");
 // A path's folder and its last part, and the path of a name in a folder
 // ("" being the top).

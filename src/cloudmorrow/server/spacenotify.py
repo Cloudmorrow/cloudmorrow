@@ -7,11 +7,16 @@ the space's name and the first line of what was said, and, for being added,
 a line behind the bell as well — the way chat and calendar always did it.
 
 Pushes go out on a thread, after the write has answered: nobody waits on a
-phone's push service to hear that their message was sent.
+phone's push service to hear that their message was sent. One thread, taking
+the notices in turn: a thread for each notice let a busy channel start them
+faster than they finished, and a thousand threads each working out fifty
+people's badges was the server's memory gone.
 """
 
 from __future__ import annotations
 
+import logging
+import queue
 import threading
 
 from cloudmorrow.server.badge import notify_message
@@ -67,8 +72,36 @@ def _space_of(state: AppState, record: Record) -> tuple[str, str, Record | None]
     return space_model.id, space_id, space
 
 
+log = logging.getLogger("cloudmorrow.spacenotify")
+
+# The notices waiting their turn, and the one thread that takes them. A
+# push is best effort: past this many waiting, the newest is dropped and
+# said so, rather than the server growing until it is stopped.
+_waiting: queue.Queue = queue.Queue(maxsize=10_000)
+_worker: threading.Thread | None = None
+_starting = threading.Lock()
+
+
 def _later(work) -> None:
-    threading.Thread(target=work, name="space-notify", daemon=True).start()
+    global _worker
+    try:
+        _waiting.put_nowait(work)
+    except queue.Full:
+        log.warning("a push was dropped: %d are waiting already", _waiting.qsize())
+        return
+    with _starting:
+        if _worker is None or not _worker.is_alive():
+            _worker = threading.Thread(target=_run, name="space-notify", daemon=True)
+            _worker.start()
+
+
+def _run() -> None:
+    while True:
+        work = _waiting.get()
+        try:
+            work()
+        except Exception:  # one push failing is not the next one's problem
+            log.exception("a push failed")
 
 
 def install(state: AppState) -> None:

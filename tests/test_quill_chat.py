@@ -281,6 +281,7 @@ def test_the_badge_follows_the_switches(chat):
 def test_a_line_pushes_everybody_else_and_opens_the_conversation(chat, monkeypatch):
     general = listed(chat)["general"]
     pushed = []
+    monkeypatch.setattr(PushStore, "has", lambda self, who: True)
     monkeypatch.setattr(PushStore, "send", lambda self, who, payload: pushed.append((who, payload)) or 1)
     say(chat, general, "hello")
     assert [who for who, _ in pushed] == [["guest"]], "the writer does not push themselves"
@@ -295,6 +296,7 @@ def test_a_line_pushes_everybody_else_and_opens_the_conversation(chat, monkeypat
 def test_a_direct_line_is_titled_with_the_person(chat, monkeypatch):
     made = direct(chat, "guest")
     pushed = []
+    monkeypatch.setattr(PushStore, "has", lambda self, who: True)
     monkeypatch.setattr(PushStore, "send", lambda self, who, payload: pushed.append(payload) or 1)
     say(chat, made, "are you up")
     assert pushed[0]["title"] == "bram"

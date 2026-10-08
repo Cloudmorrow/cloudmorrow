@@ -316,6 +316,12 @@ class PushStore:
         with self._connect() as conn:
             conn.execute("DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,))
 
+    def has(self, username: str) -> bool:
+        """Does this person have a device to push to at all?"""
+        with self._connect() as conn:
+            row = conn.execute("SELECT 1 FROM push_subscriptions WHERE username = ? LIMIT 1", (username,)).fetchone()
+        return row is not None
+
     def list(self, username: str) -> list[Subscription]:
         with self._connect() as conn:
             rows = conn.execute(

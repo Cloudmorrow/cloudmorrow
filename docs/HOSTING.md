@@ -113,6 +113,73 @@ desktop app, `cm` and the TUI), `<address>/app` and a QR code of it for a
 phone, `<address>/mcp` for an assistant. Every one signs in with the
 person's own name and password.
 
+## How far one cloud goes
+
+A cloud is one process, by design (quills/services.py says why), and the
+way to more people is more clouds: a tenant each, not one big one. What
+one process does is measured rather than guessed, with
+`scripts/loadtest.py`: it starts a server of its own on a directory it
+takes away again, makes the accounts, fills every board, and times the
+four requests an open screen makes, as so many people at once. Run it on
+the machine a cloud will run on; these are a desktop's numbers, Python
+3.12, and what a Raspberry Pi does is a fraction of them.
+
+Fifty accounts, two hundred tasks each and a channel with a thousand lines
+in it — 11,051 records — served 400 requests of each kind at 10, 50 and 100
+at once, without an error, and the server stayed at 159 MB:
+
+| request | at once | req/s | p50 | p95 | max | errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| list | 10 | 29 | 330 ms | 574 ms | 641 ms | 0 |
+| create | 10 | 148 | 61 ms | 89 ms | 120 ms | 0 |
+| search | 10 | 26 | 397 ms | 687 ms | 754 ms | 0 |
+| thread | 10 | 286 | 31 ms | 45 ms | 59 ms | 0 |
+| list | 50 | 30 | 1268 ms | 2730 ms | 3910 ms | 0 |
+| create | 50 | 109 | 365 ms | 449 ms | 552 ms | 0 |
+| search | 50 | 21 | 2047 ms | 3375 ms | 3652 ms | 0 |
+| thread | 50 | 217 | 141 ms | 171 ms | 189 ms | 0 |
+| list | 100 | 21 | 4150 ms | 5650 ms | 6073 ms | 0 |
+| create | 100 | 91 | 713 ms | 917 ms | 987 ms | 0 |
+| search | 100 | 20 | 4347 ms | 6000 ms | 6642 ms | 0 |
+| thread | 100 | 151 | 311 ms | 588 ms | 654 ms | 0 |
+
+`list` is a board of two hundred tasks opening, `create` a task being made,
+`search` a `?q=` over the person's tasks, `thread` an open conversation
+asking for what it has not got. Seeding ran at 113 writes a second with
+sixteen writing at once.
+
+What the numbers say. Writes and small reads go at a hundred to three
+hundred a second whatever the crowd. A listing of two hundred records
+costs the process some fifteen milliseconds of Python — each row is
+unsealed and decoded, the query itself is answered from an index — so one
+process hands out twenty to thirty such listings a second, and past that
+people queue: ten opening boards at once wait a third of a second, a
+hundred wait four. A household never gets there; a company of fifty on
+one cloud will feel it on the heaviest screens at the busiest moment, and
+the answer is for screens to ask for less (`_last`, a filter) before it is
+for the server to grow.
+
+What was changed to make these numbers true, and to hold them:
+
+- The database is in write-ahead mode with a busy wait, so a write no
+  longer blocks every read, and the clock folds the log back into the file
+  (`db.connect`, `db.checkpoint`).
+- A connection closes when its `with` block ends. Python 3.12's own
+  connection frees its native memory only when the cyclic collector gets
+  round to it, and under load hundreds sat open, each with its cache: the
+  server grew by the gigabyte. That is why the server now stays at 159 MB.
+- A listing is at most a thousand records and a search two hundred
+  matches, and the fields a screen narrows by have indexes
+  ([DATAMODELS.md](DATAMODELS.md), *Records*).
+- The change feed keeps ninety days; the sweep takes the rest.
+- An open screen listens to `/api/changes` instead of asking every five
+  seconds — one idle connection per screen instead of a request per screen
+  per five seconds, which at fifty open screens is ten requests a second
+  for nothing.
+- A notice to the people in a space goes through one thread, and the badge
+  — every space they can see, counted — is worked out only for somebody
+  with a device to carry it.
+
 ## What is in the repository, and what is not
 
 | piece | where | status |
@@ -123,5 +190,7 @@ person's own name and password.
 | The container image, compose file, Caddyfile | `deploy/docker/` | built, not yet run in CI |
 | Home network discovery | `server/access_lan.py`, `client/discover.py` | built |
 | Sign-in limits | `server/signin_limits.py` | built |
+| The change feed, `GET /api/changes` | `server/changefeed.py`, `web/changes.js` | built |
+| The load measurement | `scripts/loadtest.py` | built; numbers above |
 | Add a device | web app, `tui/screens/adddevice.py` | built |
 | The shop and the tenant control plane | their own repositories | not started |

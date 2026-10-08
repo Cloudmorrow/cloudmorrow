@@ -100,6 +100,15 @@ every message, event, task, dotfile and secret is gone; there is no
 recovery, by design. Keep a copy somewhere that is not the server. Keep
 it apart from your backup of the data, or the backup is as good as plain.
 
+**The database is three files while the server runs.** It is kept in
+SQLite's write-ahead mode, so beside `cloudmorrow.db` there are
+`cloudmorrow.db-wal`, the writes not yet folded in, and
+`cloudmorrow.db-shm`. A copy of the data directory takes all three; a copy
+of the `.db` alone, made while the server runs, is the database as it was
+at the last checkpoint. For a copy at one moment, `sqlite3 cloudmorrow.db
+".backup copy.db"` folds the log in as it copies. All of it is ciphertext
+without the key either way.
+
 **Every command sees the same key.** `cloudmorrow-server` reads the
 config and registers the key for the database before it opens it, so
 `user create` and the rest seal and open under the service's key. A

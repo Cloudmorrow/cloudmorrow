@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, RedirectResponse
 
 from cloudmorrow import __version__
-from cloudmorrow.server import spacenotify
+from cloudmorrow.server import changefeed, spacenotify
 from cloudmorrow.server.access import is_allowed, parse_rules
 from cloudmorrow.server.access_lan import announcer
 from cloudmorrow.server.agents import AgentStore, JobStore
@@ -127,6 +127,9 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     # keep it from starting.
     # What happens in shared spaces reaches the people in them.
     spacenotify.install(app.state.cloudmorrow)
+    # And every open screen hears of what changed, the moment it did.
+    app.state.cloudmorrow.changes = changefeed.ChangeFeed(record_store)
+    record_store.on_change.append(app.state.cloudmorrow.changes.listen)
     # Datamodels that live where they always have, served as records.
     record_store.backends["notes"] = NotesBackend(
         lambda username: app.state.cloudmorrow.note_store(user_store.require(username))
@@ -224,6 +227,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         ],
     )
     app.include_router(records.router)
+    app.include_router(changefeed.router)
     app.include_router(records.models_router)
     app.include_router(records.people_router)
     app.include_router(quills.router)

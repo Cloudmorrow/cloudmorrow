@@ -46,7 +46,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from cloudmorrow.server.db import connect
+from cloudmorrow.server.db import checkpoint, connect
 from cloudmorrow.server.quills import QuillError, QuillRegistry, load_catalog
 from cloudmorrow.server.records import RecordStore, UnknownModelError
 
@@ -474,6 +474,9 @@ def sweep_all(registry: QuillRegistry, records: RecordStore) -> int:
             gone += records.sweep(model_id)
         except UnknownModelError:
             continue
+    # The change feed's old lines go with the expired records: what it is
+    # kept for (an open screen catching up, an audit) looks back weeks, not years.
+    records.prune_changes()
     return gone
 
 
@@ -513,6 +516,9 @@ class Clock:
                     self.on_tick()
                 except Exception:  # a job that cannot start is tried next tick
                     log.exception("run jobs failed")
+            # The database's log, folded in and cut back while there is a
+            # moment with nobody reading (db.checkpoint).
+            checkpoint(self.db_path)
             if self._stop.wait(TICK if self.on_tick is not None else SWEEP_EVERY):
                 return
             if time.monotonic() - swept >= SWEEP_EVERY:

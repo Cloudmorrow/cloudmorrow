@@ -59,6 +59,10 @@ def notify_message(
     """
     landed = 0
     for who in dict.fromkeys(usernames):
+        # The badge is the costly part — every space they can see, counted —
+        # so it is not worked out for somebody with no device to carry it.
+        if not state.push.has(who):
+            continue
         counts = badge_for(state, who)
         landed += state.push.send(
             [who],

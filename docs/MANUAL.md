@@ -2023,6 +2023,7 @@ All note paths are relative to the calling user's notes root.
 | `DELETE` | `/api/records/{model}/{id}/members/{username}` | take somebody out, or with your own name leave |
 | `POST` | `/api/records/{model}/{id}/seen` | you have looked in a space: what is in it is not unread |
 | `GET` | `/api/records/{model}?_last=50&_since=…` | the newest fifty, still in order; only what changed at or after a moment |
+| `GET` | `/api/changes` | a server-sent events stream of the records you may see being made, changed or deleted; `?since=<seq>` to catch up |
 | `GET` | `/api/people` | everybody a space could be shared with, or written to |
 | `GET`/`POST` | `/api/shares` | your fileshares; a share carries its `url` |
 | `GET`/`DELETE` | `/api/shares/{name}` | one share; `?remove_files=true` deletes a directory the server made |

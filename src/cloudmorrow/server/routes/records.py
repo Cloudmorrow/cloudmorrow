@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 from cloudmorrow.server.backends import AttachmentTooBig
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_current_user, get_principal, get_state
-from cloudmorrow.server.records import Principal, RecordError, UnknownRecordError
+from cloudmorrow.server.records import SEARCH_CAP, Principal, RecordError, UnknownRecordError
 from cloudmorrow.server.routes.errors import ERRORS, http_error
 from cloudmorrow.server.seeding import seed
 
@@ -98,6 +98,7 @@ def list_datamodels(state: AppState = Depends(get_state), user: User = Depends(g
 def list_records(
     model: str,
     request: Request,
+    response: Response,
     state: AppState = Depends(get_state),
     principal: Principal = Depends(get_principal),
 ) -> list[dict]:
@@ -109,6 +110,11 @@ def list_records(
     `_last=50` keeps the newest fifty, still in order — a conversation's
     first page — and `_since=<ISO time>` only what was made or changed at or
     after it, which is how an open screen asks what it has not got.
+
+    A plain listing is at most a thousand records, the first thousand in
+    order, and says so with `X-Records-Capped: 1000` when it stopped there;
+    a search is at most two hundred matches. Narrow with a filter, `_last`
+    or `_since` for the rest.
     """
     switched_on(state, model)
     where = dict(request.query_params)
@@ -119,6 +125,9 @@ def list_records(
         records = state.records.list(principal, model, where, last=_whole(last), since=since or None)
     except ERRORS as exc:
         raise http_error(exc) from exc
+    cap = SEARCH_CAP if where.get("q") else (None if (last or since) else state.records.list_cap)
+    if cap is not None and len(records) >= cap:
+        response.headers["X-Records-Capped"] = str(cap)
     return [record.to_dict() for record in records]
 
 

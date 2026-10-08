@@ -307,6 +307,7 @@ def test_devices_are_not_shared_between_accounts(client, auth):
 
 def test_the_test_push_goes_to_yourself(client, auth, monkeypatch):
     pushed = []
+    monkeypatch.setattr(PushStore, "has", lambda self, who: True)
     monkeypatch.setattr(PushStore, "send", lambda self, who, payload: pushed.append((who, payload)) or 1)
     assert client.post("/api/push/test", headers=auth).status_code == 200
     assert pushed[0][0] == ["bram"]

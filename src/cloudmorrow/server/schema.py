@@ -312,7 +312,26 @@ class Step:
     run: Callable[[sqlite3.Connection], None]
 
 
-STEPS: tuple[Step, ...] = (Step(1, "the tables as they stood before they were versioned", _baseline),)
+def _indexes_for_scale(conn: sqlite3.Connection) -> None:
+    """The indexes the two biggest tables need once a cloud has had a year of use.
+
+    `records (model, updated_at)` is what an open screen's `_since` asks;
+    `record_changes (at)` is what the retention sweep deletes by. The
+    per-field expression indexes are the record store's own (records.py,
+    `ensure_indexes`), because they follow the installed datamodels.
+    """
+    conn.executescript(
+        """
+        CREATE INDEX IF NOT EXISTS records_model_updated ON records (model, updated_at);
+        CREATE INDEX IF NOT EXISTS record_changes_at ON record_changes (at);
+        """
+    )
+
+
+STEPS: tuple[Step, ...] = (
+    Step(1, "the tables as they stood before they were versioned", _baseline),
+    Step(2, "indexes for what an open screen and the retention sweep ask", _indexes_for_scale),
+)
 
 VERSION = STEPS[-1].version
 
