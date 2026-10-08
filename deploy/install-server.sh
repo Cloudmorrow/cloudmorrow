@@ -1,10 +1,11 @@
 #!/bin/sh
 # Install (or re-install) the Cloudmorrow server on this machine.
 #
-# One command, five questions — what your cloud is called, who its first
+# One command, six questions — what your cloud is called, who its first
 # account (the administrator) is, where on this machine it goes (Enter
-# takes the usual places), which of its addresses it answers on, and which
-# of the standard quills it has — and it is running:
+# takes the usual places), which of its addresses it answers on, which
+# database it keeps its records in (the built-in one, unless you run a
+# PostgreSQL), and which of the standard quills it has — and it is running:
 #
 #   curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
 #
@@ -53,6 +54,7 @@ QUILLS=""
 DRY_RUN=""
 UPDATE=""
 HOST_GIVEN=""
+DATABASE=""
 
 usage() {
 	sed -n '2,18p' "$0"
@@ -84,6 +86,11 @@ Options:
   --host ADDR         address(es) to answer on, comma-separated
                       (asked if not given; default: $HOST, every address)
   --port N            bind port                         (default: $PORT)
+  --database WHAT     where the records are kept: builtin (a file in the
+                      data directory), container (PostgreSQL in a container
+                      beside the server, with docker or podman), or the
+                      URL of a PostgreSQL server you already have
+                      (asked if not given)
   --service-user NAME system user to run as             (default: $SERVICE_USER)
   --admin USER        unix user allowed to update and restart (default: \$SUDO_USER)
   --ssh-key PATH      deploy key for a private repo     (default: generate one)
@@ -109,6 +116,7 @@ while [ $# -gt 0 ]; do
 	--data-dir) DATA_DIR="$2"; shift 2 ;;
 	--host) HOST="$2"; HOST_GIVEN="1"; shift 2 ;;
 	--port) PORT="$2"; shift 2 ;;
+	--database) DATABASE="$2"; shift 2 ;;
 	--service-user) SERVICE_USER="$2"; shift 2 ;;
 	--service-name) SERVICE_NAME="$2"; shift 2 ;;
 	--admin) ADMIN_USER="$2"; shift 2 ;;
@@ -860,6 +868,143 @@ if [ ! -f "$CONFIG" ]; then
 	HEALTH_URL="http://$HEALTH_HOST:$PORT/api/health"
 fi
 
+# --- the database ----------------------------------------------------------
+# Asked once the software is in, like the addresses; a config that exists
+# has its answer. Built in is a file in the data directory, which is right
+# for most. A container runs PostgreSQL beside the server with docker or
+# podman, its password made once and kept beside the sealing key, where
+# only the service user reads it, and handed to the driver as a passfile so
+# server.toml holds no secret. A URL is a PostgreSQL server of your own,
+# reached once before anything is written. Chosen here and not changed
+# after: the records do not move between databases.
+PG_CONTAINER="cloudmorrow-postgres"
+PG_IMAGE="postgres:16"
+PG_PORT="5432"
+PGPASS="$CONFIG_DIR/postgres.pgpass"
+DUMP_DIR="$DATA_DIR/postgres"
+DATABASE_URL=""
+CONTAINER_ENGINE=""
+CONTAINER_UNIT=""
+
+hide_password() { printf '%s' "$1" | sed 's|://[^@/]*@|://…@|'; }
+
+ask_database() {
+	set -- --title "Which database should it keep its records in?" --need-one \
+		--item builtin "Built in" "a file in $DATA_DIR; right for most" --on builtin --alone builtin \
+		--item container "PostgreSQL in a container" "beside the server, with docker or podman" --alone container \
+		--other "A PostgreSQL server you have" --other-hint "postgresql://user:password@host:5432/cloudmorrow" \
+		--other-pattern 'postgres(ql)?://[^ ]+'
+	status=0
+	chosen="$("$VENV/bin/python" -m cloudmorrow.checklist "$@")" || status=$?
+	case "$status" in
+	0) DATABASE="$(printf '%s\n' "$chosen" | head -n 1)" ;;
+	130) die "stopped. Run this again to carry on where it left off." ;;
+	*) warn "could not ask, so the records go in the built-in database (--database chooses)" ;;
+	esac
+}
+
+container_engine() {
+	for candidate in docker podman; do
+		if command -v "$candidate" >/dev/null 2>&1; then
+			CONTAINER_ENGINE="$candidate"
+			return 0
+		fi
+	done
+	return 1
+}
+
+database_container() {
+	if ! container_engine; then
+		[ -n "$DRY_RUN" ] || die "a PostgreSQL container needs docker or podman on this machine: install one, or choose --database builtin"
+		warn "this machine has neither docker nor podman, which the container needs"
+		CONTAINER_ENGINE="docker"
+	fi
+	[ "$CONTAINER_ENGINE" != "docker" ] || CONTAINER_UNIT="docker.service"
+	if [ -f "$PGPASS" ]; then
+		say "keeping the database password at $PGPASS"
+		PG_PORT="$(cut -d: -f2 "$PGPASS" | head -n 1)"
+		password="$(cut -d: -f5 "$PGPASS" | head -n 1)"
+	else
+		# A port nothing else answers on: a PostgreSQL of the machine's own
+		# would be on 5432 already.
+		while ss -ltn 2>/dev/null | grep -q ":$PG_PORT "; do
+			PG_PORT=$((PG_PORT + 1))
+		done
+		say "writing the database password to $PGPASS"
+		if [ -n "$DRY_RUN" ]; then
+			password="(generated)"
+		else
+			password="$(head -c 24 /dev/urandom | base64 | tr -d '/+=\n')"
+			(umask 077 && printf '127.0.0.1:%s:cloudmorrow:cloudmorrow:%s\n' "$PG_PORT" "$password" >"$PGPASS")
+		fi
+		run chown "$SERVICE_USER:$SERVICE_USER" "$PGPASS"
+		run chmod 600 "$PGPASS"
+	fi
+	if "$CONTAINER_ENGINE" container inspect "$PG_CONTAINER" >/dev/null 2>&1; then
+		say "starting the container $PG_CONTAINER, which is there already"
+		run "$CONTAINER_ENGINE" start "$PG_CONTAINER"
+	else
+		say "running PostgreSQL as the container $PG_CONTAINER ($PG_IMAGE), on 127.0.0.1:$PG_PORT"
+		run "$CONTAINER_ENGINE" run -d --name "$PG_CONTAINER" --restart unless-stopped \
+			-p "127.0.0.1:$PG_PORT:5432" \
+			-e POSTGRES_USER=cloudmorrow -e "POSTGRES_PASSWORD=$password" -e POSTGRES_DB=cloudmorrow \
+			-v "$PG_CONTAINER:/var/lib/postgresql/data" "$PG_IMAGE"
+	fi
+	password=""
+	if [ -z "$DRY_RUN" ]; then
+		tries=0
+		until "$CONTAINER_ENGINE" exec "$PG_CONTAINER" pg_isready -U cloudmorrow -q 2>/dev/null; do
+			tries=$((tries + 1))
+			[ "$tries" -lt 60 ] || die "the database container did not answer within a minute: $CONTAINER_ENGINE logs $PG_CONTAINER"
+			sleep 1
+		done
+	fi
+	DATABASE_URL="postgresql://cloudmorrow@127.0.0.1:$PG_PORT/cloudmorrow?passfile=$PGPASS"
+}
+
+check_database() {
+	if [ -n "$DRY_RUN" ]; then
+		printf '   \033[2mwould check:\033[0m the database at %s\n' "$(hide_password "$1")"
+		return 0
+	fi
+	say "checking the database at $(hide_password "$1")"
+	sudo -u "$SERVICE_USER" -H "$VENV/bin/python" -c 'import sys, psycopg
+psycopg.connect(sys.argv[1], connect_timeout=10).close()' "$1" ||
+		die "cannot reach that database: check the URL, the password, and who may connect to the server (pg_hba.conf)"
+}
+
+if [ -f "$CONFIG" ]; then
+	DATABASE_URL="$(config_value database_url)"
+	case "$DATABASE_URL" in
+	*"passfile=$PGPASS"*) DATABASE="container" ;;
+	"") DATABASE="builtin" ;;
+	*) DATABASE="$DATABASE_URL" ;;
+	esac
+elif [ -z "$DATABASE" ]; then
+	if [ -n "$DRY_RUN" ]; then
+		printf '   \033[2mwould ask:\033[0m which database to keep its records in\n'
+	elif [ -n "$TTY" ]; then
+		ask_database
+	fi
+	[ -n "$DATABASE" ] || DATABASE="builtin"
+fi
+case "$DATABASE" in
+builtin) ;;
+container | postgresql://* | postgres://*)
+	# The driver, on top of what is installed already.
+	say "installing the PostgreSQL driver (cloudmorrow[postgres])"
+	run sudo -u "$SERVICE_USER" "$VENV/bin/python" -m pip install --quiet --editable "$SRC[server,agent,postgres]"
+	;;
+*) die "--database is builtin, container, or a postgresql:// URL, not \"$DATABASE\"" ;;
+esac
+case "$DATABASE" in
+container) database_container ;;
+postgresql://* | postgres://*)
+	DATABASE_URL="$DATABASE"
+	[ -f "$CONFIG" ] || check_database "$DATABASE_URL"
+	;;
+esac
+
 # --- configuration ---------------------------------------------------------
 if [ -f "$CONFIG" ]; then
 	say "keeping the existing $CONFIG"
@@ -869,6 +1014,11 @@ else
 		SHARES_LINE="shares_dir = \"$SHARES_DIR\""
 	else
 		SHARES_LINE="# shares_dir = \"/srv/shares\""
+	fi
+	if [ -n "$DATABASE_URL" ]; then
+		DATABASE_LINE="database_url = \"$DATABASE_URL\""
+	else
+		DATABASE_LINE="# database_url = \"postgresql://cloudmorrow@db.example.com:5432/cloudmorrow?passfile=$PGPASS\""
 	fi
 	write_file "$CONFIG" 0644 <<EOF
 # Written by install-server.sh. Safe to edit; the installer never rewrites it.
@@ -880,9 +1030,15 @@ name = "$CLOUD_NAME"
 # Everyone's files: a folder per person, and the Shares folder. (The key
 # is called notes_dir from when notes were all that was kept in it.)
 notes_dir = "$FILES_DIR"
-# The database, the keys and the quills.
+# The keys, the quills, and the database when it is the built-in one.
 data_dir = "$DATA_DIR"
 per_user_dirs = true
+
+# Which database holds the records and accounts: blank, the built-in one,
+# a file in data_dir; or a PostgreSQL server by URL, with the password in
+# it or in a passfile it names. Chosen at install; the records do not move
+# between databases afterwards.
+$DATABASE_LINE
 
 # The Shares folder, for files shared with every machine: Shares among
 # the files, unless this says otherwise. A folder outside the directories
@@ -934,7 +1090,7 @@ say "writing $UNIT"
 write_file "$UNIT" 0644 <<EOF
 [Unit]
 Description=Cloudmorrow API
-After=network-online.target
+After=network-online.target${CONTAINER_UNIT:+ $CONTAINER_UNIT}
 Wants=network-online.target
 
 [Service]
@@ -959,6 +1115,37 @@ ReadWritePaths=$FILES_DIR $DATA_DIR $PREFIX${SHARES_OUTSIDE:+ $SHARES_OUTSIDE}
 [Install]
 WantedBy=multi-user.target
 EOF
+
+# --- a daily dump of the database, when it is the container's ---------------
+# Into the data directory, so whatever backs that up — the server's own
+# agent, rsync, a snapshot — carries the database with it, as it does the
+# built-in one. The dump is ciphertext without the key, like the rest.
+if [ "$DATABASE" = "container" ]; then
+	say "a daily dump of the database goes into $DUMP_DIR (cloudmorrow-pgdump.timer)"
+	run mkdir -p "$DUMP_DIR"
+	run chown "$SERVICE_USER:$SERVICE_USER" "$DUMP_DIR"
+	write_file /etc/systemd/system/cloudmorrow-pgdump.service 0644 <<EOF
+[Unit]
+Description=A dump of Cloudmorrow's database, into its data directory
+${CONTAINER_UNIT:+After=$CONTAINER_UNIT}
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c '$CONTAINER_ENGINE exec $PG_CONTAINER pg_dump -U cloudmorrow -Fc cloudmorrow >$DUMP_DIR/cloudmorrow.dump.new && mv $DUMP_DIR/cloudmorrow.dump.new $DUMP_DIR/cloudmorrow.dump && chown $SERVICE_USER:$SERVICE_USER $DUMP_DIR/cloudmorrow.dump'
+EOF
+	write_file /etc/systemd/system/cloudmorrow-pgdump.timer 0644 <<EOF
+[Unit]
+Description=Dump Cloudmorrow's database every day
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+fi
 
 # --- the updater your user runs -------------------------------------------
 say "installing /usr/local/bin/cloudmorrow-update"
@@ -1037,6 +1224,7 @@ if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
 	run systemctl daemon-reload
 	run systemctl enable --quiet "$SERVICE_NAME"
 	run systemctl restart "$SERVICE_NAME"
+	[ "$DATABASE" != "container" ] || run systemctl enable --quiet --now cloudmorrow-pgdump.timer
 	if [ -n "$DRY_RUN" ]; then
 		:
 	elif problem="$(wait_healthy)"; then
@@ -1154,6 +1342,11 @@ done
 heading "Where things are"
 item "settings" "$CONFIG"
 item "data" "$DATA_DIR"
+case "$DATABASE" in
+container) item "database" "PostgreSQL in the container $PG_CONTAINER; a dump each day in $DUMP_DIR" ;;
+postgresql://* | postgres://*) item "database" "$(hide_password "$DATABASE_URL")" ;;
+*) item "database" "built in, $DATA_DIR/cloudmorrow.db" ;;
+esac
 item "files" "$FILES_DIR"
 item "shares" "${SHARES_DIR:-$FILES_DIR/Shares}"
 item "code" "$SRC ($BRANCH)"

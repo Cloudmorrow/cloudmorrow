@@ -109,13 +109,16 @@ or says the command that would. One command:
 curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
 ```
 
-It asks five questions: what your cloud is called, a username and password
+It asks six questions: what your cloud is called, a username and password
 for the first account, which becomes the administrator, where on the
 machine it goes (the code, the settings and the data, each on a row with
 its usual place filled in; Enter takes them all, or change the ones you
 want elsewhere; everything people keep goes under the data directory, in
 `files/`), which of the machine's addresses it answers on
-(every one unless you tick others, or type your own), and which of the
+(every one unless you tick others, or type your own), which database it
+keeps its records in (the built-in one, a file in the data directory,
+which is right for most; or PostgreSQL, in a container it runs beside the
+server or on a server you already have), and which of the
 standard quills it should have (Notes, Tasks, Calendar, Chat, Files,
 Secrets; all of them unless you untick some). Then it creates a service
 user, clones the code into `/opt/cloudmorrow` (or where you said), builds a
@@ -261,7 +264,7 @@ shares are stored as they are, so they need no key, and are not yet encrypted.
 
 ## How it is built
 
-One FastAPI service with SQLite and a folder of files, a Textual terminal
+One FastAPI service with a database (SQLite, or PostgreSQL) and a folder of files, a Textual terminal
 app, a plain HTML web app, and a small agent that runs on each machine. No
 containers, no build step, no JavaScript framework. The layout, the API and
 every command are described in [docs/MANUAL.md](docs/MANUAL.md).

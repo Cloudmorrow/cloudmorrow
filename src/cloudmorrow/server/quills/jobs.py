@@ -43,8 +43,10 @@ import logging
 import threading
 import time
 from collections.abc import Callable
+from pathlib import Path
 
 from cloudmorrow.server.database import Database
+from cloudmorrow.server.database import open as open_database
 from cloudmorrow.server.quills import QuillError, QuillRegistry, load_catalog
 from cloudmorrow.server.records import RecordStore, UnknownModelError
 
@@ -69,14 +71,16 @@ LEGACY_CHAT = "legacy_chat_moved"
 MOVED_BUILTINS: tuple[str, ...] = ("notes",)
 
 
-def read_meta(db: Database, key: str) -> str | None:
+def read_meta(db: Database | Path, key: str) -> str | None:
+    db = open_database(db)
     with db.connect() as conn:
         row = conn.execute("SELECT value FROM schema_meta WHERE key = ?", (key,)).fetchone()
     conn.close()
     return row[0] if row else None
 
 
-def write_meta(db: Database, key: str, value: str) -> None:
+def write_meta(db: Database | Path, key: str, value: str) -> None:
+    db = open_database(db)
     with db.connect() as conn:
         conn.execute(
             "INSERT INTO schema_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
@@ -94,8 +98,9 @@ def _legacy_rows(db: Database) -> bool:
     return bool(row and row[0])
 
 
-def install_foundation(db: Database, registry: QuillRegistry) -> list[str]:
+def install_foundation(db: Database | Path, registry: QuillRegistry) -> list[str]:
     """The catalog's foundation Quills, on a server that has never had any."""
+    db = open_database(db)
     if read_meta(db, SEEDED) or registry.quills:
         return []
     catalog = load_catalog(registry.catalog_location)
@@ -108,8 +113,9 @@ def install_foundation(db: Database, registry: QuillRegistry) -> list[str]:
     return installed
 
 
-def move_legacy_tasks(db: Database, registry: QuillRegistry, records: RecordStore) -> int:
+def move_legacy_tasks(db: Database | Path, registry: QuillRegistry, records: RecordStore) -> int:
     """Boards and tasks from the old tables into records. Returns how many moved."""
+    db = open_database(db)
     if read_meta(db, LEGACY_TASKS) or not _legacy_rows(db):
         return 0
     if "tasks" not in registry.quills:
@@ -174,7 +180,7 @@ def _had_calendar(db: Database) -> tuple[bool, bool]:
     return True, bool(count) or switched_on
 
 
-def move_legacy_calendar(db: Database, registry: QuillRegistry, records: RecordStore) -> int:
+def move_legacy_calendar(db: Database | Path, registry: QuillRegistry, records: RecordStore) -> int:
     """Calendars, their people and their events from the old tables into records.
 
     A calendar becomes a `calendar` space of the scope its kind was, owned
@@ -184,6 +190,7 @@ def move_legacy_calendar(db: Database, registry: QuillRegistry, records: RecordS
     whoever wrote it, its times exactly as they were — wall-clock, and a
     bare date for a whole day. Returns how many records were written.
     """
+    db = open_database(db)
     if read_meta(db, LEGACY_CALENDAR):
         return 0
     existed, wanted = _had_calendar(db)
@@ -265,7 +272,7 @@ def adopted_key(quill_id: str) -> str:
     return f"builtin_adopted:{quill_id}"
 
 
-def adopt_builtins(db: Database, registry: QuillRegistry) -> list[str]:
+def adopt_builtins(db: Database | Path, registry: QuillRegistry) -> list[str]:
     """Features that were part of the core and are Quills now, installed where they were on.
 
     A server from before the move had Notes as a built-in feature, on
@@ -279,6 +286,7 @@ def adopt_builtins(db: Database, registry: QuillRegistry) -> list[str]:
     move (`standard.choose`, the first-boot page) is marked as having
     decided, and a fresh one gets them as foundation Quills instead.
     """
+    db = open_database(db)
     adopted = []
     for quill_id in MOVED_BUILTINS:
         key = adopted_key(quill_id)
@@ -293,12 +301,13 @@ def adopt_builtins(db: Database, registry: QuillRegistry) -> list[str]:
     return adopted
 
 
-def install_secrets_quill(db: Database, registry: QuillRegistry) -> bool:
+def install_secrets_quill(db: Database | Path, registry: QuillRegistry) -> bool:
     """The Secrets Quill, on a server that had Secrets built in. True when it was installed.
 
     Once: after that, and on a server whose installer chose (`standard.choose`
     marks it), whether Secrets is installed is the administrator's business.
     """
+    db = open_database(db)
     if read_meta(db, SECRETS_QUILL):
         return False
     installed = False
@@ -310,7 +319,7 @@ def install_secrets_quill(db: Database, registry: QuillRegistry) -> bool:
     return installed
 
 
-def install_files(db: Database, registry: QuillRegistry) -> bool:
+def install_files(db: Database | Path, registry: QuillRegistry) -> bool:
     """Files, on a server that had it built in. Returns whether it was installed.
 
     Nothing moves: the files are where they always were, and the `shares`
@@ -320,6 +329,7 @@ def install_files(db: Database, registry: QuillRegistry) -> bool:
     Quill's id too. A server set up since the move chose for itself (the
     installer, or the foundation Quills at first boot), and is left alone.
     """
+    db = open_database(db)
     if read_meta(db, FILES_QUILL):
         return False
     if "files" in registry.quills:
@@ -347,13 +357,14 @@ def _has_rows(db: Database, table: str) -> bool:
 CHAT_SCOPES = {"public": "public", "private": "shared", "direct": "shared"}
 
 
-def move_legacy_chat(db: Database, registry: QuillRegistry, records: RecordStore) -> int:
+def move_legacy_chat(db: Database | Path, registry: QuillRegistry, records: RecordStore) -> int:
     """Channels and messages from the old tables into records. Returns how many moved.
 
     Installs the Chat Quill first on a server that had Chat: one with old
     channels, or with accounts at all — a server nobody has signed in to yet
     is still being set up, and its choice of Quills is the installer's.
     """
+    db = open_database(db)
     if read_meta(db, LEGACY_CHAT):
         return 0
     legacy = _has_rows(db, "chat_channels")
@@ -431,8 +442,9 @@ def move_legacy_chat(db: Database, registry: QuillRegistry, records: RecordStore
     return moved
 
 
-def boot(db: Database, registry: QuillRegistry, records: RecordStore) -> None:
+def boot(db: Database | Path, registry: QuillRegistry, records: RecordStore) -> None:
     """The boot work, in order. Each step logs its own failure and lets the next run."""
+    db = open_database(db)
     try:
         install_foundation(db, registry)
     except QuillError as exc:
@@ -481,12 +493,12 @@ class Clock:
 
     def __init__(
         self,
-        db: Database,
+        db: Database | Path,
         registry: QuillRegistry,
         records: RecordStore,
         on_tick: Callable[[], object] | None = None,
     ) -> None:
-        self.db = db
+        self.db = open_database(db)
         self.registry = registry
         self.records = records
         # Asked every TICK: the `run` jobs whose time has come (quills.services).

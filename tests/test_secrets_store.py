@@ -11,6 +11,7 @@ from cloudmorrow.server.crypto import (
     seal,
     unseal,
 )
+from cloudmorrow.server.database import connect
 from cloudmorrow.server.secrets import (
     InvalidEnvironmentError,
     InvalidSecretNameError,
@@ -47,9 +48,14 @@ def test_setting_the_same_value_again_is_a_no_op(store):
 
 def test_values_are_not_on_disk_in_the_clear(store):
     store.set(OWNER, NONE, "production", "API_KEY", "hunter2-in-the-clear")
-    assert b"hunter2-in-the-clear" not in store.db_path.read_bytes()
+    with connect(store.db.path) as conn:
+        row = conn.execute("SELECT name, sealed FROM secrets").fetchone()
+    assert "hunter2-in-the-clear" not in row["sealed"]
     # The name is deliberately readable, so listing needs no key.
-    assert b"API_KEY" in store.db_path.read_bytes()
+    assert row["name"] == "API_KEY"
+    if store.db.engine.name == "sqlite":
+        assert b"hunter2-in-the-clear" not in store.db.path.read_bytes()
+        assert b"API_KEY" in store.db.path.read_bytes()
 
 
 def test_environments_are_separate(store):

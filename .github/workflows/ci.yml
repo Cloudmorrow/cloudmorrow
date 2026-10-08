@@ -38,6 +38,38 @@ jobs:
       - run: pip install -e ".[tui,agent,server,dev]"
       - run: pytest -q
 
+  # The same suite on the other engine: every test that opens a database
+  # file gets a schema on this server instead (tests/conftest.py). A
+  # statement that passes on one engine and not the other fails the build.
+  test-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cloudmorrow
+          POSTGRES_PASSWORD: cloudmorrow
+          POSTGRES_DB: cloudmorrow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cloudmorrow"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[tui,agent,server,postgres,dev]"
+      - run: pytest -q
+        env:
+          CLOUDMORROW_TEST_DATABASE_URL: postgresql://cloudmorrow:cloudmorrow@localhost:5432/cloudmorrow
+
   image:
     runs-on: ubuntu-latest
     steps:

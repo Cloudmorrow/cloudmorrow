@@ -11,8 +11,15 @@ name = "Cloudmorrow"
 # called notes_dir from when notes were all that was kept in it.
 notes_dir = "/var/lib/cloudmorrow/files"
 
-# The database, the keys and the quills.
+# The keys, the quills, and the database when it is the built-in one.
 data_dir = "/var/lib/cloudmorrow"
+
+# Which database holds the records and accounts. Blank is the built-in
+# one, a SQLite file in data_dir, which is right for most. A PostgreSQL
+# server is a URL, with the password in it or in a libpq passfile it
+# names; the installer writes the one for the container it runs. Chosen
+# at install: the records do not move between databases afterwards.
+# database_url = "postgresql://cloudmorrow@127.0.0.1:5432/cloudmorrow?passfile=/etc/cloudmorrow/postgres.pgpass"
 
 # true  -> every user gets notes_dir/<username>
 # false -> all users share notes_dir

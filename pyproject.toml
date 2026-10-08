@@ -70,6 +70,13 @@ server = [
     # _cloudmorrow._tcp (access_lan). Pure Python; no Avahi needed.
     "zeroconf>=0.131",
 ]
+# PostgreSQL as the database, chosen at install (docs/HOSTING.md, *The
+# database*). The driver carries its own libpq, so nothing is needed from
+# the system. Installed on top of [server] by the installer when it is
+# chosen, and always in the container image.
+postgres = [
+    "psycopg[binary,pool]>=3.1",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",

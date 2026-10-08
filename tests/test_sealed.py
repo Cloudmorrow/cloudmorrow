@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import sqlite3
 from pathlib import Path
 
 import pytest
@@ -16,15 +15,12 @@ from cloudmorrow.server.notifications import NotificationStore
 from cloudmorrow.server.quills import QuillRegistry
 from cloudmorrow.server.records import Principal, RecordStore
 from cloudmorrow.server.sealed import Sealer, rotate, use_key
-from tests.conftest import ADMIN, QUILL_CATALOG, token_for
+from tests.conftest import ADMIN, QUILL_CATALOG, sqlite_only, token_for
 
 
 def raw(db_path: Path, sql: str, *args: object) -> list[tuple]:
-    conn = sqlite3.connect(db_path)
-    try:
-        return conn.execute(sql, args).fetchall()
-    finally:
-        conn.close()
+    with connect(db_path) as conn:
+        return [tuple(row) for row in conn.execute(sql, args).fetchall()]
 
 
 def test_a_record_is_ciphertext_in_the_database_and_text_through_the_store(tmp_path):
@@ -46,15 +42,16 @@ def test_a_value_moved_to_another_row_does_not_open(tmp_path):
     store.add("bram", title="Backup done")
     store.add("guest", title="Their own")
     sealed_title = raw(db, "SELECT title FROM notifications WHERE owner = 'bram'")[0][0]
-    conn = sqlite3.connect(db)
-    conn.execute("UPDATE notifications SET title = ? WHERE owner = 'guest'", (sealed_title,))
-    conn.commit()
-    conn.close()
+    with connect(db) as conn:
+        conn.execute("UPDATE notifications SET title = ? WHERE owner = 'guest'", (sealed_title,))
     with pytest.raises(SealError):
         store.list("guest")
 
 
+@sqlite_only
 def test_a_database_from_before_sealing_is_sealed_on_first_connect(tmp_path):
+    import sqlite3
+
     db = tmp_path / "cm.db"
     # What an older version left: plain rows, and no sealing version.
     conn = sqlite3.connect(db)

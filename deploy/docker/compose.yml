@@ -6,6 +6,17 @@
 # Then open https://cloud.example.com — the first visit names the cloud and
 # makes the administrator. A hosted tenant is this, once per customer, with
 # the domain set to their subdomain and the certificate handled at the edge.
+#
+# The database is the built-in one, a file in the data volume, unless the
+# `postgres` profile is on: then a PostgreSQL container runs beside the
+# server, on a volume of its own, and the server is pointed at it.
+#
+#   COMPOSE_PROFILES=postgres POSTGRES_PASSWORD=$(openssl rand -hex 24) \
+#     CLOUDMORROW_DOMAIN=cloud.example.com docker compose up -d
+#
+# A PostgreSQL server you already have: leave the profile off and set
+# CLOUDMORROW_DATABASE_URL to it. Either way, the choice is made before the
+# first visit, and not changed after: a database is not moved by this file.
 services:
   cloudmorrow:
     build:
@@ -19,9 +30,28 @@ services:
       CLOUDMORROW_NAME: ${CLOUDMORROW_NAME:-Cloudmorrow}
       # Optional: where the weather on the front page is for.
       CLOUDMORROW_WEATHER_PLACE: ${CLOUDMORROW_WEATHER_PLACE:-}
+      # Blank is the built-in database. With the postgres profile on, the
+      # container beside this one; or a server of your own, by URL.
+      CLOUDMORROW_DATABASE_URL: ${CLOUDMORROW_DATABASE_URL:-${POSTGRES_PASSWORD:+postgresql://cloudmorrow:${POSTGRES_PASSWORD}@postgres:5432/cloudmorrow}}
     volumes:
       - data:/data
       - keys:/keys
+
+  postgres:
+    image: postgres:16
+    profiles: ["postgres"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cloudmorrow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_DB: cloudmorrow
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudmorrow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   caddy:
     image: caddy:2
@@ -40,5 +70,9 @@ volumes:
   # Back these two up separately: the data is ciphertext without the key.
   data:
   keys:
+  # With the postgres profile: the database. Back it up as a dump
+  # (`docker compose exec postgres pg_dump -U cloudmorrow -Fc cloudmorrow`),
+  # which is ciphertext without the key like the data volume is.
+  postgres:
   caddy_data:
   caddy_config:

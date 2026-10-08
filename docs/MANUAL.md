@@ -133,7 +133,7 @@ src/cloudmorrow/
     share.py         list, show, add, remove, mount, unmount
   client/            talking to a server: config, credentials, HTTP
     mounts.py        which share is mounted where on this machine, and by what
-  server/            FastAPI app, SQLite stores, notes-on-disk store
+  server/            FastAPI app, the stores and the database layer under them
     types.py         the kinds of data there are, who provides each, and who reaches it
     settings.py      what the server was told about itself from the app: its name
     crypto.py        sealing secret values (AES-256-GCM)
@@ -174,7 +174,7 @@ Notes are the person's, not a project's, so there is one tree and no scoping
 to think about. A note is a plain Markdown file like any other file in the
 drive: it shows in My Files and on WebDAV, and any editor can open it.
 
-Secrets are the exception to files-not-a-database: they live in the SQLite
+Secrets are the exception to files-not-a-database: they live in the
 database, encrypted — see [Secrets](#secrets).
 
 ## The command line
@@ -204,10 +204,11 @@ Secrets Quills' now (`cm notes list`, `cm secrets list`, through the kit);
 ## Server, on the home box
 
 One script, run as root on the home box. It asks what the cloud is called,
-what address people will use and who the first account is, then clones the
-repo, builds a venv, writes the config and the systemd unit, generates the
-sealing key, starts the service, creates that account as administrator and
-gives the server an agent of its own.
+who the first account is, where it goes, which addresses it answers on,
+which database it keeps its records in and which standard quills it has,
+then clones the repo, builds a venv, writes the config and the systemd
+unit, generates the sealing key, starts the service, creates that account
+as administrator and gives the server an agent of its own.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
@@ -246,11 +247,31 @@ What it leaves behind:
 | `/etc/sudoers.d/cloudmorrow` | lets `--admin` run exactly those two commands |
 | `/var/lib/cloudmorrow/.ssh/` | the deploy key the service pulls with, if the repo needed one |
 | `/etc/cloudmorrow/cloudmorrow.key` | the key everything is sealed with at rest |
+| `/etc/cloudmorrow/postgres.pgpass` | the database password, when the installer ran PostgreSQL in a container |
 
 Re-running the script is safe: it puts the checkout on the remote branch,
 reinstalls, and leaves your config, notes, database and accounts alone. It
-reads the name and address back out of the existing config rather than
-asking again, and asks for an account only while the server has none.
+reads the name, address and database back out of the existing config
+rather than asking again, and asks for an account only while the server
+has none.
+
+### The database
+
+The records, the accounts and everything else that is not a file live in
+one database, and the installer asks which: the built-in one, a SQLite
+file at `/var/lib/cloudmorrow/cloudmorrow.db`, which is right for a
+household or a company and needs nothing else on the machine; or
+PostgreSQL. `--database container` runs PostgreSQL beside the server as
+the container `cloudmorrow-postgres` (docker or podman), with a password
+made once and kept at `/etc/cloudmorrow/postgres.pgpass`, and a dump of it
+written into `/var/lib/cloudmorrow/postgres/` every day by
+`cloudmorrow-pgdump.timer`, so whatever backs up the data directory
+carries the database with it. `--database postgresql://…` is a server you
+already run, reached once before anything is written. Either way the
+answer is `database_url` in `server.toml`, blank for the built-in one; the
+server reads `CLOUDMORROW_DATABASE_URL` in a container. The choice is made
+at install: the records do not move from one database to the other.
+[HOSTING.md](HOSTING.md), *The database*, says what each is for.
 
 ### The cloud's name
 
@@ -285,7 +306,11 @@ bought is "open it and fill in the setup page".
 `deploy/docker/` builds the server into one image, with `/data` and
 `/keys` as its two volumes and every config key an environment variable.
 `compose.yml` puts Caddy in front of it for the certificate, and the first
-visit is the setup page above. Updating is replacing the image, so
+visit is the setup page above. The database is the built-in one in the
+data volume unless the `postgres` profile is on, which runs PostgreSQL as
+a third container on a volume of its own (`COMPOSE_PROFILES=postgres
+POSTGRES_PASSWORD=… docker compose up -d`), or `CLOUDMORROW_DATABASE_URL`
+names a server of your own. Updating is replacing the image, so
 `allow_api_update` is off inside it, and `FORWARDED_ALLOW_IPS=*` lets
 uvicorn believe a proxy that is another container rather than the
 loopback. The wheel the image was built from is copied into `/data/dist`

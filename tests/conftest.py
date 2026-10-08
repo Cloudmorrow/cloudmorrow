@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import base64
+import os
 import re
+import secrets
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
 
 from cloudmorrow.client.config import ClientConfig
+from cloudmorrow.server import database
 from cloudmorrow.server.app import create_app
 from cloudmorrow.server.config import ServerConfig
 from cloudmorrow.server.db import UserStore
@@ -31,6 +35,61 @@ def isolated_client_config(tmp_path_factory, monkeypatch):
 
 # A local copy of the Quill Catalog, so no test reaches the network.
 QUILL_CATALOG = Path(__file__).parent / "fixtures" / "quills"
+
+# The suite runs on SQLite, and on PostgreSQL when this names a server:
+# every test that opens a database file gets a schema of its own there
+# instead (`database.stand_in`), so the same tests say the same things
+# about both engines. What is SQLite's alone is marked `sqlite_only`.
+POSTGRES_URL = os.environ.get("CLOUDMORROW_TEST_DATABASE_URL", "").strip()
+sqlite_only = pytest.mark.skipif(bool(POSTGRES_URL), reason="what SQLite alone does")
+
+
+@pytest.fixture(scope="session")
+def postgres_database():
+    """One database for the run, in C collation — so rows sort as SQLite sorts
+    them, bytewise — dropped when the run is over."""
+    if not POSTGRES_URL:
+        yield ""
+        return
+    import psycopg
+
+    name = "cm_test_" + secrets.token_hex(4)
+    with psycopg.connect(POSTGRES_URL, autocommit=True) as admin:
+        admin.execute(f"CREATE DATABASE {name} TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C'")
+    yield urlsplit(POSTGRES_URL)._replace(path=f"/{name}", query="").geturl()
+    with psycopg.connect(POSTGRES_URL, autocommit=True) as admin:
+        admin.execute(f"DROP DATABASE {name} WITH (FORCE)")
+
+
+@pytest.fixture(autouse=True)
+def database_engine(postgres_database, monkeypatch):
+    """On PostgreSQL, a schema per database file the test opens; dropped after."""
+    if not postgres_database:
+        yield
+        return
+    import psycopg
+
+    admin = psycopg.connect(postgres_database, autocommit=True)
+    made: dict[str, database.Database] = {}
+    schemas: list[str] = []
+
+    def stand_in(path: Path) -> database.Database:
+        key = str(path.expanduser().resolve())
+        db = made.get(key)
+        if db is None:
+            schema = "t_" + secrets.token_hex(5)
+            admin.execute(f"CREATE SCHEMA {schema}")
+            schemas.append(schema)
+            db = made[key] = database.open(f"{postgres_database}?options=-c%20search_path%3D{schema}", path=path)
+        return db
+
+    monkeypatch.setattr(database, "stand_in", stand_in)
+    yield
+    for db in made.values():
+        database.forget(db)
+    for schema in schemas:
+        admin.execute(f"DROP SCHEMA {schema} CASCADE")
+    admin.close()
 
 
 @pytest.fixture()

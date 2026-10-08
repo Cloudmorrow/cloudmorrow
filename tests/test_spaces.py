@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import sqlite3
+import json
 from pathlib import Path
 
 import pytest
 
 from cloudmorrow.server.crypto import SealError
+from cloudmorrow.server.database import connect
 from cloudmorrow.server.records import Principal
 from tests.conftest import ADMIN, GUEST, QUILL_CATALOG, token_for
 
@@ -187,11 +188,10 @@ def test_a_message_is_sealed_to_its_channel(spaces, config):
     room = spaces("POST", "/api/records/channel", {"fields": {"name": "a"}, "scope": "public"}, expect=201)
     other = spaces("POST", "/api/records/channel", {"fields": {"name": "b"}, "scope": "public"}, expect=201)
     said = spaces("POST", "/api/records/message", {"fields": {"channel": room["id"], "body": "secret"}}, expect=201)
-    with sqlite3.connect(config.db_path) as conn:
-        conn.execute(
-            "UPDATE records SET indexed = json_set(indexed, '$.channel', ?) WHERE id = ?",
-            (other["id"], said["id"]),
-        )
+    with connect(config.db_path) as conn:
+        indexed = json.loads(conn.execute("SELECT indexed FROM records WHERE id = ?", (said["id"],)).fetchone()[0])
+        indexed["channel"] = other["id"]
+        conn.execute("UPDATE records SET indexed = ? WHERE id = ?", (json.dumps(indexed), said["id"]))
     store = spaces.client.app.state.cloudmorrow.records
     with pytest.raises(SealError):
         store.get(Principal.person("bram"), "message", said["id"])

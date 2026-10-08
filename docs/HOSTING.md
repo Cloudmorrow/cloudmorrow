@@ -7,7 +7,7 @@ work, so the pieces being built now fit the pieces that come after.
 
 | shape | what you do | status |
 | --- | --- | --- |
-| **Your own machine** | run the installer, answer five questions | built |
+| **Your own machine** | run the installer, answer six questions | built |
 | **A hosted tenant** | buy one, open the address, fill in the setup page | the server side is built; the shop and the control plane are not |
 
 What both share is in the repository, and it is what makes the tenant
@@ -29,7 +29,7 @@ possible without a terminal:
 
 ## Your own machine
 
-[The README](../README.md#install-a-server). One command, five questions.
+[The README](../README.md#install-a-server). One command, six questions.
 This is the shape everything else is measured against: whatever the tenant
 does for you, it must not need anything this one does not have.
 
@@ -113,6 +113,45 @@ desktop app, `cm` and the TUI), `<address>/app` and a QR code of it for a
 phone, `<address>/mcp` for an assistant. Every one signs in with the
 person's own name and password.
 
+## The database
+
+Every store keeps its rows in one database, through one layer
+(`server/database/`) that owns every statement, and behind it sit two
+engines. **SQLite** is the default and what a fresh install gets: one file
+in the data directory, a connection per call, nothing else on the machine.
+**PostgreSQL** is chosen at install — the installer's sixth question, or
+`CLOUDMORROW_DATABASE_URL` for a container — as a container the installer
+runs beside the server, or a server you already have, by URL. The choice
+is written as `database_url` in `server.toml`, blank for SQLite, and made
+once: the records do not move between engines.
+
+What PostgreSQL is for is not speed. The ceiling of one cloud is Python
+time per request, measured below, and a tenant scales by being one
+container among many. It is for the person who already runs one, for a
+cloud too large for one file, and for the day the server runs as several
+processes, which a shared database makes possible and a file does not.
+Nothing runs as several processes yet: the supervisor, the clock and the
+change feed assume one, and `LISTEN`/`NOTIFY` is the change feed's path
+there when it comes.
+
+What is the engine's alone stays inside it: SQLite's write-ahead mode, busy
+wait and the log folded back on the clock; PostgreSQL's pool, its `ctid`
+and its advisory lock standing in for `BEGIN IMMEDIATE`. The schema steps
+are written once, in the SQL both speak, with the three words that differ
+(`AUTOINCREMENT`, a `JSON` column, an `AUTONUMBER` one) spelled by the
+dialect, and the record store's indexed fields are read with
+`json_extract` on one and `->>` with a `jsonb` expression index on the
+other. The test suite runs on both: in CI, and locally with
+`CLOUDMORROW_TEST_DATABASE_URL` pointing at a server, every test that
+opens a database file gets a schema there instead.
+
+Backups differ. On SQLite, a copy of the data directory is the whole
+truth ([ENCRYPTION.md](ENCRYPTION.md)). With the container, the installer
+puts a `pg_dump` into `<data>/postgres/` every day, so the same copy
+carries the database; with a server of your own, its backups are yours,
+as the server is. The key stays where it is, and a dump without it opens
+nothing, as before.
+
 ## How far one cloud goes
 
 A cloud is one process, by design (quills/services.py says why), and the
@@ -163,7 +202,7 @@ What was changed to make these numbers true, and to hold them:
 
 - The database is in write-ahead mode with a busy wait, so a write no
   longer blocks every read, and the clock folds the log back into the file
-  (`db.connect`, `db.checkpoint`).
+  (`database/sqlite.py`).
 - A connection closes when its `with` block ends. Python 3.12's own
   connection frees its native memory only when the cyclic collector gets
   round to it, and under load hundreds sat open, each with its cache: the
@@ -188,6 +227,8 @@ What was changed to make these numbers true, and to hold them:
 | First-boot setup page and `/api/setup` | `server/routes/setup.py`, `templates/setup.html` | built |
 | The name, in the database, `GET`/`PATCH /api/server/settings` | `server/settings.py` | built |
 | The container image, compose file, Caddyfile | `deploy/docker/` | built, not yet run in CI |
+| The database layer, SQLite and PostgreSQL behind it | `server/database/` | built; the suite runs on both |
+| PostgreSQL at install: a container beside the server, or a URL | `deploy/install-server.sh`, `deploy/docker/compose.yml` | built |
 | Home network discovery | `server/access_lan.py`, `client/discover.py` | built |
 | Sign-in limits | `server/signin_limits.py` | built |
 | The change feed, `GET /api/changes` | `server/changefeed.py`, `web/changes.js` | built |

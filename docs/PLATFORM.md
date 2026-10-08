@@ -24,7 +24,7 @@ out of.
 
 | layer | what it is | what it grows out of |
 | --- | --- | --- |
-| **Data** | Files, plain on disk, and a database of records of catalogued types, sealed at rest, searchable | My Files, with notes in its `Notes` folder, and shares; the per-feature SQLite tables and the `SEALED` scope binding |
+| **Data** | Files, plain on disk, and a database of records of catalogued types, sealed at rest, searchable | My Files, with notes in its `Notes` folder, and shares; the record table and the `SEALED` scope binding |
 | **Guard** | Who may touch which type or folder, declared, approved, listed, revocable | the feature switches, the three access kinds in chat and calendar, MCP connections you can cut off, agent tokens |
 | **Kit** | A small vocabulary of screens — list, detail, form, board, calendar, thread, grid, editor — each rendered by every client | the web app's one-file-per-feature screens and `registerTab`, the TUI panes, `cm RESOURCE ACTION` |
 | **Apps** | A manifest naming the types it uses, the grants it asks for and its screens; the included apps are just the first manifests | Notes, Tasks, Calendar, Chat, Secrets, Files as they are |
@@ -58,7 +58,7 @@ kind of data on the server with its fields, its scopes, what is sealed,
 which apps use it and whether an assistant may reach it. It is metadata
 until the record store arrives; then it is the schema.
 
-**Records of a type.** The platform stores them in SQLite in one table:
+**Records of a type.** The platform stores them in one table of the database (SQLite, or PostgreSQL):
 
 ```
 records(type, id, scope_kind, scope_id, owner, written_by,
@@ -327,10 +327,10 @@ everything should be.
   router is behind it. Phase 1 puts one there; phases 3 and 4 finish the
   walk. Until then the Apps screen must say which apps are not yet under
   it, rather than imply they are.
-- **A document store on SQLite.** Right for one household, one company or
-  one institution; every design above keeps the content sealed and the lookups
-  plain so that swapping the store later is a storage change, not a
-  product change.
+- **A document store on SQLite, or PostgreSQL.** Right for one household,
+  one company or one institution; every design above keeps the content
+  sealed and the lookups plain, and the engine is a line of configuration
+  ([HOSTING.md](HOSTING.md), *The database*), not a product change.
 - **Email is a product.** A read-only archive is a connector; a mail
   client is a year. Phase 5 does the first and says so.
 

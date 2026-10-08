@@ -31,7 +31,7 @@ DRY_RUN=""
 
 # Everything the installer makes, in the order it is removed. The user goes
 # last: it owns the directories.
-KINDS="services code config data files shares user"
+KINDS="services code config data files shares database user"
 
 usage() {
 	sed -n '2,17p' "$0"
@@ -39,7 +39,9 @@ usage() {
 
 Options:
   --remove LIST       what goes, comma-separated, instead of asking:
-                      services, code, config, data, files, shares, user
+                      services, code, config, data, files, shares,
+                      database (the PostgreSQL container and its volume,
+                      when the installer ran one), user
   --delete-data       all of it: the software, the config, the key, the
                       database, everyone's files, and the service user
   --yes               do not ask; take what --remove says, or the services
@@ -177,6 +179,16 @@ fi
 [ ! -e "$DATA_DIR" ] || found "data|Data|$DATA_DIR: the database, keys and quills${FILES_INSIDE:+ (not the files in it)}"
 [ ! -e "$FILES_DIR" ] || found "files|Files|$FILES_DIR: everyone's files and shares"
 [ -z "$SHARES_DIR" ] || [ ! -e "$SHARES_DIR" ] || found "shares|Shares|$SHARES_DIR: every fileshare"
+# The PostgreSQL container the installer ran, when it did: it and its volume.
+PG_CONTAINER="cloudmorrow-postgres"
+CONTAINER_ENGINE=""
+for candidate in docker podman; do
+	if command -v "$candidate" >/dev/null 2>&1 && "$candidate" container inspect "$PG_CONTAINER" >/dev/null 2>&1; then
+		CONTAINER_ENGINE="$candidate"
+		break
+	fi
+done
+[ -z "$CONTAINER_ENGINE" ] || found "database|Database|the PostgreSQL container $PG_CONTAINER and its volume; the daily dump is in the data"
 ! id "$SERVICE_USER" >/dev/null 2>&1 || found "user|User|the system user $SERVICE_USER"
 
 if [ -z "$FOUND" ]; then
@@ -296,7 +308,7 @@ fi
 # Data is anything a later install would pick up again, and the user that
 # owns it. Removing it is a different question from removing software.
 DATA_GOES=""
-for kind in config data files shares user; do
+for kind in config data files shares database user; do
 	! chose "$kind" || DATA_GOES="1"
 done
 
@@ -402,6 +414,16 @@ if chose files; then
 	fi
 fi
 ! chose shares || remove_dir "$SHARES_DIR"
+if chose database; then
+	say "removing the container $PG_CONTAINER and its volume"
+	if command -v systemctl >/dev/null 2>&1 && [ -f /etc/systemd/system/cloudmorrow-pgdump.timer ]; then
+		run systemctl disable --now --quiet cloudmorrow-pgdump.timer || true
+		run rm -f /etc/systemd/system/cloudmorrow-pgdump.timer /etc/systemd/system/cloudmorrow-pgdump.service
+	fi
+	run "$CONTAINER_ENGINE" rm -f "$PG_CONTAINER"
+	run "$CONTAINER_ENGINE" volume rm "$PG_CONTAINER"
+	[ ! -f "$CONFIG_DIR/postgres.pgpass" ] || run rm -f "$CONFIG_DIR/postgres.pgpass"
+fi
 if chose user; then
 	say "removing the system user $SERVICE_USER"
 	run userdel "$SERVICE_USER" || warn "the user $SERVICE_USER is still there; remove it with userdel"

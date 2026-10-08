@@ -9,7 +9,7 @@ from __future__ import annotations
 from cloudmorrow.server.database import connect
 from cloudmorrow.server.db import UserStore
 from cloudmorrow.server.security import hash_password
-from tests.conftest import ADMIN, GUEST, token_for
+from tests.conftest import ADMIN, GUEST, sqlite_only, token_for
 
 
 def headers(client, who) -> dict[str, str]:
@@ -72,6 +72,7 @@ def test_a_role_that_is_not_a_role_is_refused(client, auth):
     assert "role must be one of" in refused.json()["detail"]
 
 
+@sqlite_only
 def test_an_account_from_before_roles_existed_keeps_its_rights(config, tmp_path):
     """The flag was the truth once; the migration makes the role match it."""
     config.ensure_dirs()

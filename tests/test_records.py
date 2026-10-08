@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-import sqlite3
 
 import pytest
 
 from cloudmorrow.server.crypto import SealError
+from cloudmorrow.server.database import connect
 from cloudmorrow.server.records import Principal, RecordError, Refused, check
 from tests.conftest import ADMIN, GUEST, token_for
 
@@ -101,7 +101,7 @@ def test_a_task_done_for_a_week_is_swept_when_the_board_is_read(api, config):
     )
     # Eight days ago, as far as the store can tell.
     long_ago = (dt.datetime.now(tz=dt.UTC) - dt.timedelta(days=8)).isoformat(timespec="seconds")
-    with sqlite3.connect(config.db_path) as conn:
+    with connect(config.db_path) as conn:
         indexed = json.loads(conn.execute("SELECT indexed FROM records WHERE id = ?", (old["id"],)).fetchone()[0])
         indexed["done_at"] = long_ago
         conn.execute("UPDATE records SET indexed = ? WHERE id = ?", (json.dumps(indexed), old["id"]))
@@ -190,8 +190,8 @@ def test_content_is_sealed_at_rest_and_lanes_are_not(api, config):
         {"fields": {"board": board, "title": "Buy a ring", "body": "the secret"}},
         expect=201,
     )
-    with sqlite3.connect(config.db_path) as conn:
-        rows = conn.execute("SELECT indexed, body FROM records WHERE model = 'task'").fetchall()
+    with connect(config.db_path) as conn:
+        rows = [tuple(row) for row in conn.execute("SELECT indexed, body FROM records WHERE model = 'task'")]
     raw = json.dumps(rows)
     assert "Buy a ring" not in raw and "the secret" not in raw
     assert '"lane": "todo"' in rows[0][0]
@@ -200,7 +200,7 @@ def test_content_is_sealed_at_rest_and_lanes_are_not(api, config):
 def test_a_sealed_record_moved_to_another_owner_does_not_open(api, config):
     board = board_of(api)
     task = api("POST", "/api/records/task", {"fields": {"board": board, "title": "Mine"}}, expect=201)
-    with sqlite3.connect(config.db_path) as conn:
+    with connect(config.db_path) as conn:
         conn.execute("UPDATE records SET owner = 'guest' WHERE id = ?", (task["id"],))
     store = api.client.app.state.cloudmorrow.records
     with pytest.raises(SealError):

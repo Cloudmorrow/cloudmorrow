@@ -46,7 +46,9 @@ RUN useradd --system --uid 1000 --home-dir /data --shell /usr/sbin/nologin cloud
 # The wheel is installed, and also kept: it is what /install.sh hands to
 # the machines that install the client from this server.
 COPY --from=build /wheels/*.whl /opt/cloudmorrow/dist/
-RUN pip install --no-cache-dir "cloudmorrow[server,agent] @ file://$(ls /opt/cloudmorrow/dist/*.whl)"
+# With the PostgreSQL driver: the image runs on either database, and
+# CLOUDMORROW_DATABASE_URL says which (deploy/docker/compose.yml).
+RUN pip install --no-cache-dir "cloudmorrow[server,agent,postgres] @ file://$(ls /opt/cloudmorrow/dist/*.whl)"
 
 COPY deploy/docker/entrypoint.sh /usr/local/bin/cloudmorrow-entrypoint
 RUN chmod 755 /usr/local/bin/cloudmorrow-entrypoint

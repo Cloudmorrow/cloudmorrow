@@ -72,6 +72,8 @@ def test_dry_run_with_every_answer_asks_nothing():
         "all",
         "--host",
         "0.0.0.0",
+        "--database",
+        "builtin",
         "--prefix",
         "/opt/cm",
         env={"CLOUDMORROW_ADMIN_PASSWORD": "longenough"},
@@ -124,6 +126,61 @@ def test_the_standard_quills_are_the_fifth_question():
     assert "would ask: which standard quills to have" in result.stdout
     # And the guide at the end points at the one-line client install.
     assert "curl -fsSL https://cloud.test/install.sh | sh" in result.stdout
+
+
+EVERY_OTHER_ANSWER = (
+    "--name",
+    "Test",
+    "--public-url",
+    "https://cloud.test",
+    "--user",
+    "alice",
+    "--host",
+    "0.0.0.0",
+    "--quills",
+    "all",
+    "--prefix",
+    "/opt/cm",
+)
+
+
+def test_the_database_is_the_sixth_question():
+    result = dry_run(*EVERY_OTHER_ANSWER, env={"CLOUDMORROW_ADMIN_PASSWORD": "longenough"})
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "would ask: which database to keep its records in" in result.stdout
+    # Unanswered, the records go in the built-in database, as they always did.
+    assert "built in, /var/lib/cloudmorrow/cloudmorrow.db" in result.stdout
+    assert "cloudmorrow[postgres]" not in result.stdout
+
+
+def test_a_postgres_container_runs_beside_the_server_with_a_dump_each_day():
+    result = dry_run(*EVERY_OTHER_ANSWER, "--database", "container", env={"CLOUDMORROW_ADMIN_PASSWORD": "longenough"})
+    assert result.returncode == 0, result.stderr + result.stdout
+    out = result.stdout
+    assert "would ask" not in out
+    assert "cloudmorrow[postgres]" in out
+    assert "--name cloudmorrow-postgres" in out and "postgres:16" in out
+    # The password is made once, kept beside the sealing key, and never shown.
+    assert "/etc/cloudmorrow/postgres.pgpass" in out
+    assert "POSTGRES_PASSWORD=(generated)" in out
+    assert "cloudmorrow-pgdump.timer" in out
+    assert "a dump each day in /var/lib/cloudmorrow/postgres" in out
+
+
+def test_a_postgres_server_of_your_own_is_checked_before_anything_is_written():
+    url = "postgresql://cm:hunter2@db.example.com:5432/cloudmorrow"
+    result = dry_run(*EVERY_OTHER_ANSWER, "--database", url, env={"CLOUDMORROW_ADMIN_PASSWORD": "longenough"})
+    assert result.returncode == 0, result.stderr + result.stdout
+    out = result.stdout
+    assert "would check: the database at postgresql://…@db.example.com:5432/cloudmorrow" in out
+    assert "hunter2" not in out
+    assert "cloudmorrow-pgdump" not in out
+
+
+def test_a_database_the_installer_does_not_know_is_refused_first():
+    result = dry_run(*EVERY_OTHER_ANSWER, "--database", "mysql://db/cloudmorrow")
+    assert result.returncode == 1
+    assert "--database is builtin, container, or a postgresql:// URL" in result.stderr
 
 
 def test_where_it_goes_is_asked_unless_a_place_is_given():

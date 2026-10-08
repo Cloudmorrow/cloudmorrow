@@ -2,21 +2,16 @@
 
 from __future__ import annotations
 
-import sqlite3
-
 from cloudmorrow.server import schema
 from cloudmorrow.server.database import connect
-
-
-def tables(conn) -> set[str]:
-    return {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+from tests.conftest import sqlite_only
 
 
 def test_a_new_database_is_made_at_the_current_version_with_every_stores_tables(tmp_path):
     conn = connect(tmp_path / "cloud.db")
     assert schema.version_of(conn) == schema.VERSION
     # Tables from db's own schema, from stores, and the first circle.
-    assert {
+    for table in (
         "users",
         "records",
         "mcp_tokens",
@@ -27,12 +22,16 @@ def test_a_new_database_is_made_at_the_current_version_with_every_stores_tables(
         "quill_job_runs",
         "quill_call_runs",
         "circles",
-    } <= tables(conn)
+    ):
+        assert conn.table_exists(table), table
     assert conn.execute("SELECT COUNT(*) FROM circles WHERE is_default = 1").fetchone()[0] == 1
     conn.close()
 
 
+@sqlite_only
 def test_a_database_from_before_versions_gets_its_columns_and_keeps_its_admins(tmp_path):
+    import sqlite3
+
     path = tmp_path / "cloud.db"
     old = sqlite3.connect(path)
     # An account table from before roles, and secrets from before vaults.

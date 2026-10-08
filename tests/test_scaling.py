@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import datetime as dt
 import re
-import sqlite3
 import subprocess
 import sys
 import threading
@@ -15,24 +14,22 @@ from pathlib import Path
 
 import pytest
 
-from cloudmorrow.server import schema
+from cloudmorrow.server import database, schema
 from cloudmorrow.server.database import connect
 from cloudmorrow.server.quills import jobs
 from cloudmorrow.server.routes.web import WEB
-from tests.conftest import ADMIN, GUEST, token_for
+from tests.conftest import ADMIN, GUEST, sqlite_only, token_for
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
 def names(db_path: Path, kind: str) -> set[str]:
-    conn = sqlite3.connect(db_path)
-    try:
+    with connect(db_path) as conn:
         return {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = ?", (kind,))}
-    finally:
-        conn.close()
 
 
 # -- the database ------------------------------------------------------------------------
+@sqlite_only
 def test_the_database_runs_in_write_ahead_mode_with_a_busy_wait(tmp_path):
     conn = connect(tmp_path / "cloud.db")
     assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
@@ -47,9 +44,8 @@ def test_the_database_runs_in_write_ahead_mode_with_a_busy_wait(tmp_path):
     conn.close()
 
 
+@sqlite_only
 def test_the_clock_folds_the_log_back_into_the_file(tmp_path):
-    from cloudmorrow.server.db import checkpoint
-
     path = tmp_path / "cloud.db"
     conn = connect(path)
     conn.execute("CREATE TABLE scratch (x)")
@@ -57,23 +53,25 @@ def test_the_clock_folds_the_log_back_into_the_file(tmp_path):
     conn.commit()
     # Still open: the log holds the writes, and is well over a megabyte.
     assert (path.with_name("cloud.db-wal")).stat().st_size > 1_000_000
-    assert checkpoint(path) is True
+    assert database.open(path).checkpoint() is True
     assert (path.with_name("cloud.db-wal")).stat().st_size == 0
     conn.close()
 
 
+@sqlite_only
 def test_a_new_database_has_the_indexes_an_open_screen_and_the_sweep_ask(tmp_path):
     conn = connect(tmp_path / "cloud.db")
-    assert schema.version_of(conn) == 2
+    assert schema.version_of(conn) == schema.VERSION
     conn.close()
     assert {"records_model_updated", "record_changes_at"} <= names(tmp_path / "cloud.db", "index")
 
 
+@sqlite_only
 def test_an_older_database_gets_the_indexes_on_opening(tmp_path):
     path = tmp_path / "cloud.db"
     conn = connect(path)
     conn.execute("DROP INDEX records_model_updated")
-    conn.execute("PRAGMA user_version = 1")
+    conn.set_schema_version(1)
     conn.commit()
     conn.close()
     connect(path).close()
@@ -100,12 +98,13 @@ def make_tasks(api, board: str, titles: list[str]) -> list[str]:
     return [r.json()["id"] for r in made]
 
 
+@sqlite_only
 def test_listing_a_datamodel_makes_the_indexes_its_filters_use(api):
     api("GET", "/api/records/task")
     db_path = api.state.config.db_path
     # The group fields and the link: what a board asks by.
     assert {"records_task_board", "records_task_lane"} <= names(db_path, "index")
-    conn = sqlite3.connect(db_path)
+    conn = connect(db_path)
     plan = " ".join(
         row[3]
         for row in conn.execute(
@@ -157,7 +156,7 @@ def test_the_sweep_takes_old_lines_of_gone_records_out_of_the_change_feed(api):
     a, b = make_tasks(api, board, ["a", "b"])
     api("DELETE", f"/api/records/task/{a}", expect=204)
     db_path = api.state.config.db_path
-    conn = sqlite3.connect(db_path)
+    conn = connect(db_path)
     count = conn.execute("SELECT COUNT(*) FROM record_changes").fetchone()[0]
     assert count >= 4  # the board, two tasks, and one deletion
     old = (dt.datetime.now(tz=dt.UTC) - dt.timedelta(days=100)).isoformat(timespec="seconds")
@@ -165,7 +164,7 @@ def test_the_sweep_takes_old_lines_of_gone_records_out_of_the_change_feed(api):
     conn.commit()
     conn.close()
     jobs.sweep_all(api.state.quills, api.state.records)
-    conn = sqlite3.connect(db_path)
+    conn = connect(db_path)
     left = {row[0] for row in conn.execute("SELECT record_id FROM record_changes")}
     conn.close()
     assert a not in left and board in left and b in left

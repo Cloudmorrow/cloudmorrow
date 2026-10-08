@@ -100,8 +100,8 @@ every message, event, task, dotfile and secret is gone; there is no
 recovery, by design. Keep a copy somewhere that is not the server. Keep
 it apart from your backup of the data, or the backup is as good as plain.
 
-**The database is three files while the server runs.** It is kept in
-SQLite's write-ahead mode, so beside `cloudmorrow.db` there are
+**The built-in database is three files while the server runs.** It is
+kept in SQLite's write-ahead mode, so beside `cloudmorrow.db` there are
 `cloudmorrow.db-wal`, the writes not yet folded in, and
 `cloudmorrow.db-shm`. A copy of the data directory takes all three; a copy
 of the `.db` alone, made while the server runs, is the database as it was
@@ -109,12 +109,21 @@ at the last checkpoint. For a copy at one moment, `sqlite3 cloudmorrow.db
 ".backup copy.db"` folds the log in as it copies. All of it is ciphertext
 without the key either way.
 
+**On PostgreSQL, a copy of the data directory is not the whole truth.**
+The rows are on the database server. With the container the installer
+runs, `cloudmorrow-pgdump.timer` writes a `pg_dump` into
+`<data_dir>/postgres/cloudmorrow.dump` every day, so a copy of the data
+directory carries yesterday's database; for a copy at one moment, run the
+dump yourself. With a server of your own, its backups are yours. A dump
+is sealed rows like the file is: ciphertext without the key.
+
 **Every command sees the same key.** `cloudmorrow-server` reads the
 config and registers the key for the database before it opens it, so
 `user create` and the rest seal and open under the service's key. A
-program that opens the database through `db.connect` without going through
-the config falls back to `secrets.key` beside the database, which is only
-right when that is where the key is. Use the config.
+program that opens a SQLite file through the database layer without going
+through the config falls back to `secrets.key` beside the file, which is
+only right when that is where the key is; a PostgreSQL database has no
+beside, and refuses until a key is registered. Use the config.
 
 **Changing the key.**
 
@@ -135,8 +144,8 @@ while rotation runs is a row nobody can open afterwards.
 
 **The database** is migrated on the first connection after the upgrade.
 `schema_meta` holds a `sealed` version; a database below it has every
-listed column of every listed table sealed in one `BEGIN IMMEDIATE`
-transaction, then the version written. A second worker booting at the
+listed column of every listed table sealed in one transaction under the
+write lock, then the version written. A second worker booting at the
 same moment waits on the lock, reads the version, and does nothing. From
 then on every read expects ciphertext, and there is no sniffing: a message
 that happens to look like `s1:...` is still a message. The table is

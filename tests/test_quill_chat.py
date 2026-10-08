@@ -10,8 +10,6 @@ right conversation — and the old tables move into records once, at boot.
 
 from __future__ import annotations
 
-import sqlite3
-
 import pytest
 
 from cloudmorrow.server import spacenotify
@@ -229,7 +227,7 @@ def test_the_topic_and_the_words_are_sealed(chat, config):
         expect=201,
     )
     say(chat, room, "who has the pager")
-    with sqlite3.connect(config.db_path) as conn:
+    with connect(config.db_path) as conn:
         rows = [r[0] + (r[1] or "") for r in conn.execute("SELECT indexed, body FROM records")]
     assert not any("pager" in row for row in rows)
     assert chat("GET", f"/api/records/channel/{room['id']}")["fields"]["topic"] == "the pager rota"
@@ -314,7 +312,7 @@ def _old_chat(db) -> None:
     with connect(db) as conn:
 
         def room(slug, name, kind, by, topic=""):
-            return conn.execute(
+            return conn.insert(
                 "INSERT INTO chat_channels (slug, name, topic, kind, created_by, created_at, updated_at)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
@@ -326,7 +324,7 @@ def _old_chat(db) -> None:
                     "2026-09-01T10:00:00+00:00",
                     "2026-09-01T10:00:00+00:00",
                 ),
-            ).lastrowid
+            )
 
         def member(cid, who, last_read=0):
             conn.execute(
@@ -336,10 +334,10 @@ def _old_chat(db) -> None:
             )
 
         def line(cid, who, body, at, edited=None):
-            return conn.execute(
+            return conn.insert(
                 "INSERT INTO chat_messages (channel_id, author, body, created_at, edited_at) VALUES (?, ?, ?, ?, ?)",
                 (cid, who, conn.seal("chat_messages", "body", (cid,), body), at, edited),
-            ).lastrowid
+            )
 
         pub = room("homelab", "Homelab", "public", "bram", "the rack")
         priv = room("club", "Club", "private", "bram")

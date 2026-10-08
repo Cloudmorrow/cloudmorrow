@@ -328,16 +328,16 @@ THEN = "2026-09-01T10:00:00+00:00"
 
 
 def old_calendar(conn, slug, name, kind, colour, owner, members) -> int:
-    cursor = conn.execute(
+    calendar_id = conn.insert(
         "INSERT INTO calendars (slug, name, kind, colour, owner, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (slug, name, kind, colour, owner, THEN, THEN),
     )
     for who in members:
         conn.execute(
             "INSERT INTO calendar_members (calendar_id, username, joined_at) VALUES (?, ?, ?)",
-            (cursor.lastrowid, who, THEN),
+            (calendar_id, who, THEN),
         )
-    return int(cursor.lastrowid)
+    return calendar_id
 
 
 def old_event(conn, calendar_id, title, starts, ends, *, all_day=False, by="bram", notes="", where=""):
@@ -434,7 +434,10 @@ def test_a_calendar_switched_off_and_empty_is_not_installed(config, users, regis
             "CREATE TABLE IF NOT EXISTS features (key TEXT PRIMARY KEY, enabled INTEGER,"
             " changed_by TEXT, updated_at TEXT)"
         )
-        conn.execute("INSERT OR REPLACE INTO features VALUES ('calendar', 0, 'bram', ?)", (THEN,))
+        conn.execute(
+            "INSERT INTO features VALUES ('calendar', 0, 'bram', ?) ON CONFLICT (key) DO UPDATE SET enabled = 0",
+            (THEN,),
+        )
     conn.close()
     assert move_legacy_calendar(config.db_path, registry, records) == 0
     assert "calendar" not in registry.quills
@@ -444,7 +447,10 @@ def test_boot_installs_it_for_a_server_that_had_the_calendar_on(config, users, r
     with connect(config.db_path) as conn:
         conn.executescript(OLD_SCHEMA)
         # Tasks was installed already, so the foundation step stands aside.
-        conn.execute("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('quills_seeded', 'tasks')")
+        conn.execute(
+            "INSERT INTO schema_meta (key, value) VALUES ('quills_seeded', 'tasks')"
+            " ON CONFLICT (key) DO UPDATE SET value = excluded.value"
+        )
     conn.close()
     boot(config.db_path, registry, records)
     assert "calendar" in registry.quills
