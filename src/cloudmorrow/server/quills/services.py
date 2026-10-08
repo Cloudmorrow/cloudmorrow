@@ -632,7 +632,9 @@ class Supervisor:
                         for h in manifest.webhooks
                     ],
                     "apis": [
-                        {"id": a["id"], "service": a["service"], "prefix": a.get("prefix", "")} for a in manifest.apis
+                        # An API answered by a handler in quill.py names no service.
+                        {"id": a["id"], "service": a.get("service", ""), "prefix": a.get("prefix", "")}
+                        for a in manifest.apis
                     ],
                 }
             )

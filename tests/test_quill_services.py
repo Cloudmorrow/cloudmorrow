@@ -210,7 +210,7 @@ def test_uninstalling_stops_everything_and_revokes_the_token(live):
     pid = live.running()["pid"]
     token = live.quill_token()
     secret = live.state.quill_tokens.webhook_secret("relay", "inbound")
-    assert live.http.delete("/api/quills/relay", headers=live.admin).status_code == 204
+    assert live.http.delete("/api/quills/relay", headers=live.admin).status_code == 200
     wait_for(lambda: not alive(pid), what="the service to stop")
     assert live.http.get("/api/records/relay.ping", headers=token).status_code == 401
     assert live.state.quill_tokens.holders() == []
