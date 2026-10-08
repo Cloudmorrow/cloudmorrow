@@ -9,7 +9,7 @@ can edit the markers, and every other line renders as you leave it.
 
 - [ ] click a note on the left to open it
 - [ ] press `ctrl+t` on this line to tick it off
-- [x] notes are plain `.md` files on your server
+- [x] notes are plain `.md` files in the Notes folder of your drive
 
 > Everything autosaves. `ctrl+s` if you are impatient.
 """
