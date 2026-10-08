@@ -1,9 +1,8 @@
 """A short form on the terminal: the installer's "where should it go?".
 
-    › Code      /opt/cloudmorrow▏        the checkout and the virtualenv
-      Settings  /etc/cloudmorrow         server.toml and the sealing key
-      Data      /var/lib/cloudmorrow     the database, keys and quills
-      Notes     /srv/cloudmorrow/notes   every note and file
+    › Code      /opt/cloudmorrow▏      the checkout and the virtualenv
+      Settings  /etc/cloudmorrow       server.toml and the sealing key
+      Data      /var/lib/cloudmorrow   files/, the database, keys and quills
 
 Every row is a field with a default in it. Arrows move, typing changes the
 field on the row, Backspace erases, Ctrl-U puts the default back, Enter is
@@ -123,7 +122,7 @@ class Form:
         label_width = min(max((len(f.label) for f in self.fields), default=0), width // 3)
         # Wide enough for the defaults too, so the details stay put while a
         # path is being shortened.
-        value_width = min(max((max(len(f.value), len(f.default)) for f in self.fields), default=0) + 1, width // 2)
+        value_width = min(max((max(len(f.value), len(f.default)) for f in self.fields), default=0) + 3, width // 2)
         room = max(height - len(out) - 4, 3) if not done else self.rows
         if self.cursor < self.top:
             self.top = self.cursor

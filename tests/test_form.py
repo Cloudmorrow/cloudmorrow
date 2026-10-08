@@ -8,8 +8,7 @@ from tests.test_checklist import ANSI, on_a_terminal
 PLACES = [
     ("code", "Code", "/opt/cloudmorrow", "the checkout and the virtualenv"),
     ("config", "Settings", "/etc/cloudmorrow", "server.toml and the sealing key"),
-    ("data", "Data", "/var/lib/cloudmorrow", "the database, keys and quills"),
-    ("notes", "Notes", "/srv/cloudmorrow/notes", "every note and file"),
+    ("data", "Data", "/var/lib/cloudmorrow", "files/, the database, keys and quills"),
 ]
 
 
@@ -32,11 +31,11 @@ def test_enter_takes_the_defaults():
 
 
 def test_backspace_edits_the_end_of_the_default():
-    typed = b"\x7f" * len("cloudmorrow") + b"cm\x1b[B\x1b[B\x1b[B" + b"\x7f" * 5 + b"pages\r"
+    typed = b"\x7f" * len("cloudmorrow") + b"cm\x1b[B\x1b[B" + b"\x7f" * len("lib/cloudmorrow") + b"cloud\r"
     values, _ = on_a_terminal(typed, lambda t: fill(places(), t))
     assert values["code"] == "/opt/cm"
-    assert values["notes"] == "/srv/cloudmorrow/pages"
-    assert values["data"] == "/var/lib/cloudmorrow"
+    assert values["data"] == "/var/cloud"
+    assert values["config"] == "/etc/cloudmorrow"
 
 
 def test_ctrl_u_puts_the_default_back():

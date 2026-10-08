@@ -123,7 +123,7 @@ exec sh "$SRC/deploy/install-server.sh" \
 	--branch "$BRANCH" \
 	--prefix "$NEW_PREFIX" \
 	--data-dir "$NEW_DATA" \
-	--notes-dir "$NOTES_DIR" \
+	--files-dir "$NOTES_DIR" \
 	--public-url "$PUBLIC_URL" \
 	--ssh-key "$KEY" \
 	${ADMIN_USER:+--admin "$ADMIN_USER"}

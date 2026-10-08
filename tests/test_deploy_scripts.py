@@ -131,12 +131,16 @@ def test_where_it_goes_is_asked_unless_a_place_is_given():
     answers = ("--name", "T", "--public-url", "https://cloud.test", "--user", "alice")
     asked = dry_run(*answers)
     assert "would ask: where things go" in asked.stdout
-    # The usual places, when nothing is said; one flag answers for the lot.
-    assert f"{usual}, /srv/cloudmorrow/notes" in asked.stdout
-    given = dry_run(*answers, "--notes-dir", "/data/notes")
-    assert "would ask: where things go" not in given.stdout
-    assert f"{usual}, /data/notes" in given.stdout
-    assert "notes     /data/notes" in given.stdout
+    # The usual places, when nothing is said: everyone's files under the data.
+    assert f"{usual}, /var/lib/cloudmorrow/files" in asked.stdout
+    assert "shares    /var/lib/cloudmorrow/files/Shares" in asked.stdout
+    # One flag answers for the lot, and the files follow the data directory.
+    moved = dry_run(*answers, "--data-dir", "/srv/cm")
+    assert "would ask: where things go" not in moved.stdout
+    assert "directories: /opt/cloudmorrow, /etc/cloudmorrow, /srv/cm, /srv/cm/files" in moved.stdout
+    given = dry_run(*answers, "--files-dir", "/data/files")
+    assert f"{usual}, /data/files" in given.stdout
+    assert "files     /data/files" in given.stdout
     # A settings directory of its own is a flag too, and the unit points at it.
     moved = dry_run(*answers, "--config-dir", "/srv/cm/etc")
     assert "would write: /srv/cm/etc/server.toml" in moved.stdout
@@ -145,17 +149,17 @@ def test_where_it_goes_is_asked_unless_a_place_is_given():
 
 def test_a_shares_folder_of_its_own_is_made_and_writable():
     answers = ("--name", "T", "--public-url", "https://cloud.test", "--user", "alice")
-    usual = "directories: /opt/cloudmorrow, /etc/cloudmorrow, /var/lib/cloudmorrow, /srv/cloudmorrow/notes"
+    usual = "directories: /opt/cloudmorrow, /etc/cloudmorrow, /var/lib/cloudmorrow, /var/lib/cloudmorrow/files"
     out = dry_run(*answers, "--shares-dir", "/srv/shares").stdout
     assert f"{usual}, /srv/shares" in out
     assert "shares    /srv/shares" in out
-    # Inside the notes it is nothing of its own: not made twice, not listed twice.
-    inside = dry_run(*answers, "--shares-dir", "/srv/cloudmorrow/notes/Shares").stdout
+    # Among the files it is nothing of its own: not made twice, not listed twice.
+    inside = dry_run(*answers, "--shares-dir", "/var/lib/cloudmorrow/files/Shares").stdout
     assert f"{usual}\n" in inside
-    assert "shares    /srv/cloudmorrow/notes/Shares" in inside
+    assert "shares    /var/lib/cloudmorrow/files/Shares" in inside
     # The unit lets the service write there, and a re-run reads the folder off the config.
     text = INSTALLER.read_text()
-    assert "ReadWritePaths=$NOTES_DIR $DATA_DIR $PREFIX${SHARES_OUTSIDE:+ $SHARES_OUTSIDE}" in text
+    assert "ReadWritePaths=$FILES_DIR $DATA_DIR $PREFIX${SHARES_OUTSIDE:+ $SHARES_OUTSIDE}" in text
     assert 'SHARES_DIR="$(config_value shares_dir)"' in text
 
 
@@ -258,6 +262,6 @@ def test_an_address_of_its_own_gets_the_proxy_to_put_in_front():
 
 def test_no_linking_is_left_in_it():
     text = INSTALLER.read_text()
-    assert "ReadWritePaths=$NOTES_DIR $DATA_DIR $PREFIX${SHARES_OUTSIDE:+ $SHARES_OUTSIDE}\n" in text
+    assert "ReadWritePaths=$FILES_DIR $DATA_DIR $PREFIX${SHARES_OUTSIDE:+ $SHARES_OUTSIDE}\n" in text
     for gone in ("--link", "access link", "tailscale ", "acmedns", "CADDY_DIR", "relay", "cmtunnel"):
         assert gone not in text, gone

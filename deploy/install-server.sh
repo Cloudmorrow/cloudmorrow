@@ -21,7 +21,7 @@
 # server first: running and answering, it says so and changes nothing;
 # otherwise it updates and reinstalls it, and checks again. --update does
 # that whatever the check says. It never overwrites an existing
-# /etc/cloudmorrow/server.toml, your notes, or the database, and it never
+# /etc/cloudmorrow/server.toml, everyone's files, or the database, and it never
 # asks a question it already has the answer to. For routine "I pushed a
 # change" updates, use `cloudmorrow update server` from any machine, or the
 # `cloudmorrow-update` command this script installs.
@@ -33,11 +33,10 @@ BRANCH="main"
 DEFAULT_PREFIX="/opt/cloudmorrow"
 DEFAULT_CONFIG_DIR="/etc/cloudmorrow"
 DEFAULT_DATA_DIR="/var/lib/cloudmorrow"
-DEFAULT_NOTES_DIR="/srv/cloudmorrow/notes"
 PREFIX=""
 CONFIG_DIR=""
 DATA_DIR=""
-NOTES_DIR=""
+FILES_DIR=""
 SHARES_DIR=""
 CLOUD_NAME=""
 PUBLIC_URL=""
@@ -73,12 +72,15 @@ Options:
   --branch NAME       branch to deploy                  (default: $BRANCH)
   --prefix DIR        the checkout and the virtualenv   (default: $DEFAULT_PREFIX)
   --config-dir DIR    server.toml and the sealing key   (default: $DEFAULT_CONFIG_DIR)
-  --data-dir DIR      the database, keys and quills     (default: $DEFAULT_DATA_DIR)
-  --notes-dir DIR     every note and file               (default: $DEFAULT_NOTES_DIR)
-                      (where things go is asked when none of the four is
+  --data-dir DIR      everyone's files, the database, keys and quills
+                                                        (default: $DEFAULT_DATA_DIR)
+                      (where things go is asked when none of the three is
                       given; a re-run finds them where they are)
-  --shares-dir DIR    the Shares folder, when it is not to be inside the
-                      notes (default: $DEFAULT_NOTES_DIR/Shares)
+  --files-dir DIR     everyone's files — a folder per person, and the
+                      Shares folder — when they are not to be under the
+                      data directory                    (default: <data>/files)
+  --shares-dir DIR    the Shares folder, when it is not to be with the
+                      files                             (default: <files>/Shares)
   --host ADDR         address(es) to answer on, comma-separated
                       (asked if not given; default: $HOST, every address)
   --port N            bind port                         (default: $PORT)
@@ -102,7 +104,7 @@ while [ $# -gt 0 ]; do
 	--branch) BRANCH="$2"; shift 2 ;;
 	--prefix) PREFIX="$2"; shift 2 ;;
 	--config-dir) CONFIG_DIR="$2"; shift 2 ;;
-	--notes-dir) NOTES_DIR="$2"; shift 2 ;;
+	--files-dir | --notes-dir) FILES_DIR="$2"; shift 2 ;;
 	--shares-dir) SHARES_DIR="$2"; shift 2 ;;
 	--data-dir) DATA_DIR="$2"; shift 2 ;;
 	--host) HOST="$2"; HOST_GIVEN="1"; shift 2 ;;
@@ -182,13 +184,15 @@ write_file() {
 # --- where things are, or go ----------------------------------------------
 # A flag says. Else, on a machine that has the server, the unit says where
 # the venv and the config are and the config says where the data and the
-# notes are, so a re-run needs no flags to find a custom layout. On a fresh
+# files are, so a re-run needs no flags to find a custom layout. On a fresh
 # machine the usual places are offered on the terminal (ask_places, below),
-# to change or to take with Enter.
+# to change or to take with Enter. Everything people keep — a folder per
+# person, and the Shares folder — is under the data directory, in files/,
+# unless a flag or the config says otherwise.
 UNIT="/etc/systemd/system/$SERVICE_NAME.service"
 unit_value() { sed -n "s/^$1=//p" "$UNIT" 2>/dev/null | head -n 1; }
 ASK_PLACES=""
-if [ -z "$PREFIX$CONFIG_DIR$DATA_DIR$NOTES_DIR$SHARES_DIR" ] && [ ! -f "$UNIT" ] && [ ! -f "$DEFAULT_CONFIG_DIR/server.toml" ]; then
+if [ -z "$PREFIX$CONFIG_DIR$DATA_DIR$FILES_DIR$SHARES_DIR" ] && [ ! -f "$UNIT" ] && [ ! -f "$DEFAULT_CONFIG_DIR/server.toml" ]; then
 	ASK_PLACES="1"
 fi
 if [ -z "$PREFIX" ]; then
@@ -207,20 +211,41 @@ if [ -z "$CONFIG_DIR" ]; then
 	*) CONFIG_DIR="$DEFAULT_CONFIG_DIR" ;;
 	esac
 fi
+CONFIG="$CONFIG_DIR/server.toml"
+config_value() { sed -n "s/^$1 = \"\{0,1\}\([^\"]*\)\"\{0,1\}\$/\1/p" "$CONFIG" 2>/dev/null | head -n 1; }
+[ -n "$DATA_DIR" ] || DATA_DIR="$(config_value data_dir)"
+[ -n "$DATA_DIR" ] || DATA_DIR="$DEFAULT_DATA_DIR"
+# The config's key for the files is notes_dir, from when notes were all it
+# held; the flag and the installer's words say files.
+FILES_GIVEN="$FILES_DIR"
+[ -n "$FILES_GIVEN" ] || FILES_GIVEN="$(config_value notes_dir)"
+[ -n "$SHARES_DIR" ] || SHARES_DIR="$(config_value shares_dir)"
+# places: what follows from the answers; called again once they are asked.
 places() {
 	SRC="$PREFIX/src"
 	VENV="$PREFIX/venv"
 	CONFIG="$CONFIG_DIR/server.toml"
 	KEY_FILE="$CONFIG_DIR/cloudmorrow.key"
+	FILES_DIR="${FILES_GIVEN:-$DATA_DIR/files}"
 }
 places
+# shares_outside: the Shares folder when it is a directory of its own —
+# outside the files, the data and the code — to make, and to let the
+# service write to (ReadWritePaths in the unit). Moved by hand later, a
+# run with --update rewrites the unit to match.
+shares_outside() {
+	case "$SHARES_DIR" in
+	"" | "$FILES_DIR" | "$FILES_DIR"/* | "$DATA_DIR" | "$DATA_DIR"/* | "$PREFIX" | "$PREFIX"/*) ;;
+	*) printf '%s' "$SHARES_DIR" ;;
+	esac
+}
 # place_flags: the flags that name every place that is not the usual one,
 # for a message that says how to run this again.
 place_flags() {
 	[ "$PREFIX" = "$DEFAULT_PREFIX" ] || printf ' --prefix %s' "$PREFIX"
 	[ "$CONFIG_DIR" = "$DEFAULT_CONFIG_DIR" ] || printf ' --config-dir %s' "$CONFIG_DIR"
 	[ "$DATA_DIR" = "$DEFAULT_DATA_DIR" ] || printf ' --data-dir %s' "$DATA_DIR"
-	[ "$NOTES_DIR" = "$DEFAULT_NOTES_DIR" ] || printf ' --notes-dir %s' "$NOTES_DIR"
+	[ "$FILES_DIR" = "$DATA_DIR/files" ] || printf ' --files-dir %s' "$FILES_DIR"
 	[ -z "$SHARES_DIR" ] || printf ' --shares-dir %s' "$SHARES_DIR"
 }
 
@@ -373,22 +398,6 @@ esac
 # that is not gets the whole install again over it: the checkout reset to
 # the branch, the packages reinstalled, the unit rewritten, the service
 # restarted. That mends almost everything short of lost data.
-config_value() { sed -n "s/^$1 = \"\{0,1\}\([^\"]*\)\"\{0,1\}\$/\1/p" "$CONFIG" 2>/dev/null | head -n 1; }
-[ -n "$DATA_DIR" ] || DATA_DIR="$(config_value data_dir)"
-[ -n "$DATA_DIR" ] || DATA_DIR="$DEFAULT_DATA_DIR"
-[ -n "$NOTES_DIR" ] || NOTES_DIR="$(config_value notes_dir)"
-[ -n "$NOTES_DIR" ] || NOTES_DIR="$DEFAULT_NOTES_DIR"
-# The Shares folder is inside the notes unless a flag or the config moved it
-# out; only then is it a directory of its own to make, and to let the
-# service write to (ReadWritePaths in the unit). Moved by hand later, a
-# run with --update rewrites the unit to match.
-[ -n "$SHARES_DIR" ] || SHARES_DIR="$(config_value shares_dir)"
-shares_outside() {
-	case "$SHARES_DIR" in
-	"" | "$NOTES_DIR" | "$NOTES_DIR"/* | "$DATA_DIR" | "$DATA_DIR"/* | "$PREFIX" | "$PREFIX"/*) ;;
-	*) printf '%s' "$SHARES_DIR" ;;
-	esac
-}
 # listening_on "HOST, HOST": sets HEALTH_HOST, how this machine reaches the
 # server (loopback when it listens there or everywhere, else the first
 # address), and LAN_HOST, how the network does (the machine's own IP when
@@ -610,18 +619,17 @@ places_python() {
 
 ask_places() {
 	status=0
-	answer="$($PLACES_PYTHON -m cloudmorrow.form --title "Where should it go? Enter takes the usual places." \
+	answer="$($PLACES_PYTHON -m cloudmorrow.form \
+		--title "Where should it go? Enter takes the usual places. Everything people keep — a folder per person, and the Shares folder — goes under Data, in files/." \
 		--field prefix "Code" "$DEFAULT_PREFIX" "the checkout and the virtualenv" \
 		--field config "Settings" "$DEFAULT_CONFIG_DIR" "server.toml and the sealing key" \
-		--field data "Data" "$DEFAULT_DATA_DIR" "the database, keys and quills" \
-		--field notes "Notes" "$DEFAULT_NOTES_DIR" "every note and file" \
+		--field data "Data" "$DEFAULT_DATA_DIR" "files/, the database, keys and quills" \
 		--pattern '/\S*' --problem "an absolute path, please")" || status=$?
 	case "$status" in
 	0)
 		PREFIX="$(printf '%s\n' "$answer" | sed -n 's/^prefix=//p')"
 		CONFIG_DIR="$(printf '%s\n' "$answer" | sed -n 's/^config=//p')"
 		DATA_DIR="$(printf '%s\n' "$answer" | sed -n 's/^data=//p')"
-		NOTES_DIR="$(printf '%s\n' "$answer" | sed -n 's/^notes=//p')"
 		;;
 	130) die "stopped. Run this again to carry on where it left off." ;;
 	*) return 1 ;;
@@ -629,13 +637,13 @@ ask_places() {
 }
 
 ask_places_on_lines() {
-	printf '  Where should it go? Enter takes the usual place.\n' >/dev/tty
-	PREFIX="" CONFIG_DIR="" DATA_DIR="" NOTES_DIR=""
+	printf '  Where should it go? Enter takes the usual place. Everything people keep\n' >/dev/tty
+	printf '  — a folder per person, and the Shares folder — goes under Data, in files/.\n' >/dev/tty
+	PREFIX="" CONFIG_DIR="" DATA_DIR=""
 	ask PREFIX "Code, the checkout and the virtualenv" "$DEFAULT_PREFIX"
 	ask CONFIG_DIR "Settings, server.toml and the sealing key" "$DEFAULT_CONFIG_DIR"
-	ask DATA_DIR "Data, the database, keys and quills" "$DEFAULT_DATA_DIR"
-	ask NOTES_DIR "Notes, every note and file" "$DEFAULT_NOTES_DIR"
-	for place in "$PREFIX" "$CONFIG_DIR" "$DATA_DIR" "$NOTES_DIR"; do
+	ask DATA_DIR "Data, everyone's files, the database, keys and quills" "$DEFAULT_DATA_DIR"
+	for place in "$PREFIX" "$CONFIG_DIR" "$DATA_DIR"; do
 		case "$place" in
 		/*) ;;
 		*) die "$place is not an absolute path" ;;
@@ -688,9 +696,9 @@ fi
 
 # --- directories -----------------------------------------------------------
 SHARES_OUTSIDE="$(shares_outside)"
-say "directories: $PREFIX, $CONFIG_DIR, $DATA_DIR, $NOTES_DIR${SHARES_OUTSIDE:+, $SHARES_OUTSIDE}"
-run mkdir -p "$PREFIX" "$NOTES_DIR" "$DATA_DIR" "$CONFIG_DIR" ${SHARES_OUTSIDE:+"$SHARES_OUTSIDE"}
-run chown -R "$SERVICE_USER:$SERVICE_USER" "$PREFIX" "$NOTES_DIR" "$DATA_DIR" ${SHARES_OUTSIDE:+"$SHARES_OUTSIDE"}
+say "directories: $PREFIX, $CONFIG_DIR, $DATA_DIR, $FILES_DIR${SHARES_OUTSIDE:+, $SHARES_OUTSIDE}"
+run mkdir -p "$PREFIX" "$DATA_DIR" "$FILES_DIR" "$CONFIG_DIR" ${SHARES_OUTSIDE:+"$SHARES_OUTSIDE"}
+run chown -R "$SERVICE_USER:$SERVICE_USER" "$PREFIX" "$DATA_DIR" "$FILES_DIR" ${SHARES_OUTSIDE:+"$SHARES_OUTSIDE"}
 
 # --- deploy key, for a private repo over ssh -------------------------------
 # GitHub deploy keys are the least-privilege way to let one machine pull one
@@ -869,14 +877,17 @@ else
 # the phone's home screen.
 name = "$CLOUD_NAME"
 
-notes_dir = "$NOTES_DIR"
+# Everyone's files: a folder per person, and the Shares folder. (The key
+# is called notes_dir from when notes were all that was kept in it.)
+notes_dir = "$FILES_DIR"
+# The database, the keys and the quills.
 data_dir = "$DATA_DIR"
 per_user_dirs = true
 
-# The Shares folder, for files shared with every machine: Shares in the
-# notes directory, unless this says otherwise. A folder outside the
-# directories above has to be in the service's ReadWritePaths as well:
-# after moving it, run the installer again with --update.
+# The Shares folder, for files shared with every machine: Shares among
+# the files, unless this says otherwise. A folder outside the directories
+# above has to be in the service's ReadWritePaths as well: after moving
+# it, run the installer again with --update.
 $SHARES_LINE
 
 host = "$HOST"
@@ -943,7 +954,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=$NOTES_DIR $DATA_DIR $PREFIX${SHARES_OUTSIDE:+ $SHARES_OUTSIDE}
+ReadWritePaths=$FILES_DIR $DATA_DIR $PREFIX${SHARES_OUTSIDE:+ $SHARES_OUTSIDE}
 
 [Install]
 WantedBy=multi-user.target
@@ -1143,8 +1154,8 @@ done
 heading "Where things are"
 item "settings" "$CONFIG"
 item "data" "$DATA_DIR"
-item "notes" "$NOTES_DIR"
-[ -z "$SHARES_DIR" ] || item "shares" "$SHARES_DIR"
+item "files" "$FILES_DIR"
+item "shares" "${SHARES_DIR:-$FILES_DIR/Shares}"
 item "code" "$SRC ($BRANCH)"
 
 heading "To update it later"

@@ -6,7 +6,7 @@
 # It finds what the installer made — from the systemd unit and the config,
 # so custom paths are found too — and shows it as a list of boxes to tick:
 # the services, the code, the config and sealing key, the database, the
-# notes, the system user. Only the services are ticked to begin with; tick
+# files, the system user. Only the services are ticked to begin with; tick
 # what else should go, and it asks once more before it touches anything.
 # Without a terminal, say it with a flag:
 #
@@ -18,7 +18,7 @@
 set -eu
 
 PREFIX=""
-NOTES_DIR=""
+FILES_DIR=""
 DATA_DIR=""
 SERVICE_USER=""
 SERVICE_NAME="cloudmorrow"
@@ -31,7 +31,7 @@ DRY_RUN=""
 
 # Everything the installer makes, in the order it is removed. The user goes
 # last: it owns the directories.
-KINDS="services code config data notes shares user"
+KINDS="services code config data files shares user"
 
 usage() {
 	sed -n '2,17p' "$0"
@@ -39,13 +39,13 @@ usage() {
 
 Options:
   --remove LIST       what goes, comma-separated, instead of asking:
-                      services, code, config, data, notes, shares, user
+                      services, code, config, data, files, shares, user
   --delete-data       all of it: the software, the config, the key, the
-                      database, the notes, and the service user
+                      database, everyone's files, and the service user
   --yes               do not ask; take what --remove says, or the services
   --dry-run           print what would be removed, change nothing
   --prefix DIR        where the checkout and venv are (default: from the unit)
-  --notes-dir DIR     where the notes are               (default: from the config)
+  --files-dir DIR     where everyone's files are        (default: from the config)
   --data-dir DIR      the database and keys             (default: from the config)
   --config-dir DIR    server.toml and the sealing key    (default: from the unit)
   --service-user NAME the system user it runs as        (default: from the unit)
@@ -61,7 +61,7 @@ while [ $# -gt 0 ]; do
 	--yes | -y) YES="1"; shift ;;
 	--dry-run) DRY_RUN="1"; shift ;;
 	--prefix) PREFIX="$2"; shift 2 ;;
-	--notes-dir) NOTES_DIR="$2"; shift 2 ;;
+	--files-dir | --notes-dir) FILES_DIR="$2"; shift 2 ;;
 	--data-dir) DATA_DIR="$2"; shift 2 ;;
 	--config-dir) CONFIG_DIR="$2"; shift 2 ;;
 	--service-user) SERVICE_USER="$2"; shift 2 ;;
@@ -114,15 +114,22 @@ if [ -z "$PREFIX" ]; then
 fi
 [ -n "$SERVICE_USER" ] || SERVICE_USER="$(unit_value User)"
 [ -n "$SERVICE_USER" ] || SERVICE_USER="cloudmorrow"
-[ -n "$NOTES_DIR" ] || NOTES_DIR="$(config_value notes_dir)"
-[ -n "$NOTES_DIR" ] || NOTES_DIR="/srv/cloudmorrow/notes"
 [ -n "$DATA_DIR" ] || DATA_DIR="$(config_value data_dir)"
 [ -n "$DATA_DIR" ] || DATA_DIR="/var/lib/cloudmorrow"
-# The Shares folder is inside the notes directory unless the config moved it
-# out; only then is it a thing of its own to remove.
+# Everyone's files: the config's notes_dir, from when notes were all it held.
+[ -n "$FILES_DIR" ] || FILES_DIR="$(config_value notes_dir)"
+[ -n "$FILES_DIR" ] || FILES_DIR="$DATA_DIR/files"
+# The Shares folder is among the files unless the config moved it out; only
+# then is it a thing of its own to remove.
 SHARES_DIR="$(config_value shares_dir)"
 case "$SHARES_DIR" in
-"" | "$NOTES_DIR" | "$NOTES_DIR"/*) SHARES_DIR="" ;;
+"" | "$FILES_DIR" | "$FILES_DIR"/*) SHARES_DIR="" ;;
+esac
+# The files are under the data directory unless they were moved out; inside
+# it, removing the data has to leave them be unless they go too.
+FILES_INSIDE=""
+case "$FILES_DIR" in
+"$DATA_DIR"/*) FILES_INSIDE="1" ;;
 esac
 CLOUD_NAME="$(config_value name)"
 
@@ -167,8 +174,8 @@ if [ -e "$CONFIG_DIR" ]; then
 	[ ! -f "$KEY_FILE" ] || key_note=" and the sealing key"
 	found "config|Config|$CONFIG_DIR: server.toml$key_note"
 fi
-[ ! -e "$DATA_DIR" ] || found "data|Data|$DATA_DIR: the database, keys and quills"
-[ ! -e "$NOTES_DIR" ] || found "notes|Notes|$NOTES_DIR: every note and file"
+[ ! -e "$DATA_DIR" ] || found "data|Data|$DATA_DIR: the database, keys and quills${FILES_INSIDE:+ (not the files in it)}"
+[ ! -e "$FILES_DIR" ] || found "files|Files|$FILES_DIR: everyone's files and shares"
 [ -z "$SHARES_DIR" ] || [ ! -e "$SHARES_DIR" ] || found "shares|Shares|$SHARES_DIR: every fileshare"
 ! id "$SERVICE_USER" >/dev/null 2>&1 || found "user|User|the system user $SERVICE_USER"
 
@@ -195,6 +202,7 @@ if [ -n "$DELETE_DATA" ]; then
 	CHOSEN="$(kinds_found | tr '\n' ' ')"
 elif [ -n "$REMOVE_FLAG" ]; then
 	for kind in $(printf '%s' "$REMOVE_FLAG" | tr ',' ' '); do
+		[ "$kind" != "notes" ] || kind="files" # the old name for them
 		case " $KINDS " in
 		*" $kind "*) ;;
 		*) die "--remove does not know \"$kind\"; it takes: $(echo $KINDS | sed 's/ /, /g')" ;;
@@ -288,13 +296,13 @@ fi
 # Data is anything a later install would pick up again, and the user that
 # owns it. Removing it is a different question from removing software.
 DATA_GOES=""
-for kind in config data notes shares user; do
+for kind in config data files shares user; do
 	! chose "$kind" || DATA_GOES="1"
 done
 
 ! chose code || check_dir "$PREFIX"
 ! chose data || check_dir "$DATA_DIR"
-! chose notes || check_dir "$NOTES_DIR"
+! chose files || check_dir "$FILES_DIR"
 ! chose shares || check_dir "$SHARES_DIR"
 
 printf '\n  %sThis removes from this machine:\n\n' "${CLOUD_NAME:+The Cloudmorrow server \"$CLOUD_NAME\". }"
@@ -309,7 +317,7 @@ if [ -n "$kept" ]; then
 	printf '\n  and keeps the %s, so installing again picks up where it was.\n' "$kept"
 fi
 if [ -n "$DATA_GOES" ]; then
-	printf '\n  \033[1mWhat is removed cannot be brought back: accounts, notes, files, secrets.\033[0m\n'
+	printf '\n  \033[1mWhat is removed cannot be brought back: accounts, files, shares, secrets.\033[0m\n'
 fi
 printf '\n'
 
@@ -372,11 +380,23 @@ remove_dir() {
 	fi
 }
 ! chose config || remove_dir "$CONFIG_DIR"
-! chose data || remove_dir "$DATA_DIR"
-if chose notes; then
-	remove_dir "$NOTES_DIR"
-	# The installer made /srv/cloudmorrow to hold notes/; empty now, it goes too.
-	parent="$(dirname "$NOTES_DIR")"
+if chose data; then
+	if [ -n "$FILES_INSIDE" ] && ! chose files && [ -e "$FILES_DIR" ]; then
+		# Everything in the data directory but the files, which stay.
+		say "removing $DATA_DIR, but not the files in it"
+		for entry in "$DATA_DIR"/* "$DATA_DIR"/.[!.]* "$DATA_DIR"/..?*; do
+			[ -e "$entry" ] || [ -L "$entry" ] || continue
+			case "$FILES_DIR" in "$entry" | "$entry"/*) continue ;; esac
+			run rm -rf "$entry"
+		done
+	else
+		remove_dir "$DATA_DIR"
+	fi
+fi
+if chose files; then
+	remove_dir "$FILES_DIR"
+	# An older install made /srv/cloudmorrow to hold notes/; empty now, it goes too.
+	parent="$(dirname "$FILES_DIR")"
 	if [ "$(basename "$parent")" = "cloudmorrow" ] && [ -d "$parent" ]; then
 		run rmdir "$parent" 2>/dev/null || true
 	fi

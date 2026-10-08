@@ -111,9 +111,10 @@ curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy
 
 It asks five questions: what your cloud is called, a username and password
 for the first account, which becomes the administrator, where on the
-machine it goes (the code, the settings, the data and the notes, each on a
-row with its usual place filled in; Enter takes them all, or change the
-ones you want elsewhere), which of the machine's addresses it answers on
+machine it goes (the code, the settings and the data, each on a row with
+its usual place filled in; Enter takes them all, or change the ones you
+want elsewhere; everything people keep goes under the data directory, in
+`files/`), which of the machine's addresses it answers on
 (every one unless you tick others, or type your own), and which of the
 standard quills it should have (Notes, Tasks, Calendar, Chat, Files,
 Secrets; all of them unless you untick some). Then it creates a service
@@ -172,11 +173,12 @@ file and a Caddyfile:
 cd deploy/docker && CLOUDMORROW_DOMAIN=cloud.example.com docker compose up -d
 ```
 
-The server keeps its config in `/etc/cloudmorrow/server.toml`, notes and
-files under `/srv/cloudmorrow/notes`, the database under `/var/lib/cloudmorrow`
-and the encryption key in `/etc/cloudmorrow/cloudmorrow.key` — unless you put
-them elsewhere when the installer asked, or with `--prefix`, `--config-dir`,
-`--data-dir`, `--notes-dir` and `--shares-dir`; a re-run finds them where they
+The server keeps its config in `/etc/cloudmorrow/server.toml`, the database
+under `/var/lib/cloudmorrow`, everyone's files beside it in
+`/var/lib/cloudmorrow/files` (a folder per person, and the Shares folder) and
+the encryption key in `/etc/cloudmorrow/cloudmorrow.key` — unless you put them
+elsewhere when the installer asked, or with `--prefix`, `--config-dir`,
+`--data-dir`, `--files-dir` and `--shares-dir`; a re-run finds them where they
 are. Every key in the
 config, the cloud's name included, is explained in
 [deploy/server.example.toml](deploy/server.example.toml).
@@ -249,7 +251,7 @@ Three things, and the third is the one people forget:
 
 | what | where |
 | --- | --- |
-| notes, pictures, files and shares | `/srv/cloudmorrow/notes` |
+| everyone's files and shares | `/var/lib/cloudmorrow/files` |
 | accounts, tasks, chat, calendar, secrets | `/var/lib/cloudmorrow` |
 | the encryption key | `/etc/cloudmorrow/cloudmorrow.key` |
 

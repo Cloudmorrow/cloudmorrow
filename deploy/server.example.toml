@@ -7,10 +7,11 @@
 # phone's home screen and /api/health. The installer asks for it.
 name = "Cloudmorrow"
 
-# The directory your notes live in. Plain markdown files, nothing else.
-notes_dir = "/srv/cloudmorrow/notes"
+# Everyone's files: a folder per person, and the Shares folder. The key is
+# called notes_dir from when notes were all that was kept in it.
+notes_dir = "/var/lib/cloudmorrow/files"
 
-# Database (users) and the generated token signing key.
+# The database, the keys and the quills.
 data_dir = "/var/lib/cloudmorrow"
 
 # true  -> every user gets notes_dir/<username>
@@ -18,10 +19,11 @@ data_dir = "/var/lib/cloudmorrow"
 per_user_dirs = true
 
 # The Shares folder: every server share is a folder in it. Unset, it is
-# notes_dir/Shares, in the Cloudmorrow directory. Whatever you set, keep it
-# under a path the service unit may write to (ReadWritePaths); the rest of
-# the filesystem is read-only to the server.
-# shares_dir = "/srv/cloudmorrow/Shares"
+# notes_dir/Shares, among the files. Whatever you set, keep it under a path
+# the service unit may write to (ReadWritePaths); the rest of the filesystem
+# is read-only to the server. Moved, `install-server.sh --update` rewrites
+# the unit to match.
+# shares_dir = "/srv/shares"
 
 # Every address, so http://<this machine's IP>:8787 answers on the network
 # as well as a reverse proxy in front. "127.0.0.1" for the proxy alone, or
