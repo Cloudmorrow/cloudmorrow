@@ -72,11 +72,14 @@ def test_dry_run_with_every_answer_asks_nothing():
         "all",
         "--host",
         "0.0.0.0",
+        "--prefix",
+        "/opt/cm",
         env={"CLOUDMORROW_ADMIN_PASSWORD": "longenough"},
     )
     assert result.returncode == 0, result.stderr + result.stdout
     out = result.stdout
     assert "would choose: the standard quills all" in out
+    assert "/opt/cm/src" in out
     assert "The Larsens" in out
     assert "cloud.example.com" in out
     assert "would create: the account alice" in out
@@ -115,12 +118,59 @@ def test_a_username_the_server_would_refuse_is_refused_first(bad):
     assert "a username is" in result.stderr
 
 
-def test_the_standard_quills_are_the_fourth_question():
+def test_the_standard_quills_are_the_fifth_question():
     result = dry_run("--name", "Test", "--public-url", "https://cloud.test", "--user", "alice")
     assert result.returncode == 0, result.stderr + result.stdout
     assert "would ask: which standard quills to have" in result.stdout
     # And the guide at the end points at the one-line client install.
     assert "curl -fsSL https://cloud.test/install.sh | sh" in result.stdout
+
+
+def test_where_it_goes_is_asked_unless_a_place_is_given():
+    usual = "directories: /opt/cloudmorrow, /etc/cloudmorrow, /var/lib/cloudmorrow"
+    answers = ("--name", "T", "--public-url", "https://cloud.test", "--user", "alice")
+    asked = dry_run(*answers)
+    assert "would ask: where things go" in asked.stdout
+    # The usual places, when nothing is said; one flag answers for the lot.
+    assert f"{usual}, /srv/cloudmorrow/notes" in asked.stdout
+    given = dry_run(*answers, "--notes-dir", "/data/notes")
+    assert "would ask: where things go" not in given.stdout
+    assert f"{usual}, /data/notes" in given.stdout
+    assert "notes     /data/notes" in given.stdout
+    # A settings directory of its own is a flag too, and the unit points at it.
+    moved = dry_run(*answers, "--config-dir", "/srv/cm/etc")
+    assert "would write: /srv/cm/etc/server.toml" in moved.stdout
+    assert "settings  /srv/cm/etc/server.toml" in moved.stdout
+
+
+def test_a_shares_folder_of_its_own_is_made_and_writable():
+    answers = ("--name", "T", "--public-url", "https://cloud.test", "--user", "alice")
+    usual = "directories: /opt/cloudmorrow, /etc/cloudmorrow, /var/lib/cloudmorrow, /srv/cloudmorrow/notes"
+    out = dry_run(*answers, "--shares-dir", "/srv/shares").stdout
+    assert f"{usual}, /srv/shares" in out
+    assert "shares    /srv/shares" in out
+    # Inside the notes it is nothing of its own: not made twice, not listed twice.
+    inside = dry_run(*answers, "--shares-dir", "/srv/cloudmorrow/notes/Shares").stdout
+    assert f"{usual}\n" in inside
+    assert "shares    /srv/cloudmorrow/notes/Shares" in inside
+    # The unit lets the service write there, and a re-run reads the folder off the config.
+    text = INSTALLER.read_text()
+    assert "ReadWritePaths=$NOTES_DIR $DATA_DIR $PREFIX${SHARES_OUTSIDE:+ $SHARES_OUTSIDE}" in text
+    assert 'SHARES_DIR="$(config_value shares_dir)"' in text
+
+
+def test_the_form_the_installer_asks_where_with_is_in_the_checkout():
+    """Through curl | sh it fetches these three files on their own, so they are
+    the whole of what the form needs, and the installer names them."""
+    text = INSTALLER.read_text()
+    assert "for file in form.py checklist.py palette.py; do" in text
+    src = DEPLOY.parent / "src" / "cloudmorrow"
+    for name in ("form.py", "checklist.py", "palette.py"):
+        assert (src / name).exists()
+    imports = re.findall(r"^(?:from|import) (\S+)", (src / "form.py").read_text(), re.M)
+    assert {i for i in imports if i.startswith("cloudmorrow")} == {"cloudmorrow.checklist", "cloudmorrow.palette"}
+    imports = re.findall(r"^(?:from|import) (\S+)", (src / "checklist.py").read_text(), re.M)
+    assert {i for i in imports if i.startswith("cloudmorrow")} == {"cloudmorrow.palette"}
 
 
 def test_the_script_installs_from_the_cloudmorrow_organisation():
@@ -208,6 +258,6 @@ def test_an_address_of_its_own_gets_the_proxy_to_put_in_front():
 
 def test_no_linking_is_left_in_it():
     text = INSTALLER.read_text()
-    assert "ReadWritePaths=$NOTES_DIR $DATA_DIR $PREFIX\n" in text
+    assert "ReadWritePaths=$NOTES_DIR $DATA_DIR $PREFIX${SHARES_OUTSIDE:+ $SHARES_OUTSIDE}\n" in text
     for gone in ("--link", "access link", "tailscale ", "acmedns", "CADDY_DIR", "relay", "cmtunnel"):
         assert gone not in text, gone

@@ -1600,7 +1600,10 @@ help.
 
 **Where a server share's files are.** In the Shares folder on the server,
 and nowhere else: `<notes_dir>/Shares/` in the Cloudmorrow directory, or
-`shares_dir` if the server config sets one. One folder for everyone's
+`shares_dir` if the server config sets one (a folder outside the notes,
+data and code directories is one the service may not write to until the
+installer has put it in the unit: run `install-server.sh --update`, or give
+`--shares-dir` when installing). One folder for everyone's
 shares, whichever admin made them. A share is the folder of its name in
 there. `share add media --server` makes `Shares/media` if it is not there
 — and if you have already

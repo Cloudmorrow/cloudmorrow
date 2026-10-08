@@ -23,7 +23,7 @@ DATA_DIR=""
 SERVICE_USER=""
 SERVICE_NAME="cloudmorrow"
 AGENT_NAME="cloudmorrow-agent"
-CONFIG_DIR="/etc/cloudmorrow"
+CONFIG_DIR=""
 REMOVE_FLAG=""
 DELETE_DATA=""
 YES=""
@@ -47,7 +47,7 @@ Options:
   --prefix DIR        where the checkout and venv are (default: from the unit)
   --notes-dir DIR     where the notes are               (default: from the config)
   --data-dir DIR      the database and keys             (default: from the config)
-  --config-dir DIR    server.toml and the sealing key    (default: $CONFIG_DIR)
+  --config-dir DIR    server.toml and the sealing key    (default: from the unit)
   --service-user NAME the system user it runs as        (default: from the unit)
   --service-name NAME the systemd service               (default: $SERVICE_NAME)
 EOF
@@ -86,13 +86,22 @@ run() {
 
 UNIT="/etc/systemd/system/$SERVICE_NAME.service"
 AGENT_UNIT="/etc/systemd/system/$AGENT_NAME.service"
-CONFIG="$CONFIG_DIR/server.toml"
-KEY_FILE="$CONFIG_DIR/cloudmorrow.key"
 
 # --- what the installer made ------------------------------------------------
-# The unit says where the venv is and who it runs as; the config says where
-# the data is. A flag wins over both, and the installer's defaults are last.
+# The unit says where the venv and the config are and who it runs as; the
+# config says where the data is. A flag wins over both, and the installer's
+# defaults are last.
 unit_value() { sed -n "s/^$1=//p" "$UNIT" 2>/dev/null | head -n 1; }
+if [ -z "$CONFIG_DIR" ]; then
+	# Environment=CLOUDMORROW_SERVER_CONFIG=/etc/cloudmorrow/server.toml
+	config_now="$(unit_value Environment=CLOUDMORROW_SERVER_CONFIG)"
+	case "$config_now" in
+	/*/server.toml) CONFIG_DIR="$(dirname "$config_now")" ;;
+	*) CONFIG_DIR="/etc/cloudmorrow" ;;
+	esac
+fi
+CONFIG="$CONFIG_DIR/server.toml"
+KEY_FILE="$CONFIG_DIR/cloudmorrow.key"
 config_value() { sed -n "s/^$1 = \"\\(.*\\)\"\$/\\1/p" "$CONFIG" 2>/dev/null | head -n 1; }
 
 if [ -z "$PREFIX" ]; then

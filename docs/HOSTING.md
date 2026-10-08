@@ -7,7 +7,7 @@ work, so the pieces being built now fit the pieces that come after.
 
 | shape | what you do | status |
 | --- | --- | --- |
-| **Your own machine** | run the installer, answer four questions | built |
+| **Your own machine** | run the installer, answer five questions | built |
 | **A hosted tenant** | buy one, open the address, fill in the setup page | the server side is built; the shop and the control plane are not |
 
 What both share is in the repository, and it is what makes the tenant
@@ -29,7 +29,7 @@ possible without a terminal:
 
 ## Your own machine
 
-[The README](../README.md#install-a-server). One command, four questions.
+[The README](../README.md#install-a-server). One command, five questions.
 This is the shape everything else is measured against: whatever the tenant
 does for you, it must not need anything this one does not have.
 

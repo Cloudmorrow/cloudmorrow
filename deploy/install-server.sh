@@ -1,9 +1,10 @@
 #!/bin/sh
 # Install (or re-install) the Cloudmorrow server on this machine.
 #
-# One command, four questions — what your cloud is called, who its first
-# account (the administrator) is, which of this machine's addresses it
-# answers on, and which of the standard quills it has — and it is running:
+# One command, five questions — what your cloud is called, who its first
+# account (the administrator) is, where on this machine it goes (Enter
+# takes the usual places), which of its addresses it answers on, and which
+# of the standard quills it has — and it is running:
 #
 #   curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
 #
@@ -29,9 +30,15 @@ set -eu
 DEFAULT_REPO="https://github.com/Cloudmorrow/cloudmorrow.git"
 REPO=""
 BRANCH="main"
-PREFIX="/opt/cloudmorrow"
-NOTES_DIR="/srv/cloudmorrow/notes"
-DATA_DIR="/var/lib/cloudmorrow"
+DEFAULT_PREFIX="/opt/cloudmorrow"
+DEFAULT_CONFIG_DIR="/etc/cloudmorrow"
+DEFAULT_DATA_DIR="/var/lib/cloudmorrow"
+DEFAULT_NOTES_DIR="/srv/cloudmorrow/notes"
+PREFIX=""
+CONFIG_DIR=""
+DATA_DIR=""
+NOTES_DIR=""
+SHARES_DIR=""
 CLOUD_NAME=""
 PUBLIC_URL=""
 HOST="0.0.0.0"
@@ -49,7 +56,7 @@ UPDATE=""
 HOST_GIVEN=""
 
 usage() {
-	sed -n '2,17p' "$0"
+	sed -n '2,18p' "$0"
 	cat <<EOF
 
 Options:
@@ -64,9 +71,14 @@ Options:
   --repo URL          git URL to clone                  (default: this checkout's
                       origin, else $DEFAULT_REPO)
   --branch NAME       branch to deploy                  (default: $BRANCH)
-  --prefix DIR        checkout + venv live here         (default: $PREFIX)
-  --notes-dir DIR     where notes and files are stored  (default: $NOTES_DIR)
-  --data-dir DIR      database and keys                 (default: $DATA_DIR)
+  --prefix DIR        the checkout and the virtualenv   (default: $DEFAULT_PREFIX)
+  --config-dir DIR    server.toml and the sealing key   (default: $DEFAULT_CONFIG_DIR)
+  --data-dir DIR      the database, keys and quills     (default: $DEFAULT_DATA_DIR)
+  --notes-dir DIR     every note and file               (default: $DEFAULT_NOTES_DIR)
+                      (where things go is asked when none of the four is
+                      given; a re-run finds them where they are)
+  --shares-dir DIR    the Shares folder, when it is not to be inside the
+                      notes (default: $DEFAULT_NOTES_DIR/Shares)
   --host ADDR         address(es) to answer on, comma-separated
                       (asked if not given; default: $HOST, every address)
   --port N            bind port                         (default: $PORT)
@@ -89,7 +101,9 @@ while [ $# -gt 0 ]; do
 	--repo) REPO="$2"; shift 2 ;;
 	--branch) BRANCH="$2"; shift 2 ;;
 	--prefix) PREFIX="$2"; shift 2 ;;
+	--config-dir) CONFIG_DIR="$2"; shift 2 ;;
 	--notes-dir) NOTES_DIR="$2"; shift 2 ;;
+	--shares-dir) SHARES_DIR="$2"; shift 2 ;;
 	--data-dir) DATA_DIR="$2"; shift 2 ;;
 	--host) HOST="$2"; HOST_GIVEN="1"; shift 2 ;;
 	--port) PORT="$2"; shift 2 ;;
@@ -165,11 +179,50 @@ write_file() {
 	fi
 }
 
-SRC="$PREFIX/src"
-VENV="$PREFIX/venv"
-CONFIG_DIR="/etc/cloudmorrow"
-CONFIG="$CONFIG_DIR/server.toml"
-KEY_FILE="$CONFIG_DIR/cloudmorrow.key"
+# --- where things are, or go ----------------------------------------------
+# A flag says. Else, on a machine that has the server, the unit says where
+# the venv and the config are and the config says where the data and the
+# notes are, so a re-run needs no flags to find a custom layout. On a fresh
+# machine the usual places are offered on the terminal (ask_places, below),
+# to change or to take with Enter.
+UNIT="/etc/systemd/system/$SERVICE_NAME.service"
+unit_value() { sed -n "s/^$1=//p" "$UNIT" 2>/dev/null | head -n 1; }
+ASK_PLACES=""
+if [ -z "$PREFIX$CONFIG_DIR$DATA_DIR$NOTES_DIR$SHARES_DIR" ] && [ ! -f "$UNIT" ] && [ ! -f "$DEFAULT_CONFIG_DIR/server.toml" ]; then
+	ASK_PLACES="1"
+fi
+if [ -z "$PREFIX" ]; then
+	# ExecStart=/opt/cloudmorrow/venv/bin/cloudmorrow-server serve
+	exec_start="$(unit_value ExecStart | cut -d' ' -f1)"
+	case "$exec_start" in
+	*/venv/bin/cloudmorrow-server) PREFIX="${exec_start%/venv/bin/cloudmorrow-server}" ;;
+	*) PREFIX="$DEFAULT_PREFIX" ;;
+	esac
+fi
+if [ -z "$CONFIG_DIR" ]; then
+	# Environment=CLOUDMORROW_SERVER_CONFIG=/etc/cloudmorrow/server.toml
+	config_now="$(unit_value Environment=CLOUDMORROW_SERVER_CONFIG)"
+	case "$config_now" in
+	/*/server.toml) CONFIG_DIR="$(dirname "$config_now")" ;;
+	*) CONFIG_DIR="$DEFAULT_CONFIG_DIR" ;;
+	esac
+fi
+places() {
+	SRC="$PREFIX/src"
+	VENV="$PREFIX/venv"
+	CONFIG="$CONFIG_DIR/server.toml"
+	KEY_FILE="$CONFIG_DIR/cloudmorrow.key"
+}
+places
+# place_flags: the flags that name every place that is not the usual one,
+# for a message that says how to run this again.
+place_flags() {
+	[ "$PREFIX" = "$DEFAULT_PREFIX" ] || printf ' --prefix %s' "$PREFIX"
+	[ "$CONFIG_DIR" = "$DEFAULT_CONFIG_DIR" ] || printf ' --config-dir %s' "$CONFIG_DIR"
+	[ "$DATA_DIR" = "$DEFAULT_DATA_DIR" ] || printf ' --data-dir %s' "$DATA_DIR"
+	[ "$NOTES_DIR" = "$DEFAULT_NOTES_DIR" ] || printf ' --notes-dir %s' "$NOTES_DIR"
+	[ -z "$SHARES_DIR" ] || printf ' --shares-dir %s' "$SHARES_DIR"
+}
 
 [ -n "$DRY_RUN" ] || [ "$(id -u)" = "0" ] || die "run this with sudo"
 # --- what it needs ----------------------------------------------------------
@@ -294,14 +347,15 @@ fi
 # The default repo is wherever this checkout came from, so running the script
 # straight out of a clone does the obvious thing; a copy on its own, or one
 # that arrived through curl, installs the public code.
-if [ -z "$REPO" ] && [ -f "$0" ]; then
-	# Only a script that is really on disk has a checkout around it; through
-	# a pipe, $0 is the shell, and whatever directory this runs from is not
-	# ours to read a remote off.
+# Only a script that is really on disk has a checkout around it; through a
+# pipe, $0 is the shell, and whatever directory this runs from is not ours
+# to read a remote off.
+SCRIPT_DIR=""
+if [ -f "$0" ]; then
 	SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" 2>/dev/null && pwd || true)"
-	if [ -n "$SCRIPT_DIR" ] && [ -d "$SCRIPT_DIR/../.git" ]; then
-		REPO="$(git -C "$SCRIPT_DIR/.." remote get-url origin 2>/dev/null || true)"
-	fi
+fi
+if [ -z "$REPO" ] && [ -n "$SCRIPT_DIR" ] && [ -d "$SCRIPT_DIR/../.git" ]; then
+	REPO="$(git -C "$SCRIPT_DIR/.." remote get-url origin 2>/dev/null || true)"
 fi
 [ -n "$REPO" ] || REPO="$DEFAULT_REPO"
 
@@ -320,6 +374,21 @@ esac
 # the branch, the packages reinstalled, the unit rewritten, the service
 # restarted. That mends almost everything short of lost data.
 config_value() { sed -n "s/^$1 = \"\{0,1\}\([^\"]*\)\"\{0,1\}\$/\1/p" "$CONFIG" 2>/dev/null | head -n 1; }
+[ -n "$DATA_DIR" ] || DATA_DIR="$(config_value data_dir)"
+[ -n "$DATA_DIR" ] || DATA_DIR="$DEFAULT_DATA_DIR"
+[ -n "$NOTES_DIR" ] || NOTES_DIR="$(config_value notes_dir)"
+[ -n "$NOTES_DIR" ] || NOTES_DIR="$DEFAULT_NOTES_DIR"
+# The Shares folder is inside the notes unless a flag or the config moved it
+# out; only then is it a directory of its own to make, and to let the
+# service write to (ReadWritePaths in the unit). Moved by hand later, a
+# run with --update rewrites the unit to match.
+[ -n "$SHARES_DIR" ] || SHARES_DIR="$(config_value shares_dir)"
+shares_outside() {
+	case "$SHARES_DIR" in
+	"" | "$NOTES_DIR" | "$NOTES_DIR"/* | "$DATA_DIR" | "$DATA_DIR"/* | "$PREFIX" | "$PREFIX"/*) ;;
+	*) printf '%s' "$SHARES_DIR" ;;
+	esac
+}
 # listening_on "HOST, HOST": sets HEALTH_HOST, how this machine reaches the
 # server (loopback when it listens there or everywhere, else the first
 # address), and LAN_HOST, how the network does (the machine's own IP when
@@ -500,6 +569,95 @@ if [ -n "$TTY" ]; then
 	printf '\n' >/dev/tty
 fi
 
+# --- where it goes ---------------------------------------------------------
+# The usual places, each on a row to change or to leave: Enter takes them
+# all. The form (cloudmorrow.form) is in the checkout when this runs from
+# one; through curl | sh nothing is installed yet, so the three files it is
+# made of are fetched from the repository on their own. Failing both, each
+# place is asked on a line.
+PLACES_PYTHON=""
+PLACES_DIR=""
+places_python() {
+	if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/../src/cloudmorrow/form.py" ]; then
+		PLACES_PYTHON="env PYTHONPATH=$SCRIPT_DIR/../src $PYTHON"
+		return 0
+	fi
+	if [ -x "$VENV/bin/python" ] && "$VENV/bin/python" -c "import cloudmorrow.form" 2>/dev/null; then
+		PLACES_PYTHON="$VENV/bin/python"
+		return 0
+	fi
+	case "$REPO" in
+	https://github.com/*) raw="https://raw.githubusercontent.com/${REPO#https://github.com/}" ;;
+	git@github.com:*) raw="https://raw.githubusercontent.com/${REPO#git@github.com:}" ;;
+	*) return 1 ;;
+	esac
+	raw="${raw%.git}/$BRANCH/src/cloudmorrow"
+	if command -v curl >/dev/null 2>&1; then
+		fetch="curl -fsSL -o"
+	elif command -v wget >/dev/null 2>&1; then
+		fetch="wget -qO"
+	else
+		return 1
+	fi
+	PLACES_DIR="$(mktemp -d)"
+	mkdir -p "$PLACES_DIR/cloudmorrow"
+	: >"$PLACES_DIR/cloudmorrow/__init__.py"
+	for file in form.py checklist.py palette.py; do
+		$fetch "$PLACES_DIR/cloudmorrow/$file" "$raw/$file" 2>/dev/null || return 1
+	done
+	PLACES_PYTHON="env PYTHONPATH=$PLACES_DIR $PYTHON"
+}
+
+ask_places() {
+	status=0
+	answer="$($PLACES_PYTHON -m cloudmorrow.form --title "Where should it go? Enter takes the usual places." \
+		--field prefix "Code" "$DEFAULT_PREFIX" "the checkout and the virtualenv" \
+		--field config "Settings" "$DEFAULT_CONFIG_DIR" "server.toml and the sealing key" \
+		--field data "Data" "$DEFAULT_DATA_DIR" "the database, keys and quills" \
+		--field notes "Notes" "$DEFAULT_NOTES_DIR" "every note and file" \
+		--pattern '/\S*' --problem "an absolute path, please")" || status=$?
+	case "$status" in
+	0)
+		PREFIX="$(printf '%s\n' "$answer" | sed -n 's/^prefix=//p')"
+		CONFIG_DIR="$(printf '%s\n' "$answer" | sed -n 's/^config=//p')"
+		DATA_DIR="$(printf '%s\n' "$answer" | sed -n 's/^data=//p')"
+		NOTES_DIR="$(printf '%s\n' "$answer" | sed -n 's/^notes=//p')"
+		;;
+	130) die "stopped. Run this again to carry on where it left off." ;;
+	*) return 1 ;;
+	esac
+}
+
+ask_places_on_lines() {
+	printf '  Where should it go? Enter takes the usual place.\n' >/dev/tty
+	PREFIX="" CONFIG_DIR="" DATA_DIR="" NOTES_DIR=""
+	ask PREFIX "Code, the checkout and the virtualenv" "$DEFAULT_PREFIX"
+	ask CONFIG_DIR "Settings, server.toml and the sealing key" "$DEFAULT_CONFIG_DIR"
+	ask DATA_DIR "Data, the database, keys and quills" "$DEFAULT_DATA_DIR"
+	ask NOTES_DIR "Notes, every note and file" "$DEFAULT_NOTES_DIR"
+	for place in "$PREFIX" "$CONFIG_DIR" "$DATA_DIR" "$NOTES_DIR"; do
+		case "$place" in
+		/*) ;;
+		*) die "$place is not an absolute path" ;;
+		esac
+	done
+	printf '\n' >/dev/tty
+}
+
+if [ -n "$ASK_PLACES" ]; then
+	if [ -n "$DRY_RUN" ]; then
+		printf '   \033[2mwould ask:\033[0m where things go (the usual places unless changed)\n'
+	elif [ -n "$TTY" ]; then
+		if places_python && ask_places; then
+			:
+		else
+			ask_places_on_lines
+		fi
+		[ -z "$PLACES_DIR" ] || rm -rf "$PLACES_DIR"
+		places
+	fi
+fi
+
 CLOUD_NAME="${CLOUD_NAME:-Cloudmorrow}"
 PUBLIC_URL="$(printf '%s' "$PUBLIC_URL" | sed 's|/*$||')"
 # The name it announces on the home network: "The Larsens" -> the-larsens.local.
@@ -529,9 +687,10 @@ else
 fi
 
 # --- directories -----------------------------------------------------------
-say "directories: $PREFIX, $NOTES_DIR, $DATA_DIR"
-run mkdir -p "$PREFIX" "$NOTES_DIR" "$DATA_DIR" "$CONFIG_DIR"
-run chown -R "$SERVICE_USER:$SERVICE_USER" "$PREFIX" "$NOTES_DIR" "$DATA_DIR"
+SHARES_OUTSIDE="$(shares_outside)"
+say "directories: $PREFIX, $CONFIG_DIR, $DATA_DIR, $NOTES_DIR${SHARES_OUTSIDE:+, $SHARES_OUTSIDE}"
+run mkdir -p "$PREFIX" "$NOTES_DIR" "$DATA_DIR" "$CONFIG_DIR" ${SHARES_OUTSIDE:+"$SHARES_OUTSIDE"}
+run chown -R "$SERVICE_USER:$SERVICE_USER" "$PREFIX" "$NOTES_DIR" "$DATA_DIR" ${SHARES_OUTSIDE:+"$SHARES_OUTSIDE"}
 
 # --- deploy key, for a private repo over ssh -------------------------------
 # GitHub deploy keys are the least-privilege way to let one machine pull one
@@ -578,6 +737,7 @@ if [ -n "$NEEDS_KEY" ]; then
 	export GIT_SSH_COMMAND="$GIT_SSH"
 
 	if [ -n "$GENERATED" ] && [ -z "$DRY_RUN" ]; then
+		PLACE_FLAGS="$(place_flags)"
 		cat <<EOF
 
   This machine has no access to $REPO yet.
@@ -585,7 +745,9 @@ if [ -n "$NEEDS_KEY" ]; then
   Add its new public key to the repository as a read-only deploy key
   (GitHub: Settings -> Deploy keys -> Add deploy key), then run this
   script again — it will pick up where it left off.
-
+${PLACE_FLAGS:+
+  Give it the same places:$PLACE_FLAGS
+}
 EOF
 		printf '  '
 		cat "$SSH_KEY.pub"
@@ -695,6 +857,11 @@ if [ -f "$CONFIG" ]; then
 	say "keeping the existing $CONFIG"
 else
 	say "writing $CONFIG"
+	if [ -n "$SHARES_DIR" ]; then
+		SHARES_LINE="shares_dir = \"$SHARES_DIR\""
+	else
+		SHARES_LINE="# shares_dir = \"/srv/shares\""
+	fi
 	write_file "$CONFIG" 0644 <<EOF
 # Written by install-server.sh. Safe to edit; the installer never rewrites it.
 [server]
@@ -705,6 +872,12 @@ name = "$CLOUD_NAME"
 notes_dir = "$NOTES_DIR"
 data_dir = "$DATA_DIR"
 per_user_dirs = true
+
+# The Shares folder, for files shared with every machine: Shares in the
+# notes directory, unless this says otherwise. A folder outside the
+# directories above has to be in the service's ReadWritePaths as well:
+# after moving it, run the installer again with --update.
+$SHARES_LINE
 
 host = "$HOST"
 port = $PORT
@@ -770,7 +943,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=$NOTES_DIR $DATA_DIR $PREFIX
+ReadWritePaths=$NOTES_DIR $DATA_DIR $PREFIX${SHARES_OUTSIDE:+ $SHARES_OUTSIDE}
 
 [Install]
 WantedBy=multi-user.target
@@ -893,7 +1066,7 @@ ACCOUNT_PASSWORD=""
 # belongs to the first administrator, which is why it comes after the account.
 AGENT_INSTALLED=""
 if [ -z "$DRY_RUN" ] && "$VENV/bin/cloudmorrow-server" agent-install \
-	--run-as "$SERVICE_USER" \
+	--config "$CONFIG" --run-as "$SERVICE_USER" \
 	--url "${PUBLIC_URL:-http://$HEALTH_HOST:$PORT}" >/tmp/cloudmorrow-agent-install.$$ 2>&1; then
 	AGENT_INSTALLED="1"
 	say "the server has an agent of its own (cloudmorrow-agent.service)"
@@ -969,7 +1142,9 @@ done
 
 heading "Where things are"
 item "settings" "$CONFIG"
+item "data" "$DATA_DIR"
 item "notes" "$NOTES_DIR"
+[ -z "$SHARES_DIR" ] || item "shares" "$SHARES_DIR"
 item "code" "$SRC ($BRANCH)"
 
 heading "To update it later"

@@ -91,7 +91,7 @@ the plan for the rest is [docs/PLATFORM.md](docs/PLATFORM.md).
 
 ## Two ways to get one
 
-- **Your own machine.** The installer below: one command, four questions.
+- **Your own machine.** The installer below: one command, five questions.
 - **A hosted tenant.** The same server as a container, one per customer, on
   a service we run at a low monthly price. The server side is built; the
   shop is not yet.
@@ -109,15 +109,17 @@ or says the command that would. One command:
 curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
 ```
 
-It asks four questions: what your cloud is called, a username and password
-for the first account, which becomes the administrator, which of the
-machine's addresses it answers on (every one
-unless you tick others, or type your own), and which of the standard
-quills it should have (Notes, Tasks, Calendar, Chat, Files, Secrets; all of
-them unless you untick some). Then it creates a service user, clones the code into
-`/opt/cloudmorrow`, builds a virtualenv, writes the config and the systemd
-unit, generates the encryption key, starts the service and makes your
-account. Run it again any time: if the server is running and answering, it
+It asks five questions: what your cloud is called, a username and password
+for the first account, which becomes the administrator, where on the
+machine it goes (the code, the settings, the data and the notes, each on a
+row with its usual place filled in; Enter takes them all, or change the
+ones you want elsewhere), which of the machine's addresses it answers on
+(every one unless you tick others, or type your own), and which of the
+standard quills it should have (Notes, Tasks, Calendar, Chat, Files,
+Secrets; all of them unless you untick some). Then it creates a service
+user, clones the code into `/opt/cloudmorrow` (or where you said), builds a
+virtualenv, writes the config and the systemd unit, generates the
+encryption key, starts the service and makes your account. Run it again any time: if the server is running and answering, it
 says so and changes nothing; if not, it updates and reinstalls it and checks
 again (`--update` does that either way). It keeps your config, notes,
 database and accounts, and never asks a question it already has the answer to.
@@ -172,7 +174,10 @@ cd deploy/docker && CLOUDMORROW_DOMAIN=cloud.example.com docker compose up -d
 
 The server keeps its config in `/etc/cloudmorrow/server.toml`, notes and
 files under `/srv/cloudmorrow/notes`, the database under `/var/lib/cloudmorrow`
-and the encryption key in `/etc/cloudmorrow/cloudmorrow.key`. Every key in the
+and the encryption key in `/etc/cloudmorrow/cloudmorrow.key` — unless you put
+them elsewhere when the installer asked, or with `--prefix`, `--config-dir`,
+`--data-dir`, `--notes-dir` and `--shares-dir`; a re-run finds them where they
+are. Every key in the
 config, the cloud's name included, is explained in
 [deploy/server.example.toml](deploy/server.example.toml).
 
