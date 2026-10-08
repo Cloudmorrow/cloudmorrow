@@ -1,5 +1,6 @@
 # A tag like v1.0.0 is a release: checked and tested once more, then
-# published, ready for its line in the Quill Catalog.
+# published, ready for its line in the Quill Catalog. Checked against the
+# datamodels on main, as check.yml says why.
 name: release
 on:
   push:
@@ -9,11 +10,17 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      CLOUDMORROW_DATAMODELS: .datamodels
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Cloudmorrow/datamodels
+          path: .datamodels
       - uses: astral-sh/setup-uv@v5
       - run: uv sync
-      - run: uv run cm quill check .
+      - run: uv run cm quill check . --datamodels .datamodels
       - run: uv run cm quill test . --sandbox
       - name: Check the version is the tag's
         run: |
