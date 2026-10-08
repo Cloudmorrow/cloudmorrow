@@ -274,7 +274,10 @@ per person is not there yet.
 
 ## Datamodels you introduce
 
-One TOML file each, in `datamodels/`, with an id under your Quill's:
+One TOML file each, in `datamodels/`, with an id under your Quill's. The
+full contract for data — field kinds, versions, extension fields, spaces,
+who may see and change what — is `docs/DATAMODELS.md` in the Cloudmorrow
+repository; the foundational datamodels are at cloudmorrow.com/datamodels.
 
 ```toml
 [datamodel]

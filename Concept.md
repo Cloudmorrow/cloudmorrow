@@ -2,8 +2,9 @@
 
 > **Now:** apps are **Quills** and elements are **datamodels** —
 > foundational or extended — and each Quill lives in its own repository and
-> is found in the Quill Catalog. The contract, and what is built, is
-> [QUILLS.md](docs/QUILLS.md). This page is the reasoning behind it.
+> is found in the Quill Catalog. The contract for data is [DATAMODELS.md](docs/DATAMODELS.md), and for
+> what sits on top — screens, jobs, code — [QUILLS.md](docs/QUILLS.md). This
+> page is the reasoning behind both.
 
 Cloudmorrow is your personal platform for everything. For a person, a
 household, or a company. It is the place your data lives, in standard
