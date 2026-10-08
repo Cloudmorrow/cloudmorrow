@@ -249,7 +249,7 @@ records(id, element, version, scope_kind, scope_id, owner, written_by,
 links(from_id, role, to_id)                  -- derived from link fields on every write
 members(scope_id, username)                  -- who is in a shared scope
 changes(seq, id, element, op, by, at)        -- the feed
-attachments(id, record_id, path, size, mime) -- files on disk, sealed like notes
+attachments(id, record_id, path, size, mime) -- files on disk
 ```
 
 The seal's associated data is `(element, scope_kind, scope_id)`: a

@@ -36,13 +36,13 @@ start with the [README](../README.md); this is the page to come back to.
   Every row and button is a click target with a key beside it. The markdown
   editor is live: the line the cursor is on stays raw source, and every
   other line renders as you leave it.
-- **Encrypted at rest.** Everything you write — chat, events, tasks, notes,
-  pictures, secrets, synced dotfiles — is ciphertext on the server's disk,
-  under one key the server holds. You never handle a key; you sign in with
-  a password. See [Encryption at rest](#encryption-at-rest).
-- **Notes are files.** Each note is a file under a directory you name in the
-  server config, folders are folders, and a copy of the tree is a backup.
-  The bytes inside are sealed, so it is the app that reads them, not `grep`.
+- **Encrypted at rest.** Everything you write into the database — chat,
+  events, tasks, secrets, synced dotfiles — is ciphertext on the server's
+  disk, under one key the server holds. You never handle a key; you sign in
+  with a password. See [Encryption at rest](#encryption-at-rest).
+- **Notes are files.** Each note is a Markdown file in the `Notes` folder of
+  your drive on the server, folders are folders, and a copy of the tree is a
+  backup. `grep` works, `rsync` works, and so does any editor.
 - **A local agent** on each machine — registers itself when you sign in, runs
   as you, for backups and whatever comes next. The server has one too, so the
   box that holds everything is in the list with the rest of them.
@@ -164,17 +164,15 @@ scripts/
   release.py         tag this commit as a release, and push it
 ```
 
-Notes on disk, one tree per user:
+Notes on disk, one tree per user, in the `Notes` folder of their drive:
 
 ```
-<notes_dir>/<user>/notes/
+<notes_dir>/<user>/files/Notes/
 ```
 
 Notes are the person's, not a project's, so there is one tree and no scoping
-to think about. (Older layouts — notes loose in `<user>/`, or under
-`<user>/projects/<slug>/notes/` from when a project had its own — are folded
-into it the first time the server sees them; a project's notes become a folder
-of that name.)
+to think about. A note is a plain Markdown file like any other file in the
+drive: it shows in My Files and on WebDAV, and any editor can open it.
 
 Secrets are the exception to files-not-a-database: they live in the SQLite
 database, encrypted — see [Secrets](#secrets).
@@ -1350,28 +1348,27 @@ The long version, with the threat model and what every store seals, is
 The server's disk holds ciphertext. Every piece of content — a chat message
 and a channel's topic, an event's title, notes and place, a task and its
 board's title, a notification, a synced dotfile, a project's description, an
-agent job's payload and result, a phone's push keys, a secret's value, and
-every note and picture in the notes tree — is sealed with AES-256-GCM before
-it is written and opened when it is read. What stays plain is what the
-server needs to find, sort and range by: usernames, slugs, timestamps, lanes,
-positions, who is in a channel, and the names of notes, which are their file
-names.
+agent job's payload and result, a phone's push keys, a secret's value — is
+sealed with AES-256-GCM before it is written and opened when it is read.
+What stays plain is what the server needs to find, sort and range by:
+usernames, slugs, timestamps, lanes, positions, who is in a channel. Files
+are plain too: notes and their pictures, My Files and shares are files on
+disk, as files on a server are.
 
 **One key, held by the server.** It is a file — `key_file` in the config,
 `/etc/cloudmorrow/cloudmorrow.key` on an installed server, `<data_dir>/secrets.key`
 when unset — generated on first boot at mode 600. The install script puts it
 in `/etc`, away from `/var/lib`, so a copy of the data directory on its own
-opens nothing. Three subkeys are derived from it, for the database, for the
-notes tree and for secrets, so none of them is the key itself. Nobody who
-uses Cloudmorrow ever sees any of this: you sign in with a password, and the
-server does the rest. That is the point, and also the limit: this is
-encryption at rest, not end to end. It protects the database file, the notes
-directory, a backup of either, and a disk that leaves the machine. Whoever
-has the key file and the data has everything.
+opens nothing. A subkey is derived from it for the database, and secrets
+use the key itself. Nobody who uses Cloudmorrow ever sees any of this: you
+sign in with a password, and the server does the rest. That is the point,
+and also the limit: this is encryption at rest, not end to end. It protects
+the database file, a backup of it, and a disk that leaves the machine.
+Whoever has the key file and the data has everything.
 
 **Back up the key with the data, and never instead of it.** Lose the key and
-every note, message and secret is gone; there is no recovery. Keep a copy
-somewhere that is not the server.
+every message, event, task and secret is gone; there is no recovery. Keep a
+copy somewhere that is not the server.
 
 **Every seal is bound to its row.** A sealed value carries, in its tamper
 check, the table and column it belongs to and what it is scoped by — the
@@ -1379,15 +1376,13 @@ channel a message is in, the owner of a task — so a row cannot be moved to
 another channel or another account by editing the database.
 
 **Older data is sealed on the first boot.** A database from before this
-release is sealed in one transaction the first time the server opens it, and
-every user's notes tree is swept at boot; a plain file left in a notes
-directory is read as itself and sealed on the next start. After that every
-read expects ciphertext, with no guessing: a message that happens to look
-like one is still a message.
+release is sealed in one transaction the first time the server opens it.
+After that every read expects ciphertext, with no guessing: a message that
+happens to look like one is still a message.
 
 **Changing the key.** Stop the service, run `cloudmorrow-server rotate-key`,
-start it again. Every row and file is opened under the key in place and
-sealed under a new one, which replaces it; the old key stays beside it as
+start it again. Every row is opened under the key and sealed under a new
+one, which replaces it; the old key stays beside it as
 `cloudmorrow.key.old` until you delete it.
 
 Not covered yet: the files in My Files and the fileshares, which are served
@@ -1495,8 +1490,7 @@ cannot collide, and ends with what the file was called, so `ls img/` still
 reads. The type is taken from the bytes, never from the name: PNG, JPEG, GIF
 and WebP, up to 25 MB. The folder never shows in the note list — a picture
 is something a note shows, not a thing to find — and a copy of the notes
-tree takes the pictures with it, because they are files like everything else,
-sealed like everything else.
+tree takes the pictures with it, because they are files like everything else.
 
 **How they show.** The phone and the web app put each picture where the
 note has it, between the text above and below it; tap one to see it full
@@ -1547,7 +1541,8 @@ the server, served as `my-files`: `…/dav/my-files/`, first in `share list`,
 mounted with `share mount my-files`, and at the top of the **Files** tab in
 both apps. Nobody makes it and nobody removes it — it is there because the
 account is — and only its owner ever sees it. Its files are in that
-account's own tree, `<notes_dir>/<username>/files/`, beside their notes.
+account's own tree, `<notes_dir>/<username>/files/`, and their notes are
+the `Notes` folder in it.
 
 **The Files Quill.** What is in them is on screen through the **Files**
 Quill, a foundation Quill in the catalog: installed on a new server with
@@ -2132,21 +2127,6 @@ CLOUDMORROW_NOTES_DIR=/tmp/notes CLOUDMORROW_DATA_DIR=/tmp/cloudmorrow-data \
 CLOUDMORROW_NOTES_DIR=/tmp/notes CLOUDMORROW_DATA_DIR=/tmp/cloudmorrow-data \
   cloudmorrow-server serve --port 8787 --reload
 ```
-
-## Housekeeping
-
-What is left over from the layout that kept notes inside projects — the
-per-project note directories — is found by:
-
-```bash
-cloudmorrow-server prune          # on the server: says what nothing can reach
-cloudmorrow-server prune --yes    # and deletes it
-```
-
-It never deletes a note: notes in an old per-project directory are moved into
-the owner's tree first, as a folder of that project's name, and only empty
-directories are removed. A directory holding anything else is reported and
-left where it is.
 
 ## Known limits
 

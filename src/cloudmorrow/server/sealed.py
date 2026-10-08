@@ -1,18 +1,19 @@
 """Content encrypted at rest, under a key the server holds.
 
-Everything a person writes into Cloudmorrow — a chat message, an event, a
-task, a note, a picture — is sealed with AES-256-GCM before it is stored and
-opened again when it is read, so the database and the notes directory hold
-ciphertext. Users never see a key: the server has one, in a file, and that
-is the whole model. It is encryption at rest, not end to end. Someone with
-the key file and the data has everything; someone with the data alone has
-nothing.
+Everything a person writes into the database — a chat message, an event, a
+task, a notification — is sealed with AES-256-GCM before it is stored and
+opened again when it is read, so the database holds ciphertext. Users never
+see a key: the server has one, in a file, and that is the whole model. It
+is encryption at rest, not end to end. Someone with the key file and the
+database has everything; someone with the database alone has nothing.
 
-One key file, three subkeys derived from it with HKDF: `content` for the
-database columns listed in SEALED, `notes` for the files in a notes tree,
-and the key itself for the secrets store, which was sealing values before
-this module existed and keeps its format. The derivation means a subkey
-that leaks (a note file's key, say) opens nothing else.
+Files are not sealed: notes, pictures, My Files and shares are plain files
+on disk, as files on a server are.
+
+One key file, two keys from it: `content`, derived with HKDF, for the
+database columns listed in SEALED, and the key itself for the secrets
+store, which was sealing values before this module existed and keeps its
+format. The derivation means the content key leaking opens no secret.
 
 What stays plain is what the server has to look things up, sort or range
 by: usernames, slugs, timestamps, lanes, positions, who is in a channel.
@@ -30,9 +31,7 @@ than beside the data it protects, which is what a fresh install does.
 seals every row in every listed table, in one transaction, and writes the
 sealing version into `schema_meta`. From then on every read unseals, with no
 guessing about whether a value is plain: a message that happens to look
-like ciphertext is still a message. Note files carry a magic prefix, so a
-plain one left on disk by an older version reads as itself until
-`seal_tree` has been over it, which happens at boot.
+like ciphertext is still a message.
 """
 
 from __future__ import annotations
@@ -54,15 +53,12 @@ from cloudmorrow.server import crypto
 from cloudmorrow.server.crypto import KEY_BYTES, NONCE_BYTES, SealError, load_or_create_key
 
 __all__ = [
-    "FILE_MAGIC",
     "SEALED",
     "SealError",
     "Sealer",
-    "is_sealed_file",
     "key_for",
     "migrate",
     "rotate",
-    "seal_tree",
     "sealer_for",
     "use_key",
 ]
@@ -102,14 +98,8 @@ SEALED: dict[int, tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...]] = {
 SEALED_VERSION = max(SEALED)
 
 TEXT_FORMAT = "s1"
-# A sealed file starts with a NUL, which no text file does, so a plain
-# note left by an older version is told apart from a sealed one without
-# trying the key on it.
-FILE_MAGIC = b"\x00CMS1"
-FILE_OVERHEAD = len(FILE_MAGIC) + NONCE_BYTES + 16  # magic, nonce, GCM tag
 
 _INFO_CONTENT = b"cloudmorrow/content/v1"
-_INFO_NOTES = b"cloudmorrow/notes/v1"
 
 
 def _derive(master: bytes, info: bytes) -> bytes:
@@ -124,7 +114,6 @@ class Sealer:
             raise SealError(f"the key is not {KEY_BYTES * 8} bits")
         self.master = master
         self._content = AESGCM(_derive(master, _INFO_CONTENT))
-        self._notes = AESGCM(_derive(master, _INFO_NOTES))
 
     # -- database columns ----------------------------------------------------
     @staticmethod
@@ -151,31 +140,6 @@ class Sealer:
         except (InvalidTag, ValueError) as exc:
             raise SealError(f"cannot open {table}.{column} with the current key") from exc
         return opened.decode("utf-8")
-
-    # -- files ---------------------------------------------------------------
-    def seal_file(self, data: bytes) -> bytes:
-        nonce = os.urandom(NONCE_BYTES)
-        return FILE_MAGIC + nonce + self._notes.encrypt(nonce, data, FILE_MAGIC)
-
-    def unseal_file(self, data: bytes) -> bytes:
-        """The file's contents. A file that was never sealed is returned as it is."""
-        if not is_sealed_file(data):
-            return data
-        start = len(FILE_MAGIC)
-        nonce, sealed = data[start : start + NONCE_BYTES], data[start + NONCE_BYTES :]
-        try:
-            return self._notes.decrypt(nonce, sealed, FILE_MAGIC)
-        except (InvalidTag, ValueError) as exc:
-            raise SealError("cannot open this file with the current key") from exc
-
-
-def is_sealed_file(data: bytes) -> bool:
-    return data.startswith(FILE_MAGIC)
-
-
-def plain_size(stored: int) -> int:
-    """How long a sealed file's contents are, from how long the file is."""
-    return max(0, stored - FILE_OVERHEAD)
 
 
 # -- which key ---------------------------------------------------------------------
@@ -310,40 +274,14 @@ def _seal_table(
         conn.execute(f"UPDATE {table} SET {assignments} WHERE rowid = ?", (*sealed, row[0]))
 
 
-def seal_tree(root: Path, sealer: Sealer) -> int:
-    """Seal every file under a notes root that is not sealed yet.
-
-    Returns how many were sealed. Hidden files are left alone: the `.tmp`
-    files a write goes through, and anything a person's editor keeps.
-    """
-    sealed = 0
-    if not root.is_dir():
-        return 0
-    for path in root.rglob("*"):
-        if not path.is_file() or path.is_symlink():
-            continue
-        if any(part.startswith(".") for part in path.relative_to(root).parts):
-            continue
-        with path.open("rb") as handle:
-            if is_sealed_file(handle.read(len(FILE_MAGIC))):
-                continue
-        data = path.read_bytes()
-        tmp = path.with_name(f".{path.name}.tmp")
-        tmp.write_bytes(sealer.seal_file(data))
-        os.replace(tmp, path)
-        sealed += 1
-    return sealed
-
-
 # -- a new key -----------------------------------------------------------------------
-def rotate(db_path: Path, note_roots: Iterable[Path], old: Sealer, new: Sealer) -> dict[str, int]:
+def rotate(db_path: Path, old: Sealer, new: Sealer) -> dict[str, int]:
     """Open everything with *old* and seal it again with *new*.
 
-    Every listed column, the secrets store's values and fingerprints, and
-    every sealed file under the note roots. The database part is one
-    transaction; the files are one at a time, each replaced whole. Run it
-    with the service stopped — a row written under the old key while this
-    runs would be a row nobody can open afterwards. Returns what it did.
+    Every listed column, and the secrets store's values and fingerprints,
+    in one transaction. Run it with the service stopped — a row written
+    under the old key while this runs would be a row nobody can open
+    afterwards. Returns what it did.
     """
     rows = 0
     conn = sqlite3.connect(db_path)
@@ -388,23 +326,7 @@ def rotate(db_path: Path, note_roots: Iterable[Path], old: Sealer, new: Sealer) 
     finally:
         conn.close()
 
-    files = 0
-    for root in note_roots:
-        if not root.is_dir():
-            continue
-        for path in root.rglob("*"):
-            if not path.is_file() or path.is_symlink():
-                continue
-            if any(part.startswith(".") for part in path.relative_to(root).parts):
-                continue
-            data = path.read_bytes()
-            if not is_sealed_file(data):
-                continue
-            tmp = path.with_name(f".{path.name}.tmp")
-            tmp.write_bytes(new.seal_file(old.unseal_file(data)))
-            os.replace(tmp, path)
-            files += 1
-    return {"rows": rows, "files": files}
+    return {"rows": rows}
 
 
 def _encode(raw: bytes) -> str:

@@ -315,7 +315,7 @@ through the same record API by a **backend**:
 
 | datamodel | backend | lives in | also reached by |
 | --- | --- | --- | --- |
-| `note` | `notes` | Markdown files in each person's notes folder, sealed | WebDAV, the notes MCP tools, `cm note` |
+| `note` | `notes` | Markdown files in the `Notes` folder of each person's drive | WebDAV, the Files Quill, the notes MCP tools, `cm note` |
 | `share`, `file` | `shares` | the fileshares and each person's drive | WebDAV, the desktop app's mounts, `cm share`, `/api/shares` |
 | `secret` | `vaults` | the secrets store, sealed under its own key | `cm secret run`, and never an assistant |
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from cloudmorrow.server.notes import ensure_notes_layout
 from cloudmorrow.server.shares import InvalidSlugError, validate_share_name
 from tests.conftest import basic
 
@@ -24,13 +23,14 @@ def test_every_account_has_a_drive_and_it_is_not_an_admins_call(client, guest_au
 
 def test_the_drive_is_browsed_and_written_like_a_share(client, guest_auth, config):
     root = config.notes_dir / "guest" / "files"
-    root.mkdir(parents=True)
+    root.mkdir(parents=True, exist_ok=True)
     (root / "Tax").mkdir()
     (root / "cv.txt").write_text("me")
     body = client.get("/api/shares/my-files/ls", headers=guest_auth).json()
     assert body["share"] == "my-files"
     found = sorted((e["name"], e["is_dir"]) for e in body["entries"])
-    assert found == [("Tax", True), ("cv.txt", False)]
+    # Notes is a folder in the drive like any other: the person's notes are there.
+    assert found == [("Notes", True), ("Tax", True), ("cv.txt", False)]
     put = client.post(
         "/api/shares/my-files/upload?path=Tax&filename=2025.pdf",
         content=b"%PDF",
@@ -43,12 +43,12 @@ def test_the_drive_is_browsed_and_written_like_a_share(client, guest_auth, confi
 
 
 def test_each_account_sees_only_its_own_drive(client, auth, guest_auth, config):
-    (config.notes_dir / "bram" / "files").mkdir(parents=True)
+    (config.notes_dir / "bram" / "files").mkdir(parents=True, exist_ok=True)
     (config.notes_dir / "bram" / "files" / "secret.txt").write_text("x")
     guest = client.get("/api/shares/my-files/ls", headers=guest_auth).json()
-    assert guest["entries"] == []
+    assert [e["name"] for e in guest["entries"] if e["name"] != "Notes"] == []
     admin = client.get("/api/shares/my-files/ls", headers=auth).json()
-    assert [e["name"] for e in admin["entries"]] == ["secret.txt"]
+    assert [e["name"] for e in admin["entries"] if e["name"] != "Notes"] == ["secret.txt"]
 
 
 def test_the_drive_is_mounted_over_dav_under_its_name(client, guest_auth, config):
@@ -69,14 +69,3 @@ def test_the_drive_cannot_be_removed_or_taken_as_a_share_name(client, auth, gues
     assert taken.status_code == 400
     with pytest.raises(InvalidSlugError):
         validate_share_name("My-Files")
-
-
-def test_the_drive_is_not_swept_into_notes_as_a_stray(tmp_path):
-    """The notes layout folds strays beside `notes` into it; the drive is
-    not one — it is there before the notes folder is, on a fresh account."""
-    base = tmp_path / "guest"
-    (base / "files" / "Tax").mkdir(parents=True)
-    (base / "files" / "cv.txt").write_text("me")
-    ensure_notes_layout(base)
-    assert (base / "files" / "cv.txt").read_text() == "me"
-    assert not (base / "notes" / "files").exists()

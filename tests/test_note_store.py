@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from cloudmorrow.server.notes import (
@@ -11,12 +9,11 @@ from cloudmorrow.server.notes import (
     NoteStore,
     unique_path,
 )
-from cloudmorrow.server.sealed import Sealer
 
 
 @pytest.fixture()
 def store(tmp_path) -> NoteStore:
-    return NoteStore(tmp_path / "notes", Sealer(os.urandom(32)))
+    return NoteStore(tmp_path / "notes")
 
 
 def test_write_read_roundtrip(store):

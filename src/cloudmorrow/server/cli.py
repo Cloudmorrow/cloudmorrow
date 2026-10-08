@@ -27,7 +27,6 @@ from cloudmorrow.server.db import (
     UserExistsError,
     UserStore,
 )
-from cloudmorrow.server.maintenance import delete_orphans, find_orphans
 from cloudmorrow.server.quills.cli import app as quill_app
 from cloudmorrow.server.sealed import Sealer, key_for, rotate, use_key
 from cloudmorrow.server.security import hash_password
@@ -469,32 +468,6 @@ def update(
 
 
 @app.command()
-def prune(
-    config_path: ConfigOption = None,
-    yes: Annotated[bool, typer.Option("--yes", "-y", help="Actually delete it. Without this, it only looks.")] = False,
-) -> None:
-    """Find what an older layout left behind, and optionally delete it.
-
-    The empty per-project note directories from when notes were kept inside
-    projects. Notes themselves are never deleted: the layout migration moves
-    them into the owner's tree first.
-    """
-    config = _load(config_path)
-    orphans = find_orphans(config)
-    if orphans.empty:
-        typer.echo("Nothing orphaned.")
-        return
-    for directory in orphans.directories:
-        typer.echo(f"  dir      {directory}")
-    summary = _plural(len(orphans.directories), "leftover directory", "leftover directories")
-    if not yes:
-        typer.echo(f"\n{summary}. Nothing deleted — pass --yes to delete it.")
-        return
-    delete_orphans(config, orphans)
-    typer.echo(f"\nDeleted {summary}.")
-
-
-@app.command()
 def publish(
     wheel: Annotated[
         Path | None,
@@ -546,21 +519,20 @@ def rotate_key(
     config = _load(config_path)
     key_path = config.secrets_key_path
     if not yes:
-        console.print(f"This reseals the database and every note under a new key at {key_path}.")
+        console.print(f"This reseals the database under a new key at {key_path}.")
         console.print("The service must be stopped. Continue? [y/N] ", end="")
         if input().strip().lower() not in {"y", "yes"}:
             raise typer.Exit(code=1)
     old = Sealer(key_for(config.db_path))
     new = Sealer(os.urandom(32))
-    roots = [config.notes_root(user.username) for user in _store(config).list()]
-    counts = rotate(config.db_path, roots, old, new)
+    counts = rotate(config.db_path, old, new)
     backup = key_path.with_name(key_path.name + ".old")
     os.replace(key_path, backup)
     handle = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(handle, "w", encoding="utf-8") as file:
         file.write(base64.urlsafe_b64encode(new.master).decode("ascii") + "\n")
     console.print(
-        f"Resealed {_plural(counts['rows'], 'row')} and {_plural(counts['files'], 'file')}."
+        f"Resealed {_plural(counts['rows'], 'row')}."
         f" The old key is at {backup}; delete it once you have started the service and"
         " seen it open things."
     )

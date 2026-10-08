@@ -8,7 +8,8 @@ through the same file routes — so every client that can open a share can
 open it. What it is not is a row in the shares table: it cannot be made,
 renamed or removed, and the name `my-files` is kept for it.
 
-Where it is: `<user's tree>/files`, beside their notes (`config.files_root`).
+Where it is: `<user's tree>/files` (`config.files_root`); their notes are
+the `Notes` folder in it.
 Only the owner ever sees it; the WebDAV and the API sides both ask for the
 caller's drive, never anyone else's.
 """

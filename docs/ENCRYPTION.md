@@ -12,7 +12,7 @@ seals every piece of content with it before writing and opens it again when
 reading. Someone with the data alone — a copied database, a stolen disk, an
 old backup — has nothing. Someone with the data *and* the key file has
 everything, and so does the running server, because it is the thing that
-hands your notes back to you. The choice was deliberate: an end-to-end
+hands your messages back to you. The choice was deliberate: an end-to-end
 design puts device keys and recovery phrases in users' hands, and the
 product's point is that anyone can run it on their own hardware without
 any of that. Volume encryption (LUKS, ZFS) would also have kept keys out of
@@ -34,33 +34,33 @@ range over stays plain.
 | Agent jobs | payload and result | type, status, timestamps |
 | Web push | the subscription's `p256dh` and `auth` keys | the endpoint URL (needed to send, and unique) |
 | Secrets | values | vaults, key names, environments, lengths, a keyed fingerprint per value |
-| Notes | every note's contents, every picture | file names, which are the titles; folder names; sizes and modification times |
 | Users | — | usernames, display names, roles; passwords are argon2 hashes, which is not encryption and needs no key |
 
-Not sealed, and known: the files in **My Files** and the **fileshares**.
-They are served over WebDAV straight from disk, and a mount expects to
-read and write raw bytes with range requests. Sealing them means a WebDAV
-provider of our own that decrypts on read and encrypts on write; it is on
-the list, not done. Note **file names** are the other gap: a title is how
-a note is found and listed, so it is the name on disk.
+Not sealed, by choice: the files. **Notes** and their pictures, **My
+Files** and the **fileshares** are plain files on disk. They are served
+over WebDAV straight from disk, a mount expects to read and write raw
+bytes with range requests, and a note is meant to be a file anyone can
+open with an editor. Sealing them would mean a WebDAV provider of our own
+that decrypts on read and encrypts on write, and would take all of that
+away; it is not on the list.
 
 ## How it is sealed
 
 **The cipher.** AES-256-GCM, a fresh 96-bit random nonce per value, from
 the `cryptography` package, which ships wheels for every platform
 Cloudmorrow installs on. A sealed database value is stored as text:
-`s1:<nonce>:<ciphertext>`, both parts URL-safe base64. A sealed file is
-bytes: a five-byte magic `\x00CMS1`, the nonce, the ciphertext with its
-tag. The magic starts with a NUL, which no text file begins with, so a
-plain note left by an older version can be told from a sealed one without
-trying the key.
+`s1:<nonce>:<ciphertext>`, both parts URL-safe base64.
 
-**One key, three subkeys.** The key file holds 32 random bytes. From it,
+**Files are not sealed.** Notes, the pictures in them, My Files and the
+shares are plain files on disk, as files on a server are: a note is
+Markdown in the `Notes` folder of its owner's drive, readable with any
+editor, on WebDAV, and in a backup. What is sealed is the database.
+
+**One key, one subkey.** The key file holds 32 random bytes. From it,
 HKDF-SHA256 derives a subkey for database content
-(`cloudmorrow/content/v1`) and one for the notes tree
-(`cloudmorrow/notes/v1`). Secrets use the key itself, because they were
+(`cloudmorrow/content/v1`). Secrets use the key itself, because they were
 sealed under it before the rest existed and their format did not change.
-A subkey that leaks opens only its own kind of thing.
+The content subkey leaking opens no secret.
 
 **Every seal is bound to its row.** GCM's associated data carries the
 table, the column, and the row's *scope* — the channel a message is in,
@@ -69,23 +69,18 @@ belongs to. Moving a ciphertext to another row by editing the database
 makes it fail to open. The scopes were chosen to be immutable for a row,
 or to be rewritten by the same update that could change them (an event
 moved to another calendar is resealed by the move). Secrets are bound to
-owner, vault, environment and key name. A note file is bound
-to the constant magic only: notes move between folders, and a rename must
-not need the key.
+owner, vault, environment and key name.
 
 **Where in the code.** `src/cloudmorrow/server/sealed.py` is the whole
 mechanism: the `Sealer`, the versioned table `SEALED` of which columns are
-sealed and by what scope, the boot migration, the notes sweep, and
-rotation. `db.connect` returns a connection with `seal` and `unseal`
-methods, so a store writes `conn.seal("tasks", "body", (owner,), body)`
-and reads with the matching `unseal`. `NoteStore` takes a `Sealer` and
-every file goes through it. Nothing else in the server touches ciphertext.
+sealed and by what scope, the boot migration, and rotation. `db.connect`
+returns a connection with `seal` and `unseal` methods, so a store writes
+`conn.seal("tasks", "body", (owner,), body)` and reads with the matching
+`unseal`. Nothing else in the server touches ciphertext.
 
 **What it costs.** Sorting on a sealed column is done in Python rather
-than SQL; boards are the only case. Searching notes opens each file whole;
-a note over two megabytes is skipped by search and gets no preview. A
-picture is read into memory to serve it. None of this is noticeable at
-the scale of a home server.
+than SQL; boards are the only case. None of this is noticeable at the
+scale of a home server.
 
 ## The key
 
@@ -101,7 +96,7 @@ A server that boots without a key file at the configured path generates
 one there, if it can write there.
 
 **Back it up with the data, and never instead of it.** Lose the key and
-every note, message, event, task, dotfile and secret is gone; there is no
+every message, event, task, dotfile and secret is gone; there is no
 recovery, by design. Keep a copy somewhere that is not the server. Keep
 it apart from your backup of the data, or the backup is as good as plain.
 
@@ -120,13 +115,11 @@ sudo -u cloudmorrow /opt/cloudmorrow/venv/bin/cloudmorrow-server rotate-key
 sudo systemctl start cloudmorrow
 ```
 
-Every sealed row, every secret and its fingerprint, and every sealed file
-under every user's notes tree is opened under the key in place and sealed
-under a new one, which then replaces the file. The database part is one
-transaction; the files are replaced one at a time, each written whole and
-renamed into place. The old key is kept as `<key_file>.old` until you
+Every sealed row, and every secret and its fingerprint, is opened under
+the key and sealed under a new one, in one transaction, which then
+replaces the file. The old key is kept as `<key_file>.old` until you
 delete it, which you should do once the service is up and you have opened
-a note. The service must be stopped: a row written under the old key
+a message. The service must be stopped: a row written under the old key
 while rotation runs is a row nobody can open afterwards.
 
 ## Older servers
@@ -140,12 +133,6 @@ then on every read expects ciphertext, and there is no sniffing: a message
 that happens to look like `s1:...` is still a message. The table is
 versioned so a column sealed in a later release migrates on its own
 without touching the rest; an entry that has shipped is never edited.
-
-**The notes** are swept at boot: every user's notes tree, every file not
-starting with the magic, sealed in place. Reading is tolerant in the
-other direction — a plain file reads as itself — so a file dropped into a
-notes directory by hand is readable at once and ciphertext after the next
-start. Writing always seals.
 
 ## In transit
 
@@ -188,7 +175,7 @@ authority; until then, treat machine shares as LAN-only.
 | Threat | Covered |
 | --- | --- |
 | The database file or a backup of it is copied | yes: ciphertext without the key |
-| The notes directory or a backup of it is copied | yes, apart from file names |
+| The files directory or a backup of it is copied | no: notes, pictures, My Files and shares are plain files |
 | The server's disk is lost, stolen or decommissioned | yes, if the key was not on it or was on a different volume; on a single-disk box, put the key in `/etc` and back the data up separately |
 | Someone reads traffic on the network | yes, on every hop but a machine share |
 | Someone with root on the running server | no: they have the key, and the server itself must be able to read everything |

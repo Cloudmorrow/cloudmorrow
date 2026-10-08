@@ -168,19 +168,20 @@ class ServerConfig:
         return self.notes_dir / username if self.per_user_dirs else self.notes_dir
 
     def notes_root(self, username: str) -> Path:
-        """Where a user's notes live: `<base>/notes`, and nowhere else.
+        """Where a user's notes live: the `Notes` folder of their own drive.
 
-        Notes belong to the person, not to a project. The extra `notes` level
-        leaves room for other per-user data beside them later.
+        A note is a plain Markdown file in the person's files, like any
+        other file there: it shows in My Files, on WebDAV, and in a backup
+        of the directory, and any editor can open it.
         """
-        return self.user_base(username) / "notes"
+        return self.files_root(username) / "Notes"
 
     def files_root(self, username: str) -> Path:
-        """Where a user's own files live: `<base>/files`, beside their notes.
+        """Where a user's own files live: `<base>/files`.
 
-        The drive every account has on the server, served as `my-files`.
-        With one shared tree (`per_user_dirs` off) it is one drive for
-        everyone, the same as the notes then are.
+        The drive every account has on the server, served as `my-files`;
+        their notes are the `Notes` folder in it. With one shared tree
+        (`per_user_dirs` off) it is one drive for everyone.
         """
         return self.user_base(username) / "files"
 

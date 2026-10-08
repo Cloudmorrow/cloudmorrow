@@ -1,20 +1,18 @@
 """Notes on disk.
 
-Notes are markdown files in a directory tree; folders in the tree are
-folders on disk. Each file is sealed (`cloudmorrow.server.sealed`): the
-name on disk is the note's title, the bytes inside are ciphertext under
-the server's key, and this store is the only thing that reads them. The
-tree is still a tree — a folder is a folder, a note is a file, and a copy
-of the directory is a backup — but it is not a place to open a file with
-an editor any more.
+Notes are Markdown files in a directory tree; folders in the tree are
+folders on disk. The tree is the `Notes` folder of the person's own drive
+(`config.notes_root`), so a note is a file like any other file there: it
+shows in My Files and on WebDAV, a copy of the directory is a backup, and
+any editor can open it. Nothing about it is special to this store except
+that this store knows which files are notes.
 
-They belong to the person, not to a project: one tree per user, at
-`<base>/notes`.
+They belong to the person, not to a project: one tree per user.
 
-Pictures live beside them, in `<base>/notes/img`: one flat folder, named by
-when each arrived, that the tree never lists. A picture is something a note
-shows — `![holiday](img/20260917-134501-ab12cd-holiday.jpg)` — not a thing to
-find in the list, so the folder is there for the files and invisible
+Pictures live beside them, in `Notes/img`: one flat folder, named by when
+each arrived, that the tree never lists. A picture is something a note
+shows — `![holiday](img/20260917-134501-ab12cd-holiday.jpg)` — not a thing
+to find in the list, so the folder is there for the files and invisible
 otherwise.
 """
 
@@ -29,7 +27,6 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
 from cloudmorrow.server.paths import UnsafePathError, normalise_rel_path, resolve_within
-from cloudmorrow.server.sealed import Sealer, is_sealed_file, plain_size
 
 NOTE_SUFFIX = ".md"
 MAX_SEARCH_RESULTS = 200
@@ -147,64 +144,6 @@ class NoteContent:
 # `projects` from the old layout; `shares`, where server shares used to be
 # kept per user; and `Shares`, where they all are now — which is a sibling
 # of the user bases, or the base itself when there is one tree.
-LAYOUT_DIRS = {"notes", "files", "projects", "shares", "Shares"}
-
-
-def ensure_notes_layout(base: Path) -> bool:
-    """Make sure `<base>/notes` exists, and holds everything that is a note.
-
-    Two older layouts get folded in: notes kept directly in `<base>`, from
-    before there was a `notes` directory at all; and notes kept per project in
-    `<base>/projects/<slug>/notes`, from when a project had its own. A
-    project's notes become a folder of that name, because a project no longer
-    holds notes — the person does.
-
-    Returns True when something actually moved, so the caller can log it.
-    """
-    base.mkdir(parents=True, exist_ok=True)
-    notes = base / "notes"
-    moved = False
-    if not notes.exists():
-        strays = [entry for entry in base.iterdir() if entry.name not in LAYOUT_DIRS]
-        notes.mkdir()
-        for stray in strays:
-            shutil.move(str(stray), str(notes / stray.name))
-        moved = bool(strays)
-    projects = base / "projects"
-    if not projects.is_dir():
-        return moved
-    for project in sorted(projects.iterdir()):
-        if not project.is_dir():
-            continue
-        source = project / "notes"
-        if source.is_dir():
-            if any(source.iterdir()):
-                shutil.move(str(source), str(_free_name(notes, project.name)))
-                moved = True
-            else:
-                source.rmdir()
-                moved = True
-        # Only what is empty is removed. Anything else in there was put there
-        # by someone, and this is not the place to decide it can go.
-        if not any(project.iterdir()):
-            project.rmdir()
-            moved = True
-    if not any(projects.iterdir()):
-        projects.rmdir()
-        moved = True
-    return moved
-
-
-def _free_name(parent: Path, stem: str) -> Path:
-    """`parent/stem`, or `parent/stem-2`… — whichever is not taken."""
-    candidate = parent / stem
-    counter = 2
-    while candidate.exists():
-        candidate = parent / f"{stem}-{counter}"
-        counter += 1
-    return candidate
-
-
 PREVIEW_CHARS = 120
 PREVIEW_BYTES = 4096
 
@@ -246,42 +185,28 @@ def file_rev(path: Path) -> str:
 
 
 class NoteStore:
-    """All note operations for a single user's root directory.
+    """All note operations for a single user's root directory."""
 
-    Every file under it goes through *sealer* on the way in and out.
-    """
-
-    def __init__(self, root: Path, sealer: Sealer) -> None:
+    def __init__(self, root: Path) -> None:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self.root = self.root.resolve()
-        self.sealer = sealer
 
     # -- helpers -----------------------------------------------------------
     def _resolve(self, rel_path: str) -> Path:
         return resolve_within(self.root, rel_path)
 
     def _read_bytes(self, path: Path) -> bytes:
-        return self.sealer.unseal_file(path.read_bytes())
+        return path.read_bytes()
 
     def _read_text(self, path: Path, *, errors: str = "strict") -> str:
         return self._read_bytes(path).decode("utf-8", errors=errors)
 
     def _write_bytes(self, path: Path, data: bytes) -> None:
-        """Seal and write atomically: the file is whole or it is not there."""
+        """Write atomically: the file is whole or it is not there."""
         tmp = path.with_name(f".{path.name}.tmp")
-        tmp.write_bytes(self.sealer.seal_file(data))
+        tmp.write_bytes(data)
         os.replace(tmp, path)
-
-    @staticmethod
-    def _content_size(path: Path, stored: int) -> int:
-        """How long the note is, not how long its ciphertext is."""
-        try:
-            with path.open("rb") as handle:
-                sealed = is_sealed_file(handle.read(8))
-        except OSError:
-            return stored
-        return plain_size(stored) if sealed else stored
 
     def _rel(self, path: Path) -> str:
         return path.resolve().relative_to(self.root).as_posix()
@@ -332,15 +257,14 @@ class NoteStore:
                         name=entry.name,
                         path=self._rel(entry_path),
                         is_dir=False,
-                        size=self._content_size(entry_path, stat.st_size),
+                        size=stat.st_size,
                         modified=stat.st_mtime,
                         preview=self._preview(entry_path, stat.st_size) if previews else None,
                     )
                 )
 
     def _preview(self, path: Path, stored: int) -> str:
-        # A sealed file has to be opened whole to read its head; a note
-        # too big to search is too big to preview, and gets none.
+        # A note too big to search is too big to preview, and gets none.
         if stored > MAX_SEARCH_FILE_BYTES:
             return ""
         try:

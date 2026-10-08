@@ -248,7 +248,7 @@ Three things, and the third is the one people forget:
 | accounts, tasks, chat, calendar, secrets | `/var/lib/cloudmorrow` |
 | the encryption key | `/etc/cloudmorrow/cloudmorrow.key` |
 
-Notes, tasks, chat, calendar and secrets are ciphertext without the third.
+Tasks, chat, calendar and secrets are ciphertext without the third.
 Back the key up with the data and keep the copy somewhere that is not the
 server. Lose it and there is no recovery, by design. Files in the drives and
 shares are stored as they are, so they need no key, and are not yet encrypted.

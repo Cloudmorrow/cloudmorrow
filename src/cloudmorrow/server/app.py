@@ -56,7 +56,7 @@ from cloudmorrow.server.routes import (
 from cloudmorrow.server.routes import (
     server as server_routes,
 )
-from cloudmorrow.server.sealed import seal_tree, use_key
+from cloudmorrow.server.sealed import use_key
 from cloudmorrow.server.secrets import SecretStore
 from cloudmorrow.server.settings import SettingsStore
 from cloudmorrow.server.shares import ShareStore
@@ -81,9 +81,6 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     # The key, before the first connection: every store seals through it.
     sealer = use_key(config.db_path, config.secrets_key_path)
     user_store = UserStore(config.db_path)
-    # Notes written before they were sealed. Idempotent, and quick once done.
-    for user in user_store.list():
-        seal_tree(config.notes_root(user.username), sealer)
     share_store = ShareStore(config.db_path, config.shares_root)
     # Shares made when each account had its own shares folder come into the
     # one Shares folder, so there is one place to look.

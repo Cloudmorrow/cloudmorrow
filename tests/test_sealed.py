@@ -16,7 +16,7 @@ from cloudmorrow.server.notes import NoteStore
 from cloudmorrow.server.notifications import NotificationStore
 from cloudmorrow.server.quills import QuillRegistry
 from cloudmorrow.server.records import Principal, RecordStore
-from cloudmorrow.server.sealed import FILE_MAGIC, Sealer, rotate, seal_tree, use_key
+from cloudmorrow.server.sealed import Sealer, rotate, use_key
 from tests.conftest import ADMIN, QUILL_CATALOG, token_for
 
 
@@ -80,23 +80,18 @@ def test_a_database_from_before_sealing_is_sealed_on_first_connect(tmp_path):
     assert (got[0].title, got[0].body) == ("Plain title", "Plain body")
 
 
-def test_a_note_is_ciphertext_on_disk_and_a_plain_one_is_sealed_by_the_sweep(tmp_path):
-    sealer = Sealer(os.urandom(32))
-    store = NoteStore(tmp_path / "notes", sealer)
+def test_a_note_is_a_plain_file_in_the_drive(tmp_path):
+    """Files are not sealed: a note is Markdown on disk, in the person's drive."""
+    config = ServerConfig(notes_dir=tmp_path / "trees", data_dir=tmp_path / "data")
+    store = NoteStore(config.notes_root("bram"))
     store.write("plan", "# plan\n\nbuy milk\n")
-    on_disk = (store.root / "plan.md").read_bytes()
-    assert on_disk.startswith(FILE_MAGIC) and b"milk" not in on_disk
-    assert store.read("plan").content == "# plan\n\nbuy milk\n"
+    on_disk = config.files_root("bram") / "Notes" / "plan.md"
+    assert on_disk.read_text(encoding="utf-8") == "# plan\n\nbuy milk\n"
     assert store.read("plan").size == len("# plan\n\nbuy milk\n")
-    # A plain file from an older version reads as itself, and the sweep seals it.
-    (store.root / "old.md").write_text("still readable\n", encoding="utf-8")
-    assert store.read("old").content == "still readable\n"
-    assert seal_tree(store.root, sealer) == 1
-    assert seal_tree(store.root, sealer) == 0
-    assert (store.root / "old.md").read_bytes().startswith(FILE_MAGIC)
-    assert store.read("old").content == "still readable\n"
+    # A file put there by hand, over WebDAV or with an editor, is a note too.
+    (store.root / "shopping.md").write_text("eggs\n", encoding="utf-8")
+    assert store.read("shopping").content == "eggs\n"
     assert store.search("milk")[0]["path"] == "plan.md"
-    assert store.tree(previews=True).children[1].preview == "buy milk"
 
 
 def test_the_key_file_can_live_elsewhere(tmp_path, monkeypatch):
@@ -122,19 +117,6 @@ def test_the_default_key_sits_beside_the_database():
     assert config.secrets_key_path == Path("/var/lib/cm/secrets.key")
 
 
-def test_boot_seals_every_users_notes(client, config, auth):
-    """A server starting on notes from before sealing seals them."""
-    from cloudmorrow.server.app import create_app
-
-    notes = config.notes_root(ADMIN[0])
-    notes.mkdir(parents=True, exist_ok=True)
-    (notes / "legacy.md").write_text("from before\n", encoding="utf-8")
-    create_app(config)
-    assert (notes / "legacy.md").read_bytes().startswith(FILE_MAGIC)
-    got = client.get("/api/notes/file/legacy.md", headers=auth)
-    assert got.status_code == 200 and got.json()["content"] == "from before\n"
-
-
 def test_rotating_the_key_reseals_everything(tmp_path, config, users):
     db = config.db_path
     old_path = tmp_path / "old.key"
@@ -145,13 +127,10 @@ def test_rotating_the_key_reseals_everything(tmp_path, config, users):
     bram = Principal.person("bram")
     room = store.create(bram, "channel", {"name": "homelab", "kind": "public", "topic": "the rack"}, scope="public")
     store.create(bram, "message", {"channel": room.id, "body": "hello there"})
-    notes = NoteStore(tmp_path / "notes", old)
-    notes.write("plan", "rotate me\n")
-    notes.save_image(b"\x89PNG\r\n\x1a\n" + b"\x00" * 16)
 
     new = Sealer(os.urandom(32))
-    counts = rotate(db, [notes.root], old, new)
-    assert counts == {"rows": 2, "files": 2}
+    counts = rotate(db, old, new)
+    assert counts == {"rows": 2}
 
     # The old sealer cannot open a row any more; the new one can.
     with pytest.raises(SealError):
@@ -162,9 +141,6 @@ def test_rotating_the_key_reseals_everything(tmp_path, config, users):
     sealed._keys[db.resolve()] = new.master
     assert store.list(bram, "message")[0].fields["body"] == "hello there"
     assert store.get(bram, "channel", room.id).fields["topic"] == "the rack"
-    assert NoteStore(notes.root, new).read("plan").content == "rotate me\n"
-    with pytest.raises(SealError):
-        NoteStore(notes.root, old).read("plan")
 
 
 def test_the_api_round_trips_sealed_content(chat_quill, auth):

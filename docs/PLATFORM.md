@@ -24,7 +24,7 @@ out of.
 
 | layer | what it is | what it grows out of |
 | --- | --- | --- |
-| **Data** | Files, and a database of records of catalogued types, sealed at rest, searchable | the notes tree, My Files and shares; the per-feature SQLite tables and the `SEALED` scope binding |
+| **Data** | Files, plain on disk, and a database of records of catalogued types, sealed at rest, searchable | My Files, with notes in its `Notes` folder, and shares; the per-feature SQLite tables and the `SEALED` scope binding |
 | **Guard** | Who may touch which type or folder, declared, approved, listed, revocable | the feature switches, the three access kinds in chat and calendar, MCP connections you can cut off, agent tokens |
 | **Kit** | A small vocabulary of screens — list, detail, form, board, calendar, thread, grid, editor — each rendered by every client | the web app's one-file-per-feature screens and `registerTab`, the TUI panes, `cm RESOURCE ACTION` |
 | **Apps** | A manifest naming the types it uses, the grants it asks for and its screens; the included apps are just the first manifests | Notes, Tasks, Calendar, Chat, Secrets, Files as they are |

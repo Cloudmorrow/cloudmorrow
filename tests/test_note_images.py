@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from cloudmorrow.server.notes import InvalidImageError, NoteStore, sniff_image
-from cloudmorrow.server.sealed import FILE_MAGIC, Sealer
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 40
 JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 40
@@ -28,7 +25,7 @@ def test_the_type_comes_from_the_bytes():
 
 @pytest.fixture()
 def store(tmp_path) -> NoteStore:
-    return NoteStore(tmp_path / "notes", Sealer(os.urandom(32)))
+    return NoteStore(tmp_path / "notes")
 
 
 def test_a_picture_is_kept_under_a_name_that_says_when_it_came(store):
@@ -36,9 +33,8 @@ def test_a_picture_is_kept_under_a_name_that_says_when_it_came(store):
     assert info.path == f"img/{info.name}"
     assert info.name.endswith("-holiday-photo.png")
     assert info.content_type == "image/png"
-    # On disk it is ciphertext; through the store it is the picture.
-    stored = (store.root / "img" / info.name).read_bytes()
-    assert stored != PNG and stored.startswith(FILE_MAGIC)
+    # On disk it is the picture, as any file in the drive is.
+    assert (store.root / "img" / info.name).read_bytes() == PNG
     assert store.image(info.name) == (PNG, "image/png")
 
 

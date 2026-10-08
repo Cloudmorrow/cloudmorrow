@@ -19,7 +19,7 @@ from cloudmorrow.server.configsync import ConfigStore
 from cloudmorrow.server.db import User, UserStore
 from cloudmorrow.server.features import FeatureStore
 from cloudmorrow.server.mcp import MCPStore
-from cloudmorrow.server.notes import NoteStore, ensure_notes_layout
+from cloudmorrow.server.notes import NoteStore
 from cloudmorrow.server.notifications import NotificationStore
 from cloudmorrow.server.quills import QuillRegistry
 from cloudmorrow.server.quills.services import Supervisor
@@ -79,5 +79,4 @@ class AppState:
         return self.settings.name(self.config.name)
 
     def note_store(self, user: User) -> NoteStore:
-        ensure_notes_layout(self.config.user_base(user.username))
-        return NoteStore(self.config.notes_root(user.username), self.sealer)
+        return NoteStore(self.config.notes_root(user.username))

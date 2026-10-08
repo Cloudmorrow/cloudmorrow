@@ -139,8 +139,10 @@ def test_a_folder_is_listed_as_records_and_a_file_read_as_itself(files, config):
     (root / "cv.txt").write_text("me")
     (root / ".hidden").write_text("no")
     top = call(files, "GET", "/api/records/file?share=my-files")
+    # Notes is the folder the account's notes are in, a folder like any other.
     assert [(f["fields"]["name"], f["fields"]["kind"]) for f in top] == [
         ("cv.txt", "file"),
+        ("Notes", "folder"),
         ("Photos", "folder"),
     ]
     cv = next(f for f in top if f["fields"]["name"] == "cv.txt")
@@ -240,10 +242,11 @@ def test_folders_are_made_renamed_moved_and_deleted(files, config):
 
 def test_files_are_their_owners_alone(files, config):
     (drive(config) / "secret.txt").write_text("x")
-    mine = call(files, "GET", "/api/records/file?share=my-files")
+    mine = [f for f in call(files, "GET", "/api/records/file?share=my-files") if f["fields"]["name"] != "Notes"]
     assert [f["fields"]["name"] for f in mine] == ["secret.txt"]
     # The guest's my-files is their own drive, and the id of bram's file is nothing to them.
-    assert call(files, "GET", "/api/records/file?share=my-files", who=GUEST) == []
+    theirs = call(files, "GET", "/api/records/file?share=my-files", who=GUEST)
+    assert [f["fields"]["name"] for f in theirs if f["fields"]["name"] != "Notes"] == []
     call(files, "GET", f"/api/records/file/{mine[0]['id']}", who=GUEST, expect=404)
     call(files, "GET", f"/api/records/file/{mine[0]['id']}/content", who=GUEST, expect=404)
     call(files, "POST", "/api/shares", {"name": "family"}, expect=201)
