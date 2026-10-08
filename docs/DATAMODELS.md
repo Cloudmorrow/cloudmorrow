@@ -26,8 +26,12 @@ happened to want it.
 **Extended datamodels** are what Quills add on top: fields of their own on
 a foundational datamodel (`fleet.odometer` on a `vehicle`), or whole new
 datamodels under their own name (`fleet.service_visit`). Any later Quill may
-use either. They are declared in the Quill's repository, arrive with it,
-and the records written in them stay when it goes.
+use either. They are declared in the Quill's repository and arrive with
+it. When the Quill goes they stay, by default: an administrator removing a
+Quill may choose to drop the datamodels it introduced and the fields it
+added, records and all, and the sheet says which. The datamodels
+repository and cloudmorrow.com/datamodels hold only the foundational ones;
+what a Quill brings is on the Quill's own page in the catalog.
 
 ## A datamodel
 
@@ -350,12 +354,18 @@ that keeps it both delightful and safe.
    value: the log says *bram changed phone and notes on Tuesday*, and the
    record says what they are now. People act under responsibility, and
    responsibility is visible.
-4. **Not in this, and said so:** hiding one field from some people; a
+4. **Removing a Quill asks about its data.** The sheet lists the
+   datamodels it introduced and the fields it added, with how many records
+   hold them, ticked to keep. An administrator unticks what should go with
+   it. Kept fields stay on the records, read-only, until another Quill
+   declares them or the person clears them.
+5. **Not in this, and said so:** hiding one field from some people; a
    guardian reading a child's personal records; access by time.
 
 *Done when:* one person is given read on the budget without a circle made
 for them, a Quill's install sheet shows who gets its data before it is
-installed, and a contact's sheet shows who changed what and when.
+installed, removing a Quill offers to keep or drop what it brought, and a
+contact's sheet shows who changed what and when.
 
 ### Phase 2 — Lists and kinds
 
