@@ -17,8 +17,9 @@ a Quill that goes leaves every record behind.
 **Foundational datamodels** are the ones Cloudmorrow decides are
 foundational: the shapes in [`Cloudmorrow/datamodels`](https://github.com/Cloudmorrow/datamodels),
 grouped in **domains** — Tasks, Customers, Fleet, Calendars, Messaging,
-Notes, Secrets, Files — and chosen by domain when you install, with or
-without a Quill that uses them. They grow by our hand, by pull request to
+Secrets, Files, and for now Notes, which is leaving (*What is next*,
+phase 0) — and chosen by domain when you install, with or without a Quill
+that uses them. They grow by our hand, by pull request to
 that repository, when we judge a shape is one every Quill should agree on.
 A datamodel is foundational because we said so, not because enough Quills
 happened to want it. The foundation is meant to be broad: every domain we
@@ -268,7 +269,7 @@ through the same record API by a **backend**:
 
 | datamodel | backend | lives in | also reached by |
 | --- | --- | --- | --- |
-| `note` | `notes` | Markdown files in the `Notes` folder of each person's drive | WebDAV, the Files Quill, the notes MCP tools, `cm note` |
+| `note` (leaving: phase 0 below) | `notes` | Markdown files in the `Notes` folder of each person's drive | WebDAV, the Files Quill, the notes MCP tools, `cm note` |
 | `share`, `file` | `shares` | the fileshares and each person's drive | WebDAV, the desktop app's mounts, `cm share`, `/api/shares` |
 | `secret` | `vaults` | the secrets store, sealed under its own key | `cm secret run`, and never an assistant |
 
@@ -340,6 +341,32 @@ domains, the envelope, scopes, extensions, datasets, the change feed — and
 the gaps are in the claim itself: who may change a record is only half
 said, reference data is free text, and the foundation is narrow. Each
 phase ends with something a person can use.
+
+### Phase 0 — Notes leaves the foundation
+
+A note is a Markdown file in the Notes folder of a person's drive, and
+Notes is a Quill that edits files there: nothing more. So `note` is not a
+datamodel. Today it is one, kept by a backend of its own over the same
+files, because the editor kit was written against it; that is a seam
+nobody should see.
+
+1. The editor kit draws a `file` record whose content is Markdown: `path`
+   is the file's folder and name inside its share, `body` is its content
+   (`GET …/content`, written back the same way), and pictures are files
+   beside it. The `shares` backend answers folders and search for the
+   editor the way the notes backend did.
+2. The Notes Quill's screen binds to `file`, in the person's own drive,
+   under `Notes`. Its welcome dataset is a file. `cm note` and the
+   assistant's note tools read and write the same files through `file`.
+3. `note` goes: from the datamodels repository and its Notes domain, from
+   the server's backends, and from the first-boot page, where Files
+   already covers it. The Notes Quill's release and the catalog's
+   datamodels pin move together, so a fresh install never asks for a
+   datamodel that is gone.
+
+*Done when:* a note made in Notes, in My Files, over WebDAV and by the
+assistant is the same file, `note` is nowhere on the server, and the
+registry page has no Notes domain.
 
 ### Phase 1 — Who may change it, said in full
 
