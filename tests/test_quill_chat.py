@@ -15,7 +15,7 @@ import sqlite3
 import pytest
 
 from cloudmorrow.server import spacenotify
-from cloudmorrow.server.db import connect
+from cloudmorrow.server.database import connect
 from cloudmorrow.server.quills import QuillError, QuillRegistry, load_manifest, parse_manifest
 from cloudmorrow.server.quills.jobs import LEGACY_CHAT, boot, move_legacy_chat, read_meta
 from cloudmorrow.server.records import Principal, RecordStore

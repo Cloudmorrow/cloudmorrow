@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from cloudmorrow.server import pages, sealed
+from cloudmorrow.server import database, pages, sealed
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.crypto import SealError, load_or_create_key
-from cloudmorrow.server.db import connect
+from cloudmorrow.server.database import connect
 from cloudmorrow.server.notifications import NotificationStore
 from cloudmorrow.server.quills import QuillRegistry
 from cloudmorrow.server.records import Principal, RecordStore
@@ -135,10 +135,9 @@ def test_rotating_the_key_reseals_everything(tmp_path, config, users):
     # The old sealer cannot open a row any more; the new one can.
     with pytest.raises(SealError):
         store.list(bram, "message")
-    sealed._keys.clear()
     sealed._sealers.clear()
     old_path.write_bytes(b"")  # not read again: the new key is registered below
-    sealed._keys[db.resolve()] = new.master
+    database.open(db)._sealer = new
     assert store.list(bram, "message")[0].fields["body"] == "hello there"
     assert store.get(bram, "channel", room.id).fields["topic"] == "the rack"
 

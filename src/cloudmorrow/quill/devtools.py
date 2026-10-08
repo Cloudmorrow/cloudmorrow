@@ -90,7 +90,7 @@ def serve(folder: Path, *, port: int, sandbox: bool, host: str) -> int:
         allow_api_update=False,
     )
     config.ensure_dirs()
-    users = UserStore(config.db_path)
+    users = UserStore(config.database())
     you = os.environ.get("USER", "you").lower() or "you"
     password = secrets.token_urlsafe(9)
     users.create(you, hash_password(password), is_admin=True)
@@ -105,7 +105,7 @@ def serve(folder: Path, *, port: int, sandbox: bool, host: str) -> int:
         quilljobs.LEGACY_CHAT,
         *(quilljobs.adopted_key(q) for q in quilljobs.MOVED_BUILTINS),
     ):
-        quilljobs.write_meta(config.db_path, key, "0")
+        quilljobs.write_meta(config.database(), key, "0")
     app = create_app(config)
     state = app.state.cloudmorrow
     if sandbox:

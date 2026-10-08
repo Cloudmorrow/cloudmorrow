@@ -14,10 +14,10 @@ thing does not need a migration.
 from __future__ import annotations
 
 import datetime as dt
-import sqlite3
 from pathlib import Path
 
-from cloudmorrow.server.db import connect
+from cloudmorrow.server.database import Connection, Database
+from cloudmorrow.server.database import open as open_database
 
 # Made by schema.py, step 1. A change to it is a new step there.
 TABLE = """
@@ -53,13 +53,12 @@ def _now() -> str:
 
 
 class SettingsStore:
-    def __init__(self, db_path: Path) -> None:
-        self.db_path = db_path
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self, db: Database | Path) -> None:
+        self.db = open_database(db)
         self._connect().close()
 
-    def _connect(self) -> sqlite3.Connection:
-        return connect(self.db_path)
+    def _connect(self) -> Connection:
+        return self.db.connect()
 
     def get(self, key: str, default: str = "") -> str:
         with self._connect() as conn:

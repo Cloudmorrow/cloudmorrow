@@ -7,8 +7,12 @@ import secrets
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from cloudmorrow.privatefile import write_private
+
+if TYPE_CHECKING:
+    from cloudmorrow.server.database import Database
 
 DEFAULT_CONFIG_PATHS = (
     Path("/etc/cloudmorrow/server.toml"),
@@ -33,6 +37,12 @@ class ServerConfig:
     notes_dir: Path = Path("/var/lib/cloudmorrow/notes")
     # Where the user database and generated secret key live.
     data_dir: Path = Path("/var/lib/cloudmorrow")
+    # Which database holds the records, accounts and the rest. Blank is the
+    # built-in one, a SQLite file in data_dir. A PostgreSQL server is
+    # `postgresql://user@host:5432/cloudmorrow` — with the password in it,
+    # or in a passfile named by `?passfile=/etc/cloudmorrow/postgres.pgpass`
+    # — chosen at install, or from a container's environment.
+    database_url: str = ""
     # One notes subdirectory per user (notes_dir/<username>), or one shared tree.
     per_user_dirs: bool = True
     # The Shares folder: every server share is a folder in it, whoever made
@@ -110,7 +120,17 @@ class ServerConfig:
 
     @property
     def db_path(self) -> Path:
+        """The built-in database's file: what `database_url` blank means."""
         return self.data_dir / "cloudmorrow.db"
+
+    def database(self) -> Database:
+        """The database this server runs on (database/): the one `database_url`
+        names, else the file in data_dir. The same object every time."""
+        from cloudmorrow.server.database import open as open_database
+
+        if self.database_url:
+            return open_database(self.database_url, path=self.db_path)
+        return open_database(self.db_path)
 
     @property
     def secrets_key_path(self) -> Path:
@@ -230,6 +250,7 @@ def load_config(path: Path | None = None) -> ServerConfig:
             "name",
             "notes_dir",
             "data_dir",
+            "database_url",
             "per_user_dirs",
             "shares_dir",
             "host",
@@ -268,6 +289,7 @@ def load_config(path: Path | None = None) -> ServerConfig:
         "NAME": ("name", str),
         "NOTES_DIR": ("notes_dir", lambda v: Path(v).expanduser()),
         "DATA_DIR": ("data_dir", lambda v: Path(v).expanduser()),
+        "DATABASE_URL": ("database_url", str),
         "PER_USER_DIRS": ("per_user_dirs", _env_bool),
         "SHARES_DIR": ("shares_dir", lambda v: Path(v).expanduser()),
         "HOST": ("host", str),
@@ -297,6 +319,7 @@ def load_config(path: Path | None = None) -> ServerConfig:
             setattr(config, attr, caster(raw))
 
     config.name = config.name.strip() or "Cloudmorrow"
+    config.database_url = str(config.database_url or "").strip()
     config.notes_dir = Path(config.notes_dir).expanduser()
     config.data_dir = Path(config.data_dir).expanduser()
     if config.shares_dir is not None:

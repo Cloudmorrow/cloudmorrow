@@ -20,12 +20,13 @@ by: usernames, slugs, timestamps, lanes, positions, who is in a channel.
 That is metadata, and it is the same trade the secrets store makes when it
 keeps key names in the clear and seals the values.
 
-**Where the key comes from.** `db.connect` opens a connection that can seal
-and unseal, and finds the key through `key_for`: the one registered for
-that database by `use_key` — `create_app` and the CLI do this from the
-config — or, failing that, `secrets.key` beside the database, which is the
-default place for it. Registering is what lets the key live somewhere other
-than beside the data it protects, which is what a fresh install does.
+**Where the key comes from.** A connection (database/) seals and unseals
+with its database's sealer, which is the key registered for that database
+by `use_key` — `create_app` and the CLI do this from the config — or,
+failing that, `secrets.key` beside a SQLite file, which is the default
+place for it. Registering is what lets the key live somewhere other than
+beside the data it protects, which is what a fresh install does, and is
+the only way for a database that is not a file.
 
 **Migration.** The first connection to a database that predates sealing
 seals every row in every listed table, in one transaction, and writes the
@@ -39,10 +40,10 @@ from __future__ import annotations
 import base64
 import json
 import os
-import sqlite3
 import threading
 from collections.abc import Iterable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
@@ -50,7 +51,10 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from cloudmorrow.server import crypto
-from cloudmorrow.server.crypto import KEY_BYTES, NONCE_BYTES, SealError, load_or_create_key
+from cloudmorrow.server.crypto import KEY_BYTES, NONCE_BYTES, SealError
+
+if TYPE_CHECKING:
+    from cloudmorrow.server.database import Connection, Database, Row
 
 __all__ = [
     "SEALED",
@@ -60,6 +64,7 @@ __all__ = [
     "migrate",
     "rotate",
     "sealer_for",
+    "sealer_with",
     "use_key",
 ]
 
@@ -143,36 +148,12 @@ class Sealer:
 
 
 # -- which key ---------------------------------------------------------------------
-_keys: dict[Path, bytes] = {}
 _lock = threading.Lock()
-
-
-def use_key(db_path: Path, key_path: Path) -> Sealer:
-    """Say which key file seals *db_path*. Generates the key on first use."""
-    key = load_or_create_key(key_path)
-    with _lock:
-        _keys[Path(db_path).resolve()] = key
-    return Sealer(key)
-
-
-def key_for(db_path: Path) -> bytes:
-    """The key sealing *db_path*: the registered one, else `secrets.key` beside it."""
-    resolved = Path(db_path).resolve()
-    with _lock:
-        key = _keys.get(resolved)
-    if key is None:
-        key = load_or_create_key(resolved.parent / "secrets.key")
-        with _lock:
-            _keys.setdefault(resolved, key)
-    return key
-
-
 _sealers: dict[bytes, Sealer] = {}
 
 
-def sealer_for(db_path: Path) -> Sealer:
-    """The sealer for a database. Connections are opened per call, so this is cached."""
-    key = key_for(db_path)
+def sealer_with(key: bytes) -> Sealer:
+    """The sealer for *key*. Connections are opened per call, so this is cached."""
     with _lock:
         sealer = _sealers.get(key)
         if sealer is None:
@@ -180,26 +161,46 @@ def sealer_for(db_path: Path) -> Sealer:
     return sealer
 
 
+def use_key(target: Database | Path | str, key_path: Path) -> Sealer:
+    """Say which key file seals the database *target*. Generates the key on first use."""
+    from cloudmorrow.server.database import open as open_database
+
+    return open_database(target).use_key(key_path)
+
+
+def key_for(target: Database | Path | str) -> bytes:
+    """The key sealing *target*: the registered one, else `secrets.key` beside the file."""
+    return sealer_for(target).master
+
+
+def sealer_for(target: Database | Path | str) -> Sealer:
+    """The sealer for a database (`Database.sealer`)."""
+    from cloudmorrow.server.database import open as open_database
+
+    return open_database(target).sealer
+
+
 # -- the migration -------------------------------------------------------------------
-def migrate(conn: sqlite3.Connection, sealer: Sealer) -> None:
+def migrate(conn: Connection, sealer: Sealer) -> None:
     """Seal what an older database holds plain. Cheap when there is nothing to do."""
     current = _sealed_version(conn)
     if current >= SEALED_VERSION:
         return
     # One writer at a time: a second connection booting alongside waits here,
     # then reads the version this one wrote and does nothing.
-    conn.execute("BEGIN IMMEDIATE")
+    conn.lock()
     try:
         current = _sealed_version(conn)
         for version in sorted(SEALED):
             if version <= current:
                 continue
             for table, scope_cols, columns in SEALED[version]:
-                if not _table_exists(conn, table):
+                if not conn.table_exists(table):
                     continue
                 _seal_table(conn, sealer, table, scope_cols, columns)
         conn.execute(
-            "INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('sealed', ?)",
+            "INSERT INTO schema_meta (key, value) VALUES ('sealed', ?)"
+            " ON CONFLICT (key) DO UPDATE SET value = excluded.value",
             (str(SEALED_VERSION),),
         )
         conn.commit()
@@ -208,12 +209,12 @@ def migrate(conn: sqlite3.Connection, sealer: Sealer) -> None:
         raise
 
 
-def _sealed_version(conn: sqlite3.Connection) -> int:
+def _sealed_version(conn: Connection) -> int:
     row = conn.execute("SELECT value FROM schema_meta WHERE key = 'sealed'").fetchone()
     return int(row[0]) if row else 0
 
 
-def _record_scopes(row: sqlite3.Row) -> list[tuple]:
+def _record_scopes(row: Row) -> list[tuple]:
     """What a record's body may be sealed to: its owner, or the space it is in.
 
     A record in a space (a message in a channel) is sealed to the space, and
@@ -232,17 +233,18 @@ def _record_scopes(row: sqlite3.Row) -> list[tuple]:
     return scopes
 
 
-def _rotate_records(conn: sqlite3.Connection, old: Sealer, new: Sealer) -> int:
+def _rotate_records(conn: Connection, old: Sealer, new: Sealer) -> int:
     rows = 0
-    for row in conn.execute("SELECT rowid, id, model, owner, indexed, body FROM records").fetchall():
+    address = conn.dialect.row_address
+    for row in conn.execute(f"SELECT {address} AS address, id, model, owner, indexed, body FROM records").fetchall():
         for scope in _record_scopes(row):
             try:
                 text = old.unseal("records", "body", scope, row["body"])
             except SealError:
                 continue
             conn.execute(
-                "UPDATE records SET body = ? WHERE rowid = ?",
-                (new.seal("records", "body", scope, text), row["rowid"]),
+                f"UPDATE records SET body = ? WHERE {address} = ?",
+                (new.seal("records", "body", scope, text), row["address"]),
             )
             rows += 1
             break
@@ -251,31 +253,26 @@ def _rotate_records(conn: sqlite3.Connection, old: Sealer, new: Sealer) -> int:
     return rows
 
 
-def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
-    return (
-        conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)).fetchone() is not None
-    )
-
-
 def _seal_table(
-    conn: sqlite3.Connection,
+    conn: Connection,
     sealer: Sealer,
     table: str,
     scope_cols: tuple[str, ...],
     columns: tuple[str, ...],
 ) -> None:
-    select = ", ".join(("rowid", *scope_cols, *columns))
+    address = conn.dialect.row_address
+    select = ", ".join((address, *scope_cols, *columns))
     rows = conn.execute(f"SELECT {select} FROM {table}").fetchall()
     assignments = ", ".join(f"{column} = ?" for column in columns)
     for row in rows:
         scope = tuple(row[1 : 1 + len(scope_cols)])
         values = row[1 + len(scope_cols) :]
         sealed = [sealer.seal(table, column, scope, value) for column, value in zip(columns, values, strict=True)]
-        conn.execute(f"UPDATE {table} SET {assignments} WHERE rowid = ?", (*sealed, row[0]))
+        conn.execute(f"UPDATE {table} SET {assignments} WHERE {address} = ?", (*sealed, row[0]))
 
 
 # -- a new key -----------------------------------------------------------------------
-def rotate(db_path: Path, old: Sealer, new: Sealer) -> dict[str, int]:
+def rotate(target: Database | Path | str, old: Sealer, new: Sealer) -> dict[str, int]:
     """Open everything with *old* and seal it again with *new*.
 
     Every listed column, and the secrets store's values and fingerprints,
@@ -283,19 +280,21 @@ def rotate(db_path: Path, old: Sealer, new: Sealer) -> dict[str, int]:
     under the old key while this runs would be a row nobody can open
     afterwards. Returns what it did.
     """
+    from cloudmorrow.server.database import open as open_database
+
     rows = 0
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    conn = open_database(target).connect()
+    address = conn.dialect.row_address
     try:
-        conn.execute("BEGIN IMMEDIATE")
+        conn.lock()
         for version in sorted(SEALED):
             for table, scope_cols, columns in SEALED[version]:
-                if not _table_exists(conn, table):
+                if not conn.table_exists(table):
                     continue
                 if table == "records":
                     rows += _rotate_records(conn, old, new)
                     continue
-                select = ", ".join(("rowid", *scope_cols, *columns))
+                select = ", ".join((address, *scope_cols, *columns))
                 assignments = ", ".join(f"{column} = ?" for column in columns)
                 for row in conn.execute(f"SELECT {select} FROM {table}").fetchall():
                     scope = tuple(row[1 : 1 + len(scope_cols)])
@@ -304,9 +303,9 @@ def rotate(db_path: Path, old: Sealer, new: Sealer) -> dict[str, int]:
                         new.seal(table, column, scope, old.unseal(table, column, scope, blob))
                         for column, blob in zip(columns, blobs, strict=True)
                     ]
-                    conn.execute(f"UPDATE {table} SET {assignments} WHERE rowid = ?", (*values, row[0]))
+                    conn.execute(f"UPDATE {table} SET {assignments} WHERE {address} = ?", (*values, row[0]))
                     rows += 1
-        if _table_exists(conn, "secrets"):
+        if conn.table_exists("secrets"):
             for row in conn.execute("SELECT id, owner, vault, environment, name, sealed FROM secrets").fetchall():
                 aad = crypto.associated_data(row["owner"], row["vault"], row["environment"], row["name"])
                 value = crypto.unseal(old.master, row["sealed"], aad)

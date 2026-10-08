@@ -34,10 +34,11 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import secrets
-import sqlite3
 from pathlib import Path
 
-from cloudmorrow.server.db import UserStore, connect
+from cloudmorrow.server.database import Connection, Database
+from cloudmorrow.server.database import open as open_database
+from cloudmorrow.server.db import UserStore
 
 __all__ = ["PREFIX", "QuillTokenStore", "runs_as"]
 
@@ -87,13 +88,12 @@ def runs_as(users: UserStore, origin: dict) -> str:
 class QuillTokenStore:
     """Tokens and webhook secrets, per Quill."""
 
-    def __init__(self, db_path: Path) -> None:
-        self.db_path = db_path
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self, db: Database | Path) -> None:
+        self.db = open_database(db)
         self._connect().close()
 
-    def _connect(self) -> sqlite3.Connection:
-        return connect(self.db_path)
+    def _connect(self) -> Connection:
+        return self.db.connect()
 
     # -- the token -------------------------------------------------------------
     def issue(self, quill: str) -> str:
@@ -153,7 +153,7 @@ class QuillTokenStore:
         leave one of them holding a secret that no longer is.
         """
         with self._connect() as conn:
-            conn.execute("BEGIN IMMEDIATE")
+            conn.lock()
             row = conn.execute(
                 "SELECT secret FROM quill_webhooks WHERE quill = ? AND hook = ?", (quill, hook)
             ).fetchone()
@@ -164,10 +164,11 @@ class QuillTokenStore:
         return value
 
     @staticmethod
-    def _write_webhook(conn: sqlite3.Connection, quill: str, hook: str) -> str:
+    def _write_webhook(conn: Connection, quill: str, hook: str) -> str:
         secret = secrets.token_urlsafe(24)
         conn.execute(
-            "INSERT OR REPLACE INTO quill_webhooks (quill, hook, secret, issued_at) VALUES (?, ?, ?, ?)",
+            "INSERT INTO quill_webhooks (quill, hook, secret, issued_at) VALUES (?, ?, ?, ?)"
+            " ON CONFLICT (quill, hook) DO UPDATE SET secret = excluded.secret, issued_at = excluded.issued_at",
             (quill, hook, conn.seal("quill_webhooks", "secret", (quill, hook), secret), _now()),
         )
         return secret

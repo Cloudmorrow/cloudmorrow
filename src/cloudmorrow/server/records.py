@@ -40,15 +40,15 @@ from __future__ import annotations
 import datetime as dt
 import json
 import secrets
-import sqlite3
 import threading
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
 from cloudmorrow.server.circles import Access
+from cloudmorrow.server.database import Connection, Database, Row
+from cloudmorrow.server.database import open as open_database
 from cloudmorrow.server.datamodels import Datamodel, parse_duration
-from cloudmorrow.server.db import Connection, connect
 from cloudmorrow.server.principal import (
     DATASET,
     NEVER_FOR_ASSISTANTS,
@@ -105,15 +105,19 @@ CREATE TABLE IF NOT EXISTS records (
     -- 0..n-1 inside the record's group, for a datamodel that is ordered.
     position   INTEGER NOT NULL DEFAULT 0,
     -- The fields the datamodel marks indexed, plain, as JSON.
-    indexed    TEXT    NOT NULL DEFAULT '{}',
+    indexed    JSON    NOT NULL DEFAULT '{}',
     -- Every other field, as JSON, sealed.
     body       TEXT,
     -- Which Quill wrote it last: a fact for the audit line, not ownership.
     written_by TEXT    NOT NULL DEFAULT '',
     created_at TEXT    NOT NULL,
-    updated_at TEXT    NOT NULL
+    updated_at TEXT    NOT NULL,
+    -- The order the rows were written in: the tie-breaker for two written
+    -- in the same second, which is the grain of the stamps.
+    seq        INTEGER AUTONUMBER
 );
 CREATE INDEX IF NOT EXISTS records_model_owner ON records (model, owner, position);
+CREATE INDEX IF NOT EXISTS records_seq ON records (seq);
 CREATE TABLE IF NOT EXISTS record_changes (
     seq        INTEGER PRIMARY KEY AUTOINCREMENT,
     model      TEXT    NOT NULL,
@@ -244,11 +248,6 @@ def _truthy(value: object) -> bool:
     return str(value).lower() in ("1", "true", "yes", "on")
 
 
-def _extract(field: str) -> str:
-    """The SQL that reads an indexed field: the same text in a query as in its index."""
-    return f"json_extract(indexed, '$.\"{field}\"')"
-
-
 def _matches(model: Datamodel, record: Record, query: str) -> bool:
     """Does any text of *record* hold *query*? The preview says where."""
     needle = query.casefold()
@@ -290,11 +289,11 @@ class RecordStore:
 
     def __init__(
         self,
-        db_path: Path,
+        db: Database | Path,
         models: ModelLookup,
         expiries: Callable[[], dict[str, tuple[str, dt.timedelta]]] | None = None,
     ) -> None:
-        self.db_path = db_path
+        self.db = open_database(db)
         self._models = models
         self._expiries = expiries or (lambda: {})
         # Told about a record written in a space whose datamodel notifies:
@@ -318,7 +317,23 @@ class RecordStore:
         # The datamodels whose expression indexes this process has made sure of.
         self._indexed: set[str] = set()
         # Its table is made with the rest (schema.py), when it is first opened.
-        connect(self.db_path).close()
+        self.db.connect().close()
+
+    # -- the SQL of an indexed field ----------------------------------------------
+    @property
+    def _next(self) -> str:
+        """What an INSERT writes into `seq`: the next number."""
+        return self.db.dialect.next_number("records", "seq")
+
+    def _extract(self, field: str, column: str = "indexed") -> str:
+        """The SQL that reads an indexed field as text: the same text in a query
+        as in its index, which is what makes the index the one used. *field* is a
+        field of a datamodel, so letters, digits and underscores (datamodels.FIELD_RE)."""
+        return self.db.dialect.json_text(column, field)
+
+    def _compare(self, field: str, op: str, value: object) -> tuple[str, list[object]]:
+        """`field op value` on the indexed fields, typed as the value is."""
+        return self.db.dialect.json_compare("indexed", field, op, value)
 
     # -- indexes ---------------------------------------------------------------
     def ensure_indexes(self, model: Datamodel) -> None:
@@ -336,11 +351,11 @@ class RecordStore:
         fields = {model.in_space} if model.in_space else set()
         fields |= {f.name for f in model.fields if f.kind == "link"}
         fields |= set(model.ordered_within)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             for name in sorted(fields):
                 # Both are validated identifiers (datamodels.ID_RE, FIELD_RE).
                 index = f"records_{model.id.replace('.', '_')}_{name}"
-                conn.execute(f"CREATE INDEX IF NOT EXISTS {index} ON records (model, {_extract(name)})")
+                conn.execute(f"CREATE INDEX IF NOT EXISTS {index} ON records (model, {self._extract(name)})")
         conn.close()
         self._indexed.add(model.id)
 
@@ -391,7 +406,7 @@ class RecordStore:
             return (model.id, "space", str(indexed[model.in_space]), record_id)
         return (model.id, owner, record_id)
 
-    def _record(self, conn: Connection, model: Datamodel, row: sqlite3.Row, asker: Principal | None = None) -> Record:
+    def _record(self, conn: Connection, model: Datamodel, row: Row, asker: Principal | None = None) -> Record:
         fields = json.loads(row["indexed"] or "{}")
         scope = self._seal_scope(model, row["owner"], row["id"], fields)
         body = conn.unseal("records", "body", scope, row["body"])
@@ -438,12 +453,12 @@ class RecordStore:
         ]
 
     @staticmethod
-    def _may_manage(principal: Principal, space_row: sqlite3.Row) -> bool:
+    def _may_manage(principal: Principal, space_row: Row) -> bool:
         if space_row["owner"] == principal.username:
             return True
         return principal.admin and space_row["scope"] != "personal"
 
-    def _space_visible(self, conn: Connection, principal: Principal, space_row: sqlite3.Row) -> bool:
+    def _space_visible(self, conn: Connection, principal: Principal, space_row: Row) -> bool:
         if space_row["owner"] == principal.username or space_row["scope"] == "public":
             return True
         if space_row["scope"] != "shared":
@@ -458,19 +473,19 @@ class RecordStore:
 
     def may_see_space(self, principal: Principal, space_id: str) -> bool:
         """May this principal see the space with this id? No such space is no."""
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             row = conn.execute("SELECT * FROM records WHERE id = ?", (space_id,)).fetchone()
             seen = row is not None and self._space_visible(conn, principal, row)
         conn.close()
         return seen
 
-    def _space_of(self, conn: Connection, model: Datamodel, indexed: dict) -> sqlite3.Row | None:
+    def _space_of(self, conn: Connection, model: Datamodel, indexed: dict) -> Row | None:
         space_id = indexed.get(model.in_space)
         if not space_id:
             return None
         return conn.execute("SELECT * FROM records WHERE id = ?", (space_id,)).fetchone()
 
-    def _visible(self, conn: Connection, principal: Principal, model: Datamodel, row: sqlite3.Row) -> bool:
+    def _visible(self, conn: Connection, principal: Principal, model: Datamodel, row: Row) -> bool:
         """The one question: may this principal see this record at all?"""
         if model.space:
             return self._space_visible(conn, principal, row)
@@ -483,7 +498,7 @@ class RecordStore:
         # its writer's alone, like any personal record.
         return row["owner"] == principal.username
 
-    def _row(self, conn: Connection, principal: Principal, model: Datamodel, record_id: str) -> sqlite3.Row:
+    def _row(self, conn: Connection, principal: Principal, model: Datamodel, record_id: str) -> Row:
         row = conn.execute("SELECT * FROM records WHERE id = ? AND model = ?", (record_id, model.id)).fetchone()
         # Not there, and there but not yours, are the same answer: a record
         # somebody cannot see is not one they can learn exists.
@@ -491,7 +506,7 @@ class RecordStore:
             raise UnknownRecordError(record_id)
         return row
 
-    def _writable(self, conn: Connection, principal: Principal, model: Datamodel, row: sqlite3.Row) -> None:
+    def _writable(self, conn: Connection, principal: Principal, model: Datamodel, row: Row) -> None:
         """Seeing is not always changing: a space is its manager's, a message its author's,
         and an event its writer's or its calendar's manager's."""
         if model.space and not self._may_manage(principal, row):
@@ -517,7 +532,7 @@ class RecordStore:
             return f"id IN ({spaces})", [model.id, username, username]
         if model.in_space:
             space_model = model.get_field(model.in_space).to
-            link = _extract(model.in_space)
+            link = self._extract(model.in_space)
             return (
                 f"({link} IN ({spaces}) OR (COALESCE({link}, '') = '' AND owner = ?))",
                 [space_model, username, username, username],
@@ -555,12 +570,11 @@ class RecordStore:
         ).fetchone()
         if joined:
             return ">=", str(joined["joined_at"])
-        try:
-            # The accounts live in the same database; a store made on its own,
-            # as a test makes one, has no such table and counts from the start.
+        # The accounts live in the same database; a store made on its own,
+        # as a test makes one, has no such table and counts from the start.
+        account = None
+        if conn.table_exists("users"):
             account = conn.execute("SELECT created_at FROM users WHERE username = ?", (username,)).fetchone()
-        except sqlite3.OperationalError:
-            account = None
         return ">=", str(account["created_at"]) if account else ""
 
     def _unread(self, conn: Connection, space_model: Datamodel, space_id: str, username: str) -> int:
@@ -573,7 +587,7 @@ class RecordStore:
         for child in children:
             row = conn.execute(
                 "SELECT COUNT(*) FROM records WHERE model = ? AND owner != ?"
-                f" AND json_extract(indexed, '$.\"{child.in_space}\"') = ? AND created_at {op} ?",
+                f" AND {self._extract(child.in_space)} = ? AND created_at {op} ?",
                 (child.id, username, space_id, since),
             ).fetchone()
             count += int(row[0])
@@ -581,12 +595,12 @@ class RecordStore:
 
     def _latest(self, conn: Connection, space_model: Datamodel, space_id: str) -> dict | None:
         """The newest thing written in a space, of a kind that counts as unread."""
-        newest: tuple[sqlite3.Row, Datamodel] | None = None
+        newest: tuple[Row, Datamodel] | None = None
         for child in self._unread_children(space_model):
             row = conn.execute(
                 "SELECT * FROM records WHERE model = ?"
-                f" AND json_extract(indexed, '$.\"{child.in_space}\"') = ?"
-                " ORDER BY created_at DESC, rowid DESC LIMIT 1",
+                f" AND {self._extract(child.in_space)} = ?"
+                " ORDER BY created_at DESC, seq DESC LIMIT 1",
                 (child.id, space_id),
             ).fetchone()
             if row is not None and (newest is None or row["created_at"] > newest[0]["created_at"]):
@@ -612,7 +626,7 @@ class RecordStore:
         """
         wanted = set(models) if models is not None else None
         total = 0
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             for model in self._models().values():
                 if not model.space or model.backend or (wanted is not None and model.id not in wanted):
                     continue
@@ -686,19 +700,18 @@ class RecordStore:
         self.ensure_indexes(model)
         plain = stored_indexed(model)
         clause, clause_params = self._visible_clause(model, principal.username)
-        query = f"SELECT *, rowid AS seq FROM records WHERE model = ? AND {clause}"
+        query = f"SELECT * FROM records WHERE model = ? AND {clause}"
         params: list[object] = [model.id, *clause_params]
         for key, value in (where or {}).items():
             name, operator = parse_filter(key)
             if name not in plain:
                 raise RecordError(f"{model.id} cannot be filtered by {name!r}: it is not indexed")
-            coerced = coerce(model, model.get_field(name), value)
-            # The path is written into the SQL, not bound: SQLite uses an
+            # The field is written into the SQL, not bound: an engine uses an
             # expression index only for the very expression it was made on
-            # (`ensure_indexes`). *name* is a field of the datamodel, so it
-            # is letters, digits and underscores (datamodels.FIELD_RE).
-            query += f" AND {_extract(name)} {operator} ?"
-            params.append(coerced if not isinstance(coerced, bool) else int(coerced))
+            # (`ensure_indexes`).
+            sql, extra = self._compare(name, operator, coerce(model, model.get_field(name), value))
+            query += f" AND {sql}"
+            params.extend(extra)
         if since:
             # A `+` in a query string arrives as a space, if it was not escaped.
             moment = parse_moment(since.strip().replace(" ", "+"))
@@ -716,12 +729,12 @@ class RecordStore:
             # The newest *last* of them, then turned back the right way round.
             query = (
                 f"SELECT * FROM ({query} ORDER BY position DESC, created_at DESC, seq DESC"
-                f" LIMIT {int(last)}) ORDER BY position, created_at, seq"
+                f" LIMIT {int(last)}) AS newest ORDER BY position, created_at, seq"
             )
         else:
             query += " ORDER BY position, created_at, seq"
         records: list[Record] = []
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             for row in conn.execute(query, params):
                 record = self._record(conn, model, row, principal)
                 if keep is not None and not keep(record):
@@ -743,7 +756,7 @@ class RecordStore:
         model = self.model(model_id)
         if model.backend:
             return self._backend(model).get(principal, model, record_id)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             record = self._record(conn, model, self._row(conn, principal, model, record_id), principal)
         conn.close()
         return record
@@ -814,7 +827,7 @@ class RecordStore:
     # administrator removing a Quill does, and the route is theirs alone.
     def count_all(self, model_id: str) -> int:
         """Every record of *model_id* on the server, whoever's."""
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             row = conn.execute("SELECT COUNT(*) FROM records WHERE model = ?", (model_id,)).fetchone()
         conn.close()
         return int(row[0])
@@ -824,7 +837,7 @@ class RecordStore:
         them, which lives in the sealed body, so each is opened to see."""
         model = self.model(model_id)
         found = 0
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             for row in conn.execute("SELECT * FROM records WHERE model = ?", (model_id,)):
                 indexed = json.loads(row["indexed"] or "{}")
                 if indexed.get(field) is not None:
@@ -841,7 +854,7 @@ class RecordStore:
     def drop_model(self, model_id: str) -> int:
         """Every record of *model_id*, whoever's, and what hangs off them: gone.
         What an administrator asked for when removing the Quill that brought it."""
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             ids = [row["id"] for row in conn.execute("SELECT id FROM records WHERE model = ?", (model_id,))]
             for record_id in ids:
                 conn.execute("DELETE FROM records WHERE id = ?", (record_id,))
@@ -857,7 +870,7 @@ class RecordStore:
         field, dropped with the Quill. Returns how many records it came off."""
         model = self.model(model_id)
         changed = 0
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             for row in conn.execute("SELECT * FROM records WHERE model = ?", (model_id,)).fetchall():
                 indexed = json.loads(row["indexed"] or "{}")
                 scope = self._seal_scope(model, row["owner"], row["id"], indexed)
@@ -882,7 +895,7 @@ class RecordStore:
         if scope:
             query += " AND scope = ?"
             params.append(scope)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             row = conn.execute(query, params).fetchone()
         conn.close()
         return int(row[0])
@@ -894,14 +907,15 @@ class RecordStore:
         model = self.model(model_id)
         if not model.space:
             raise RecordError(f"a {model.label.lower()} has no members")
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             row = self._row(conn, principal, model, space_id)
             if row["scope"] != "shared":
                 raise RecordError(f"only a shared {model.label.lower()} has members")
             if not self._may_manage(principal, row) and not self._space_visible(conn, principal, row):
                 raise Refused("only somebody in it may add people")
             added = conn.execute(
-                "INSERT OR IGNORE INTO record_members (space_id, username, added_by, joined_at) VALUES (?, ?, ?, ?)",
+                "INSERT INTO record_members (space_id, username, added_by, joined_at) VALUES (?, ?, ?, ?)"
+                " ON CONFLICT DO NOTHING",
                 (space_id, username, principal.username, iso_stamp()),
             ).rowcount
             if username == row["owner"]:
@@ -917,7 +931,7 @@ class RecordStore:
         """Take somebody out of a shared space: its manager may, and anybody may leave."""
         self._check(principal, "write", model_id)
         model = self.model(model_id)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             row = self._row(conn, principal, model, space_id)
             if row["scope"] != "shared":
                 raise RecordError(f"nobody leaves a {row['scope']} {model.label.lower()}")
@@ -932,7 +946,7 @@ class RecordStore:
         """Somebody has looked in a space: what is in it is no longer news to them."""
         self._check(principal, "read", model_id)
         model = self.model(model_id)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             self._row(conn, principal, model, space_id)
             conn.execute(
                 "INSERT INTO record_seen (space_id, username, seen_at) VALUES (?, ?, ?)"
@@ -1007,8 +1021,9 @@ class RecordStore:
             query = "SELECT id FROM records WHERE model = ? AND owner = ?"
             params = [model.id, owner]
         for name, value in zip(model.ordered_within, group, strict=True):
-            query += " AND json_extract(indexed, ?) IS ?"
-            params += [f'$."{name}"', value]
+            sql, extra = self._compare(name, "IS", value)
+            query += f" AND {sql}"
+            params += extra
         query += " ORDER BY position, created_at, id"
         return [row["id"] for row in conn.execute(query, params)]
 
@@ -1094,7 +1109,7 @@ class RecordStore:
         people = [who for who in dict.fromkeys(str(m).strip() for m in members) if who and who != owner]
         if people and (not model.space or scope != "shared"):
             raise RecordError(f"only a shared {model.label.lower()} has members")
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             fields = self._clean(conn, model, principal, incoming, current=None)
             indexed, body = self._write_row(conn, model, owner, record_id, fields)
             position = 0
@@ -1102,15 +1117,15 @@ class RecordStore:
                 position = len(self._group_ids(conn, model, owner, self._group(model, fields)))
             conn.execute(
                 "INSERT INTO records (id, model, owner, scope, rev, position, indexed, body,"
-                " written_by, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)",
+                f" written_by, created_at, updated_at, seq) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, {self._next})",
                 (record_id, model.id, owner, scope, position, indexed, body, principal.writer, now, now),
             )
             if model.ordered and index is not None:
                 self._renumber(conn, model, owner, self._group(model, fields), moved=record_id, insert_at=index)
             for username in people:
                 conn.execute(
-                    "INSERT OR IGNORE INTO record_members (space_id, username, added_by, joined_at)"
-                    " VALUES (?, ?, ?, ?)",
+                    "INSERT INTO record_members (space_id, username, added_by, joined_at)"
+                    " VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
                     (record_id, username, owner, now),
                 )
             self._log(conn, principal, model.id, record_id, "created", 1, [n for n in incoming if n in model.by_name])
@@ -1164,9 +1179,9 @@ class RecordStore:
             if name in plain and name in model.by_name
         }
         clause, params = self._visible_clause(model, principal.username)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             rows = conn.execute(
-                f"SELECT * FROM records WHERE model = ? AND scope = ? AND {clause} ORDER BY created_at, rowid",
+                f"SELECT * FROM records WHERE model = ? AND scope = ? AND {clause} ORDER BY created_at, seq",
                 [model.id, scope, *params],
             ).fetchall()
             found = None
@@ -1225,10 +1240,10 @@ class RecordStore:
             changed = self._backend(model).update(principal, model, record_id, dict(incoming), rev)
             self._changed(principal, "changed", changed, None)
             return changed
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             # Read and write under one lock, so two writers cannot both pass
             # the revision check. Anything raised below rolls the lot back.
-            conn.execute("BEGIN IMMEDIATE")
+            conn.lock()
             row = self._row(conn, principal, model, record_id)
             self._writable(conn, principal, model, row)
             owner = row["owner"]
@@ -1309,8 +1324,8 @@ class RecordStore:
             if before is not None:
                 self._changed(principal, "deleted", before, dict(before.fields))
             return gone
-        with connect(self.db_path) as conn:
-            conn.execute("BEGIN IMMEDIATE")
+        with self.db.connect() as conn:
+            conn.lock()
             row = self._row(conn, principal, model, record_id)
             self._writable(conn, principal, model, row)
             before = self._record(conn, model, row, principal) if self.on_change else None
@@ -1344,7 +1359,7 @@ class RecordStore:
                 pointing = [
                     r["id"]
                     for r in conn.execute(
-                        f"SELECT id FROM records WHERE model = ? AND {_extract(f.name)} = ?",
+                        f"SELECT id FROM records WHERE model = ? AND {self._extract(f.name)} = ?",
                         (other.id, record_id),
                     )
                 ]
@@ -1370,16 +1385,14 @@ class RecordStore:
         field_name, after = expiry
         model = self.model(model_id)
         cutoff = iso_stamp(utc_now() - after)
-        query = (
-            "SELECT id, owner FROM records WHERE model = ?"
-            " AND json_extract(indexed, ?) IS NOT NULL AND json_extract(indexed, ?) < ?"
-        )
-        params: list[object] = [model_id, f'$."{field_name}"', f'$."{field_name}"', cutoff]
+        stamp = self._extract(field_name)
+        query = f"SELECT id, owner FROM records WHERE model = ? AND {stamp} IS NOT NULL AND {stamp} < ?"
+        params: list[object] = [model_id, cutoff]
         if owner is not None:
             query += " AND owner = ?"
             params.append(owner)
         gone = 0
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             for row in conn.execute(query, params).fetchall():
                 who = Principal("quill", row["owner"], quill="core")
                 gone += self._delete(conn, who, model, row["id"], "expired")
@@ -1405,7 +1418,7 @@ class RecordStore:
         a folder of a drive, for a datamodel kept outside the record store.
         """
         if once:
-            with connect(self.db_path) as conn:
+            with self.db.connect() as conn:
                 row = conn.execute(
                     "SELECT 1 FROM records WHERE model = ? AND scope = ? LIMIT 1",
                     (model_id, scope or "personal"),
@@ -1448,14 +1461,14 @@ class RecordStore:
         space_model = self.model(model.get_field(model.in_space).to)
         clause, params = self._visible_clause(space_model, principal.username)
         with self._seeding:
-            with connect(self.db_path) as conn:
+            with self.db.connect() as conn:
                 empty = [
                     row["id"]
                     for row in conn.execute(
                         f"SELECT id FROM records WHERE model = ? AND {clause} AND NOT EXISTS"
                         " (SELECT 1 FROM records AS inside WHERE inside.model = ?"
-                        f" AND json_extract(inside.indexed, '$.\"{model.in_space}\"') = records.id)"
-                        " ORDER BY created_at, rowid",
+                        f" AND {self._extract(model.in_space, 'inside.indexed')} = records.id)"
+                        " ORDER BY created_at, seq",
                         [space_model.id, *params, model.id],
                     ).fetchall()
                 ]
@@ -1468,7 +1481,7 @@ class RecordStore:
             ]
 
     def changes(self, owner: str, since: int = 0, limit: int = 200) -> list[dict]:
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM record_changes WHERE owner = ? AND seq > ? ORDER BY seq LIMIT ?",
                 (owner, since, limit),
@@ -1486,7 +1499,7 @@ class RecordStore:
         themselves instead — and then go. The sweep calls this (quills/jobs.py).
         """
         before = iso_stamp(utc_now() - keep)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             gone = conn.execute(
                 "DELETE FROM record_changes WHERE at < ? AND record_id NOT IN (SELECT id FROM records)", (before,)
             ).rowcount
@@ -1505,7 +1518,7 @@ class RecordStore:
         model = self.model(model_id)
         if model.backend:
             return []
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             self._row(conn, principal, model, record_id)
             rows = conn.execute(
                 "SELECT * FROM record_changes WHERE record_id = ? AND model = ? ORDER BY seq DESC",
@@ -1533,14 +1546,14 @@ class RecordStore:
 
     def forget(self, owner: str) -> None:
         """Everything an account had, for when the account goes."""
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             conn.execute("DELETE FROM records WHERE owner = ?", (owner,))
             conn.execute("DELETE FROM record_changes WHERE owner = ?", (owner,))
         conn.close()
 
     def import_seen(self, space_id: str, username: str, seen_at: str) -> None:
         """When somebody last looked in a space, as it was elsewhere. For migrations."""
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             conn.execute(
                 "INSERT INTO record_seen (space_id, username, seen_at) VALUES (?, ?, ?)"
                 " ON CONFLICT(space_id, username) DO UPDATE SET seen_at = excluded.seen_at",
@@ -1565,17 +1578,17 @@ class RecordStore:
         """A record as it was elsewhere, times and position kept. For migrations."""
         model = self.model(model_id)
         record_id = record_id or _new_id()
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             indexed, body = self._write_row(conn, model, owner, record_id, fields)
             for username in members:
                 conn.execute(
-                    "INSERT OR IGNORE INTO record_members (space_id, username, added_by, joined_at)"
-                    " VALUES (?, ?, ?, ?)",
+                    "INSERT INTO record_members (space_id, username, added_by, joined_at)"
+                    " VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
                     (record_id, username, owner, created_at),
                 )
             conn.execute(
                 "INSERT INTO records (id, model, owner, scope, rev, position, indexed, body,"
-                " written_by, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)",
+                f" written_by, created_at, updated_at, seq) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, {self._next})",
                 (
                     record_id,
                     model.id,

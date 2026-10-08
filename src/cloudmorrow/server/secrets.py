@@ -19,14 +19,14 @@ from __future__ import annotations
 
 import datetime as dt
 import re
-import sqlite3
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from cloudmorrow.dotenv import DEFAULT_ENVIRONMENT, DEFAULT_VAULT, KEY_RE
 from cloudmorrow.server.crypto import associated_data, fingerprint, seal, unseal
-from cloudmorrow.server.db import connect
+from cloudmorrow.server.database import Connection, Database, Row
+from cloudmorrow.server.database import open as open_database
 
 # Free-form, but a directory-safe, shell-safe token: it ends up in file names,
 # command lines and URLs. A vault is the same shape as an environment.
@@ -188,13 +188,13 @@ def _now() -> str:
 class SecretStore:
     """All secret operations, for every user, against one database."""
 
-    def __init__(self, db_path: Path, key: bytes) -> None:
-        self.db_path = db_path
+    def __init__(self, db: Database | Path, key: bytes) -> None:
+        self.db = open_database(db)
         self._key = key
-        connect(self.db_path).close()
+        self.db.connect().close()
 
     # -- helpers -----------------------------------------------------------
-    def _row_to_secret(self, row: sqlite3.Row, *, reveal: bool) -> Secret:
+    def _row_to_secret(self, row: Row, *, reveal: bool) -> Secret:
         secret = Secret(
             key=row["name"],
             environment=row["environment"],
@@ -215,7 +215,7 @@ class SecretStore:
     # -- reads -------------------------------------------------------------
     def vaults(self, owner: str) -> list[Vault]:
         """The vaults that hold something, for one person."""
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             rows = conn.execute(
                 "SELECT vault, COUNT(*) AS n, COUNT(DISTINCT environment) AS envs,"
                 " MAX(updated_at) AS updated"
@@ -234,7 +234,7 @@ class SecretStore:
 
     def environments(self, owner: str, vault: str) -> list[Environment]:
         """The environments that actually hold something, in this vault."""
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             rows = conn.execute(
                 "SELECT environment, COUNT(*) AS n, MAX(updated_at) AS updated"
                 " FROM secrets WHERE owner = ? AND vault = ?"
@@ -260,12 +260,12 @@ class SecretStore:
             query += " AND environment = ?"
             params.append(validate_environment(environment))
         query += " ORDER BY environment, name"
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             rows = conn.execute(query, params).fetchall()
         return [self._row_to_secret(row, reveal=reveal) for row in rows]
 
     def get(self, owner: str, vault: str, environment: str, name: str, *, reveal: bool = True) -> Secret | None:
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             row = conn.execute(
                 "SELECT * FROM secrets WHERE owner = ? AND vault = ? AND environment = ? AND name = ?",
                 (
@@ -294,13 +294,13 @@ class SecretStore:
         environment = validate_environment(environment)
         name = validate_key(name)
         now = _now()
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             action = self._set(conn, owner, vault, environment, name, value, now)
         return self.require(owner, vault, environment, name), action
 
     def _set(
         self,
-        conn: sqlite3.Connection,
+        conn: Connection,
         owner: str,
         vault: str,
         environment: str,
@@ -353,7 +353,7 @@ class SecretStore:
         pairs = {validate_key(name): value for name, value in entries.items()}
         result = ImportResult(environment=environment, dry_run=dry_run)
         now = _now()
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             present = {
                 row["name"]: row["fingerprint"]
                 for row in conn.execute(
@@ -389,7 +389,7 @@ class SecretStore:
         return result
 
     def delete(self, owner: str, vault: str, environment: str, name: str) -> None:
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             cursor = conn.execute(
                 "DELETE FROM secrets WHERE owner = ? AND vault = ? AND environment = ? AND name = ?",
                 (
@@ -404,7 +404,7 @@ class SecretStore:
 
     def delete_environment(self, owner: str, vault: str, environment: str) -> int:
         environment = validate_environment(environment)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             cursor = conn.execute(
                 "DELETE FROM secrets WHERE owner = ? AND vault = ? AND environment = ?",
                 (owner, validate_vault(vault), environment),
@@ -413,7 +413,7 @@ class SecretStore:
 
     def delete_vault(self, owner: str, vault: str) -> int:
         """Drop everything a vault held, every environment of it."""
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             cursor = conn.execute(
                 "DELETE FROM secrets WHERE owner = ? AND vault = ?",
                 (owner, validate_vault(vault)),

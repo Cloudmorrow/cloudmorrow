@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from cloudmorrow.server.db import connect
+from cloudmorrow.server.database import connect
 from cloudmorrow.server.features import FEATURE_KEYS, Feature, FeatureStore
 from cloudmorrow.server.quills import KIT_READY, QuillError, QuillRegistry
 from cloudmorrow.server.quills.jobs import (

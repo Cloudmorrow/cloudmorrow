@@ -40,13 +40,11 @@ the `run` jobs whose `every` has come round, which the supervisor starts
 from __future__ import annotations
 
 import logging
-import sqlite3
 import threading
 import time
 from collections.abc import Callable
-from pathlib import Path
 
-from cloudmorrow.server.db import checkpoint, connect
+from cloudmorrow.server.database import Database
 from cloudmorrow.server.quills import QuillError, QuillRegistry, load_catalog
 from cloudmorrow.server.records import RecordStore, UnknownModelError
 
@@ -71,32 +69,34 @@ LEGACY_CHAT = "legacy_chat_moved"
 MOVED_BUILTINS: tuple[str, ...] = ("notes",)
 
 
-def read_meta(db_path: Path, key: str) -> str | None:
-    with connect(db_path) as conn:
+def read_meta(db: Database, key: str) -> str | None:
+    with db.connect() as conn:
         row = conn.execute("SELECT value FROM schema_meta WHERE key = ?", (key,)).fetchone()
     conn.close()
     return row[0] if row else None
 
 
-def write_meta(db_path: Path, key: str, value: str) -> None:
-    with connect(db_path) as conn:
-        conn.execute("INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)", (key, value))
+def write_meta(db: Database, key: str, value: str) -> None:
+    with db.connect() as conn:
+        conn.execute(
+            "INSERT INTO schema_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
     conn.close()
 
 
-def _legacy_rows(db_path: Path) -> bool:
-    with connect(db_path) as conn:
-        try:
-            row = conn.execute("SELECT (SELECT COUNT(*) FROM boards) + (SELECT COUNT(*) FROM tasks)").fetchone()
-        except sqlite3.OperationalError:
+def _legacy_rows(db: Database) -> bool:
+    with db.connect() as conn:
+        if not (conn.table_exists("boards") and conn.table_exists("tasks")):
             return False
+        row = conn.execute("SELECT (SELECT COUNT(*) FROM boards) + (SELECT COUNT(*) FROM tasks)").fetchone()
     conn.close()
     return bool(row and row[0])
 
 
-def install_foundation(db_path: Path, registry: QuillRegistry) -> list[str]:
+def install_foundation(db: Database, registry: QuillRegistry) -> list[str]:
     """The catalog's foundation Quills, on a server that has never had any."""
-    if read_meta(db_path, SEEDED) or registry.quills:
+    if read_meta(db, SEEDED) or registry.quills:
         return []
     catalog = load_catalog(registry.catalog_location)
     installed = []
@@ -104,18 +104,18 @@ def install_foundation(db_path: Path, registry: QuillRegistry) -> list[str]:
         if entry.get("foundation") and entry["id"] not in registry.quills:
             registry.install_from_catalog(entry["id"], catalog)
             installed.append(entry["id"])
-    write_meta(db_path, SEEDED, ",".join(installed) or "-")
+    write_meta(db, SEEDED, ",".join(installed) or "-")
     return installed
 
 
-def move_legacy_tasks(db_path: Path, registry: QuillRegistry, records: RecordStore) -> int:
+def move_legacy_tasks(db: Database, registry: QuillRegistry, records: RecordStore) -> int:
     """Boards and tasks from the old tables into records. Returns how many moved."""
-    if read_meta(db_path, LEGACY_TASKS) or not _legacy_rows(db_path):
+    if read_meta(db, LEGACY_TASKS) or not _legacy_rows(db):
         return 0
     if "tasks" not in registry.quills:
         registry.install_from_catalog("tasks")
     moved = 0
-    with connect(db_path) as conn:
+    with db.connect() as conn:
         boards = conn.execute("SELECT * FROM boards ORDER BY id").fetchall()
         tasks = conn.execute("SELECT * FROM tasks ORDER BY id").fetchall()
         board_ids: dict[tuple[str, str], str] = {}
@@ -153,30 +153,28 @@ def move_legacy_tasks(db_path: Path, registry: QuillRegistry, records: RecordSto
             )
             moved += 1
     conn.close()
-    write_meta(db_path, LEGACY_TASKS, str(moved))
+    write_meta(db, LEGACY_TASKS, str(moved))
     log.info("moved %d boards and tasks into the record store", moved)
     return moved
 
 
-def _had_calendar(db_path: Path) -> tuple[bool, bool]:
+def _had_calendar(db: Database) -> tuple[bool, bool]:
     """(the old calendar ran here, and was left on or has something in it)."""
-    with connect(db_path) as conn:
-        try:
-            count = conn.execute(
-                "SELECT (SELECT COUNT(*) FROM calendars) + (SELECT COUNT(*) FROM calendar_events)"
-            ).fetchone()[0]
-        except sqlite3.OperationalError:
+    with db.connect() as conn:
+        if not (conn.table_exists("calendars") and conn.table_exists("calendar_events")):
             return False, False
-        try:
+        count = conn.execute(
+            "SELECT (SELECT COUNT(*) FROM calendars) + (SELECT COUNT(*) FROM calendar_events)"
+        ).fetchone()[0]
+        row = None
+        if conn.table_exists("features"):
             row = conn.execute("SELECT enabled FROM features WHERE key = 'calendar'").fetchone()
-        except sqlite3.OperationalError:
-            row = None
     conn.close()
     switched_on = row is None or bool(row[0])
     return True, bool(count) or switched_on
 
 
-def move_legacy_calendar(db_path: Path, registry: QuillRegistry, records: RecordStore) -> int:
+def move_legacy_calendar(db: Database, registry: QuillRegistry, records: RecordStore) -> int:
     """Calendars, their people and their events from the old tables into records.
 
     A calendar becomes a `calendar` space of the scope its kind was, owned
@@ -186,15 +184,15 @@ def move_legacy_calendar(db_path: Path, registry: QuillRegistry, records: Record
     whoever wrote it, its times exactly as they were — wall-clock, and a
     bare date for a whole day. Returns how many records were written.
     """
-    if read_meta(db_path, LEGACY_CALENDAR):
+    if read_meta(db, LEGACY_CALENDAR):
         return 0
-    existed, wanted = _had_calendar(db_path)
+    existed, wanted = _had_calendar(db)
     if not existed:
         return 0
     if wanted and "calendar" not in registry.quills:
         registry.install_from_catalog("calendar")
     moved = 0
-    with connect(db_path) as conn:
+    with db.connect() as conn:
         calendars = conn.execute("SELECT * FROM calendars ORDER BY id").fetchall()
         events = conn.execute("SELECT * FROM calendar_events ORDER BY id").fetchall()
         space_ids: dict[int, tuple[str, str]] = {}
@@ -248,18 +246,17 @@ def move_legacy_calendar(db_path: Path, registry: QuillRegistry, records: Record
             )
             moved += 1
     conn.close()
-    write_meta(db_path, LEGACY_CALENDAR, str(moved))
+    write_meta(db, LEGACY_CALENDAR, str(moved))
     log.info("moved %d calendars and events into the record store", moved)
     return moved
 
 
-def _switched_off(db_path: Path, key: str) -> bool:
+def _switched_off(db: Database, key: str) -> bool:
     """Did an administrator switch the feature *key* off, back when it was built in?"""
-    with connect(db_path) as conn:
-        try:
+    with db.connect() as conn:
+        row = None
+        if conn.table_exists("features"):
             row = conn.execute("SELECT enabled FROM features WHERE key = ?", (key,)).fetchone()
-        except sqlite3.OperationalError:
-            row = None
     conn.close()
     return row is not None and not row["enabled"]
 
@@ -268,7 +265,7 @@ def adopted_key(quill_id: str) -> str:
     return f"builtin_adopted:{quill_id}"
 
 
-def adopt_builtins(db_path: Path, registry: QuillRegistry) -> list[str]:
+def adopt_builtins(db: Database, registry: QuillRegistry) -> list[str]:
     """Features that were part of the core and are Quills now, installed where they were on.
 
     A server from before the move had Notes as a built-in feature, on
@@ -285,35 +282,35 @@ def adopt_builtins(db_path: Path, registry: QuillRegistry) -> list[str]:
     adopted = []
     for quill_id in MOVED_BUILTINS:
         key = adopted_key(quill_id)
-        if read_meta(db_path, key):
+        if read_meta(db, key):
             continue
-        if quill_id not in registry.quills and not _switched_off(db_path, quill_id):
+        if quill_id not in registry.quills and not _switched_off(db, quill_id):
             registry.install_from_catalog(quill_id)
             adopted.append(quill_id)
-        write_meta(db_path, key, "installed" if quill_id in registry.quills else "left out")
+        write_meta(db, key, "installed" if quill_id in registry.quills else "left out")
     if adopted:
         log.info("installed %s, which were built in before", ", ".join(adopted))
     return adopted
 
 
-def install_secrets_quill(db_path: Path, registry: QuillRegistry) -> bool:
+def install_secrets_quill(db: Database, registry: QuillRegistry) -> bool:
     """The Secrets Quill, on a server that had Secrets built in. True when it was installed.
 
     Once: after that, and on a server whose installer chose (`standard.choose`
     marks it), whether Secrets is installed is the administrator's business.
     """
-    if read_meta(db_path, SECRETS_QUILL):
+    if read_meta(db, SECRETS_QUILL):
         return False
     installed = False
     if "secrets" not in registry.quills:
         registry.install_from_catalog("secrets")
         installed = True
         log.info("installed the Secrets Quill: Secrets was built in until now")
-    write_meta(db_path, SECRETS_QUILL, "installed" if installed else "there")
+    write_meta(db, SECRETS_QUILL, "installed" if installed else "there")
     return installed
 
 
-def install_files(db_path: Path, registry: QuillRegistry) -> bool:
+def install_files(db: Database, registry: QuillRegistry) -> bool:
     """Files, on a server that had it built in. Returns whether it was installed.
 
     Nothing moves: the files are where they always were, and the `shares`
@@ -323,26 +320,25 @@ def install_files(db_path: Path, registry: QuillRegistry) -> bool:
     Quill's id too. A server set up since the move chose for itself (the
     installer, or the foundation Quills at first boot), and is left alone.
     """
-    if read_meta(db_path, FILES_QUILL):
+    if read_meta(db, FILES_QUILL):
         return False
     if "files" in registry.quills:
-        write_meta(db_path, FILES_QUILL, "present")
+        write_meta(db, FILES_QUILL, "present")
         return False
-    if not (read_meta(db_path, SEEDED) or registry.quills):
+    if not (read_meta(db, SEEDED) or registry.quills):
         # A fresh server: install_foundation, or the installer, decides.
         return False
     registry.install_from_catalog("files")
-    write_meta(db_path, FILES_QUILL, "installed")
+    write_meta(db, FILES_QUILL, "installed")
     log.info("installed the Files Quill in place of the built-in Files")
     return True
 
 
-def _has_rows(db_path: Path, query: str) -> bool:
-    with connect(db_path) as conn:
-        try:
-            row = conn.execute(query).fetchone()
-        except sqlite3.OperationalError:
-            row = None
+def _has_rows(db: Database, table: str) -> bool:
+    with db.connect() as conn:
+        row = None
+        if conn.table_exists(table):
+            row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
     conn.close()
     return bool(row and row[0])
 
@@ -351,23 +347,23 @@ def _has_rows(db_path: Path, query: str) -> bool:
 CHAT_SCOPES = {"public": "public", "private": "shared", "direct": "shared"}
 
 
-def move_legacy_chat(db_path: Path, registry: QuillRegistry, records: RecordStore) -> int:
+def move_legacy_chat(db: Database, registry: QuillRegistry, records: RecordStore) -> int:
     """Channels and messages from the old tables into records. Returns how many moved.
 
     Installs the Chat Quill first on a server that had Chat: one with old
     channels, or with accounts at all — a server nobody has signed in to yet
     is still being set up, and its choice of Quills is the installer's.
     """
-    if read_meta(db_path, LEGACY_CHAT):
+    if read_meta(db, LEGACY_CHAT):
         return 0
-    legacy = _has_rows(db_path, "SELECT COUNT(*) FROM chat_channels")
+    legacy = _has_rows(db, "chat_channels")
     if "chat" not in registry.quills:
-        if not legacy and not _has_rows(db_path, "SELECT COUNT(*) FROM users"):
-            write_meta(db_path, LEGACY_CHAT, "-")
+        if not legacy and not _has_rows(db, "users"):
+            write_meta(db, LEGACY_CHAT, "-")
             return 0
         registry.install_from_catalog("chat")
     moved = 0
-    with connect(db_path) as conn:
+    with db.connect() as conn:
         channels = conn.execute("SELECT * FROM chat_channels ORDER BY id").fetchall() if legacy else []
         for row in channels:
             people = conn.execute(
@@ -430,39 +426,39 @@ def move_legacy_chat(db_path: Path, registry: QuillRegistry, records: RecordStor
                     if earlier:
                         records.import_seen(space, person["username"], max(earlier))
     conn.close()
-    write_meta(db_path, LEGACY_CHAT, str(moved))
+    write_meta(db, LEGACY_CHAT, str(moved))
     log.info("moved %d channels and messages into the record store", moved)
     return moved
 
 
-def boot(db_path: Path, registry: QuillRegistry, records: RecordStore) -> None:
+def boot(db: Database, registry: QuillRegistry, records: RecordStore) -> None:
     """The boot work, in order. Each step logs its own failure and lets the next run."""
     try:
-        install_foundation(db_path, registry)
+        install_foundation(db, registry)
     except QuillError as exc:
         log.warning("could not install the foundation Quills yet: %s", exc)
     try:
-        adopt_builtins(db_path, registry)
+        adopt_builtins(db, registry)
     except QuillError as exc:
         log.warning("could not install the Quills that were built in yet: %s", exc)
     try:
-        move_legacy_tasks(db_path, registry, records)
+        move_legacy_tasks(db, registry, records)
     except (QuillError, UnknownModelError) as exc:
         log.warning("could not move the old tasks into records yet: %s", exc)
     try:
-        move_legacy_calendar(db_path, registry, records)
+        move_legacy_calendar(db, registry, records)
     except (QuillError, UnknownModelError) as exc:
         log.warning("could not move the old calendars into records yet: %s", exc)
     try:
-        install_files(db_path, registry)
+        install_files(db, registry)
     except QuillError as exc:
         log.warning("could not install the Files Quill yet: %s", exc)
     try:
-        move_legacy_chat(db_path, registry, records)
+        move_legacy_chat(db, registry, records)
     except (QuillError, UnknownModelError) as exc:
         log.warning("could not move the old chat into records yet: %s", exc)
     try:
-        install_secrets_quill(db_path, registry)
+        install_secrets_quill(db, registry)
     except QuillError as exc:
         log.warning("could not install the Secrets Quill yet: %s", exc)
 
@@ -485,12 +481,12 @@ class Clock:
 
     def __init__(
         self,
-        db_path: Path,
+        db: Database,
         registry: QuillRegistry,
         records: RecordStore,
         on_tick: Callable[[], object] | None = None,
     ) -> None:
-        self.db_path = db_path
+        self.db = db
         self.registry = registry
         self.records = records
         # Asked every TICK: the `run` jobs whose time has come (quills.services).
@@ -508,7 +504,7 @@ class Clock:
         self._stop.set()
 
     def _run(self) -> None:
-        boot(self.db_path, self.registry, self.records)
+        boot(self.db, self.registry, self.records)
         swept = time.monotonic()
         while True:
             if self.on_tick is not None:
@@ -516,9 +512,9 @@ class Clock:
                     self.on_tick()
                 except Exception:  # a job that cannot start is tried next tick
                     log.exception("run jobs failed")
-            # The database's log, folded in and cut back while there is a
-            # moment with nobody reading (db.checkpoint).
-            checkpoint(self.db_path)
+            # The database's housekeeping while there is a moment with nobody
+            # reading: SQLite's log, folded in and cut back (database/sqlite.py).
+            self.db.checkpoint()
             if self._stop.wait(TICK if self.on_tick is not None else SWEEP_EVERY):
                 return
             if time.monotonic() - swept >= SWEEP_EVERY:

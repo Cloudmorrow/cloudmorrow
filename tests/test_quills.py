@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from cloudmorrow.server.db import connect
+from cloudmorrow.server.database import connect
 from cloudmorrow.server.quills import QuillError, QuillRegistry, load_catalog, tarball_url
 from cloudmorrow.server.quills.jobs import boot, install_foundation, move_legacy_tasks
 from cloudmorrow.server.records import Principal, RecordStore

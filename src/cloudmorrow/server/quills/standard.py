@@ -72,7 +72,7 @@ def choices(config: ServerConfig) -> tuple[list[Choice], Catalog | None, str]:
 
 
 def chosen_already(config: ServerConfig) -> bool:
-    return bool(read_meta(config.db_path, SEEDED))
+    return bool(read_meta(config.database(), SEEDED))
 
 
 def choose(
@@ -102,7 +102,8 @@ def choose(
     if unknown:
         raise QuillError(f"not a standard quill: {', '.join(sorted(unknown))}")
     done: dict[str, list[str]] = {"installed": [], "removed": [], "on": [], "off": []}
-    features = features or FeatureStore(config.db_path)
+    db = config.database()
+    features = features or FeatureStore(db)
     for option in options:
         if option.kind != "built-in":
             continue
@@ -111,16 +112,16 @@ def choose(
     registry = registry or QuillRegistry(config.quills_dir, config.datamodels_dir, config.quill_catalog)
     # The choice is remembered before the downloads, so the boot work does
     # not install what was just left out while they run.
-    write_meta(config.db_path, SEEDED, ",".join(sorted(wanted)) or "-")
+    write_meta(db, SEEDED, ",".join(sorted(wanted)) or "-")
     # A feature that used to be built in is a choice like the rest now: the
     # boot work is not to install it after it was left out.
     for quill_id in MOVED_BUILTINS:
-        write_meta(config.db_path, adopted_key(quill_id), "chosen")
+        write_meta(db, adopted_key(quill_id), "chosen")
     # Secrets was built in until it was a Quill; chosen or left out here, it
     # is not installed again behind the installer's back at boot.
-    write_meta(config.db_path, SECRETS_QUILL, "chosen")
+    write_meta(db, SECRETS_QUILL, "chosen")
     # Files was built in once; a server choosing now has chosen about it too.
-    write_meta(config.db_path, FILES_QUILL, "chosen")
+    write_meta(db, FILES_QUILL, "chosen")
     for option in options:
         if option.kind != "quill":
             continue

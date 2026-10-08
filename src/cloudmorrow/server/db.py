@@ -1,21 +1,19 @@
-"""SQLite-backed user store.
+"""The user store.
 
-Deliberately plain sqlite3: one server does not need an ORM, and keeping the
-schema visible here makes it easy to add system-user linkage later.
+Deliberately plain SQL through the database layer (database/): one server
+does not need an ORM, and keeping the schema visible (schema.py) makes it
+easy to add system-user linkage later.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import re
-import sqlite3
-from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from cloudmorrow.server.schema import upgrade
-from cloudmorrow.server.sealed import Sealer, sealer_for
-from cloudmorrow.server.sealed import migrate as migrate_sealing
+from cloudmorrow.server.database import Connection, Database, IntegrityError, Row
+from cloudmorrow.server.database import open as open_database
 
 USERNAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 
@@ -35,95 +33,6 @@ TYPE_HUMAN = "human"
 TYPE_AGENT = "agent"
 TYPE_SYSTEM = "systems_user"
 USER_TYPES: tuple[str, ...] = (TYPE_HUMAN, TYPE_AGENT, TYPE_SYSTEM)
-
-
-class Connection(sqlite3.Connection):
-    """A connection that can seal content on the way in and open it on the way out.
-
-    Content columns (`sealed.SEALED`) hold ciphertext, so a store writes
-    `conn.seal("tasks", "body", (owner,), body)` and reads with the matching
-    `conn.unseal`. The scope is what the value is bound to; the same tuple
-    has to come back at read time.
-    """
-
-    sealer: Sealer
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        """Commit or roll back, as a connection always did on leaving `with` — and close.
-
-        A connection is opened for each call, and the standard one is only
-        freed when the cyclic collector gets round to it (its statement
-        cache points back at it), so under load hundreds sat open, each
-        with its page cache: the server grew by the gigabyte until a
-        collection ran. Closed here, the native side goes at once. What
-        the caller still holds — rows, and `unseal` on the way out — works
-        without the database.
-        """
-        try:
-            super().__exit__(exc_type, exc, tb)
-        finally:
-            self.close()
-
-    def seal(self, table: str, column: str, scope: Iterable[object], text: str | None) -> str | None:
-        return self.sealer.seal(table, column, scope, text)
-
-    def unseal(self, table: str, column: str, scope: Iterable[object], blob: str | None) -> str | None:
-        return self.sealer.unseal(table, column, scope, blob)
-
-
-# How long a connection waits for another's write to finish before giving
-# up with "database is locked". Every route opens its own connection, so
-# under load a few are always waiting on one that is writing.
-BUSY_SECONDS = 10.0
-# How big the write-ahead log may stay after a checkpoint, in bytes.
-WAL_SIZE_LIMIT = 64 * 1024 * 1024
-
-
-def checkpoint(db_path: Path) -> bool:
-    """Fold the write-ahead log into the database and cut it back to nothing.
-
-    SQLite does this by itself every thousand pages, but can only truncate
-    the log when nobody is reading, and a busy server always has somebody
-    reading: left alone, the log grows and every read gets slower for it.
-    Called on the clock (quills/jobs.py). Returns whether it got the lock
-    in time; a miss is tried again next time.
-    """
-    conn = sqlite3.connect(db_path, timeout=2.0)
-    try:
-        busy, _log, _moved = conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
-        return busy == 0
-    except sqlite3.OperationalError:
-        return False
-    finally:
-        conn.close()
-
-
-def connect(db_path: Path) -> Connection:
-    """Open a connection with the schema applied, sane pragmas, and the key."""
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path, factory=Connection, timeout=BUSY_SECONDS)
-    conn.sealer = sealer_for(db_path)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    # Write-ahead logging: a write no longer blocks every read, which is
-    # what lets the request threads overlap instead of queueing on one
-    # writer. It is a property of the file, so setting it again is free.
-    # NORMAL loses at most the last transactions to a power cut, never the
-    # file's integrity, and makes each write a fraction of the cost.
-    conn.execute("PRAGMA journal_mode = WAL")
-    conn.execute("PRAGMA synchronous = NORMAL")
-    # The log is folded back into the file as it goes (SQLite's own
-    # checkpointing), but it can only be cut back when no connection is
-    # reading, which under load is seldom: `checkpoint` below is called on
-    # the clock for that. This keeps the file from staying large after one.
-    conn.execute(f"PRAGMA journal_size_limit = {WAL_SIZE_LIMIT}")
-    # The tables, at the version this code expects: nothing to do once there.
-    upgrade(conn)
-    # Rows from before content was sealed. Versioned on its own, because a
-    # new seal is a change to the data rather than to the tables. Nothing to do on a database that
-    # has been through it once.
-    migrate_sealing(conn, conn.sealer)
-    return conn
 
 
 class UserExistsError(ValueError):
@@ -160,7 +69,7 @@ class User:
     updated_at: str
 
 
-def _row_to_user(row: sqlite3.Row) -> User:
+def _row_to_user(row: Row) -> User:
     return User(
         id=row["id"],
         username=row["username"],
@@ -206,13 +115,12 @@ def validate_username(username: str) -> str:
 class UserStore:
     """Thin repository over the users table."""
 
-    def __init__(self, db_path: Path) -> None:
-        self.db_path = db_path
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self, db: Database | Path) -> None:
+        self.db = open_database(db)
         self._connect().close()
 
-    def _connect(self) -> sqlite3.Connection:
-        return connect(self.db_path)
+    def _connect(self) -> Connection:
+        return self.db.connect()
 
     def count(self) -> int:
         with self._connect() as conn:
@@ -270,11 +178,11 @@ class UserStore:
                 )
                 # Into the default circles, so a new account has what they give.
                 conn.execute(
-                    "INSERT OR IGNORE INTO circle_members (circle_id, username)"
-                    " SELECT id, ? FROM circles WHERE is_default = 1",
+                    "INSERT INTO circle_members (circle_id, username)"
+                    " SELECT id, ? FROM circles WHERE is_default = 1 ON CONFLICT DO NOTHING",
                     (username,),
                 )
-        except sqlite3.IntegrityError as exc:
+        except IntegrityError as exc:
             raise UserExistsError(username) from exc
         return self.require(username)
 

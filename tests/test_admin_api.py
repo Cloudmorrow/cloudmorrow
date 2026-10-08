@@ -6,7 +6,8 @@ about an account, and what happens to a feature's endpoints when it is off.
 
 from __future__ import annotations
 
-from cloudmorrow.server.db import UserStore, connect
+from cloudmorrow.server.database import connect
+from cloudmorrow.server.db import UserStore
 from cloudmorrow.server.security import hash_password
 from tests.conftest import ADMIN, GUEST, token_for
 
@@ -80,7 +81,7 @@ def test_an_account_from_before_roles_existed_keeps_its_rights(config, tmp_path)
     with connect(config.db_path) as conn:
         conn.execute("ALTER TABLE users DROP COLUMN role")
         # And as old as that: from before the database carried a version.
-        conn.execute("PRAGMA user_version = 0")
+        conn.set_schema_version(0)
     reopened = UserStore(config.db_path)
     user = reopened.require("bram")
     assert user.role == "administrator"

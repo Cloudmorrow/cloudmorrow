@@ -229,7 +229,7 @@ def test_a_server_from_before_the_quill_gets_it_at_boot_once(config, users):
 def test_a_server_that_had_secrets_off_keeps_it_off(client, config):
     state = client.app.state.cloudmorrow
     # Switched off while it was built in: the row is under the same key.
-    from cloudmorrow.server.db import connect as db_connect
+    from cloudmorrow.server.database import connect as db_connect
 
     with db_connect(config.db_path) as conn:
         conn.execute("INSERT INTO features (key, enabled, changed_by, updated_at) VALUES ('secrets', 0, 'bram', 'x')")

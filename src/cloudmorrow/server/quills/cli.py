@@ -29,7 +29,6 @@ from cloudmorrow.console import console as make_console
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.quills import QuillError, QuillRegistry
 from cloudmorrow.server.quills.standard import choices, choose, chosen_already
-from cloudmorrow.server.sealed import use_key
 
 app = typer.Typer(help="Quills on this server.", no_args_is_help=True)
 console = make_console()
@@ -43,7 +42,7 @@ ConfigOption = Annotated[
 def _config(path: Path | None) -> ServerConfig:
     config = load_config(path)
     config.ensure_dirs()
-    use_key(config.db_path, config.secrets_key_path)
+    config.database().use_key(config.secrets_key_path)
     return config
 
 

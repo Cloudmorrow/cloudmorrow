@@ -15,7 +15,8 @@ import datetime as dt
 from dataclasses import dataclass
 from pathlib import Path
 
-from cloudmorrow.server.db import Connection, connect
+from cloudmorrow.server.database import Connection, Database
+from cloudmorrow.server.database import open as open_database
 
 # Anything longer is a log line, not a notification.
 MAX_BODY_CHARS = 2000
@@ -70,9 +71,9 @@ def _row(conn: Connection, row) -> Notification:
 
 
 class NotificationStore:
-    def __init__(self, db_path: Path) -> None:
-        self.db_path = db_path
-        connect(self.db_path).close()
+    def __init__(self, db: Database | Path) -> None:
+        self.db = open_database(db)
+        self.db.connect().close()
 
     def add(
         self,
@@ -84,8 +85,8 @@ class NotificationStore:
         body: str = "",
     ) -> Notification:
         title = title.strip()[:200] or "(untitled)"
-        with connect(self.db_path) as conn:
-            cursor = conn.execute(
+        with self.db.connect() as conn:
+            made = conn.insert(
                 "INSERT INTO notifications (owner, kind, machine, title, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     owner,
@@ -103,7 +104,7 @@ class NotificationStore:
                 "  LIMIT 1 OFFSET ?)",
                 (owner, owner, KEEP),
             )
-            row = conn.execute("SELECT * FROM notifications WHERE id = ?", (cursor.lastrowid,)).fetchone()
+            row = conn.execute("SELECT * FROM notifications WHERE id = ?", (made,)).fetchone()
         return _row(conn, row)
 
     def list(self, owner: str, *, limit: int = 50, unread_only: bool = False) -> list[Notification]:
@@ -111,12 +112,12 @@ class NotificationStore:
         if unread_only:
             query += " AND read_at IS NULL"
         query += " ORDER BY id DESC LIMIT ?"
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             rows = conn.execute(query, (owner, limit)).fetchall()
         return [_row(conn, row) for row in rows]
 
     def unread_count(self, owner: str) -> int:
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             return int(
                 conn.execute(
                     "SELECT COUNT(*) AS n FROM notifications WHERE owner = ? AND read_at IS NULL",
@@ -126,7 +127,7 @@ class NotificationStore:
 
     def mark_read(self, owner: str, ids: list[int] | None = None) -> int:
         """Mark some of them read, or all of them when *ids* is None."""
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             if ids is None:
                 cursor = conn.execute(
                     "UPDATE notifications SET read_at = ? WHERE owner = ? AND read_at IS NULL",

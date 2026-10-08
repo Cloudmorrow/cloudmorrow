@@ -16,6 +16,7 @@ from cloudmorrow.server.agents import AgentStore, JobStore
 from cloudmorrow.server.circles import CircleStore
 from cloudmorrow.server.config import ServerConfig
 from cloudmorrow.server.configsync import ConfigStore
+from cloudmorrow.server.database import Database
 from cloudmorrow.server.db import UserStore
 from cloudmorrow.server.features import FeatureStore
 from cloudmorrow.server.mcp import MCPStore
@@ -39,6 +40,8 @@ if TYPE_CHECKING:
 @dataclass(slots=True)
 class AppState:
     config: ServerConfig
+    # The database every store below keeps its rows in (database/).
+    db: Database
     users: UserStore
     agents: AgentStore
     jobs: JobStore

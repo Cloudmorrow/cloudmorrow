@@ -55,7 +55,6 @@ from cloudmorrow.server.routes import (
 from cloudmorrow.server.routes import (
     server as server_routes,
 )
-from cloudmorrow.server.sealed import use_key
 from cloudmorrow.server.secrets import SecretStore
 from cloudmorrow.server.settings import SettingsStore
 from cloudmorrow.server.shares import ShareStore
@@ -77,10 +76,12 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         version=__version__,
         summary="Cloudmorrow API — your data, the apps around it, and the machines.",
     )
-    # The key, before the first connection: every store seals through it.
-    sealer = use_key(config.db_path, config.secrets_key_path)
-    user_store = UserStore(config.db_path)
-    share_store = ShareStore(config.db_path, config.shares_root)
+    # The database, and its key before the first connection: every store
+    # seals through it.
+    db = config.database()
+    sealer = db.use_key(config.secrets_key_path)
+    user_store = UserStore(db)
+    share_store = ShareStore(db, config.shares_root)
     # Shares made when each account had its own shares folder come into the
     # one Shares folder, so there is one place to look.
     share_store.relocate()
@@ -88,35 +89,36 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     credential_check = CredentialCheck(user_store, config.ensure_secret_key(), signin_limits)
     # What is installed, and the one table every Quill's records live in.
     quill_registry = QuillRegistry(config.quills_dir, config.datamodels_dir, config.quill_catalog)
-    record_store = RecordStore(config.db_path, quill_registry.models, quill_registry.expiries)
+    record_store = RecordStore(db, quill_registry.models, quill_registry.expiries)
     # Who may use which datamodels: asked by the gate on every read and write.
-    circle_store = CircleStore(config.db_path)
+    circle_store = CircleStore(db)
     record_store.access = circle_store.access_for
     app.state.signin_limits = signin_limits
     app.state.cloudmorrow = AppState(
         config=config,
+        db=db,
         users=user_store,
-        agents=AgentStore(config.db_path),
-        jobs=JobStore(config.db_path),
-        secrets=SecretStore(config.db_path, sealer.master),
-        config_sync=ConfigStore(config.db_path),
-        notifications=NotificationStore(config.db_path),
+        agents=AgentStore(db),
+        jobs=JobStore(db),
+        secrets=SecretStore(db, sealer.master),
+        config_sync=ConfigStore(db),
+        notifications=NotificationStore(db),
         # Each installed Quill is one more thing to switch, at both levels.
         features=FeatureStore(
-            config.db_path,
+            db,
             lambda: (Feature(q.id, q.name, q.summary, tuple(sorted(q.models))) for q in quill_registry.quills.values()),
         ),
         push=PushStore(
-            config.db_path,
+            db,
             config.vapid_key_path,
             subject=config.push_subject or default_subject(config.public_url),
         ),
         shares=share_store,
-        mcp=MCPStore(config.db_path),
+        mcp=MCPStore(db),
         weather=Weather(config.weather_place),
         credential_check=credential_check,
         sealer=sealer,
-        settings=SettingsStore(config.db_path),
+        settings=SettingsStore(db),
         quills=quill_registry,
         records=record_store,
         circles=circle_store,
@@ -143,7 +145,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     # A Quill's code: its token and webhook secrets, and the processes that
     # run it, kept in line with what is installed and switched on.
     state = app.state.cloudmorrow
-    state.quill_tokens = QuillTokenStore(config.db_path)
+    state.quill_tokens = QuillTokenStore(db)
     state.services = Supervisor(config, quill_registry, user_store, state.features, state.quill_tokens)
     app.router.on_startup.append(state.services.start)
     # A Quill's Python: views, actions, hooks, `call` jobs, and handler
@@ -155,7 +157,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         state.services.run_due()
         state.code.run_due()
 
-    clock = Clock(config.db_path, quill_registry, record_store, on_tick=tick)
+    clock = Clock(db, quill_registry, record_store, on_tick=tick)
     app.router.on_startup.append(clock.start)
     app.router.on_shutdown.append(clock.stop)
     app.router.on_shutdown.append(state.services.stop)

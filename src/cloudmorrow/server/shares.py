@@ -26,11 +26,11 @@ import datetime as dt
 import logging
 import os
 import shutil
-import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
-from cloudmorrow.server.db import connect
+from cloudmorrow.server.database import Database, IntegrityError, Row
+from cloudmorrow.server.database import open as open_database
 from cloudmorrow.server.slugs import SLUG_RE, InvalidSlugError
 
 __all__ = [
@@ -128,7 +128,7 @@ class Share:
         }
 
 
-def _share(row: sqlite3.Row) -> Share:
+def _share(row: Row) -> Share:
     return Share(
         id=row["id"],
         owner=row["owner"],
@@ -156,10 +156,10 @@ class ShareStore:
     passed so an older layout can be found and moved (`relocate`).
     """
 
-    def __init__(self, db_path: Path, managed_root) -> None:
-        self.db_path = db_path
+    def __init__(self, db: Database | Path, managed_root) -> None:
+        self.db = open_database(db)
         self._managed_root = managed_root
-        connect(self.db_path).close()
+        self.db.connect().close()
 
     # -- reading -----------------------------------------------------------
     def shares(self, owner: str, *, kind: str | None = None) -> list[Share]:
@@ -168,13 +168,13 @@ class ShareStore:
         if kind is not None:
             query += " AND kind = ?"
             params.append(kind)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             rows = conn.execute(query + " ORDER BY name", params).fetchall()
         return [_share(row) for row in rows]
 
     def on_agent(self, agent_id: int) -> list[Share]:
         """The machine shares one agent serves — what its heartbeat carries back."""
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM shares WHERE agent_id = ? AND kind = ? ORDER BY name",
                 (agent_id, MACHINE),
@@ -182,7 +182,7 @@ class ShareStore:
         return [_share(row) for row in rows]
 
     def get(self, owner: str, name: str) -> Share | None:
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             row = conn.execute(
                 "SELECT * FROM shares WHERE owner = ? AND name = ?",
                 (owner, (name or "").strip().lower()),
@@ -211,7 +211,7 @@ class ShareStore:
         the shares that moved.
         """
         moved: list[Share] = []
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             rows = conn.execute("SELECT * FROM shares WHERE kind = ? AND managed = 1", (SERVER,)).fetchall()
         for share in (_share(row) for row in rows):
             root = self.shares_dir(share.owner)
@@ -222,7 +222,7 @@ class ShareStore:
                 log.warning("share %s stays at %s: %s is already taken", share.name, share.path, target)
                 continue
             shutil.move(str(share.path), str(target))
-            with connect(self.db_path) as conn:
+            with self.db.connect() as conn:
                 conn.execute(
                     "UPDATE shares SET path = ?, updated_at = ? WHERE id = ?",
                     (str(target), _stamp(), share.id),
@@ -309,7 +309,7 @@ class ShareStore:
             agent_id = None
         now = _stamp()
         try:
-            with connect(self.db_path) as conn:
+            with self.db.connect() as conn:
                 conn.execute(
                     "INSERT INTO shares (owner, name, kind, path, managed, agent_id,"
                     " description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -325,7 +325,7 @@ class ShareStore:
                         now,
                     ),
                 )
-        except sqlite3.IntegrityError as exc:
+        except IntegrityError as exc:
             raise ShareExistsError(name) from exc
         return self.require(owner, name)
 
@@ -353,7 +353,7 @@ class ShareStore:
         here can or does touch them.
         """
         share = self.require(owner, name)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             conn.execute("DELETE FROM shares WHERE owner = ? AND name = ?", (owner, share.name))
         if remove_files and share.managed and share.path.is_dir():
             shutil.rmtree(share.path)
@@ -361,5 +361,5 @@ class ShareStore:
 
     def forget_agent(self, agent_id: int) -> int:
         """The machine is gone; so are the shares it served. Returns how many."""
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             return int(conn.execute("DELETE FROM shares WHERE agent_id = ? AND kind = ?", (agent_id, MACHINE)).rowcount)

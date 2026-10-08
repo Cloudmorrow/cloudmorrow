@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from cloudmorrow.cli import quillrun
-from cloudmorrow.server.db import connect
+from cloudmorrow.server.database import connect
 from cloudmorrow.server.quills import QuillError, QuillRegistry, standard
 from cloudmorrow.server.quills.jobs import (
     LEGACY_CALENDAR,

@@ -39,7 +39,6 @@ import hmac
 import json
 import os
 import socket
-import sqlite3
 import struct
 import urllib.error
 import urllib.request
@@ -52,7 +51,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from cloudmorrow.server.db import Connection, connect
+from cloudmorrow.server.database import Connection, Database, Row
+from cloudmorrow.server.database import open as open_database
 
 __all__ = [
     "PushStore",
@@ -244,7 +244,7 @@ class Subscription:
         return {"id": self.id, "label": self.label, "endpoint": self.endpoint}
 
 
-def _subscription(conn: Connection, row: sqlite3.Row) -> Subscription:
+def _subscription(conn: Connection, row: Row) -> Subscription:
     scope = (row["username"],)
     return Subscription(
         id=row["id"],
@@ -259,16 +259,15 @@ def _subscription(conn: Connection, row: sqlite3.Row) -> Subscription:
 class PushStore:
     """Which devices to push, and the pushing of them."""
 
-    def __init__(self, db_path: Path, key_path: Path, *, subject: str = "") -> None:
-        self.db_path = db_path
+    def __init__(self, db: Database | Path, key_path: Path, *, subject: str = "") -> None:
+        self.db = open_database(db)
         self.key_path = key_path
         self.subject = subject
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._connect().close()
         self._key: ec.EllipticCurvePrivateKey | None = None
 
-    def _connect(self) -> sqlite3.Connection:
-        return connect(self.db_path)
+    def _connect(self) -> Connection:
+        return self.db.connect()
 
     @property
     def key(self) -> ec.EllipticCurvePrivateKey:

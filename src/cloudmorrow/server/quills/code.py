@@ -51,7 +51,6 @@ from cloudmorrow.quill import context as sdk
 from cloudmorrow.quill import ui
 from cloudmorrow.sandbox import CALL_TIMEOUT, Failed, Guest, InProcessGuest, SandboxError
 from cloudmorrow.server.datamodels import parse_duration
-from cloudmorrow.server.db import connect
 from cloudmorrow.server.quills import Manifest
 from cloudmorrow.server.quills.codespec import action_fields
 from cloudmorrow.server.quills.services import ServiceLog
@@ -320,7 +319,8 @@ class QuillCode:
         self._running_jobs: set[tuple[str, str]] = set()
         self._stop = threading.Event()
         self._worker: threading.Thread | None = None
-        connect(self.config.db_path).close()
+        self.db = self.config.database()
+        self.db.connect().close()
         state.records.on_change.append(self._on_change)
         state.quills.listeners.append(self.reconcile)
 
@@ -665,7 +665,7 @@ class QuillCode:
                 raise
         finally:
             self._running_jobs.discard((manifest.id, job["id"]))
-            with connect(self.config.db_path) as conn:
+            with self.db.connect() as conn:
                 conn.execute(
                     "UPDATE quill_call_runs SET last_error = ? WHERE quill = ? AND job = ?",
                     (error, manifest.id, job["id"]),
@@ -673,7 +673,7 @@ class QuillCode:
             conn.close()
 
     def _last_run(self, quill: str, job: str) -> dt.datetime | None:
-        with connect(self.config.db_path) as conn:
+        with self.db.connect() as conn:
             row = conn.execute(
                 "SELECT last_started FROM quill_call_runs WHERE quill = ? AND job = ?", (quill, job)
             ).fetchone()
@@ -681,7 +681,7 @@ class QuillCode:
         return dt.datetime.fromisoformat(row[0]) if row else None
 
     def _record_start(self, quill: str, job: str) -> None:
-        with connect(self.config.db_path) as conn:
+        with self.db.connect() as conn:
             conn.execute(
                 "INSERT INTO quill_call_runs (quill, job, last_started) VALUES (?, ?, ?)"
                 " ON CONFLICT(quill, job) DO UPDATE SET last_started = excluded.last_started",
@@ -694,7 +694,7 @@ class QuillCode:
         if manifest is None:
             return []
         rows = []
-        with connect(self.config.db_path) as conn:
+        with self.db.connect() as conn:
             for job in manifest.jobs:
                 if job["action"] != "call":
                     continue

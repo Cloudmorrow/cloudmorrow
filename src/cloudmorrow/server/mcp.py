@@ -23,12 +23,13 @@ import datetime as dt
 import hashlib
 import json
 import secrets
-import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from cloudmorrow.server.db import connect
+from cloudmorrow.server.database import Connection as DatabaseConnection
+from cloudmorrow.server.database import Database, Row
+from cloudmorrow.server.database import open as open_database
 
 # Made by schema.py, step 1. A change to it is a new step there.
 TABLES = """
@@ -219,13 +220,12 @@ def pkce_matches(verifier: str, challenge: str, method: str) -> bool:
 class MCPStore:
     """The clients, codes and tokens behind the MCP server."""
 
-    def __init__(self, db_path: Path) -> None:
-        self.db_path = db_path
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self, db: Database | Path) -> None:
+        self.db = open_database(db)
         self._connect().close()
 
-    def _connect(self) -> sqlite3.Connection:
-        return connect(self.db_path)
+    def _connect(self) -> DatabaseConnection:
+        return self.db.connect()
 
     # -- clients -----------------------------------------------------------
     def register(self, name: str, redirect_uris: list[str], *, public: bool = True) -> tuple[Client, str]:
@@ -256,7 +256,7 @@ class MCPStore:
         return self._client(row) if row else None
 
     @staticmethod
-    def _client(row: sqlite3.Row) -> Client:
+    def _client(row: Row) -> Client:
         return Client(
             client_id=row["client_id"],
             client_name=row["client_name"],
@@ -391,7 +391,7 @@ class MCPStore:
         return self._connection(row)
 
     @staticmethod
-    def _connection(row: sqlite3.Row) -> Connection:
+    def _connection(row: Row) -> Connection:
         return Connection(
             id=row["id"],
             username=row["username"],

@@ -22,12 +22,12 @@ otherwise.
 from __future__ import annotations
 
 import datetime as dt
-import sqlite3
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from cloudmorrow.server.db import connect
+from cloudmorrow.server.database import Connection, Database, IntegrityError, Row
+from cloudmorrow.server.database import open as open_database
 from cloudmorrow.server.slugs import slugify
 
 WRITE = "write"
@@ -161,11 +161,10 @@ class Circle:
         }
 
 
-def ensure(conn: sqlite3.Connection) -> None:
+def ensure(conn: Connection) -> None:
     """The tables, and — the first time they are made — Members, with everybody in it."""
     conn.executescript(OWN_TABLE)
-    present = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'circles'").fetchone()
-    if present:
+    if conn.table_exists("circles"):
         return
     conn.executescript(TABLE)
     circle_id = slugify(DEFAULT_NAME)
@@ -177,8 +176,7 @@ def ensure(conn: sqlite3.Connection) -> None:
         "INSERT INTO circle_rules (circle_id, model, access) VALUES (?, ?, ?)",
         (circle_id, EVERY, WRITE),
     )
-    has_users = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'users'").fetchone()
-    if has_users:
+    if conn.table_exists("users"):
         conn.execute(
             "INSERT INTO circle_members (circle_id, username) SELECT ?, username FROM users",
             (circle_id,),
@@ -189,17 +187,17 @@ def ensure(conn: sqlite3.Connection) -> None:
 class CircleStore:
     """The circles, their rules and their people, and what that adds up to per person."""
 
-    def __init__(self, db_path: Path) -> None:
-        self.db_path = db_path
+    def __init__(self, db: Database | Path) -> None:
+        self.db = open_database(db)
         with self._connect():
             pass
 
-    def _connect(self) -> sqlite3.Connection:
-        # `connect` makes the tables (and Members) through `ensure`.
-        return connect(self.db_path)
+    def _connect(self) -> Connection:
+        # Connecting makes the tables (and Members) through `ensure`.
+        return self.db.connect()
 
     # -- reading ---------------------------------------------------------------
-    def _load(self, conn: sqlite3.Connection, row: sqlite3.Row) -> Circle:
+    def _load(self, conn: Connection, row: Row) -> Circle:
         rules = {
             r["model"]: r["access"]
             for r in conn.execute(
@@ -218,14 +216,14 @@ class CircleStore:
 
     def list(self) -> list[Circle]:
         with self._connect() as conn:
-            rows = conn.execute("SELECT * FROM circles ORDER BY name COLLATE NOCASE").fetchall()
+            rows = conn.execute("SELECT * FROM circles ORDER BY lower(name)").fetchall()
             return [self._load(conn, row) for row in rows]
 
-    def _find(self, conn: sqlite3.Connection, key: str) -> sqlite3.Row:
+    def _find(self, conn: Connection, key: str) -> Row:
         """A circle by its id or its name, either case."""
         key = key.strip()
         row = conn.execute(
-            "SELECT * FROM circles WHERE id = ? OR name = ? COLLATE NOCASE",
+            "SELECT * FROM circles WHERE id = ? OR lower(name) = lower(?)",
             (key.lower(), key),
         ).fetchone()
         if row is None:
@@ -240,7 +238,7 @@ class CircleStore:
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT c.* FROM circles c JOIN circle_members m ON m.circle_id = c.id"
-                " WHERE m.username = ? ORDER BY c.name COLLATE NOCASE",
+                " WHERE m.username = ? ORDER BY lower(c.name)",
                 (username,),
             ).fetchall()
             return [self._load(conn, row) for row in rows]
@@ -350,12 +348,12 @@ class CircleStore:
                 self._set_rules(conn, circle_id, rules or {})
                 for username in members:
                     self._join(conn, circle_id, username)
-        except sqlite3.IntegrityError as exc:
+        except IntegrityError as exc:
             raise CircleError(f"there is already a circle called {name}") from exc
         return self.get(circle_id)
 
     @staticmethod
-    def _set_rules(conn: sqlite3.Connection, circle_id: str, rules: Mapping[str, str]) -> None:
+    def _set_rules(conn: Connection, circle_id: str, rules: Mapping[str, str]) -> None:
         conn.execute("DELETE FROM circle_rules WHERE circle_id = ?", (circle_id,))
         for model, access in rules.items():
             model = str(model).strip()
@@ -367,12 +365,12 @@ class CircleStore:
             )
 
     @staticmethod
-    def _join(conn: sqlite3.Connection, circle_id: str, username: str) -> None:
+    def _join(conn: Connection, circle_id: str, username: str) -> None:
         user = conn.execute("SELECT 1 FROM users WHERE username = ?", (username.strip().lower(),)).fetchone()
         if user is None:
             raise CircleError(f"there is nobody called {username} on this server")
         conn.execute(
-            "INSERT OR IGNORE INTO circle_members (circle_id, username) VALUES (?, ?)",
+            "INSERT INTO circle_members (circle_id, username) VALUES (?, ?) ON CONFLICT DO NOTHING",
             (circle_id, username.strip().lower()),
         )
 
@@ -389,7 +387,7 @@ class CircleStore:
             if name is not None and name.strip():
                 try:
                     conn.execute("UPDATE circles SET name = ? WHERE id = ?", (name.strip(), circle_id))
-                except sqlite3.IntegrityError as exc:
+                except IntegrityError as exc:
                     raise CircleError(f"there is already a circle called {name}") from exc
             if rules is not None:
                 self._set_rules(conn, circle_id, rules)

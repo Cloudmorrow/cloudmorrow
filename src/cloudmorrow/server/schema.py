@@ -1,14 +1,22 @@
 """The database's tables, and how an older database is brought up to them.
 
-Every store keeps its rows in the one SQLite file, and every connection is
-opened through `db.connect`, which calls `upgrade` here. The file carries
-its version in `PRAGMA user_version`; `upgrade` runs each step above it, in
-order, and writes the new number after each. Opening a database that is
-already current costs one pragma read.
+Every store keeps its rows in the one database, and every connection is
+opened through the database layer (database/), which calls `upgrade` here.
+The database carries its version — `PRAGMA user_version` on SQLite, a
+table of its own on PostgreSQL; the connection knows which — and `upgrade`
+runs each step above it, in order, and writes the new number after each.
+Opening a database that is already current costs one read.
 
 To change the tables, add a step at the end of STEPS. Do not edit what an
 earlier step does, or a table a step creates: a database that has run that
 step will never run it again, so the change would only reach new servers.
+A column added since a table shipped goes in ADDED_COLUMNS, and a step
+that calls `_columns` again puts it on the databases that are past step 1.
+
+The definitions are written once, in the vocabulary both engines share
+(see `database.Dialect.ddl`): `INTEGER PRIMARY KEY AUTOINCREMENT` for a key
+the engine hands out, `JSON` for a column the engine reads JSON out of,
+`INTEGER AUTONUMBER` for one that counts the rows as they come.
 
 Step 1 is everything from before there were versions: the tables, each
 store's own, the columns added and renamed since, and the first circle. It
@@ -18,10 +26,13 @@ a database at version 0 is.
 
 from __future__ import annotations
 
-import sqlite3
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from cloudmorrow.server.database import Connection
 
 # What an account is allowed to do, as the role column says it. db.py has
 # the full list; the migration needs only this one.
@@ -251,6 +262,9 @@ ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("shares", "agent_id", "INTEGER"),
     # Which fields a change touched, as a JSON list of names — never a value.
     ("record_changes", "fields", "TEXT NOT NULL DEFAULT ''"),
+    # The order records were written in, for a tie on created_at. A SQLite
+    # database from before the column counted by rowid; step 3 copies it.
+    ("records", "seq", "INTEGER AUTONUMBER"),
 )
 
 
@@ -263,15 +277,15 @@ RENAMED_COLUMNS: tuple[tuple[str, str, str], ...] = (
 )
 
 
-def _columns(conn: sqlite3.Connection) -> None:
+def _columns(conn: Connection) -> None:
     for table, old, new in RENAMED_COLUMNS:
-        present = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        present = conn.columns(table)
         if old in present and new not in present:
-            conn.execute(f"ALTER TABLE {table} RENAME COLUMN {old} TO {new}")
+            conn.executescript(f"ALTER TABLE {table} RENAME COLUMN {old} TO {new}")
     for table, column, definition in ADDED_COLUMNS:
-        present = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        present = conn.columns(table)
         if present and column not in present:
-            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+            conn.executescript(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
             if (table, column) == ("users", "role"):
                 # Everyone who was an admin before roles existed is one now.
                 conn.execute("UPDATE users SET role = ? WHERE is_admin = 1", (ROLE_ADMIN,))
@@ -295,7 +309,7 @@ def _store_tables() -> tuple[str, ...]:
     )
 
 
-def _baseline(conn: sqlite3.Connection) -> None:
+def _baseline(conn: Connection) -> None:
     conn.executescript(SCHEMA)
     for table in _store_tables():
         conn.executescript(table)
@@ -311,10 +325,10 @@ def _baseline(conn: sqlite3.Connection) -> None:
 class Step:
     version: int
     what: str
-    run: Callable[[sqlite3.Connection], None]
+    run: Callable[[Connection], None]
 
 
-def _indexes_for_scale(conn: sqlite3.Connection) -> None:
+def _indexes_for_scale(conn: Connection) -> None:
     """The indexes the two biggest tables need once a cloud has had a year of use.
 
     `records (model, updated_at)` is what an open screen's `_since` asks;
@@ -330,9 +344,25 @@ def _indexes_for_scale(conn: sqlite3.Connection) -> None:
     )
 
 
+def _columns_since(conn: Connection) -> None:
+    """The columns added since step 1 ran here, and the write order of records.
+
+    `_columns` only ran in step 1 until now, so a database past it never got
+    a column added later; this runs it again, and will for any step after.
+    A record's `seq` is what SQLite counted by all along, its rowid; the
+    column makes it a fact of the row, which the other engine needs.
+    """
+    _columns(conn)
+    if conn.dialect.name == "sqlite":
+        conn.execute("UPDATE records SET seq = rowid WHERE seq IS NULL")
+    conn.executescript("CREATE INDEX IF NOT EXISTS records_seq ON records (seq)")
+    conn.commit()
+
+
 STEPS: tuple[Step, ...] = (
     Step(1, "the tables as they stood before they were versioned", _baseline),
     Step(2, "indexes for what an open screen and the retention sweep ask", _indexes_for_scale),
+    Step(3, "the columns added since, and the order records were written in", _columns_since),
 )
 
 VERSION = STEPS[-1].version
@@ -343,22 +373,25 @@ VERSION = STEPS[-1].version
 _upgrading = threading.Lock()
 
 
-def version_of(conn: sqlite3.Connection) -> int:
-    return conn.execute("PRAGMA user_version").fetchone()[0]
+def version_of(conn: Connection) -> int:
+    return conn.schema_version()
 
 
-def upgrade(conn: sqlite3.Connection) -> None:
+def upgrade(conn: Connection) -> None:
     """Run every step this database has not run yet."""
     if version_of(conn) >= VERSION:
         return
     with _upgrading:
+        # And across processes: a second server booting on the same
+        # database waits here, then reads the version this one wrote.
+        conn.lock()
         for step in STEPS:
             if step.version <= version_of(conn):
                 continue
             step.run(conn)
-            # A pragma takes no parameters; the version is an int of ours.
-            conn.execute(f"PRAGMA user_version = {int(step.version)}")
+            conn.set_schema_version(step.version)
             # `connect` is called for reads as well as writes, and a read
             # closes the connection without committing. A step has to
             # survive that.
             conn.commit()
+        conn.commit()

@@ -13,11 +13,11 @@ import hashlib
 import json
 import re
 import secrets
-import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from cloudmorrow.server.db import Connection, connect
+from cloudmorrow.server.database import Connection, Database, IntegrityError, Row
+from cloudmorrow.server.database import open as open_database
 
 AGENT_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$")
 TOKEN_PREFIX = "bca_"
@@ -151,7 +151,7 @@ def _list(raw: str | None) -> list[str]:
     return [part for part in (raw or "").split(",") if part]
 
 
-def _agent(row: sqlite3.Row) -> Agent:
+def _agent(row: Row) -> Agent:
     return Agent(
         id=row["id"],
         owner=row["owner"],
@@ -167,7 +167,7 @@ def _agent(row: sqlite3.Row) -> Agent:
     )
 
 
-def _job(conn: Connection, row: sqlite3.Row) -> Job:
+def _job(conn: Connection, row: Row) -> Job:
     scope = (row["owner"],)
     payload = conn.unseal("jobs", "payload", scope, row["payload"])
     result = conn.unseal("jobs", "result", scope, row["result"])
@@ -187,9 +187,9 @@ def _job(conn: Connection, row: sqlite3.Row) -> Job:
 
 
 class AgentStore:
-    def __init__(self, db_path: Path) -> None:
-        self.db_path = db_path
-        connect(self.db_path).close()
+    def __init__(self, db: Database | Path) -> None:
+        self.db = open_database(db)
+        self.db.connect().close()
 
     # -- enrolment ---------------------------------------------------------
     def create_enrollment_token(
@@ -198,7 +198,7 @@ class AgentStore:
         """Return (token, expires_at). The plaintext is never stored."""
         token = new_token(ENROLL_PREFIX)
         expires_at = (_now() + dt.timedelta(minutes=ttl_minutes)).isoformat(timespec="seconds")
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             conn.execute(
                 "INSERT INTO enrollment_tokens (owner, token_hash, label, expires_at, created_at)"
                 " VALUES (?, ?, ?, ?, ?)",
@@ -219,7 +219,7 @@ class AgentStore:
         """Consume an enrolment token and return the new agent and its token."""
         name = validate_agent_name(name)
         token_hash = hash_token(enrollment_token)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             row = conn.execute("SELECT * FROM enrollment_tokens WHERE token_hash = ?", (token_hash,)).fetchone()
             if row is None:
                 raise EnrollmentError("unknown enrolment token")
@@ -245,7 +245,7 @@ class AgentStore:
                         _stamp(),
                     ),
                 )
-            except sqlite3.IntegrityError as exc:
+            except IntegrityError as exc:
                 raise AgentExistsError(name) from exc
             conn.execute("UPDATE enrollment_tokens SET used_at = ? WHERE id = ?", (_stamp(), row["id"]))
             agent_row = conn.execute("SELECT * FROM agents WHERE owner = ? AND name = ?", (owner, name)).fetchone()
@@ -271,7 +271,7 @@ class AgentStore:
         name = validate_agent_name(name)
         agent_token = new_token()
         caps = ",".join(capabilities or [])
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             existing = conn.execute("SELECT id FROM agents WHERE owner = ? AND name = ?", (owner, name)).fetchone()
             if existing:
                 conn.execute(
@@ -305,17 +305,17 @@ class AgentStore:
         return _agent(row), agent_token
 
     def by_token(self, token: str) -> Agent | None:
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             row = conn.execute("SELECT * FROM agents WHERE token_hash = ?", (hash_token(token),)).fetchone()
         return _agent(row) if row else None
 
     def list(self, owner: str) -> list[Agent]:
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             rows = conn.execute("SELECT * FROM agents WHERE owner = ? ORDER BY name", (owner,)).fetchall()
         return [_agent(row) for row in rows]
 
     def get(self, owner: str, agent_id: int) -> Agent | None:
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             row = conn.execute("SELECT * FROM agents WHERE owner = ? AND id = ?", (owner, agent_id)).fetchone()
         return _agent(row) if row else None
 
@@ -340,7 +340,7 @@ class AgentStore:
         if fields.get("dav_base") is not None:
             updates["dav_base"] = str(fields["dav_base"])
         assignments = "".join(f", {key} = ?" for key in updates)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             conn.execute(
                 f"UPDATE agents SET last_seen = ?{assignments} WHERE id = ?",
                 (_stamp(), *updates.values(), agent_id),
@@ -349,7 +349,7 @@ class AgentStore:
     def set_sync_bundles(self, owner: str, agent_id: int, bundles: list[str]) -> Agent:
         """Tell a machine which config bundles to keep in step with the others."""
         cleaned = sorted({b.strip().lower() for b in bundles if b.strip()})
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             cursor = conn.execute(
                 "UPDATE agents SET sync_bundles = ? WHERE owner = ? AND id = ?",
                 (",".join(cleaned), owner, agent_id),
@@ -363,16 +363,16 @@ class AgentStore:
         return [agent for agent in self.list(owner) if bundle in agent.sync_bundles]
 
     def delete(self, owner: str, agent_id: int) -> None:
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             cursor = conn.execute("DELETE FROM agents WHERE owner = ? AND id = ?", (owner, agent_id))
             if cursor.rowcount == 0:
                 raise UnknownAgentError(str(agent_id))
 
 
 class JobStore:
-    def __init__(self, db_path: Path) -> None:
-        self.db_path = db_path
-        connect(self.db_path).close()
+    def __init__(self, db: Database | Path) -> None:
+        self.db = open_database(db)
+        self.db.connect().close()
 
     def create(
         self,
@@ -383,8 +383,8 @@ class JobStore:
         *,
         project: str | None = None,
     ) -> Job:
-        with connect(self.db_path) as conn:
-            cursor = conn.execute(
+        with self.db.connect() as conn:
+            job_id = conn.insert(
                 "INSERT INTO jobs (agent_id, owner, project, type, payload, status, created_at)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
@@ -397,12 +397,12 @@ class JobStore:
                     _stamp(),
                 ),
             )
-            row = conn.execute("SELECT * FROM jobs WHERE id = ?", (cursor.lastrowid,)).fetchone()
+            row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
         return _job(conn, row)
 
     def claim_next(self, agent_id: int) -> Job | None:
         """Hand the agent its oldest queued job, marking it running."""
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             row = conn.execute(
                 "SELECT * FROM jobs WHERE agent_id = ? AND status = ? ORDER BY id LIMIT 1",
                 (agent_id, JOB_QUEUED),
@@ -419,7 +419,7 @@ class JobStore:
     def finish(self, agent_id: int, job_id: int, *, status: str, result: dict | None) -> Job:
         if status not in {JOB_DONE, JOB_FAILED}:
             raise ValueError(f"invalid terminal status: {status}")
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             row = conn.execute("SELECT * FROM jobs WHERE id = ? AND agent_id = ?", (job_id, agent_id)).fetchone()
             if row is None:
                 raise UnknownJobError(str(job_id))
@@ -446,16 +446,16 @@ class JobStore:
             params.append(project)
         query += " ORDER BY id DESC LIMIT ?"
         params.append(limit)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             return [_job(conn, row) for row in conn.execute(query, params).fetchall()]
 
     def get(self, owner: str, job_id: int) -> Job | None:
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             row = conn.execute("SELECT * FROM jobs WHERE owner = ? AND id = ?", (owner, job_id)).fetchone()
         return _job(conn, row) if row else None
 
     def queued_count(self, agent_id: int) -> int:
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             return int(
                 conn.execute(
                     "SELECT COUNT(*) AS n FROM jobs WHERE agent_id = ? AND status = ?",
@@ -466,7 +466,7 @@ class JobStore:
     def reap_stale(self) -> int:
         """Fail jobs an agent claimed but never reported back on."""
         cutoff = (_now() - dt.timedelta(minutes=JOB_STALE_MINUTES)).isoformat(timespec="seconds")
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             cursor = conn.execute(
                 "UPDATE jobs SET status = ?, finished_at = ?, result = ? WHERE status = ? AND started_at < ?",
                 (

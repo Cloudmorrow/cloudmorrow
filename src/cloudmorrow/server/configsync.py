@@ -19,7 +19,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from cloudmorrow.bundles import digest, validate_path
-from cloudmorrow.server.db import connect
+from cloudmorrow.server.database import Database
+from cloudmorrow.server.database import open as open_database
 
 # What a machine may be asked to sync. The agent has the matching definition of
 # which paths each one covers; the server only ever sees relative paths.
@@ -109,15 +110,15 @@ class BundleState:
 
 
 class ConfigStore:
-    def __init__(self, db_path: Path) -> None:
-        self.db_path = db_path
-        connect(self.db_path).close()
+    def __init__(self, db: Database | Path) -> None:
+        self.db = open_database(db)
+        self.db.connect().close()
 
     # -- reading -----------------------------------------------------------
     def state(self, owner: str, bundle: str) -> BundleState:
         """The bundle's manifest: every file's name and hash, no contents."""
         bundle = validate_bundle(bundle)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             row = conn.execute(
                 "SELECT * FROM config_bundles WHERE owner = ? AND bundle = ?", (owner, bundle)
             ).fetchone()
@@ -142,7 +143,7 @@ class ConfigStore:
 
     def files(self, owner: str, bundle: str) -> list[ConfigFile]:
         bundle = validate_bundle(bundle)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             rows = conn.execute(
                 "SELECT path, content, sha256, mode FROM config_files WHERE owner = ? AND bundle = ? ORDER BY path",
                 (owner, bundle),
@@ -184,7 +185,7 @@ class ConfigStore:
             )
 
         stamp = _now()
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             row = conn.execute(
                 "SELECT * FROM config_bundles WHERE owner = ? AND bundle = ?", (owner, bundle)
             ).fetchone()
@@ -229,6 +230,6 @@ class ConfigStore:
     def forget(self, owner: str, bundle: str) -> None:
         """Throw the bundle away, so the next machine to tick the box claims it."""
         bundle = validate_bundle(bundle)
-        with connect(self.db_path) as conn:
+        with self.db.connect() as conn:
             conn.execute("DELETE FROM config_files WHERE owner = ? AND bundle = ?", (owner, bundle))
             conn.execute("DELETE FROM config_bundles WHERE owner = ? AND bundle = ?", (owner, bundle))

@@ -26,12 +26,12 @@ somebody turned off. A feature nobody has touched is on, at either level.
 from __future__ import annotations
 
 import datetime as dt
-import sqlite3
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from cloudmorrow.server.db import connect
+from cloudmorrow.server.database import Connection, Database, Row
+from cloudmorrow.server.database import open as open_database
 
 # Made by schema.py, step 1. A change to it is a new step there.
 TABLE = """
@@ -91,16 +91,15 @@ def _now() -> str:
 class FeatureStore:
     """What is switched on, and the switching of it."""
 
-    def __init__(self, db_path: Path, quills: Callable[[], Iterable[Feature]] | None = None) -> None:
-        self.db_path = db_path
+    def __init__(self, db: Database | Path, quills: Callable[[], Iterable[Feature]] | None = None) -> None:
+        self.db = open_database(db)
         # The installed Quills, each one more thing to switch. Asked on every
         # call, because installing one changes the answer.
         self._quills = quills or (lambda: ())
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._connect().close()
 
-    def _connect(self) -> sqlite3.Connection:
-        return connect(self.db_path)
+    def _connect(self) -> Connection:
+        return self.db.connect()
 
     def catalogue(self) -> tuple[Feature, ...]:
         """The built-in features, then every installed Quill."""
@@ -109,7 +108,7 @@ class FeatureStore:
     def known(self, key: str) -> bool:
         return any(feature.key == key for feature in self.catalogue())
 
-    def _switched(self) -> dict[str, sqlite3.Row]:
+    def _switched(self) -> dict[str, Row]:
         with self._connect() as conn:
             rows = conn.execute("SELECT * FROM features").fetchall()
         return {row["key"]: row for row in rows}

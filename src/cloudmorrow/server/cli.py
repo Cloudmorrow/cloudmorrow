@@ -28,7 +28,7 @@ from cloudmorrow.server.db import (
     UserStore,
 )
 from cloudmorrow.server.quills.cli import app as quill_app
-from cloudmorrow.server.sealed import Sealer, key_for, rotate, use_key
+from cloudmorrow.server.sealed import Sealer, key_for, rotate
 from cloudmorrow.server.security import hash_password
 from cloudmorrow.server.update import UpdateError, build_wheel, describe, find_source_dir
 from cloudmorrow.server.update import update as do_update
@@ -54,12 +54,12 @@ def _load(config_path: Path | None) -> ServerConfig:
     config.ensure_dirs()
     # Whatever this command touches is sealed under the service's key, not
     # one made up beside the database.
-    use_key(config.db_path, config.secrets_key_path)
+    config.database().use_key(config.secrets_key_path)
     return config
 
 
 def _store(config: ServerConfig) -> UserStore:
-    return UserStore(config.db_path)
+    return UserStore(config.database())
 
 
 def _plural(count: int, one: str, many: str = "") -> str:
@@ -165,7 +165,7 @@ def config(config_path: ConfigOption = None) -> None:
         "service_name",
     ):
         table.add_row(key, str(getattr(cfg, key)))
-    table.add_row("db_path", str(cfg.db_path))
+    table.add_row("database", cfg.database().describe())
     table.add_row("secret_key", "set" if cfg.secret_key else "generated on first run")
     console.print(table)
 
@@ -349,7 +349,7 @@ def agent_install(
 
     reach = (url or cfg.public_url or loopback_url(cfg)).rstrip("/")
     try:
-        agent, token = AgentStore(cfg.db_path).enroll_for_user(
+        agent, token = AgentStore(cfg.database()).enroll_for_user(
             account.username,
             name=machine,
             hostname=socket.gethostname(),
@@ -523,9 +523,9 @@ def rotate_key(
         console.print("The service must be stopped. Continue? [y/N] ", end="")
         if input().strip().lower() not in {"y", "yes"}:
             raise typer.Exit(code=1)
-    old = Sealer(key_for(config.db_path))
+    old = Sealer(key_for(config.database()))
     new = Sealer(os.urandom(32))
-    counts = rotate(config.db_path, old, new)
+    counts = rotate(config.database(), old, new)
     backup = key_path.with_name(key_path.name + ".old")
     os.replace(key_path, backup)
     handle = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)

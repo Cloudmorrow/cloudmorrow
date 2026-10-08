@@ -216,7 +216,7 @@ class Harness:
             quill_code="sandbox" if sandbox else "trusted",
         )
         config.ensure_dirs()
-        self._users = UserStore(config.db_path)
+        self._users = UserStore(config.database())
         self._users.create(user, hash_password(PASSWORD), is_admin=True)
         self._app = create_app(config)
         self.state = self._app.state.cloudmorrow

@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 
 from cloudmorrow.server import schema
-from cloudmorrow.server.db import connect
+from cloudmorrow.server.database import connect
 
 
 def tables(conn) -> set[str]:

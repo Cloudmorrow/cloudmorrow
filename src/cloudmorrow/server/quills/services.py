@@ -56,7 +56,6 @@ import logging
 import os
 import signal
 import socket
-import sqlite3
 import subprocess
 import sys
 import threading
@@ -65,8 +64,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from cloudmorrow.server.config import ServerConfig
+from cloudmorrow.server.database import Row
 from cloudmorrow.server.datamodels import parse_duration
-from cloudmorrow.server.db import UserStore, connect
+from cloudmorrow.server.db import UserStore
 from cloudmorrow.server.features import FeatureStore
 from cloudmorrow.server.quills import Manifest, QuillRegistry
 from cloudmorrow.server.quills.tokens import QuillTokenStore, runs_as
@@ -243,7 +243,8 @@ class Supervisor:
         self._changed = True
         self._stopping = False
         self._thread: threading.Thread | None = None
-        connect(config.db_path).close()
+        self.db = config.database()
+        self.db.connect().close()
         registry.listeners.append(self.changed)
 
     # -- the thread ---------------------------------------------------------------
@@ -513,22 +514,23 @@ class Supervisor:
         row = self._job_row(quill, job)
         return dt.datetime.fromisoformat(row["last_started"]) if row else None
 
-    def _job_row(self, quill: str, job: str) -> sqlite3.Row | None:
-        with connect(self.config.db_path) as conn:
+    def _job_row(self, quill: str, job: str) -> Row | None:
+        with self.db.connect() as conn:
             row = conn.execute("SELECT * FROM quill_job_runs WHERE quill = ? AND job = ?", (quill, job)).fetchone()
         conn.close()
         return row
 
     def _record_start(self, quill: str, job: str) -> None:
-        with connect(self.config.db_path) as conn:
+        with self.db.connect() as conn:
             conn.execute(
-                "INSERT OR REPLACE INTO quill_job_runs (quill, job, last_started, last_exit) VALUES (?, ?, ?, NULL)",
+                "INSERT INTO quill_job_runs (quill, job, last_started, last_exit) VALUES (?, ?, ?, NULL)"
+                " ON CONFLICT (quill, job) DO UPDATE SET last_started = excluded.last_started, last_exit = NULL",
                 (quill, job, _now()),
             )
         conn.close()
 
     def _record_exit(self, quill: str, job: str, code: int) -> None:
-        with connect(self.config.db_path) as conn:
+        with self.db.connect() as conn:
             conn.execute(
                 "UPDATE quill_job_runs SET last_exit = ? WHERE quill = ? AND job = ?",
                 (code, quill, job),

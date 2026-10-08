@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from cloudmorrow.server import schema
-from cloudmorrow.server.db import connect
+from cloudmorrow.server.database import connect
 from cloudmorrow.server.quills import jobs
 from cloudmorrow.server.routes.web import WEB
 from tests.conftest import ADMIN, GUEST, token_for

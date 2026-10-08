@@ -16,12 +16,13 @@ a Quill that goes leaves every record behind.
 
 **Foundational datamodels** are the ones Cloudmorrow decides are
 foundational: the shapes in [`Cloudmorrow/datamodels`](https://github.com/Cloudmorrow/datamodels),
-grouped in **domains** — eighteen of them, from Tasks and Calendars to
-Invoicing, Inventory and Membership — and chosen by domain when you
-install, with or without a Quill that uses them. Each domain is on a
-shelf, its **category** — Personal, Home, Business, Operations, Community,
-Developer — which is how the registry shows them and how people think of
-their data; the domain is what is installed. They grow by our hand, by pull request to
+grouped in **domains** — twenty-one of them, from Tasks and Calendars to
+Invoicing, Accounting, Inventory, Membership and the media bank — and
+chosen by domain when you install, with or without a Quill that uses
+them. Each domain is on a shelf, its **category** — Personal, Home,
+Business, Operations, Community, Creative, Developer — which is how the
+registry shows them and how people think of their data; the domain is
+what is installed. They grow by our hand, by pull request to
 that repository, when we judge a shape is one every Quill should agree on.
 A datamodel is foundational because we said so, not because enough Quills
 happened to want it. The foundation is meant to be broad: every domain we
@@ -385,9 +386,10 @@ The foundation grows to every domain we know, in the datamodels
 repository, decided and written by us. The breadth is the point: a
 freelancer, a shop, a household and an association should each find their
 domains here and need extended datamodels only for what is peculiar to
-them. The datamodels of all eleven domains below were written on 8 October
-2026 (datamodels v1.5.0); what remains is a Quill of ours for each, so the
-shapes are proven on a screen, Home first. In order of who asks:
+them. The datamodels of all the domains below were written on 8 and 9
+October 2026 (datamodels v1.5.0 and v1.6.0); what remains is a Quill of
+ours for each, so the shapes are proven on a screen, Home first. In order
+of who asks:
 
 | domain | datamodels | reuses |
 | --- | --- | --- |
@@ -402,9 +404,13 @@ shapes are proven on a screen, Home first. In order of who asks:
 | Inventory and assets | `stock_item`, `storage_location`, `stock_movement`, `asset`, `maintenance` | `item`, `place` |
 | Workforce | `employment`, `team` (a space), `leave` | `contact` |
 | Agreements | `agreement`, `obligation` | `organisation`, `contact`, `file` |
+| Accounting | `ledger` (a space), `account`, `journal_entry`, `posting`, `tax_rate`, `bank_account`, `bank_transaction`, `budget` — a basic ERP's finance core | — |
+| Media bank | `library` (a space), `media_item`, `collection`, `collection_item`, `licence` | `organisation` |
+| Creative work | `brief`, `deliverable`, `review`, in a project | `project`, `contact`, `media_item` |
 
-Accounting, payroll, health and anything a regulator has an opinion on
-wait for somebody with the domain in their hands. What a Quill needs
+Payroll, health and anything a regulator has an opinion on wait for
+somebody with the domain in their hands; accounting is the books and
+nothing a tax office would sign. What a Quill needs
 outside all of this is its own extended datamodel, and that is where it
 stays unless we judge the domain is ours to know. Home goes first because
 the catalog's Home shelf holds only Chat.
