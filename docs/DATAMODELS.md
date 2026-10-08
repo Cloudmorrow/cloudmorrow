@@ -21,12 +21,20 @@ Notes, Secrets, Files — and chosen by domain when you install, with or
 without a Quill that uses them. They grow by our hand, by pull request to
 that repository, when we judge a shape is one every Quill should agree on.
 A datamodel is foundational because we said so, not because enough Quills
-happened to want it.
+happened to want it. The foundation is meant to be broad: every domain we
+know well enough to get right — calendars, customers, projects, invoices,
+members — gets its datamodels here, because the more Quills share one
+shape, the easier it is to change the software and keep the data. A
+domain is written when a Quill of ours needs it, never ahead of a screen,
+and it is written by us, for the domain, not for that Quill.
 
 **Extended datamodels** are what Quills add on top: fields of their own on
 a foundational datamodel (`fleet.odometer` on a `vehicle`), or whole new
-datamodels under their own name (`fleet.service_visit`). Any later Quill may
-use either. They are declared in the Quill's repository and arrive with
+datamodels under their own name (`fleet.service_visit`). They are for the
+special things one Quill wants — never a second kind of something the
+foundation has, and never a shape a whole domain needs, which belongs in
+the foundation. A Quill reaches for a foundational datamodel first and
+extends only what is its own. Any later Quill may use either. They are declared in the Quill's repository and arrive with
 it. When the Quill goes they stay, by default: an administrator removing a
 Quill may choose to drop the datamodels it introduced and the fields it
 added, records and all, and the sheet says which. The datamodels
@@ -387,21 +395,32 @@ pull request without a datamodel version.
 
 ### Phase 3 — Broaden the foundation
 
-New domains in the datamodels repository, decided and written by us, each
-with a Quill of ours that uses it so the shapes are proven on a screen
-before release. In order:
+The foundation grows to every domain we know, in the datamodels
+repository, decided and written by us, each with a Quill of ours that uses
+it so the shapes are proven on a screen before release. The breadth is the
+point: a freelancer, a shop, a household and an association should each
+find their domains here and need extended datamodels only for what is
+peculiar to them. In order of who asks:
 
 | domain | datamodels | reuses |
 | --- | --- | --- |
 | Home | `item` (name, quantity, unit, where, photo), `expense` (amount, when, who, category, receipt) | `contact` |
 | Projects | `project` (a space), `time_entry`; `task` v2 gains `project` | `task`, `contact` |
+| Products and services | `product`, `service`, `price` | `book` |
 | Invoicing | `quote`, `invoice`, `line` — an issued document keeps its lines as written, whatever changes later | `organisation`, `contact`, `book` |
 | Membership | `association` (a space), `membership` (from, to, kind), `donation` | `contact` |
+| Fundraising | `campaign`, `pledge`; `donation` gains `campaign` | `contact`, `organisation` |
+| Events | `registration`, `attendance`; `event` gains a place | `event`, `contact` |
+| Purchasing | `supplier` (an `organisation` link), `purchase_order`, `receipt` | `organisation`, `product` |
+| Inventory and assets | `stock_item`, `storage_location`, `stock_movement`, `asset`, `maintenance` | `item`, `place` |
+| Workforce | `employment`, `team` (a space), `leave` | `contact` |
+| Agreements | `agreement`, `obligation` | `organisation`, `contact`, `file` |
 
-Workforce, inventory, purchasing and accounting wait until somebody who
-runs one asks. A Quill that needs a shape outside the foundation introduces
-it as an extended datamodel, and that is where it stays unless we take it
-in. Home goes first because the catalog's Home shelf holds only Chat.
+Accounting, payroll, health and anything a regulator has an opinion on
+wait for somebody with the domain in their hands. What a Quill needs
+outside all of this is its own extended datamodel, and that is where it
+stays unless we judge the domain is ours to know. Home goes first because
+the catalog's Home shelf holds only Chat.
 
 ### Kept out, on purpose
 
