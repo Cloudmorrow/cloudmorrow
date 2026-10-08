@@ -19,7 +19,9 @@ What the store does for every datamodel, so no Quill has to:
 * cascades a delete along links that say `on_delete = "cascade"`, and clears
   those that say `clear`;
 * sweeps records an `expire` job would take, when their datamodel is read;
-* writes every change to `record_changes`, the feed sync and audit read.
+* writes every change to `record_changes` — who, when, which fields were
+  touched, never a value — which the feed, the sync and a record's history
+  read; the lines of a living record are kept for its life.
 
 The gate is `check` (principal.py): who is asking, what they want to do,
 to which datamodel. Then *which records*: a record of a plain datamodel is its owner's alone; a
@@ -122,9 +124,12 @@ CREATE TABLE IF NOT EXISTS record_changes (
     rev        INTEGER NOT NULL,
     by_kind    TEXT    NOT NULL,
     by_name    TEXT    NOT NULL,
-    at         TEXT    NOT NULL
+    at         TEXT    NOT NULL,
+    -- The names of the fields the change touched, a JSON list; never a value.
+    fields     TEXT    NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS record_changes_owner ON record_changes (owner, seq);
+CREATE INDEX IF NOT EXISTS record_changes_record ON record_changes (record_id, seq);
 CREATE TABLE IF NOT EXISTS record_members (
     -- The people in a shared space, besides its owner.
     space_id   TEXT    NOT NULL,
@@ -973,10 +978,12 @@ class RecordStore:
         record_id: str,
         action: str,
         rev: int,
+        fields: Iterable[str] = (),
     ) -> None:
+        """One line of the record's history: who did what, when, to which fields."""
         conn.execute(
-            "INSERT INTO record_changes (model, record_id, owner, action, rev, by_kind, by_name, at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO record_changes (model, record_id, owner, action, rev, by_kind, by_name, at, fields)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 model,
                 record_id,
@@ -986,6 +993,7 @@ class RecordStore:
                 principal.kind,
                 principal.quill or principal.username,
                 iso_stamp(),
+                json.dumps(list(fields)),
             ),
         )
 
@@ -1038,7 +1046,7 @@ class RecordStore:
                     " VALUES (?, ?, ?, ?)",
                     (record_id, username, owner, now),
                 )
-            self._log(conn, principal, model.id, record_id, "created", 1)
+            self._log(conn, principal, model.id, record_id, "created", 1, [n for n in incoming if n in model.by_name])
             recipients = self._recipients(conn, model, fields, owner) if model.notify else []
             if model.in_space and any(rule.get("unread") for rule in model.notify):
                 # Writing in a space is looking at it: what was above your
@@ -1177,7 +1185,8 @@ class RecordStore:
                     self._renumber(conn, model, owner, old_group)
                 if old_group != new_group or index is not None:
                     self._renumber(conn, model, owner, new_group, moved=record_id, insert_at=index)
-            self._log(conn, principal, model.id, record_id, action, current.rev + 1)
+            touched = [n for n in incoming if n in model.by_name and fields.get(n) != current.fields.get(n)]
+            self._log(conn, principal, model.id, record_id, action, current.rev + 1, touched)
             conn.commit()
         conn.close()
         changed = self.get(principal, model.id, record_id)
@@ -1401,17 +1410,59 @@ class RecordStore:
         return [dict(row) for row in rows]
 
     def prune_changes(self, keep: dt.timedelta = CHANGES_KEPT) -> int:
-        """Take the change feed's lines older than *keep* out. Returns how many went.
+        """Take out the lines older than *keep* of records that are gone. Returns how many went.
 
-        The feed is an audit line and a sync cursor, and both have a horizon:
-        a client whose cursor is older than it reads the records themselves
-        instead. The sweep calls this (quills/jobs.py).
+        A living record keeps its whole history: that is what its sheet shows,
+        and what somebody acting under responsibility is answerable with. A
+        deleted record's lines serve the feed and the sync a while longer —
+        a client whose cursor is older than *keep* reads the records
+        themselves instead — and then go. The sweep calls this (quills/jobs.py).
         """
         before = iso_stamp(utc_now() - keep)
         with connect(self.db_path) as conn:
-            gone = conn.execute("DELETE FROM record_changes WHERE at < ?", (before,)).rowcount
+            gone = conn.execute(
+                "DELETE FROM record_changes WHERE at < ? AND record_id NOT IN (SELECT id FROM records)", (before,)
+            ).rowcount
         conn.close()
         return int(gone)
+
+    def history(self, principal: Principal, model_id: str, record_id: str) -> list[dict]:
+        """Who did what to one record, newest first: `{seq, action, rev, by, by_kind, at, fields}`.
+
+        Only for a record the principal may see, which is the one door every
+        read goes through. The names of the fields a change touched, never
+        their values: the record says what they are now. A record kept by a
+        backend has no history here.
+        """
+        self._check(principal, "read", model_id)
+        model = self.model(model_id)
+        if model.backend:
+            return []
+        with connect(self.db_path) as conn:
+            self._row(conn, principal, model, record_id)
+            rows = conn.execute(
+                "SELECT * FROM record_changes WHERE record_id = ? AND model = ? ORDER BY seq DESC",
+                (record_id, model.id),
+            ).fetchall()
+        conn.close()
+        lines = []
+        for row in rows:
+            try:
+                touched = json.loads(row["fields"] or "[]")
+            except ValueError:
+                touched = []
+            lines.append(
+                {
+                    "seq": row["seq"],
+                    "action": row["action"],
+                    "rev": row["rev"],
+                    "by": row["by_name"],
+                    "by_kind": row["by_kind"],
+                    "at": row["at"],
+                    "fields": [str(name) for name in touched if name in model.by_name],
+                }
+            )
+        return lines
 
     def forget(self, owner: str) -> None:
         """Everything an account had, for when the account goes."""

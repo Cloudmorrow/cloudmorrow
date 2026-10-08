@@ -341,3 +341,40 @@ async def test_removing_asks_then_takes_the_tab_and_keeps_the_records(app):
         assert tab_labels(screen)[0] == "Notes  f1"
         assert not screen.query("#pane-tasks")
         assert len(app.client.record_store["task"]) == 3
+
+
+async def test_the_sheet_shows_who_did_what_to_the_record(app):
+    """Under the fields: the record's history, in words, never a value."""
+    app.client.history = {
+        "r_task1": [
+            {
+                "seq": 2,
+                "action": "changed",
+                "rev": 2,
+                "by": "bram",
+                "by_kind": "person",
+                "at": "2026-10-08T09:41:00+00:00",
+                "fields": ["title", "lane"],
+            },
+            {
+                "seq": 1,
+                "action": "created",
+                "rev": 1,
+                "by": "tasks",
+                "by_kind": "dataset",
+                "at": "2026-10-08T08:10:00+00:00",
+                "fields": ["board", "title"],
+            },
+        ]
+    }
+    async with app.run_test(size=(120, 36)) as pilot:
+        sheet = await open_card(app, pilot)
+        # settle() waits while the sheet is open: breathe instead.
+        await breathe(pilot)
+        await breathe(pilot)
+        said = sheet.query_one("#sheet-history").visual.plain
+        assert "you changed title and lane" in said
+        assert "the tasks Quill made it" in said
+        assert "Rack" not in said
+        sheet.action_cancel()
+        await settle(app, pilot)

@@ -209,3 +209,36 @@ def page_fields(bound: dict, path: str) -> dict:
         name = path.rsplit("/", 1)[-1]
         fields[bound["title"]] = whole_path(bound, name) if not bound["root"] else name + bound["suffix"]
     return fields
+
+
+# -- a record's history --------------------------------------------------------
+
+
+def history_said(line: dict, model: dict, me: str = "") -> str:
+    """One line of a record's history in words: `you changed phone and notes`,
+    `bram made it`, `the tasks Quill moved it`. Never a value."""
+    who = str(line.get("by") or "somebody")
+    kind = str(line.get("by_kind") or "person")
+    if kind == "person":
+        who = "you" if me and who == me else who
+    elif kind in ("quill", "dataset"):
+        who = f"the {who} Quill"
+    elif kind == "assistant":
+        who = f"an assistant, as {who}"
+    labels = {f.get("name"): str(f.get("label") or f.get("name")) for f in model.get("fields", [])}
+    names = [labels.get(n, str(n)) for n in line.get("fields") or []]
+    action = str(line.get("action") or "changed")
+    if action == "created":
+        what = "made it"
+    elif action == "deleted":
+        what = "deleted it"
+    elif action == "expired":
+        what = "let it expire"
+    elif action == "moved" and not names:
+        what = "moved it"
+    elif names:
+        joined = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+        what = f"changed {joined.lower()}"
+    else:
+        what = "changed it"
+    return f"{who} {what}"

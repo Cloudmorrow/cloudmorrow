@@ -376,6 +376,23 @@ def delete_record(
 PRIVATE = {"Cache-Control": "private, no-cache"}
 
 
+@router.get("/{model}/{record_id}/history")
+def record_history(
+    model: str,
+    record_id: str,
+    state: AppState = Depends(get_state),
+    principal: Principal = Depends(get_principal),
+) -> list[dict]:
+    """Who did what to the record, newest first: each line says who, when, what
+    was done and which fields it touched — never a value. The record says what
+    they are now."""
+    switched_on(state, model)
+    try:
+        return state.records.history(principal, model, record_id)
+    except ERRORS as exc:
+        raise http_error(exc) from exc
+
+
 @router.get("/{model}/{record_id}/content")
 def record_content(
     model: str,

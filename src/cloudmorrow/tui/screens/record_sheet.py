@@ -50,6 +50,7 @@ import json
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from textual import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import (
@@ -61,6 +62,8 @@ from textual.widgets import (
 )
 
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.quill.screens import history_said
+from cloudmorrow.tui.dates import as_local
 from cloudmorrow.tui.kitdata import (
     actions_on,
     can_write,
@@ -169,6 +172,9 @@ class RecordSheet(Modal[dict | str | None]):
                     asks=lambda field: self.writes and not read_only(field),
                     id="sheet-rows",
                 )
+                # Who did what to it, newest first, under the fields: filled in once it is read.
+                if self.record is not None:
+                    yield Static("", id="sheet-history", classes="sheet-history")
             if self.record is not None and self.run_action is not None:
                 self.actions = actions_on(installed(self.app), self.model_id)
             if self.actions:
@@ -232,6 +238,8 @@ class RecordSheet(Modal[dict | str | None]):
         return Static(escape(said), id=wid, classes="sheet-fixed")
 
     def on_mount(self) -> None:
+        if self.record is not None:
+            self.load_history()
         # Where you start is where you would start typing: the title.
         for field in self.fields:
             if read_only(field) or not self.writes:
@@ -242,6 +250,21 @@ class RecordSheet(Modal[dict | str | None]):
                 if isinstance(widget, Input):
                     widget.cursor_position = len(widget.value)
                 break
+
+    @work(group="history")
+    async def load_history(self) -> None:
+        """The record's history under its fields: who did what, when; never a value."""
+        fetch = getattr(self.client, "record_history", None)
+        if fetch is None or self.record is None:
+            return
+        try:
+            lines = await fetch(self.model_id, str(self.record["id"]))
+        except Exception:
+            return
+        me = str(getattr(self.app, "username", "") or "")
+        said = [f"{history_said(line, self.model, me)}  [dim]{as_local(line.get('at'))}[/]" for line in lines[:8]]
+        if said:
+            self.query_one("#sheet-history", Static).update("\n".join(said))
 
     def _field_widget(self, field: dict):
         try:

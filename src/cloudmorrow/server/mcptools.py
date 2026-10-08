@@ -163,6 +163,11 @@ def get_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
     return state.records.get(_principal(user), _model(state, args), _str(args, "id", required=True)).to_dict()
 
 
+def get_record_history(state: AppState, user: User, args: dict[str, Any]) -> Any:
+    lines = state.records.history(_principal(user), _model(state, args), _str(args, "id", required=True))
+    return {"history": lines}
+
+
 def create_record(state: AppState, user: User, args: dict[str, Any]) -> Any:
     members = args.get("members") or []
     if not isinstance(members, list) or not all(isinstance(m, str) for m in members):
@@ -323,6 +328,14 @@ TOOLS: tuple[Tool, ...] = (
         _schema({"model": _MODEL, "id": _RECORD_ID}, ("model", "id")),
         "",
         get_record,
+    ),
+    Tool(
+        "get_record_history",
+        "Who did what to one record, newest first: who, when, what was done, and which "
+        "fields it touched — never a value. The record itself says what they are now.",
+        _schema({"model": _MODEL, "id": _RECORD_ID}, ("model", "id")),
+        "",
+        get_record_history,
     ),
     Tool(
         "create_record",

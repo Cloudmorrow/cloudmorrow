@@ -18,7 +18,7 @@
 
 import {
   SAVE_DELAY, api, app, back, esc, formatDate, heading, icons, localMinute, nav, occupy,
-  recordsUrl, renderRoute, replace, seconds, setStatus, store, tabs, toast, vacate, wireShell,
+  recordsUrl, renderRoute, replace, seconds, session, setStatus, store, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
 import { drawsHere, renderGroupedList, secretWidget, wireSecretWidgets } from "./kit_grouped.js";
@@ -634,6 +634,44 @@ function same(f, a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+// -- a record's history ------------------------------------------------------------
+// One line of it in words: "you changed phone and notes", "bram made it",
+// "the tasks Quill moved it". Never a value: the record says what they are.
+// The same words as quill/screens.py's history_said.
+export function historySaid(line, model, me = "") {
+  let who = String(line.by || "somebody");
+  const kind = String(line.by_kind || "person");
+  if (kind === "person") who = me && who === me ? "you" : who;
+  else if (kind === "quill" || kind === "dataset") who = `the ${who} Quill`;
+  else if (kind === "assistant") who = `an assistant, as ${who}`;
+  const labels = Object.fromEntries((model.fields || []).map((f) => [f.name, f.label || f.name]));
+  const names = (line.fields || []).map((n) => labels[n] || n);
+  const action = String(line.action || "changed");
+  let what;
+  if (action === "created") what = "made it";
+  else if (action === "deleted") what = "deleted it";
+  else if (action === "expired") what = "let it expire";
+  else if (action === "moved" && !names.length) what = "moved it";
+  else if (names.length) {
+    const joined = names.length === 1 ? names[0] : names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+    what = `changed ${joined.toLowerCase()}`;
+  } else what = "changed it";
+  return `${who} ${what}`;
+}
+
+// Under the fields: who did what to this record, newest first, as the
+// server keeps it for the life of the record. Nothing to type into.
+async function drawHistory(slot, model, id) {
+  if (!slot) return;
+  let lines;
+  try { lines = await api("GET", recordsUrl(model.id, id, "/history")); }
+  catch { return; }
+  if (!Array.isArray(lines) || !lines.length || !slot.isConnected) return;
+  slot.innerHTML = `<p class="group-label">History</p><div class="group history">${lines.slice(0, 12).map((l) =>
+    `<div class="row"><span class="main"><span class="title">${esc(historySaid(l, model, session.user))}</span>` +
+    `<span class="meta"><span class="date">${esc(formatDate(seconds(l.at) || Date.now() / 1000, { long: true }))}</span></span></span></div>`).join("")}</div>`;
+}
+
 export async function renderRecordSheet(at, modelId, id, arg) {
   const { quill, screen } = at;
   // An editor's own records open on its page, not on the sheet.
@@ -739,9 +777,11 @@ export async function renderRecordSheet(at, modelId, id, arg) {
       </div>
       ${people}
       ${sheetSection(model.id)}
+      <div class="history-slot"></div>
     </main>`;
   wireShell();
   app.querySelector(".nav").classList.add("lined");
+  drawHistory(app.querySelector(".history-slot"), model, id);
   // A secret is still a password box with its eye, only not one to type in.
   if (looked) for (const el of app.querySelectorAll(".editor input")) el.readOnly = true;
   if (own && own.wire && !looked) own.wire(app.querySelector(".editor"));

@@ -249,6 +249,8 @@ ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     # serves; a database from before the split holds only server shares.
     ("shares", "kind", "TEXT NOT NULL DEFAULT 'server'"),
     ("shares", "agent_id", "INTEGER"),
+    # Which fields a change touched, as a JSON list of names — never a value.
+    ("record_changes", "fields", "TEXT NOT NULL DEFAULT ''"),
 )
 
 

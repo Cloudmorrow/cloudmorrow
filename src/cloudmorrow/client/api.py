@@ -430,6 +430,10 @@ class CloudmorrowClient:
     async def record(self, model: str, record_id: str) -> dict:
         return (await self._request("GET", f"/api/records/{model}/{record_id}")).json()
 
+    async def record_history(self, model: str, record_id: str) -> list[dict]:
+        """Who did what to the record, newest first; which fields, never a value."""
+        return (await self._request("GET", f"/api/records/{model}/{record_id}/history")).json()
+
     async def create_record(
         self,
         model: str,

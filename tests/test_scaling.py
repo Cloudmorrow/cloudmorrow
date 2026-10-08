@@ -150,23 +150,25 @@ def test_a_search_stops_at_its_cap(api, monkeypatch):
 
 
 # -- the change feed's retention -----------------------------------------------------------
-def test_the_sweep_takes_old_lines_out_of_the_change_feed(api):
+def test_the_sweep_takes_old_lines_of_gone_records_out_of_the_change_feed(api):
+    """A living record keeps its whole history (its sheet shows it); a deleted
+    record's lines serve the feed a while, then go with the sweep."""
     board = api("GET", "/api/records/board").json()[0]["id"]
-    make_tasks(api, board, ["a", "b"])
+    a, b = make_tasks(api, board, ["a", "b"])
+    api("DELETE", f"/api/records/task/{a}", expect=204)
     db_path = api.state.config.db_path
     conn = sqlite3.connect(db_path)
     count = conn.execute("SELECT COUNT(*) FROM record_changes").fetchone()[0]
-    assert count >= 3  # the board, and two tasks
+    assert count >= 4  # the board, two tasks, and one deletion
     old = (dt.datetime.now(tz=dt.UTC) - dt.timedelta(days=100)).isoformat(timespec="seconds")
-    conn.execute("UPDATE record_changes SET at = ? WHERE record_id = ?", (old, board))
+    conn.execute("UPDATE record_changes SET at = ? WHERE record_id IN (?, ?)", (old, board, a))
     conn.commit()
     conn.close()
     jobs.sweep_all(api.state.quills, api.state.records)
     conn = sqlite3.connect(db_path)
     left = {row[0] for row in conn.execute("SELECT record_id FROM record_changes")}
     conn.close()
-    assert board not in left
-    assert len(left) == count - 1
+    assert a not in left and board in left and b in left
 
 
 # -- two at once ----------------------------------------------------------------------------------

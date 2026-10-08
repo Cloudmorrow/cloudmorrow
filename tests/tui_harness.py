@@ -227,6 +227,12 @@ class FakeClient(FakeSpaces, FakeNotes, FakeFiles, FakeQuills, FakeCircles):
     async def me(self) -> dict:
         return {"username": "bram", "is_admin": True}
 
+    # A record's history, by id: a test that wants lines on the sheet puts them here.
+    history: dict[str, list[dict]] = {}
+
+    async def record_history(self, model: str, record_id: str) -> list[dict]:
+        return list(self.__dict__.setdefault("history", {}).get(record_id, []))
+
     # What the account signs in with, and what a password change was asked for.
     password = "supersecret1"
     password_calls: list[tuple[str, str]]

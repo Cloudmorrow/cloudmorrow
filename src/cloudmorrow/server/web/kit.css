@@ -246,3 +246,8 @@
 /* Chips and the enum's buttons are set like the rest of the controls: in
    the semi-condensed face the guide gives labels and buttons. */
 .chip, .segments button { font-family: var(--display); font-size: 15px; }
+
+/* A record's history under its fields: who did what, when; never a value. */
+.history-slot .group-label { margin-top: 18px; }
+.history .row { padding-top: 9px; padding-bottom: 9px; }
+.history .row .title { font-size: 15px; }

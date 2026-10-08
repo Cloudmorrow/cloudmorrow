@@ -208,3 +208,9 @@
 .action-fields .sheet-text {
     background: $surface;
 }
+
+/* A record's history under its fields: who did what, when; never a value. */
+.sheet-history {
+    margin: 1 1 0 1;
+    color: $text-muted;
+}

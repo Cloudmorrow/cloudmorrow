@@ -25,6 +25,9 @@ A field may be named by what the screen binds it as (`starts=` for the
 calendar's `starts_at`), and a link field (`calendar=House`) takes the
 linked record's name or id.
 
+Every screen's records have a history — who did what, which fields, never
+a value: `cm <quill> history <id or title>`.
+
 An `editor` screen is pages of Markdown, found by their path:
 
     cm notes list                      # every page, folders and all
@@ -78,6 +81,7 @@ from cloudmorrow.cli.quillrun.actions import _list_actions, _press, _view
 from cloudmorrow.cli.quillrun.board import _lane_named, _lanes  # noqa: F401
 from cloudmorrow.cli.quillrun.editor import _act_editor
 from cloudmorrow.cli.quillrun.grid import _act_grid
+from cloudmorrow.cli.quillrun.history import _history
 from cloudmorrow.cli.quillrun.records import _act_records
 from cloudmorrow.cli.quillrun.screen import (  # noqa: F401
     MASK,
@@ -104,6 +108,7 @@ ACTIONS = (
     "edit",
     "search",
     "say",
+    "history",
 )
 
 
@@ -194,6 +199,9 @@ async def _act(
     days: tuple[str, str] = ("", ""),
     reveal: bool = False,
 ) -> None:
+    if action == "history":
+        await _history(api, screen, args, plain)
+        return
     if screen.kit == "editor":
         await _act_editor(api, screen, action, args, plain)
         return

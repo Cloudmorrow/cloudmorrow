@@ -312,7 +312,7 @@ or `path` renames or moves it inside its share.
 
 ## Access: who may see it, who may change it
 
-The whole of it, in five lines. The screens are in [CIRCLES.md](CIRCLES.md).
+The whole of it, in six lines. The screens are in [CIRCLES.md](CIRCLES.md).
 
 - Access is **none, read or write**, on a datamodel, given to a circle.
   Nothing finer: there is no rule on a field. A person's access is the most
@@ -330,9 +330,16 @@ The whole of it, in five lines. The screens are in [CIRCLES.md](CIRCLES.md).
 - **One gate.** Every read and write, by a person, a Quill's code or an
   assistant, passes the same check of principal, action, datamodel and
   scope, and an assistant never reaches `secret`.
+- **Everything is logged.** Every create, change and delete of a record
+  keeps who, when, and which fields were touched — never a value — for as
+  long as the record lives (a deleted record's lines serve the change feed
+  ninety days more, then go). A record's sheet shows it on every surface,
+  `cm <quill> history <record>` prints it, and an assistant asks
+  `get_record_history`. People act under responsibility, and
+  responsibility is visible.
 
 Next, under *What is next*: the same three words given to one person
-without a circle, and a log on every record of who changed it.
+without a circle.
 
 ## What is next
 
@@ -357,14 +364,7 @@ that keeps it both delightful and safe.
    server shows *Everyone can read and write: vehicle, service visit* with
    the circles to narrow it to, before the yes. The same words on the
    catalog page at cloudmorrow.com.
-3. **A record's log.** Every write keeps the names of the fields it touched
-   beside who and when, in `record_changes`, kept for the life of the
-   record instead of ninety days. `GET /api/records/{model}/{id}/history`
-   serves it, newest first; the record sheet shows it under the fields on
-   every surface; `cm <quill> history <id>` on the command line. Never a
-   value: the log says *bram changed phone and notes on Tuesday*, and the
-   record says what they are now. People act under responsibility, and
-   responsibility is visible.
+3. **A record's log** — built: see *Access* above.
 4. **Removing a Quill asks about its data.** The sheet lists the
    datamodels it introduced and the fields it added, with how many records
    hold them, ticked to keep. An administrator unticks what should go with
