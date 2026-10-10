@@ -6,11 +6,24 @@
 #   *.whl       the client itself, which that installer installs
 #
 # At releases/latest/download/<name>, so nobody has to know a version.
+#
+# It also runs by hand (Actions → Release → Run workflow), for whoever may
+# push to main but not tag it — a session on claude.ai/code, say. Then it
+# tags main here, with the next minor unless told otherwise, and builds
+# that tag in the same run: a tag pushed with the workflow's own token
+# would start no second run.
 name: Release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Which version the head of main becomes"
+        type: choice
+        options: [minor, major, patch]
+        default: minor
 
 permissions:
   contents: write
@@ -26,12 +39,27 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Tag main, when run by hand
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          case "${{ inputs.bump }}" in
+            major) flag="--major" ;;
+            patch) flag="--patch" ;;
+            *) flag="" ;;
+          esac
+          python scripts/release.py $flag
+          echo "TAG=$(git tag --points-at HEAD 'v*')" >> "$GITHUB_ENV"
+      - name: The tag that was pushed
+        if: github.event_name != 'workflow_dispatch'
+        run: echo "TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV"
       - run: pip install build
       - run: python -m build --wheel
       - name: The client installer, pointed at this release's wheel
         run: |
           wheel="$(ls dist/*.whl | head -n 1)"
-          python scripts/release_installer.py --tag "$GITHUB_REF_NAME" --wheel "$wheel" --out dist/install.sh
+          python scripts/release_installer.py --tag "$TAG" --wheel "$wheel" --out dist/install.sh
           sh -n dist/install.sh
       - name: Publish
         env:
@@ -39,11 +67,11 @@ jobs:
         # A release made on github.com makes its tag, and the tag starts this:
         # then the release is there already, and only wants its two files.
         run: |
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist/*.whl dist/install.sh --clobber
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.whl dist/install.sh --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/*.whl dist/install.sh \
-              --title "$GITHUB_REF_NAME" \
-              --notes "$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")" \
+            gh release create "$TAG" dist/*.whl dist/install.sh \
+              --title "$TAG" \
+              --notes "$(git tag -l --format='%(contents)' "$TAG")" \
               --verify-tag
           fi
