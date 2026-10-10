@@ -50,9 +50,12 @@ def test_the_old_files_screen_is_gone():
     for path in sorted(WEB.glob("*.js")) + sorted(WEB.glob("*.css")) + [WEB / "app.html"]:
         text = path.read_text(encoding="utf-8")
         assert "files.js" not in text and "files.css" not in text, path.name
-    # The web app reads files through the record API now, not the share routes.
+    # The web app reads files through the record API now, not the share file
+    # routes. Making a share and saying who has it is still /api/shares.
     for path in sorted(WEB.glob("*.js")):
-        assert "/api/shares/" not in path.read_text(encoding="utf-8"), path.name
+        text = path.read_text(encoding="utf-8")
+        for route in ("/ls", "/file?", "/thumb", "/upload"):
+            assert not re.search(r"/api/shares/[^\"'`]*" + re.escape(route), text), (path.name, route)
 
 
 def test_nothing_in_the_grid_is_named_for_one_quill():

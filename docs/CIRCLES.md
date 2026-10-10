@@ -156,9 +156,11 @@ answer every request, and it is no more secret than the list of accounts.
 
 ## Not yet
 
-- **Sharing with a circle.** A shared space's people are named one by one
-  today. Sharing the family calendar with *Kids*, so the next child is in
-  it the day they get an account, is next.
+- **Sharing a space with a circle.** A shared space's people are named one
+  by one today. Sharing the family calendar with *Kids*, so the next child
+  is in it the day they get an account, is next. Fileshares do this
+  already: a share is shared with circles as well as people, and follows
+  the circle as it changes (MANUAL.md, *Fileshares*).
 - **Guardians.** A parent seeing a child's personal records is a real
   wish, and it must be a visible link the child can see — never a power an
   administrator has quietly. Not in this.

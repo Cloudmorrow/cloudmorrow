@@ -90,9 +90,6 @@ class Agent:
     # Config bundles this machine has been told to keep in sync. The agent
     # learns them from its heartbeat, so a tick in the TUI is all it takes.
     sync_bundles: list[str] = field(default_factory=list)
-    # Where this machine serves its shares — `http://192.168.1.10:8788` —
-    # as it last reported. Empty when it serves nothing.
-    dav_base: str = ""
 
     @property
     def online(self) -> bool:
@@ -114,7 +111,6 @@ class Agent:
             "enrolled_at": self.enrolled_at,
             "online": self.online,
             "sync_bundles": self.sync_bundles,
-            "dav_base": self.dav_base,
         }
 
 
@@ -163,7 +159,6 @@ def _agent(row: Row) -> Agent:
         last_seen=row["last_seen"],
         enrolled_at=row["enrolled_at"],
         sync_bundles=_list(row["sync_bundles"]),
-        dav_base=row["dav_base"] or "",
     )
 
 
@@ -328,8 +323,7 @@ class AgentStore:
     def touch(self, agent_id: int, **fields: str | list[str] | None) -> None:
         """Record a heartbeat, refreshing whatever the agent reported with it.
 
-        A field left out or empty keeps its value — except `dav_base`, where
-        empty is the report: the machine serves nothing now.
+        A field left out or empty keeps its value.
         """
         allowed = {"hostname", "platform", "version", "capabilities"}
         updates = {
@@ -337,8 +331,6 @@ class AgentStore:
             for key, value in fields.items()
             if key in allowed and value
         }
-        if fields.get("dav_base") is not None:
-            updates["dav_base"] = str(fields["dav_base"])
         assignments = "".join(f", {key} = ?" for key in updates)
         with self.db.connect() as conn:
             conn.execute(

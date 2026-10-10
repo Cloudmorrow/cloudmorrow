@@ -207,9 +207,12 @@ def set_rule(
 @router.delete("/{circle_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_circle(circle_id: str, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> None:
     try:
-        _circles(state).delete(circle_id)
+        circle = _circles(state).get(circle_id)
+        _circles(state).delete(circle.id)
     except UnknownCircleError as exc:
         raise _failed(exc) from exc
+    # The shares that were shared with it are not any more.
+    state.shares.forget_circle(circle.id)
 
 
 @router.put("/{circle_id}/members/{username}")

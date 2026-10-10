@@ -131,8 +131,8 @@ CREATE TABLE IF NOT EXISTS shares (
     -- before shares lived there, pointed at a directory elsewhere, which
     -- is never deleted from here.
     managed     INTEGER NOT NULL DEFAULT 1,
-    -- 'server': the directory is on the server. 'machine': it is on one of
-    -- the owner's machines, and agent_id says which agent serves it.
+    -- 'server'. There were 'machine' shares too, served by an agent
+    -- (agent_id); step 4 took them away, and the columns stay unused.
     kind        TEXT    NOT NULL DEFAULT 'server',
     agent_id    INTEGER REFERENCES agents(id) ON DELETE CASCADE,
     description TEXT    NOT NULL DEFAULT '',
@@ -253,11 +253,11 @@ ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("users", "role", "TEXT NOT NULL DEFAULT 'user'"),
     ("users", "user_type", "TEXT NOT NULL DEFAULT 'human'"),
     ("agents", "sync_bundles", "TEXT NOT NULL DEFAULT ''"),
-    # Where an agent serves its machine shares, reported on its heartbeat:
-    # `http://192.168.1.10:8788`. Empty while it serves nothing.
+    # Where an agent served its machine shares. Unused since machine shares
+    # went (step 4); kept, since a column is not taken off a database.
     ("agents", "dav_base", "TEXT NOT NULL DEFAULT ''"),
     # 'server' for a directory on the server, 'machine' for one an agent
-    # serves; a database from before the split holds only server shares.
+    # served, until step 4 took those away.
     ("shares", "kind", "TEXT NOT NULL DEFAULT 'server'"),
     ("shares", "agent_id", "INTEGER"),
     # Which fields a change touched, as a JSON list of names — never a value.
@@ -359,10 +359,39 @@ def _columns_since(conn: Connection) -> None:
     conn.commit()
 
 
+def _shares_shared(conn: Connection) -> None:
+    """Shares are on the server and shared with people, not on machines.
+
+    A machine share — a directory an agent served on one of the owner's
+    machines — is no more, so its rows go (the files were on the machine
+    and stay there). A share's name becomes the server's rather than the
+    account's, since one share is now seen by many people: where two
+    accounts had one name, the later share is renamed `<name>-<id>`, and a
+    unique index keeps it so. And who each share is shared with gets its
+    table (shares.py).
+    """
+    from cloudmorrow.server.shares import TABLE as SHARE_MEMBERS
+
+    conn.execute("DELETE FROM shares WHERE kind = 'machine'")
+    seen: set[str] = set()
+    for row in conn.execute("SELECT id, name FROM shares ORDER BY id").fetchall():
+        name = row["name"]
+        if name in seen:
+            suffix = f"-{row['id']}"
+            renamed = name[: 64 - len(suffix)].rstrip("-") + suffix
+            conn.execute("UPDATE shares SET name = ? WHERE id = ?", (renamed, row["id"]))
+            name = renamed
+        seen.add(name)
+    conn.executescript(SHARE_MEMBERS)
+    conn.executescript("CREATE UNIQUE INDEX IF NOT EXISTS shares_by_name ON shares (name)")
+    conn.commit()
+
+
 STEPS: tuple[Step, ...] = (
     Step(1, "the tables as they stood before they were versioned", _baseline),
     Step(2, "indexes for what an open screen and the retention sweep ask", _indexes_for_scale),
     Step(3, "the columns added since, and the order records were written in", _columns_since),
+    Step(4, "shares shared with people and circles, and no machine shares", _shares_shared),
 )
 
 VERSION = STEPS[-1].version

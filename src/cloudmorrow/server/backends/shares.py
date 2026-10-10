@@ -30,14 +30,15 @@ from cloudmorrow.server.records import (
 from cloudmorrow.server.shares import (
     DRIVE,
     DRIVE_NAME,
-    MACHINE,
-    SERVER,
+    PERSON,
+    WRITE,
     InvalidSlugError,
     Share,
+    ShareError,
     ShareExistsError,
-    ShareKindError,
-    SharePathError,
+    ShareRefused,
     ShareStore,
+    UnknownShareError,
 )
 
 
@@ -60,11 +61,13 @@ class SharesBackend:
     """Shares and their files as records: `share` and `file`.
 
     A **share** record is one of the places files are kept: the person's own
-    drive first (`my-files`, shown as My Files), then their shares, on the
-    server or on one of their machines. Its id is its name, which is what a
-    share is mounted by. It is made — a server share by an administrator, a
-    machine share by anyone, on one of their own machines — and forgotten
-    (its files stay), and never changed: the same rules `/api/shares` has.
+    drive first (`my-files`, shown as My Files), then every share they have
+    — theirs, and the ones shared with them. Its id is its name, which is
+    what a share is mounted by. Anybody makes one, in the Shares folder; an
+    administrator may give it a `path` elsewhere on the server. Its owner
+    changes its `description` (and an administrator its `path`) and
+    forgets it (its files stay): the same rules `/api/shares` has. Who it
+    is shared with is changed through `/api/shares/<name>/members`.
 
     A **file** record is a file or a folder in one of them. Its id is the
     share and the path in it, encoded; its `share` is the share's id, so
@@ -81,8 +84,8 @@ class SharesBackend:
     a root the query names (`share`, `within`): the folders under it, and
     the pictures in its `img` folder, which no listing shows.
 
-    A machine share is listed, and says whether its machine is serving it,
-    but its files are on that machine and the server has nothing to show.
+    A share shared with somebody to read is listed and browsed like any
+    other; making, changing or removing anything in it is refused.
     """
 
     FILE_PREFIX = "f_"
@@ -91,14 +94,12 @@ class SharesBackend:
         self,
         shares: ShareStore,
         drive_of: Callable[[str], Share],
-        agents_of: Callable[[str], list],
         *,
         data_dir: Path,
         base_url: Callable[[], str] = lambda: "",
     ) -> None:
         self._shares = shares
         self._drive_of = drive_of
-        self._agents_of = agents_of
         self._data_dir = data_dir
         self._base_url = base_url
 
@@ -140,17 +141,15 @@ class SharesBackend:
 
     def update(self, principal: Principal, model: Datamodel, record_id: str, fields: dict, rev: object) -> Record:
         if self._is_share(model):
-            raise RecordError("a share is not changed once it is made: remove it and make it again")
+            return self._change_share(principal, model, record_id, fields)
         return self._change_file(principal, model, record_id, fields, rev)
 
     def delete(self, principal: Principal, model: Datamodel, record_id: str) -> int:
         if self._is_share(model):
-            share = self._find_share(principal, record_id)
-            if share.kind == DRIVE:
-                raise Refused(f"{DRIVE_NAME} is your own drive on the server — it cannot be removed")
-            self._shares.delete(principal.username, share.name)
+            share = self._managed(principal, record_id)
+            self._shares.delete(share.name)
             return 1
-        share, path = self._locate(principal, record_id)
+        share, path = self._locate(principal, record_id, write=True)
         target = self._existing(share, path, record_id)
         try:
             if target.is_dir() and not target.is_symlink():
@@ -163,37 +162,46 @@ class SharesBackend:
 
     # -- shares ----------------------------------------------------------------------
     def _all_shares(self, principal: Principal) -> list[Share]:
-        return [self._drive_of(principal.username), *self._shares.shares(principal.username)]
+        return [self._drive_of(principal.username), *self._shares.visible(principal.username)]
 
     def _find_share(self, principal: Principal, name: str) -> Share:
         name = (name or "").strip().lower()
         if name == DRIVE_NAME:
             return self._drive_of(principal.username)
-        share = self._shares.get(principal.username, name)
+        share = self._shares.for_user(principal.username, name)
         if share is None:
             raise UnknownRecordError(name)
         return share
 
-    def _agents(self, username: str) -> dict:
-        return {agent.id: agent for agent in self._agents_of(username)}
+    def _managed(self, principal: Principal, name: str) -> Share:
+        share = self._find_share(principal, name)
+        if share.kind == DRIVE:
+            raise Refused(f"{DRIVE_NAME} is your own drive on the server — it is not shared or removed")
+        if not self._shares.may_manage(share, principal.username):
+            raise Refused(f"{share.name} is {share.owner}'s; only they decide about it")
+        return share
 
-    def _share_record(self, model: Datamodel, owner: str, share: Share, agents: dict | None = None) -> Record:
+    @staticmethod
+    def _shared_with(share: Share) -> str:
+        """Who has it besides its owner, in a few words: "Ann, Kids (read)"."""
+        return ", ".join(m.label + (" (read)" if m.access != WRITE else "") for m in share.members)
+
+    def _share_record(self, model: Datamodel, username: str, share: Share) -> Record:
         base = self._base_url().rstrip("/")
         url = f"{base}/dav/{share.name}/" if base else ""
-        online = True
-        machine = ""
-        if share.kind == MACHINE:
-            agent = (agents if agents is not None else self._agents(owner)).get(share.agent_id or -1)
-            machine = agent.name if agent else ""
-            served_at = agent.dav_base.rstrip("/") if agent else ""
-            online = bool(agent and agent.online and served_at)
-            url = f"{served_at}/dav/{share.name}/" if served_at else ""
-            where = f"On {machine or 'a machine'}" + ("" if online else ", offline")
-            about = f"{where} — mount it to browse it"
-        elif share.kind == DRIVE:
+        if share.kind == DRIVE:
+            owner, access, manages = username, WRITE, False
             about = share.description or "Your own files on the server"
         else:
-            about = share.description or "On the server"
+            owner = share.owner
+            access = self._shares.access_of(share, username) or "read"
+            manages = self._shares.may_manage(share, username)
+            if manages:
+                shared = self._shared_with(share)
+                about = share.description or (f"Shared with {shared}" if shared else "Yours, not shared yet")
+            else:
+                whose = f"shared with you by {share.owner}" + ("" if access == WRITE else ", to read")
+                about = f"{share.description} — {whose}" if share.description else whose[0].upper() + whose[1:]
         stamp = share.updated_at or share.created_at or ""
         return Record(
             id=share.name,
@@ -207,10 +215,14 @@ class SharesBackend:
                 "label": "My Files" if share.kind == DRIVE else share.name,
                 "kind": share.kind,
                 "description": share.description,
-                "machine": machine,
-                "path": str(share.path),
-                "online": online,
-                "browsable": share.kind != MACHINE,
+                "owner": owner,
+                "access": access,
+                "can_manage": manages,
+                "shared_with": "" if share.kind == DRIVE else self._shared_with(share),
+                # Where it is on the server is its manager's to know.
+                "path": str(share.path) if manages or share.kind == DRIVE else "",
+                "online": True,
+                "browsable": True,
                 "about": about,
                 "url": url,
             },
@@ -223,59 +235,80 @@ class SharesBackend:
         unknown = set(where) - set(model.by_name)
         if unknown:
             raise RecordError(f"shares have no field {', '.join(sorted(unknown))}")
-        agents = self._agents(principal.username)
-        records = [
-            self._share_record(model, principal.username, share, agents) for share in self._all_shares(principal)
-        ]
+        records = [self._share_record(model, principal.username, share) for share in self._all_shares(principal)]
         return [r for r in records if _matches(r.fields, where)]
+
+    @staticmethod
+    def _members_in(fields: dict) -> list[tuple[str, str, str]]:
+        """`members` as a list of {kind, who, access}: who to share a new share with."""
+        raw = fields.get("members") or []
+        if not isinstance(raw, list):
+            raise RecordError("members is a list of {kind, who, access}")
+        found = []
+        for item in raw:
+            if not isinstance(item, dict):
+                raise RecordError("members is a list of {kind, who, access}")
+            found.append(
+                (str(item.get("kind") or PERSON), str(item.get("who") or ""), str(item.get("access") or WRITE))
+            )
+        return found
 
     def _make_share(self, principal: Principal, model: Datamodel, fields: dict) -> Record:
         """A share, made as `/api/shares` makes one, with the same rules."""
         name = str(fields.get("name") or fields.get("label") or "").strip()
-        kind = str(fields.get("kind") or SERVER).strip().lower()
-        agent_id = None
         path = str(fields.get("path") or "").strip() or None
-        if kind == MACHINE:
-            machine = str(fields.get("machine") or "").strip()
-            if not machine:
-                raise RecordError("a machine share needs the machine that serves it")
-            agent = next((a for a in self._agents_of(principal.username) if a.name == machine), None)
-            if agent is None:
-                raise RecordError(f"no such machine: {machine}")
-            agent_id = agent.id
-        elif kind == SERVER and not principal.admin:
-            raise Refused(
-                "only an admin can make a share on the server — "
-                "a machine share serves a directory on one of your own machines"
-            )
         try:
-            share = self._shares.create(
+            share, _warnings = self._shares.create(
                 principal.username,
                 name,
-                kind=kind,
+                admin=principal.admin,
                 path=path,
-                agent_id=agent_id,
                 description=str(fields.get("description") or ""),
+                members=self._members_in(fields),
             )
         except ShareExistsError:
             raise RecordError("a share with that name exists") from None
-        except (InvalidSlugError, SharePathError, ShareKindError) as exc:
+        except ShareRefused as exc:
+            raise Refused(str(exc)) from None
+        except (InvalidSlugError, ShareError, UnknownShareError) as exc:
             raise RecordError(str(exc)) from None
         return self._share_record(model, principal.username, share)
 
-    def _server_side(self, principal: Principal, name: str) -> Share:
-        """A share whose files the server has: the drive, or a server share."""
+    def _change_share(self, principal: Principal, model: Datamodel, name: str, fields: dict) -> Record:
+        """Its description, or — an administrator's — the directory it is."""
+        unknown = set(fields) - {"description", "path"}
+        if unknown:
+            raise RecordError(
+                f"a share's {', '.join(sorted(unknown))} is not changed here; "
+                "who has it is changed through /api/shares/<name>/members"
+            )
+        share = self._managed(principal, name)
+        try:
+            share, _warnings = self._shares.update(
+                share,
+                admin=principal.admin,
+                path=fields.get("path"),
+                description=fields.get("description"),
+            )
+        except ShareRefused as exc:
+            raise Refused(str(exc)) from None
+        except ShareError as exc:
+            raise RecordError(str(exc)) from None
+        return self._share_record(model, principal.username, share)
+
+    def _server_side(self, principal: Principal, name: str, *, write: bool = False) -> Share:
+        """A share the caller has: the drive, or a share — one they may
+        change what is in, with *write*."""
         try:
             share = self._find_share(principal, name)
         except UnknownRecordError:
             raise RecordError(f"no such share: {name}") from None
-        if share.kind == MACHINE:
-            record = self._share_record(_SHARE_ONLY, principal.username, share)
-            raise RecordError(f"{share.name} is {record.fields['about'][0].lower()}{record.fields['about'][1:]}")
+        if write and share.kind != DRIVE and self._shares.access_of(share, principal.username) != WRITE:
+            raise Refused(f"{share.name} is shared with you to read, not to change")
         return share
 
     # -- files ---------------------------------------------------------------------
-    def _locate(self, principal: Principal, record_id: str) -> tuple[Share, str]:
+    def _locate(self, principal: Principal, record_id: str, *, write: bool = False) -> tuple[Share, str]:
         key = decode_id(self.FILE_PREFIX, record_id)
         name, _, path = key.partition("/")
         if not path:
@@ -284,6 +317,9 @@ class SharesBackend:
             share = self._server_side(principal, name)
         except RecordError:
             raise UnknownRecordError(record_id) from None
+        if write:
+            # Known to them, so the reason can be said.
+            self._server_side(principal, name, write=True)
         return share, path
 
     def _existing(self, share: Share, path: str, record_id: str) -> Path:
@@ -423,7 +459,7 @@ class SharesBackend:
 
     def _destination(self, principal: Principal, fields: dict) -> tuple[Share, str, str]:
         """The share, folder and name a new file or folder goes to."""
-        share = self._server_side(principal, str(fields.get("share") or DRIVE_NAME))
+        share = self._server_side(principal, str(fields.get("share") or DRIVE_NAME), write=True)
         path = str(fields.get("path") or "").strip("/ ")
         if path:
             folder, _, name = path.rpartition("/")
@@ -490,7 +526,7 @@ class SharesBackend:
         if unknown:
             raise RecordError(f"a file's {', '.join(sorted(unknown))} is not written directly")
         current = self.get(principal, model, record_id)
-        share, path = self._locate(principal, record_id)
+        share, path = self._locate(principal, record_id, write=True)
         if rev not in (None, "") and str(rev) != str(current.rev):
             raise RecordConflictError(current)
         if fields.get("share") not in (None, "", share.name):
@@ -532,9 +568,9 @@ class SharesBackend:
     # -- folders and pictures, within a root ------------------------------------------
     # The editor kit asks for these with `share` and `within` on the query:
     # the folders under a root, and the pictures kept in its `img` folder.
-    def _root(self, principal: Principal, where: dict | None) -> tuple[Share, str, Path]:
+    def _root(self, principal: Principal, where: dict | None, *, write: bool = False) -> tuple[Share, str, Path]:
         where = where or {}
-        share = self._server_side(principal, str(where.get("share") or DRIVE_NAME))
+        share = self._server_side(principal, str(where.get("share") or DRIVE_NAME), write=write)
         root = str(where.get("within") or "").strip("/ ")
         if self._hidden(root):
             raise RecordError("no such folder")
@@ -572,7 +608,7 @@ class SharesBackend:
         return found
 
     def make_folder(self, principal: Principal, model: Datamodel, path: str, where: dict | None = None) -> dict:
-        share = self._server_side(principal, str((where or {}).get("share") or DRIVE_NAME))
+        share = self._server_side(principal, str((where or {}).get("share") or DRIVE_NAME), write=True)
         rel, target = self._folder_path(share, path)
         if target.exists():
             raise RecordError(f"there is already something called {rel}")
@@ -585,7 +621,7 @@ class SharesBackend:
     def move_folder(
         self, principal: Principal, model: Datamodel, path: str, to: str, where: dict | None = None
     ) -> dict:
-        share = self._server_side(principal, str((where or {}).get("share") or DRIVE_NAME))
+        share = self._server_side(principal, str((where or {}).get("share") or DRIVE_NAME), write=True)
         source_rel, source = self._folder_path(share, path)
         target_rel, target = self._folder_path(share, to)
         if not source.is_dir() or source.is_symlink():
@@ -602,7 +638,7 @@ class SharesBackend:
         return {"path": target_rel, "name": target.name}
 
     def delete_folder(self, principal: Principal, model: Datamodel, path: str, where: dict | None = None) -> None:
-        share = self._server_side(principal, str((where or {}).get("share") or DRIVE_NAME))
+        share = self._server_side(principal, str((where or {}).get("share") or DRIVE_NAME), write=True)
         rel, target = self._folder_path(share, path)
         if not target.is_dir() or target.is_symlink():
             raise RecordError(f"there is no folder called {rel}")
@@ -615,7 +651,7 @@ class SharesBackend:
         self, principal: Principal, model: Datamodel, data: bytes, filename: str, where: dict | None = None
     ) -> dict:
         """A picture kept in the root's `img` folder, under a name that says when it arrived."""
-        _share, _root, top = self._root(principal, where)
+        _share, _root, top = self._root(principal, where, write=True)
         if not data:
             raise RecordError("the image is empty")
         if len(data) > pages.MAX_IMAGE_BYTES:
@@ -676,16 +712,3 @@ class SharesBackend:
         except fileops.FileOpError as exc:
             raise ContentError(exc.status, str(exc)) from None
         return self._file_record(model, share, _join(folder, target.name), target)
-
-
-# A stand-in datamodel, for saying where a share is when no record is wanted.
-_SHARE_ONLY = Datamodel(
-    id="share",
-    version=1,
-    label="Share",
-    description="",
-    domain="files",
-    scopes=("personal",),
-    fields=(),
-    title="label",
-)

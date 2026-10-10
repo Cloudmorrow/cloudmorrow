@@ -1,0 +1,60 @@
+/* Fileshares: a new one, and who has one (shares.js).
+
+   The same rows as everywhere, with a menu on each person, circle and
+   Everybody — Not shared, Can change, Can read — because a menu says in
+   words what somebody has. What is wrong with a share's folder is said in
+   amber, what stops it in red, under the field it is about. */
+
+.share-form input:not([type]) {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--ink);
+  font: inherit;
+  /* 16px or iOS zooms the page the moment the field is focused. */
+  font-size: 16px;
+}
+.share-form input::placeholder { color: var(--muted); }
+/* A path is data: set as data, and read whole. */
+.share-form input[name="path"] { font-family: var(--mono); font-size: 15px; }
+
+.share-form .hint {
+  margin: -6px 4px 18px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.share-notes .note {
+  margin: 0 4px 12px;
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.share-notes .note.warn { color: var(--warn); }
+.share-notes .note.bad { color: var(--bad); }
+.share-notes:empty { display: none; }
+
+.who-row .main { min-width: 0; }
+.who-row .preview { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who-row select {
+  flex: none;
+  max-width: 9.5em;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--line-bright);
+  border-radius: var(--radius-control);
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  /* 16px or iOS zooms the page the moment it is focused. */
+  font-size: 16px;
+}
+.who-row select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* In the Files list: the button above, and the line under each share. */
+.share-new { margin-bottom: 18px; }
+.row.share-who { min-height: 40px; padding-left: 54px; }
+.row.share-who .preview { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.share-who .said { color: var(--accent); font-weight: 600; font-size: 14px; }

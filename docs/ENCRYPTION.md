@@ -180,13 +180,11 @@ to reach in the clear, on purpose; `cloudmorrow config set
 allow_insecure_http true` sets it, and the agent copies it from the
 client at enrolment.
 
-**What is not there yet.** A machine share — a directory on one of your
-machines, served by the agent there — is served over plain HTTP on the
-LAN with Basic auth, because the agent has no certificate anyone trusts.
-It is the one place content and credentials still cross a wire
-unencrypted. The fix is a small certificate authority on the server,
-issuing each agent a certificate at enrolment, with clients trusting that
-authority; until then, treat machine shares as LAN-only.
+**Every share is the server's.** A fileshare is served by the server,
+over the same TLS as everything else. Machine shares — a directory served
+by the agent on one of your machines, over plain HTTP on the LAN with Basic
+auth — were the one place content and credentials crossed a wire
+unencrypted, and they are gone.
 
 ## What this does and does not protect against
 
@@ -195,7 +193,7 @@ authority; until then, treat machine shares as LAN-only.
 | The database file or a backup of it is copied | yes: ciphertext without the key |
 | The files directory or a backup of it is copied | no: notes, pictures, My Files and shares are plain files |
 | The server's disk is lost, stolen or decommissioned | yes, if the key was not on it or was on a different volume; on a single-disk box, put the key in `/etc` and back the data up separately |
-| Someone reads traffic on the network | yes, on every hop but a machine share |
+| Someone reads traffic on the network | yes, on every hop, when the server is reached over https |
 | Someone with root on the running server | no: they have the key, and the server itself must be able to read everything |
 | Another Cloudmorrow user on the same server | not by encryption: by the access checks in the API, which are the same as before |
 | The operator, or Cloudmorrow itself | no; this is not end to end |

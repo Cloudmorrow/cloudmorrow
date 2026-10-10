@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import partial
+from pathlib import Path
 
 from a2wsgi import WSGIMiddleware
 from fastapi import Depends, FastAPI, Request
@@ -57,13 +58,28 @@ from cloudmorrow.server.routes import (
 )
 from cloudmorrow.server.secrets import SecretStore
 from cloudmorrow.server.settings import SettingsStore
-from cloudmorrow.server.shares import ShareStore
+from cloudmorrow.server.shares import Protected, ShareStore
 from cloudmorrow.server.signin_limits import SigninLimits
 from cloudmorrow.server.state import AppState
 from cloudmorrow.server.today import Weather
 from cloudmorrow.server.transport import install as require_tls
 from cloudmorrow.server.update import deployed_commit
 from cloudmorrow.server.webpush import PushStore, default_subject
+
+
+def protected_places(config: ServerConfig) -> list[Protected]:
+    """What no share may hold or be inside, whatever path an admin gives:
+    the server's own data and key, its settings, and the people's own files
+    (each drive is its owner's alone). The Shares folder is inside those,
+    and is where shares belong, so `check_path` lets a path in it through."""
+    places = [
+        Protected(config.data_dir, "the server's database and data"),
+        Protected(config.secrets_key_path, "the encryption key"),
+        Protected(config.notes_dir, "everybody's own files"),
+    ]
+    if config.config_path is not None:
+        places.append(Protected(Path(config.config_path).parent, "the server's settings"))
+    return places
 
 
 def create_app(config: ServerConfig | None = None) -> FastAPI:
@@ -81,7 +97,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     db = config.database()
     sealer = db.use_key(config.secrets_key_path)
     user_store = UserStore(db)
-    share_store = ShareStore(db, config.shares_root)
+    share_store = ShareStore(db, config.shares_root, protected=lambda: protected_places(config))
     # Shares made when each account had its own shares folder come into the
     # one Shares folder, so there is one place to look.
     share_store.relocate()
@@ -135,7 +151,6 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     record_store.backends["shares"] = SharesBackend(
         share_store,
         lambda username: user_drive(config, username),
-        lambda username: app.state.cloudmorrow.agents.list(username),
         data_dir=config.data_dir,
         base_url=lambda: config.public_url or "",
     )

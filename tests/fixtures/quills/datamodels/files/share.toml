@@ -2,7 +2,7 @@
 id = "share"
 version = 1
 label = "Share"
-description = "A place files are kept: your own drive on the server (My Files), a folder on the server that everyone's machines mount, or a directory on one of your machines, served by its agent."
+description = "A place files are kept: your own drive on the server (My Files), or a folder on the server, made by somebody and shared with the people and circles they chose."
 domain = "files"
 scopes = ["personal"]
 title = "label"
@@ -13,9 +13,12 @@ backend = "shares"
 [fields]
 name = { kind = "string", required = true, indexed = true, label = "Name", description = "What it is mounted as: /dav/<name>/" }
 label = { kind = "string", indexed = true, label = "Shown as" }
-kind = { kind = "enum", values = ["drive", "server", "machine"], labels = ["My Files", "On the server", "On a machine"], default = "server", indexed = true }
+kind = { kind = "enum", values = ["drive", "server"], labels = ["My Files", "On the server"], default = "server", indexed = true }
 description = { kind = "text" }
-machine = { kind = "string", indexed = true, description = "The machine that serves a machine share" }
+owner = { kind = "string", indexed = true, description = "Who made it, and decides who has it" }
+access = { kind = "string", indexed = true, description = "What you may do in it: write or read" }
+can_manage = { kind = "bool", indexed = true, description = "Whether it is yours to share, change and remove" }
+shared_with = { kind = "string", description = "Who has it besides its owner, in a few words" }
 path = { kind = "string", description = "Its directory, where it is" }
 online = { kind = "bool", indexed = true, description = "Whether it can be reached right now" }
 browsable = { kind = "bool", indexed = true, description = "Whether the server can show what is in it" }

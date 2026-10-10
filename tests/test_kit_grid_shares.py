@@ -1,6 +1,6 @@
 """Shares on this machine, in the terminal: the grid's extension for shares
-(tui/sharemounts.py) — the MOUNTED HERE column, and New share, Mount,
-Unmount, Copy URL and Remove on the share the cursor is on."""
+(tui/sharemounts.py) — the MOUNTED HERE column, and New share, Share with,
+Mount, Unmount, Copy URL and Remove on the share the cursor is on."""
 
 from __future__ import annotations
 
@@ -9,13 +9,12 @@ from pathlib import Path
 
 from textual.widgets import DataTable, Input, Static
 
-from cloudmorrow.agent.setup import machine_name
 from cloudmorrow.client import mounts, rclone
 from cloudmorrow.tui.app import CloudmorrowApp
 from cloudmorrow.tui.panes.kit_grid import GridPane
 from cloudmorrow.tui.screens.install import InstallRcloneModal
 from cloudmorrow.tui.screens.share_modals import NoticeModal
-from tests.tui_harness import agent_row, said, settle, start
+from tests.tui_harness import said, settle, start
 
 
 async def open_files(app, pilot):
@@ -249,7 +248,7 @@ async def test_with_no_package_manager_the_dialog_says_where_to_read(app, monkey
 
 
 async def test_new_share_is_created_on_the_server(app):
-    """An admin with no machines: the only place a share can go is the server."""
+    """A name is all it takes: the folder of that name in Shares, yours."""
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_files(app, pilot)
         await pilot.click("#pane-files #do-new_group")
@@ -257,116 +256,126 @@ async def test_new_share_is_created_on_the_server(app):
         await pilot.pause()
         await pilot.press(*"docs", "enter")
         await settle(app, pilot)
-        assert app.client.share_calls == [("create", "docs", None, "")]
+        assert app.client.share_calls == [("create", "docs", None, "", [])]
         assert [row[0] for row in rows(screen)] == ["media", "photos", "docs"]
         assert rows(screen)[2][1] == "On the server"
 
 
-async def test_a_server_share_is_named_not_placed(app):
-    """An admin choosing the server sees no path field, and what a name would pick up."""
-    here = machine_name()
-    app.client.agent_list = [agent_row(here, online=True)]
+async def test_a_new_share_is_shared_with_people_and_circles(app):
+    async with app.run_test(size=(120, 34)) as pilot:
+        await open_files(app, pilot)
+        await pilot.click("#pane-files #do-new_group")
+        await pilot.pause()
+        await pilot.pause()
+        dialog = app.screen
+        # Who there is to share with is said under the field.
+        hint = dialog.query_one("#share-with-hint", Static).visual.plain
+        assert "ann" in hint and "circle:Kids" in hint and "everyone" in hint
+        await pilot.press(*"family")
+        dialog.query_one("#share-with", Input).focus()
+        await pilot.press(*"ann, circle:kids (read)", "enter")
+        await settle(app, pilot)
+        assert app.client.share_calls == [
+            (
+                "create",
+                "family",
+                None,
+                "",
+                [
+                    {"kind": "user", "who": "ann", "access": "write"},
+                    {"kind": "circle", "who": "kids", "access": "read"},
+                ],
+            )
+        ]
+
+
+async def test_an_administrator_sees_the_path_and_may_change_it(app):
+    """The path follows the name; left as it is, the share is in Shares."""
+    async with app.run_test(size=(120, 34)) as pilot:
+        await open_files(app, pilot)
+        await pilot.click("#pane-files #do-new_group")
+        await pilot.pause()
+        await pilot.pause()
+        dialog = app.screen
+        path = dialog.query_one("#share-path", Input)
+        assert path.display
+        # What is in Shares unshared is offered.
+        assert "Pictures" in dialog.query_one("#share-path-hint", Static).visual.plain
+        await pilot.press(*"pictures")
+        await pilot.pause()
+        assert path.value == "/srv/cloudmorrow/notes/Shares/pictures"
+        await pilot.press("enter")
+        await settle(app, pilot)
+        assert app.client.share_calls == [("create", "pictures", None, "", [])]
+
+
+async def test_a_path_with_something_wrong_is_shared_and_said(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_files(app, pilot)
         await pilot.click("#pane-files #do-new_group")
         await pilot.pause()
         await pilot.pause()
         dialog = app.screen
-        # This machine has an agent, so the dialog starts there, path and all.
-        assert dialog.query_one("#share-path", Input).display
-        await pilot.click("#kind-server")
-        await pilot.pause()
-        assert not dialog.query_one("#share-path", Input).display
-        # The name is the folder in Shares; what is in there unshared is offered.
-        name_hint = dialog.query_one("#share-name-hint", Static).visual.plain
-        assert "/srv/cloudmorrow/notes/Shares" in name_hint
-        assert "Pictures" in dialog.query_one("#share-hint", Static).visual.plain
+        await pilot.press(*"world")
+        dialog.query_one("#share-path", Input).value = "/srv/world"
         dialog.query_one("#share-name", Input).focus()
-        await pilot.press(*"pictures", "enter")
+        await pilot.press("enter")
         await settle(app, pilot)
-        assert app.client.share_calls == [("create", "pictures", None, "")]
-        assert rows(screen)[2][1] == "On the server"
-
-
-async def test_new_share_goes_on_this_machine_when_it_has_an_agent(app, tmp_path):
-    """With this machine enrolled, a new share is on it by default, and needs its path."""
-    here = machine_name()
-    music = tmp_path / "Music"
-    music.mkdir()
-    app.client.agent_list = [agent_row("laptop", online=True), agent_row(here, online=True)]
-    async with app.run_test(size=(120, 34)) as pilot:
-        screen = await open_files(app, pilot)
-        await pilot.click("#pane-files #do-new_group")
-        await pilot.pause()
-        await pilot.pause()
-        await pilot.press(*"music", "enter")
-        await pilot.pause()
-        # Name alone is not enough: the directory on this machine is asked for.
-        assert app.client.share_calls == []
-        await pilot.press(*str(music), "enter")
-        await settle(app, pilot)
-        assert app.client.share_calls == [("create", "music", str(music.resolve()), "")]
-        created = app.client.share_list[-1]
-        # This machine, not the laptop: there was never a choice to make.
-        assert (created["kind"], created["machine"]) == ("machine", here)
-        assert rows(screen)[2][1].startswith(f"On {here}")
-
-
-async def test_a_directory_that_cannot_be_shared_keeps_the_dialog_open(app, tmp_path):
-    """Not there, or not yours to read: said under the path, and nothing is sent."""
-    here = machine_name()
-    app.client.agent_list = [agent_row(here, online=True)]
-    async with app.run_test(size=(120, 34)) as pilot:
-        screen = await open_files(app, pilot)
-        await pilot.click("#pane-files #do-new_group")
-        await pilot.pause()
-        await pilot.pause()
-        dialog = app.screen
-        await pilot.press(*"music", "enter")
-        await pilot.pause()
-        await pilot.press(*str(tmp_path / "nowhere"), "enter")
-        await pilot.pause()
-        await pilot.pause()
-        assert app.screen is dialog
-        assert "not there" in dialog.query_one("#share-hint", Static).visual.plain
-        assert app.client.share_calls == []
+        assert app.client.share_calls == [("create", "world", "/srv/world", "", [])]
+        notice = app.screen
+        assert isinstance(notice, NoticeModal)
+        assert "world-writable" in notice.query_one("#notice-text", Static).visual.plain
         await pilot.press("escape")
         await settle(app, pilot)
         assert app.screen is screen
 
 
-async def test_a_share_is_never_made_from_another_machine(app):
-    """Other machines are not on offer: an admin here without an agent gets the server."""
-    app.client.agent_list = [agent_row("laptop", online=True)]
-    async with app.run_test(size=(120, 34)) as pilot:
-        screen = await open_files(app, pilot)
-        await pilot.click("#pane-files #do-new_group")
-        await pilot.pause()
-        await pilot.pause()
-        dialog = app.screen
-        assert dialog.query_one("#kind-machine").disabled
-        assert dialog.query_one("#kind-server").value
-        assert list(dialog.query("#share-machine")) == []
-        await pilot.press(*"docs", "enter")
-        await settle(app, pilot)
-        assert app.client.share_calls == [("create", "docs", None, "")]
-        assert rows(screen)[2][1] == "On the server"
-
-
-async def test_a_machine_with_no_agent_cannot_share_and_says_so(app):
-    """Not an admin, and no agent here: nothing can serve a share, so no dialog."""
-
+async def test_somebody_who_is_not_an_administrator_is_not_asked_for_a_path(app):
     async def member():
         return {"username": "bram", "is_admin": False}
 
     app.client.me = member
-    app.client.agent_list = [agent_row("laptop", online=True)]
+    async with app.run_test(size=(120, 34)) as pilot:
+        await open_files(app, pilot)
+        await pilot.click("#pane-files #do-new_group")
+        await pilot.pause()
+        await pilot.pause()
+        assert not app.screen.query_one("#share-path", Input).display
+        await pilot.press(*"docs", "enter")
+        await settle(app, pilot)
+        assert app.client.share_calls == [("create", "docs", None, "", [])]
+
+
+async def test_who_has_a_share_is_changed_as_a_line(app):
+    app.client.share_list[0]["members"] = [{"kind": "user", "who": "ann", "access": "write", "label": "Ann"}]
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_files(app, pilot)
-        await pilot.click("#pane-files #do-new_group")
+        await pilot.click("#pane-files #do-share_with")
+        await pilot.pause()
+        await pilot.pause()
+        line = app.screen.query_one("#members-line", Input)
+        assert line.value == "ann"
+        line.value = "circle:kids (read)"
+        await pilot.press("enter")
+        await settle(app, pilot)
+        assert app.client.share_calls == [
+            ("unshare", "media", "user", "ann"),
+            ("with", "media", "circle", "kids", "read"),
+        ]
+        assert "kids" in said(screen)
+
+
+async def test_a_share_somebody_else_made_is_not_theirs_to_share(app):
+    app.client.share_list[0].update(owner="ann", can_manage=False, access="read")
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await open_files(app, pilot)
+        await pilot.click("#pane-files #do-share_with")
         await settle(app, pilot)
         assert app.screen is screen
-        assert "no agent" in said(screen)
+        assert "only they decide" in said(screen)
+        await pilot.click("#pane-files #do-remove")
+        await settle(app, pilot)
+        assert app.screen is screen
         assert app.client.share_calls == []
 
 

@@ -122,10 +122,6 @@ def status(config_path: ConfigOption = None) -> None:
     table.add_row("backup retention", str(config.backup_retention))
     table.add_row("allow shell", str(config.allow_shell))
     table.add_row("allow config sync", str(config.allow_config_sync))
-    table.add_row(
-        "machine shares",
-        f"served on port {config.share_port}" if config.allow_shares else "off",
-    )
     table.add_row("omarchy", omarchy.describe())
     for bundle in sorted(BUNDLES):
         state = SyncState.load(bundle)

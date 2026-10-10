@@ -97,19 +97,17 @@ def test_another_accounts_share_does_not_exist(client, auth, share):
     assert client.get("/api/shares/media/file?path=readme.txt", headers=guest).status_code == 404
 
 
-def test_a_machine_share_cannot_be_browsed_from_the_server(client):
+def test_a_share_is_browsed_by_whoever_it_is_shared_with(client, auth, share, config):
+    (config.notes_dir / "Shares" / "media" / "film.mkv").write_bytes(b"x")
     guest = {"Authorization": f"Bearer {token_for(client, *GUEST)}"}
-    enrolled = client.post("/api/agents/enroll-self", json={"name": "laptop"}, headers=guest)
-    assert enrolled.status_code == 200, enrolled.text
-    created = client.post(
-        "/api/shares",
-        json={"name": "music", "kind": "machine", "machine": "laptop", "path": "/home/guest/Music"},
-        headers=guest,
-    )
-    assert created.status_code == 201, created.text
-    refused = client.get("/api/shares/music/ls", headers=guest)
-    assert refused.status_code == 409
-    assert "mount it" in refused.json()["detail"]
+    assert client.get("/api/shares/media/ls", headers=guest).status_code == 404
+    client.put("/api/shares/media/members", json={"kind": "user", "who": "guest", "access": "read"}, headers=auth)
+    listed = client.get("/api/shares/media/ls", headers=guest)
+    assert "film.mkv" in [e["name"] for e in listed.json()["entries"]]
+    assert client.get("/api/shares/media/file?path=film.mkv", headers=guest).content == b"x"
+    # To read: nothing is put there.
+    refused = client.post("/api/shares/media/upload?filename=a.txt", content=b"a", headers=guest)
+    assert refused.status_code == 403
 
 
 # -- putting a file in ----------------------------------------------------------------

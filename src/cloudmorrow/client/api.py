@@ -581,32 +581,52 @@ class CloudmorrowClient:
         return (await self._request("GET", f"/api/shares/{name}")).json()
 
     async def share_folders(self) -> dict:
-        """Your Shares directory on the server, and the folders in it that are
+        """The Shares folder on the server, and the folders in it that are
         not shares yet: {"directory": ..., "folders": [...]}. Admins only."""
         return (await self._request("GET", "/api/shares/folders")).json()
+
+    async def share_candidates(self) -> dict:
+        """Who a share could be shared with: {"people", "circles", "everyone", "directory"}."""
+        return (await self._request("GET", "/api/shares/candidates")).json()
+
+    async def check_share_path(self, path: str, *, share: str = "") -> dict:
+        """Whether a directory on the server could be a share: {"ok", "errors", "warnings"}. Admins only."""
+        return (await self._request("GET", "/api/shares/check", params={"path": path, "share": share})).json()
 
     async def create_share(
         self,
         name: str,
         *,
-        kind: str = "server",
         path: str | None = None,
-        machine: str | None = None,
         description: str = "",
+        members: list[dict] | None = None,
     ) -> dict:
-        """A new share.
-
-        A server share (admins only) is the folder of that name in your Shares
-        directory on the server, made if it is not there; it takes no *path*.
-        A machine share serves *path* on the agent called *machine*, and
-        anyone may make one.
-        """
-        payload: dict[str, str] = {"name": name, "kind": kind, "description": description}
+        """A new share, yours: the folder of that name in the Shares folder on
+        the server, or — for an administrator — the directory *path* there.
+        *members* are {"kind": "user"|"circle"|"everyone", "who", "access"}.
+        What is wrong with the directory's permissions is in `warnings`."""
+        payload: dict = {"name": name, "description": description, "members": members or []}
         if path:
             payload["path"] = path
-        if machine:
-            payload["machine"] = machine
         return (await self._request("POST", "/api/shares", json=payload)).json()
+
+    async def change_share(self, name: str, *, path: str | None = None, description: str | None = None) -> dict:
+        """Change what a share says, or (an administrator) where it is; "" puts it back in Shares."""
+        payload: dict = {}
+        if path is not None:
+            payload["path"] = path
+        if description is not None:
+            payload["description"] = description
+        return (await self._request("PATCH", f"/api/shares/{name}", json=payload)).json()
+
+    async def share_with(self, name: str, kind: str, who: str = "", access: str = "write") -> dict:
+        """Share it with a person, a circle or everybody, or change what they may do."""
+        payload = {"kind": kind, "who": who, "access": access}
+        return (await self._request("PUT", f"/api/shares/{name}/members", json=payload)).json()
+
+    async def unshare(self, name: str, kind: str, who: str = "") -> None:
+        """Stop sharing it with somebody; with your own username, leave it."""
+        await self._request("DELETE", f"/api/shares/{name}/members/{kind}/{who or '*'}")
 
     async def delete_share(self, name: str, *, remove_files: bool = False) -> None:
         await self._request("DELETE", f"/api/shares/{name}", params={"remove_files": remove_files})

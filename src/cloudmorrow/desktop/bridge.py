@@ -118,7 +118,7 @@ class Bridge:
             "os": system.os_name(),
             "system": _platform.platform(),
             "hostname": socket.gethostname(),
-            # The name this machine's agent goes by, and its shares say "on".
+            # The name this machine's agent goes by.
             "machine": machine_name(),
             "mount": system.mount_support(),
         }

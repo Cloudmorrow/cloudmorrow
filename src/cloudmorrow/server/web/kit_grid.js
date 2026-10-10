@@ -223,6 +223,8 @@ async function renderGroups(at, b) {
     catch { return null; }
   }))).filter(Boolean);
   const after = (r) => extras.map((x) => (x.after ? x.after(r) : "")).join("");
+  // What a hook puts above the groups: a button that makes one, say.
+  const top = extras.map((x) => (x.top ? x.top() : "")).join("");
   const rowOf = (r, index) => {
     const about = b.groupSubtitle ? String(r.fields[b.groupSubtitle] || "") : "";
     const meta = about ? `<span class="meta"><span class="preview">${esc(about)}</span></span>` : "";
@@ -241,6 +243,7 @@ async function renderGroups(at, b) {
   app.innerHTML = nav({ title: at.screen.label }) + `
     <main class="grid-groups">
       ${heading(at.screen.label)}
+      ${top}
       ${first ? `<div class="group">${rowOf(first, 0)}${after(first)}</div>` : ""}
       ${rest.length ? `<div class="group-label">${esc(plural(b.groupModel.label))}</div>
         <div class="group">${rest.map((r, i) => rowOf(r, i + 1) + after(r)).join("")}</div>` : ""}

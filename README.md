@@ -47,9 +47,11 @@ It is free software under the [GNU AGPL v3](LICENSE).
   double-books the meeting room or the car.
 - **Chat.** Channels and direct messages between the people on your server,
   with real push notifications and an unread count on the phone's icon.
-- **Files.** A private drive per account and named shares for what a team
-  or a household keeps together, served over WebDAV so Finder, a Windows
-  drive letter, a phone's file manager or `rclone` can mount them.
+- **Files.** A private drive per account, and shares anybody can make for
+  what a team or a household keeps together: shared with people and
+  circles, to change or only to read, and with everybody when an
+  administrator says so. Served over WebDAV so Finder, a Windows drive
+  letter, a phone's file manager or `rclone` can mount them.
 - **Secrets.** Keys and passwords in vaults you name, encrypted, never
   printed unless you ask. `.env` files in and out, or `secret run` to hand
   them to a program with no file at all. Part of the foundation: an app is
@@ -214,7 +216,7 @@ alone). Every `cloudmorrow` command reads `RESOURCE ACTION`:
 
 ```
 cloudmorrow secret  list | get | set | import | export | run | vaults | remove
-cloudmorrow share   list | add | mount | unmount | remove
+cloudmorrow share   list | add | with | unshare | mount | unmount | remove
 cloudmorrow agent   list | run | jobs
 cloudmorrow update  [server | all]
 cloudmorrow app

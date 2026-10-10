@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from cloudmorrow.agent.client import AgentApiError, AgentClient
 from cloudmorrow.agent.config import AgentConfig
 from cloudmorrow.agent.quills import MachineQuills
-from cloudmorrow.agent.shares import ShareHost
 from cloudmorrow.agent.sync import sync_all
 from cloudmorrow.agent.tasks import TaskError, run_task
 
@@ -37,8 +36,6 @@ class AgentRunner:
         self.client = client or AgentClient(config)
         self.stats = RunnerStats()
         self._stop = False
-        # This machine's shares, served while the server lists any.
-        self.shares = ShareHost(config, self.client)
         # Quills' machine handlers switched on here (agent/quills.py).
         self.quills = MachineQuills(config, self.client)
 
@@ -97,26 +94,14 @@ class AgentRunner:
             log.exception("a Quill's machine handler failed")
 
     def tick(self) -> None:
-        """One heartbeat, the config, the shares, then drain whatever work is waiting."""
-        beat = self.client.heartbeat(socket.gethostname(), platform.platform(), dav_base=self.shares.base_url)
+        """One heartbeat, the config, then drain whatever work is waiting."""
+        beat = self.client.heartbeat(socket.gethostname(), platform.platform())
         self.stats.heartbeats += 1
         self.sync_config(beat.get("sync_bundles") or [])
-        self.serve_shares(beat.get("shares") or [])
         while not self._stop and self.run_one_job():
             pass
         if self.config.allow_quill_code:
             self.run_quills()
-
-    def serve_shares(self, shares: list[dict]) -> None:
-        """Serve whatever the server says is shared from this machine.
-
-        Like the bundles, the list rides on the heartbeat: a share made in
-        the TUI is served within one poll. Serving starts with the first
-        share and stops with the last, so an idle agent holds no port.
-        """
-        if shares and "shares" not in self.config.capabilities:
-            return
-        self.shares.update(shares)
 
     def sync_config(self, bundles: list[str]) -> None:
         """Keep whatever the server says this machine syncs in step.
@@ -154,5 +139,4 @@ class AgentRunner:
             if self._stop or (max_ticks is not None and ticks >= max_ticks):
                 break
             time.sleep(backoff or self.config.poll_seconds)
-        self.shares.stop()
         return self.stats

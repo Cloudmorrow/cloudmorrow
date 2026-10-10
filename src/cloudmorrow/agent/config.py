@@ -68,14 +68,6 @@ class AgentConfig:
     backup_dir: str = field(default_factory=lambda: str(default_backup_dir()))
     backup_retention: int = 7
 
-    # Machine shares: directories on this machine, served over WebDAV to
-    # the owner's other machines while the agent runs. The server says which
-    # directories, on the heartbeat; this is the machine's veto, and where
-    # it listens. `share_host` is the address the other machines reach this
-    # one on; left empty, the agent works it out from its route to the server.
-    allow_shares: bool = True
-    share_port: int = 8788
-    share_host: str = ""
     # A Quill's code on this machine (docs/QUILLCODE.md): a `[[machine]]`
     # handler runs only when it is switched on *here*, with the folders it
     # was given here: {quill: {handler id: {"folders": {name: path}}}}.
@@ -103,8 +95,6 @@ class AgentConfig:
             caps.append("shell")
         if self.allow_config_sync and self.is_omarchy():
             caps.append("omarchy")
-        if self.allow_shares:
-            caps.append("shares")
         if self.allow_quill_code:
             caps.append("quills")
         return caps
@@ -137,9 +127,6 @@ class AgentConfig:
                 "backup_roots",
                 "backup_dir",
                 "backup_retention",
-                "allow_shares",
-                "share_port",
-                "share_host",
                 "allow_quill_code",
                 "quills",
                 "quill_programs",
@@ -174,9 +161,6 @@ class AgentConfig:
                 "backup_roots": self.backup_roots,
                 "backup_dir": self.backup_dir,
                 "backup_retention": self.backup_retention,
-                "allow_shares": self.allow_shares,
-                "share_port": self.share_port,
-                "share_host": self.share_host,
                 "allow_quill_code": self.allow_quill_code,
                 "quills": self.quills,
                 "quill_programs": self.quill_programs,

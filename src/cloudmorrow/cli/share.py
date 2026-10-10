@@ -1,14 +1,18 @@
-"""`cloudmorrow share` — fileshares, mounted here.
+"""`cloudmorrow share` — fileshares on the server, shared with people, mounted here.
 
-A share is a directory with a name, served over WebDAV at `/dav/<name>/`.
-It is a directory on the machine you are standing on, served by the agent
-here while it runs — you share what is in front of you, never a path on some
-other machine typed from memory. An admin may put one on the server instead:
+A share is a folder on the server with a name, served over WebDAV at
+`/dav/<name>/`. Anybody makes one; it is the folder of that name in the
+Shares folder there, and it is theirs to share with people and circles.
+An administrator may also share with everybody, and put a share on a
+directory elsewhere on the server:
 
-    cloudmorrow share add music --path ~/Music       # this machine
-    cloudmorrow share add media --server             # the server (admins)
-    cloudmorrow share mount music         # ~/Fileshares/music, or /Volumes/music on a Mac
-    cloudmorrow share unmount music
+    cloudmorrow share add family --with ann --with circle:kids
+    cloudmorrow share add library --with everyone --read       # administrators
+    cloudmorrow share add media --path /srv/media               # administrators
+    cloudmorrow share with family sam --read
+    cloudmorrow share unshare family circle:kids
+    cloudmorrow share mount family         # ~/Fileshares/family, or /Volumes/family on a Mac
+    cloudmorrow share unmount family
 
 The mount signs in as you, with the token `cloudmorrow login` stored, so it
 lasts as long as your session does and no password is written down for it.
@@ -25,15 +29,19 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
-from cloudmorrow.agent.setup import machine_name
 from cloudmorrow.cli.common import client, console, emit, fail, out, run
-from cloudmorrow.client import mounts, rclone, sharing
-from cloudmorrow.client.api import ApiError
+from cloudmorrow.client import mounts, rclone
 from cloudmorrow.client.config import StoredCredentials
+from cloudmorrow.client.members import format_members, parse_one, spec
 
-app = typer.Typer(help="Fileshares: on the server or on your machines, mounted here.", no_args_is_help=True)
+app = typer.Typer(help="Fileshares on the server: make them, share them, mount them here.", no_args_is_help=True)
 
 NameArgument = Annotated[str, typer.Argument(help="The share's name.")]
+WhoArgument = Annotated[
+    str,
+    typer.Argument(help="A username, circle:NAME for a circle, or everyone (administrators)."),
+]
+ReadOption = Annotated[bool, typer.Option("--read", help="To read what is in it, not to change it.")]
 
 
 def _mounted_at(name: str) -> str:
@@ -43,21 +51,32 @@ def _mounted_at(name: str) -> str:
     return str(mounted.path) if mounted.active else f"{mounted.path} (gone)"
 
 
-def _where(share: dict) -> str:
-    """Server, or which machine — and whether that machine is serving right now."""
+def _whose(share: dict) -> str:
+    """Yours, or whose — and to read, when that is all you may do."""
     if share.get("kind") == "drive":
-        return "server (yours)"
-    if share.get("kind") != "machine":
-        return "server"
-    machine = share.get("machine") or "?"
-    return f"{machine}" if share.get("online") else f"{machine} (offline)"
+        return "yours (My Files)"
+    if share.get("can_manage"):
+        return "yours"
+    owner = share.get("owner") or "?"
+    return f"{owner}'s" + (", to read" if share.get("access") == "read" else "")
+
+
+def _with(share: dict) -> str:
+    if share.get("kind") == "drive":
+        return ""
+    return format_members(share.get("members") or []) or "—"
+
+
+def _warn(share: dict) -> None:
+    for warning in share.get("warnings") or []:
+        console.print(f"[yellow]warning:[/] {warning}")
 
 
 @app.command("list")
 def list_shares(
     plain: Annotated[bool, typer.Option("--plain", help="One name per line, for scripts.")] = False,
 ) -> None:
-    """List your shares, where each lives, and where each is mounted on this machine."""
+    """List your shares and the ones shared with you, and where each is mounted here."""
 
     async def _list() -> None:
         _config, api = client()
@@ -66,48 +85,52 @@ def list_shares(
         if plain:
             emit("".join(f"{share['name']}\n" for share in shares))
             return
-        if not shares:
-            console.print(
-                "[dim]No shares yet — `cloudmorrow share add NAME --path DIR` shares a directory on this machine.[/]"
-            )
-            return
         table = Table(title="fileshares", title_style="bold cyan")
         table.add_column("name")
-        table.add_column("where")
+        table.add_column("whose")
+        table.add_column("shared with", overflow="fold")
         table.add_column("mounted here", style="green")
-        table.add_column("directory", style="dim", overflow="fold")
         table.add_column("about", style="dim", overflow="fold")
         for share in shares:
-            where = _where(share)
+            whose = _whose(share)
+            if share.get("warnings"):
+                whose += " [yellow](!)[/]"
             table.add_row(
                 share["name"],
-                f"[yellow]{where}[/]" if "offline" in where else where,
+                whose,
+                _with(share),
                 _mounted_at(share["name"]) or "—",
-                share["path"],
                 share.get("description") or "",
             )
         out.print(table)
+        if len(shares) == 1:
+            console.print("[dim]No shares yet — `cloudmorrow share add NAME --with USER` makes one.[/]")
 
     run(_list())
 
 
 @app.command("show")
 def show(name: NameArgument) -> None:
-    """One share: its URL, its directory, and whether it is mounted here."""
+    """One share: whose it is, who has it, its URL, and whether it is mounted here."""
 
     async def _show() -> None:
         _config, api = client()
         async with api:
             share = await api.get_share(name)
         console.print(f"[b]{share['name']}[/]  {share.get('description') or ''}")
-        console.print(f"[dim]where:[/]      {_where(share)}")
-        url = share["url"] or "— (the machine has not said where it serves yet)"
-        console.print(f"[dim]url:[/]        {url}")
-        if share.get("kind") == "machine":
-            console.print(f"[dim]directory:[/]  {share['path']}  [dim](on {share.get('machine')})[/]")
-        else:
-            console.print(f"[dim]server:[/]     {share['path']}")
-        console.print(f"[dim]mounted at:[/] {_mounted_at(share['name']) or 'not on this machine'}")
+        console.print(f"[dim]whose:[/]       {_whose(share)}")
+        if share.get("kind") != "drive":
+            console.print("[dim]shared with:[/]")
+            members = share.get("members") or []
+            for found in members:
+                console.print(f"  {spec(found):<24} {found['access']:<6} [dim]{found.get('label') or ''}[/]")
+            if not members:
+                console.print("  [dim]nobody yet[/]")
+        console.print(f"[dim]url:[/]         {share['url']}")
+        if share.get("path"):
+            console.print(f"[dim]on server:[/]   {share['path']}")
+        console.print(f"[dim]mounted at:[/]  {_mounted_at(share['name']) or 'not on this machine'}")
+        _warn(share)
 
     run(_show())
 
@@ -115,70 +138,112 @@ def show(name: NameArgument) -> None:
 @app.command("add")
 def add(
     name: NameArgument,
+    with_: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--with",
+            "-w",
+            help="Who to share it with: a username, circle:NAME, or everyone (administrators). Again for more.",
+            show_default=False,
+        ),
+    ] = None,
+    read: ReadOption = False,
     path: Annotated[
         str | None,
         typer.Option(
             "--path",
-            help="The directory to share, on this machine.",
+            help="Administrators: a directory elsewhere on the server to share, as the server sees it. "
+            "Without it, the share is the folder of its name in the Shares folder there.",
             show_default=False,
         ),
     ] = None,
-    server: Annotated[
-        bool,
-        typer.Option(
-            "--server",
-            help="Put the share on the server instead: the folder of that name in the "
-            "Shares folder there, made if it is not there. Admins only.",
-        ),
-    ] = False,
     description: Annotated[str, typer.Option("--description", "-d", help="What is in it.")] = "",
 ) -> None:
-    """Share a directory on this machine — or, as an admin, one on the server."""
+    """Make a share on the server, yours, and share it with whoever you name."""
 
     async def _add() -> None:
         _config, api = client()
         async with api:
-            if server:
-                if path:
-                    fail(
-                        "a server share is the folder of that name in the Shares folder on "
-                        "the server — there is no path to give\n"
-                        "(--path is for a share on this machine)"
-                    )
-                kind, machine, directory = "server", None, None
-            else:
-                if not path:
-                    fail(
-                        "a share is a directory on this machine: --path DIR\n"
-                        "(an admin puts one on the server with --server)"
-                    )
-                # The machine is the one you are on — the only one whose paths
-                # you can see, where `~` means something, and where whether it
-                # can be shared at all is known before the server is asked.
-                complaint = sharing.problem(path)
-                if complaint:
-                    fail(complaint)
-                kind, machine = "machine", machine_name()
-                directory = str(sharing.resolve(path))
-            try:
-                share = await api.create_share(
-                    name, kind=kind, path=directory, machine=machine, description=description
-                )
-            except ApiError as exc:
-                if kind == "machine" and exc.status_code == 404:
-                    fail(
-                        f"this machine ({machine}) has no agent, so nothing here can serve a "
-                        "share — `cloudmorrow login` enrols it"
-                    )
-                raise
-        console.print(f"[green]Created[/] [b]{share['name']}[/] — {_where(share)}")
-        if share.get("kind") == "machine" and not share.get("online"):
-            console.print(f"[dim]{share.get('machine')} starts serving it on its agent's next heartbeat.[/]")
-        else:
-            console.print(f"[dim]at {share['url']}[/]")
+            share = await api.create_share(
+                name,
+                path=path,
+                description=description,
+                members=[parse_one(each, read=read) for each in with_ or []],
+            )
+        console.print(f"[green]Created[/] [b]{share['name']}[/] — at {share['path']}")
+        if share.get("members"):
+            console.print(f"[dim]shared with {_with(share)}[/]")
+        _warn(share)
         console.print(f"[dim]mount it with `cloudmorrow share mount {share['name']}`[/]")
 
     run(_add())
+
+
+@app.command("with")
+def share_with(name: NameArgument, who: WhoArgument, read: ReadOption = False) -> None:
+    """Share it with somebody, a circle or everybody — or change what they may do."""
+
+    async def _with_one() -> None:
+        _config, api = client()
+        wanted = parse_one(who, read=read)
+        async with api:
+            share = await api.share_with(name, wanted["kind"], wanted["who"], wanted["access"])
+        console.print(f"[green]Shared[/] {share['name']} with {who} ({wanted['access']})")
+
+    run(_with_one())
+
+
+@app.command("unshare")
+def unshare(name: NameArgument, who: WhoArgument) -> None:
+    """Stop sharing it with somebody, a circle or everybody."""
+
+    async def _unshare() -> None:
+        _config, api = client()
+        wanted = parse_one(who)
+        async with api:
+            await api.unshare(name, wanted["kind"], wanted["who"])
+        console.print(f"[green]Stopped sharing[/] {name} with {who}")
+
+    run(_unshare())
+
+
+@app.command("leave")
+def leave(name: NameArgument) -> None:
+    """Take yourself off a share somebody shared with you by name."""
+
+    async def _leave() -> None:
+        _config, api = client()
+        credentials = StoredCredentials.load()
+        if credentials is None:
+            fail("not signed in — `cloudmorrow login` first")
+        async with api:
+            await api.unshare(name, "user", credentials.username)
+        console.print(f"[green]Left[/] {name}")
+
+    run(_leave())
+
+
+@app.command("move")
+def move(
+    name: NameArgument,
+    path: Annotated[
+        str | None,
+        typer.Argument(help="The directory on the server, as the server sees it.", show_default=False),
+    ] = None,
+    back: Annotated[bool, typer.Option("--back", help="Put it back in its own folder in the Shares folder.")] = False,
+) -> None:
+    """Administrators: point a share at another directory on the server. Files are not moved."""
+    if bool(path) == back:
+        fail("give the directory to point it at, or --back for its own folder in Shares")
+
+    async def _move() -> None:
+        _config, api = client()
+        async with api:
+            share = await api.change_share(name, path="" if back else path)
+        console.print(f"[green]Moved[/] {share['name']} — at {share['path']}")
+        _warn(share)
+
+    run(_move())
 
 
 @app.command("remove")
@@ -188,12 +253,13 @@ def remove(
         bool,
         typer.Option(
             "--files",
-            help="Delete its folder on the server too. A directory on a machine is never deleted from here.",
+            help="Delete its folder in the Shares folder too. "
+            "A directory elsewhere on the server is never deleted from here.",
         ),
     ] = False,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip the confirmation.")] = False,
 ) -> None:
-    """Stop serving a share. Unmounts it here first, if it is mounted."""
+    """Remove a share you made, for everybody it was shared with. Unmounts it here first."""
 
     async def _remove() -> None:
         _config, api = client()
@@ -205,7 +271,8 @@ def remove(
                     if files and share["managed"]
                     else "— its files stay where they are"
                 )
-                typer.confirm(f"Remove share {share['name']} {what}?", abort=True)
+                shared = f", for {_with(share)} too" if share.get("members") else ""
+                typer.confirm(f"Remove share {share['name']} {what}{shared}?", abort=True)
             mounted = mounts.lookup(share["name"])
             if mounted is not None:
                 try:
@@ -239,10 +306,6 @@ def mount(
             if credentials is None or not api.token:
                 fail("not signed in — `cloudmorrow login` first")
             share = await api.get_share(name)
-        # Said before rclone is offered: installing it would not help.
-        why = mounts.refusal(share)
-        if why:
-            fail(why)
         if mounts.platform() != mounts.MACOS and not rclone.installed():
             _install_rclone()
         try:

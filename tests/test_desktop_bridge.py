@@ -24,7 +24,7 @@ API = "https://cloud.example"
 SHARES = [
     {"name": "my-files", "kind": "drive", "url": f"{API}/dav/my-files/"},
     {"name": "media", "kind": "server", "url": f"{API}/dav/media/"},
-    {"name": "music", "kind": "machine", "machine": "desk", "online": False, "url": ""},
+    {"name": "family", "kind": "server", "owner": "ann", "access": "read", "url": f"{API}/dav/family/"},
 ]
 
 
@@ -102,7 +102,7 @@ def test_shares_say_which_are_mounted_here_and_where(bridge, machine, signed_in,
     assert listed["my-files"]["mounted"] is False
     assert listed["my-files"]["path"] == ""
     # The server's own facts come through untouched.
-    assert listed["music"]["machine"] == "desk"
+    assert listed["family"]["owner"] == "ann" and listed["family"]["access"] == "read"
 
 
 def test_a_mount_signs_in_as_the_machine_does(bridge, machine, signed_in):
@@ -132,8 +132,6 @@ def test_mounted_here_is_what_this_machine_has(bridge, machine, signed_in, tmp_p
 
 def test_refusals_come_back_as_words_not_exceptions(bridge, machine, signed_in):
     assert "not mounted on this machine" in bridge.unmount("media")["error"]
-    # A machine share whose machine is not serving: the command line's words.
-    assert "not serving right now" in bridge.mount("music")["error"]
     assert "no share called nope" in bridge.mount("nope")["error"]
     bridge.mount("media")
     assert "already mounted" in bridge.mount("media")["error"]

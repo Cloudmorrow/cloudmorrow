@@ -1,19 +1,19 @@
-"""Shares over WebDAV: the part the server and the agent have in common.
+"""Shares over WebDAV: the protocol side of the server's fileshares.
 
 A share is a name and a directory, served at `/dav/<name>/`. The server
-serves the shares it holds; an agent serves the ones on its own machine.
-Both hand WsgiDAV the same two things — which shares the caller may see,
-and whether the caller is who they say — and everything else is here.
+hands WsgiDAV two things — which shares the caller may see, and whether
+the caller is who they say (`cloudmorrow.server.dav`) — and everything
+else is here.
 
 WsgiDAV does the protocol. What is ours:
 
 - **who is asking.** Mounts speak HTTP Basic, so a `check_credentials`
-  callable decides whether a username and password are good. The server
-  checks them itself; an agent asks the server.
+  callable decides whether a username and password are good, against the
+  server's accounts.
 - **what they may see.** One provider, which turns `/<name>/rest` into the
-  directory behind the caller's share of that name and nothing else. The
-  root lists the caller's shares; another account's share does not exist,
-  as far as this is concerned.
+  directory behind the share of that name the caller has, and nothing else.
+  The root lists the caller's shares; a share that is not theirs and not
+  shared with them does not exist, as far as this is concerned.
 """
 
 from __future__ import annotations

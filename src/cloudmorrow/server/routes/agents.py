@@ -23,8 +23,6 @@ from cloudmorrow.server.deps import (
 from cloudmorrow.server.schemas import (
     AgentOut,
     AgentSyncUpdate,
-    CredentialsCheck,
-    CredentialsOut,
     EnrollRequest,
     EnrollResponse,
     EnrollSelfRequest,
@@ -32,7 +30,6 @@ from cloudmorrow.server.schemas import (
     EnrollTokenResponse,
     HeartbeatRequest,
     HeartbeatResponse,
-    HeartbeatShare,
     JobCreate,
     JobOut,
     JobResult,
@@ -124,8 +121,6 @@ def delete_agent(
         state.agents.delete(user.username, agent_id)
     except UnknownAgentError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such agent") from exc
-    # The shares it served went with it; there is no machine to serve them.
-    state.shares.forget_agent(agent_id)
 
 
 @router.post("/{agent_id}/jobs", response_model=JobOut, status_code=status.HTTP_201_CREATED)
@@ -197,7 +192,6 @@ def heartbeat(
         platform=payload.platform,
         version=payload.version,
         capabilities=payload.capabilities,
-        dav_base=payload.dav_base,
     )
     state.jobs.reap_stale()
     return HeartbeatResponse(
@@ -208,26 +202,7 @@ def heartbeat(
         sync_bundles=[
             bundle for bundle in agent.sync_bundles if bundle in (payload.capabilities or agent.capabilities)
         ],
-        shares=[HeartbeatShare(name=share.name, path=str(share.path)) for share in state.shares.on_agent(agent.id)],
     )
-
-
-@agent_router.post("/credentials", response_model=CredentialsOut)
-def check_credentials(
-    payload: CredentialsCheck,
-    state: AppState = Depends(get_state),
-    agent: Agent = Depends(get_current_agent),
-) -> CredentialsOut:
-    """Is this a good username and password for a mount of a machine share?
-
-    An agent serving a share has no way to check a password or a token of
-    its own — the hashes and the signing key are here — so it asks. Only
-    the agent's owner may mount what it serves: a machine share is one
-    person's disk, for that person's other machines.
-    """
-    if payload.username.strip().lower() != agent.owner.lower():
-        return CredentialsOut(valid=False)
-    return CredentialsOut(valid=state.credential_check(payload.username, payload.password))
 
 
 @agent_router.post("/jobs/claim", response_model=JobOut | None)

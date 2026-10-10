@@ -88,3 +88,7 @@ def delete_user(
     state.features.forget(username)
     if state.circles is not None:
         state.circles.forget(username)
+    # What they were given goes; what they made passes to the administrator
+    # who removed them, files and members as they were, so no share is left
+    # with nobody to decide about it.
+    state.shares.forget_user(username, heir=admin.username)
