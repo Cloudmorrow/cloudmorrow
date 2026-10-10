@@ -217,6 +217,8 @@ class SharesBackend:
                 "description": share.description,
                 "owner": owner,
                 "access": access,
+                # What a grid's `group_writes` reads: false hides writing.
+                "writable": access == WRITE,
                 "can_manage": manages,
                 "shared_with": "" if share.kind == DRIVE else self._shared_with(share),
                 # Where it is on the server is its manager's to know.

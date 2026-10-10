@@ -22,7 +22,8 @@
 
    A group whose `group_open` field is false is listed and not opened — it
    is somewhere this server cannot show — with its `group_subtitle` saying
-   why. Something else in the app may add to the groups list (a line under
+   why. One whose `group_writes` field is false is opened as if its records
+   could only be read: everything still opens, and nothing writes. Something else in the app may add to the groups list (a line under
    each, and what it does) through `registerGridHook`, without this file
    knowing what it adds.
 
@@ -91,6 +92,7 @@ function bind(at) {
     groupTitle: groupModel.title,
     groupSubtitle: screen.group_subtitle || "",
     groupOpen: screen.group_open || "",
+    groupWrites: screen.group_writes || "",
     writes: mayWrite(model),
   };
 }
@@ -206,6 +208,9 @@ async function groupsOf(at, b, fresh = false) {
 }
 const groupLabel = (b, record) => String((record && record.fields[b.groupTitle]) || (record && record.id) || "");
 const opens = (b, record) => !b.groupOpen || record.fields[b.groupOpen] !== false;
+// A group whose `group_writes` field is false is read, never written: the
+// circles may allow the datamodel, and this one place still not.
+const readOnlyIn = (b, record) => !!(b.groupWrites && record && record.fields[b.groupWrites] === false);
 
 export async function renderGrid(at, arg) {
   const b = bind(at);
@@ -276,6 +281,7 @@ async function renderFolder(at, b, group, folder) {
   }
   const groups = await groupsOf(at, b).catch(() => []);
   const here = groups.find((g) => g.id === group);
+  if (readOnlyIn(b, here)) b.writes = false;
   const groupName = here ? groupLabel(b, here) : group;
   const parent = folder ? folderHash(at, group, folderOf(folder)) : at.base;
   const parentLabel = folder ? (folderOf(folder) ? baseName(folderOf(folder)) : groupName) : at.screen.label;
@@ -697,7 +703,9 @@ export async function renderGridItem(at, id) {
   const entry = entryOf(b, record);
   const group = String(record.fields[b.group] || "");
   const groups = await groupsOf(at, b).catch(() => []);
-  const groupName = groupLabel(b, groups.find((g) => g.id === group)) || group;
+  const groupRecord = groups.find((g) => g.id === group);
+  if (readOnlyIn(b, groupRecord)) b.writes = false;
+  const groupName = groupLabel(b, groupRecord) || group;
   const kind = kindOf(entry);
   const parent = folderHash(at, group, entry.folder);
   const facts = [

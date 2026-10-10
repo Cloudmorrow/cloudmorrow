@@ -237,3 +237,12 @@ def test_a_file_you_may_only_read_is_not_renamed_moved_or_deleted():
     assert '${b.writes ? `<div class="group item-actions">' in item
     # Sending it on, or saving it, is reading.
     assert 'app.querySelector(".download").addEventListener' in item
+
+
+def test_a_group_that_may_only_be_read_draws_nothing_that_writes():
+    """`group_writes` names a bool on the group; false and the folder and the
+    file's page are drawn as for records that may only be read."""
+    code = code_of(GRID_JS)
+    assert 'groupWrites: screen.group_writes || ""' in code
+    assert "record.fields[b.groupWrites] === false" in code
+    assert code.count("b.writes = false") == 2

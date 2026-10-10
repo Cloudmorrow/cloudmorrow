@@ -374,3 +374,18 @@ def test_a_share_called_dav_is_guarded_like_any_other(client, auth, config):
         "MOVE", "/dav/scratch/y.txt", headers={**guest, "Destination": "http://testserver/dav/dav/y.txt"}
     )
     assert moved.status_code == 403
+
+
+def test_a_share_record_says_whether_you_may_write_in_it(client, auth, guest_auth):
+    """What the Files Quill's `group_writes` reads."""
+    client.app.state.cloudmorrow.quills.install_from_catalog("files")
+    client.post(
+        "/api/shares",
+        json={"name": "library", "members": [{"kind": "user", "who": "guest", "access": "read"}]},
+        headers=auth,
+    )
+    theirs = {r["id"]: r["fields"] for r in client.get("/api/records/share", headers=guest_auth).json()}
+    assert theirs["library"]["writable"] is False
+    assert theirs["my-files"]["writable"] is True
+    mine = client.get("/api/records/share/library", headers=auth).json()["fields"]
+    assert mine["writable"] is True
