@@ -14,6 +14,7 @@ import "./me.js";
 import "./admin.js";
 import "./circlesadmin.js";
 import "./quillsadmin.js";
+import "./myquills.js";
 import "./adddevice.js";
 import "./push.js";
 import "./desktop.js";

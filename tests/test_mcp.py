@@ -478,8 +478,25 @@ def test_an_administrators_assistant_builds_a_quill_in_a_conversation(client, au
     assert [q["id"] for q in client.get("/api/quills", headers=auth).json()] == ["plants"]
 
 
-def test_only_an_administrators_assistant_may_install(client):
+def test_anybody_elses_assistant_builds_a_quill_of_their_own(client, auth, guest_auth):
     token = connect(client, GUEST)["access_token"]
+    made = call(client, token, "quill_dev_install", manifest=PLANTS, datamodels={"plant.toml": PLANT})
+    assert made["structuredContent"]["installed"] == "plants" and made["structuredContent"]["whose"] == GUEST[0]
+    # On the guest's shelf, under their name, and on nobody else's.
+    mine = {q["id"]: q for q in client.get("/api/quills", headers=guest_auth).json()}
+    assert mine["plants"]["key"] == f"~{GUEST[0]}.plants" and "~guest.plants.plant" in mine["plants"]["models"]
+    assert "plants" not in {q["id"] for q in client.get("/api/quills", headers=auth).json()}
+    assert "plants_" not in str(
+        [t["name"] for t in rpc(client, connect(client)["access_token"], "tools/list").json()["result"]["tools"]]
+    )
+    # Switched to asking, the tool says how.
+    state = client.app.state.cloudmorrow
+    state.policy.set("personal_quills", "ask")
+    refused = call(client, token, "quill_check", manifest=PLANTS, datamodels={"plant.toml": PLANT})
+    assert refused["isError"] is True and "quill_request" in refused["content"][0]["text"]
+    asked = call(client, token, "quill_request", quill="tasks", note="please")
+    assert asked["structuredContent"]["state"] == "open"
+    state.policy.set("personal_quills", "off")
     refused = call(client, token, "quill_dev_install", manifest=PLANTS, datamodels={"plant.toml": PLANT})
     assert refused["isError"] is True and "administrator" in refused["content"][0]["text"]
 

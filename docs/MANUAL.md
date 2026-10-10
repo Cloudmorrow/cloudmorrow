@@ -851,6 +851,50 @@ cm quill dev              # on your own server, on every device, now
 `quill_catalog` in the server config says where the catalog is read from —
 the GitHub URL by default, or a local folder.
 
+### Quills of your own
+
+Anybody on the server may have Quills of their own: software they added or
+made for themselves, on their shelf alone, over their own data, run as them
+(the contract is [SHARING.md](SHARING.md)). Under **Me → Your Quills** on
+the phone and in the browser, or from the command line:
+
+```sh
+cm quill add budget --mine          # from the catalog, for yourself: the sheet, then a yes
+cm quill dev                        # a folder you (or your assistant) wrote, as your own
+cm quill mine                       # yours, who has them, what you were offered
+cm quill share budget bob carol     # offer it; each says yes with `cm quill accept alice/budget`
+cm quill request plants -m "why"    # ask an administrator for one; `--promote` for one of yours
+cm quill export budget              # a folder in the template's shape, to test, push and publish
+cm quill fork budget spending       # a copy of your own, under a new id, to change
+```
+
+Your assistant can do the same: `quill_check` and `quill_dev_install` build
+one of your own when you are not an administrator; `quill_share` offers it;
+`quill_request` asks.
+
+What a Quill of your own may not do: add fields to data everybody shares,
+run services, or keep anything but personal records. Its own datamodels
+are named after you (`~alice.budget.envelope`) and nobody else can reach
+them until you share the Quill — and then each person has their own
+records of them, not yours.
+
+**For an administrator**, Administration → Quills has the rest, under the
+catalog: the three settings (may people have Quills of their own — `on`,
+`ask`, or `off`; may they run code; may they be shared), the open requests
+with *for everyone*, *for the asker* and *decline*, and every personal Quill
+there is, whose it is and who has it, with **Promote** — the server's, for
+everyone, every record of its datamodels moved with it — and a switch. In
+the TUI it is **Shelves…** (`s`) on the Quills side. From the command line:
+
+```sh
+cm quill policy --personal ask      # or on, off; --code on|off; --sharing on|off
+cm quill requests                   # what people asked for
+cm quill approve 3 --for Parents    # or --asker, or nothing: everyone
+cm quill promote alice/budget       # the server's now, records and all
+cm quill add fleet --for Warehouse  # a server Quill for a circle, not everyone
+cm quill audience fleet --for Warehouse --person carol
+```
+
 ## Chat
 
 Everything else in Cloudmorrow is one person's. Chat is the exception, and it

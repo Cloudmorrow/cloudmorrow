@@ -62,8 +62,9 @@ function place(list) {
     label: screen.label || quill.name,
     icon: pixelIcon(quill.icon) || pixelArt(QUILL_GLYPH),
     // The Quill is the feature: the administrator's switch and your own
-    // take its tabs away together, as they did when Tasks was built in.
-    feature: quill.id,
+    // take its tabs away together, as they did when Tasks was built in. A
+    // Quill of somebody's own is switched by its key, `~alice.budget`.
+    feature: quill.key || quill.id,
     href: () => screenHash(quill, screen),
   }))));
 }

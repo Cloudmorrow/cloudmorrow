@@ -54,11 +54,15 @@ class HostIn(BaseModel):
     machine: str = ""
 
 
+def _shelf(state: AppState, username: str) -> list[Manifest]:
+    return list(state.shelf.for_user(username).values()) if state.shelf else list(state.quills.quills.values())
+
+
 def _machine_quill(state: AppState, agent: Agent, quill_id: str) -> Manifest:
-    manifest = state.quills.quills.get(quill_id)
+    manifest = next((m for m in _shelf(state, agent.owner) if m.id == quill_id), None)
     if manifest is None or not manifest.machine or not manifest.code:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"{quill_id} has no code for a machine")
-    if not state.features.enabled_for(agent.owner, quill_id):
+    if not state.features.enabled_for(agent.owner, manifest.key):
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"{manifest.name} is switched off")
     if state.code is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "this server runs no Quill code")
@@ -69,10 +73,10 @@ def _machine_quill(state: AppState, agent: Agent, quill_id: str) -> Manifest:
 def machine_quills(state: AppState = Depends(get_state), agent: Agent = Depends(get_current_agent)) -> list[dict]:
     """Every Quill with a machine handler that is on for this machine's owner."""
     rows = []
-    for manifest in state.quills.quills.values():
+    for manifest in _shelf(state, agent.owner):
         if not manifest.machine or not manifest.code:
             continue
-        if not state.features.enabled_for(agent.owner, manifest.id):
+        if not state.features.enabled_for(agent.owner, manifest.key):
             continue
         rows.append(
             {
@@ -94,7 +98,7 @@ def machine_code(
     quill_id: str, state: AppState = Depends(get_state), agent: Agent = Depends(get_current_agent)
 ) -> Response:
     manifest = _machine_quill(state, agent, quill_id)
-    folder = manifest.folder or state.quills.quills_dir / quill_id
+    folder = manifest.folder or state.quills.folder_of(quill_id, manifest.owner)
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
         for path in sorted(folder.rglob("*")):

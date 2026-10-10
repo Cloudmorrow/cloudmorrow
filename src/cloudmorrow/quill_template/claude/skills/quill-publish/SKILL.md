@@ -24,6 +24,13 @@ description: Release a Quill and put it in the Quill Catalog — versions, tags,
    ```
    An update is the same pull request with a new `ref`.
 
+A Quill that began as somebody's own on their server (`cm quill dev` as a
+person who is not an administrator, or their assistant's `quill_dev_install`)
+gets this shape with `cm quill export <id>`: the folder, with tests, this
+CLAUDE.md, the workflows and a pyproject written in around it, and — by
+choice, `--dataset` — their records of its own datamodels as per-owner
+datasets. Then the steps above.
+
 Start a Quill with GitHub's "Use this template" on Cloudmorrow/quill-template
 (not a fork), or `cm quill new <id>`. The SDK is a dependency
 (`pyproject.toml`, and `sdk = "1"` in the manifest), so a Quill made from an

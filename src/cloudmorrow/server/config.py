@@ -149,6 +149,11 @@ class ServerConfig:
         return self.data_dir / "quills"
 
     @property
+    def personal_quills_dir(self) -> Path:
+        """Everybody's own Quills, a folder per owner (docs/SHARING.md)."""
+        return self.data_dir / "quills-personal"
+
+    @property
     def datamodels_dir(self) -> Path:
         """The foundational datamodels this server has records of, or may."""
         return self.data_dir / "datamodels"

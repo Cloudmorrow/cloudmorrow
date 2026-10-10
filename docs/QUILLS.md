@@ -27,6 +27,7 @@ pages win, and those remain the reasoning behind them.
 | **Dataset** | Records that come with a Quill — reference data (car makes, country codes) or a starting record (your first board) — and, later, a named collection of records a person makes and shares ("Fleet 2026"). |
 | **Kit** | The fixed vocabulary of screens every surface can draw: `list`, `board`, `detail`, `form`, `calendar`, `thread`, `grid`, `editor`, and `view` — a screen a Quill's code draws from primitives. |
 | **Quill code** | The Python a manifest names — views, actions, hooks, jobs, webhooks, APIs, machine handlers — run in a sandbox, through the gate. See [QUILLCODE.md](QUILLCODE.md). |
+| **Shelf** | What one person has: the server's Quills that are for them (everyone's, or an **audience** of circles and people), their own, and the ones shared with them. A **personal Quill** is one somebody installed for themselves; its key is `~owner.id`. See [SHARING.md](SHARING.md). |
 
 ## The rules
 
@@ -62,6 +63,13 @@ pages win, and those remain the reasoning behind them.
 6. **Every Quill is its own repository.** Ours live in the Cloudmorrow
    organisation as `quill-<id>`; anybody else's live wherever they like and
    join the catalog by pull request.
+7. **Anybody may have a Quill of their own, and it changes nothing other
+   people see.** A person installs one for themselves — from the catalog, a
+   folder, or a conversation with their assistant — and it is on their
+   shelf alone, over their own data, run as them; they may share it with
+   people who say yes, an administrator may promote it for everyone, and
+   it may be exported to be published. The administrator decides whether
+   any of that is allowed ([SHARING.md](SHARING.md)).
 
 ## A Quill
 
@@ -431,6 +439,7 @@ manifest written, checked and installed in one conversation.
 | datamodel definitions, validation | `server/datamodels.py` |
 | records, sealing, positions, stamps, the gate | `server/records.py` |
 | circles: who may use which datamodels, and fitting a Quill to its person | `server/circles.py`, `server/routes/circles.py`, `fitted` in `server/routes/quills.py` |
+| Quills of people's own: shelves, audiences, shares, requests, the policy, promotion, export | `server/quills/shelf.py`, `sharing.py`, `promotion.py`, `export.py`, `server/routes/quillshelf.py`; see [SHARING.md](SHARING.md) |
 | manifests, sources, install, catalog | `server/quills/` (`manifest`, `catalog`, `registry`, `checks`), `server/routes/quills.py` |
 | the record API | `server/routes/records.py` |
 | jobs, and the boot work (foundation Quills, built-ins that became Quills, old tables into records: `move_legacy_tasks`, `move_legacy_calendar`, `move_legacy_chat`) | `server/quills/jobs.py` |
@@ -464,3 +473,6 @@ manifest written, checked and installed in one conversation.
 7. Quill code ([QUILLCODE.md](QUILLCODE.md)): Python in a sandbox for views,
    actions, hooks, jobs, webhooks, APIs and machine handlers; the template
    Python and TOML with tests and skills; the standard Quills made in its shape.
+8. Quills of people's own ([SHARING.md](SHARING.md)): installed for one
+   person, shared, promoted, exported for the catalog; server Quills for an
+   audience. (Done; consent on update and maintainers are its *not yet*.)

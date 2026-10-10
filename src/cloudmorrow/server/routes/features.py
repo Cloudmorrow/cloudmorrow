@@ -43,7 +43,7 @@ def require_feature(key: str) -> Callable[..., None]:
 
     def guard(state: AppState = Depends(get_state)) -> None:
         if not state.features.enabled(key):
-            quill = state.quills.quills.get(key)
+            quill = state.quills.by_key(key)
             label = BY_KEY[key].label if key in BY_KEY else quill.name if quill else key
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -99,8 +99,14 @@ def set_feature(
 
 @mine_router.get("", response_model=list[MyFeatureOut])
 def my_features(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> list[MyFeatureOut]:
-    """What you may switch, and what you have. Tabs are drawn from this."""
-    return [MyFeatureOut(**row) for row in state.features.list_for(user.username)]
+    """What you may switch, and what you have. Tabs are drawn from this. A Quill of
+    somebody's own is here only when it stands on your shelf."""
+    mine = {m.key for m in state.shelf.for_user(user.username).values()} if state.shelf else set()
+    return [
+        MyFeatureOut(**row)
+        for row in state.features.list_for(user.username)
+        if not row["key"].startswith("~") or row["key"] in mine
+    ]
 
 
 @mine_router.patch("/{key}", response_model=MyFeatureOut)

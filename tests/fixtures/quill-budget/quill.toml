@@ -1,0 +1,74 @@
+# A Quill somebody made for themselves, for the tests: what a Quill of one's
+# own may do — a datamodel of its own, a view, actions, a hook, a job, a
+# webhook, a machine handler — and nothing it may not.
+[quill]
+id = "budget"
+name = "Budget"
+version = "0.2.0"
+summary = "Envelopes of money, and what went into each."
+category = "personal"
+code = "quill.py"
+
+[uses]
+datamodels = ["contact"]
+
+[[screens]]
+id = "overview"
+label = "Budget"
+view = "overview"
+model = "budget.envelope"
+
+[[screens]]
+id = "envelopes"
+kit = "list"
+label = "Envelopes"
+model = "budget.envelope"
+title = "name"
+subtitle = "total"
+
+[[screens]]
+id = "people"
+kit = "list"
+label = "People"
+model = "contact"
+title = "name"
+
+[[actions]]
+id = "add-envelope"
+label = "Add an envelope"
+tone = "primary"
+[actions.fields]
+name = { kind = "string", required = true }
+
+[[actions]]
+id = "spend"
+label = "Spend"
+on = "budget.envelope"
+[actions.fields]
+amount = { kind = "int", required = true }
+note = "string"
+
+[[hooks]]
+on = "budget.entry"
+when = "created"
+handler = "entry_made"
+
+[[jobs]]
+id = "nightly"
+action = "call"
+handler = "nightly"
+every = "1d"
+
+[[webhooks]]
+id = "bank"
+handler = "bank_ping"
+
+[[apis]]
+id = "summary"
+handler = "summary"
+
+[[machine]]
+id = "import-statements"
+why = "to read bank statements from a folder into entries"
+[machine.needs]
+folders = [{ name = "statements", access = "read" }]

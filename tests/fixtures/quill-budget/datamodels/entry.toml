@@ -1,0 +1,12 @@
+[datamodel]
+id = "budget.entry"
+version = 1
+label = "Entry"
+description = "Money into or out of an envelope."
+scopes = ["personal"]
+title = "note"
+
+[fields]
+envelope = { kind = "link", to = "budget.envelope", required = true, on_delete = "cascade" }
+amount = { kind = "int", required = true }
+note = { kind = "string" }

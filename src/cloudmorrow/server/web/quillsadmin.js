@@ -53,8 +53,9 @@ export async function drawQuills(panel) {
   let catalog;
   let installed = [];
   try {
+    // Every server Quill, on this administrator's own shelf or not.
     [catalog, installed] = await Promise.all([
-      api("GET", "/api/quills/catalog"), api("GET", "/api/quills"),
+      api("GET", "/api/quills/catalog"), api("GET", "/api/quills/all").then((all) => all.server),
     ]);
   } catch (err) {
     panel.innerHTML = `<p class="note">The catalog could not be read: ${esc(err.message)}</p>`;
@@ -88,6 +89,100 @@ export async function drawQuills(panel) {
         `<div class="group">${here.map(catalogRow).join("")}</div>`;
     }).join("");
   await drawRunningList(panel);
+  await drawShelves(panel);
+}
+
+// -- Quills of people's own: what the server allows, what was asked for, whose is whose ----
+const POLICY = [
+  ["personal_quills", "Quills of people's own", {
+    on: "Anybody may add one for themselves",
+    ask: "Only through a request an administrator approves",
+    off: "Nobody; the ones there are go dark",
+  }],
+  ["personal_quill_code", "May run code", { on: "In the sandbox, as its owner", off: "Declared Quills only" }],
+  ["personal_quill_sharing", "May be shared", { on: "With people who say yes", off: "Yours alone" }],
+];
+
+async function drawShelves(panel) {
+  let all;
+  try { all = await api("GET", "/api/quills/all"); } catch (err) {
+    panel.insertAdjacentHTML("beforeend", `<p class="note">People's own Quills could not be read: ${esc(err.message)}</p>`);
+    return;
+  }
+  const requests = all.requests || [];
+  const personal = all.personal || [];
+  panel.insertAdjacentHTML("beforeend", `
+    <p class="group-label">Quills of people's own</p>
+    <p class="shelf-note">What this server allows (docs/SHARING.md). A Quill somebody adds for themselves is on
+      their shelf alone, over their own data, run as them; it changes nothing other people see.</p>
+    <div class="group policy">${POLICY.map(([key, label, words]) => `<label class="row">
+      <span class="main"><span class="title">${esc(label)}</span>
+      <span class="meta"><span class="preview">${esc(words[all.policy[key]] || "")}</span></span></span>
+      <select data-key="${key}" aria-label="${esc(label)}">${Object.keys(words).map((v) =>
+        `<option value="${v}"${all.policy[key] === v ? " selected" : ""}>${v}</option>`).join("")}</select></label>`).join("")}</div>
+    ${requests.length ? `<p class="group-label">Asked for</p>
+    <p class="shelf-note">Approve for everyone, for the one who asked, or decline with a word. A circle is
+      chosen on the Quill's own sheet afterwards, under its audience.</p>
+    <div class="group">${requests.map((r) => `<div class="row request-row" data-id="${r.id}" data-who="${esc(r.username)}">
+      <span class="main"><span class="title">${esc(r.username)} asks for ${esc(r.kind === "promote" ? `${r.quill} to be promoted` : r.quill || r.source)}</span>
+      <span class="meta"><span class="preview">${esc(r.note || "")}</span></span></span>
+      <span class="own-buttons">
+        <button type="button" class="quill-chip on everyone">For everyone</button>
+        ${r.kind === "promote" ? "" : `<button type="button" class="quill-chip asker">For ${esc(r.username)}</button>`}
+        <button type="button" class="quill-chip decline">Decline</button></span></div>`).join("")}</div>` : ""}
+    ${personal.length ? `<p class="group-label">Whose</p>
+    <div class="group">${personal.map((q) => {
+      const yes = (q.shared_with || []).filter((x) => x.state === "accepted").map((x) => x.username);
+      const gone = q.owner_active === false ? " · its owner's account is gone: promote it, or remove it" : "";
+      return `<div class="row own-row" data-owner="${esc(q.owner)}" data-quill="${esc(q.id)}" data-name="${esc(q.name)}">
+        <span class="main"><span class="title">${esc(q.name)} <span class="meta-inline">v${esc(q.version)}</span></span>
+        <span class="meta"><span class="preview">${esc(q.owner)}'s${yes.length ? `, shared with ${esc(yes.join(", "))}` : ""}${
+          q.code ? " · runs code, as each of them" : ""}${gone}</span></span></span>
+        <span class="own-buttons">
+          <button type="button" class="quill-chip on promote">Promote</button>
+          <button type="button" class="quill-chip ${q.enabled ? "switch-off" : "switch-on"}">${q.enabled ? "Switch off" : "Switch on"}</button>
+        </span></div>`;
+    }).join("")}</div>
+    <p class="shelf-note">Promoting makes it the server's, for everyone: every record of its own datamodels —
+      the owner's and the people's it was shared with — moves with it. Switching one off takes it from
+      everybody who has it until it is switched on again.</p>` : ""}`);
+
+  for (const select of panel.querySelectorAll(".policy select")) {
+    select.addEventListener("change", async () => {
+      try {
+        await api("PUT", "/api/quills/policy", { [select.dataset.key]: select.value });
+        toast("Saved");
+        await drawQuills(panel);
+      } catch (err) { toast(err.message); }
+    });
+  }
+  const redo = async (fn, done) => {
+    try { await fn(); if (done) toast(done); await refreshQuills(); await drawQuills(panel); } catch (err) { toast(err.message); }
+  };
+  for (const row of panel.querySelectorAll(".request-row")) {
+    const { id, who } = row.dataset;
+    const url = `/api/quills/requests/${id}`;
+    row.querySelector(".everyone").addEventListener("click", () => redo(() => api("POST", url + "/approve", {}), "Installed for everyone"));
+    row.querySelector(".asker")?.addEventListener("click", () => redo(
+      () => api("POST", url + "/approve", { audience: { people: [who] } }), `Installed for ${who}`));
+    row.querySelector(".decline").addEventListener("click", () => {
+      const note = prompt(`Decline ${who}'s request? A word back, if you like:`);
+      if (note === null) return;
+      redo(() => api("POST", url + "/decline", { note }), "Declined");
+    });
+  }
+  for (const row of panel.querySelectorAll(".own-row")) {
+    const { owner, quill, name } = row.dataset;
+    row.querySelector(".promote").addEventListener("click", () => {
+      if (!confirm(`Promote ${owner}'s ${name}, for everyone? Every record of its datamodels moves to the server's.`)) return;
+      redo(() => api("POST", "/api/quills/promote", { owner, id: quill }), `${name} is the server's now`);
+    });
+    const key = `~${owner}.${quill}`;
+    row.querySelector(".switch-off")?.addEventListener("click", () => redo(
+      () => api("PATCH", "/api/server/features/" + encodeURIComponent(key), { enabled: false })));
+    row.querySelector(".switch-on")?.addEventListener("click", () => redo(
+      () => api("PATCH", "/api/server/features/" + encodeURIComponent(key), { enabled: true })));
+  }
 }
 
 function catalogRow(q) {
@@ -118,6 +213,10 @@ async function renderQuill(id) {
       ? await api("POST", "/api/quills/plan", { id })
       : { ...(await api("GET", quillUrl(id))), from_source: true };
     if (plan.from_source) plan.installed_version = plan.version;
+    // Who an installed Quill is for is on the Quill itself, not in the catalog.
+    if (plan.installed_version && !plan.from_source) {
+      try { plan.audience = (await api("GET", quillUrl(id))).audience; } catch { /* everyone, then */ }
+    }
   } catch (err) {
     toast(err.message);
     replace("#/admin");
@@ -133,6 +232,12 @@ async function renderQuill(id) {
   }
   const verb = !installed ? `Install ${name}`
     : installed !== plan.version ? `Update to v${plan.version}` : "";
+  // Who the Quill is for: everyone, or the circles ticked (docs/SHARING.md).
+  let allCircles = circles;
+  if (!allCircles.length) {
+    try { allCircles = await api("GET", "/api/circles"); } catch { allCircles = []; }
+  }
+  const audience = plan.audience || { circles: [], people: [] };
 
   app.innerHTML = nav({ back: "#/admin", backLabel: "Admin", title: name }) + `
     <main class="quill-sheet">
@@ -144,6 +249,8 @@ async function renderQuill(id) {
       ].filter(Boolean).join(" · ")}</p>
       ${sections(plan, me)}
       ${whoGetsIt(fresh, circles)}
+      ${whoItIsFor(allCircles, audience, installed)}
+      ${adoptSheet(plan.adopt || [])}
       ${installed ? `<div class="quill-running"></div>` : ""}
       ${verb ? `<div class="group"><button class="row primary add-quill" type="button">${esc(verb)}</button></div>` : ""}
       ${installed ? `<div class="group"><button class="row bad remove-quill" type="button">Remove ${esc(name)}</button></div>` : ""}
@@ -151,13 +258,24 @@ async function renderQuill(id) {
   wireShell();
   const running = app.querySelector(".quill-running");
   if (running) drawRunning(running, id);
+  const change = app.querySelector(".change-audience");
+  if (change) change.addEventListener("click", async () => {
+    const forCircles = [...app.querySelectorAll(".who-it-is-for input:checked")].map((b) => b.value);
+    try {
+      await api("PUT", quillUrl(id) + "/audience", { circles: forCircles, people: audience.people || [] });
+      await refreshQuills();
+      toast(forCircles.length ? `${name} is for ${forCircles.length} circle${forCircles.length === 1 ? "" : "s"}` : `${name} is for everyone`);
+    } catch (err) { toast(err.message); }
+  });
 
   const install = app.querySelector(".add-quill");
   if (install) install.addEventListener("click", async () => {
     install.disabled = true;
     install.textContent = "Installing…";
     try {
-      await api("POST", "/api/quills", { id });
+      const forCircles = [...app.querySelectorAll(".who-it-is-for input:checked")].map((b) => b.value);
+      const adopt = [...app.querySelectorAll(".adopt-sheet input:checked")].map((b) => b.value);
+      await api("POST", "/api/quills", { id, audience: { circles: forCircles, people: [] }, adopt });
       const ticked = [...app.querySelectorAll(".who-gets-it input:checked:not(:disabled)")];
       for (const box of ticked) {
         for (const d of fresh) {
@@ -234,6 +352,35 @@ function removeSheet(name, brought) {
   </div>`;
 }
 
+/** Who the Quill is for: nobody ticked is everyone; a circle ticked is its people,
+    and the Quill is not on anybody else's shelf. The data under it is still the
+    gate's business, so this is about the software, not the records. */
+function whoItIsFor(circles, audience, installed) {
+  if (!circles.length) return "";
+  const chosen = new Set((audience.circles || []).map((c) => c.toLowerCase()));
+  const people = audience.people || [];
+  return `<p class="group-label">Who it is for</p>
+    <p class="shelf-note">Nobody ticked is everyone on the server. Tick circles to put its tabs on their
+      shelves only.${people.length ? ` Also for ${esc(people.join(", "))}, from a request.` : ""}</p>
+    <div class="group choices who-it-is-for">${circles.map((c) => `<label class="row"><span class="main">
+      <span class="title">${esc(c.name)}</span><span class="meta"><span class="preview">${esc(c.members.join(", ") || "nobody")}</span></span></span>
+      <input type="checkbox" value="${esc(c.id)}"${chosen.has(c.id.toLowerCase()) || chosen.has(c.name.toLowerCase()) ? " checked" : ""}
+        aria-label="${esc(c.name)}"></label>`).join("")}</div>
+    ${installed ? `<div class="group"><button class="row change-audience" type="button">Change who it is for</button></div>` : ""}`;
+}
+
+/** Somebody's own Quill of the same id: tick to bring their records into this one. */
+function adoptSheet(adopt) {
+  if (!adopt.length) return "";
+  return `<p class="group-label">Already here as somebody's own</p>
+    <p class="shelf-note">Ticked, their records of its datamodels move into the server's, and their own
+      copy goes; they have this one instead.</p>
+    <div class="group choices adopt-sheet">${adopt.map((a) => `<label class="row"><span class="main">
+      <span class="title">${esc(a.owner)}'s, v${esc(a.version)}</span>
+      <span class="meta"><span class="preview">${esc(a.records.join(", "))}</span></span></span>
+      <input type="checkbox" value="${esc(a.owner)}" checked aria-label="${esc(a.owner)}"></label>`).join("")}</div>`;
+}
+
 /** A tick per circle for the data the Quill brings; a `* = write` circle is
     ticked and fixed, because it has everything already. */
 function whoGetsIt(fresh, circles) {
@@ -256,8 +403,8 @@ function whoGetsIt(fresh, circles) {
     }).join("")}</div>`;
 }
 
-/** Everything the Quill contains and adds, a section each. */
-function sections(plan, me) {
+/** Everything the Quill contains and adds, a section each. Your Quills (myquills.js) draws the same. */
+export function sections(plan, me) {
   const out = [];
   const row = (title, note = "", right = "") => `<div class="row sheet-fact">
     <span class="main"><span class="title">${title}</span>${note ? `<span class="meta"><span class="preview">${note}</span></span>` : ""}</span>${right}</div>`;

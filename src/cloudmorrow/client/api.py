@@ -412,6 +412,113 @@ class CloudmorrowClient:
         params = {"drop": ",".join(drop)} if drop else {}
         return (await self._request("DELETE", f"/api/quills/{quill_id}", params=params)).json()
 
+    async def set_quill_audience(self, quill_id: str, *, circles: list[str] = (), people: list[str] = ()) -> dict:
+        """Who a server Quill is for: circles and people, or nobody named, which is everyone (admin)."""
+        body = {"circles": list(circles), "people": list(people)}
+        return (await self._request("PUT", f"/api/quills/{quill_id}/audience", json=body)).json()
+
+    # -- Quills of your own: yours, shared, asked for, promoted (docs/SHARING.md) ----------
+    async def quill_policy(self) -> dict:
+        return (await self._request("GET", "/api/quills/policy")).json()
+
+    async def set_quill_policy(self, **settings: str) -> dict:
+        """personal_quills (on, ask, off), personal_quill_code, personal_quill_sharing (on, off). Admin."""
+        return (await self._request("PUT", "/api/quills/policy", json=settings)).json()
+
+    async def my_quills(self) -> dict:
+        """Your own Quills and who has them, what you were offered, what you asked for."""
+        return (await self._request("GET", "/api/quills/mine")).json()
+
+    async def plan_my_quill(self, *, id: str = "", source: str = "", ref: str = "") -> dict:
+        body = {"id": id, "source": source, "ref": ref}
+        return (await self._request("POST", "/api/quills/mine/plan", json=body)).json()
+
+    async def install_my_quill(self, *, id: str = "", source: str = "", ref: str = "") -> dict:
+        body = {"id": id, "source": source, "ref": ref}
+        return (await self._request("POST", "/api/quills/mine", json=body)).json()
+
+    async def upload_my_quill(self, data: bytes, *, plan_only: bool = False) -> dict:
+        response = await self._request(
+            "POST",
+            "/api/quills/mine/upload",
+            params={"plan_only": str(plan_only).lower()},
+            content=data,
+            headers_extra={"Content-Type": "application/gzip"},
+        )
+        return response.json()
+
+    async def my_quill_brought(self, quill_id: str) -> list[dict]:
+        return (await self._request("GET", f"/api/quills/mine/{quill_id}/brought")).json()
+
+    async def remove_my_quill(self, quill_id: str, drop: list[str] | None = None) -> dict:
+        params = {"drop": ",".join(drop)} if drop else {}
+        return (await self._request("DELETE", f"/api/quills/mine/{quill_id}", params=params)).json()
+
+    async def share_my_quill(self, quill_id: str, *, people: list[str] = (), circles: list[str] = ()) -> list[dict]:
+        body = {"people": list(people), "circles": list(circles)}
+        return (await self._request("PUT", f"/api/quills/mine/{quill_id}/share", json=body)).json()
+
+    async def unshare_my_quill(self, quill_id: str, username: str) -> list[dict]:
+        return (await self._request("DELETE", f"/api/quills/mine/{quill_id}/share/{username}")).json()
+
+    async def export_my_quill(self, quill_id: str, *, datasets: list[str] = ()) -> bytes:
+        """Your Quill as a repository would hold it, as a .tar.gz."""
+        params = {"datasets": ",".join(datasets)} if datasets else {}
+        return (await self._request("GET", f"/api/quills/mine/{quill_id}/export", params=params)).content
+
+    async def fork_quill(self, quill_id: str, new_id: str, *, name: str = "") -> dict:
+        body = {"id": quill_id, "new_id": new_id, "name": name}
+        return (await self._request("POST", "/api/quills/mine/fork", json=body)).json()
+
+    async def answer_quill_offer(self, owner: str, quill_id: str, accept: bool) -> dict:
+        verb = "accept" if accept else "decline"
+        return (await self._request("POST", f"/api/quills/offers/{owner}/{quill_id}/{verb}")).json()
+
+    async def leave_quill(self, owner: str, quill_id: str) -> dict:
+        return (await self._request("DELETE", f"/api/quills/offers/{owner}/{quill_id}")).json()
+
+    async def quill_requests(self, *, all: bool = False) -> list[dict]:  # noqa: A002
+        return (await self._request("GET", "/api/quills/requests", params={"all": str(all).lower()})).json()
+
+    async def request_quill(
+        self, *, kind: str = "install", id: str = "", source: str = "", ref: str = "", note: str = ""
+    ) -> dict:
+        body = {"kind": kind, "id": id, "source": source, "ref": ref, "note": note}
+        return (await self._request("POST", "/api/quills/requests", json=body)).json()
+
+    async def approve_quill_request(
+        self,
+        request_id: int,
+        *,
+        circles: list[str] = (),
+        people: list[str] = (),
+        give_to: list[str] = (),
+        note: str = "",
+    ) -> dict:
+        body = {"audience": {"circles": list(circles), "people": list(people)}, "give_to": list(give_to), "note": note}
+        return (await self._request("POST", f"/api/quills/requests/{request_id}/approve", json=body)).json()
+
+    async def decline_quill_request(self, request_id: int, *, note: str = "") -> dict:
+        return (await self._request("POST", f"/api/quills/requests/{request_id}/decline", json={"note": note})).json()
+
+    async def withdraw_quill_request(self, request_id: int) -> dict:
+        return (await self._request("DELETE", f"/api/quills/requests/{request_id}")).json()
+
+    async def all_quills(self) -> dict:
+        """Every Quill there is, whose it is, who has it (admin)."""
+        return (await self._request("GET", "/api/quills/all")).json()
+
+    async def promote_quill(
+        self, owner: str, quill_id: str, *, circles: list[str] = (), people: list[str] = (), give_to: list[str] = ()
+    ) -> dict:
+        body = {
+            "owner": owner,
+            "id": quill_id,
+            "audience": {"circles": list(circles), "people": list(people)},
+            "give_to": list(give_to),
+        }
+        return (await self._request("POST", "/api/quills/promote", json=body)).json()
+
     # -- a Quill's code, for an administrator --------------------------------
     async def quill_services(self) -> list[dict]:
         """Every Quill that runs code: services and their state, jobs, webhooks, APIs."""

@@ -41,7 +41,10 @@ It is free software under the [GNU AGPL v3](LICENSE).
   you say yes. A Quill has no UI code: its screens come from one kit, so each
   one is on the phone, in the browser, in the terminal, on the command line
   (`cm tasks list`) and to your assistant at once. Build your own with
-  `cm quill new`, or ask your assistant to.
+  `cm quill new`, or ask your assistant to. Anybody on the server may have
+  [Quills of their own](docs/SHARING.md): over their own data, run as them,
+  shared with people who say yes, promoted for everyone by an administrator,
+  and exported for the catalog.
 - **Calendar.** One of your own, plus the ones you share with the people on
   your server. Every calendar you can see is drawn at once, so nobody
   double-books the meeting room or the car.

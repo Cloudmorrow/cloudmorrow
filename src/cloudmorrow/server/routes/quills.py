@@ -29,6 +29,7 @@ from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_admin_user, get_current_user, get_state
 from cloudmorrow.server.quills import MANIFEST, MAX_DOWNLOAD, QuillError, fetch, load_catalog, removal
 from cloudmorrow.server.quills.code import CodeError
+from cloudmorrow.server.quills.shelf import audience_of
 
 router = APIRouter(prefix="/api/quills", tags=["quills"])
 
@@ -42,6 +43,16 @@ class QuillSource(BaseModel):
     # For a source: where its foundational datamodels come from. Empty, the
     # catalog's datamodels.
     datamodels: str = ""
+    # Who the Quill is for (docs/SHARING.md): circles and people, or nobody
+    # named, which is everyone. An administrator's install only.
+    audience: dict | None = None
+    # Owners whose own Quill of this id folds into it, records and all.
+    adopt: list[str] = []
+
+
+class AudienceIn(BaseModel):
+    circles: list[str] = []
+    people: list[str] = []
 
 
 def _bad(exc: QuillError) -> HTTPException:
@@ -120,18 +131,34 @@ def fitted(quill: dict, access: Access) -> dict:
 
 def _for(state: AppState, user: User, quill: dict) -> dict:
     quill = _with_models(state, quill)
-    return fitted(quill, state.circles.access_for(user.username)) if state.circles else quill
+    access = state.shelf or state.circles
+    return fitted(quill, access.access_for(user.username)) if access else quill
+
+
+def _shelf_of(state: AppState, user: User) -> list:
+    """The Quills on this person's shelf (docs/SHARING.md): the server's that are for
+    them, their own, and the ones shared with them."""
+    if state.shelf is not None:
+        return list(state.shelf.for_user(user.username).values())
+    return state.quills.ordered(state.quills.quills.values())
+
+
+def _told(state: AppState, user: User, manifest) -> dict:
+    """One Quill as a client is told it: described, with whose it is and whether it is on for them."""
+    quill = state.quills.describe(manifest)
+    quill["enabled"] = state.features.enabled_for(user.username, manifest.key)
+    quill["readme"] = ""
+    quill["mine"] = manifest.owner == user.username
+    quill["shared_by"] = manifest.owner if manifest.personal and manifest.owner != user.username else ""
+    if not manifest.personal:
+        quill["audience"] = audience_of(manifest)
+    return quill
 
 
 @router.get("")
 def list_quills(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> list[dict]:
-    """Every installed Quill, with whether it is on for you, and what it draws."""
-    rows = []
-    for quill in state.quills.installed():
-        quill["enabled"] = state.features.enabled_for(user.username, quill["id"])
-        quill["readme"] = ""
-        rows.append(_for(state, user, quill))
-    return rows
+    """Every Quill on your shelf, with whether it is on for you, and what it draws."""
+    return [_for(state, user, _told(state, user, manifest)) for manifest in _shelf_of(state, user)]
 
 
 @router.get("/catalog")
@@ -203,9 +230,25 @@ def install(
         try:
             folder, models, origin = _resolve(state, payload, Path(tmp))
             # Its code, if it has any, runs as whoever said yes.
-            return state.quills.install(folder, models, origin=origin | {"installed_by": admin.username})
+            if payload.audience is not None:
+                origin["audience"] = payload.audience
+            plan = state.quills.install(folder, models, origin=origin | {"installed_by": admin.username})
+            plan["adopted"] = _adopt(state, plan["id"], payload.adopt)
+            return plan
         except QuillError as exc:
             raise _bad(exc) from exc
+
+
+def _adopt(state: AppState, quill_id: str, owners: list[str]) -> dict:
+    """Owners' own Quills of this id, folded into the server's just installed."""
+    from cloudmorrow.server.quills import promotion
+
+    adopted = {}
+    for owner in owners:
+        if state.sharing is None:
+            break
+        adopted[owner] = promotion.adopt(state.quills, state.records, state.sharing, owner, quill_id)
+    return adopted
 
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
@@ -256,11 +299,32 @@ def get_quill(
     state: AppState = Depends(get_state),
     user: User = Depends(get_current_user),
 ) -> dict:
-    for quill in state.quills.installed():
-        if quill["id"] == quill_id:
-            quill["enabled"] = state.features.enabled_for(user.username, quill_id)
-            return _for(state, user, quill)
+    for manifest in _shelf_of(state, user):
+        if manifest.id == quill_id:
+            return _for(state, user, _told(state, user, manifest))
+    # An administrator manages every server Quill, on their shelf or not.
+    manifest = state.quills.quills.get(quill_id) if user.is_admin else None
+    if manifest is not None:
+        return _for(state, user, _told(state, user, manifest))
     raise HTTPException(status.HTTP_404_NOT_FOUND, f"{quill_id} is not installed")
+
+
+@router.put("/{quill_id}/audience")
+def set_audience(
+    quill_id: str,
+    payload: AudienceIn,
+    state: AppState = Depends(get_state),
+    _: User = Depends(get_admin_user),
+) -> dict:
+    """Who a server Quill is for: circles and people, or nobody named, which is everyone."""
+    manifest = state.quills.quills.get(quill_id)
+    if manifest is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"{quill_id} is not installed")
+    try:
+        changed = state.quills.set_origin(manifest, audience=payload.model_dump())
+    except QuillError as exc:
+        raise _bad(exc) from exc
+    return {"id": quill_id, "audience": audience_of(changed)}
 
 
 @router.get("/{quill_id}/brought")

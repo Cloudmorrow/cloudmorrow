@@ -21,8 +21,14 @@ are kit elements, or views built from primitives every surface draws.
 4. Tag a release (`v1.0.0`) and open a pull request on
    `Cloudmorrow/quill-catalog` adding the Quill to `catalog.toml`.
 
-Over MCP an administrator's assistant has the first loop: `quill_schema`,
-`quill_check`, `quill_dev_install`.
+Over MCP an assistant has the first loop: `quill_schema`, `quill_check`,
+`quill_dev_install`. An administrator's assistant builds the server's
+Quill; anybody else's builds one of their own — on their shelf alone, over
+their own data, run as them — which may add no fields to shared datamodels,
+run no services, and keep personal records only (its own datamodels are
+named after them on the server; the code uses the names written here).
+`quill_share` offers it to people; `quill_request` asks an administrator for
+a Quill, or for one of theirs to be promoted for everyone.
 
 ## quill.toml
 
@@ -352,3 +358,5 @@ purpose: what the kit cannot say, the kit grows to say, for every Quill at once.
 - Everything you read or write that you did not introduce is in `[uses]`,
   `[[extends]]` or `[[grants]]`.
 - Uninstalling a Quill never deletes records.
+- A Quill of one person's own: no `[[extends]]`, no `[[services]]`, and
+  `scopes = ["personal"]` on what it introduces, which is never a space.

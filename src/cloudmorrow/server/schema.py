@@ -387,11 +387,20 @@ def _shares_shared(conn: Connection) -> None:
     conn.commit()
 
 
+def _quill_sharing(conn: Connection) -> None:
+    """Quills of somebody's own, shared and asked for (quills/sharing.py)."""
+    from cloudmorrow.server.quills import sharing
+
+    conn.executescript(sharing.TABLES)
+    conn.commit()
+
+
 STEPS: tuple[Step, ...] = (
     Step(1, "the tables as they stood before they were versioned", _baseline),
     Step(2, "indexes for what an open screen and the retention sweep ask", _indexes_for_scale),
     Step(3, "the columns added since, and the order records were written in", _columns_since),
     Step(4, "shares shared with people and circles, and no machine shares", _shares_shared),
+    Step(5, "who a Quill of somebody's own is shared with, and what people asked for", _quill_sharing),
 )
 
 VERSION = STEPS[-1].version

@@ -177,9 +177,9 @@ and fails a manifest that names a handler the code does not have.
 | view | `ctx` (`ctx.params`, `.record` when opened on one) | the person looking | a tree of primitives |
 | action | `ctx`, the record (for `on`), the form's fields as keywords | the person pressing | effects |
 | hook | `ctx`, `change` (`.action`, `.record`, `.before`, `.changed`) | whoever made the change | nothing |
-| job (`call`) | `ctx` | the administrator who installed it | nothing |
-| webhook | `ctx`, `request` (`.json()`, `.text`, `.headers`, `.query`) | the administrator who installed it | `respond(...)`, a dict (JSON), or nothing (204) |
-| API | `ctx`, `request` (… and `.user`, who asked) | the administrator who installed it | the same |
+| job (`call`) | `ctx` | the administrator who installed it; a personal Quill's owner | nothing |
+| webhook | `ctx`, `request` (`.json()`, `.text`, `.headers`, `.query`) | the administrator who installed it; a personal Quill's owner | `respond(...)`, a dict (JSON), or nothing (204) |
+| API | `ctx`, `request` (… and `.user`, who asked) | the administrator who installed it; a personal Quill's owner | the same |
 | machine | `ctx` | the machine's owner, on their machine | anything JSON |
 
 Every principal is `Principal("quill", <them>, quill=<id>, models=<declared>)`:
@@ -278,7 +278,9 @@ so a sandbox starts in a tenth of a second.
 Each Quill gets one interpreter, in a process of its own (`python -m
 cloudmorrow.sandbox`), started on its first call and kept warm; it is
 stopped when the Quill is reinstalled, switched off or removed, and after
-ten idle minutes. It sees the standard library at `/lib`, the SDK at `/sdk`
+ten idle minutes. A Quill of somebody's own ([SHARING.md](SHARING.md)) gets
+one per person using it, so code one person wrote shares no interpreter
+with the people it was shared with. It sees the standard library at `/lib`, the SDK at `/sdk`
 and the Quill at `/quill`, all read-only — and on a machine, the folders the
 person picked at `/folders/<name>`. It has no sockets, no processes and
 none of the host's environment, and at most 256 MB. A call has fifteen
@@ -422,8 +424,9 @@ WebAssembly.
 - **Packages.** Pure-Python dependencies from PyPI, listed in the manifest
   and vendored into the release by the template's workflow, so the server
   never runs pip.
-- **Per-person code.** A job, webhook or API runs as the installer; a job
-  per person is the same *next* as services.
+- **Per-person code.** A server Quill's job, webhook or API runs as the
+  installer; a job per person is the same *next* as services. (A Quill of
+  somebody's own runs them as its owner: [SHARING.md](SHARING.md).)
 - **Services in the sandbox.** A handler that is allowed to loop, with
   `ctx.fetch` as its only way out, would take most services inside the gate.
 - **A server asking a machine.** A server handler queueing a machine

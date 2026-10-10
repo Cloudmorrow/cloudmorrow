@@ -126,8 +126,8 @@ def _fields(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def _access(state: AppState, user: User) -> Access | None:
-    circles = getattr(state, "circles", None)
-    return circles.access_for(user.username) if circles is not None else None
+    shelf = getattr(state, "shelf", None) or getattr(state, "circles", None)
+    return shelf.access_for(user.username) if shelf is not None else None
 
 
 def list_datamodels(state: AppState, user: User, args: dict[str, Any]) -> Any:
@@ -220,17 +220,40 @@ def _rev(args: dict[str, Any]) -> int | str | None:
     raise ToolError("rev is the rev get_record gave")
 
 
-# -- building Quills, for an administrator's assistant -------------------------
-def _admin(user: User) -> None:
-    if not user.is_admin:
-        raise ToolError("only an administrator's assistant may build Quills")
+# -- building Quills: an administrator's for the server, anybody's for themselves --------
+def _builds_for(state: AppState, user: User) -> str:
+    """Whose the Quill an assistant builds will be: "" for the server's (an administrator's
+    assistant), the person's own name for one of their own (docs/SHARING.md), or refused."""
+    if user.is_admin:
+        return ""
+    policy = getattr(state, "policy", None)
+    if policy is None or not policy.may_install():
+        if policy is not None and policy.may_have():
+            raise ToolError(
+                "on this server a Quill of your own comes through a request: quill_request asks an administrator"
+            )
+        raise ToolError("only an administrator's assistant may build Quills on this server")
+    return user.username
+
+
+def _personal_allowed(state: AppState, plan: dict) -> None:
+    policy = getattr(state, "policy", None)
+    if plan.get("code") and policy is not None and not policy.may_code():
+        raise ToolError("Quills of your own may not run code on this server; leave the code out")
 
 
 def quill_schema(state: AppState, user: User, args: dict[str, Any]) -> Any:
+    shelf = getattr(state, "shelf", None)
+    mine = sorted(shelf.for_user(user.username)) if shelf is not None else sorted(state.quills.quills)
+    rows = state.quills.catalogue_of_models()
+    access = _access(state, user)
+    if access is not None:
+        rows = [row for row in rows if access.may("read", row["id"])]
     return {
         "reference": quill_reference(),
-        "datamodels": state.quills.catalogue_of_models(),
-        "installed": sorted(state.quills.quills),
+        "datamodels": rows,
+        "installed": mine,
+        "builds": "the server's" if user.is_admin else f"{user.username}'s own",
     }
 
 
@@ -259,28 +282,128 @@ def _datamodels_for(state: AppState, tmp: Path) -> Path | None:
 
 
 def quill_check(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    _admin(user)
+    owner = _builds_for(state, user)
     with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
         folder = _write_draft(state, args, Path(tmp) / "q")
         try:
-            return {"ok": True, "adds": state.quills.plan(folder, _datamodels_for(state, Path(tmp)))}
+            plan = state.quills.plan(folder, _datamodels_for(state, Path(tmp)), owner=owner)
         except QuillError as exc:
             raise ToolError(f"not yet: {exc}") from exc
+        if owner:
+            _personal_allowed(state, plan)
+        return {"ok": True, "adds": plan, "whose": owner or "the server's"}
 
 
 def quill_dev_install(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    _admin(user)
+    owner = _builds_for(state, user)
     with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
         folder = _write_draft(state, args, Path(tmp) / "q")
         try:
+            source = _datamodels_for(state, Path(tmp))
+            if owner:
+                _personal_allowed(state, state.quills.plan(folder, source, owner=owner))
             plan = state.quills.install(
                 folder,
-                _datamodels_for(state, Path(tmp)),
+                source,
                 origin={"catalog": False, "dev": True, "by": "assistant", "installed_by": user.username},
+                owner=owner,
             )
         except QuillError as exc:
             raise ToolError(f"not installed: {exc}") from exc
-    return {"installed": plan["id"], "version": plan["version"], "adds": plan}
+    return {"installed": plan["id"], "version": plan["version"], "whose": owner or "the server's", "adds": plan}
+
+
+def quill_mine(state: AppState, user: User, args: dict[str, Any]) -> Any:
+    """Your own Quills and who has them, what you were offered, what you asked for."""
+    sharing = getattr(state, "sharing", None)
+    if sharing is None:
+        raise ToolError("this server keeps no shelves")
+    own = state.quills.personal.get(user.username, {})
+    return {
+        "quills": [
+            {
+                "id": m.id,
+                "name": m.name,
+                "version": m.version,
+                "summary": m.summary,
+                "shared_with": sharing.shared_with(user.username, m.id),
+            }
+            for m in own.values()
+        ],
+        "offers": sharing.of_person(user.username),
+        "requests": sharing.requests(username=user.username, open_only=False),
+        "policy": state.policy.get() if getattr(state, "policy", None) else {},
+    }
+
+
+def quill_share(state: AppState, user: User, args: dict[str, Any]) -> Any:
+    """Offer a Quill of the person's own to people; each says yes themselves."""
+    sharing, policy = getattr(state, "sharing", None), getattr(state, "policy", None)
+    if sharing is None or policy is None:
+        raise ToolError("this server keeps no shelves")
+    quill_id = _str(args, "quill", required=True).strip()
+    if quill_id not in state.quills.personal.get(user.username, {}):
+        raise ToolError(f"{user.username} has no Quill of their own called {quill_id}")
+    if not policy.may_share():
+        raise ToolError("sharing Quills of your own is switched off on this server")
+    people = args.get("people")
+    if not isinstance(people, list) or not all(isinstance(p, str) for p in people) or not people:
+        raise ToolError("people is a list of usernames")
+    known = {u.username for u in state.users.list() if u.is_active}
+    unknown = sorted(set(people) - known)
+    if unknown:
+        raise ToolError(f"no such account: {', '.join(unknown)}")
+    manifest = state.quills.personal[user.username][quill_id]
+    for who in people:
+        if who == user.username:
+            continue
+        from cloudmorrow.server.quills.sharing import OFFERED, SharingError
+
+        try:
+            share = sharing.offer(user.username, quill_id, who, by=user.username)
+        except SharingError as exc:
+            raise ToolError(str(exc)) from exc
+        if share["state"] == OFFERED:
+            state.notifications.add(
+                who,
+                kind="quill.offered",
+                title=f"{user.display_name or user.username} shared {manifest.name} with you",
+                body="Say yes under Me, Your Quills, and it is on your shelf, over your own data.",
+            )
+    return {"shared_with": sharing.shared_with(user.username, quill_id)}
+
+
+def quill_request(state: AppState, user: User, args: dict[str, Any]) -> Any:
+    """Ask an administrator for a Quill: from the catalog or a source, or one of the person's own promoted."""
+    sharing = getattr(state, "sharing", None)
+    if sharing is None:
+        raise ToolError("this server keeps no shelves")
+    from cloudmorrow.server.quills.sharing import SharingError
+
+    kind = _str(args, "kind", default="install")
+    quill_id = _str(args, "quill").strip()
+    if kind == "promote" and quill_id not in state.quills.personal.get(user.username, {}):
+        raise ToolError(f"{user.username} has no Quill of their own called {quill_id}")
+    try:
+        made = sharing.ask(
+            user.username,
+            kind,
+            quill=quill_id,
+            source=_str(args, "source"),
+            ref=_str(args, "ref"),
+            note=_str(args, "note"),
+        )
+    except SharingError as exc:
+        raise ToolError(str(exc)) from exc
+    for admin in (u for u in state.users.list() if u.is_admin and u.is_active and u.username != user.username):
+        state.notifications.add(
+            admin.username,
+            kind="quill.requested",
+            title=f"{user.display_name or user.username} asks for {quill_id or _str(args, 'source')}"
+            + (" to be promoted" if kind == "promote" else ""),
+            body=_str(args, "note") or "Under Administration, Quills.",
+        )
+    return made
 
 
 # -- the catalogue ------------------------------------------------------------
@@ -407,7 +530,9 @@ TOOLS: tuple[Tool, ...] = (
     Tool(
         "quill_check",
         "Check a Quill manifest (and any datamodels it introduces) without installing it, "
-        "and say everything it would add. Administrators only.",
+        "and say everything it would add. For an administrator the Quill is the server's; for "
+        "anybody else it is their own: on their shelf alone, over their own data, with no fields "
+        "added to shared datamodels, no services, and personal-scope datamodels only.",
         _schema({"manifest": _MANIFEST, "datamodels": _DATAMODELS}, ("manifest",)),
         "",
         quill_check,
@@ -415,11 +540,49 @@ TOOLS: tuple[Tool, ...] = (
     Tool(
         "quill_dev_install",
         "Install a Quill from a manifest on this server, as a development Quill: it is on the "
-        "phone, the web app and the terminal at once. Installing again replaces it. "
-        "Administrators only; check it first.",
+        "phone, the web app and the terminal at once. Installing again replaces it. An "
+        "administrator's is the server's; anybody else's is a Quill of their own. Check it first.",
         _schema({"manifest": _MANIFEST, "datamodels": _DATAMODELS}, ("manifest",)),
         "",
         quill_dev_install,
+    ),
+    Tool(
+        "quill_mine",
+        "The user's own Quills and who has them, the Quills offered to them, and what they asked an administrator for.",
+        _schema({}),
+        "",
+        quill_mine,
+    ),
+    Tool(
+        "quill_share",
+        "Offer one of the user's own Quills to people on this server. Each person says yes "
+        "themselves; then it is on their shelf, over their own data, run as them.",
+        _schema(
+            {
+                "quill": {"type": "string", "description": "The id of a Quill of the user's own."},
+                "people": {"type": "array", "items": {"type": "string"}, "description": "Usernames."},
+            },
+            ("quill", "people"),
+        ),
+        "",
+        quill_share,
+    ),
+    Tool(
+        "quill_request",
+        "Ask an administrator for a Quill: kind 'install' with a catalog id (quill) or a source "
+        "repository, or kind 'promote' with the id of one of the user's own Quills, to be made "
+        "the server's for everyone. Say why in note.",
+        _schema(
+            {
+                "kind": {"type": "string", "enum": ["install", "promote"]},
+                "quill": {"type": "string", "description": "A catalog id, or the user's own Quill's id."},
+                "source": {"type": "string", "description": "A repository, instead of the catalog."},
+                "ref": {"type": "string", "description": "Its release, e.g. v1.0.0."},
+                "note": {"type": "string", "description": "Why, in a line."},
+            },
+        ),
+        "",
+        quill_request,
     ),
 )
 
@@ -434,7 +597,9 @@ INSTRUCTIONS = (
     '"within": "Notes", "suffix": ".md"}; a file\'s words are its \'text\' when '
     "read one at a time with get_record, and written back with update_record and its rev. "
     "Read before you overwrite, and prefer move_record over rewriting or deleting. To build "
-    "a new Quill, read quill_schema first."
+    "a new Quill, read quill_schema first: an administrator's assistant builds the server's, "
+    "anybody else's builds one of their own, on their shelf alone (quill_share offers it to "
+    "others; quill_request asks an administrator for more)."
 )
 
 
@@ -512,7 +677,7 @@ def _action_tool(state: AppState, manifest, action: dict) -> Tool:
         action_tool_name(manifest.id, action["id"]),
         description,
         _schema(properties, tuple(required)),
-        manifest.id,
+        manifest.key,
         handler,
     )
 
@@ -523,8 +688,12 @@ def action_tools(state: AppState, user: User | None = None) -> list[Tool]:
         return []
     access = _access(state, user) if user is not None else None
     tools = []
-    for manifest in quills.quills.values():
-        if not manifest.code or not _enabled(state, manifest.id):
+    shelf = getattr(state, "shelf", None)
+    manifests = (
+        shelf.for_user(user.username).values() if (user is not None and shelf is not None) else quills.quills.values()
+    )
+    for manifest in manifests:
+        if not manifest.code or not _enabled(state, manifest.key):
             continue
         for action in manifest.actions:
             on = action.get("on", "")

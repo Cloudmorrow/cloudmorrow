@@ -12,14 +12,16 @@ import io
 import json
 import re
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from cloudmorrow.server.datamodels import (
+    OWNER_PREFIX,
     Datamodel,
     DatamodelError,
     load_datamodel,
     parse_duration,
+    renamed,
 )
 from cloudmorrow.server.quills.codespec import CodeSpecError, check_handlers, parse_code
 from cloudmorrow.server.quills.hooks import PathError, parse_path
@@ -88,6 +90,35 @@ class Manifest:
     readme: str = ""
     folder: Path | None = None
     origin: dict = field(default_factory=dict)
+    # A Quill of somebody's own (docs/SHARING.md): whose, and what its
+    # introduced datamodels are called here — `budget.envelope` in the
+    # folder, `~alice.budget.envelope` on this server — so two people's
+    # Budgets never meet in the record store. Empty for a server Quill.
+    owner: str = ""
+    renamed: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def personal(self) -> bool:
+        return bool(self.owner)
+
+    @property
+    def key(self) -> str:
+        """What this installation is called where one name must do for every
+        Quill on the server: the id for a server Quill, `~owner.id` for a
+        personal one. The feature switch, the logs and the sandbox go by it."""
+        return f"{OWNER_PREFIX}{self.owner}.{self.id}" if self.owner else self.id
+
+    def resolve(self, model: str) -> str:
+        """A datamodel as the Quill's own files and code name it, as this server knows it."""
+        return self.renamed.get(model, model)
+
+    def plain(self, model: str) -> str:
+        """The other way: a datamodel as this server knows it, as the Quill's code names it."""
+        return self._plain.get(model, model)
+
+    @property
+    def _plain(self) -> dict[str, str]:
+        return {v: k for k, v in self.renamed.items()}
 
     @property
     def models(self) -> frozenset[str]:
@@ -132,7 +163,54 @@ class Manifest:
             "secrets": list(self.secrets),
             "machine": list(self.machine),
             "origin": dict(self.origin),
+            "owner": self.owner,
+            "key": self.key,
+            "personal": self.personal,
+            "renamed": dict(self.renamed),
         }
+
+
+def _renamed_in(items, names: dict[str, str], *keys: str) -> tuple[dict, ...]:
+    out = []
+    for item in items:
+        item = dict(item)
+        for key in keys:
+            if isinstance(item.get(key), str) and item[key] in names:
+                item[key] = names[item[key]]
+        if "fields" in item and isinstance(item["fields"], list):  # an action's form: its links
+            item["fields"] = [
+                {**f, "to": names[f["to"]]} if isinstance(f, dict) and f.get("to") in names else f
+                for f in item["fields"]
+            ]
+        out.append(item)
+    return tuple(out)
+
+
+def personalise(manifest: Manifest, owner: str) -> Manifest:
+    """*manifest* as *owner*'s own Quill: every datamodel it introduces, and every
+    place the manifest names one, under their name (`~owner.<quill>.<name>`).
+
+    The folder on disk is left as it was written, so the same files publish
+    as they are; the renaming is how the server reads them, and `resolve`
+    and `plain` carry its code's names across (docs/SHARING.md).
+    """
+    names = {m.id: f"{OWNER_PREFIX}{owner}.{m.id}" for m in manifest.introduces}
+    rename = lambda model: names.get(model, model)  # noqa: E731
+    return replace(
+        manifest,
+        owner=owner,
+        renamed=names,
+        uses=tuple(rename(m) for m in manifest.uses),
+        extends={rename(m): f for m, f in manifest.extends.items()},
+        introduces=tuple(renamed(m, names) for m in manifest.introduces),
+        grants=_renamed_in(manifest.grants, names, "model"),
+        screens=_renamed_in(manifest.screens, names, "model"),
+        jobs=_renamed_in(manifest.jobs, names, "model"),
+        datasets=_renamed_in(manifest.datasets, names, "model"),
+        webhooks=_renamed_in(manifest.webhooks, names, "model"),
+        actions=_renamed_in(manifest.actions, names, "on"),
+        hooks=_renamed_in(manifest.hooks, names, "on"),
+    )
 
 
 def _table_list(data: dict, key: str, where: str) -> list[dict]:
@@ -382,7 +460,8 @@ def _features(head: dict, where: str) -> tuple[str, ...]:
     return tuple(f.strip() for f in features)
 
 
-def load_manifest(folder: Path) -> Manifest:
+def load_manifest(folder: Path, *, owner: str = "") -> Manifest:
+    """The manifest in *folder*, with its `.origin.json`; as *owner*'s own Quill when one is named."""
     path = folder / MANIFEST
     if not path.is_file():
         raise QuillError(f"there is no {MANIFEST} in {folder.name}")
@@ -397,4 +476,4 @@ def load_manifest(folder: Path) -> Manifest:
             manifest.origin = json.loads(origin.read_text(encoding="utf-8"))
         except ValueError:
             manifest.origin = {}
-    return manifest
+    return personalise(manifest, owner) if owner else manifest

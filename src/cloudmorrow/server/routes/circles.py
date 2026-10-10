@@ -67,7 +67,7 @@ def require_data(model: str) -> Callable[..., None]:
     ) -> None:
         if state.circles is None:
             return
-        access = state.circles.access_for(user.username)
+        access = (state.shelf or state.circles).access_for(user.username)
         if not access.may("read", model):
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
         if request.method not in READING and not access.may("write", model):
@@ -78,7 +78,7 @@ def require_data(model: str) -> Callable[..., None]:
 
 def _access_of(state: AppState, username: str) -> dict:
     circles = _circles(state)
-    access = circles.access_for(username)
+    access = (state.shelf or circles).access_for(username)
     return {
         "username": username,
         "access": access.of(sorted(state.quills.datamodels)),

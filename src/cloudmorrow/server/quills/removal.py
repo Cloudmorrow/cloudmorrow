@@ -20,10 +20,11 @@ from cloudmorrow.server.records import RecordStore
 __all__ = ["brought", "remove"]
 
 
-def brought(registry: QuillRegistry, records: RecordStore, quill_id: str) -> list[dict]:
+def brought(registry: QuillRegistry, records: RecordStore, quill_id: str, owner: str = "") -> list[dict]:
     """What *quill_id* brought to this server, with how many records hold each:
-    `{"id", "kind": "datamodel" | "field", "label", "model", "records"}`."""
-    manifest = registry.quills.get(quill_id)
+    `{"id", "kind": "datamodel" | "field", "label", "model", "records"}`.
+    With *owner*, their own Quill of that id."""
+    manifest = registry.by_key(f"~{owner}.{quill_id}" if owner else quill_id)
     if manifest is None:
         raise QuillError(f"{quill_id} is not installed")
     found: list[dict] = []
@@ -57,7 +58,9 @@ def brought(registry: QuillRegistry, records: RecordStore, quill_id: str) -> lis
     return found
 
 
-def remove(registry: QuillRegistry, records: RecordStore, quill_id: str, drop: Iterable[str] = ()) -> dict:
+def remove(
+    registry: QuillRegistry, records: RecordStore, quill_id: str, drop: Iterable[str] = (), *, owner: str = ""
+) -> dict:
     """Take the Quill away, dropping what *drop* names of what it brought — records
     and all — and keeping the rest. Returns `{"dropped": {id: records gone}}`.
 
@@ -65,7 +68,7 @@ def remove(registry: QuillRegistry, records: RecordStore, quill_id: str, drop: I
     sealed body can be opened and rewritten; then the Quill is removed.
     """
     wanted = {str(name).strip() for name in drop if str(name).strip()}
-    offered = {row["id"]: row for row in brought(registry, records, quill_id)}
+    offered = {row["id"]: row for row in brought(registry, records, quill_id, owner)}
     unknown = sorted(wanted - set(offered))
     if unknown:
         raise QuillError(f"{quill_id} did not bring {', '.join(unknown)}")
@@ -76,5 +79,5 @@ def remove(registry: QuillRegistry, records: RecordStore, quill_id: str, drop: I
             dropped[name] = records.drop_model(row["model"])
         else:
             dropped[name] = records.drop_field(row["model"], name)
-    registry.uninstall(quill_id)
+    registry.uninstall(quill_id, owner)
     return {"dropped": dropped}

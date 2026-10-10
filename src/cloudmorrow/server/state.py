@@ -23,6 +23,8 @@ from cloudmorrow.server.mcp import MCPStore
 from cloudmorrow.server.notifications import NotificationStore
 from cloudmorrow.server.quills import QuillRegistry
 from cloudmorrow.server.quills.services import Supervisor
+from cloudmorrow.server.quills.sharing import Policy, SharingStore
+from cloudmorrow.server.quills.shelf import Shelf
 from cloudmorrow.server.quills.tokens import QuillTokenStore
 from cloudmorrow.server.records import RecordStore
 from cloudmorrow.server.sealed import Sealer
@@ -73,6 +75,11 @@ class AppState:
     circles: CircleStore | None = None
     # What runs a Quill's Python, in its sandbox (quills/code.py).
     code: object | None = None
+    # Quills of people's own: who has which, who was offered which, what was
+    # asked for, and what the server allows (quills/shelf.py, quills/sharing.py).
+    sharing: SharingStore | None = None
+    shelf: Shelf | None = None
+    policy: Policy | None = None
     # What announces the box on the home network (access_lan); None when off.
     lan: LanAnnouncer | None = None
     # What tells an open screen a record changed, as it does (changefeed.py).

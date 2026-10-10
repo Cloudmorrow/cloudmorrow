@@ -1,0 +1,11 @@
+[datamodel]
+id = "budget.envelope"
+version = 1
+label = "Envelope"
+description = "A pot of money with a name."
+scopes = ["personal"]
+title = "name"
+
+[fields]
+name = { kind = "string", required = true, indexed = true }
+total = { kind = "int" }

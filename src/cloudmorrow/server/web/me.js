@@ -10,6 +10,7 @@ import { pushCard, wirePushCard } from "./push.js";
 import { adminRow, isAdmin } from "./admin.js";
 import { computerCard, wireComputerCard } from "./desktopbridge.js";
 import { addDeviceRow } from "./adddevice.js";
+import { myQuillsRow } from "./myquills.js";
 
 
 async function renderMe() {
@@ -43,6 +44,7 @@ async function renderMe() {
         `<div class="row"><span class="main">${esc(label)}</span><span class="value">${esc(value)}</span></div>`).join("")}</div>
       ${computerCard()}
       ${addDeviceRow()}
+      ${myQuillsRow()}
       ${isAdmin(me) ? adminRow() : ""}
       <div class="group"><button class="row signout">Sign out</button></div>
     </main>`;

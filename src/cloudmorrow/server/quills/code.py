@@ -19,7 +19,12 @@ of its reach, and it is given no secret.
 
 One sandbox per Quill, started on its first call and kept warm; it is
 stopped when the Quill is reinstalled, switched off or removed, and after
-ten idle minutes. A call that runs past its time is stopped with it.
+ten idle minutes. A call that runs past its time is stopped with it. A Quill
+of somebody's own (docs/SHARING.md) gets one per person using it, so the
+code one person wrote shares no interpreter between the people it was shared
+with; its jobs, webhooks and APIs run as its owner, and its datamodels, which
+the server knows under the owner's name, are given to the code under the
+names its files use (`Manifest.resolve`, `plain`).
 
 Hooks are queued as records change and run one at a time on a thread of
 their own, so a write never waits for somebody's code. A Quill's hooks are
@@ -197,7 +202,11 @@ class HostCalls:
         model = str(args.get("model", ""))
         if not model:
             raise sdk.Invalid("which datamodel?")
-        return model
+        return self.manifest.resolve(model)
+
+    def _out(self, record: Record) -> dict:
+        """A record as the code knows it: its datamodel under the Quill's own name."""
+        return plain_record(self.manifest, record.to_dict())
 
     def op_records_list(self, args: dict) -> list[dict]:
         from cloudmorrow.server.seeding import seed
@@ -209,16 +218,16 @@ class HostCalls:
         seed(self.state, self.principal, model)
         last = args.get("last")
         records = self.state.records.list(self.principal, model, where, last=int(last) if last else None)
-        return [r.to_dict() for r in records]
+        return [self._out(r) for r in records]
 
     def op_records_get(self, args: dict) -> dict:
-        return self.state.records.get(self.principal, self._model(args), str(args.get("id", ""))).to_dict()
+        return self._out(self.state.records.get(self.principal, self._model(args), str(args.get("id", ""))))
 
     def op_records_create(self, args: dict) -> dict:
         record = self.state.records.create(
             self.principal, self._model(args), dict(args.get("fields") or {}), index=args.get("index")
         )
-        return record.to_dict()
+        return self._out(record)
 
     def op_records_patch(self, args: dict) -> dict:
         record = self.state.records.update(
@@ -228,7 +237,7 @@ class HostCalls:
             dict(args.get("fields") or {}),
             rev=args.get("rev"),
         )
-        return record.to_dict()
+        return self._out(record)
 
     def op_records_move(self, args: dict) -> dict:
         record = self.state.records.move(
@@ -238,7 +247,7 @@ class HostCalls:
             dict(args.get("fields") or {}),
             args.get("index"),
         )
-        return record.to_dict()
+        return self._out(record)
 
     def op_records_delete(self, args: dict) -> int:
         return self.state.records.delete(self.principal, self._model(args), str(args.get("id", "")))
@@ -248,7 +257,7 @@ class HostCalls:
         return dt.datetime.now(tz=dt.UTC).isoformat()
 
     def op_log(self, args: dict) -> None:
-        self.code.log(self.manifest.id).write(str(args.get("line", "")) + "\n")
+        self.code.log(self.manifest.key).write(str(args.get("line", "")) + "\n")
 
     def op_run(self, args: dict) -> None:
         raise sdk.Refused("ctx.run is for a machine handler, on a person's own machine")
@@ -300,6 +309,13 @@ class HostCalls:
         return {"status": status, "headers": head, "body": base64.b64encode(data).decode("ascii")}
 
 
+def plain_record(manifest: Manifest, record: dict) -> dict:
+    """*record* (as `Record.to_dict`) with its datamodel named as the Quill's code names it."""
+    if manifest.renamed and record.get("model") in manifest._plain:
+        return {**record, "model": manifest.plain(record["model"])}
+    return record
+
+
 # -- the runtime ---------------------------------------------------------------------------
 class QuillCode:
     """The sandboxes, and every way into them."""
@@ -341,59 +357,84 @@ class QuillCode:
     def reconcile(self) -> None:
         """Stop the sandboxes of Quills that went, were switched off, or were installed again."""
         with self._lock:
-            for quill_id, (stamp, guest) in list(self._guests.items()):
-                manifest = self.state.quills.quills.get(quill_id)
-                if manifest is None or self._stamp(manifest) != stamp or not self._on(quill_id):
+            for guest_key, (stamp, guest) in list(self._guests.items()):
+                manifest = self.state.quills.by_key(guest_key.split("@", 1)[0])
+                if manifest is None or self._stamp(manifest) != stamp or not self._on(manifest.key):
                     guest.stop()
-                    del self._guests[quill_id]
+                    del self._guests[guest_key]
 
-    def _on(self, quill_id: str) -> bool:
+    def _on(self, key: str) -> bool:
         try:
-            return self.state.features.enabled(quill_id)
+            return self.state.features.enabled(key)
         except Exception:
             return True
+
+    def _shelf(self):
+        return getattr(self.state, "shelf", None)
+
+    def _runs_as(self, manifest: Manifest) -> str:
+        """Whom a Quill's jobs, webhooks and APIs act for: a personal Quill's owner,
+        else the administrator who installed it ("" when there is nobody)."""
+        if manifest.personal:
+            user = self.state.users.get(manifest.owner)
+            return manifest.owner if user is not None and user.is_active else ""
+        return runs_as(self.state.users, manifest.origin)
 
     @staticmethod
     def _stamp(manifest: Manifest) -> str:
         return str(manifest.origin.get("installed_at", "")) + manifest.version
 
-    def log(self, quill_id: str) -> ServiceLog:
-        if quill_id not in self._logs:
-            self._logs[quill_id] = ServiceLog(self.config.data_dir / "logs" / "quills" / quill_id / "code.log")
-        return self._logs[quill_id]
+    def log(self, key: str) -> ServiceLog:
+        """A Quill's code log, by its key: `~alice.budget` for a Quill of alice's own."""
+        if key not in self._logs:
+            self._logs[key] = ServiceLog(self.config.data_dir / "logs" / "quills" / key / "code.log")
+        return self._logs[key]
 
-    def tail(self, quill_id: str, lines: int = 50) -> list[str]:
-        return self.log(quill_id).tail(lines)
+    def tail(self, key: str, lines: int = 50) -> list[str]:
+        return self.log(key).tail(lines)
 
-    def _guest(self, manifest: Manifest) -> Guest | InProcessGuest:
+    def _guest(self, manifest: Manifest, username: str = "") -> Guest | InProcessGuest:
         with self._lock:
             stamp = self._stamp(manifest)
-            found = self._guests.get(manifest.id)
+            # A Quill of somebody's own: a sandbox per person it runs for.
+            guest_key = f"{manifest.key}@{username}" if manifest.personal else manifest.key
+            found = self._guests.get(guest_key)
             if found is not None and found[0] == stamp:
                 return found[1]
             if found is not None:
                 found[1].stop()
             kind = InProcessGuest if self.trusted else Guest
-            logfile = self.log(manifest.id)
+            logfile = self.log(manifest.key)
             guest = kind(
-                Path(manifest.folder or self.state.quills.quills_dir / manifest.id),
+                Path(manifest.folder or self.state.quills.folder_of(manifest.id, manifest.owner)),
                 manifest.code,
                 runtime_base=self.config.data_dir / "sandbox",
                 on_log=lambda line: logfile.write(line + "\n"),
             )
-            self._guests[manifest.id] = (stamp, guest)
+            self._guests[guest_key] = (stamp, guest)
             return guest
 
     # -- one call --------------------------------------------------------------------------
-    def installed(self, quill_id: str) -> Manifest:
-        manifest = self.state.quills.quills.get(quill_id)
+    def installed(self, quill_id: str, username: str | None = None) -> Manifest:
+        """The Quill called *quill_id*: on *username*'s shelf, or the server's own."""
+        shelf = self._shelf()
+        if username is not None and shelf is not None:
+            manifest = shelf.find(username, quill_id)
+        else:
+            manifest = self.state.quills.by_key(quill_id)
         if manifest is None:
             raise CodeError("notfound", f"{quill_id} is not installed")
-        if not self._on(quill_id):
+        if not self._on(manifest.key):
             raise CodeError("off", f"{manifest.name} is switched off on this server")
         if not manifest.code:
             raise CodeError("notfound", f"{manifest.name} has no code")
+        if manifest.personal and not self._personal_code_allowed():
+            raise CodeError("off", "Quills of people's own may not run code on this server")
         return manifest
+
+    def _personal_code_allowed(self) -> bool:
+        policy = getattr(self.state, "policy", None)
+        return policy is None or (policy.may_have() and policy.may_code())
 
     def principal_for(self, manifest: Manifest, username: str, *, via: str) -> Principal:
         models = manifest.models
@@ -432,31 +473,31 @@ class QuillCode:
         data = {"quill": manifest.id, "user": self._user(principal.username), "where": "server", **(ctx or {})}
         host = HostCalls(self, manifest, principal, via=via)
         try:
-            return self._guest(manifest).call(kind, name, data, args or {}, host, timeout=timeout)
+            return self._guest(manifest, principal.username).call(kind, name, data, args or {}, host, timeout=timeout)
         except Failed as failure:
             if failure.kind in ("error", "timeout"):
-                self.log(manifest.id).note(f"{kind} {name} failed: {failure.message}")
+                self.log(manifest.key).note(f"{kind} {name} failed: {failure.message}")
                 if failure.trace:
-                    self.log(manifest.id).write(failure.trace.rstrip() + "\n")
+                    self.log(manifest.key).write(failure.trace.rstrip() + "\n")
             raise CodeError(failure.kind, failure.message, failure.trace) from failure
         except SandboxError as exc:
-            self.log(manifest.id).note(str(exc))
+            self.log(manifest.key).note(str(exc))
             raise CodeError("unavailable", str(exc)) from exc
 
     # -- views and actions ---------------------------------------------------------------------
     def view(self, username: str, quill_id: str, screen_id: str, params: dict, *, record: str = "") -> dict:
-        manifest = self.installed(quill_id)
+        manifest = self.installed(quill_id, username)
         screen = next((s for s in manifest.screens if s["id"] == screen_id), None)
         if screen is None or screen["kit"] != "view":
             raise CodeError("notfound", f"{manifest.name} has no view called {screen_id}")
         principal = self.principal_for(manifest, username, via="person")
         ctx: dict = {"params": {str(k): str(v) for k, v in params.items()}}
         if record:
-            model = screen.get("model") or str(params.get("model", ""))
+            model = screen.get("model") or manifest.resolve(str(params.get("model", "")))
             if not model:
                 raise CodeError("invalid", "a record is opened with its datamodel")
             try:
-                ctx["record"] = self.state.records.get(principal, model, record).to_dict()
+                ctx["record"] = plain_record(manifest, self.state.records.get(principal, model, record).to_dict())
             except STORE_ERRORS as exc:
                 raise CodeError(_kind(exc), str(_host_error(exc))) from exc
         tree = self.run(manifest, "view", screen["view"], principal, ctx=ctx)
@@ -467,14 +508,21 @@ class QuillCode:
                 screens={s["id"] for s in manifest.screens},
             )
         except ui.TreeError as exc:
-            self.log(manifest.id).note(f"view {screen_id}: {exc}")
+            self.log(manifest.key).note(f"view {screen_id}: {exc}")
             raise CodeError("error", str(exc)) from exc
 
-    def actions_on(self, model: str) -> list[tuple[Manifest, dict]]:
-        """Every action of every Quill that is on, on records of *model*."""
+    def actions_on(self, model: str, username: str | None = None) -> list[tuple[Manifest, dict]]:
+        """Every action of every Quill that is on — on *username*'s shelf, or the
+        server's — on records of *model*."""
+        shelf = self._shelf()
+        manifests = (
+            shelf.for_user(username).values()
+            if username is not None and shelf is not None
+            else self.state.quills.quills.values()
+        )
         found = []
-        for manifest in self.state.quills.quills.values():
-            if not manifest.code or not self._on(manifest.id):
+        for manifest in manifests:
+            if not manifest.code or not self._on(manifest.key):
                 continue
             found.extend((manifest, a) for a in manifest.actions if a.get("on") == model)
         return found
@@ -490,7 +538,7 @@ class QuillCode:
         via: str = "person",
     ) -> list[dict]:
         """Press an action: its form checked, its record found as the person, its effects."""
-        manifest = self.installed(quill_id)
+        manifest = self.installed(quill_id, username)
         action = next((a for a in manifest.actions if a["id"] == action_id), None)
         if action is None:
             raise CodeError("notfound", f"{manifest.name} has no action {action_id}")
@@ -502,7 +550,8 @@ class QuillCode:
             if not record:
                 raise CodeError("invalid", f"{action['label']} is done to a {action['on']}: which one?")
             try:
-                args["record"] = self.state.records.get(principal, action["on"], record).to_dict()
+                found = self.state.records.get(principal, action["on"], record)
+                args["record"] = plain_record(manifest, found.to_dict())
             except STORE_ERRORS as exc:
                 raise CodeError(_kind(exc), str(_host_error(exc))) from exc
         elif record:
@@ -561,10 +610,10 @@ class QuillCode:
             if before is not None
             else sorted(after)
         )
-        for manifest in list(self.state.quills.quills.values()):
+        for manifest in list(self.state.quills.all()):
             if not manifest.hooks or not manifest.code:
                 continue
-            if principal.kind == "quill" and principal.quill == manifest.id == hooking:
+            if principal.kind == "quill" and principal.quill == manifest.id and manifest.key == hooking:
                 continue
             for hook in manifest.hooks:
                 if hook["on"] != record.model or action not in hook["when"]:
@@ -572,10 +621,10 @@ class QuillCode:
                 if action == "changed" and hook.get("fields") and not set(hook["fields"]) & set(changed):
                     continue
                 if depth >= HOOK_DEPTH:
-                    self.log(manifest.id).note(f"hook on {record.model} not run: {HOOK_DEPTH} hooks deep already")
+                    self.log(manifest.key).note(f"hook on {record.model} not run: {HOOK_DEPTH} hooks deep already")
                     continue
                 self._busy.set()
-                self._hooks.put((manifest.id, hook, principal, action, record.to_dict(), before, changed, depth + 1))
+                self._hooks.put((manifest.key, hook, principal, action, record.to_dict(), before, changed, depth + 1))
 
     def _run_hooks(self) -> None:
         while not self._stop.is_set():
@@ -590,20 +639,44 @@ class QuillCode:
                 if self._hooks.empty():
                     self._busy.clear()
 
-    def _hook(self, quill_id, hook, changer, action, record, before, changed, depth) -> None:
-        manifest = self.state.quills.quills.get(quill_id)
-        if manifest is None or not self._on(quill_id):
+    def _hook(self, key, hook, changer, action, record, before, changed, depth) -> None:
+        manifest = self.state.quills.by_key(key)
+        if manifest is None or not self._on(key):
+            return
+        if manifest.personal and not self._personal_code_allowed():
             return
         via = "assistant" if changer.kind == "assistant" else "person"
-        principal = self.principal_for(manifest, changer.username, via=via)
-        change = {"action": action, "record": record, "before": before, "changed": changed}
-        self._local.depth, self._local.quill = depth, quill_id
-        try:
-            self.run(manifest, "hook", hook["handler"], principal, via=via, args={"change": change})
-        except CodeError:
-            pass  # logged by run
-        finally:
-            self._local.depth, self._local.quill = 0, ""
+        change = {"action": action, "record": plain_record(manifest, record), "before": before, "changed": changed}
+        # A server Quill's hook runs as whoever made the change. A Quill of
+        # somebody's own runs for the people who have it: as the one who made
+        # the change, when they do, and as each of the others who can see the
+        # record — never as somebody it was not shared with.
+        for who in self._hook_people(manifest, changer, record):
+            principal = self.principal_for(manifest, who, via=via if who == changer.username else "person")
+            self._local.depth, self._local.quill = depth, key
+            try:
+                self.run(manifest, "hook", hook["handler"], principal, via=via, args={"change": change})
+            except CodeError:
+                pass  # logged by run
+            finally:
+                self._local.depth, self._local.quill = 0, ""
+
+    def _hook_people(self, manifest: Manifest, changer: Principal, record: dict) -> list[str]:
+        if not manifest.personal:
+            return [changer.username]
+        shelf = self._shelf()
+        people = shelf.people_of(manifest) if shelf is not None else [manifest.owner]
+        found = []
+        for who in people:
+            if who == changer.username or record.get("owner") == who:
+                found.append(who)
+                continue
+            try:
+                self.state.records.get(Principal.person(who), record["model"], record["id"])
+            except Exception:
+                continue  # not theirs to see, or gone: nothing of theirs happened
+            found.append(who)
+        return found
 
     def drain(self, timeout: float = 30.0) -> None:
         """Wait until every queued hook has run: for tests, and for a clean stop."""
@@ -622,39 +695,42 @@ class QuillCode:
         """Start every `call` job whose time has come; stop sandboxes left idle."""
         started = []
         now = dt.datetime.now(tz=dt.UTC)
-        for manifest in list(self.state.quills.quills.values()):
-            if not manifest.code or not self._on(manifest.id):
+        for manifest in list(self.state.quills.all()):
+            if not manifest.code or not self._on(manifest.key):
+                continue
+            if manifest.personal and not self._personal_code_allowed():
                 continue
             for job in manifest.jobs:
-                if job["action"] != "call" or (manifest.id, job["id"]) in self._running_jobs:
+                if job["action"] != "call" or (manifest.key, job["id"]) in self._running_jobs:
                     continue
-                last = self._last_run(manifest.id, job["id"])
+                last = self._last_run(manifest.key, job["id"])
                 if last is not None and now - last < parse_duration(job["every"]):
                     continue
-                self._running_jobs.add((manifest.id, job["id"]))
-                self._record_start(manifest.id, job["id"])
+                self._running_jobs.add((manifest.key, job["id"]))
+                self._record_start(manifest.key, job["id"])
                 threading.Thread(target=self._job, args=(manifest, job), daemon=True).start()
-                started.append(f"{manifest.id}/{job['id']}")
+                started.append(f"{manifest.key}/{job['id']}")
         with self._lock:
-            for quill_id, (_, guest) in list(self._guests.items()):
+            for guest_key, (_, guest) in list(self._guests.items()):
                 if guest.last_used and time.monotonic() - guest.last_used > IDLE:
                     guest.stop()
-                    del self._guests[quill_id]
+                    del self._guests[guest_key]
         return started
 
     def run_job(self, quill_id: str, job_id: str) -> None:
-        """Run one `call` job now, and wait for it: `cm quill run`, and tests."""
+        """Run one `call` job now, and wait for it: `cm quill run`, and tests.
+        *quill_id* is a server Quill's id, or a key (`~alice.budget`)."""
         manifest = self.installed(quill_id)
         job = next((j for j in manifest.jobs if j["id"] == job_id and j["action"] == "call"), None)
         if job is None:
             raise CodeError("notfound", f"{manifest.name} has no job {job_id} that calls code")
-        self._record_start(quill_id, job_id)
+        self._record_start(manifest.key, job_id)
         self._job(manifest, job, raise_=True)
 
     def _job(self, manifest: Manifest, job: dict, *, raise_: bool = False) -> None:
         error = ""
         try:
-            owner = runs_as(self.state.users, manifest.origin)
+            owner = self._runs_as(manifest)
             if not owner:
                 raise CodeError("refused", f"{manifest.name} runs as nobody: install it again")
             principal = self.principal_for(manifest, owner, via="person")
@@ -664,11 +740,11 @@ class QuillCode:
             if raise_:
                 raise
         finally:
-            self._running_jobs.discard((manifest.id, job["id"]))
+            self._running_jobs.discard((manifest.key, job["id"]))
             with self.db.connect() as conn:
                 conn.execute(
                     "UPDATE quill_call_runs SET last_error = ? WHERE quill = ? AND job = ?",
-                    (error, manifest.id, job["id"]),
+                    (error, manifest.key, job["id"]),
                 )
             conn.close()
 
@@ -690,7 +766,7 @@ class QuillCode:
         conn.close()
 
     def jobs_status(self, quill_id: str) -> list[dict]:
-        manifest = self.state.quills.quills.get(quill_id)
+        manifest = self.state.quills.by_key(quill_id)
         if manifest is None:
             return []
         rows = []
@@ -700,7 +776,7 @@ class QuillCode:
                     continue
                 row = conn.execute(
                     "SELECT last_started, last_error FROM quill_call_runs WHERE quill = ? AND job = ?",
-                    (quill_id, job["id"]),
+                    (manifest.key, job["id"]),
                 ).fetchone()
                 rows.append(
                     {
@@ -709,7 +785,7 @@ class QuillCode:
                         "handler": job["handler"],
                         "last_run": row[0] if row else None,
                         "last_error": row[1] if row else "",
-                        "running": (quill_id, job["id"]) in self._running_jobs,
+                        "running": (manifest.key, job["id"]) in self._running_jobs,
                     }
                 )
         conn.close()
@@ -717,7 +793,9 @@ class QuillCode:
 
     # -- webhooks and APIs -------------------------------------------------------------------
     def webhook(self, manifest: Manifest, hook: dict, request: dict) -> dict:
-        owner = runs_as(self.state.users, manifest.origin)
+        if manifest.personal and not self._personal_code_allowed():
+            raise CodeError("off", "Quills of people's own may not run code on this server")
+        owner = self._runs_as(manifest)
         if not owner:
             raise CodeError("unavailable", f"{manifest.name} runs as nobody")
         principal = self.principal_for(manifest, owner, via="person")
@@ -725,7 +803,9 @@ class QuillCode:
 
     def api(self, manifest: Manifest, api: dict, username: str, request: dict, *, as_quill: bool) -> dict:
         """An API answered by code: as the installer, told who asked (`request.user`)."""
-        owner = runs_as(self.state.users, manifest.origin)
+        if manifest.personal and not self._personal_code_allowed():
+            raise CodeError("off", "Quills of people's own may not run code on this server")
+        owner = self._runs_as(manifest)
         if not owner:
             raise CodeError("unavailable", f"{manifest.name} runs as nobody")
         principal = self.principal_for(manifest, owner, via="person")

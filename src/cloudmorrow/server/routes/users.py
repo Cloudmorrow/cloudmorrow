@@ -92,3 +92,7 @@ def delete_user(
     # who removed them, files and members as they were, so no share is left
     # with nobody to decide about it.
     state.shares.forget_user(username, heir=admin.username)
+    # The Quills offered to them and what they asked for go too; their own
+    # Quills stay on disk, for an administrator to promote or remove.
+    if state.sharing is not None:
+        state.sharing.forget_person(username)

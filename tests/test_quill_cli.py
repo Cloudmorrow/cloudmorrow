@@ -90,3 +90,55 @@ def test_the_datamodels_folder_in_the_environment_is_honoured(tmp_path, monkeypa
     monkeypatch.setenv("CLOUDMORROW_DATAMODELS", str(tmp_path / "nowhere"))
     with pytest.raises(typer.Exit):
         _datamodels_folder(None, tmp_path)
+
+
+# -- Quills of your own (docs/SHARING.md) -------------------------------------------
+def test_the_shelf_commands_are_there_and_say_whose_a_quill_is():
+    helped = runner.invoke(quill_cli.app, ["--help"])
+    for command in ("mine", "share", "accept", "request", "approve", "promote", "export", "fork", "policy", "audience"):
+        assert command in helped.output, command
+    assert quill_cli._whose({"mine": True}) == "yours"
+    assert quill_cli._whose({"shared_by": "alice"}) == "alice's, shared"
+    assert quill_cli._whose({"audience": {"circles": ["Parents"], "people": []}}) == "the server's, for Parents"
+    assert quill_cli._whose({}) == "the server's"
+    assert quill_cli._owner_and_id("alice/budget") == ("alice", "budget")
+    with pytest.raises(typer.Exit):
+        quill_cli._owner_and_id("budget")
+
+
+def test_mine_lists_what_the_server_says(monkeypatch):
+    class FakeApi:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return None
+
+        async def my_quills(self):
+            return {
+                "may": {"have": True, "install": False, "ask": True, "code": True, "share": True},
+                "quills": [
+                    {
+                        "id": "budget",
+                        "name": "Budget",
+                        "version": "0.2.0",
+                        "enabled": True,
+                        "shared_with": [
+                            {"username": "bob", "state": "accepted"},
+                            {"username": "carol", "state": "offered"},
+                        ],
+                        "webhook_urls": [{"id": "bank", "url": "https://x/hooks/~alice.budget/bank", "secret": "s3"}],
+                    }
+                ],
+                "offers": [{"owner": "dan", "quill": "plants", "name": "Plants", "state": "offered"}],
+                "requests": [{"id": 4, "kind": "install", "quill": "tasks", "source": "", "state": "open"}],
+            }
+
+    monkeypatch.setattr(quill_cli, "client", lambda: (None, FakeApi()))
+    shown = runner.invoke(quill_cli.app, ["mine"])
+    assert shown.exit_code == 0, shown.output
+    assert "cm quill request" in shown.output
+    assert "bob, carol (offered)" in shown.output
+    assert "https://x/hooks/~alice.budget/bank?token=s3" in shown.output
+    assert "cm quill accept dan/plants" in shown.output
+    assert "request 4: install tasks" in shown.output

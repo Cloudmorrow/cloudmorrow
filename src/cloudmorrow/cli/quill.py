@@ -13,10 +13,23 @@ And for running a server:
 
     cm quill catalog               # what there is, by category
     cm quill add fleet             # what it adds, a yes, and it is installed
-    cm quill list                  # what is installed
+    cm quill add fleet --for Parents   # for a circle (or --person), not everyone
+    cm quill list                  # what is on your shelf
     cm quill remove fleet          # its screens go; its records stay
     cm quill services              # what Quills' code is doing, as whom
     cm quill logs fleet [service]  # the last lines of a service's log
+
+And for a Quill of your own (docs/SHARING.md), whoever you are:
+
+    cm quill add budget --mine     # from the catalog, on your shelf alone
+    cm quill dev                   # as somebody who is not an administrator: your own
+    cm quill mine                  # yours, who has them, what you were offered
+    cm quill share budget bob      # offer it; `cm quill accept alice/budget` is the yes
+    cm quill request budget        # ask an administrator for one; `requests`, `approve`, `decline`
+    cm quill promote alice/budget  # an administrator makes it the server's
+    cm quill export budget         # a folder in the template's shape, to publish
+    cm quill fork budget mine      # a copy of your own, to change
+    cm quill policy                # what the server allows; an administrator sets it
 
 `check` needs no server: it reads the foundational datamodels from the
 catalog (or `--datamodels`, a folder) and checks the Quill against them the
@@ -434,17 +447,35 @@ def dev(
     async def _dev() -> None:
         _, api = client()
         async with api:
-            plan = await api.upload_quill(_tarball(folder))
+            # An administrator's is the server's; anybody else's is their own.
+            me = await api.me()
+            if me.get("is_admin"):
+                plan = await api.upload_quill(_tarball(folder))
+                whose = ""
+            else:
+                plan = await api.upload_my_quill(_tarball(folder))
+                whose = " as a Quill of your own,"
         console.print(
-            f"[green]Installed[/] {plan['name']} {plan['version']} — it is in `cm`, the web app and on the phone now"
+            f"[green]Installed[/] {plan['name']} {plan['version']} —{whose} it is in `cm`, the web app and on the"
+            " phone now"
         )
 
     run(_dev())
 
 
+def _whose(quill: dict) -> str:
+    if quill.get("mine"):
+        return "yours"
+    if quill.get("shared_by"):
+        return f"{quill['shared_by']}'s, shared"
+    audience = quill.get("audience") or {}
+    named = [*audience.get("circles", []), *audience.get("people", [])]
+    return f"the server's, for {', '.join(named)}" if named else "the server's"
+
+
 @app.command("list")
 def list_installed() -> None:
-    """The Quills on your server."""
+    """The Quills on your shelf: the server's that are for you, your own, the ones shared with you."""
 
     async def _list() -> None:
         _, api = client()
@@ -454,7 +485,7 @@ def list_installed() -> None:
             console.print("[dim]No Quills installed. `cm quill catalog` has some.[/]")
             return
         table = Table(title="quills", title_style=TITLE)
-        for column in ("id", "name", "version", "from", "on"):
+        for column in ("id", "name", "version", "from", "whose", "on"):
             table.add_column(column)
         for quill in quills:
             origin = quill.get("origin", {})
@@ -464,6 +495,7 @@ def list_installed() -> None:
                 escape(quill["name"]),
                 quill["version"],
                 escape(source),
+                escape(_whose(quill)),
                 "yes" if quill.get("enabled", True) else "[dim]off[/]",
             )
         out.print(table)
@@ -573,22 +605,50 @@ def add(
     quill_id: Annotated[str, typer.Argument(help="The Quill's id in the catalog.")] = "",
     source: Annotated[str, typer.Option("--source", help="Instead: a repository or a folder on the server.")] = "",
     ref: Annotated[str, typer.Option("--ref", help="The release of --source, e.g. v1.0.0.")] = "",
+    mine: Annotated[bool, typer.Option("--mine", help="As a Quill of your own: on your shelf alone.")] = False,
+    circles: Annotated[
+        list[str] | None, typer.Option("--for", help="Only for this circle (again for more). Admin.")
+    ] = None,
+    people: Annotated[
+        list[str] | None, typer.Option("--person", help="Only for this person (again for more). Admin.")
+    ] = None,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Do not ask.")] = False,
 ) -> None:
-    """Install a Quill: shows what it adds, and asks first."""
+    """Install a Quill: shows what it adds, and asks first. For everyone, for some (--for, --person), or
+    for yourself alone (--mine)."""
     if bool(quill_id) == bool(source):
         fail("name a Quill from the catalog, or give --source")
+    if mine and (circles or people):
+        fail("--mine is yours alone; --for and --person are an administrator's")
 
     async def _add() -> None:
         _, api = client()
         async with api:
-            plan = await api.plan_quill(id=quill_id, source=source, ref=ref)
+            plan = await (api.plan_my_quill if mine else api.plan_quill)(id=quill_id, source=source, ref=ref)
             print_plan(plan)
+            if plan.get("adopt"):
+                owners = ", ".join(a["owner"] for a in plan["adopt"])
+                console.print(f"[yellow]{owners} has a Quill of their own called {plan['id']}: `cm quill adopt`[/]")
             if not yes and not typer.confirm("Install it?", default=True):
                 console.print("[dim]Nothing installed.[/]")
                 return
-            await api.install_quill(id=quill_id, source=source, ref=ref)
-        console.print(f"[green]Installed[/] {plan['name']} {plan['version']}")
+            if mine:
+                await api.install_my_quill(id=quill_id, source=source, ref=ref)
+            elif circles or people:
+                await api._request(
+                    "POST",
+                    "/api/quills",
+                    json={
+                        "id": quill_id,
+                        "source": source,
+                        "ref": ref,
+                        "audience": {"circles": circles or [], "people": people or []},
+                    },
+                )
+            else:
+                await api.install_quill(id=quill_id, source=source, ref=ref)
+        whose = " as a Quill of your own" if mine else ""
+        console.print(f"[green]Installed[/] {plan['name']} {plan['version']}{whose}")
 
     run(_add())
 
@@ -596,6 +656,7 @@ def add(
 @app.command("remove")
 def remove(
     quill_id: Annotated[str, typer.Argument(help="The Quill's id.")],
+    mine: Annotated[bool, typer.Option("--mine", help="A Quill of your own.")] = False,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Do not ask.")] = False,
 ) -> None:
     """Remove a Quill. Its screens and jobs go; the records stay, because they are yours."""
@@ -605,10 +666,386 @@ def remove(
     async def _remove() -> None:
         _, api = client()
         async with api:
-            await api.uninstall_quill(quill_id)
+            if mine:
+                await api.remove_my_quill(quill_id)
+            else:
+                await api.uninstall_quill(quill_id)
         console.print(f"[green]Removed[/] {quill_id}")
 
     run(_remove())
+
+
+@app.command("audience")
+def audience(
+    quill_id: Annotated[str, typer.Argument(help="A server Quill's id.")],
+    circles: Annotated[list[str] | None, typer.Option("--for", help="A circle (again for more).")] = None,
+    people: Annotated[list[str] | None, typer.Option("--person", help="A person (again for more).")] = None,
+) -> None:
+    """Who a server Quill is for: the circles and people named, or everyone when none is (admin)."""
+
+    async def _audience() -> None:
+        _, api = client()
+        async with api:
+            done = await api.set_quill_audience(quill_id, circles=circles or [], people=people or [])
+        named = [*done["audience"]["circles"], *done["audience"]["people"]]
+        console.print(f"[green]{quill_id}[/] is for {', '.join(named) if named else 'everyone'}")
+
+    run(_audience())
+
+
+# -- Quills of your own (docs/SHARING.md) -------------------------------------------------------
+def _owner_and_id(spec: str) -> tuple[str, str]:
+    owner, sep, quill_id = spec.partition("/")
+    if not sep or not owner or not quill_id:
+        fail("name it as owner/quill, e.g. alice/budget")
+    return owner, quill_id
+
+
+@app.command("mine")
+def mine() -> None:
+    """Your own Quills and who has them, what you were offered, and what you asked for."""
+
+    async def _mine() -> None:
+        _, api = client()
+        async with api:
+            found = await api.my_quills()
+        may = found["may"]
+        if not may["have"]:
+            console.print("[yellow]Quills of people's own are switched off on this server.[/]")
+        elif may["ask"]:
+            console.print("[dim]On this server a Quill of your own comes through `cm quill request`.[/]")
+        if found["quills"]:
+            table = Table(title="your quills", title_style=TITLE)
+            for column in ("id", "name", "version", "shared with", "on"):
+                table.add_column(column)
+            for quill in found["quills"]:
+                shared = ", ".join(
+                    s["username"] + ("" if s["state"] == "accepted" else f" ({s['state']})")
+                    for s in quill.get("shared_with", [])
+                )
+                table.add_row(
+                    quill["id"],
+                    escape(quill["name"]),
+                    quill["version"],
+                    escape(shared),
+                    "yes" if quill.get("enabled", True) else "[dim]off[/]",
+                )
+            out.print(table)
+            for quill in found["quills"]:
+                for hook in quill.get("webhook_urls", []):
+                    out.print(f"webhook {quill['id']}/{hook['id']}: {hook['url']}?token={hook['secret']}", markup=False)
+        else:
+            console.print("[dim]No Quills of your own. `cm quill add <id> --mine`, or `cm quill dev` in a folder.[/]")
+        for offer in found["offers"]:
+            state = offer["state"]
+            said = (
+                f"`cm quill accept {offer['owner']}/{offer['quill']}` says yes"
+                if state == "offered"
+                else f"{state}; `cm quill leave {offer['owner']}/{offer['quill']}` leaves it"
+                if state == "accepted"
+                else state
+            )
+            console.print(f"[b]{escape(offer['name'])}[/] — {offer['owner']}'s, {said}")
+        for shadow in found.get("shadowed", []):
+            console.print(f"[dim]{shadow['owner']}'s {shadow['id']} is behind a Quill of the same id on your shelf.[/]")
+        for request in found["requests"]:
+            what = request["quill"] or request["source"]
+            console.print(f"request {request['id']}: {request['kind']} {escape(what)} — {request['state']}")
+        for key, why in found.get("broken", {}).items():
+            console.print(f"[red]{key} does not load:[/] {escape(why)}")
+
+    run(_mine())
+
+
+@app.command("share")
+def share(
+    quill_id: Annotated[str, typer.Argument(help="A Quill of your own.")],
+    people: Annotated[list[str] | None, typer.Argument(help="Who to offer it to.")] = None,
+    circles: Annotated[list[str] | None, typer.Option("--circle", help="Everybody in a circle.")] = None,
+    take_back: Annotated[str, typer.Option("--take-back", help="Take it back from this person instead.")] = "",
+) -> None:
+    """Offer a Quill of your own to people. Each says yes before it is on their shelf, over their own data."""
+    if not (people or circles or take_back):
+        fail("name people, --circle, or --take-back somebody")
+
+    async def _share() -> None:
+        _, api = client()
+        async with api:
+            if take_back:
+                rows = await api.unshare_my_quill(quill_id, take_back)
+            else:
+                rows = await api.share_my_quill(quill_id, people=people or [], circles=circles or [])
+        for row in rows:
+            console.print(f"{row['username']}: {row['state']}")
+        if not rows:
+            console.print("[dim]Shared with nobody.[/]")
+
+    run(_share())
+
+
+@app.command("accept")
+def accept(spec: Annotated[str, typer.Argument(help="owner/quill, as `cm quill mine` lists it.")]) -> None:
+    """Yes to a Quill somebody offered you: it is on your shelf, over your own data, as you."""
+    owner, quill_id = _owner_and_id(spec)
+
+    async def _accept() -> None:
+        _, api = client()
+        async with api:
+            await api.answer_quill_offer(owner, quill_id, True)
+        console.print(f"[green]{quill_id}[/] is on your shelf — `cm {quill_id}`, and a tab everywhere")
+
+    run(_accept())
+
+
+@app.command("decline")
+def decline(spec: Annotated[str, typer.Argument(help="owner/quill.")]) -> None:
+    """No to a Quill somebody offered you."""
+    owner, quill_id = _owner_and_id(spec)
+
+    async def _decline() -> None:
+        _, api = client()
+        async with api:
+            await api.answer_quill_offer(owner, quill_id, False)
+        console.print(f"Declined {owner}'s {quill_id}")
+
+    run(_decline())
+
+
+@app.command("leave")
+def leave(spec: Annotated[str, typer.Argument(help="owner/quill.")]) -> None:
+    """Leave a Quill somebody shared with you. Your records of its datamodels stay yours."""
+    owner, quill_id = _owner_and_id(spec)
+
+    async def _leave() -> None:
+        _, api = client()
+        async with api:
+            await api.leave_quill(owner, quill_id)
+        console.print(f"Left {owner}'s {quill_id}")
+
+    run(_leave())
+
+
+@app.command("request")
+def request(
+    quill_id: Annotated[
+        str, typer.Argument(help="A Quill's id in the catalog, or one of your own with --promote.")
+    ] = "",
+    source: Annotated[str, typer.Option("--source", help="Instead: a repository.")] = "",
+    ref: Annotated[str, typer.Option("--ref", help="The release of --source.")] = "",
+    promote: Annotated[
+        bool, typer.Option("--promote", help="Ask for a Quill of your own to be made the server's.")
+    ] = False,
+    note: Annotated[str, typer.Option("--note", "-m", help="Why, in a line.")] = "",
+) -> None:
+    """Ask an administrator for a Quill: one to be installed, or one of yours to be promoted."""
+
+    async def _request() -> None:
+        _, api = client()
+        async with api:
+            made = await api.request_quill(
+                kind="promote" if promote else "install", id=quill_id, source=source, ref=ref, note=note
+            )
+        console.print(f"[green]Asked[/] (request {made['id']}). An administrator will see it.")
+
+    run(_request())
+
+
+@app.command("requests")
+def requests(
+    all: Annotated[bool, typer.Option("--all", help="The answered ones too.")] = False,  # noqa: A002
+) -> None:
+    """Open requests: everybody's for an administrator, your own otherwise."""
+
+    async def _requests() -> None:
+        _, api = client()
+        async with api:
+            rows = await api.quill_requests(all=all)
+        if not rows:
+            console.print("[dim]No requests.[/]")
+            return
+        table = Table(title="requests", title_style=TITLE)
+        for column in ("#", "who", "what", "note", "state"):
+            table.add_column(column)
+        for row in rows:
+            what = f"{row['kind']} {row['quill'] or row['source']}" + (f" @{row['ref']}" if row["ref"] else "")
+            table.add_row(str(row["id"]), row["username"], escape(what), escape(row["note"]), row["state"])
+        out.print(table)
+
+    run(_requests())
+
+
+@app.command("approve")
+def approve(
+    request_id: Annotated[int, typer.Argument(help="The request's number, from `cm quill requests`.")],
+    circles: Annotated[list[str] | None, typer.Option("--for", help="For this circle (again for more).")] = None,
+    people: Annotated[list[str] | None, typer.Option("--person", help="For this person (again for more).")] = None,
+    asker: Annotated[bool, typer.Option("--asker", help="For the one who asked, alone.")] = False,
+    give_to: Annotated[
+        list[str] | None, typer.Option("--give", help="A circle that gets write on what it introduces.")
+    ] = None,
+    note: Annotated[str, typer.Option("--note", "-m", help="A word back.")] = "",
+) -> None:
+    """Yes to a request (admin): installed for everyone, for circles and people, or for the asker alone."""
+
+    async def _approve() -> None:
+        _, api = client()
+        async with api:
+            who = list(people or [])
+            if asker:
+                found = next((r for r in await api.quill_requests() if r["id"] == request_id), None)
+                if found is None:
+                    fail(f"there is no open request {request_id}")
+                who.append(found["username"])
+            done = await api.approve_quill_request(
+                request_id, circles=circles or [], people=who, give_to=give_to or [], note=note
+            )
+        console.print(f"[green]Approved[/] — {done.get('installed', '')} {done.get('version', '')} is installed")
+
+    run(_approve())
+
+
+@app.command("decline-request")
+def decline_request(
+    request_id: Annotated[int, typer.Argument(help="The request's number.")],
+    note: Annotated[str, typer.Option("--note", "-m", help="A word back.")] = "",
+) -> None:
+    """No to a request (admin)."""
+
+    async def _decline() -> None:
+        _, api = client()
+        async with api:
+            await api.decline_quill_request(request_id, note=note)
+        console.print(f"Declined request {request_id}")
+
+    run(_decline())
+
+
+@app.command("promote")
+def promote(
+    spec: Annotated[str, typer.Argument(help="owner/quill: whose Quill, and which.")],
+    circles: Annotated[list[str] | None, typer.Option("--for", help="For this circle (again for more).")] = None,
+    people: Annotated[list[str] | None, typer.Option("--person", help="For this person (again for more).")] = None,
+    give_to: Annotated[
+        list[str] | None, typer.Option("--give", help="A circle that gets write on what it introduces.")
+    ] = None,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Do not ask.")] = False,
+) -> None:
+    """Make somebody's own Quill the server's (admin): for everyone, or for the circles and people named.
+    Every record of its datamodels — theirs, and the people's they shared it with — moves with it."""
+    owner, quill_id = _owner_and_id(spec)
+    if not yes and not typer.confirm(
+        f"Promote {owner}'s {quill_id}? Their records move to the server's datamodels.", default=True
+    ):
+        return
+
+    async def _promote() -> None:
+        _, api = client()
+        async with api:
+            plan = await api.promote_quill(
+                owner, quill_id, circles=circles or [], people=people or [], give_to=give_to or []
+            )
+        moved = ", ".join(f"{n} {m}" for m, n in plan.get("moved", {}).items()) or "no records"
+        console.print(f"[green]Promoted[/] {plan['name']} {plan['version']} — moved {moved}")
+
+    run(_promote())
+
+
+@app.command("adopt")
+def adopt(
+    spec: Annotated[str, typer.Argument(help="owner/quill: whose own Quill folds into the server's of that id.")],
+) -> None:
+    """Fold somebody's own Quill into the server Quill of the same id, records and all (admin)."""
+    owner, quill_id = _owner_and_id(spec)
+
+    async def _adopt() -> None:
+        _, api = client()
+        async with api:
+            done = (await api._request("POST", f"/api/quills/adopt/{owner}/{quill_id}")).json()
+        moved = ", ".join(f"{n} {m}" for m, n in done.get("moved", {}).items()) or "no records"
+        console.print(f"[green]Adopted[/] {owner}'s {quill_id} — moved {moved}")
+
+    run(_adopt())
+
+
+@app.command("export")
+def export(
+    quill_id: Annotated[str, typer.Argument(help="A Quill of your own.")],
+    into: Annotated[Path | None, typer.Option("--dir", help="Where to unpack it. ./quill-<id>.")] = None,
+    datasets: Annotated[
+        list[str] | None,
+        typer.Option("--dataset", help="A datamodel of its own whose records go with it (again for more)."),
+    ] = None,
+) -> None:
+    """Your Quill as a repository would hold it: the folder in the template's shape, with tests, a
+    CLAUDE.md and the workflows — ready for `cm quill test`, a push, a tag, and the catalog."""
+    target = (into or Path(f"quill-{quill_id}")).resolve()
+    if target.exists() and any(target.iterdir()):
+        fail(f"{target} is not empty")
+
+    async def _export() -> None:
+        _, api = client()
+        async with api:
+            data = await api.export_my_quill(quill_id, datasets=datasets or [])
+        target.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
+            for member in archive.getmembers():
+                # The archive holds one folder, quill-<id>/; unpack what is in it.
+                member.name = "/".join(member.name.split("/")[1:])
+                if member.name:
+                    archive.extract(member, target, filter="data")
+        console.print(
+            f"[green]Exported[/] to {target}/ — next: [b]cd {target} && uv sync && cm quill test[/], then push it,"
+            " tag a release, and open a pull request on Cloudmorrow/quill-catalog"
+        )
+
+    run(_export())
+
+
+@app.command("fork")
+def fork(
+    quill_id: Annotated[str, typer.Argument(help="A Quill on your shelf: the server's, shared with you, or your own.")],
+    new_id: Annotated[str, typer.Argument(help="The new id: lowercase letters, digits and _.")],
+    name: Annotated[str, typer.Option("--name", help="What to call it.")] = "",
+) -> None:
+    """A copy of a Quill you have, as one of your own under a new id, to change. The id is renamed in its
+    manifest, datamodels and code — textually, so `cm quill check` the export if it misbehaves."""
+
+    async def _fork() -> None:
+        _, api = client()
+        async with api:
+            plan = await api.fork_quill(quill_id, new_id, name=name)
+        console.print(f"[green]Forked[/] {quill_id} into {plan['name']} ({new_id}), a Quill of your own")
+
+    run(_fork())
+
+
+@app.command("policy")
+def policy(
+    personal: Annotated[
+        str, typer.Option("--personal", help="on, ask or off: may people have Quills of their own?")
+    ] = "",
+    code: Annotated[str, typer.Option("--code", help="on or off: may those run code?")] = "",
+    sharing: Annotated[str, typer.Option("--sharing", help="on or off: may they be shared?")] = "",
+) -> None:
+    """What this server allows about Quills of people's own; an administrator changes it."""
+
+    async def _policy() -> None:
+        _, api = client()
+        async with api:
+            changes = {
+                k: v
+                for k, v in (
+                    ("personal_quills", personal),
+                    ("personal_quill_code", code),
+                    ("personal_quill_sharing", sharing),
+                )
+                if v
+            }
+            found = await (api.set_quill_policy(**changes) if changes else api.quill_policy())
+        for key in ("personal_quills", "personal_quill_code", "personal_quill_sharing"):
+            console.print(f"{key}: [b]{found[key]}[/]")
+
+    run(_policy())
 
 
 # -- a Quill's code on this machine ----------------------------------------------------

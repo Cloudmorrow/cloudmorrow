@@ -62,3 +62,21 @@
   color: var(--muted);
 }
 .quill-chip { font-family: var(--display); font-size: 12.5px; letter-spacing: .02em; }
+
+/* -- Quills of people's own, on the Quills side ------------------------------- */
+.policy select {
+  margin-left: auto;
+  padding: 4px 8px;
+  border: 1px solid var(--line-bright);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+.own-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: auto; }
+.own-buttons .quill-chip { margin-left: 0; }
+button.quill-chip { cursor: pointer; background: transparent; font: inherit; font-size: 11.5px; font-weight: 600; }
+button.quill-chip:hover { border-color: var(--accent); color: var(--accent); }
+.meta-inline { color: var(--muted); font-weight: 400; font-size: 13px; }
+.row.request-row, .row.own-row { align-items: center; }

@@ -67,7 +67,10 @@ BACKENDS = frozenset({"notes", "shares", "vaults"})
 NOTIFY_WHEN = frozenset({"created"})
 
 # `task`, `board`, `fleet.service_visit`, and an extension's `fleet.odometer`.
-ID_RE = re.compile(r"^[a-z][a-z0-9_]{0,39}(\.[a-z][a-z0-9_]{0,39})?$")
+# A datamodel somebody's own Quill introduced carries their name in front,
+# `~alice.budget.envelope` (docs/SHARING.md): the same grammar, with a home.
+OWNER_PREFIX = "~"
+ID_RE = re.compile(r"^(~[a-z_][a-z0-9_-]{0,31}\.)?[a-z][a-z0-9_]{0,39}(\.[a-z][a-z0-9_]{0,39})?$")
 FIELD_RE = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
 
 
@@ -236,6 +239,15 @@ def _replace(f: Field, **changes) -> Field:
     return Field(**values)
 
 
+def renamed(model: Datamodel, names: dict[str, str]) -> Datamodel:
+    """*model* with its id, and every link to a datamodel in *names*, renamed: how
+    a Quill of somebody's own gets its datamodels under their name."""
+    fields = tuple(_replace(f, to=names[f.to]) if f.kind == "link" and f.to in names else f for f in model.fields)
+    values = {name: getattr(model, name) for name in Datamodel.__slots__}
+    values.update(id=names.get(model.id, model.id), fields=fields)
+    return Datamodel(**values)
+
+
 def parse_field(where: str, name: str, spec: object) -> Field:
     """One field on its own: an action's form is fields, checked the way a datamodel's are."""
     if isinstance(spec, str):
@@ -325,7 +337,7 @@ def parse_datamodel(data: dict, *, source: str = "foundation", where: str = "") 
         raise DatamodelError(f"{where or 'datamodel'}: no [datamodel] table")
     model_id = str(head.get("id", ""))
     where = where or model_id or "datamodel"
-    if not ID_RE.match(model_id):
+    if not ID_RE.match(model_id) or model_id.startswith(OWNER_PREFIX):
         raise DatamodelError(f"{where}: id {model_id!r} is lowercase words, optionally `quill.name`")
     if source != "foundation" and not model_id.startswith(source + "."):
         raise DatamodelError(f"{where}: a datamodel {source} introduces is named {source}.<name>")

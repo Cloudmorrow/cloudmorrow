@@ -152,14 +152,28 @@
 }
 
 /* -- Administration: Quills ------------------------------------------------ */
-#quill-sheet-body, #quill-services-body {
+#quill-sheet-body, #quill-services-body, #shelves-body {
     height: auto;
     max-height: 62vh;
     scrollbar-size-vertical: 1;
 }
 
-#quill-sheet-body Static, #quill-services-body Static {
+#quill-sheet-body Static, #quill-services-body Static, #shelves-body Static {
     height: auto;
+}
+
+/* People's own Quills and the requests (admin_quills.ShelvesModal): a line
+   each, and its buttons under it. */
+.shelves-buttons {
+    height: auto;
+    margin: 0 0 1 2;
+}
+
+.shelves-buttons Button {
+    height: 1;
+    min-width: 6;
+    margin-right: 1;
+    padding: 0 1;
 }
 
 /* The Quill actions on a record (tui/quill_actions.py), under its fields. */

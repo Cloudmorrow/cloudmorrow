@@ -55,7 +55,9 @@ Nothing here widens what anybody sees; everything here narrows it.
    principal, this action, this datamodel — asks the person's access first.
    A Quill's service and an assistant acting for somebody reach at most
    what that person may; an assistant never reaches `secret`, whatever the
-   circles say.
+   circles say. A datamodel of somebody's own Quill (`~alice.budget.envelope`,
+   [SHARING.md](SHARING.md)) is reached only from a shelf that Quill stands
+   on, whatever `*` says: the shelf narrows before the circles are asked.
 6. **Refused looks like absent.** A datamodel you may not read answers 404
    on its records and is missing from `GET /api/datamodels`, the way a
    record you cannot see is missing today. Writing where you may only read

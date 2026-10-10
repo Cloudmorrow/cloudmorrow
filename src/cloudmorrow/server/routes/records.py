@@ -75,7 +75,7 @@ def switched_on(state: AppState, model: str) -> None:
     """
     users = state.quills.users_of(model)
     if users and not any(state.features.enabled(quill) for quill in users):
-        names = ", ".join(state.quills.quills[q].name for q in users)
+        names = ", ".join(m.name for q in users if (m := state.quills.by_key(q)) is not None)
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"{names} is switched off on this server")
 
 
@@ -88,9 +88,9 @@ def list_datamodels(state: AppState = Depends(get_state), user: User = Depends(g
     """Every datamodel on this server you may use, foundational first, with who uses
     each and your `access` to it. One your circles do not give is not there."""
     rows = state.quills.catalogue_of_models()
-    if state.circles is None:
+    if state.circles is None and state.shelf is None:
         return rows
-    access = state.circles.access_for(user.username)
+    access = (state.shelf or state.circles).access_for(user.username)
     return [row | {"access": access.level(row["id"])} for row in rows if access.may("read", row["id"])]
 
 

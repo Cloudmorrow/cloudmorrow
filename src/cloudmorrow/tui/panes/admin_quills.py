@@ -20,6 +20,12 @@ Quill (or another that uses the same datamodels) is installed.
 
 Both change what the workspace behind this panel should show, so each asks
 it to fetch the Quills again: the tab comes or goes without a restart.
+
+Shelves (`s`) is the rest: the Quills people made or added for themselves
+(docs/SHARING.md), who has each, the requests waiting for an answer, and the
+three settings that say what the server allows. Approving installs for
+everyone or for the one who asked; promoting makes somebody's own Quill the
+server's, records and all. The policy itself is `cm quill policy`.
 """
 
 from __future__ import annotations
@@ -277,6 +283,79 @@ class RemoveSheet(Modal[list[str] | None]):
         self.dismiss(None)
 
 
+class ShelvesModal(Modal[str | None]):
+    """People's own Quills, and what was asked for: one button each, answered one at a time.
+
+    Answers with what to do — `approve:<id>`, `asker:<id>`, `decline:<id>`,
+    `promote:<owner>/<quill>` — or None; the pane does it and opens this again.
+    """
+
+    BINDINGS = [("escape", "cancel", "Cancel")]
+
+    def __init__(self, everything: dict) -> None:
+        super().__init__()
+        self.everything = everything
+
+    def compose(self) -> ComposeResult:
+        policy = self.everything.get("policy") or {}
+        requests = self.everything.get("requests") or []
+        personal = self.everything.get("personal") or []
+        with Vertical(classes="modal modal-wide", id="shelves"):
+            yield Label("Quills of people's own", classes="modal-title")
+            with VerticalScroll(id="shelves-body"):
+                yield Static(
+                    f"[{MUTED}]people's own: [b]{policy.get('personal_quills', 'on')}[/] · code: "
+                    f"[b]{policy.get('personal_quill_code', 'on')}[/] · sharing: "
+                    f"[b]{policy.get('personal_quill_sharing', 'on')}[/]  — `cm quill policy` changes it[/]",
+                    id="shelves-policy",
+                )
+                if requests:
+                    yield Static(f"\n[b {ACCENT}]Asked for[/]", classes="shelves-head")
+                for request in requests:
+                    what = (
+                        f"{request['quill']} to be promoted"
+                        if request["kind"] == "promote"
+                        else request["quill"] or request["source"]
+                    )
+                    note = f"  [{MUTED}]{escape(request['note'])}[/]" if request.get("note") else ""
+                    yield Static(f"  [b]{escape(request['username'])}[/] asks for [b]{escape(what)}[/]{note}")
+                    with Horizontal(classes="shelves-buttons"):
+                        yield Button("For everyone", variant="primary", id=f"approve-{request['id']}")
+                        if request["kind"] != "promote":
+                            yield Button(f"For {request['username']}", id=f"asker-{request['id']}")
+                        yield Button("Decline", variant="error", id=f"decline-{request['id']}")
+                if personal:
+                    yield Static(f"\n[b {ACCENT}]Whose[/]", classes="shelves-head")
+                for index, quill in enumerate(personal):
+                    shared = [s["username"] for s in quill.get("shared_with", []) if s["state"] == "accepted"]
+                    with_ = f", shared with {', '.join(shared)}" if shared else ""
+                    off = "" if quill.get("enabled", True) else f"  [{WARN}]switched off[/]"
+                    yield Static(
+                        f"  [b]{escape(quill['name'])}[/] [{MUTED}]{quill['version']}[/]  "
+                        f"[{MUTED}]{escape(quill['owner'])}'s{escape(with_)}[/]{off}"
+                    )
+                    with Horizontal(classes="shelves-buttons"):
+                        yield Button("Promote for everyone", id=f"promote-{index}")
+                if not requests and not personal:
+                    yield Static(f"[{FAINT}]Nobody has a Quill of their own yet, and nothing is asked for.[/]")
+            with Horizontal(classes="modal-buttons"):
+                yield Button("Close", id="cancel")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        event.stop()
+        kind, _, rest = (event.button.id or "").partition("-")
+        if kind == "promote":
+            quill = (self.everything.get("personal") or [])[int(rest)]
+            self.dismiss(f"promote:{quill['owner']}/{quill['id']}")
+        elif kind in ("approve", "asker", "decline"):
+            self.dismiss(f"{kind}:{rest}")
+        else:
+            self.dismiss(None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class QuillsView(Pane):
     """The catalog by category, what is installed, install and remove."""
 
@@ -286,10 +365,12 @@ class QuillsView(Pane):
         ("i", "fire('install')", "Install"),
         ("d", "fire('remove')", "Remove"),
         ("r", "fire('running')", "Running"),
+        ("s", "fire('shelves')", "Shelves"),
     ]
     ACTIONS = (
         Action("install", "Install…", "i", variant="primary", hint="See what it adds, then install it"),
         Action("running", "Running…", "r", hint="What its code is doing: services, logs, webhook addresses"),
+        Action("shelves", "Shelves…", "s", hint="People's own Quills, and what they asked for"),
         Action("remove", "Remove", "d", variant="error", hint="Its tabs and jobs go; its records stay"),
     )
 
@@ -498,6 +579,55 @@ class QuillsView(Pane):
         self.status(f"Removed {name}. " + (f"{dropped} records went with it." if dropped else "Its records are kept."))
         self._workspace_follows()
         self.reload()
+
+    # -- people's own Quills, and what they asked for ----------------------------
+    def act_shelves(self) -> None:
+        self.shelves()
+
+    @work(group="ui")
+    async def shelves(self) -> None:
+        while True:
+            try:
+                everything = await self.api.all_quills()
+            except ApiError as exc:
+                self.status(str(exc), error=True)
+                return
+            answer = await self.app.push_screen_wait(ShelvesModal(everything))
+            if not answer:
+                return
+            kind, _, rest = answer.partition(":")
+            try:
+                if kind == "approve":
+                    done = await self.api.approve_quill_request(int(rest))
+                    self.status(f"Installed {done.get('installed', '')} for everyone.")
+                elif kind == "asker":
+                    who = next(r["username"] for r in everything["requests"] if r["id"] == int(rest))
+                    done = await self.api.approve_quill_request(int(rest), people=[who])
+                    self.status(f"Installed {done.get('installed', '')} for {who}.")
+                elif kind == "decline":
+                    await self.api.decline_quill_request(int(rest))
+                    self.status("Declined.")
+                elif kind == "promote":
+                    owner, _, quill_id = rest.partition("/")
+                    confirmed = await self.app.push_screen_wait(
+                        ConfirmModal(
+                            f"Promote {owner}'s {quill_id}?",
+                            detail=(
+                                "[dim]It becomes the server's, for everyone. Every record of its own datamodels — "
+                                f"{owner}'s and those of the people it was shared with — moves with it.[/]"
+                            ),
+                            confirm_label="Promote",
+                        )
+                    )
+                    if not confirmed:
+                        continue
+                    plan = await self.api.promote_quill(owner, quill_id)
+                    moved = sum(int(n) for n in (plan.get("moved") or {}).values())
+                    self.status(f"Promoted {plan.get('name') or quill_id}; {plural(moved, 'record')} moved.")
+            except ApiError as exc:
+                self.status(str(exc), error=True)
+            self._workspace_follows()
+            self.reload()
 
     def _workspace_follows(self) -> None:
         """The tabs behind this panel: fetched again, so they match."""

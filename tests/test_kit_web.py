@@ -48,7 +48,9 @@ def test_the_kit_is_listed_and_served(client):
     assert 'import "./quillsadmin.js";' in APP_JS
     assert '@import "./kit.css";' in APP_CSS
     assert '@import "./quillsadmin.css";' in APP_CSS
-    for name in ("kit.js", "kit.css", "quills.js", "quillsadmin.js", "quillsadmin.css", *OWN_FILES):
+    assert 'import "./myquills.js";' in APP_JS and '@import "./myquills.css";' in APP_CSS
+    mine = ("myquills.js", "myquills.css")
+    for name in ("kit.js", "kit.css", "quills.js", "quillsadmin.js", "quillsadmin.css", *mine, *OWN_FILES):
         assert client.get(f"/app/{version}/{name}").status_code == 200, name
 
 
@@ -61,7 +63,7 @@ def test_the_quill_tabs_sit_where_notes_and_tasks_were():
     assert "export function tabSlot()" in core
     # And the feature switches see them like any other tab.
     assert "tabList.flatMap((t) => t.tabs || [t])" in core
-    assert "feature: quill.id," in QUILLS_JS
+    assert "feature: quill.key || quill.id," in QUILLS_JS
 
 
 def test_the_old_task_screen_is_gone():

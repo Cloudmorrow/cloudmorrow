@@ -1,0 +1,10 @@
+/* Your Quills: rows with a chip or two of buttons each, like Administration's. */
+
+.myquills .own-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: auto; }
+.myquills .own-buttons .quill-chip { margin-left: 0; }
+.myquills .row .quill-chip + .quill-chip { margin-left: 6px; }
+.myquills button.quill-chip { cursor: pointer; background: transparent; font: inherit; font-size: 11.5px; font-weight: 600; }
+.myquills button.quill-chip:hover { border-color: var(--accent); color: var(--accent); }
+.myquills .meta-inline { color: var(--muted); font-weight: 400; font-size: 13px; }
+.myquills .row.own-row, .myquills .row.offer-row, .myquills .row.catalog-row, .myquills .row.request-row { align-items: center; }
+.myquills .share-sheet { margin: 0 0 14px; }

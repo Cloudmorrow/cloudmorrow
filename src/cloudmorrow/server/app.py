@@ -29,6 +29,8 @@ from cloudmorrow.server.quills import QuillRegistry
 from cloudmorrow.server.quills.code import QuillCode
 from cloudmorrow.server.quills.jobs import Clock
 from cloudmorrow.server.quills.services import Supervisor
+from cloudmorrow.server.quills.sharing import Policy, SharingStore
+from cloudmorrow.server.quills.shelf import Shelf
 from cloudmorrow.server.quills.tokens import QuillTokenStore
 from cloudmorrow.server.records import RecordStore
 from cloudmorrow.server.routes import (
@@ -44,6 +46,7 @@ from cloudmorrow.server.routes import (
     push,
     quillcode,
     quills,
+    quillshelf,
     records,
     secrets,
     setup,
@@ -104,11 +107,28 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     signin_limits = SigninLimits()
     credential_check = CredentialCheck(user_store, config.ensure_secret_key(), signin_limits)
     # What is installed, and the one table every Quill's records live in.
-    quill_registry = QuillRegistry(config.quills_dir, config.datamodels_dir, config.quill_catalog)
+    quill_registry = QuillRegistry(
+        config.quills_dir, config.datamodels_dir, config.quill_catalog, personal_dir=config.personal_quills_dir
+    )
     record_store = RecordStore(db, quill_registry.models, quill_registry.expiries)
     # Who may use which datamodels: asked by the gate on every read and write.
     circle_store = CircleStore(db)
-    record_store.access = circle_store.access_for
+    # Each installed Quill is one more thing to switch, at both levels; a
+    # Quill of somebody's own by its key, `~alice.budget`.
+    feature_store = FeatureStore(
+        db,
+        lambda: (
+            Feature(q.key, q.name if not q.owner else f"{q.name} ({q.owner}'s)", q.summary, tuple(sorted(q.models)))
+            for q in quill_registry.all()
+        ),
+    )
+    # Whose Quills are whose, and the access that follows: a datamodel of
+    # somebody's own is reached only from a shelf it stands on.
+    sharing_store = SharingStore(db)
+    settings_store = SettingsStore(db)
+    policy = Policy(settings_store)
+    shelf = Shelf(quill_registry, sharing_store, circle_store, user_store, enabled=feature_store.enabled, policy=policy)
+    record_store.access = shelf.access_for
     app.state.signin_limits = signin_limits
     app.state.cloudmorrow = AppState(
         config=config,
@@ -119,11 +139,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         secrets=SecretStore(db, sealer.master),
         config_sync=ConfigStore(db),
         notifications=NotificationStore(db),
-        # Each installed Quill is one more thing to switch, at both levels.
-        features=FeatureStore(
-            db,
-            lambda: (Feature(q.id, q.name, q.summary, tuple(sorted(q.models))) for q in quill_registry.quills.values()),
-        ),
+        features=feature_store,
         push=PushStore(
             db,
             config.vapid_key_path,
@@ -134,10 +150,13 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         weather=Weather(config.weather_place),
         credential_check=credential_check,
         sealer=sealer,
-        settings=SettingsStore(db),
+        settings=settings_store,
         quills=quill_registry,
         records=record_store,
         circles=circle_store,
+        sharing=sharing_store,
+        shelf=shelf,
+        policy=policy,
     )
     # The foundation Quills on a fresh server, old tasks into records, and
     # the sweeps: on a thread, once the server is up, so none of it can
@@ -237,6 +256,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.include_router(changefeed.router)
     app.include_router(records.models_router)
     app.include_router(records.people_router)
+    app.include_router(quillshelf.router)
     app.include_router(quills.router)
     # A Quill's code: its APIs, its webhooks, and running them, for admins.
     app.include_router(quillcode.api_router)

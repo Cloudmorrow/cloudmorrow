@@ -29,45 +29,45 @@ def _assemble(
     for manifest in quills.values():
         for model in manifest.introduces:
             if model.id in models:
-                problems[manifest.id] = f"{model.id} is introduced twice"
+                problems[manifest.key] = f"{model.id} is introduced twice"
             models[model.id] = model
     for manifest in quills.values():
         for model_id, fields in manifest.extends.items():
             if model_id not in models:
-                problems.setdefault(manifest.id, f"{manifest.id} extends {model_id}, which is not installed")
+                problems.setdefault(manifest.key, f"{manifest.id} extends {model_id}, which is not installed")
                 continue
             try:
                 models[model_id] = models[model_id].with_extension(manifest.id, fields)
             except DatamodelError as exc:
-                problems.setdefault(manifest.id, str(exc))
+                problems.setdefault(manifest.key, str(exc))
     for manifest in quills.values():
         for model_id in manifest.models:
             if model_id not in models:
                 problems.setdefault(
-                    manifest.id,
+                    manifest.key,
                     f"{manifest.id} needs the datamodel {model_id}, which is not installed",
                 )
     for model in models.values():
         for f in model.fields:
             if f.kind == "link" and f.to not in models:
-                owner = (
-                    model.source
-                    if model.source != "foundation"
-                    else next((q.id for q in quills.values() if model.id in q.models), "")
-                )
+                owner = _owner_of(model, quills)
                 if owner:
                     problems.setdefault(owner, f"{model.id}.{f.name} links to {f.to}, which is not installed")
         if model.in_space:
             target = models.get(model.get_field(model.in_space).to)
             if target is not None and not target.space:
-                owner = (
-                    model.source
-                    if model.source != "foundation"
-                    else next((q.id for q in quills.values() if model.id in q.models), "")
-                )
+                owner = _owner_of(model, quills)
                 if owner:
                     problems.setdefault(owner, f"{model.id} is in_space {target.id}, which is not a space")
     return models, problems
+
+
+def _owner_of(model: Datamodel, quills: dict[str, Manifest]) -> str:
+    """The key of the Quill a datamodel's trouble is charged to: the one that
+    introduced it, else the first that uses it."""
+    if model.source != "foundation":
+        return next((q.key for q in quills.values() if any(m.id == model.id for m in q.introduces)), model.source)
+    return next((q.key for q in quills.values() if model.id in q.models), "")
 
 
 def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
@@ -373,6 +373,9 @@ def describe(
             "foundation": bool(model and model.source == "foundation"),
             "new": model_id in (new_foundation or []) or model_id in introduced,
         }
+        if manifest.plain(model_id) != model_id:
+            # Somebody's own: what its files, and its code, call it.
+            row["plain"] = manifest.plain(model_id)
         if model_id in manifest.extends:
             row["fields"] = [f"{manifest.id}.{name}" for name in manifest.extends[model_id]]
         grant = next((g for g in manifest.grants if g["model"] == model_id), None)

@@ -45,10 +45,11 @@ hook_rate = RateLimit(limit=120, window=60.0)
 
 
 def _quill(state: AppState, quill_id: str) -> Manifest:
-    manifest = state.quills.quills.get(quill_id)
+    """A Quill by id, or by key for one of somebody's own: `/hooks/~alice.budget/…`."""
+    manifest = state.quills.by_key(quill_id)
     if manifest is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"{quill_id} is not installed")
-    if not state.features.enabled(quill_id):
+    if not state.features.enabled(manifest.key):
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"{manifest.name} is switched off on this server")
     return manifest
 
@@ -112,14 +113,14 @@ async def webhook(
     state: AppState = Depends(get_state),
 ) -> Response:
     """Something outside tells the Quill something: a record, or a service's to answer."""
-    manifest = state.quills.quills.get(quill_id)
+    manifest = state.quills.by_key(quill_id)
     hook = next((h for h in manifest.webhooks if h["path"] == path), None) if manifest else None
     if manifest is None or hook is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no such webhook")
-    if not state.features.enabled(quill_id):
+    if not state.features.enabled(manifest.key):
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"{manifest.name} is switched off")
     body = await read_body(request, HOOK_MAX_BODY)
-    secret = state.quill_tokens.webhook_secret(quill_id, hook["id"])
+    secret = state.quill_tokens.webhook_secret(manifest.key, hook["id"])
     sent = token or request.headers.get("x-cloudmorrow-webhook-token", "")
     signed = hook.get("signature") and signature_ok(secret, body, request.headers.get(hook["signature"]))
     if not (signed or (sent and hmac.compare_digest(sent, secret))):
@@ -147,7 +148,7 @@ async def webhook(
             drop=("token",),
         )
 
-    owner = runs_as(state.users, manifest.origin)
+    owner = state.code._runs_as(manifest) if state.code else runs_as(state.users, manifest.origin)
     if not owner:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"{manifest.name} runs as nobody")
     try:
@@ -231,7 +232,7 @@ def logs(
     _: User = Depends(get_admin_user),
 ) -> dict[str, list[str]]:
     """The last lines of each service's log, or of the one named."""
-    manifest = state.quills.quills.get(quill_id)
+    manifest = state.quills.by_key(quill_id)
     if manifest is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"{quill_id} is not installed")
     names = [s["id"] for s in manifest.services] + (["code"] if manifest.code else [])
@@ -271,11 +272,11 @@ def rotate_secret(
     _: User = Depends(get_admin_user),
 ) -> dict:
     """A new secret for one webhook: the sender needs the new one from now."""
-    manifest = state.quills.quills.get(quill_id)
+    manifest = state.quills.by_key(quill_id)
     hook = next((h for h in manifest.webhooks if h["id"] == hook_id), None) if manifest else None
     if hook is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no such webhook")
-    secret = state.quill_tokens.rotate_webhook(quill_id, hook_id)
+    secret = state.quill_tokens.rotate_webhook(manifest.key, hook_id)
     return {
         "id": hook_id,
         "secret": secret,

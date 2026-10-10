@@ -889,6 +889,31 @@ class RecordStore:
         conn.close()
         return changed
 
+    def rename_model(self, old_id: str, new_id: str) -> int:
+        """Every record of *old_id* becomes one of *new_id*, sealed again under the new
+        name: how somebody's own datamodel (`~alice.budget.envelope`) becomes the
+        server's (`budget.envelope`) when their Quill is promoted (docs/SHARING.md).
+        Both datamodels must be known. Returns how many records moved."""
+        old = self.model(old_id)
+        new = self.model(new_id)
+        moved = 0
+        with self.db.connect() as conn:
+            for row in conn.execute("SELECT * FROM records WHERE model = ?", (old_id,)).fetchall():
+                indexed = json.loads(row["indexed"] or "{}")
+                scope = self._seal_scope(old, row["owner"], row["id"], indexed)
+                body = conn.unseal("records", "body", scope, row["body"])
+                fields = {**indexed, **(json.loads(body) if body else {})}
+                new_indexed, new_body = self._write_row(conn, new, row["owner"], row["id"], fields)
+                conn.execute(
+                    "UPDATE records SET model = ?, indexed = ?, body = ? WHERE id = ?",
+                    (new_id, new_indexed, new_body, row["id"]),
+                )
+                moved += 1
+            conn.execute("UPDATE record_changes SET model = ? WHERE model = ?", (new_id, old_id))
+            conn.commit()
+        conn.close()
+        return moved
+
     def count(self, owner: str, model_id: str, *, scope: str | None = None) -> int:
         query = "SELECT COUNT(*) FROM records WHERE model = ? AND owner = ?"
         params: list[object] = [model_id, owner]
