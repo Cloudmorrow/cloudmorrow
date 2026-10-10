@@ -318,6 +318,11 @@ main (`vX.Y.Z`), and the only version number there is:
 `make deploy WHAT=explain` says how the pieces fit together, and the top
 of [scripts/deploy.py](scripts/deploy.py) lists every step.
 
+No machine at hand? Run the **Release** workflow from the Actions tab
+(minor, patch or major): it tags `main`'s newest commit the way
+`scripts/release.py` does and publishes the release with its wheel and
+installer.
+
 ## License
 
 Cloudmorrow is free software under the [GNU Affero General Public License,

@@ -6,11 +6,23 @@
 #   *.whl       the client itself, which that installer installs
 #
 # At releases/latest/download/<name>, so nobody has to know a version.
+#
+# Three ways to start one: push a tag (scripts/release.py, on a laptop);
+# publish a release on github.com, which makes the tag; or run this workflow
+# from the Actions tab (or the API), which tags main's newest commit with the
+# next version, the way scripts/release.py would, and releases it here.
 name: Release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Which number goes up: minor (the usual), patch (a fix on its own) or major"
+        type: choice
+        options: [minor, patch, major]
+        default: minor
 
 permissions:
   contents: write
@@ -21,29 +33,55 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # The version comes from the tag (hatch-vcs).
+          # The version comes from the tag (hatch-vcs). Started by hand, it
+          # is main that is released, whichever branch the button was on.
           fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: The tag
+        id: tag
+        env:
+          BUMP: ${{ inputs.bump }}
+        # Started by hand: tag main as scripts/release.py does, and push the
+        # tag. A tag pushed from here starts no other workflow, so this run
+        # is the release.
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            case "$BUMP" in
+              patch) python scripts/release.py --patch ;;
+              major) python scripts/release.py --major ;;
+              *) python scripts/release.py ;;
+            esac
+            tag="$(git describe --tags --exact-match HEAD)"
+          else
+            tag="$GITHUB_REF_NAME"
+          fi
+          echo "name=$tag" >> "$GITHUB_OUTPUT"
       - run: pip install build
       - run: python -m build --wheel
       - name: The client installer, pointed at this release's wheel
+        env:
+          TAG: ${{ steps.tag.outputs.name }}
         run: |
           wheel="$(ls dist/*.whl | head -n 1)"
-          python scripts/release_installer.py --tag "$GITHUB_REF_NAME" --wheel "$wheel" --out dist/install.sh
+          python scripts/release_installer.py --tag "$TAG" --wheel "$wheel" --out dist/install.sh
           sh -n dist/install.sh
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.name }}
         # A release made on github.com makes its tag, and the tag starts this:
         # then the release is there already, and only wants its two files.
         run: |
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist/*.whl dist/install.sh --clobber
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.whl dist/install.sh --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/*.whl dist/install.sh \
-              --title "$GITHUB_REF_NAME" \
-              --notes "$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")" \
+            gh release create "$TAG" dist/*.whl dist/install.sh \
+              --title "$TAG" \
+              --notes "$(git tag -l --format='%(contents)' "$TAG")" \
               --verify-tag
           fi
