@@ -8,10 +8,10 @@ and nothing of any Quill: it hands the grid an extension for any grid whose
 groups are shares, which adds
 
 - a MOUNTED HERE column, lit while this machine has the share mounted;
-- New share (^n) — on the server for an administrator, or a directory on
-  this machine, served by its agent;
-- Mount (m), Unmount (u), Copy URL (c) and Remove (d), on the share the
-  cursor is on.
+- New share (^n) — a folder on the server, yours, shared with whoever you
+  name; an administrator may point it at another directory there;
+- Share with (s), Mount (m), Unmount (u), Copy URL (c) and Remove (d), on
+  the share the cursor is on.
 
 The grid calls these with itself and the share record; they talk to the
 same `/api/shares` routes and the same mount table as `cm share` does, so
@@ -26,13 +26,13 @@ from pathlib import Path
 
 from textual.app import SuspendNotSupported
 
-from cloudmorrow.agent.setup import machine_name
 from cloudmorrow.client import mounts, rclone
 from cloudmorrow.client.api import ApiError
+from cloudmorrow.client.members import changes, format_members, parse
 from cloudmorrow.tui.panes.kit_grid import GridPane, GroupExtension, register_group_extension
 from cloudmorrow.tui.screens.install import InstallRcloneModal
 from cloudmorrow.tui.screens.modals import ConfirmModal, PromptModal
-from cloudmorrow.tui.screens.share_modals import CommandModal, NoticeModal, ShareModal
+from cloudmorrow.tui.screens.share_modals import CommandModal, MembersModal, NoticeModal, ShareModal
 from cloudmorrow.tui.theme import GOOD, MUTED, WARN
 from cloudmorrow.tui.widgets.toolbar import Action
 
@@ -42,8 +42,9 @@ ACTIONS = (
         "New share",
         "^n",
         variant="primary",
-        hint="On the server, or a directory on this machine",
+        hint="A folder on the server, shared with whoever you name",
     ),
+    Action("share_with", "Share with", "s", hint="Who has the selected share"),
     Action("mount", "Mount", "m", hint="Mount the selected share on this machine"),
     Action("unmount", "Unmount", "u", hint="Unmount it here; the share stays"),
     Action("copy_url", "Copy URL", "c", hint="Its WebDAV address, for any other client"),
@@ -67,11 +68,14 @@ def mounted_cell(share: dict) -> tuple[str, ...]:
 
 def detail(share: dict) -> str:
     fields = _fields(share)
-    if fields.get("url"):
-        return f"[{MUTED}]{fields['url']}[/]"
-    if fields.get("kind") == "machine":
-        return f"[{MUTED}]{fields.get('machine') or 'its machine'} has not said where it serves yet[/]"
-    return f"[{MUTED}]{fields.get('path', '')}[/]"
+    lines = []
+    if fields.get("kind") == "server":
+        whose = "yours" if fields.get("can_manage") else f"{fields.get('owner') or '?'}'s"
+        if fields.get("access") == "read":
+            whose += ", to read"
+        lines.append(f"[{MUTED}]{whose} — shared with {fields.get('shared_with') or 'nobody yet'}[/]")
+    lines.append(f"[{MUTED}]{fields.get('url') or fields.get('path', '')}[/]")
+    return "\n".join(lines)
 
 
 async def run(pane: GridPane, action: str, share: dict | None) -> None:
@@ -85,6 +89,8 @@ async def run(pane: GridPane, action: str, share: dict | None) -> None:
         await mount_share(pane, share)
     elif action == "unmount":
         await unmount_share(pane, share)
+    elif action == "share_with":
+        await edit_members(pane, share)
     elif action == "copy_url":
         await copy_url(pane, share)
     elif action == "remove":
@@ -98,56 +104,90 @@ def _complain(pane: GridPane, title: str, exc: Exception) -> None:
     pane.app.push_screen(NoticeModal(title, str(exc)))
 
 
+async def _candidates(pane: GridPane) -> dict:
+    """Who there is to share with; nice to have, so nothing when it cannot be had."""
+    try:
+        return await pane.api.share_candidates()
+    except ApiError:
+        return {}
+
+
+def _warned(pane: GridPane, share: dict, done: str) -> None:
+    """Said on the bar — or, when the server found something wrong with the
+    share's directory, in a dialog, because it has to be read and fixed."""
+    warnings = share.get("warnings") or []
+    if warnings:
+        pane.status(f"{done} — with something to fix.", error=True)
+        pane.app.push_screen(NoticeModal(f"{share['name']}: check its folder", "\n\n".join(warnings)))
+    else:
+        pane.status(done)
+
+
 async def new_share(pane: GridPane) -> None:
     api = pane.api
     try:
         me = await api.me()
-        machines = await api.agents()
     except ApiError as exc:
         pane.status(str(exc), error=True)
         return
-    here = machine_name()
     admin = bool(me.get("is_admin"))
-    if not admin and not any(m.get("name") == here for m in machines):
-        # A share is a directory on this machine, and only its agent can
-        # serve one. Without that there is nothing to open a dialog for.
-        pane.status(
-            f"This machine ({here}) has no agent, so nothing here can serve a share — `cloudmorrow login` enrols it.",
-            error=True,
-        )
-        return
     folders: dict | None = None
     if admin:
-        # What a server share of a given name would pick up. Nice to know,
+        # What a share of a given name would pick up. Nice to know,
         # not needed: without it the dialog still works.
         try:
             folders = await api.share_folders()
         except ApiError:
             folders = None
-    fields = await pane.app.push_screen_wait(
-        ShareModal(machines=machines, admin=admin, this_machine=here, folders=folders)
-    )
+    candidates = await _candidates(pane)
+    fields = await pane.app.push_screen_wait(ShareModal(admin=admin, candidates=candidates, folders=folders))
     if fields is None:
         return
     try:
         share = await api.create_share(
             fields["name"],
-            kind=fields["kind"],
             path=fields["path"] or None,
-            machine=fields["machine"] or None,
             description=fields["description"],
+            members=fields["members"],
         )
     except ApiError as exc:
-        # The reason is the server's — "a share with that name exists" — and
-        # has to be read.
+        # The reason is the server's — "a share with that name exists", or
+        # what is wrong with the path — and has to be read.
         _complain(pane, f"Could not create {fields['name']}", exc)
         return
-    if share.get("kind") == "machine" and not share.get("online"):
-        pane.status(
-            f"Created {share['name']} — {share.get('machine')} starts serving it on its agent's next heartbeat."
-        )
-    else:
-        pane.status(f"Created {share['name']} — Mount puts it on this machine.")
+    _warned(pane, share, f"Created {share['name']} — Mount puts it on this machine")
+    pane.reload()
+
+
+async def edit_members(pane: GridPane, share: dict) -> None:
+    """Who has it, as a line to edit; what changed is asked for, one by one."""
+    name = share["id"]
+    fields = _fields(share)
+    if fields.get("kind") == "drive":
+        pane.status(f"{fields.get('label') or name} is your own drive — it is not shared.", error=True)
+        return
+    if not fields.get("can_manage"):
+        pane.status(f"{name} is {fields.get('owner') or 'somebody else'}'s; only they decide who has it.", error=True)
+        return
+    try:
+        current = (await pane.api.get_share(name)).get("members") or []
+    except ApiError as exc:
+        pane.status(str(exc), error=True)
+        return
+    line = await pane.app.push_screen_wait(MembersModal(name, format_members(current), await _candidates(pane)))
+    if line is None:
+        return
+    put, gone = changes(current, parse(line))
+    try:
+        for member in gone:
+            await pane.api.unshare(name, member["kind"], member["who"])
+        for member in put:
+            await pane.api.share_with(name, member["kind"], member["who"], member["access"])
+    except ApiError as exc:
+        _complain(pane, f"Could not change who has {name}", exc)
+        pane.reload()
+        return
+    pane.status(f"{name} is shared with {format_members(parse(line)) or 'nobody but you'}")
     pane.reload()
 
 
@@ -157,13 +197,6 @@ async def mount_share(pane: GridPane, share: dict) -> None:
     username = getattr(pane.app, "username", "")
     if not token or not username:
         pane.status("Not signed in.", error=True)
-        return
-    fields = _fields(share)
-    if fields.get("kind") == "machine" and not fields.get("online"):
-        pane.status(
-            f"{name} is on {fields.get('machine')}, and its agent is not serving right now.",
-            error=True,
-        )
         return
     try:
         # Where to mount from is the server's to say, as it says to `cm share mount`.
@@ -248,12 +281,6 @@ async def copy_url(pane: GridPane, share: dict) -> None:
     except ApiError as exc:
         pane.status(str(exc), error=True)
         return
-    if not url:
-        pane.status(
-            f"{share['id']} has no address yet: its machine has not said where it serves.",
-            error=True,
-        )
-        return
     pane.app.copy_to_clipboard(url)
     pane.status(f"Copied {url}")
 
@@ -264,18 +291,18 @@ async def remove_share(pane: GridPane, share: dict) -> None:
     if fields.get("kind") == "drive":
         pane.status(f"{fields.get('label') or name} is your own drive on the server — it stays.", error=True)
         return
+    if not fields.get("can_manage"):
+        pane.status(f"{name} is {fields.get('owner') or 'somebody else'}'s; only they remove it.", error=True)
+        return
     confirmed = await pane.app.push_screen_wait(
         ConfirmModal(
             "Remove this share?",
             detail=(
                 f"[b]{name}[/]\n"
-                f"It stops being served, and is unmounted here if it is mounted. "
-                + (
-                    f"Its files stay on {fields.get('machine')} at {fields.get('path')}."
-                    if fields.get("kind") == "machine"
-                    else f"Its files stay on the server at {fields.get('path')} — "
-                    f"`cloudmorrow share remove --files` is what deletes them."
-                )
+                + (f"Whoever has it loses it too: {fields['shared_with']}.\n" if fields.get("shared_with") else "")
+                + "It stops being served, and is unmounted here if it is mounted. "
+                + f"Its files stay on the server at {fields.get('path')} — "
+                + "`cloudmorrow share remove --files` is what deletes them."
             ),
             confirm_label="Remove",
         )
@@ -304,6 +331,6 @@ EXTENSION = GroupExtension(
     actions=ACTIONS,
     run=run,
     detail=detail,
-    keys={"mount": "m", "unmount": "u", "copy_url": "c", "remove": "d"},
+    keys={"share_with": "s", "mount": "m", "unmount": "u", "copy_url": "c", "remove": "d"},
 )
 register_group_extension(EXTENSION)

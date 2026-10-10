@@ -121,6 +121,11 @@ def share_row(name: str, **extra) -> dict:
         "path": extra.get("path", f"/srv/cloudmorrow/notes/Shares/{name}"),
         "managed": extra.get("managed", True),
         "description": extra.get("description", ""),
+        "owner": extra.get("owner", "bram"),
+        "access": extra.get("access", "write"),
+        "can_manage": extra.get("can_manage", True),
+        "members": list(extra.get("members", [])),
+        "warnings": list(extra.get("warnings", [])),
         "url": f"https://test.invalid/dav/{name}/",
         "created_at": "2026-09-01T09:00:00",
         "updated_at": "2026-09-01T09:00:00",
@@ -347,20 +352,35 @@ class FakeClient(FakeSpaces, FakeNotes, FakeFiles, FakeQuills, FakeCircles):
     async def share_folders(self) -> dict:
         return {"directory": "/srv/cloudmorrow/notes/Shares", "folders": ["Pictures"]}
 
-    async def create_share(
-        self, name: str, *, kind: str = "server", path=None, machine=None, description: str = ""
-    ) -> dict:
-        self.share_calls.append(("create", name, path, description))
-        share = share_row(name, path=path or None, managed=not path, description=description)
-        share["kind"] = kind
-        share["machine"] = machine or ""
-        share["online"] = kind != "machine"
-        if kind == "machine":
-            share["url"] = ""
-        elif path is None:
-            share["path"] = f"/srv/cloudmorrow/notes/Shares/{name}"
+    async def share_candidates(self) -> dict:
+        return {
+            "people": [{"username": "ann", "display_name": "Ann"}],
+            "circles": [{"id": "kids", "name": "Kids"}],
+            "everyone": True,
+            "directory": "/srv/cloudmorrow/notes/Shares",
+        }
+
+    async def create_share(self, name: str, *, path=None, description: str = "", members=None) -> dict:
+        self.share_calls.append(("create", name, path, description, list(members or [])))
+        share = share_row(name, managed=not path, description=description, members=members or [])
+        share["kind"] = "server"
+        share["path"] = path or f"/srv/cloudmorrow/notes/Shares/{name}"
+        if path and path.startswith("/srv/world"):
+            share["warnings"] = [f"{path} is world-writable: anybody with an account on this machine can change it"]
         self.share_list.append(share)
         return share
+
+    async def share_with(self, name: str, kind: str, who: str = "", access: str = "write") -> dict:
+        self.share_calls.append(("with", name, kind, who, access))
+        share = await self.get_share(name)
+        share["members"] = [m for m in share["members"] if (m["kind"], m["who"]) != (kind, who)]
+        share["members"].append({"kind": kind, "who": who, "access": access, "label": who})
+        return share
+
+    async def unshare(self, name: str, kind: str, who: str = "") -> None:
+        self.share_calls.append(("unshare", name, kind, who))
+        share = await self.get_share(name)
+        share["members"] = [m for m in share["members"] if (m["kind"], m["who"]) != (kind, who)]
 
     async def delete_share(self, name: str, *, remove_files: bool = False) -> None:
         self.share_calls.append(("delete", name, remove_files))

@@ -6,11 +6,9 @@ file manager shows a folder.
 
 - **My Files** is a folder of your own on the server, there from the day
   your account is. Nothing to set up.
-- **Shares** sit beside it: a folder on the server that everyone's machines
-  mount (an administrator makes those), or a directory on one of your own
-  machines, served by its agent. A machine share is listed, and says whether
-  its machine is serving it; its files are on that machine, so you mount it
-  to see them.
+- **Shares** sit beside it: a folder on the server that somebody made and
+  shared with people and circles, to change or only to read. Yours are
+  listed with who has them; the ones shared with you say whose they are.
 - Open one and it is its folders and files: as a list that says when and how
   big, or as tiles that show what a picture is of. Put files in from the
   phone, the camera, a drag or a paste; make folders; rename, move and

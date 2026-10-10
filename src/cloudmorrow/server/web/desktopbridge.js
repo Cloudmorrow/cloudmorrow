@@ -99,8 +99,6 @@ function mountLine(share, mounted) {
     words = "Mounted at " + here.path;
     buttons = `<button class="desk-button ghost" data-open="${esc(here.path)}">Open folder</button>` +
       `<button class="desk-button ghost" data-unmount="${esc(name)}">Unmount</button>`;
-  } else if (share.fields.kind === "machine" && !share.fields.online) {
-    words = "Not mounted — its machine is offline";
   } else {
     words = "Not mounted on this computer";
     buttons = `<button class="desk-button cloud" data-mount="${esc(name)}">Mount on this computer</button>`;
@@ -150,12 +148,12 @@ export const computerCard = () => (bridge ? `<div class="computer-slot"></div>` 
 
 const agentWords = (agent) => {
   if (agent.error) return ["Not known", agent.error, ""];
-  if (!agent.enrolled) return ["Not set up", "Nothing here serves a share or makes a backup yet", "warn"];
+  if (!agent.enrolled) return ["Not set up", "Nothing here makes a backup or syncs its settings yet", "warn"];
   if (agent.running === false) {
     return ["Stopped", `Enrolled as ${agent.name}, but not running`, "warn"];
   }
   if (agent.running == null) return ["Enrolled", `As ${agent.name}`, ""];
-  return ["Running", `As ${agent.name} — serves this computer's shares`, "good"];
+  return ["Running", `As ${agent.name} — backs up and syncs this computer`, "good"];
 };
 
 /** Fill in the group `computerCard` left room for. */

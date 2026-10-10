@@ -56,8 +56,7 @@ class AppState:
     # The forecast for the place in the config, for the app's front page.
     weather: Weather
     # Is this a good username and password, or token, for an account? What
-    # the WebDAV side asks on every request, and what an agent serving a
-    # machine share asks through the API.
+    # the WebDAV side asks on every request.
     credential_check: Callable[[str, str], bool]
     # What seals content at rest: the notes stores are handed it; the
     # database stores find it through their connection.

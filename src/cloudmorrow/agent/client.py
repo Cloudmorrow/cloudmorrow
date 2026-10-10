@@ -72,21 +72,14 @@ class AgentClient:
         }
         return self._post("/api/agent/enroll", payload, authenticated=False) or {}
 
-    def heartbeat(self, hostname: str, platform: str, *, dav_base: str = "") -> dict:
+    def heartbeat(self, hostname: str, platform: str) -> dict:
         payload = {
             "hostname": hostname,
             "platform": platform,
             "version": __version__,
             "capabilities": self.config.capabilities,
-            # Where this machine serves its shares; "" says it serves nothing.
-            "dav_base": dav_base,
         }
         return self._post("/api/agent/heartbeat", payload) or {}
-
-    def check_credentials(self, username: str, password: str) -> bool:
-        """Whether a mount of one of this machine's shares may come in."""
-        answer = self._post("/api/agent/credentials", {"username": username, "password": password})
-        return bool(answer and answer.get("valid"))
 
     def claim_job(self) -> dict | None:
         return self._post("/api/agent/jobs/claim", {})

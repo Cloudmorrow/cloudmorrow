@@ -5,9 +5,10 @@ folder — and the `shares` backend serves them through the record API, with
 their bytes and a small copy of each picture beside the record. These hold
 that the Quill does everything the built-in Files did: list a share and a
 folder, open a file, a thumbnail of a picture, put a file in, and — new —
-make a folder, rename, move and delete; that a machine share still says
-where it is and that it is offline; that an account sees only its own; and
-that a server which had Files built in gets the Quill at boot.
+make a folder, rename, move and delete; that a share is made by anybody
+and seen by the people it is shared with, read-only when that is all they
+were given; that an account sees only what it has; and that a server which
+had Files built in gets the Quill at boot.
 """
 
 from __future__ import annotations
@@ -100,36 +101,66 @@ def test_my_files_comes_first_then_the_shares(files, config):
 
 
 def test_a_share_is_made_and_forgotten_as_a_record_by_the_same_rules(files, config):
-    # A server share puts files on the server: an admin's call.
-    call(files, "POST", "/api/records/share", {"fields": {"name": "media"}}, who=GUEST, expect=403)
-    made = call(files, "POST", "/api/records/share", {"fields": {"label": "media"}}, expect=201)
+    # Anybody makes one, in the Shares folder; it is theirs.
+    made = call(files, "POST", "/api/records/share", {"fields": {"name": "media"}}, who=GUEST, expect=201)
     assert made["id"] == "media" and made["fields"]["kind"] == "server"
-    assert [s["name"] for s in call(files, "GET", "/api/shares")] == ["my-files", "media"]
-    # Forgotten; its folder stays.
-    call(files, "DELETE", "/api/records/share/media", expect=204)
+    assert made["fields"]["owner"] == "guest" and made["fields"]["can_manage"] is True
+    assert made["fields"]["path"] == str(config.shares_root("guest") / "media")
+    # Only an administrator places one elsewhere on the server.
+    refused = call(
+        files, "POST", "/api/records/share", {"fields": {"name": "elsewhere", "path": "/srv"}}, who=GUEST, expect=403
+    )
+    assert "administrator" in refused["detail"]
+    # Nobody else has it until it is shared with them.
     assert [s["id"] for s in call(files, "GET", "/api/records/share")] == ["my-files"]
-    assert (config.shares_root("bram") / "media").is_dir()
+    call(files, "DELETE", "/api/records/share/media", expect=404)
+    # Its owner changes what it says, and forgets it; its folder stays.
+    changed = call(files, "PATCH", "/api/records/share/media", {"fields": {"description": "films"}}, who=GUEST)
+    assert changed["fields"]["description"] == "films"
+    call(files, "DELETE", "/api/records/share/media", who=GUEST, expect=204)
+    assert [s["id"] for s in call(files, "GET", "/api/records/share", who=GUEST)] == ["my-files"]
+    assert (config.shares_root("guest") / "media").is_dir()
     # The drive is nobody's to remove.
     call(files, "DELETE", "/api/records/share/my-files", expect=403)
 
 
-def test_a_machine_share_says_where_it_is_and_that_it_is_offline(files):
-    auth = headers(files)
-    files.post("/api/agents/enroll-self", json={"name": "laptop"}, headers=auth)
+def test_a_share_shared_to_read_is_browsed_and_not_changed(files, config):
     call(
         files,
         "POST",
         "/api/shares",
-        {"name": "music", "kind": "machine", "machine": "laptop", "path": "/home/bram/Music"},
+        {"name": "media", "members": [{"kind": "user", "who": "guest", "access": "read"}]},
         expect=201,
     )
-    music = call(files, "GET", "/api/records/share/music")
-    assert music["fields"]["kind"] == "machine"
-    assert music["fields"]["online"] is False and music["fields"]["browsable"] is False
-    assert music["fields"]["about"] == "On laptop, offline — mount it to browse it"
-    # Its files are on the machine; the server has nothing to list.
-    refused = call(files, "GET", "/api/records/file?share=music", expect=400)
-    assert "on laptop, offline — mount it to browse it" in refused["detail"]
+    (config.shares_root("bram") / "media" / "film.txt").write_text("x")
+    media = call(files, "GET", "/api/records/share/media", who=GUEST)
+    assert media["fields"]["access"] == "read" and media["fields"]["can_manage"] is False
+    # Where it is on the server is its owner's to know.
+    assert media["fields"]["path"] == ""
+    assert media["fields"]["about"] == "Shared with you by bram, to read"
+    listed = call(files, "GET", "/api/records/file?share=media", who=GUEST)
+    assert [f["fields"]["name"] for f in listed] == ["film.txt"]
+    refused = call(
+        files,
+        "POST",
+        "/api/records/file",
+        {"fields": {"share": "media", "name": "new", "kind": "folder"}},
+        who=GUEST,
+        expect=403,
+    )
+    assert "to read" in refused["detail"]
+    call(files, "DELETE", f"/api/records/file/{listed[0]['id']}", who=GUEST, expect=403)
+    assert (config.shares_root("bram") / "media" / "film.txt").exists()
+    # Write, and they may.
+    call(files, "PUT", "/api/shares/media/members", {"kind": "user", "who": "guest", "access": "write"})
+    call(
+        files,
+        "POST",
+        "/api/records/file",
+        {"fields": {"share": "media", "name": "new", "kind": "folder"}},
+        who=GUEST,
+        expect=201,
+    )
 
 
 # -- files ---------------------------------------------------------------------------

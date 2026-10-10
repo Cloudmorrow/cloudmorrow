@@ -7,10 +7,10 @@ any client from before the Files Quill, which reaches the same files as
 `file` records through the `shares` backend. Both sides do the work in
 `server/fileops.py`, so both keep the same rules.
 
-Only a server share — a machine share's files are on the machine, and this
-server never sees them — and the caller's own drive, `my-files`, which is
-one in all but the table it is not in. The caller's own shares only, the
-same as the WebDAV side.
+The caller's own drive, `my-files`, which is a share in all but the table
+it is not in, and every share the caller has — theirs and the ones shared
+with them — the same as the WebDAV side. Putting a file in one takes
+`write` on it.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_current_user, get_state
 from cloudmorrow.server.drive import is_drive, user_drive
 from cloudmorrow.server.fileops import FILE_MODE, FileOpError
-from cloudmorrow.server.shares import SERVER, Share, UnknownShareError
+from cloudmorrow.server.shares import WRITE, Share
 
 __all__ = ["FILE_MODE", "router"]
 
@@ -68,19 +68,19 @@ def _out(entry: fileops.Entry) -> EntryOut:
     )
 
 
-def _server_share(state: AppState, user: User, name: str) -> Share:
-    """The share *name* on the server — or the caller's own drive, which is
-    served the same way and browsed the same way."""
+def _server_share(state: AppState, user: User, name: str, *, write: bool = False) -> Share:
+    """The share *name* on the server, if the caller has it — or their own
+    drive, which is served the same way and browsed the same way. With
+    *write*, only if they may change what is in it."""
     if is_drive(name):
         return user_drive(state.config, user.username)
-    try:
-        share = state.shares.require(user.username, name)
-    except UnknownShareError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"no such share: {name}") from exc
-    if share.kind != SERVER:
+    share = state.shares.for_user(user.username, name)
+    if share is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"no such share: {name}")
+    if write and state.shares.access_of(share, user.username) != WRITE:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"{share.name} is on one of your machines, not the server — mount it to browse it",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"{share.name} is shared with you to read, not to change",
         )
     return share
 
@@ -167,7 +167,7 @@ async def upload_file(
     once the whole of it has arrived, so a dropped connection leaves no
     half a photo with a photo's name. A name already taken gets a number.
     """
-    share = _server_share(state, user, name)
+    share = _server_share(state, user, name, write=True)
     folder = _inside(share, path)
     if not folder.is_dir():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such folder")

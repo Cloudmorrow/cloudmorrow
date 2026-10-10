@@ -54,12 +54,15 @@ start with the [README](../README.md); this is the page to come back to.
 - **My Files.** A drive of your own on the server, there because your
   account is: `cloudmorrow share mount my-files` and it is a folder on this
   machine; in the app it is the first thing under Files.
-- **Fileshares.** A directory on the server with a name, served over WebDAV,
-  mounted on whichever machine you are at: `cloudmorrow share mount media` and
-  it is `~/Fileshares/media` here, or `/Volumes/media` on a Mac. Finder does
-  the mounting on macOS with nothing installed; on Linux it is `rclone`.
-  Made and mounted from the **Files** tab as well, which is the Files Quill:
-  the files themselves stay where they are.
+- **Fileshares.** A folder on the server with a name, served over WebDAV,
+  and shared with the people and circles you pick — to change what is in it,
+  or only to read it. Anybody makes one; an administrator may also share
+  with everybody, and put a share on another directory on the server. It is
+  mounted on whichever machine you are at: `cloudmorrow share mount media`
+  and it is `~/Fileshares/media` here, or `/Volumes/media` on a Mac. Finder
+  does the mounting on macOS with nothing installed; on Linux it is
+  `rclone`. Made, shared and mounted from the **Files** tab as well, which
+  is the Files Quill: the files themselves stay where they are.
 - **Chat.** Channels and direct messages, between everyone on the server —
   a Quill, like Tasks, offered when you install. A **public** channel is
   everybody's, in everyone's list and open to write in; a **private** one is
@@ -130,7 +133,7 @@ src/cloudmorrow/
     progress.py      the spinner, the bar, and the line saying what is happening
     secret.py        list, get, set, remove, import, export, run, vaults
     note.py          list, show, add, edit, remove
-    share.py         list, show, add, remove, mount, unmount
+    share.py         list, show, add, with, unshare, leave, move, remove, mount, unmount
   client/            talking to a server: config, credentials, HTTP
     mounts.py        which share is mounted where on this machine, and by what
   server/            FastAPI app, the stores and the database layer under them
@@ -142,7 +145,7 @@ src/cloudmorrow/
     configsync.py    the one copy of the shared config, and its revisions
     notifications.py what the machines did, kept where all of them can leave it
     webpush.py       VAPID, aes128gcm, and the devices to push
-    shares.py        the fileshares: a name, a directory, whose directory it is
+    shares.py        the fileshares: a name, a folder, whose it is and who it is shared with
     dav.py           those directories over WebDAV, at /dav/<share>/
     templates/       the install page and install.sh
     web/             the app for the browser: one page, a core, and a file per feature
@@ -184,7 +187,7 @@ Everything reads `cloudmorrow RESOURCE ACTION`, with singular resource names:
 ```
 cloudmorrow secret  list | get | set | remove | import | export | run | vaults
 cloudmorrow agent   list | run | jobs | enroll-token
-cloudmorrow share   list | show | add | remove | mount | unmount
+cloudmorrow share   list | show | add | with | unshare | leave | move | remove | mount | unmount
 cloudmorrow config  show | set
 cloudmorrow update  [server | all]
 ```
@@ -1200,8 +1203,7 @@ Quill's grid; the lines come in through the grid's hook, from
 `desktopbridge.js`) has a line under it: *Mounted at ~/Fileshares/media* with **Open folder** and
 **Unmount**, or **Mount on this computer**. It is the same mount the terminal
 app and `cloudmorrow share mount` make — recorded in the same `mounts.json` —
-so all three agree on what is mounted. A machine share whose machine is
-offline says so and offers nothing. On Linux the mount is rclone's; if rclone
+so all three agree on what is mounted. On Linux the mount is rclone's; if rclone
 is missing the answer is the one command that installs it, since the window
 has no terminal for sudo to ask its password in. **Me** gets a **This
 computer** group: the machine's name, whether its agent is running, what
@@ -1432,10 +1434,12 @@ things make sure that is the only plain hop:
   plain `http://` address unless it is this machine, or the config says
   `allow_insecure_http = true`, which is a decision for a box you have
   reasons to reach in the clear, not a default.
-- **What is not there yet.** A machine share is served by the agent on that
-  machine over plain HTTP on your LAN, with Basic auth. It is the one place
-  content still crosses a wire unencrypted; certificates issued by the server
-  are the fix, and the next step.
+
+Every share is served by the server, over the same TLS as the rest of it.
+There were machine shares once — a directory served by the agent on one of
+your machines, over plain HTTP on the LAN — and they are gone, so nothing
+Cloudmorrow sends crosses a wire unencrypted unless you chose plain HTTP
+for the whole server.
 
 ## Notes
 
@@ -1514,39 +1518,98 @@ stays in `img/` until something prunes it.
 
 ## Fileshares
 
-A share is a directory with a name. The name is the last segment of its
-URL — `…/dav/media/` — and the thing you mount. There are two kinds, told
-apart by where the directory is:
+A share is a folder on the server with a name. The name is the last
+segment of its URL — `…/dav/media/` — and the thing you mount. It is the
+server's name, not the account's: there is one share called `media`, since
+it is one folder and one address. `folders`, `candidates` and `check` are
+kept for the API, and `my-files` is everybody's own drive.
 
-- A **server share** is a folder in the Shares folder on the server, served
-  by the server. Only an admin makes one: it puts files on the server.
-- A **machine share** is a directory on the machine you are standing on,
-  served by the agent running there. Anyone makes one — it is their own disk
-  — and it is there for their other machines exactly as long as that agent
-  is running. The Files tab and `share list` say which machine, and whether
-  it is serving right now. It is always *this* machine: you share the
-  directory in front of you, not a path on some other box typed from memory,
-  so there is no machine to pick and nothing to get wrong. To share something
-  on the desktop, make the share from the desktop.
+**Anybody makes one.** It is the folder of its name in the Shares folder
+on the server, and it is theirs: they see it, write in it, decide who else
+does, and remove it. Being an administrator opens nobody's share — an
+admin has the shares they made and the ones shared with them, like
+everybody else.
+
+**Shared with people, circles, or everybody.** A share's owner shares it
+with people by name and with circles, each to **change** what is in it
+(`write`) or only to **read** it. A circle is followed as it changes: the
+next person put in *Kids* has the share the day they are. An administrator
+may also share with **everybody** on the server, today's accounts and every
+one made later. Your access to a share is the most any of those gives you —
+by name, through a circle, or as everybody — the same rule as circles have
+for data ([CIRCLES.md](CIRCLES.md)). There is no deny. Nobody is asked to
+accept; a person shared with by name may leave, and a circle is left by
+leaving the circle.
+
+**Read means read.** Somebody who may only read a share lists it, opens
+its files and mounts it; everything that would change it — a file put
+there, a folder made, a rename, a move, a delete, over WebDAV or the API —
+is refused with 403, and so is copying or moving something out of a share
+you may write into one you may only read. Somebody whose circles give only
+`read` on files gets the same in every share, their own drive included.
+
+**An administrator's share elsewhere.** An administrator may point a share
+at another directory on the server — a media library in `/srv/media`, say —
+by giving its path when the share is made, or by changing it later
+(`share move`; the files are not moved, and an empty path puts the share
+back in its own folder in Shares). The path is checked as it is given, and
+the checks are of two kinds:
+
+- **Refused**, so nothing is made: a path that is not absolute, not there,
+  or not a directory; and anything that holds, or is inside, what the server
+  keeps for itself — its data directory and database, the encryption key,
+  its settings, and everybody's own files (each drive is its owner's alone).
+  A path inside the Shares folder is fine. Symlinks are followed to where
+  they lead, and judged there.
+- **Said, and shared all the same**, so it can be fixed in place: a folder
+  the server cannot open, one it can read but not write (the share then
+  works as read-only), a filesystem the service sees as read-only (under
+  systemd that is `ProtectSystem=strict`: add the folder to `ReadWritePaths`
+  with `systemctl edit cloudmorrow`), a world-writable folder, files at the
+  top of it the server cannot read or change, and a folder another share
+  already covers. These come back as `warnings` when the share is made, and
+  again every time its owner looks, until they are fixed. The web app checks
+  as the path is typed (`GET /api/shares/check`), before anything is made.
+
+Somebody who is not an administrator is never asked for a path: their
+share is the folder of its name, and that is the whole of where it can be.
 
 ```bash
-cloudmorrow share add music --path ~/Music    # this machine
-cloudmorrow share add media --server          # the server (admins)
-cloudmorrow share mount music                 # ~/Fileshares/music, or /Volumes/music on a Mac
-cloudmorrow share unmount music
-cloudmorrow share remove music                # stops serving it; the files stay
-cloudmorrow share remove media --files        # …and deletes its folder on the server
+cloudmorrow share add family --with ann --with circle:kids   # yours, shared with Ann and Kids
+cloudmorrow share add library --with everyone --read          # administrators: everybody may read it
+cloudmorrow share add media --path /srv/media                  # administrators: a directory elsewhere
+cloudmorrow share with family sam --read                       # Sam may read it
+cloudmorrow share unshare family circle:kids
+cloudmorrow share leave recipes                                # somebody shared it with you
+cloudmorrow share move media /srv/films                        # administrators; --back for Shares
+cloudmorrow share mount family                                 # ~/Fileshares/family, or /Volumes/family
+cloudmorrow share unmount family
+cloudmorrow share remove family                                # for everybody; the files stay
+cloudmorrow share remove family --files                        # …and deletes its folder in Shares
 ```
 
-The same things are buttons on the **Files** tab, where a new share is on
-this machine, or — for an admin — on the server. On a machine that has no
-agent yet there is nothing to serve a share, and both say so.
+The same things are on the **Files** tab. On the phone and the web app a
+**New share** button sits above the list: a name, who has it (a menu per
+person, circle and — for an administrator — Everybody), and, for an
+administrator, the path, filled in as the name is typed and checked as it
+is changed. Under each share is whose it is and who has it, which opens
+the share's own page: the same menus, changed as they are chosen, the
+path, and Remove — or, for a share somebody else made, whose it is, who
+has it and Leave. In the terminal app, ctrl+n makes one and `s` changes
+who has the one the cursor is on, as one line to edit:
+`ann, circle:kids (read), everyone`.
+
+**When an account or a circle goes.** What an account was given goes with
+it; the shares it made pass to the administrator who removed it, with their
+files and who has them as they were, so no share is left with nobody to
+decide about it. A circle that is deleted takes its line off every share,
+and a new circle of the same name does not inherit it.
 
 **My Files.** Beside the shares, every account has a drive of its own on
 the server, served as `my-files`: `…/dav/my-files/`, first in `share list`,
 mounted with `share mount my-files`, and at the top of the **Files** tab in
 both apps. Nobody makes it and nobody removes it — it is there because the
-account is — and only its owner ever sees it. Its files are in that
+account is — and only its owner ever sees it; it is not shared. Its files are in that
 account's own tree, `<notes_dir>/<username>/files/`, and their notes are
 the `Notes` folder in it.
 
@@ -1561,7 +1624,8 @@ and a new file put with `POST /api/records/file/upload`. The Quill is only
 the screen, drawn by the kit's `grid`, so the same thing is on every
 surface, and to an assistant through the generic record tools.
 
-On the phone and the web app, **Files** lists My Files, then your shares.
+On the phone and the web app, **Files** lists My Files, then your shares
+and the ones shared with you.
 One opens as its folders and files, the way a file manager shows them —
 sorted by name, date, size or type, folders first — as a list, or as tiles
 with a picture of each photo (the switch beside the sort; the choice is
@@ -1570,10 +1634,8 @@ opens the phone's share sheet (or saves it), and Rename, Move and Delete.
 The plus beside the title puts something in the folder you are in: a file
 chosen from the phone, one its camera takes there and then, or a new
 folder; on a computer a file dragged onto the folder or pasted goes in too.
-The “…” beside a folder's name renames, moves or deletes it. A machine
-share is listed but not opened: its files are on that machine, so it is
-browsed from a mount, and the line under it says where it is and whether
-it is online.
+The “…” beside a folder's name renames, moves or deletes it. In a share
+you may only read, those are offered and refused with the reason.
 
 The terminal app has the same, on the Files card: the shares, then enter
 on one for its folders and files. The same sort (`s` is the next one, `S`
@@ -1594,7 +1656,7 @@ cm files add my-files Photos/2026              # a new folder
 cm files delete my-files Photos/old.jpg
 ```
 
-`cm share` stays as it is, for making, mounting and removing shares.
+`cm share` is for making, sharing, mounting and removing shares.
 
 **Thumbnails.** The server makes them, once, with the long edge at one of
 a few sizes, and keeps them under `<data_dir>/thumbs/`. The key includes
@@ -1604,40 +1666,26 @@ safe to empty at any time. A JPEG, PNG, GIF, WebP, BMP or TIFF gets one;
 a HEIC or an SVG shows as its icon, since Pillow reads neither without
 help.
 
-**Where a server share's files are.** In the Shares folder on the server,
-and nowhere else: `<notes_dir>/Shares/` in the Cloudmorrow directory, or
-`shares_dir` if the server config sets one (a folder outside the notes,
-data and code directories is one the service may not write to until the
-installer has put it in the unit: run `install-server.sh --update`, or give
-`--shares-dir` when installing). One folder for everyone's
-shares, whichever admin made them. A share is the folder of its name in
-there. `share add media --server` makes `Shares/media` if it is not there
-— and if you have already
-put a folder there (rsync'd a library in as `Pictures`, say), naming it
-shares that folder as it is, whatever its case. The new-share dialog lists
-the folders that are not shares yet. Keeping every share inside that one
-directory is what lets the server be locked down to it: the systemd unit
-makes the rest of the filesystem read-only, so a share anywhere else could
-be read but never written to. `--files` on remove deletes the folder;
-without it the share is only unlinked and the folder stays.
+**Where a share's files are.** In the Shares folder on the server, unless
+an administrator pointed it elsewhere: `<notes_dir>/Shares/` in the
+Cloudmorrow directory, or `shares_dir` if the server config sets one (a
+folder outside the notes, data and code directories is one the service may
+not write to until the installer has put it in the unit: run
+`install-server.sh --update`, or give `--shares-dir` when installing). One
+folder for everyone's shares, whoever made them. A share is the folder of
+its name in there: `share add media` makes `Shares/media` if it is not
+there — and if an administrator has already put a folder there (rsync'd a
+library in as `Pictures`, say), naming it shares that folder as it is,
+whatever its case. The new-share dialog lists, for an administrator, the
+folders that are not shares yet. `--files` on remove deletes the folder;
+without it the share is only forgotten and the folder stays. A directory
+an administrator pointed a share at is never deleted from here.
 
-**How a machine share works.** The server keeps only the record: which
-machine, which directory. The agent on that machine learns its shares on its
-heartbeat, serves them over WebDAV itself — `http://<that machine>:8788/dav/<name>/`
-— and reports the address back on the next heartbeat, which is what the
-server hands out as the share's URL. When the heartbeats stop, the share is
-offline and `share mount` says so. A mount signs in with your username and
-token as ever; the agent has no passwords and no signing key, so it asks the
-server whether they are good, and only the owner's are — a machine share is
-one person's disk, for that person's other machines. The other machines
-have to reach that one directly, so this is for machines on the same
-network; the server share is the one that works from anywhere. In
-`agent.toml`, `allow_shares = false` keeps a machine out of it, `share_port`
-moves the port, and `share_host` names the address to advertise when the
-one the agent works out for itself is not the one the others can reach.
-WsgiDAV, which speaks the protocol, is not installed with the agent: the
-first time a machine has a share to serve, its agent fetches it into its own
-venv, so a machine that never shares never carries it.
+**Who has a share, in the database.** `shares` holds the share — its
+name, unique on the server, its owner and its directory — and
+`share_members` one line per person, circle or everybody it is shared with,
+each `write` or `read`. Plain, like circles: who may open what is what the
+server reads on every request.
 
 **How it is served.** WebDAV, by [WsgiDAV](https://github.com/mar10/wsgidav),
 mounted inside the API at `/dav`. Every machine already has a client for
@@ -1647,8 +1695,9 @@ mount that behaves worse than the one the OS ships. The endpoint speaks HTTP
 Basic and takes your password — or the access token `cloudmorrow login` stored,
 in the password's place. That is what `share mount` sends, so a mount is
 signed in exactly as long as the client that made it, and no second password
-is written anywhere. Each account sees only its own shares; someone else's
-does not exist as far as `/dav` is concerned. Point any WebDAV client at the
+is written anywhere. `/dav/` lists the caller's drive and every share they
+have; a share that is not theirs and not shared with them does not exist as
+far as `/dav` is concerned. Point any WebDAV client at the
 URL — a phone's file manager, a Windows drive letter — with the same
 username and password.
 
@@ -1719,8 +1768,7 @@ keeps — see [Omarchy config in sync](#omarchy-config-in-sync).
 
 Everything a machine may do is declared in its own `~/.config/cloudmorrow/agent.toml`
 rather than decided by the server: backups only read below `backup_roots`
-(your home, by default), `shell` needs `allow_shell = true` there, and
-`allow_shares = false` keeps the machine from serving [fileshares](#fileshares).
+(your home, by default), and `shell` needs `allow_shell = true` there.
 A job asking for anything else comes back failed, with the reason.
 
 For a headless box you never sign in on — a NAS, say — mint a token with
@@ -2025,8 +2073,12 @@ the cursor still moves in an input and the selection still moves in a list.
 | `GET` | `/api/records/{model}?_last=50&_since=…` | the newest fifty, still in order; only what changed at or after a moment |
 | `GET` | `/api/changes` | a server-sent events stream of the records you may see being made, changed or deleted; `?since=<seq>` to catch up |
 | `GET` | `/api/people` | everybody a space could be shared with, or written to |
-| `GET`/`POST` | `/api/shares` | your fileshares; a share carries its `url` |
-| `GET`/`DELETE` | `/api/shares/{name}` | one share; `?remove_files=true` deletes a directory the server made |
+| `GET`/`POST` | `/api/shares` | your fileshares and the ones shared with you; `{name, members, path}` makes one (`path` for administrators); a share carries its `url`, `access`, `members` and, for its owner, `warnings` |
+| `GET`/`PATCH`/`DELETE` | `/api/shares/{name}` | one share; `PATCH {description, path}` (`path` for administrators); `?remove_files=true` deletes a folder in Shares |
+| `PUT` | `/api/shares/{name}/members` | `{kind: user\|circle\|everyone, who, access: write\|read}` — share it, or change what they may do |
+| `DELETE` | `/api/shares/{name}/members/{kind}/{who}` | stop sharing it; with your own username, leave it |
+| `GET` | `/api/shares/candidates` | who a share could be shared with: people, circles, and whether everybody |
+| `GET` | `/api/shares/check?path=` | administrators: whether a directory could be a share, and what is wrong with it |
 | `*` | `/dav/{name}/…` | the share itself, as WebDAV — Basic auth with your password or token |
 | `GET`/`POST`/`DELETE` | `/api/agents…` | your machines |
 | `POST` | `/api/agents/{id}/jobs` | queue work |

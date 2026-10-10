@@ -35,11 +35,14 @@ FILES_MODELS = {
                 "label": "Kind",
                 "indexed": True,
                 "default": "server",
-                "values": ["drive", "server", "machine"],
-                "labels": ["My Files", "On the server", "On a machine"],
+                "values": ["drive", "server"],
+                "labels": ["My Files", "On the server"],
             },
             {"name": "description", "kind": "text", "label": "Description"},
-            {"name": "machine", "kind": "string", "label": "Machine", "indexed": True},
+            {"name": "owner", "kind": "string", "label": "Owner", "indexed": True},
+            {"name": "access", "kind": "string", "label": "Access", "indexed": True},
+            {"name": "can_manage", "kind": "bool", "label": "Yours", "indexed": True},
+            {"name": "shared_with", "kind": "string", "label": "Shared with"},
             {"name": "path", "kind": "string", "label": "Path"},
             {"name": "online", "kind": "bool", "label": "Online", "indexed": True},
             {"name": "browsable", "kind": "bool", "label": "Browsable", "indexed": True},
@@ -144,11 +147,7 @@ class FakeFiles:
     # -- shares -----------------------------------------------------------------
     def _share_record(self, share: dict) -> dict:
         kind = share.get("kind") or "server"
-        online = bool(share.get("online", True))
-        if kind == "machine":
-            about = f"On {share.get('machine') or 'a machine'}" + ("" if online else ", offline")
-            about += " — mount it to browse it"
-        elif kind == "drive":
+        if kind == "drive":
             about = share.get("description") or "Your own files on the server"
         else:
             about = share.get("description") or "On the server"
@@ -168,10 +167,13 @@ class FakeFiles:
                 "label": "My Files" if kind == "drive" else share["name"],
                 "kind": kind,
                 "description": share.get("description", ""),
-                "machine": share.get("machine", ""),
+                "owner": share.get("owner", "bram"),
+                "access": share.get("access", "write"),
+                "can_manage": share.get("can_manage", kind != "drive"),
+                "shared_with": ", ".join(m.get("label") or m["who"] for m in share.get("members") or []),
                 "path": share.get("path", ""),
-                "online": online,
-                "browsable": kind != "machine",
+                "online": True,
+                "browsable": True,
                 "about": about,
                 "url": share.get("url", ""),
             },
@@ -208,12 +210,6 @@ class FakeFiles:
         }
 
     def _folder(self, share: str, folder: str) -> list[dict]:
-        found = next((s for s in self.share_list if s["name"] == share), None)
-        if found is not None and (found.get("kind") == "machine"):
-            raise ApiError(
-                f"{share} is {self._share_record(found)['fields']['about'].lower()}",
-                status_code=400,
-            )
         folders = self.share_tree.get(share)
         if folders is None or folder not in folders:
             raise ApiError("no such folder", status_code=400)

@@ -243,8 +243,6 @@ class AgentOut(BaseModel):
     online: bool = False
     # Config bundles this machine keeps in step with the others.
     sync_bundles: list[str] = Field(default_factory=list)
-    # Where it serves its machine shares, as last reported; "" when it does not.
-    dav_base: str = ""
 
 
 class AgentSyncUpdate(BaseModel):
@@ -260,16 +258,6 @@ class HeartbeatRequest(BaseModel):
     # Re-reported every time, so a machine that grows a capability — Omarchy
     # installed since enrolment — says so without enrolling again.
     capabilities: list[str] = Field(default_factory=list)
-    # Where this machine serves its shares, `http://192.168.1.10:8788`, or
-    # "" while it serves nothing. None when the agent predates shares.
-    dav_base: str | None = None
-
-
-class HeartbeatShare(BaseModel):
-    """A machine share, as the agent that serves it needs to know it."""
-
-    name: str
-    path: str
 
 
 class HeartbeatResponse(BaseModel):
@@ -279,20 +267,9 @@ class HeartbeatResponse(BaseModel):
     # What this machine has been told to keep in sync. The agent asks for
     # nothing else: the tick in the TUI arrives here.
     sync_bundles: list[str] = Field(default_factory=list)
-    # The machine shares this agent serves. Same idea: made in the TUI or
-    # the CLI, and the agent starts serving on its next heartbeat.
-    shares: list[HeartbeatShare] = Field(default_factory=list)
-
-
-class CredentialsCheck(BaseModel):
-    """An agent asking whether a mount's username and password are good."""
-
-    username: str
-    password: str
-
-
-class CredentialsOut(BaseModel):
-    valid: bool
+    # Always empty. Agents served machine shares once, and one from then
+    # reads this list as what to serve: empty, it stops.
+    shares: list[dict] = Field(default_factory=list)
 
 
 class JobCreate(BaseModel):
@@ -378,41 +355,94 @@ class ServerUpdateOut(BaseModel):
     restart_blocked: str = ""
 
 
+class ShareMemberOut(BaseModel):
+    # "user", "circle" or "everyone".
+    kind: str
+    # A username, a circle's id, or "*".
+    who: str
+    # "write" or "read".
+    access: str
+    # What to call them: a display name, a circle's name, "Everybody".
+    label: str = ""
+    added_by: str = ""
+
+
 class ShareOut(BaseModel):
     name: str
-    # "server": a directory on the server, served by the server. "machine":
-    # a directory on one of the owner's machines, served by its agent.
+    # "drive" for the caller's own My Files, "server" for a share.
     kind: str = "server"
-    # The directory: on the server, or on the machine named below.
-    path: str
-    # In the server's Shares directory, and so deletable with the share.
-    # False only for a share made before shares lived there.
-    managed: bool
-    # The machine that serves a machine share; "" for a server share.
-    machine: str = ""
-    # Reachable now. Always true for a server share; for a machine share,
-    # true while its agent is running and serving.
+    # Whoever made it, and decides who has it.
+    owner: str = ""
+    # The directory on the server. Said to whoever manages the share, and
+    # "" to everybody else: where it is on the server is not theirs to know.
+    path: str = ""
+    # In the server's Shares folder, and so deletable with the share. False
+    # for a directory an administrator pointed it at.
+    managed: bool = True
+    # Always true: a share is on the server.
     online: bool = True
     description: str = ""
-    # Where to point a WebDAV client: `<public_url>/dav/<name>/` for a server
-    # share, `<machine's address>/dav/<name>/` for a machine share — "" when
-    # the machine has never said where it serves.
+    # Where to point a WebDAV client: `<public_url>/dav/<name>/`.
     url: str
+    # What the caller may do in it: "write" or "read".
+    access: str = "write"
+    # Whether the caller decides about it: who has it, where it is, whether
+    # it stays. Its owner.
+    can_manage: bool = False
+    # Who it is shared with, besides its owner.
+    members: list[ShareMemberOut] = Field(default_factory=list)
+    # What is wrong with its directory now — permissions the server cannot
+    # use, a folder that went. Only for whoever manages it.
+    warnings: list[str] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
 
 
+class ShareMemberIn(BaseModel):
+    # "user", "circle" or "everyone" (administrators only).
+    kind: str
+    # A username or a circle (its id or its name); nothing for everyone.
+    who: str = ""
+    # "write" (the default) or "read".
+    access: str = "write"
+
+
 class ShareCreate(BaseModel):
     name: str
-    # "server" (admins only) or "machine".
-    kind: str = "server"
-    # For a machine share: the directory on that machine, absolute. A server
-    # share takes none — it is the folder of its name in the owner's Shares
-    # directory on the server.
+    # Administrators only: a directory elsewhere on the server to share.
+    # Left out, the share is the folder of its name in the Shares folder.
     path: str | None = None
-    # For a machine share: the name of the agent that serves it.
-    machine: str | None = None
     description: str = ""
+    # Who to share it with from the start.
+    members: list[ShareMemberIn] = Field(default_factory=list)
+
+
+class ShareChange(BaseModel):
+    description: str | None = None
+    # Administrators only. "" puts it back in its own folder in Shares.
+    path: str | None = None
+
+
+class SharePathCheck(BaseModel):
+    """Whether a directory on the server could be shared, before it is."""
+
+    path: str
+    ok: bool
+    # Reasons it cannot be.
+    errors: list[str] = Field(default_factory=list)
+    # Things to fix for it to work as expected.
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ShareCandidatesOut(BaseModel):
+    """Who a share could be shared with."""
+
+    people: list[dict] = Field(default_factory=list)
+    circles: list[dict] = Field(default_factory=list)
+    # Whether the caller may share with everybody: administrators.
+    everyone: bool = False
+    # Where a new share's folder goes, for a dialog to show.
+    directory: str = ""
 
 
 class ShareFoldersOut(BaseModel):

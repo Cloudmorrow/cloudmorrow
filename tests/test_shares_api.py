@@ -42,12 +42,13 @@ def test_the_url_is_built_on_public_url_when_there_is_one(client, auth, config):
     assert created["url"] == "https://cloudmorrow.example/dav/media/"
 
 
-def test_only_an_admin_makes_a_share_on_the_server(client, auth, guest_auth):
-    refused = client.post("/api/shares", json={"name": "photos"}, headers=guest_auth)
-    assert refused.status_code == 403
-    allowed = client.post("/api/shares", json={"name": "photos"}, headers=auth)
-    assert allowed.status_code == 201, allowed.text
-    assert allowed.json()["managed"] is True
+def test_anybody_makes_a_share_in_the_shares_folder(client, guest_auth, config):
+    created = client.post("/api/shares", json={"name": "photos"}, headers=guest_auth)
+    assert created.status_code == 201, created.text
+    made = created.json()
+    assert made["managed"] is True and made["owner"] == "guest"
+    assert made["path"] == str(config.notes_dir / "Shares" / "photos")
+    assert made["access"] == "write" and made["can_manage"] is True and made["members"] == []
 
 
 def test_a_folder_already_in_shares_becomes_the_share(client, auth, config):
@@ -74,18 +75,27 @@ def test_the_shares_directory_is_listed_for_the_dialog(client, auth, guest_auth,
     assert client.get("/api/shares/folders", headers=guest_auth).status_code == 403
 
 
-def test_a_bad_name_or_a_path_is_a_400(client, auth, tmp_path):
+def test_a_bad_name_is_a_400(client, auth):
     assert client.post("/api/shares", json={"name": "My Media"}, headers=auth).status_code == 400
     # A project id's reserved words are not a share's: "projects" is fine.
     assert client.post("/api/shares", json={"name": "projects"}, headers=auth).status_code == 201
-    # A server share is named, not placed — even at a directory that is there.
-    placed = client.post("/api/shares", json={"name": "media", "path": str(tmp_path)}, headers=auth)
-    assert placed.status_code == 400
-    assert "Shares directory" in placed.json()["detail"]
+    # The words the API keeps for itself are not.
+    for word in ("folders", "candidates", "check", "my-files"):
+        assert client.post("/api/shares", json={"name": word}, headers=auth).status_code == 400, word
 
 
-def test_a_name_is_taken_once(client, auth, share):
+def test_only_an_administrator_places_a_share_elsewhere(client, guest_auth, tmp_path):
+    elsewhere = tmp_path.parent / f"{tmp_path.name}-media"
+    elsewhere.mkdir()
+    refused = client.post("/api/shares", json={"name": "media", "path": str(elsewhere)}, headers=guest_auth)
+    assert refused.status_code == 403
+    assert "administrator" in refused.json()["detail"]
+
+
+def test_a_name_is_taken_once(client, auth, guest_auth, share):
     assert client.post("/api/shares", json={"name": "media"}, headers=auth).status_code == 409
+    # Once on the server, not once per account: it is one folder and one address.
+    assert client.post("/api/shares", json={"name": "media"}, headers=guest_auth).status_code == 409
 
 
 def test_shares_are_the_callers_own(client, auth, guest_auth, share):

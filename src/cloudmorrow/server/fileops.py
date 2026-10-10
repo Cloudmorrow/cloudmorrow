@@ -1,15 +1,16 @@
 """What can be done with the files in a server share, for whoever asks.
 
 Two things ask: the share file routes (`/api/shares/<name>/ls`, `file`,
-`thumb`, `upload` — the CLI, the agent and the old clients), and the
+`thumb`, `upload` — the CLI and the old clients), and the
 `shares` backend, which serves the same files as `file` records to the
 Files Quill, `cm files` and an assistant. Both go through here, so both
 keep the same rules: nothing hidden is listed, no symlink is followed out
 of the share, a path is checked against the share's folder before anything
 is opened or written, and nothing is overwritten by a file put there.
 
-Only a server share, and the caller's own drive. A machine share's files
-are on the machine, and this server never sees them.
+A share on the server, and the caller's own drive: which of them a caller
+has, and whether they may change what is in one, is the caller's business
+(routes/sharefiles.py, backends/shares.py), not this module's.
 """
 
 from __future__ import annotations

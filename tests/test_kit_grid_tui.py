@@ -246,31 +246,6 @@ async def test_an_empty_share_opens_empty(app):
         assert names(screen) == []
 
 
-async def test_a_machine_share_is_listed_but_says_to_mount_it(app):
-    app.client.share_list.append(
-        {
-            "name": "laptop",
-            "kind": "machine",
-            "machine": "book",
-            "online": False,
-            "path": "/home/me/stuff",
-            "managed": False,
-            "description": "",
-            "url": "",
-            "created_at": "",
-            "updated_at": "",
-        }
-    )
-    async with app.run_test(size=(120, 34)) as pilot:
-        screen = await open_browse(app, pilot)
-        assert names(screen) == ["media", "photos", "laptop"]
-        await pilot.press("down", "down")
-        await pilot.press("enter")
-        await settle(app, pilot)
-        assert app.client.listing_calls == []
-        assert "mount it to browse it" in status(screen)
-
-
 async def test_a_folder_that_is_gone_sends_you_back_to_the_shares(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_browse(app, pilot)
@@ -370,7 +345,16 @@ async def test_among_the_shares_only_what_works_there_is_offered(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_browse(app, pilot)
         shown = [b.id for b in screen.active_pane.query(".toolbar Button") if b.display]
-        assert shown == ["do-new_group", "do-mount", "do-unmount", "do-copy_url", "do-remove", "do-open", "do-refresh"]
+        assert shown == [
+            "do-new_group",
+            "do-share_with",
+            "do-mount",
+            "do-unmount",
+            "do-copy_url",
+            "do-remove",
+            "do-open",
+            "do-refresh",
+        ]
         await pilot.press("enter")
         await settle(app, pilot)
         shown = [b.id for b in screen.active_pane.query(".toolbar Button") if b.display]

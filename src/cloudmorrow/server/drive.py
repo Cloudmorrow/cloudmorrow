@@ -1,7 +1,7 @@
 """My Files: the drive every account has on the server.
 
-A share is something an admin makes and everyone's machines mount. This is
-the other thing people expect of a server: a folder of their own, there
+A share is a folder somebody makes and shares with the people who need it.
+This is the other thing people expect of a server: a folder of their own, there
 from the day the account is, with nothing to set up. It is served exactly
 as a server share is — over WebDAV at `/dav/my-files/`, and to the browser
 through the same file routes — so every client that can open a share can
@@ -53,5 +53,4 @@ def user_drive(config: ServerConfig, username: str) -> Share:
         created_at="",
         updated_at="",
         kind=DRIVE,
-        agent_id=None,
     )

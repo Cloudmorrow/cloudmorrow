@@ -7,11 +7,11 @@ alternative — a FUSE driver of our own talking to a private API — would be
 more code on the end that is hardest to debug, for a mount that behaves
 worse than the one the OS ships.
 
-The protocol and the provider live in `cloudmorrow.webdav`, shared with the
-agent, which serves the shares on its own machine the same way. What is the
-server's alone is here: the credential check, against its accounts, and
-which shares it serves — the ones on the server, since a machine share is
-served by the machine.
+The protocol and the provider live in `cloudmorrow.webdav`. What is the
+server's is here: the credential check, against its accounts; which shares
+a caller has — their drive, and every share that is theirs or shared with
+them (`ShareStore.visible`); and the guard that keeps a caller who may only
+read a share, or only read files at all, from changing anything in it.
 
 The whole thing is a WSGI app; `create_app` mounts it at `/dav`.
 """
@@ -23,13 +23,14 @@ import hashlib
 import threading
 import time
 from collections.abc import Callable
+from urllib.parse import unquote, urlsplit
 
 from wsgidav.wsgidav_app import WsgiDAVApp
 
 from cloudmorrow.server.circles import Access
 from cloudmorrow.server.db import UserStore
 from cloudmorrow.server.security import TokenError, decode_access_token, verify_password
-from cloudmorrow.server.shares import DRIVE_NAME, SERVER, Share, ShareStore
+from cloudmorrow.server.shares import DRIVE_NAME, WRITE, Share, ShareStore
 from cloudmorrow.server.signin_limits import SigninLimits
 from cloudmorrow.webdav import MOUNT_PATH, build_app
 
@@ -85,8 +86,8 @@ class CredentialCheck:
 
 
 class ServerShares:
-    """The shares this server serves: the caller's own drive, then their
-    shares — only those on the server.
+    """The shares this server serves a caller: their own drive, then every
+    share they have — theirs, and the ones shared with them.
 
     *drive_for* gives an account its drive (`cloudmorrow.server.drive`); it
     is listed first and answers to its own name, whatever the shares table
@@ -111,18 +112,28 @@ class ServerShares:
     def shares_for(self, owner: str) -> list[Share]:
         if not self._reads_files(owner):
             return []
-        return [self._drive_for(owner), *self._shares.shares(owner, kind=SERVER)]
+        return [self._drive_for(owner), *self._shares.visible(owner)]
 
     def share_for(self, owner: str, name: str) -> Share | None:
         if not self._reads_files(owner):
             return None
         if (name or "").strip().lower() == DRIVE_NAME:
             return self._drive_for(owner)
-        share = self._shares.get(owner, name)
-        return share if share is not None and share.kind == SERVER else None
+        return self._shares.for_user(owner, name)
+
+    def writes(self, username: str, name: str) -> bool:
+        """May *username* change what is in the share called *name*? Their
+        drive, yes; a share, if they have `write` on it."""
+        if not name or (name or "").strip().lower() == DRIVE_NAME:
+            return True
+        share = self._shares.get(name)
+        # No such share, or not theirs: the provider answers 404 for it.
+        if share is None:
+            return True
+        return self._shares.access_of(share, username) == WRITE
 
 
-# What a mount may do to somebody whose circles give only `read` on files.
+# What a mount may do to somebody who may only read: look.
 DAV_READS = frozenset({"GET", "HEAD", "OPTIONS", "PROPFIND"})
 FILE_MODEL = "file"
 
@@ -140,15 +151,44 @@ def _caller(environ: dict) -> str:
     return decoded.partition(":")[0].strip().lower()
 
 
-def read_only_for(app, access: Callable[[str], Access]):
-    """Refuse every writing method to whoever may only read files."""
+def _share_in(path: str) -> str:
+    """The share a path inside the mount is in: its first segment.
+    `PATH_INFO` is already inside it — `/media/a.txt` for `/dav/media/a.txt`."""
+    return next((part for part in unquote(path or "").split("/") if part), "").lower()
+
+
+def _destination_in(environ: dict) -> str:
+    """The share a COPY or MOVE is going to, from its Destination URL, which
+    is a whole path — `/dav/media/a.txt` — with the mount in front of it."""
+    path = unquote(urlsplit(environ.get("HTTP_DESTINATION", "")).path)
+    # Behind a proxy that serves the cloud under a prefix the URL has more
+    # in front of the mount than this app was handed, so it is looked for.
+    mount = MOUNT_PATH + "/"
+    at = path.find(mount)
+    return _share_in(path[at + len(mount) :]) if at != -1 else ""
+
+
+def read_only_for(app, shares: ServerShares, access: Callable[[str], Access] | None = None):
+    """Refuse every writing method to whoever may only read: files at all,
+    by their circles, or the share it is aimed at — or, for a copy or a
+    move, the share it is going to."""
 
     def guarded(environ: dict, start_response):
         if environ.get("REQUEST_METHOD", "GET").upper() not in DAV_READS:
             username = _caller(environ)
-            if username and not access(username).may("write", FILE_MODEL):
-                start_response("403 Forbidden", [("Content-Type", "text/plain")])
-                return [b"you may read files here, not change them"]
+            if username:
+                refused = ""
+                if access is not None and not access(username).may("write", FILE_MODEL):
+                    refused = "you may read files here, not change them"
+                else:
+                    targets = {_share_in(environ.get("PATH_INFO", ""))}
+                    if environ.get("HTTP_DESTINATION"):
+                        targets.add(_destination_in(environ))
+                    if any(not shares.writes(username, name) for name in targets):
+                        refused = "this share is shared with you to read, not to change"
+                if refused:
+                    start_response("403 Forbidden", [("Content-Type", "text/plain")])
+                    return [refused.encode()]
         return app(environ, start_response)
 
     return guarded
@@ -161,5 +201,6 @@ def build_dav_app(
     access: Callable[[str], Access] | None = None,
 ):
     """The WSGI app `create_app` mounts at `/dav`."""
-    app: WsgiDAVApp = build_app(ServerShares(shares, drive_for, access), check)
-    return read_only_for(app, access) if access is not None else app
+    served = ServerShares(shares, drive_for, access)
+    app: WsgiDAVApp = build_app(served, check)
+    return read_only_for(app, served, access)

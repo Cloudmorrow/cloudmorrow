@@ -132,12 +132,14 @@ TYPES: tuple[DataType, ...] = (
     DataType(
         "share",
         "Share",
-        "A named folder served over WebDAV, on the server or on one of your machines.",
+        "A named folder on the server, served over WebDAV, and shared with people and circles.",
         FOUNDATION,
         ("personal",),
         (
             _f("name", "string"),
-            _f("kind", "string", "server or machine"),
+            _f("kind", "string", "drive or server"),
+            _f("owner", "string"),
+            _f("access", "string", "write or read"),
             _f("url", "string"),
         ),
     ),
