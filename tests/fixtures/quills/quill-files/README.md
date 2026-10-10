@@ -7,8 +7,9 @@ file manager shows a folder.
 - **My Files** is a folder of your own on the server, there from the day
   your account is. Nothing to set up.
 - **Shares** sit beside it: a folder on the server that somebody made and
-  shared with people and circles, to change or only to read. Yours are
-  listed with who has them; the ones shared with you say whose they are.
+  shared with people and circles, to change or only to read. Yours say who
+  has them; the ones shared with you say whose they are. One you may only
+  read opens like any other, with nothing that changes it.
 - Open one and it is its folders and files: as a list that says when and how
   big, or as tiles that show what a picture is of. Put files in from the
   phone, the camera, a drag or a paste; make folders; rename, move and
@@ -35,7 +36,7 @@ It contains no code: everything above is declared in [`quill.toml`](quill.toml).
 On the command line:
 
 ```
-cm files list                      # My Files and your shares
+cm files list                      # My Files, your shares and the ones shared with you
 cm files list my-files Photos      # a folder
 cm files get my-files Photos/cat.jpg [out]
 cm files put my-files Photos ./dog.jpg
@@ -43,7 +44,15 @@ cm files put my-files Photos ./dog.jpg
 
 ## Working on it
 
-See [CLAUDE.md](CLAUDE.md). In short: `cm quill check`, then `cm quill dev`.
+See [CLAUDE.md](CLAUDE.md) and the skills in `.claude/skills/`. In short:
+
+```
+uv sync                  # .venv with Cloudmorrow and pytest
+cm quill check           # the manifest, as a server would install it
+cm quill test            # tests/, against the real record store and gate
+cm quill test --sandbox  # the same, with the code in the sandbox
+cm quill dev --local     # a throwaway server here, reinstalled as you save
+```
 
 ## Licence
 

@@ -319,7 +319,7 @@ and has every surface draw it hidden until asked for.
 | detail / form | model; optional fields = [...] | one record's fields, editable |
 | calendar | model, starts, ends (indexed datetime/date), space (a link to a space datamodel); optional all_day (bool), colour (a field of the space), subtitle | every space's things at once: a month, a week, the day's list; the spaces and their people |
 | editor | model, title, body (markdown); optional path (a string like folder/sub/title: the folders) | a tree of folders and records beside a page of Markdown; pictures where the backend keeps attachments |
-| grid | a model with bytes beside its fields (the foundational `file`); group (link: the places, picked first), folder (string), kind (an enum with "folder"); optional size, modified, mime, group_subtitle and group_open (fields of the group's model) | the groups, then folders and tiles with pictures; put in, get, new folder, rename, move, delete |
+| grid | a model with bytes beside its fields (the foundational `file`); group (link: the places, picked first), folder (string), kind (an enum with "folder"); optional size, modified, mime, group_subtitle, group_open and group_writes (fields of the group's model; group_open and group_writes are bools: false and the group is listed but not opened, or opened with nothing that writes) | the groups, then folders and tiles with pictures; put in, get, new folder, rename, move, delete |
 | thread | model (in a space), space (its link to the space), body; optional about (a field of the space), made_as | the spaces with unread counts, then a conversation: newest at the bottom, grouped by author and day, a box to write in |
 
 A thread's `made_as` says what fields a space gets for how it is made — by

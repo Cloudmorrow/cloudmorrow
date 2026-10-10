@@ -1,7 +1,7 @@
 [quill]
 id = "files"
 name = "Files"
-version = "1.0.1"
+version = "1.0.2"
 summary = "Your own drive on the server, your fileshares, and what is in them."
 category = "personal"
 icon = "files"
@@ -9,7 +9,7 @@ publisher = "Cloudmorrow"
 license = "AGPL-3.0-or-later"
 features = [
   "My Files: a drive of your own on the server, there from the day your account is",
-  "Your fileshares beside it, and the ones shared with you",
+  "Your fileshares beside it, and the ones shared with you, to change or only to read",
   "Folders and files as a list, or as tiles with a picture of each photo",
   "Sort by name, date, size or type; folders first",
   "Upload from the phone, the camera, a drag or a paste; make folders; rename, move and delete",
@@ -29,9 +29,10 @@ kit = "grid"
 label = "Files"
 model = "file"
 title = "name"
-group = "share"                 # the share picker: My Files, then your shares
-group_subtitle = "about"        # where each one is, and whether it can be reached
-group_open = "browsable"        # every share is opened
+group = "share"                 # the share picker: My Files, then your shares and the ones shared with you
+group_subtitle = "about"        # whose each one is, and who has it
+group_open = "browsable"        # one the server cannot show is listed, not opened
+group_writes = "writable"       # one shared with you to read opens with nothing that writes
 folder = "folder"
 kind = "kind"
 size = "size"

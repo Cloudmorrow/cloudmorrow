@@ -1,8 +1,8 @@
 [datamodel]
 id = "share"
-version = 1
+version = 2
 label = "Share"
-description = "A place files are kept: your own drive on the server (My Files), or a folder on the server, made by somebody and shared with the people and circles they chose."
+description = "A place files are kept: your own drive on the server (My Files), or a folder on the server that somebody made and shared with people and circles, to change or only to read."
 domain = "files"
 scopes = ["personal"]
 title = "label"
@@ -13,14 +13,19 @@ backend = "shares"
 [fields]
 name = { kind = "string", required = true, indexed = true, label = "Name", description = "What it is mounted as: /dav/<name>/" }
 label = { kind = "string", indexed = true, label = "Shown as" }
-kind = { kind = "enum", values = ["drive", "server"], labels = ["My Files", "On the server"], default = "server", indexed = true }
+# "machine" stays a value, since a released value is never taken away; no
+# share is one any more: every share is on the server.
+kind = { kind = "enum", values = ["drive", "server", "machine"], labels = ["My Files", "On the server", "On a machine"], default = "server", indexed = true }
 description = { kind = "text" }
-owner = { kind = "string", indexed = true, description = "Who made it, and decides who has it" }
-access = { kind = "string", indexed = true, description = "What you may do in it: write or read" }
+owner = { kind = "string", indexed = true, label = "Owner", description = "Who made it, and decides who has it" }
+access = { kind = "enum", values = ["write", "read"], labels = ["Can change", "Can read"], default = "write", indexed = true, label = "Access", description = "What you may do in it" }
+writable = { kind = "bool", indexed = true, description = "Whether you may change what is in it" }
 can_manage = { kind = "bool", indexed = true, description = "Whether it is yours to share, change and remove" }
-shared_with = { kind = "string", description = "Who has it besides its owner, in a few words" }
-path = { kind = "string", description = "Its directory, where it is" }
+shared_with = { kind = "string", label = "Shared with", description = "Who has it besides its owner, in a few words" }
+# Retired with machine shares in version 2; kept, since a released field is never taken away.
+machine = { kind = "string", indexed = true, description = "Not used since version 2: the machine that served a machine share" }
+path = { kind = "string", description = "Its directory on the server; only its owner is told" }
 online = { kind = "bool", indexed = true, description = "Whether it can be reached right now" }
 browsable = { kind = "bool", indexed = true, description = "Whether the server can show what is in it" }
-about = { kind = "string", description = "One line on where it is, and whether it can be reached" }
+about = { kind = "string", description = "One line on whose it is and who has it" }
 url = { kind = "url", description = "Its WebDAV address" }

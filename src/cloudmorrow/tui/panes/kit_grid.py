@@ -9,7 +9,8 @@ called; the screen and the datamodels say.
 
 At the top, the groups in a table: each one's title, and the line the
 screen's `group_subtitle` names; one whose `group_open` field is false is
-listed but not opened — the server cannot show what is in it. Enter opens a
+listed but not opened — the server cannot show what is in it; one whose
+`group_writes` field is false opens as if it may only be read. Enter opens a
 group, and it is its folders and records, sorted the way the web app sorts
 them — name, date, size or type, folders first — as a list, or as tiles
 with the picture drawn, since the terminal can draw one. The picture the
@@ -423,6 +424,7 @@ class GridPane(KitPane):
         self.group_title: str = self.group_model.get("title") or "title"
         self.group_subtitle: str = screen.get("group_subtitle") or ""
         self.group_open: str = screen.get("group_open") or ""
+        self.group_writes: str = screen.get("group_writes") or ""
         bound = grid_fields(screen, self.model)
         self.title_field: str = bound["title"]
         self.folder_field: str = bound["folder"]
@@ -500,6 +502,22 @@ class GridPane(KitPane):
 
     def opens(self, record: dict) -> bool:
         return not self.group_open or (record.get("fields") or {}).get(self.group_open) is not False
+
+    @property
+    def read_only_here(self) -> bool:
+        """In a group whose `group_writes` field is false: look, never write."""
+        if self.at_top or not self.group_writes:
+            return False
+        return ((self.current_group or {}).get("fields") or {}).get(self.group_writes) is False
+
+    def _refused_here(self, name: str) -> bool:
+        return name in self.refused or (self.read_only_here and name in self.WRITING)
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        """In a group that may only be read, writing's keys are not in the footer either."""
+        if action == "fire" and parameters and self._refused_here(str(parameters[0])):
+            return False
+        return super().check_action(action, parameters)
 
     @property
     def current_group(self) -> dict | None:
@@ -599,7 +617,11 @@ class GridPane(KitPane):
             crumb.update(f"[b]{escape(trail)}[/]")
         for button in self.query(".toolbar Button"):
             action = (button.id or "")[len("do-") :]
-            button.display = action in (self.top_actions if self.at_top else IN_FOLDER)
+            button.display = action in (self.top_actions if self.at_top else IN_FOLDER) and not (
+                self.read_only_here and action in self.WRITING
+            )
+        # Into a group that may only be read, or out of one: the footer follows.
+        self.refresh_bindings()
         self._label("toggle_view", "List" if self.view == "grid" else "Thumbnails")
         self._label("sort", f"Sort: {dict(SORTS)[self.sort_key]} {'↓' if self.descending else '↑'}")
         showing = "grid-tiles" if self.view == "grid" and not self.at_top else "grid-table"
@@ -822,7 +844,7 @@ class GridPane(KitPane):
 
     # -- the extensions' own keys, among the groups ---------------------------------
     def fire(self, name: str) -> None:
-        if name in self.refused:
+        if self._refused_here(name):
             return
         for ext in self.extensions:
             if any(a.id == name for a in ext.actions):

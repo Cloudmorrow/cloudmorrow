@@ -306,3 +306,14 @@ def test_boards_and_tasks_from_before_move_into_records(config, users, registry)
     # Once.
     assert move_legacy_tasks(db, registry, store) == 0
     assert len(store.list(bram, "task")) == 2
+
+
+def test_a_grids_group_writes_names_a_bool_on_the_group(registry, tmp_path):
+    """The Files Quill's `group_writes`: checked like `group_open`, against the share datamodel."""
+    files = (QUILL_CATALOG / "quill-files" / "quill.toml").read_text(encoding="utf-8")
+    assert 'group_writes = "writable"' in files
+    good = write_quill(tmp_path / "good", files)
+    assert registry.plan(good, models_source())
+    bad = write_quill(tmp_path / "bad", files.replace('group_writes = "writable"', 'group_writes = "owner"'))
+    with pytest.raises(QuillError, match="group_writes"):
+        registry.plan(bad, models_source())

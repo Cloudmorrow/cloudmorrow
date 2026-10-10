@@ -1634,8 +1634,10 @@ opens the phone's share sheet (or saves it), and Rename, Move and Delete.
 The plus beside the title puts something in the folder you are in: a file
 chosen from the phone, one its camera takes there and then, or a new
 folder; on a computer a file dragged onto the folder or pasted goes in too.
-The “…” beside a folder's name renames, moves or deletes it. In a share
-you may only read, those are offered and refused with the reason.
+The “…” beside a folder's name renames, moves or deletes it. A share you
+may only read opens with none of that: no plus, nothing dropped or pasted
+in, and no rename, move or delete — the Files Quill's `group_writes` reads
+the share's `writable` field. The terminal app hides the same keys.
 
 The terminal app has the same, on the Files card: the shares, then enter
 on one for its folders and files. The same sort (`s` is the next one, `S`

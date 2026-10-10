@@ -165,6 +165,8 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
                     need(group_model, thing + " group_subtitle", screen["group_subtitle"])
                 if screen.get("group_open"):
                     need(group_model, thing + " group_open", screen["group_open"], ("bool",))
+                if screen.get("group_writes"):
+                    need(group_model, thing + " group_writes", screen["group_writes"], ("bool",))
         elif kit == "thread":
             _check_thread(manifest, screen, model, models, need)
     for job in manifest.jobs:

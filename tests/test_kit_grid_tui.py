@@ -360,3 +360,27 @@ async def test_among_the_shares_only_what_works_there_is_offered(app):
         shown = [b.id for b in screen.active_pane.query(".toolbar Button") if b.display]
         assert shown[:3] == ["do-put", "do-new_record", "do-rename"]
         assert "do-mount" not in shown
+
+
+async def test_a_group_that_may_only_be_read_opens_with_nothing_that_writes(app):
+    """`group_writes`: a share shared with you to read is looked in, never written."""
+    app.client.share_list[0]["access"] = "read"
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await open_browse(app, pilot)
+        await pilot.press("enter")
+        await settle(app, pilot)
+        shown = [b.id for b in screen.active_pane.query(".toolbar Button") if b.display]
+        for writing in ("do-put", "do-new_record", "do-rename", "do-delete_record"):
+            assert writing not in shown, writing
+        assert "do-sort" in shown
+        before = list(app.client.file_calls)
+        await pilot.press("delete")
+        await settle(app, pilot)
+        assert app.client.file_calls == before
+        # Back among the shares, and into one that may be written: all of it again.
+        await pilot.press("backspace")
+        await settle(app, pilot)
+        await pilot.press("down", "enter")
+        await settle(app, pilot)
+        shown = [b.id for b in screen.active_pane.query(".toolbar Button") if b.display]
+        assert "do-put" in shown and "do-new_record" in shown
