@@ -175,8 +175,11 @@ async def _thread(api: CloudmorrowClient, screen: Screen, action: str, args: lis
     reply_to = screen.spec.get("reply_to") or ""
     pinned = screen.spec.get("pinned") or ""
     reactions_model = screen.spec.get("reactions") or ""
-    does = ["list", "show", "say"] + (["reply"] if reply_to else []) + (["react"] if reactions_model else []) + (
-        ["pin"] if pinned else []
+    does = (
+        ["list", "show", "say"]
+        + (["reply"] if reply_to else [])
+        + (["react"] if reactions_model else [])
+        + (["pin"] if pinned else [])
     )
     if action not in does:
         fail(f"a {screen.kit} is {', '.join(does)}")
