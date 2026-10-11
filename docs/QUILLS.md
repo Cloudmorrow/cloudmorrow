@@ -409,6 +409,38 @@ above by default), fetches a Quill as the tarball of its pinned `ref` — no git
 needed on the server — and keeps it under `<data_dir>/quills/<id>/`. A source
 can also be a local directory, which is how you develop one.
 
+A Quill is released in its own repository: a pushed tag (`v1.2.0`, the same
+as `version` in `quill.toml`), a release made on github.com, or the
+**release** workflow run from the Actions tab, which tags `main` with the
+manifest's version once the checks pass. The template carries that
+workflow, so every Quill releases the same way.
+
+The catalog follows the releases. Its **releases** workflow runs every
+fifteen minutes and finds the newest release of every `Cloudmorrow/quill-*`
+repository, of the datamodels, and of every other repository the catalog
+lists; it works out the catalog as it should be and runs the check — every
+Quill fetched at its pin, planned against the pinned datamodels, as a server
+would before installing — and then:
+
+- **Cloudmorrow's Quills** are committed to `main` with no review and no
+  further step, a new one included, with its name, summary and category
+  from its `quill.toml`. The template is excluded.
+- **The datamodels** move the same way, but only when every Quill still
+  checks out against the new release; otherwise the pin stays and the run
+  names the Quill that breaks.
+- **Everyone else's listed Quills** get a pull request per release, opened
+  by the workflow with the check result and the install sheet in its body.
+  One of us merges it, or closes it; a release turned down is not proposed
+  again. The submitter may open that pull request themselves; the result is
+  the same.
+- **A new Quill from someone else** is a pull request from its author adding
+  one `[[quills]]` block, and the check runs on it.
+
+The workflow is the only writer of `catalog.toml`'s refs; nobody edits them
+by hand. The `foundation` flag and the categories are product decisions, and
+stay hand edits. The catalog's history is the record of every release a
+server could ever install.
+
 ## Building one, with an assistant
 
 The loop is meant to be a conversation, and every step of it has a command
@@ -425,8 +457,10 @@ and an MCP tool, so an assistant can drive it as well as you can.
 3. **Try** with `cm quill dev --local` (a throwaway server here) or `cm quill dev .`: installs the folder on your own server as a
    development Quill, and reinstalls it when a file changes. It is on your
    phone and in your terminal at once.
-4. **Publish** with a release tag in your repository and a pull request adding
-   three lines to the catalog.
+4. **Publish** with a release in your repository (a tag, a release on
+   github.com, or the release workflow by hand) and, the first time, a pull
+   request adding one block to the catalog; after that the catalog follows
+   your releases by itself (*The catalog*, above).
 
 Over MCP, an administrator's assistant has `quill_schema`, `quill_check` and
 `quill_dev_install`: "make me a place to track the car's services" is a

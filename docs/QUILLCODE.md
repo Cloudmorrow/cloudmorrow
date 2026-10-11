@@ -378,16 +378,21 @@ text, from a server with nothing on it but the Quill and its datasets.
    template* (not a fork: a fork stays tied to the template, cannot be
    private, and sends pull requests to us), or `cm quill new fleet`.
 2. **Build** it, with `cm quill test` and `cm quill test --sandbox` passing.
-3. **Release** with a tag (`v1.2.0`, the same as `version`). The template's
-   release workflow checks, tests in the sandbox, and publishes the release.
-4. **Submit** it: a pull request on `Cloudmorrow/quill-catalog` adding its
-   `repo`, `ref` and `category`. cloudmorrow.com/publish lists it on the
-   site meanwhile; opening the pull request from there is still to come.
+3. **Release** it: push a tag (`v1.2.0`, the same as `version`), publish a
+   release on github.com, or run the template's **release** workflow from
+   the Actions tab, which tags `main` with the manifest's version. The
+   workflow checks, tests in the sandbox, and publishes the release.
+4. **Submit** it, once: a pull request on `Cloudmorrow/quill-catalog` adding
+   one `[[quills]]` block (`id`, `name`, `summary`, `repo`, `ref`,
+   `category`, `publisher`). Every release after that, the catalog's
+   **releases** workflow opens the pull request itself within fifteen
+   minutes, with the check result and the install sheet in its body, and we
+   merge it or say why not. cloudmorrow.com shows what the catalog pins.
 
-Ours go the same way. Every standard Quill is a `quill-*` repository in the
-same shape as the template, released and added by the same kind of pull
-request; the only thing ours have that nobody else's do is `foundation =
-true` in the catalog.
+Ours are `quill-*` repositories in the Cloudmorrow organisation, in the same
+shape as the template and released the same way; the same workflow commits
+their releases to the catalog with no review. The only thing ours have that
+nobody else's do is `foundation = true` in the catalog, set by hand.
 
 A repository made from a template does not get the template's later
 changes, so the template holds as little as it can: the SDK is a dependency

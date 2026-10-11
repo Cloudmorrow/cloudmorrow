@@ -18,8 +18,9 @@ are kit elements, or views built from primitives every surface draws.
 3. `cm quill preview <view>` draws a view as text; `cm quill dev --local` is a
    throwaway server on this machine, reinstalled as you save; `cm quill dev`
    installs this folder on your own server as a development Quill.
-4. Tag a release (`v1.0.0`) and open a pull request on
-   `Cloudmorrow/quill-catalog` adding the Quill to `catalog.toml`.
+4. Tag a release (`v1.0.0`); the first time, open a pull request on
+   `Cloudmorrow/quill-catalog` adding the Quill to `catalog.toml`; after
+   that the catalog follows your releases by itself.
 
 Over MCP an assistant has the first loop: `quill_schema`, `quill_check`,
 `quill_dev_install`. An administrator's assistant builds the server's
