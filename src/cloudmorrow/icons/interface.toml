@@ -1,0 +1,742 @@
+# Cloudmorrow icons, theme "Interface": CC0 1.0, free to use anywhere, no attribution needed.
+
+[[icons]]
+id = "arrow-up"
+name = "Arrow up"
+tags = ["direction", "up", "north"]
+rows = [
+  ".....XX.....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXX.XX.XXX.",
+  "XX...XX...XX",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "arrow-down"
+name = "Arrow down"
+tags = ["direction", "down", "south"]
+rows = [
+  "............",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "XX...XX...XX",
+  ".XXX.XX.XXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  ".....XX.....",
+]
+
+[[icons]]
+id = "arrow-left"
+name = "Arrow left"
+tags = ["direction", "left", "back"]
+rows = [
+  "............",
+  "....X.......",
+  "...XX.......",
+  "..XXX.......",
+  ".XXXX.......",
+  "XXXXXXXXXXX.",
+  "XXXXXXXXXXX.",
+  ".XXXX.......",
+  "..XXX.......",
+  "...XX.......",
+  "....X.......",
+  "............",
+]
+
+[[icons]]
+id = "arrow-right"
+name = "Arrow right"
+tags = ["direction", "right", "forward"]
+rows = [
+  "............",
+  ".......X....",
+  ".......XX...",
+  ".......XXX..",
+  ".......XXXX.",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  ".......XXXX.",
+  ".......XXX..",
+  ".......XX...",
+  ".......X....",
+  "............",
+]
+
+[[icons]]
+id = "chevron-up"
+name = "Chevron up"
+tags = ["expand", "up", "collapse"]
+rows = [
+  "............",
+  "............",
+  ".....XX.....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXX..XXX..",
+  ".XXX....XXX.",
+  "XXX......XXX",
+  "XX........XX",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "chevron-down"
+name = "Chevron down"
+tags = ["expand", "down", "open"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "XX........XX",
+  "XXX......XXX",
+  ".XXX....XXX.",
+  "..XXX..XXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  ".....XX.....",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "chevron-left"
+name = "Chevron left"
+tags = ["back", "previous", "left"]
+rows = [
+  "............",
+  ".......XX...",
+  "......XX....",
+  ".....XX.....",
+  "....XX......",
+  "...XX.......",
+  "...XX.......",
+  "....XX......",
+  ".....XX.....",
+  "......XX....",
+  ".......XX...",
+  "............",
+]
+
+[[icons]]
+id = "chevron-right"
+name = "Chevron right"
+tags = ["next", "forward", "right"]
+rows = [
+  "............",
+  "...XX.......",
+  "....XX......",
+  ".....XX.....",
+  "......XX....",
+  ".......XX...",
+  ".......XX...",
+  "......XX....",
+  ".....XX.....",
+  "....XX......",
+  "...XX.......",
+  "............",
+]
+
+[[icons]]
+id = "plus"
+name = "Plus"
+tags = ["add", "new", "create"]
+rows = [
+  "............",
+  "............",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "minus"
+name = "Minus"
+tags = ["remove", "subtract", "less"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "............",
+  "............",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "............",
+  "............",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "cross"
+name = "Cross"
+tags = ["close", "cancel", "delete"]
+rows = [
+  "............",
+  ".XX......XX.",
+  "..XX....XX..",
+  "...XX..XX...",
+  "....XXXX....",
+  ".....XX.....",
+  "....XXXX....",
+  "...XX..XX...",
+  "..XX....XX..",
+  ".XX......XX.",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "tick"
+name = "Tick"
+tags = ["done", "yes", "check"]
+rows = [
+  "............",
+  "............",
+  "..........XX",
+  ".........XX.",
+  "........XX..",
+  ".XX....XX...",
+  "..XX..XX....",
+  "...XXXX.....",
+  "....XX......",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "check-circle"
+name = "Check circle"
+tags = ["done", "success", "complete"]
+rows = [
+  "....XXXX....",
+  "..XX....XX..",
+  ".X........X.",
+  ".X.......XX.",
+  "X.......XX.X",
+  "X.XX...XX..X",
+  "X..XX.XX...X",
+  ".X..XXX...X.",
+  ".X...X....X.",
+  "..XX....XX..",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "warning"
+name = "Warning"
+tags = ["alert", "caution", "attention"]
+rows = [
+  ".....XX.....",
+  ".....XX.....",
+  "....X..X....",
+  "....X..X....",
+  "...X.XX.X...",
+  "...X.XX.X...",
+  "..X..XX..X..",
+  "..X......X..",
+  ".X...XX...X.",
+  ".X........X.",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "info"
+name = "Info"
+tags = ["information", "about", "help"]
+rows = [
+  "....XXXX....",
+  "..XX....XX..",
+  ".X...XX...X.",
+  ".X........X.",
+  "X...XXX....X",
+  "X....XX....X",
+  "X....XX....X",
+  ".X...XX...X.",
+  ".X..XXXX..X.",
+  "..XX....XX..",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "question"
+name = "Question"
+tags = ["help", "ask", "unknown"]
+rows = [
+  "....XXXX....",
+  "..XX....XX..",
+  ".X..XXXX..X.",
+  ".X.XX..XX.X.",
+  "X......XX..X",
+  "X.....XX...X",
+  "X....XX....X",
+  ".X...XX...X.",
+  ".X........X.",
+  "..XX.XX.XX..",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "search"
+name = "Search"
+tags = ["find", "magnifier", "look"]
+rows = [
+  "...XXXX.....",
+  "..X....X....",
+  ".X......X...",
+  ".X......X...",
+  ".X......X...",
+  ".X......X...",
+  "..X....X....",
+  "...XXXX.X...",
+  "........XX..",
+  ".........XX.",
+  "..........XX",
+  "............",
+]
+
+[[icons]]
+id = "filter"
+name = "Filter"
+tags = ["narrow", "sift", "refine"]
+rows = [
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "............",
+  "....XXXX....",
+  "....XXXX....",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "sort"
+name = "Sort"
+tags = ["order", "arrange", "ascending"]
+rows = [
+  "...X........",
+  "..XXX.......",
+  ".XXXXX......",
+  "...X....X...",
+  "...X....X...",
+  "...X....X...",
+  "...X....X...",
+  "...X....X...",
+  "......XXXXX.",
+  ".......XXX..",
+  "........X...",
+  "............",
+]
+
+[[icons]]
+id = "menu"
+name = "Menu"
+tags = ["hamburger", "navigation", "lines"]
+rows = [
+  "............",
+  "............",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "............",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "............",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "more"
+name = "More"
+tags = ["ellipsis", "options", "dots"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "............",
+  "............",
+  ".XX..XX..XX.",
+  ".XX..XX..XX.",
+  "............",
+  "............",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "settings-sliders"
+name = "Sliders"
+tags = ["settings", "adjust", "preferences"]
+rows = [
+  "..XX........",
+  ".XXXXXXXXXX.",
+  "..XX........",
+  "............",
+  "......XX....",
+  ".XXXXXXXXXX.",
+  "......XX....",
+  "............",
+  "...XX.......",
+  ".XXXXXXXXXX.",
+  "...XX.......",
+  "............",
+]
+
+[[icons]]
+id = "refresh"
+name = "Refresh"
+tags = ["reload", "sync", "again"]
+rows = [
+  "....XXXX....",
+  "..XX....XX..",
+  ".X........X.",
+  ".X.......XXX",
+  ".........XX.",
+  ".........X..",
+  "..X.........",
+  ".XX.........",
+  "XXX.......X.",
+  ".X........X.",
+  "..XX....XX..",
+  "....XXXX....",
+]
+
+[[icons]]
+id = "undo"
+name = "Undo"
+tags = ["back", "revert", "history"]
+rows = [
+  "............",
+  "...X........",
+  "..XX........",
+  ".XXXXXXXX...",
+  "..XX.....XX.",
+  "...X.......X",
+  "...........X",
+  "...........X",
+  "..........X.",
+  ".....XXXXX..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "redo"
+name = "Redo"
+tags = ["forward", "repeat", "again"]
+rows = [
+  "............",
+  "........X...",
+  "........XX..",
+  "...XXXXXXXX.",
+  ".XX.....XX..",
+  "X.......X...",
+  "X...........",
+  "X...........",
+  ".X..........",
+  "..XXXXX.....",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "upload"
+name = "Upload"
+tags = ["send", "put", "cloud"]
+rows = [
+  ".....XX.....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XX.XX.XX..",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "............",
+  "XX........XX",
+  "XX........XX",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "download"
+name = "Download"
+tags = ["save", "get", "fetch"]
+rows = [
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "..XX.XX.XX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  ".....XX.....",
+  "............",
+  "XX........XX",
+  "XX........XX",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "share"
+name = "Share"
+tags = ["send", "network", "pass on"]
+rows = [
+  ".........XXX",
+  "........XXXX",
+  ".......X.XXX",
+  ".....XX.....",
+  "XXX.X.......",
+  "XXX.........",
+  "XXX.X.......",
+  ".....XX.....",
+  ".......X.XXX",
+  "........XXXX",
+  ".........XXX",
+  "............",
+]
+
+[[icons]]
+id = "copy"
+name = "Copy"
+tags = ["duplicate", "clipboard", "clone"]
+rows = [
+  "............",
+  "..XXXXXXX...",
+  "..X.....X...",
+  "..X.XXXXXXX.",
+  "..X.X...X.X.",
+  "..X.X...X.X.",
+  "..X.X...X.X.",
+  "..XXX...X.X.",
+  "....X.....X.",
+  "....X.....X.",
+  "....XXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "edit"
+name = "Edit"
+tags = ["pencil", "write", "change"]
+rows = [
+  "............",
+  ".........XX.",
+  "........XXXX",
+  ".......XX.XX",
+  "......XX.XX.",
+  ".....XX.XX..",
+  "....XX.XX...",
+  "...XX.XX....",
+  "..X..XX.....",
+  "..XXXX......",
+  "..XX........",
+  "............",
+]
+
+[[icons]]
+id = "bin"
+name = "Bin"
+tags = ["delete", "trash", "rubbish"]
+rows = [
+  "............",
+  "....XXXX....",
+  ".XXXXXXXXXX.",
+  "..X......X..",
+  "..X.X..X.X..",
+  "..X.X..X.X..",
+  "..X.X..X.X..",
+  "..X.X..X.X..",
+  "..X.X..X.X..",
+  "..XXXXXXXX..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "bell"
+name = "Bell"
+tags = ["notification", "alert", "ring"]
+rows = [
+  ".....XX.....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "............",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "bookmark"
+name = "Bookmark"
+tags = ["save", "mark", "favourite"]
+rows = [
+  "............",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXX..XXX..",
+  "..XX....XX..",
+  "..X......X..",
+  "............",
+]
+
+[[icons]]
+id = "flag"
+name = "Flag"
+tags = ["mark", "report", "goal"]
+rows = [
+  ".XX.........",
+  ".XXXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXX..",
+  ".XXXXXXXX...",
+  ".XX.........",
+  ".XX.........",
+  ".XX.........",
+  ".XX.........",
+  ".XX.........",
+  "............",
+]
+
+[[icons]]
+id = "tag"
+name = "Tag"
+tags = ["label", "price", "category"]
+rows = [
+  "............",
+  ".XXXXXX.....",
+  ".X....XX....",
+  ".X.XX..XX...",
+  ".X.XX...XX..",
+  ".X.......XX.",
+  ".XX.......X.",
+  "..XX.....X..",
+  "...XX...X...",
+  "....XX.X....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "grid"
+name = "Grid"
+tags = ["tiles", "layout", "apps"]
+rows = [
+  "............",
+  ".XXXX..XXXX.",
+  ".XXXX..XXXX.",
+  ".XXXX..XXXX.",
+  ".XXXX..XXXX.",
+  "............",
+  ".XXXX..XXXX.",
+  ".XXXX..XXXX.",
+  ".XXXX..XXXX.",
+  ".XXXX..XXXX.",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "list-lines"
+name = "List"
+tags = ["bullets", "items", "rows"]
+rows = [
+  "............",
+  "............",
+  ".XX.XXXXXXX.",
+  ".XX.XXXXXXX.",
+  "............",
+  ".XX.XXXXXXX.",
+  ".XX.XXXXXXX.",
+  "............",
+  ".XX.XXXXXXX.",
+  ".XX.XXXXXXX.",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "external-link"
+name = "External link"
+tags = ["open", "new window", "outside"]
+rows = [
+  ".......XXXX.",
+  ".........XX.",
+  "........X.X.",
+  ".......X..X.",
+  ".XXXXXX.....",
+  ".X....X.....",
+  ".X....X.....",
+  ".X....X.....",
+  ".X....X.....",
+  ".XXXXXX.....",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "zoom-in"
+name = "Zoom in"
+tags = ["magnify", "enlarge", "closer"]
+rows = [
+  "...XXXX.....",
+  "..X....X....",
+  ".X..XX..X...",
+  ".X..XX..X...",
+  ".X.XXXX.X...",
+  ".X..XX..X...",
+  "..X....X....",
+  "...XXXX.X...",
+  "........XX..",
+  ".........XX.",
+  "..........XX",
+  "............",
+]

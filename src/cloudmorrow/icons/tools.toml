@@ -1,0 +1,571 @@
+# Cloudmorrow icons, theme "Tools": CC0 1.0, free to use anywhere, no attribution needed.
+
+[[icons]]
+id = "hammer"
+name = "Hammer"
+tags = ["tool", "nail", "build"]
+rows = [
+  "............",
+  ".XXXXXXXX...",
+  ".XXXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "...XX.....X.",
+  "....XX......",
+  ".....XX.....",
+  "......XX....",
+  ".......XX...",
+  "........XX..",
+  ".........XX.",
+  "............",
+]
+
+[[icons]]
+id = "wrench"
+name = "Wrench"
+tags = ["tool", "spanner", "fix"]
+rows = [
+  ".......XX.XX",
+  "......XXXXXX",
+  "......XXXXX.",
+  ".......XXX..",
+  "......XXX...",
+  ".....XXX....",
+  "....XXX.....",
+  "...XXX......",
+  "..XXX.......",
+  ".XXX........",
+  ".XX.........",
+  "............",
+]
+
+[[icons]]
+id = "spanner-adjustable"
+name = "Adjustable spanner"
+tags = ["tool", "wrench", "monkey wrench"]
+rows = [
+  "..XX...XXX..",
+  "..XX...XXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "...XXXXXXX..",
+  "....XXXX....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "screwdriver"
+name = "Screwdriver"
+tags = ["tool", "screw", "fix"]
+rows = [
+  "..........XX",
+  ".........XX.",
+  "........XX..",
+  ".......XX...",
+  "......XX....",
+  "....XXXX....",
+  "...XXXXX....",
+  "..XXXXXX....",
+  ".XXXXXX.....",
+  ".XXXXX......",
+  ".XXXX.......",
+  "............",
+]
+
+[[icons]]
+id = "pliers"
+name = "Pliers"
+tags = ["tool", "grip", "wire"]
+rows = [
+  "...XX..XX...",
+  "...XX..XX...",
+  "....XXXX....",
+  "....XXXX....",
+  ".....XX.....",
+  "....XXXX....",
+  "...XX..XX...",
+  "..XX....XX..",
+  "..X......X..",
+  "..X......X..",
+  "...X....X...",
+  "............",
+]
+
+[[icons]]
+id = "saw"
+name = "Saw"
+tags = ["tool", "wood", "cut"]
+rows = [
+  "............",
+  "............",
+  ".XXX........",
+  ".X.XXXXXXXXX",
+  ".X.XXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "...XXXXXXX..",
+  "...X.X.X.X..",
+  "............",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "drill"
+name = "Drill"
+tags = ["tool", "power", "hole"]
+rows = [
+  "............",
+  "....XXXXXXX.",
+  "XXXXXXXXXXXX",
+  "....XXXXXXX.",
+  "....XXXXXX..",
+  "........XXX.",
+  "........XXX.",
+  ".......XXXX.",
+  ".......XXX..",
+  ".......XXX..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "axe"
+name = "Axe"
+tags = ["tool", "wood", "chop"]
+rows = [
+  ".......XXX..",
+  "......XXXXX.",
+  ".....XXXXXX.",
+  "......XXXXX.",
+  ".......XXX..",
+  "......XX....",
+  ".....XX.....",
+  "....XX......",
+  "...XX.......",
+  "..XX........",
+  ".XX.........",
+  "............",
+]
+
+[[icons]]
+id = "chisel"
+name = "Chisel"
+tags = ["tool", "wood", "carve"]
+rows = [
+  "....XXXX....",
+  "....XXXX....",
+  "....XXXX....",
+  "....XXXX....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "tape-measure"
+name = "Tape measure"
+tags = ["tool", "measure", "length"]
+rows = [
+  "............",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXX..XXXX.",
+  ".XXX....XXX.",
+  ".XXX....XXX.",
+  ".XXXX..XXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXXXXX",
+  ".........X.X",
+  ".........XXX",
+  "............",
+]
+
+[[icons]]
+id = "ruler"
+name = "Ruler"
+tags = ["measure", "length", "straight"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "X..X..X..X.X",
+  "X.XX.XX.XX.X",
+  "X..X..X..X.X",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "spirit-level"
+name = "Spirit level"
+tags = ["tool", "level", "bubble"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "X...XXXX...X",
+  "X..XX..XX..X",
+  "X..XX..XX..X",
+  "X...XXXX...X",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "nail"
+name = "Nail"
+tags = ["hardware", "hammer"]
+rows = [
+  "............",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "......X.....",
+  "............",
+]
+
+[[icons]]
+id = "screw"
+name = "Screw"
+tags = ["hardware", "thread"]
+rows = [
+  "............",
+  "..XXXXXXXX..",
+  "..XXX..XXX..",
+  "..XXXXXXXX..",
+  "....XXXX....",
+  "...XXXXXX...",
+  "....XXXX....",
+  "...XXXXXX...",
+  "....XXXX....",
+  "...XXXXXX...",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "bolt"
+name = "Bolt"
+tags = ["hardware", "thread", "hex"]
+rows = [
+  "............",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  "...XXXXXX...",
+  "....XXXX....",
+  "...XXXXXX...",
+  "....XXXX....",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "nut"
+name = "Nut"
+tags = ["hardware", "hex", "bolt"]
+rows = [
+  "............",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXX..XXXX.",
+  ".XXX....XXX.",
+  ".XXX....XXX.",
+  ".XXXX..XXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "gear"
+name = "Gear"
+tags = ["cog", "settings", "machine"]
+rows = [
+  ".....XX.....",
+  "..X.XXXX.X..",
+  "..XXXXXXXX..",
+  ".XXXX..XXXX.",
+  "XXXX....XXXX",
+  "XXX......XXX",
+  "XXX......XXX",
+  "XXXX....XXXX",
+  ".XXXX..XXXX.",
+  "..XXXXXXXX..",
+  "..X.XXXX.X..",
+  ".....XX.....",
+]
+
+[[icons]]
+id = "clamp"
+name = "Clamp"
+tags = ["tool", "hold", "vise"]
+rows = [
+  "............",
+  "..XXXXXXX...",
+  "..XX...XXX..",
+  "..XX....XX..",
+  "..XX........",
+  "..XX........",
+  "..XX........",
+  "..XX....XX..",
+  "..XX...XXX..",
+  "..XXXXXXX...",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "toolbox"
+name = "Toolbox"
+tags = ["tools", "box", "kit"]
+rows = [
+  "............",
+  ".....XX.....",
+  "....X..X....",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".X........X.",
+  ".X........X.",
+  ".X........X.",
+  ".X........X.",
+  ".XXXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "ladder"
+name = "Ladder"
+tags = ["climb", "steps", "height"]
+rows = [
+  "..X......X..",
+  "..X......X..",
+  "..XXXXXXXX..",
+  "..X......X..",
+  "..X......X..",
+  "..XXXXXXXX..",
+  "..X......X..",
+  "..X......X..",
+  "..XXXXXXXX..",
+  "..X......X..",
+  "..X......X..",
+  "............",
+]
+
+[[icons]]
+id = "paint-roller"
+name = "Paint roller"
+tags = ["paint", "wall", "decorate"]
+rows = [
+  "............",
+  ".XXXXXXXX...",
+  ".XXXXXXXX...",
+  ".XXXXXXXXXX.",
+  "..........X.",
+  "..........X.",
+  "......XXXXX.",
+  "......X.....",
+  "......XX....",
+  "......XX....",
+  "......XX....",
+  "............",
+]
+
+[[icons]]
+id = "paintbrush"
+name = "Paintbrush"
+tags = ["paint", "brush", "decorate"]
+rows = [
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "...X.XX.X...",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "bucket-paint"
+name = "Paint bucket"
+tags = ["paint", "bucket", "tin"]
+rows = [
+  "............",
+  "....XXXX....",
+  "...X....X...",
+  "..X......X..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XX....XX..",
+  "..XX....XX..",
+  "..XX....XX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "trowel"
+name = "Trowel"
+tags = ["masonry", "plaster", "garden"]
+rows = [
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "shovel"
+name = "Shovel"
+tags = ["dig", "garden", "spade"]
+rows = [
+  "....XXXX....",
+  "....X..X....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+]
+
+[[icons]]
+id = "rake"
+name = "Rake"
+tags = ["garden", "leaves"]
+rows = [
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".XXXXXXXXXX.",
+  ".X.X.XX.X.X.",
+  ".X.X.XX.X.X.",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "wheelbarrow"
+name = "Wheelbarrow"
+tags = ["garden", "cart", "build"]
+rows = [
+  "............",
+  "............",
+  ".XXXXXXXXX..",
+  ".XXXXXXXXXXX",
+  "..XXXXXXX...",
+  "...XXXXX....",
+  "..XX...X....",
+  ".X..X..X....",
+  ".X..X..X....",
+  "..XX...X....",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "hard-hat"
+name = "Hard hat"
+tags = ["safety", "helmet", "site"]
+rows = [
+  "............",
+  "............",
+  ".....XX.....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "safety-glasses"
+name = "Safety goggles"
+tags = ["safety", "eyes", "goggles"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "..XXX..XXX..",
+  ".XX.XXXX.XX.",
+  "XX...XX...XX",
+  "XX...XX...XX",
+  ".XX.XXXX.XX.",
+  "..XXX..XXX..",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "magnet"
+name = "Magnet"
+tags = ["attract", "horseshoe"]
+rows = [
+  "............",
+  ".XXXX..XXXX.",
+  ".XXXX..XXXX.",
+  ".XX......XX.",
+  ".XX......XX.",
+  ".XX......XX.",
+  ".XX......XX.",
+  ".XXX....XXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "............",
+  "............",
+]

@@ -1,0 +1,552 @@
+# Cloudmorrow icons, theme "Weather": CC0 1.0, free to use anywhere, no attribution needed.
+
+[[icons]]
+id = "sunny"
+name = "Sunny"
+tags = ["sun", "clear", "weather"]
+rows = [
+  "............",
+  ".....XX.....",
+  "..X..XX..X..",
+  "...X....X...",
+  "....XXXX....",
+  "XX.XXXXXX.XX",
+  "XX.XXXXXX.XX",
+  "....XXXX....",
+  "...X....X...",
+  "..X..XX..X..",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "partly-cloudy"
+name = "Partly cloudy"
+tags = ["sun", "cloud", "weather"]
+rows = [
+  "............",
+  "..X.X.X.....",
+  "...XXX......",
+  ".X.XXX.X....",
+  "...XXX......",
+  "..X.X.X.XX..",
+  ".......XXXX.",
+  "....XXXXXXXX",
+  "...XXXXXXXXX",
+  "..XXXXXXXXXX",
+  "...XXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "cloudy"
+name = "Cloudy"
+tags = ["cloud", "weather"]
+rows = [
+  "............",
+  "............",
+  ".....XXX....",
+  "....XXXXX...",
+  "...XXXXXXXX.",
+  "..XXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  "..XXXXXXXXX.",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "overcast"
+name = "Overcast"
+tags = ["clouds", "grey", "weather"]
+rows = [
+  "............",
+  "....XXX.....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "............",
+  ".....XXX....",
+  "...XXXXXXX..",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  "..XXXXXXXXX.",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "rainy"
+name = "Rainy"
+tags = ["rain", "cloud", "weather"]
+rows = [
+  "............",
+  ".....XXX....",
+  "...XXXXXXX..",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  "..XXXXXXXXX.",
+  "............",
+  "...X..X..X..",
+  "...X..X..X..",
+  "..X..X..X...",
+  "..X..X..X...",
+  "............",
+]
+
+[[icons]]
+id = "drizzle"
+name = "Drizzle"
+tags = ["rain", "light", "weather"]
+rows = [
+  "............",
+  ".....XXX....",
+  "...XXXXXXX..",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  "..XXXXXXXXX.",
+  "............",
+  "...X....X...",
+  "............",
+  ".....X....X.",
+  "............",
+  "..X....X....",
+]
+
+[[icons]]
+id = "downpour"
+name = "Downpour"
+tags = ["rain", "heavy", "weather"]
+rows = [
+  "............",
+  ".....XXX....",
+  "...XXXXXXX..",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  "..XXXXXXXXX.",
+  "............",
+  ".X.X.X.X.X.X",
+  ".X.X.X.X.X.X",
+  "X.X.X.X.X.X.",
+  "X.X.X.X.X.X.",
+  "............",
+]
+
+[[icons]]
+id = "snowy"
+name = "Snowy"
+tags = ["snow", "cloud", "weather"]
+rows = [
+  "............",
+  ".....XXX....",
+  "...XXXXXXX..",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  "..XXXXXXXXX.",
+  "............",
+  "..X.X.......",
+  "...X....X.X.",
+  "..X.X....X..",
+  "........X.X.",
+  "............",
+]
+
+[[icons]]
+id = "sleet"
+name = "Sleet"
+tags = ["rain", "snow", "weather"]
+rows = [
+  "............",
+  ".....XXX....",
+  "...XXXXXXX..",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  "..XXXXXXXXX.",
+  "............",
+  "...X.....X..",
+  "..X...X.X...",
+  "............",
+  "...X..X..X..",
+  "..X......X..",
+]
+
+[[icons]]
+id = "hail"
+name = "Hail"
+tags = ["ice", "cloud", "weather"]
+rows = [
+  "............",
+  ".....XXX....",
+  "...XXXXXXX..",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  "..XXXXXXXXX.",
+  "............",
+  "..XX....XX..",
+  "..XX....XX..",
+  ".....XX.....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "stormy"
+name = "Stormy"
+tags = ["storm", "lightning", "cloud", "weather"]
+rows = [
+  "............",
+  ".....XXX....",
+  "...XXXXXXX..",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  "..XXXXXXXXX.",
+  ".......X....",
+  "......XX....",
+  ".....XXXX...",
+  ".......X....",
+  "......X.....",
+  ".....X......",
+]
+
+[[icons]]
+id = "thunder"
+name = "Thunder"
+tags = ["lightning", "bolt", "weather"]
+rows = [
+  "............",
+  ".......XX...",
+  "......XX....",
+  ".....XX.....",
+  "....XX......",
+  "...XXXXXX...",
+  "......XX....",
+  ".....XX.....",
+  "....XX......",
+  "...XX.......",
+  "..X.........",
+  "............",
+]
+
+[[icons]]
+id = "foggy"
+name = "Foggy"
+tags = ["fog", "mist", "weather"]
+rows = [
+  "............",
+  ".....XXX....",
+  "...XXXXXXX..",
+  ".XXXXXXXXXXX",
+  "..XXXXXXXXX.",
+  "............",
+  ".XXXXXXXXX..",
+  "............",
+  "...XXXXXXXXX",
+  "............",
+  ".XXXXXXX....",
+  "............",
+]
+
+[[icons]]
+id = "windy"
+name = "Windy"
+tags = ["wind", "weather"]
+rows = [
+  "............",
+  "......XX....",
+  ".....X..X...",
+  "........X...",
+  ".XXXXXXXX...",
+  "............",
+  ".XXXXXXXXXX.",
+  "...........X",
+  "..........X.",
+  "..XXXXXXXX..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "gust"
+name = "Gust"
+tags = ["wind", "leaves", "weather"]
+rows = [
+  "............",
+  "............",
+  ".XXXXXX.....",
+  "........XX..",
+  "..XXXXX.XX..",
+  "............",
+  ".XXXXXXXX...",
+  "..........XX",
+  "...XXXXX..XX",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "tornado"
+name = "Tornado"
+tags = ["twister", "storm", "weather"]
+rows = [
+  "............",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "....XXXXX...",
+  ".....XXXX...",
+  ".....XXX....",
+  "......XX....",
+  "......XX....",
+  ".......X....",
+  "......X.....",
+  "............",
+]
+
+[[icons]]
+id = "hurricane"
+name = "Hurricane"
+tags = ["cyclone", "storm", "weather"]
+rows = [
+  "............",
+  ".....XXXXX..",
+  "...XX.....X.",
+  "..X...XXX..X",
+  ".X...X...X.X",
+  ".X..X..X.X.X",
+  ".X..X..XX..X",
+  ".X..X.....X.",
+  "..X..XXXXX..",
+  "...XX.......",
+  ".....XXXX...",
+  "............",
+]
+
+[[icons]]
+id = "hot"
+name = "Hot"
+tags = ["heat", "sun", "warm", "weather"]
+rows = [
+  "............",
+  ".....XXX....",
+  "..X.XXXXX.X.",
+  "...XXXXXXX..",
+  "...XXXXXXX..",
+  "..X.XXXXX.X.",
+  ".....XXX....",
+  "............",
+  "..XX..XX..XX",
+  ".X..XX..XX..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "cold"
+name = "Cold"
+tags = ["snowflake", "freezing", "weather"]
+rows = [
+  "............",
+  ".....XX.....",
+  ".X...XX...X.",
+  "..X..XX..X..",
+  "...X.XX.X...",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "...X.XX.X...",
+  "..X..XX..X..",
+  ".X...XX...X.",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "thermometer"
+name = "Thermometer"
+tags = ["temperature", "degrees", "weather"]
+rows = [
+  "............",
+  ".....XX.....",
+  "....X..X....",
+  "....X..X.XX.",
+  "....X..X....",
+  "....X..X.XX.",
+  "....XXXX....",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "umbrella"
+name = "Umbrella"
+tags = ["rain", "weather"]
+rows = [
+  "............",
+  "......X.....",
+  "....XXXXX...",
+  "..XXXXXXXXX.",
+  ".XXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "......X.....",
+  "......X.....",
+  "......X.....",
+  "....X.X.....",
+  "....XXX.....",
+  "............",
+]
+
+[[icons]]
+id = "sunrise"
+name = "Sunrise"
+tags = ["dawn", "morning", "weather"]
+rows = [
+  "............",
+  "......X.....",
+  ".....XXX....",
+  "......X.....",
+  "......X.....",
+  "..X.......X.",
+  "....XXXXX...",
+  "...XXXXXXX..",
+  "..XXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "sunset"
+name = "Sunset"
+tags = ["dusk", "evening", "weather"]
+rows = [
+  "............",
+  "......X.....",
+  "......X.....",
+  "......X.....",
+  ".....XXX....",
+  "..X...X...X.",
+  "....XXXXX...",
+  "...XXXXXXX..",
+  "..XXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "night-clear"
+name = "Clear night"
+tags = ["moon", "night", "weather"]
+rows = [
+  "............",
+  ".....XXXX...",
+  "...XXX......",
+  "..XXX.......",
+  ".XXX........",
+  ".XXX......X.",
+  ".XXX.....XXX",
+  ".XXX......X.",
+  "..XXX.......",
+  "...XXX......",
+  ".....XXXX...",
+  "............",
+]
+
+[[icons]]
+id = "night-cloudy"
+name = "Cloudy night"
+tags = ["moon", "cloud", "night", "weather"]
+rows = [
+  "............",
+  "....XXXX....",
+  "...XX.......",
+  "..XX........",
+  "..XX........",
+  "..XX...XXX..",
+  "...XX.XXXXX.",
+  ".....XXXXXXX",
+  "...XXXXXXXXX",
+  "..XXXXXXXXXX",
+  "...XXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "humidity"
+name = "Humidity"
+tags = ["drop", "water", "damp", "weather"]
+rows = [
+  "............",
+  "......X.....",
+  ".....XXX....",
+  "....XXXXX...",
+  "....XXXXX...",
+  "...XXXXXXX..",
+  "...XXXXXXX..",
+  "...XXXXXXX..",
+  "...XXXXXXX..",
+  "....XXXXX...",
+  ".....XXX....",
+  "............",
+]
+
+[[icons]]
+id = "barometer"
+name = "Barometer"
+tags = ["pressure", "gauge", "weather"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XX....XX..",
+  ".X........X.",
+  ".X........X.",
+  "X....X.....X",
+  "X...X......X",
+  "X..X.......X",
+  ".X...XX...X.",
+  ".X...XX...X.",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "compass-rose"
+name = "Compass rose"
+tags = ["direction", "north", "weather"]
+rows = [
+  "............",
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  "....XXXX....",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "....XXXX....",
+  "....XXXX....",
+  ".....XX.....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "tide"
+name = "Tide"
+tags = ["waves", "sea", "weather"]
+rows = [
+  "............",
+  "............",
+  "..XX........",
+  ".X..X...XX..",
+  "X....X.X..X.",
+  "......X....X",
+  "............",
+  "..XX........",
+  ".X..X...XX..",
+  "X....X.X..X.",
+  "......X....X",
+  "............",
+]

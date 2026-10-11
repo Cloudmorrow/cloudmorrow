@@ -1,0 +1,571 @@
+# Cloudmorrow icons, theme "Finance": CC0 1.0, free to use anywhere, no attribution needed.
+
+[[icons]]
+id = "coin"
+name = "Coin"
+tags = ["money", "cash", "currency"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XX....XX..",
+  ".X........X.",
+  ".X...XX...X.",
+  "X....XX....X",
+  "X....XX....X",
+  ".X...XX...X.",
+  ".X........X.",
+  "..XX....XX..",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "coins"
+name = "Coins"
+tags = ["money", "stack", "cash"]
+rows = [
+  "............",
+  "............",
+  "..XXXXXXXX..",
+  ".X........X.",
+  "..XXXXXXXX..",
+  ".X........X.",
+  "..XXXXXXXX..",
+  ".X........X.",
+  "..XXXXXXXX..",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "banknote"
+name = "Banknote"
+tags = ["money", "cash", "bill"]
+rows = [
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X...XXXX...X",
+  "X.X.X..X.X.X",
+  "X.X.X..X.X.X",
+  "X...XXXX...X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "cash"
+name = "Cash"
+tags = ["money", "notes", "bills"]
+rows = [
+  "............",
+  "............",
+  ".XXXXXXXXX..",
+  ".X.......X..",
+  ".X.XXXX..XXX",
+  ".X.X..X..X.X",
+  ".X.XXXX..X.X",
+  ".X.......X.X",
+  ".XXXXXXXXX.X",
+  "...X.......X",
+  "...XXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "wallet"
+name = "Wallet"
+tags = ["money", "cards", "pocket"]
+rows = [
+  "............",
+  "............",
+  ".XXXXXXXXX..",
+  ".X.......XX.",
+  ".X........X.",
+  ".XXXXXXXXXX.",
+  ".X......XXXX",
+  ".X......X.XX",
+  ".X......XXXX",
+  ".X........X.",
+  ".XXXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "purse"
+name = "Purse"
+tags = ["money", "coins", "bag"]
+rows = [
+  "............",
+  "....X..X....",
+  "...X.XX.X...",
+  "...XXXXXX...",
+  "..X......X..",
+  ".X........X.",
+  ".X........X.",
+  ".X........X.",
+  "..X......X..",
+  "...XXXXXX...",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "piggy-bank"
+name = "Piggy bank"
+tags = ["savings", "money", "pig"]
+rows = [
+  "............",
+  "............",
+  "..X.XXXX.X..",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "..XX....XX..",
+  "..XX....XX..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "bank"
+name = "Bank"
+tags = ["building", "money", "institution"]
+rows = [
+  "............",
+  ".....XX.....",
+  "...XXXXXX...",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "............",
+  "XX.XX..XX.XX",
+  "XX.XX..XX.XX",
+  "XX.XX..XX.XX",
+  "XX.XX..XX.XX",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "safe"
+name = "Safe"
+tags = ["vault", "secure", "money"]
+rows = [
+  "............",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X...XXXX...X",
+  "X..XX..XX..X",
+  "X..X....X.XX",
+  "X..X....X.XX",
+  "X..XX..XX..X",
+  "X...XXXX...X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "credit-card"
+name = "Credit card"
+tags = ["payment", "card", "bank"]
+rows = [
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X.XXXX.....X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "receipt"
+name = "Receipt"
+tags = ["paper", "purchase", "till"]
+rows = [
+  "..XXXXXXXX..",
+  "..X......X..",
+  "..X.XXXX.X..",
+  "..X......X..",
+  "..X.XXXX.X..",
+  "..X......X..",
+  "..X.XXXX.X..",
+  "..X......X..",
+  "..X..XXX.X..",
+  "..X......X..",
+  "..XX.XX.XX..",
+  "............",
+]
+
+[[icons]]
+id = "cash-register"
+name = "Cash register"
+tags = ["till", "shop", "sale"]
+rows = [
+  "............",
+  "....XXXXXXX.",
+  "....X.....X.",
+  "....XXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".X.X.X.X.X.X",
+  ".XXXXXXXXXXX",
+  ".X.X.X.X.X.X",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "percent"
+name = "Percent"
+tags = ["rate", "discount", "interest"]
+rows = [
+  "............",
+  ".XXX......X.",
+  ".X.X.....X..",
+  ".XXX....X...",
+  ".......X....",
+  "......X.....",
+  ".....X......",
+  "....X.......",
+  "...X....XXX.",
+  "..X.....X.X.",
+  ".X......XXX.",
+  "............",
+]
+
+[[icons]]
+id = "chart-up"
+name = "Chart rising"
+tags = ["growth", "profit", "trend"]
+rows = [
+  "............",
+  ".........XXX",
+  "..........XX",
+  ".........X.X",
+  "........X...",
+  ".......X....",
+  "...XX.X.....",
+  "..X..X......",
+  ".X..........",
+  "X...........",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "chart-down"
+name = "Chart falling"
+tags = ["loss", "decline", "trend"]
+rows = [
+  "X...........",
+  ".X..........",
+  "..X..X......",
+  "...XX.X.....",
+  ".......X....",
+  "........X...",
+  ".........X.X",
+  "..........XX",
+  ".........XXX",
+  "............",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "scales"
+name = "Scales"
+tags = ["balance", "justice", "weigh"]
+rows = [
+  ".....XX.....",
+  ".XXXXXXXXXX.",
+  ".X...XX...X.",
+  ".X...XX...X.",
+  "X.X..XX..X.X",
+  ".X...XX...X.",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "euro"
+name = "Euro"
+tags = ["currency", "money", "eur"]
+rows = [
+  "............",
+  "....XXXXX...",
+  "...X.....X..",
+  "..X.........",
+  ".XXXXXX.....",
+  "..X.........",
+  ".XXXXXX.....",
+  "..X.........",
+  "...X.....X..",
+  "....XXXXX...",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "dollar"
+name = "Dollar"
+tags = ["currency", "money", "usd"]
+rows = [
+  ".....XX.....",
+  "...XXXXXXX..",
+  "..X..XX..X..",
+  "..X..XX.....",
+  "...XXXXX....",
+  ".....XXXX...",
+  ".....XX..X..",
+  "..X..XX..X..",
+  "...XXXXXXX..",
+  ".....XX.....",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "pound"
+name = "Pound"
+tags = ["currency", "money", "gbp"]
+rows = [
+  "............",
+  ".....XXXX...",
+  "....X....X..",
+  "....X.......",
+  "....X.......",
+  "..XXXXXX....",
+  "....X.......",
+  "....X.......",
+  "....X.......",
+  "..XXXXXXX...",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "yen"
+name = "Yen"
+tags = ["currency", "money", "jpy"]
+rows = [
+  "............",
+  "..X......X..",
+  "..X......X..",
+  "...X....X...",
+  "....X..X....",
+  ".....XX.....",
+  "...XXXXXX...",
+  ".....XX.....",
+  "...XXXXXX...",
+  ".....XX.....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "bitcoin"
+name = "Bitcoin"
+tags = ["currency", "crypto", "btc"]
+rows = [
+  "....X.X.....",
+  "..XXXXXXX...",
+  "..X......X..",
+  "..X......X..",
+  "..XXXXXXX...",
+  "..X......X..",
+  "..X.......X.",
+  "..X......X..",
+  "..XXXXXXX...",
+  "....X.X.....",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "invoice"
+name = "Invoice"
+tags = ["bill", "document", "amount"]
+rows = [
+  "..XXXXXXX...",
+  "..X.....XX..",
+  "..X.....X.X.",
+  "..X..XX.XXX.",
+  "..X.X.....X.",
+  "..X.XXX...X.",
+  "..X.X.....X.",
+  "..X.XXX...X.",
+  "..X..XX...X.",
+  "..X...XXX.X.",
+  "..XXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "contract"
+name = "Contract"
+tags = ["agreement", "document", "sign"]
+rows = [
+  "..XXXXXXX...",
+  "..X.....XX..",
+  "..X.....X.X.",
+  "..X.....XXX.",
+  "..X.XXXXX.X.",
+  "..X.......X.",
+  "..X.XXXXX.X.",
+  "..X.......X.",
+  "..X..X.X..X.",
+  "..X.X.X.X.X.",
+  "..XXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "money-bag"
+name = "Money bag"
+tags = ["cash", "sack", "wealth"]
+rows = [
+  ".....XX.....",
+  "....X..X....",
+  "....XXXX....",
+  "...X....X...",
+  "..X......X..",
+  ".X........X.",
+  ".X..XXX...X.",
+  ".X.X......X.",
+  ".X..XXX...X.",
+  ".X.....X..X.",
+  "..X.XXX..X..",
+  "...XXXXXX...",
+]
+
+[[icons]]
+id = "savings-jar"
+name = "Savings jar"
+tags = ["coins", "save", "jar"]
+rows = [
+  "...XXXXXX...",
+  "...X....X...",
+  "..XXXXXXXX..",
+  "..X......X..",
+  "..X......X..",
+  "..X.XXXX.X..",
+  "..X.X..X.X..",
+  "..X.XXXX.X..",
+  "..X.XXXX.X..",
+  "..X......X..",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "exchange"
+name = "Exchange"
+tags = ["swap", "convert", "currency"]
+rows = [
+  ".....X......",
+  "....XX......",
+  "...XXXXXXXXX",
+  "....XX......",
+  ".....X......",
+  "............",
+  "......X.....",
+  "......XX....",
+  "XXXXXXXXX...",
+  "......XX....",
+  "......X.....",
+  "............",
+]
+
+[[icons]]
+id = "atm"
+name = "ATM"
+tags = ["cash machine", "withdraw", "bank"]
+rows = [
+  "............",
+  ".XXXXXXXXXX.",
+  ".X........X.",
+  ".X.XXXXXX.X.",
+  ".X.X....X.X.",
+  ".X.XXXXXX.X.",
+  ".X........X.",
+  ".X.X.X.X..X.",
+  ".X.X.X.X..X.",
+  ".X.XXXXXX.X.",
+  ".XXXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "gold-bar"
+name = "Gold bar"
+tags = ["bullion", "wealth", "ingot"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "cheque"
+name = "Cheque"
+tags = ["payment", "bank", "paper"]
+rows = [
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X.XXXX.....X",
+  "X..........X",
+  "X.XXXXXXX..X",
+  "X..........X",
+  "X......X.X.X",
+  "X.....X.X..X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "tax"
+name = "Tax"
+tags = ["percent", "document", "return"]
+rows = [
+  "..XXXXXXX...",
+  "..X.....XX..",
+  "..X.....X.X.",
+  "..X.....XXX.",
+  "..X.XX..X.X.",
+  "..X.XX.X..X.",
+  "..X...X...X.",
+  "..X..X.XX.X.",
+  "..X.X..XX.X.",
+  "..X.......X.",
+  "..XXXXXXXXX.",
+  "............",
+]

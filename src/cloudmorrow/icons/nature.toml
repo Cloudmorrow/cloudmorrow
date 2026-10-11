@@ -1,0 +1,552 @@
+# Cloudmorrow icons, theme "Nature": CC0 1.0, free to use anywhere, no attribution needed.
+
+[[icons]]
+id = "tree"
+name = "Tree"
+tags = ["wood", "forest", "park"]
+rows = [
+  "....XXXX....",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "....XXXX....",
+  ".....XX.....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "pine"
+name = "Pine tree"
+tags = ["fir", "conifer", "christmas"]
+rows = [
+  ".....XX.....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  ".....XX.....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "leaf"
+name = "Leaf"
+tags = ["plant", "green", "eco"]
+rows = [
+  "..........X.",
+  "........XXX.",
+  "......XXXXX.",
+  "....XXXXXXX.",
+  "...XXXXXXXX.",
+  "..XXXXXXXX..",
+  ".XXXXXXXX...",
+  ".XXXXXXX....",
+  ".XXXXXX.....",
+  ".XX.X.......",
+  "X...........",
+  "............",
+]
+
+[[icons]]
+id = "flower"
+name = "Flower"
+tags = ["daisy", "bloom", "petals"]
+rows = [
+  "....XXXX....",
+  "....XXXX....",
+  ".XX.XXXX.XX.",
+  "XXXXX..XXXXX",
+  "XXXXX..XXXXX",
+  ".XX.XXXX.XX.",
+  "....XXXX....",
+  "....XXXX....",
+  ".....XX.....",
+  "..XX.XX.....",
+  "...XXXX.....",
+  ".....XX.....",
+]
+
+[[icons]]
+id = "tulip"
+name = "Tulip"
+tags = ["flower", "spring", "bulb"]
+rows = [
+  "............",
+  ".XX..XX..XX.",
+  ".XX.XXXX.XX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  ".....XX.....",
+  "..XX.XX.XX..",
+  "...XXXXXX...",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "rose"
+name = "Rose"
+tags = ["flower", "romance", "petals"]
+rows = [
+  "............",
+  "...XXXXXX...",
+  "..XX.XX.XX..",
+  "..X.XXXX.X..",
+  "..XX.XX.XX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  ".....XX.....",
+  ".XX..XX..XX.",
+  "..XXXXXXXX..",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "cactus"
+name = "Cactus"
+tags = ["desert", "succulent", "plant"]
+rows = [
+  ".....XX.....",
+  ".....XX.....",
+  ".XX..XX..XX.",
+  ".XX..XX..XX.",
+  ".XX..XX..XX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  ".....XX.....",
+  ".....XX.....",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "mountain"
+name = "Mountain"
+tags = ["peak", "summit", "alps"]
+rows = [
+  "............",
+  ".......X....",
+  "......XXX...",
+  ".....XX.XX..",
+  "....XXXXXXX.",
+  "...X.XXXXXXX",
+  "..XXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "hill"
+name = "Hill"
+tags = ["slope", "countryside", "landscape"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "............",
+  "......XXX...",
+  "...XXXXXXXX.",
+  "..XXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "river"
+name = "River"
+tags = ["stream", "water", "flow"]
+rows = [
+  "............",
+  ".XXX........",
+  "..XXXX......",
+  "...XXXXX....",
+  "....XXXXX...",
+  ".....XXXXX..",
+  "......XXXX..",
+  ".....XXXX...",
+  "....XXXX....",
+  "...XXXX.....",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "lake"
+name = "Lake"
+tags = ["pond", "water", "still"]
+rows = [
+  "............",
+  "............",
+  "...XXXXXX...",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXX.XXXX.XXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "...XXXXXX...",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "wave"
+name = "Wave"
+tags = ["sea", "ocean", "surf"]
+rows = [
+  "............",
+  "............",
+  "............",
+  ".XXX....XXX.",
+  "XX.XX..XX.XX",
+  "X...XXXX...X",
+  "............",
+  ".XXX....XXX.",
+  "XX.XX..XX.XX",
+  "X...XXXX...X",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "island"
+name = "Island"
+tags = ["palm", "beach", "tropical"]
+rows = [
+  "..XX.XX.XX..",
+  ".X..XXXX..X.",
+  "X...X.XX....",
+  "....X..X....",
+  ".....X......",
+  ".....X......",
+  "............",
+  "....XXXX....",
+  "..XXXXXXXX..",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "sun"
+name = "Sun"
+tags = ["sunny", "day", "weather"]
+rows = [
+  ".....XX.....",
+  "X....XX....X",
+  ".X..XXXX..X.",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  ".X..XXXX..X.",
+  "X....XX....X",
+  ".....XX.....",
+]
+
+[[icons]]
+id = "moon"
+name = "Moon"
+tags = ["night", "crescent", "sleep"]
+rows = [
+  "....XXXX....",
+  "..XXXXXX....",
+  ".XXXXX......",
+  "XXXXX.......",
+  "XXXX........",
+  "XXXX........",
+  "XXXX........",
+  "XXXXX.......",
+  ".XXXXX......",
+  "..XXXXXX....",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "star"
+name = "Star"
+tags = ["night", "favourite", "rating"]
+rows = [
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  "....XXXX....",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "..XXX..XXX..",
+  ".XX......XX.",
+  "............",
+]
+
+[[icons]]
+id = "planet"
+name = "Planet"
+tags = ["saturn", "space", "ring"]
+rows = [
+  "............",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXXXXXXX.X",
+  "..XXXXXXXXX.",
+  "..XXXXXXXX..",
+  "X.XXXXXXXX..",
+  ".XXXXXXXXX..",
+  "...XXXXXX...",
+  "X...XXXX....",
+  ".XXX........",
+  "............",
+]
+
+[[icons]]
+id = "comet"
+name = "Comet"
+tags = ["shooting star", "space", "meteor"]
+rows = [
+  "..........XX",
+  ".........XXX",
+  "........XXXX",
+  ".......XXX..",
+  "......XXX...",
+  ".....XXX....",
+  "...XXXX.....",
+  "..XXXXX.....",
+  "..XXXXX.....",
+  "...XXX......",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "rain"
+name = "Rain"
+tags = ["weather", "shower", "wet"]
+rows = [
+  "............",
+  ".....XXX....",
+  "....XXXXXX..",
+  "..XXXXXXXXX.",
+  ".XXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "............",
+  "..X...X...X.",
+  ".X...X...X..",
+  "..X...X...X.",
+  "............",
+]
+
+[[icons]]
+id = "snow"
+name = "Snowflake"
+tags = ["winter", "cold", "weather"]
+rows = [
+  ".....XX.....",
+  "..X..XX..X..",
+  "...X.XX.X...",
+  "....XXXX....",
+  ".....XX.....",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".....XX.....",
+  "....XXXX....",
+  "...X.XX.X...",
+  "..X..XX..X..",
+  ".....XX.....",
+]
+
+[[icons]]
+id = "lightning"
+name = "Lightning"
+tags = ["storm", "bolt", "flash"]
+rows = [
+  "......XXXX..",
+  ".....XXXX...",
+  "....XXXX....",
+  "...XXXX.....",
+  "..XXXXXXXX..",
+  ".XXXXXXXX...",
+  ".....XXX....",
+  "....XXX.....",
+  "...XXX......",
+  "..XX........",
+  ".X..........",
+  "............",
+]
+
+[[icons]]
+id = "wind"
+name = "Wind"
+tags = ["breeze", "air", "weather"]
+rows = [
+  "............",
+  "............",
+  "...XXXXXX...",
+  "..X......X..",
+  ".........X..",
+  "XXXXXXXXXXX.",
+  "............",
+  ".XXXXXXXXX..",
+  "..........X.",
+  ".........X..",
+  "..XXXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "rainbow"
+name = "Rainbow"
+tags = ["arc", "colour", "weather"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "XXXX....XXXX",
+  "XXX......XXX",
+  "XX..XXXX..XX",
+  "XX.XXXXXX.XX",
+  "XX.XX..XX.XX",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "fire"
+name = "Fire"
+tags = ["flame", "hot", "campfire"]
+rows = [
+  "......X.....",
+  ".....XX.....",
+  ".....XXX....",
+  "....XXXX.X..",
+  "...XXXXX.XX.",
+  "..XXXXXXXXX.",
+  ".XXXXX.XXXX.",
+  ".XXXX...XXX.",
+  ".XXXX...XXX.",
+  "..XXX...XX..",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "water-drop"
+name = "Water drop"
+tags = ["droplet", "liquid", "rain"]
+rows = [
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "seed"
+name = "Seed"
+tags = ["sprout", "growth", "seedling"]
+rows = [
+  "............",
+  "......XXX...",
+  ".....XX.XX..",
+  "....XX...X..",
+  "....X.......",
+  "....X.......",
+  "..XXXXXXX...",
+  ".XXXXXXXXX..",
+  ".XXXXXXXXX..",
+  "..XXXXXXX...",
+  "...XXXXX....",
+  "............",
+]
+
+[[icons]]
+id = "acorn"
+name = "Acorn"
+tags = ["oak", "nut", "autumn"]
+rows = [
+  "............",
+  ".....XX.....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..X......X..",
+  "..X......X..",
+  "..X......X..",
+  "...X....X...",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "mushroom-wild"
+name = "Toadstool"
+tags = ["fungus", "forest", "spotted"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XX.XX.XX..",
+  ".XXXXXXXXXX.",
+  ".X.XXXX.XXX.",
+  "XXXXXXXXXXXX",
+  ".....XX.....",
+  "....X..X....",
+  "....X..X....",
+  "....X..X....",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "feather"
+name = "Feather"
+tags = ["bird", "light", "quill"]
+rows = [
+  "..........X.",
+  "........X.X.",
+  ".......XX.X.",
+  "......XX.XX.",
+  ".....XX.XX..",
+  "....XX.XX...",
+  "...XX.XX....",
+  "..XX.XX.....",
+  ".XX.XX......",
+  ".X.X........",
+  "X...........",
+  "............",
+]

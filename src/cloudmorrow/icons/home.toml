@@ -1,0 +1,552 @@
+# Cloudmorrow icons, theme "Home": CC0 1.0, free to use anywhere, no attribution needed.
+
+[[icons]]
+id = "house"
+name = "House"
+tags = ["home", "building", "residence"]
+rows = [
+  ".....XX.....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  ".XXXXX..XXX.",
+  ".XXXXX..XXX.",
+  ".XXXXX..XXX.",
+  ".XXXXX..XXX.",
+  "............",
+]
+
+[[icons]]
+id = "door"
+name = "Door"
+tags = ["entrance", "exit", "entry"]
+rows = [
+  ".XXXXXXXXXX.",
+  ".X........X.",
+  ".X.XXXXXX.X.",
+  ".X.XXXXXX.X.",
+  ".X.XXXXXX.X.",
+  ".X.XXXXXX.X.",
+  ".X.XXXX.X.X.",
+  ".X.XXXXXX.X.",
+  ".X.XXXXXX.X.",
+  ".X.XXXXXX.X.",
+  ".X.XXXXXX.X.",
+  "XXXXXXXXXXXX",
+]
+
+[[icons]]
+id = "window"
+name = "Window"
+tags = ["glass", "view", "panes"]
+rows = [
+  "............",
+  "XXXXXXXXXXXX",
+  "X....XX....X",
+  "X....XX....X",
+  "X....XX....X",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "X....XX....X",
+  "X....XX....X",
+  "X....XX....X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "door-key"
+name = "Door key"
+tags = ["key", "unlock", "entry"]
+rows = [
+  "............",
+  "..XXXX......",
+  ".XX..XX.....",
+  ".X....X.....",
+  ".XX..XX.....",
+  "..XXXX......",
+  "....XX......",
+  "....XXXX....",
+  "....XX......",
+  "....XXXX....",
+  "....XX......",
+  "............",
+]
+
+[[icons]]
+id = "bed"
+name = "Bed"
+tags = ["sleep", "bedroom", "rest"]
+rows = [
+  "............",
+  "............",
+  "X...........",
+  "X...........",
+  "X.XXXX......",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X..........X",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "sofa"
+name = "Sofa"
+tags = ["couch", "living room", "seat"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XX........XX",
+  "XX........XX",
+  "............",
+]
+
+[[icons]]
+id = "table"
+name = "Table"
+tags = ["desk", "dining", "furniture"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".XX......XX.",
+  ".XX......XX.",
+  ".XX......XX.",
+  ".XX......XX.",
+  ".XX......XX.",
+  ".XX......XX.",
+  "............",
+]
+
+[[icons]]
+id = "lamp"
+name = "Lamp"
+tags = ["light", "table lamp", "shade"]
+rows = [
+  "............",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "bulb"
+name = "Light bulb"
+tags = ["idea", "light", "lamp"]
+rows = [
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  "....XXXX....",
+  "....X..X....",
+  "....XXXX....",
+  "....XXXX....",
+  ".....XX.....",
+]
+
+[[icons]]
+id = "socket"
+name = "Wall socket"
+tags = ["outlet", "power", "plug"]
+rows = [
+  "............",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X..XX..XX..X",
+  "X..XX..XX..X",
+  "X..XX..XX..X",
+  "X..........X",
+  "X....XX....X",
+  "X....XX....X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "washing-machine"
+name = "Washing machine"
+tags = ["laundry", "washer", "appliance"]
+rows = [
+  "XXXXXXXXXXXX",
+  "X..X.X.....X",
+  "XXXXXXXXXXXX",
+  "X....XX....X",
+  "X...X..X...X",
+  "X..X....X..X",
+  "X..X....X..X",
+  "X..X....X..X",
+  "X...X..X...X",
+  "X....XX....X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "fridge"
+name = "Fridge"
+tags = ["refrigerator", "kitchen", "cold"]
+rows = [
+  "............",
+  "..XXXXXXXX..",
+  "..X......X..",
+  "..X.X....X..",
+  "..X.X....X..",
+  "..XXXXXXXX..",
+  "..X.X....X..",
+  "..X.X....X..",
+  "..X......X..",
+  "..X......X..",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "oven"
+name = "Oven"
+tags = ["stove", "cooker", "kitchen"]
+rows = [
+  "............",
+  "XXXXXXXXXXXX",
+  "X.X.X.X.X..X",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X.XXXXXXXX.X",
+  "X.X......X.X",
+  "X.X......X.X",
+  "X.XXXXXXXX.X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "bath"
+name = "Bath"
+tags = ["tub", "bathroom", "soak"]
+rows = [
+  "............",
+  ".XX.........",
+  ".X.X........",
+  ".X..........",
+  ".X..........",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "..X......X..",
+  "............",
+]
+
+[[icons]]
+id = "shower"
+name = "Shower"
+tags = ["bathroom", "wash", "water"]
+rows = [
+  "..XXXXX.....",
+  "..X...X.....",
+  "......X.....",
+  "....XXXXX...",
+  "...XXXXXXX..",
+  "..XXXXXXXXX.",
+  "............",
+  "...X.X.X.X..",
+  "..X.X.X.X...",
+  "...X.X.X.X..",
+  "..X.X.X.X...",
+  "............",
+]
+
+[[icons]]
+id = "toilet"
+name = "Toilet"
+tags = ["bathroom", "wc", "loo"]
+rows = [
+  "............",
+  "...XXXXXX...",
+  "...X....X...",
+  "...X....X...",
+  "...XXXXXX...",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  "..XXXXXXXXX.",
+  "...XXXXXXX..",
+  "....XXXXX...",
+  "....XXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "broom"
+name = "Broom"
+tags = ["sweep", "clean", "chores"]
+rows = [
+  ".........XX.",
+  "........XX..",
+  ".......XX...",
+  "......XX....",
+  ".....XX.....",
+  "....XX......",
+  "...XXXX.....",
+  "..XXXXXX....",
+  ".XXXXXXX....",
+  ".XXXXXX.....",
+  ".XX.XX......",
+  "............",
+]
+
+[[icons]]
+id = "bucket"
+name = "Bucket"
+tags = ["pail", "clean", "water"]
+rows = [
+  "....XXXX....",
+  "...X....X...",
+  "..X......X..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "vacuum"
+name = "Vacuum cleaner"
+tags = ["hoover", "clean", "chores"]
+rows = [
+  "..........X.",
+  ".........X..",
+  "........X...",
+  ".......X....",
+  "......X.....",
+  ".....XX.....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "XXXXXXXXXX..",
+  "XXXXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "plant-pot"
+name = "Potted plant"
+tags = ["houseplant", "pot", "green"]
+rows = [
+  ".....XX.....",
+  "..XX.XX.XX..",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "....XXXX....",
+  ".....XX.....",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "picture-frame"
+name = "Picture frame"
+tags = ["photo", "art", "wall"]
+rows = [
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X.XXXXXXXX.X",
+  "X.X......X.X",
+  "X.X..X...X.X",
+  "X.X.XXX..X.X",
+  "X.XXXXX.XX.X",
+  "X.XXXXXXXX.X",
+  "X.XXXXXXXX.X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "clock-wall"
+name = "Wall clock"
+tags = ["time", "clock", "hour"]
+rows = [
+  "....XXXX....",
+  "..XX....XX..",
+  ".X........X.",
+  ".X....X...X.",
+  "X.....X....X",
+  "X.....X....X",
+  "X.....XXX..X",
+  "X..........X",
+  ".X........X.",
+  ".X........X.",
+  "..XX....XX..",
+  "....XXXX....",
+]
+
+[[icons]]
+id = "thermostat"
+name = "Thermostat"
+tags = ["heating", "temperature", "dial"]
+rows = [
+  "....XXXX....",
+  "..XX....XX..",
+  ".X........X.",
+  ".X.X....X.X.",
+  "X..........X",
+  "X..XXXXXX..X",
+  "X..XXXXXX..X",
+  "X..........X",
+  ".X.X....X.X.",
+  ".X........X.",
+  "..XX....XX..",
+  "....XXXX....",
+]
+
+[[icons]]
+id = "garage"
+name = "Garage"
+tags = ["car", "parking", "building"]
+rows = [
+  ".....XX.....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  ".X........X.",
+  ".X.XXXXXX.X.",
+  ".X........X.",
+  ".X.XXXXXX.X.",
+  ".X........X.",
+  "............",
+]
+
+[[icons]]
+id = "fence"
+name = "Fence"
+tags = ["garden", "yard", "boundary"]
+rows = [
+  "............",
+  ".X...X...X..",
+  "XXX.XXX.XXX.",
+  "XXX.XXX.XXX.",
+  "XXXXXXXXXXXX",
+  "XXX.XXX.XXX.",
+  "XXX.XXX.XXX.",
+  "XXXXXXXXXXXX",
+  "XXX.XXX.XXX.",
+  "XXX.XXX.XXX.",
+  "XXX.XXX.XXX.",
+  "............",
+]
+
+[[icons]]
+id = "mailbox"
+name = "Mailbox"
+tags = ["post", "letters", "mail"]
+rows = [
+  "............",
+  "...XXXXXXX..",
+  "..XXXXXXXXX.",
+  ".XX.......X.",
+  ".XX..XXXX.X.",
+  ".XX.......X.",
+  "..XXXXXXXXX.",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "garden"
+name = "Garden"
+tags = ["flowers", "yard", "outdoors"]
+rows = [
+  "............",
+  ".XX..XX..XX.",
+  ".XX..XX..XX.",
+  "..X...X...X.",
+  "..X.X.X.X.X.",
+  "..XX..XX..X.",
+  "..X...X...X.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "shed"
+name = "Shed"
+tags = ["garden", "storage", "hut"]
+rows = [
+  "............",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  ".X........X.",
+  ".X..XX....X.",
+  ".X..XX....X.",
+  ".X........X.",
+  ".X..XX.XX.X.",
+  ".X..XX.XX.X.",
+  ".X........X.",
+  ".XXXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "basket"
+name = "Basket"
+tags = ["shopping", "laundry", "carry"]
+rows = [
+  "............",
+  "....XXXX....",
+  "...X....X...",
+  "..X......X..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".X.X.X.X.X.X",
+  "..X.X.X.X.X.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "............",
+]

@@ -18,3 +18,75 @@ id = "it"
 name = "IT"
 description = "Machines, networks, code and what keeps them safe."
 file = "it.toml"
+
+[[themes]]
+id = "people"
+name = "People"
+description = "Faces, hands and the people things are for."
+file = "people.toml"
+
+[[themes]]
+id = "home"
+name = "Home"
+description = "The house, its rooms and what is in them."
+file = "home.toml"
+
+[[themes]]
+id = "food"
+name = "Food"
+description = "Fruit, meals, cakes and what you drink."
+file = "food.toml"
+
+[[themes]]
+id = "nature"
+name = "Nature"
+description = "Trees, flowers, water, sky and fire."
+file = "nature.toml"
+
+[[themes]]
+id = "weather"
+name = "Weather"
+description = "What the sky is doing today."
+file = "weather.toml"
+
+[[themes]]
+id = "travel"
+name = "Travel"
+description = "How you get there, and what you take."
+file = "travel.toml"
+
+[[themes]]
+id = "sport"
+name = "Sport"
+description = "Balls, kit and the people playing."
+file = "sport.toml"
+
+[[themes]]
+id = "music"
+name = "Music"
+description = "Instruments, players and the sound they make."
+file = "music.toml"
+
+[[themes]]
+id = "tools"
+name = "Tools"
+description = "The shed, the workbench and the building site."
+file = "tools.toml"
+
+[[themes]]
+id = "finance"
+name = "Finance"
+description = "Money, where it is kept and what it does."
+file = "finance.toml"
+
+[[themes]]
+id = "health"
+name = "Health"
+description = "Medicine, the body and staying well."
+file = "health.toml"
+
+[[themes]]
+id = "interface"
+name = "Interface"
+description = "Arrows, actions and signs for screens."
+file = "interface.toml"

@@ -1,0 +1,571 @@
+# Cloudmorrow icons, theme "Music": CC0 1.0, free to use anywhere, no attribution needed.
+
+[[icons]]
+id = "music-note"
+name = "Note"
+tags = ["music", "quaver", "music"]
+rows = [
+  "............",
+  ".....XX.....",
+  ".....XXX....",
+  ".....X.XX...",
+  ".....X..XX..",
+  ".....X...X..",
+  ".....X......",
+  ".....X......",
+  "..XXXX......",
+  ".XXXXX......",
+  ".XXXXX......",
+  "..XXX.......",
+]
+
+[[icons]]
+id = "notes"
+name = "Notes"
+tags = ["music", "beamed", "music"]
+rows = [
+  "............",
+  "....XXXXXXX.",
+  "....XXXXXXX.",
+  "....X.....X.",
+  "....X.....X.",
+  "....X.....X.",
+  "....X.....X.",
+  "....X...XXX.",
+  ".XXXX..XXXX.",
+  ".XXXX..XXXX.",
+  "..XX....XX..",
+  "............",
+]
+
+[[icons]]
+id = "treble-clef"
+name = "Treble clef"
+tags = ["clef", "sheet", "music"]
+rows = [
+  "......X.....",
+  ".....X.X....",
+  ".....X.X....",
+  "......XX....",
+  ".....XX.....",
+  "....X.X.....",
+  "...X..XXX...",
+  "...X.X..X...",
+  "....XXXX....",
+  "......X.....",
+  "....X.X.....",
+  ".....XX.....",
+]
+
+[[icons]]
+id = "guitar"
+name = "Guitar"
+tags = ["acoustic", "strings", "music"]
+rows = [
+  "............",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXX..XXX..",
+  "..XXX..XXX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "electric-guitar"
+name = "Electric guitar"
+tags = ["bass", "rock", "strings", "music"]
+rows = [
+  "............",
+  "............",
+  "XXXXXXX.....",
+  "XXXXXXXXX...",
+  ".......XXXX.",
+  "......XXXXXX",
+  "......XXXXXX",
+  ".....XXXXXX.",
+  ".....XXXXX..",
+  "......XXX...",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "violin"
+name = "Violin"
+tags = ["fiddle", "strings", "bow", "music"]
+rows = [
+  "............",
+  "....X.XX.X..",
+  ".....XXX....",
+  ".....XX.....",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "....XXXX....",
+  "..XXX..XXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "piano"
+name = "Piano"
+tags = ["keys", "keyboard", "music"]
+rows = [
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X.XX.XX.XX.X",
+  "X.XX.XX.XX.X",
+  "X.XX.XX.XX.X",
+  "X..........X",
+  "X..X..X..X.X",
+  "X..X..X..X.X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "keyboard-synth"
+name = "Synthesizer"
+tags = ["synth", "keys", "electronic", "music"]
+rows = [
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "X.X.X.X....X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "X.XX.XX.XX.X",
+  "X.XX.XX.XX.X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "drum"
+name = "Drum"
+tags = ["snare", "percussion", "music"]
+rows = [
+  "............",
+  "............",
+  "...XXXXXX...",
+  ".XX......XX.",
+  "X..........X",
+  ".XX......XX.",
+  "X..XXXXXX..X",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  ".XXXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "drumsticks"
+name = "Drumsticks"
+tags = ["sticks", "percussion", "music"]
+rows = [
+  "............",
+  "X.........X.",
+  ".X.......X..",
+  "..X.....X...",
+  "...X...X....",
+  "....X.X.....",
+  ".....X......",
+  "....X.X.....",
+  "...X...X....",
+  "..X.....X...",
+  ".XX.....XX..",
+  "............",
+]
+
+[[icons]]
+id = "trumpet"
+name = "Trumpet"
+tags = ["brass", "horn", "music"]
+rows = [
+  "............",
+  "............",
+  "...X.X.X....",
+  "...X.X.X..XX",
+  "XXXXXXXXXXX.",
+  "XXXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..........XX",
+  "............",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "saxophone"
+name = "Saxophone"
+tags = ["sax", "jazz", "music"]
+rows = [
+  "............",
+  ".........XX.",
+  "........XX..",
+  ".......XX...",
+  ".......XX...",
+  ".......XX...",
+  ".......XXX..",
+  ".......XXX..",
+  "..XX..XXXX..",
+  "..XX.XXXXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+]
+
+[[icons]]
+id = "flute"
+name = "Flute"
+tags = ["woodwind", "pipe", "music"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "X.X.X.X.X..X",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "microphone"
+name = "Microphone"
+tags = ["mic", "sing", "music"]
+rows = [
+  "............",
+  "....XXXX....",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  ".X.XXXXXX.X.",
+  ".X..XXXX..X.",
+  "..XX....XX..",
+  "....XXXX....",
+  ".....XX.....",
+  "...XXXXXX...",
+]
+
+[[icons]]
+id = "headphones"
+name = "Headphones"
+tags = ["listen", "audio", "music"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XX....XX..",
+  ".X........X.",
+  ".X........X.",
+  "X..........X",
+  "X..........X",
+  "XXX......XXX",
+  "XXX......XXX",
+  "XXX......XXX",
+  "XXX......XXX",
+  "............",
+]
+
+[[icons]]
+id = "speaker"
+name = "Speaker"
+tags = ["loudspeaker", "audio", "music"]
+rows = [
+  "............",
+  ".XXXXXXXXXX.",
+  ".X........X.",
+  ".X...XX...X.",
+  ".X........X.",
+  ".X..XXXX..X.",
+  ".X.XX..XX.X.",
+  ".X.X....X.X.",
+  ".X.XX..XX.X.",
+  ".X..XXXX..X.",
+  ".XXXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "amplifier"
+name = "Amplifier"
+tags = ["amp", "guitar", "music"]
+rows = [
+  "............",
+  "............",
+  ".XXXXXXXXXX.",
+  ".X.X.X.X..X.",
+  ".XXXXXXXXXX.",
+  ".XX.X.X.X.X.",
+  ".X.X.X.X.XX.",
+  ".XX.X.X.X.X.",
+  ".X.X.X.X.XX.",
+  ".XXXXXXXXXX.",
+  "..X......X..",
+  "............",
+]
+
+[[icons]]
+id = "vinyl"
+name = "Vinyl"
+tags = ["record", "lp", "music"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXX..XXXX.",
+  "XXXX....XXXX",
+  "XXXX....XXXX",
+  ".XXXX..XXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "cassette"
+name = "Cassette"
+tags = ["tape", "music"]
+rows = [
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X.XX....XX.X",
+  "X.X.XXXX.X.X",
+  "X.XX....XX.X",
+  "X..........X",
+  "X..XXXXXX..X",
+  "X.X......X.X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "cd"
+name = "CD"
+tags = ["disc", "album", "music"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XX....XX..",
+  ".X........X.",
+  ".X...XX...X.",
+  "X...X..X...X",
+  "X...X..X...X",
+  ".X...XX...X.",
+  ".X........X.",
+  "..XX....XX..",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "radio"
+name = "Radio"
+tags = ["fm", "broadcast", "music"]
+rows = [
+  "............",
+  ".........X..",
+  "........X...",
+  ".XXXXXXXXXX.",
+  ".X........X.",
+  ".X.XXX.XX.X.",
+  ".X.X.X.XX.X.",
+  ".X.XXX....X.",
+  ".X.....XX.X.",
+  ".X........X.",
+  ".XXXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "play"
+name = "Play"
+tags = ["start", "playback", "music"]
+rows = [
+  "............",
+  "............",
+  "...XX.......",
+  "...XXXX.....",
+  "...XXXXXX...",
+  "...XXXXXXXX.",
+  "...XXXXXXXX.",
+  "...XXXXXX...",
+  "...XXXX.....",
+  "...XX.......",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "pause"
+name = "Pause"
+tags = ["hold", "playback", "music"]
+rows = [
+  "............",
+  "............",
+  "..XXX..XXX..",
+  "..XXX..XXX..",
+  "..XXX..XXX..",
+  "..XXX..XXX..",
+  "..XXX..XXX..",
+  "..XXX..XXX..",
+  "..XXX..XXX..",
+  "..XXX..XXX..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "stop"
+name = "Stop"
+tags = ["end", "playback", "music"]
+rows = [
+  "............",
+  "............",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "record"
+name = "Record"
+tags = ["rec", "capture", "music"]
+rows = [
+  "............",
+  "............",
+  "....XXXX....",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "....XXXX....",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "shuffle"
+name = "Shuffle"
+tags = ["random", "playback", "music"]
+rows = [
+  "............",
+  "............",
+  "XXX......X..",
+  "...X....XXX.",
+  "....X..X.X..",
+  ".....XX.....",
+  ".....XX.....",
+  "....X..X.X..",
+  "...X....XXX.",
+  "XXX......X..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "repeat"
+name = "Repeat"
+tags = ["loop", "playback", "music"]
+rows = [
+  "............",
+  "............",
+  "..XXXXXXXX..",
+  ".X.......XX.",
+  ".X......XXX.",
+  ".X.......XX.",
+  ".XX.......X.",
+  ".XXX......X.",
+  ".XX.......X.",
+  "..XXXXXXXX..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "volume"
+name = "Volume"
+tags = ["loud", "sound", "music"]
+rows = [
+  "............",
+  "............",
+  "......X.....",
+  ".....XX..X..",
+  "...XXXX...X.",
+  "XXXXXXX.X.X.",
+  "XXXXXXX.X.X.",
+  "XXXXXXX.X.X.",
+  "...XXXX...X.",
+  ".....XX..X..",
+  "......X.....",
+  "............",
+]
+
+[[icons]]
+id = "mute"
+name = "Mute"
+tags = ["silent", "sound off", "music"]
+rows = [
+  "............",
+  "............",
+  "......X.....",
+  ".....XX.....",
+  "...XXXX.X..X",
+  "XXXXXXX..XX.",
+  "XXXXXXX..XX.",
+  "XXXXXXX.X..X",
+  "...XXXX.....",
+  ".....XX.....",
+  "......X.....",
+  "............",
+]
+
+[[icons]]
+id = "metronome"
+name = "Metronome"
+tags = ["tempo", "beat", "music"]
+rows = [
+  "............",
+  ".....XX.....",
+  "....X..X....",
+  "....X..X....",
+  "...X....X...",
+  "...X.X..X...",
+  "..X..X...X..",
+  "..X.X....X..",
+  ".X..X.....X.",
+  ".X.X......X.",
+  "XXXXXXXXXXXX",
+  "............",
+]
