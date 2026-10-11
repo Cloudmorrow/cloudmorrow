@@ -95,6 +95,12 @@ database.
 **`stamp`** sets a datetime when another field takes a value, and clears it
 when the field leaves it — how a task knows when it was finished.
 
+**`managed = true`** on a field of a datamodel that lives in a space lets
+whoever manages the space change that one field on anybody's record — a
+message's `pinned`, which the channel's manager sets on a line that is not
+theirs — while the rest of the record stays its author's (`authored`,
+below). A change that touches any other field is the author's alone.
+
 **Extending** a datamodel is a `[[extends]]` table in the Quill's manifest:
 
 ```toml
@@ -413,7 +419,8 @@ somebody with the domain in their hands; accounting is the books and
 nothing a tax office would sign. What a Quill needs
 outside all of this is its own extended datamodel, and that is where it
 stays unless we judge the domain is ours to know. Home goes first because
-the catalog's Home shelf holds only Chat.
+the catalog's Home shelf is empty now that Channels, which replaced Chat,
+stands in Business.
 
 ### Kept out, on purpose
 

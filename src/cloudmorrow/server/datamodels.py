@@ -100,6 +100,10 @@ class Field:
     # Hidden until asked for: never in a listing, drawn masked with a way to
     # reveal it on every surface. A string or text field.
     secret: bool = False
+    # Whoever manages the space the record is in may change this one field on
+    # anybody's record — pinning a message in a channel they run. Only on a
+    # datamodel that lives in a space.
+    managed: bool = False
 
     def label_for(self, value: str) -> str:
         """An enum value as a person reads it."""
@@ -128,6 +132,8 @@ class Field:
             row["added_by"] = self.added_by
         if self.secret:
             row["secret"] = True
+        if self.managed:
+            row["managed"] = True
         return row
 
 
@@ -276,6 +282,7 @@ def _field(where: str, name: str, spec: object) -> Field:
         "stamp",
         "description",
         "secret",
+        "managed",
     }
     unknown = set(spec) - known
     if unknown:
@@ -306,6 +313,9 @@ def _field(where: str, name: str, spec: object) -> Field:
         raise DatamodelError(f"{where}: {name!r} secret is true or false")
     if secret and (kind not in ("string", "text") or spec.get("indexed")):
         raise DatamodelError(f"{where}: {name!r} is secret, so it is a string or text, never indexed")
+    managed = spec.get("managed", False)
+    if not isinstance(managed, bool):
+        raise DatamodelError(f"{where}: {name!r} managed is true or false")
     default = spec.get("default")
     if kind == "enum" and default is not None and str(default) not in values:
         raise DatamodelError(f"{where}: {name!r} default {default!r} is not one of its values")
@@ -323,6 +333,7 @@ def _field(where: str, name: str, spec: object) -> Field:
         stamp_field=str(stamp.get("field", "")),
         stamp_value=str(stamp.get("value", "")),
         secret=secret,
+        managed=managed,
     )
 
 
@@ -387,6 +398,8 @@ def parse_datamodel(data: dict, *, source: str = "foundation", where: str = "") 
         if link.on_delete == "clear":
             # What is in a space is sealed to it: cleared, it could not be opened.
             raise DatamodelError(f"{where}: in_space {in_space!r} goes with its space: cascade, not clear")
+    if not in_space and any(f.managed for f in fields):
+        raise DatamodelError(f"{where}: a managed field is on a datamodel that lives in a space")
     notify = []
     for rule in data.get("notify", []):
         if not isinstance(rule, dict) or rule.get("when") not in NOTIFY_WHEN or rule.get("to") != "members":

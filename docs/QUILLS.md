@@ -158,7 +158,7 @@ each element needs:
 | `board` | `model`, `lane` (an enum, or a link: see below), `title`, optional `group` (link), `subtitle` (a field or a list of them), `body`, `done` | lanes stacked | lanes as columns, drag and drop | lanes as columns, drag and keys | `cm <quill> list`, `add`, `move` |
 | `detail` / `form` | `model`, `fields` | a sheet | a panel | a modal | `cm <quill> show`, `set` |
 | `calendar` | `model`, `starts`, `ends` (indexed datetime or date fields), `space` (a link to a space: the calendars), optional `all_day` (bool), `colour` (a field of the space: cyan, violet, green, amber, rose), `title`, `subtitle` | a month with a dot per thing, and the day's list | a week of hours or a month written in | the spaces, a month, and the day's list | `cm <quill> list --from --to`, `add "<title>" starts=… ends=…` |
-| `thread` | `model` (in a space), `space` (its link to the space), `body`; optional `about` (a field of the space), `made_as` | the spaces with unread, then a conversation | both side by side | both side by side | `cm <quill> list`, `show`, `say` |
+| `thread` | `model` (in a space), `space` (its link to the space), `body`; optional `about` (a field of the space), `made_as`; a team's: `reply_to` (a link of the model to itself), `pinned` (a bool), `reactions` (a datamodel with a link to the model and an `emoji`), `mentions = true` | the spaces with unread, then a conversation; a line's thread as a page | both side by side, a thread beside them | both side by side, replies under their lines | `cm <quill> list`, `show`, `say`, `reply`, `react`, `pin` |
 | `editor` | `model`, `title`, `body` (markdown), optional `path` (a string, `folder/sub/title`: the folders) | a tree, then a list, then the page | the list and the page side by side | the tree and the live editor side by side | `cm <quill> list`, `show`, `add`, `edit`, `search` |
 | `grid` | `model` with content (`file`), `group` (a link: the places, picked first), `folder`, `kind` (an enum with `folder`), optional `size`, `modified`, `mime`, `group_subtitle`, `group_open` (a bool on the group: false and it is listed, not opened), `group_writes` (a bool on the group: false and it opens with nothing that writes) | the groups, then folders and tiles | the same, wider; drag and drop in | the groups in a table, then the folder, with the picture beside | `cm <quill> list [group] [folder]`, `get`, `put`, `add` |
 
@@ -204,21 +204,43 @@ A `thread` is the kit's conversation: things written (`body`) in spaces. Its
 `made_as` says what fields a space gets for how it is made — by its scope, or
 `direct`, a shared space found-or-made between you and the person you pick
 and named for them — and the kit draws around it what every space has: making
-one, the people in it, adding and taking out, leaving. Chat is:
+one, the people in it, adding and taking out, leaving. Channels is:
 
 ```toml
 [[screens]]
-id = "chat"
+id = "channels"
 kit = "thread"
 model = "message"
 space = "channel"
 body = "body"
 about = "topic"
+reply_to = "reply_to"       # a message with it is a reply, in a thread under its parent
+pinned = "pinned"           # kept at the top of the channel
+reactions = "reaction"      # one emoji per person per message
+mentions = true             # @name tells that person
 [screens.made_as]
 public = { kind = "public" }
 shared = { kind = "private" }
 direct = { kind = "direct" }
 ```
+
+The last four are a team's, and each is there or not; without them a
+thread is the conversation Chat was. `reply_to` names a link of the model
+to itself: a line with it set is a reply, written in its parent's space,
+counted under the parent as *N replies*, and opened as a thread — beside
+the conversation on a computer, a page on a phone, indented under its line
+in the terminal — with a box of its own. `pinned` names a bool: a pinned
+line is marked, the space's header counts them and opens the list; its
+author pins it, or whoever manages the space (the field is `managed` in
+the datamodel, which is what lets a manager change that one field on
+somebody else's record). `reactions` names a datamodel of the Quill's with
+a link to the model, an `emoji` string and `authored = true`: each line
+shows its emoji with their counts, yours lit, and tapping one toggles
+yours — one record per person per emoji per line, theirs alone to take
+back, never unread. `mentions = true` lights every `@name` in a line, the
+box offers names as an `@` is typed, and the person named gets their own
+push — *bram mentioned you in #general* — if they are in the space; what
+the line says is otherwise the space's business, as before.
 
 A conversation opens on its newest page (`?_last=100`), listens to
 `/api/changes` and asks what changed since (`?_since=`) when it hears of a
@@ -497,7 +519,9 @@ manifest written, checked and installed in one conversation.
 2. Services, webhooks and APIs run, with Quill tokens and the gate on them.
    (They run, as the installing administrator; a service per person is next.)
 3. `calendar` and `thread` in the kit; Calendar and Chat become Quills.
-   (Both are Quills: `calendar` and `thread` are drawn on every surface.)
+   (Both are Quills: `calendar` and `thread` are drawn on every surface.
+   Channels replaced Chat over the same datamodels, with threads, mentions,
+   reactions and pins on the kit.)
 4. `grid` and `editor`; Files and Notes become Quills. (Both are drawn,
    and both are Quills.) Secrets is a Quill too, a grouped `list` of the
    `secret` datamodel, while its store stays foundation, and it is the one

@@ -48,8 +48,9 @@ It is free software under the [GNU AGPL v3](LICENSE).
 - **Calendar.** One of your own, plus the ones you share with the people on
   your server. Every calendar you can see is drawn at once, so nobody
   double-books the meeting room or the car.
-- **Chat.** Channels and direct messages between the people on your server,
-  with real push notifications and an unread count on the phone's icon.
+- **Channels.** Channels and direct messages between the people on your
+  server, with threads, @mentions, reactions and pinned messages, real push
+  notifications and an unread count on the phone's icon.
 - **Files.** A private drive per account, and shares anybody can make for
   what a team or a household keeps together: shared with people and
   circles, to change or only to read, and with everybody when an
@@ -124,7 +125,7 @@ want elsewhere; everything people keep goes under the data directory, in
 keeps its records in (the built-in one, a file in the data directory,
 which is right for most; or PostgreSQL, in a container it runs beside the
 server or on a server you already have), and which of the
-standard quills it should have (Notes, Tasks, Calendar, Chat, Files,
+standard quills it should have (Notes, Tasks, Calendar, Channels, Files,
 Secrets; all of them unless you untick some). Then it creates a service
 user, clones the code into `/opt/cloudmorrow` (or where you said), builds a
 virtualenv, writes the config and the systemd unit, generates the

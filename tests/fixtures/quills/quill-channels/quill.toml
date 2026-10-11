@@ -1,0 +1,49 @@
+[quill]
+id = "channels"
+name = "Channels"
+version = "1.0.0"
+summary = "Channels, threads, mentions and reactions: a team's conversations, on your own server."
+category = "business"
+icon = "channels"
+publisher = "Cloudmorrow"
+license = "AGPL-3.0-or-later"
+features = [
+  "Public channels everybody is in, private ones for the people you add, and direct messages",
+  "Threads: reply under a message, and the conversation stays readable",
+  "@mentions that reach the person named, with a push",
+  "Reactions on any message: a thumbs up is one tap",
+  "Pinned messages, kept at the top of the channel",
+  "#general for everybody, unread counts per channel and on the app's icon",
+]
+
+[uses]
+datamodels = ["channel", "message", "reaction"]
+
+# One tab: the channels and the people you write to on one side, the
+# conversation on the other; a message's thread opens beside it.
+[[screens]]
+id = "channels"
+kit = "thread"
+label = "Channels"
+model = "message"
+space = "channel"                  # the link that puts a message in its channel
+body = "body"
+about = "topic"                    # said under the channel's name
+reply_to = "reply_to"              # a message with it is a reply, in a thread under its parent
+pinned = "pinned"                  # kept at the top of the channel
+reactions = "reaction"             # one emoji per person per message
+mentions = true                    # @name tells that person
+
+[screens.made_as]
+public = { kind = "public" }
+shared = { kind = "private" }
+direct = { kind = "direct" }
+
+# #general, made once for the whole server the first time anybody opens
+# Channels — the same dataset Chat makes, so a server that had Chat has one.
+[[datasets]]
+id = "general"
+model = "channel"
+seed = "once"
+scope = "public"
+records = [{ name = "general", kind = "public", topic = "Everybody on this server" }]

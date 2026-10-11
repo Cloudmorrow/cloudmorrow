@@ -28,7 +28,7 @@ datamodels = ["calendar", "event"]
 id = "messaging"
 label = "Messaging"
 description = "Channels and the messages in them."
-datamodels = ["channel", "message"]
+datamodels = ["channel", "message", "reaction"]
 
 [[domains]]
 id = "secrets"

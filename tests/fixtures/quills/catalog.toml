@@ -71,6 +71,14 @@ publisher = "Cloudmorrow"
 foundation = true
 
 [[quills]]
+id = "channels"
+name = "Channels"
+summary = "Channels, threads, mentions and reactions: a team's conversations, on your own server."
+repo = "quill-channels"
+category = "business"
+publisher = "Cloudmorrow"
+
+[[quills]]
 id = "secrets"
 name = "Secrets"
 summary = "Keys and passwords in vaults and environments, sealed, and never shown until you ask."

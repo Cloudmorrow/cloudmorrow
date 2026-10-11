@@ -1,6 +1,6 @@
 [datamodel]
 id = "message"
-version = 1
+version = 2
 label = "Message"
 description = "What somebody said in a channel."
 domain = "messaging"
@@ -13,6 +13,12 @@ authored = true
 channel = { kind = "link", to = "channel", required = true, indexed = true, on_delete = "cascade" }
 body = { kind = "text", required = true }
 sent_at = { kind = "datetime", indexed = true }
+# A reply: in the same channel as the message it answers, shown under it as
+# a thread. Goes with its parent.
+reply_to = { kind = "link", to = "message", indexed = true, on_delete = "cascade" }
+# Kept at the top of the channel. Its author pins it, or whoever manages
+# the channel: `managed` lets them change this one field on anybody's message.
+pinned = { kind = "bool", default = false, indexed = true, managed = true }
 
 # Everybody else in the channel is told, and it counts as unread until they look.
 [[notify]]
