@@ -281,3 +281,75 @@ main.thread > .about b { color: var(--ink); font-size: 16px; font-weight: 600; }
   .space-row:hover { background: var(--card-2); }
   .space-row.current:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 }
+
+/* -- a team's: threads, reactions, pins, mentions ------------------------------ */
+.bubble .pin { display: inline-flex; vertical-align: -2px; margin-right: 6px; color: var(--action); }
+.bubble.pinned { border-color: color-mix(in srgb, var(--action) 45%, var(--line)); }
+.bubble .mention {
+  color: var(--accent);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 6px;
+  padding: 0 3px;
+}
+.block.mine .mention { color: var(--fill-ink); background: color-mix(in srgb, var(--fill-ink) 18%, transparent); }
+/* Under a line: its reactions, and how many replies it has. */
+.block .under { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 4px; font-size: 12px; }
+.reactions { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.reaction {
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.reaction.mine { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.block .replies { color: var(--accent); font-weight: 600; text-decoration: none; }
+.block .replies:hover { text-decoration: underline; }
+/* The pinned lines, dropped down over the conversation. */
+.pinned-list {
+  flex: none;
+  max-height: 40%;
+  overflow-y: auto;
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pinned-list[hidden] { display: none; }
+.pinned-list .pinned-head { margin: 0; font-size: 12px; color: var(--muted); letter-spacing: .02em; }
+.pinned-list .bubble { max-width: 100%; }
+.icon-button.pins { gap: 3px; color: var(--action); font-size: 12px; font-weight: 600; }
+.icon-button.pins[hidden] { display: none; }
+/* Names offered while an @ is typed, just over the box. */
+.mention-list {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  overflow: hidden;
+}
+.mention-list[hidden] { display: none; }
+.mention-row { display: flex; gap: 8px; align-items: baseline; padding: 8px 12px; text-align: left; color: var(--ink); background: none; }
+.mention-row span { color: var(--muted); font-size: 13px; }
+.mention-row.picked, .mention-row:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+/* The thread: beside the conversation on a computer, a page on a phone. */
+.thread-panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.thread-lines .bubble { max-width: 100%; }
+@media (min-width: 900px) and (min-height: 600px) {
+  #app:has(main.kit-thread.split.with-thread) { --column: 1400px; }
+  main.kit-thread.split.with-thread { grid-template-columns: minmax(240px, 300px) 1fr minmax(300px, 400px); }
+  .split .thread-panel { padding: 0 0 0 20px; border-left: 1px solid var(--line); margin-left: 20px; }
+  .split .thread-panel .composer { margin: 0 0 0 -20px; padding-left: 20px; padding-right: 0; }
+  .thread-head .title { font-size: 17px; }
+}

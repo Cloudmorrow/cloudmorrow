@@ -1,0 +1,15 @@
+[datamodel]
+id = "reaction"
+version = 1
+label = "Reaction"
+description = "One person's emoji on a message."
+domain = "messaging"
+scopes = ["shared", "public"]
+title = "emoji"
+in_space = "channel"
+authored = true
+
+[fields]
+channel = { kind = "link", to = "channel", required = true, indexed = true, on_delete = "cascade" }
+message = { kind = "link", to = "message", required = true, indexed = true, on_delete = "cascade" }
+emoji = { kind = "string", required = true }

@@ -360,19 +360,24 @@ CHAT_SCOPES = {"public": "public", "private": "shared", "direct": "shared"}
 def move_legacy_chat(db: Database | Path, registry: QuillRegistry, records: RecordStore) -> int:
     """Channels and messages from the old tables into records. Returns how many moved.
 
-    Installs the Chat Quill first on a server that had Chat: one with old
-    channels, or with accounts at all — a server nobody has signed in to yet
-    is still being set up, and its choice of Quills is the installer's.
+    Installs the messaging Quill first (Channels, or Chat on a catalog that
+    still has it) on a server that had Chat: one with old channels, or with
+    accounts at all — a server nobody has signed in to yet is still being
+    set up, and its choice of Quills is the installer's.
     """
     db = open_database(db)
     if read_meta(db, LEGACY_CHAT):
         return 0
     legacy = _has_rows(db, "chat_channels")
-    if "chat" not in registry.quills:
+    if not {"chat", "channels"} & set(registry.quills):
         if not legacy and not _has_rows(db, "users"):
             write_meta(db, LEGACY_CHAT, "-")
             return 0
-        registry.install_from_catalog("chat")
+        # The catalog's messaging Quill over channel and message: Channels,
+        # which replaced Chat, or Chat on a catalog that still has it.
+        catalog = load_catalog(registry.catalog_location)
+        listed = {entry.get("id") for entry in catalog.quills}
+        registry.install_from_catalog("channels" if "channels" in listed else "chat", catalog)
     moved = 0
     with db.connect() as conn:
         channels = conn.execute("SELECT * FROM chat_channels ORDER BY id").fetchall() if legacy else []

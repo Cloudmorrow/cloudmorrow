@@ -266,6 +266,13 @@ def _check_thread(manifest: Manifest, screen: dict, model: Datamodel, models: di
     for how it is made: `public`, `shared` or `personal` — its scope — or
     `direct`, a shared space found-or-made between the people picked, named
     for whoever else is in it.
+
+    Four more are a team's: `reply_to`, a link of the model to itself, makes
+    a line with it a reply shown under its parent; `pinned`, a bool, keeps
+    a line at the top of its space; `reactions` names a datamodel of the
+    Quill's with a link to the model and an `emoji` string, one record per
+    person per line; `mentions = true` makes `@name` in a body tell that
+    person.
     """
     where = manifest.id
     thing = f"screen {screen['id']!r}"
@@ -276,6 +283,26 @@ def _check_thread(manifest: Manifest, screen: dict, model: Datamodel, models: di
     space_model = models[model.by_name[screen["space"]].to]
     if screen.get("about"):
         need(space_model, thing + " about", screen["about"])
+    if screen.get("reply_to"):
+        need(model, thing + " reply_to", screen["reply_to"], ("link",))
+        if model.by_name[screen["reply_to"]].to != model.id:
+            raise QuillError(f"{where}: {thing} reply_to {screen['reply_to']!r} links elsewhere than {model.id}")
+    if screen.get("pinned"):
+        need(model, thing + " pinned", screen["pinned"], ("bool",))
+    if "mentions" in screen and not isinstance(screen["mentions"], bool):
+        raise QuillError(f"{where}: {thing} mentions is true or false")
+    if screen.get("reactions"):
+        name = screen["reactions"]
+        reactions = models.get(name) if isinstance(name, str) else None
+        if reactions is None or name not in manifest.models:
+            raise QuillError(f"{where}: {thing} reactions names {name!r}, which the Quill does not use")
+        if not any(f.kind == "link" and f.to == model.id for f in reactions.fields):
+            raise QuillError(f"{where}: {thing} reactions {name!r} has no link to {model.id}")
+        need(reactions, thing + " reactions", "emoji", ("string",))
+        if not reactions.authored:
+            raise QuillError(f"{where}: {thing} reactions {name!r} is not authored: a reaction is its person's")
+        if reactions.in_space != model.in_space:
+            raise QuillError(f"{where}: {thing} reactions {name!r} is not in a {space_model.id} as {model.id} is")
     made_as = screen.get("made_as") or {}
     if not isinstance(made_as, dict):
         raise QuillError(f"{where}: {thing} made_as is a table of how a space is made")
