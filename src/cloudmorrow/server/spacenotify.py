@@ -84,6 +84,7 @@ def mentioned(text: str) -> list[str]:
     """The usernames an @ names in *text*, once each, in order."""
     return list(dict.fromkeys(m.group(1).rstrip(".") for m in MENTION.finditer(text or "")))
 
+
 # The notices waiting their turn, and the one thread that takes them. A
 # push is best effort: past this many waiting, the newest is dropped and
 # said so, rather than the server growing until it is stopped.

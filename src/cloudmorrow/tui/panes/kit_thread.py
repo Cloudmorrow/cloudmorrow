@@ -673,7 +673,8 @@ class ThreadPane(KitPane):
         try:
             if emoji in mine:
                 own = next(
-                    r for r in self.reactions
+                    r
+                    for r in self.reactions
                     if r.get("owner") == self.me
                     and (r.get("fields") or {}).get(self.reaction_link) == line["id"]
                     and (r.get("fields") or {}).get("emoji") == emoji

@@ -117,8 +117,10 @@ def test_a_reply_is_in_its_parents_channel_and_goes_with_it(channels):
 
 def test_a_reply_cannot_answer_a_message_you_cannot_see(channels):
     club = channels(
-        "POST", "/api/records/channel",
-        {"fields": {"name": "club", "kind": "private"}, "scope": "shared", "members": []}, expect=201,
+        "POST",
+        "/api/records/channel",
+        {"fields": {"name": "club", "kind": "private"}, "scope": "shared", "members": []},
+        expect=201,
     )
     secret = say(channels, club, "members only")
     room = general(channels)
@@ -158,9 +160,7 @@ def test_a_message_is_pinned_by_its_author_or_whoever_manages_the_channel(channe
     assert pinned["fields"]["pinned"] is True and pinned["fields"]["body"] == "read me"
     # The pin alone: the words stay the author's.
     channels("PATCH", f"/api/records/message/{theirs['id']}", {"fields": {"body": "mine now"}}, expect=403)
-    channels(
-        "PATCH", f"/api/records/message/{theirs['id']}", {"fields": {"pinned": False, "body": "x"}}, expect=403
-    )
+    channels("PATCH", f"/api/records/message/{theirs['id']}", {"fields": {"pinned": False, "body": "x"}}, expect=403)
     # Its author may, always.
     channels("PATCH", f"/api/records/message/{theirs['id']}", {"fields": {"pinned": False}}, who=channels.guest)
     assert [m["id"] for m in channels("GET", f"/api/records/message?channel={room['id']}&pinned=true")] == []
@@ -168,14 +168,14 @@ def test_a_message_is_pinned_by_its_author_or_whoever_manages_the_channel(channe
 
 def test_whoever_manages_a_channel_pins_a_line_of_somebody_elses(channels):
     club = channels(
-        "POST", "/api/records/channel",
+        "POST",
+        "/api/records/channel",
         {"fields": {"name": "club", "kind": "private"}, "scope": "shared", "members": ["bram"]},
-        who=channels.guest, expect=201,
+        who=channels.guest,
+        expect=201,
     )
     line = say(channels, club, "agenda")
-    pinned = channels(
-        "PATCH", f"/api/records/message/{line['id']}", {"fields": {"pinned": True}}, who=channels.guest
-    )
+    pinned = channels("PATCH", f"/api/records/message/{line['id']}", {"fields": {"pinned": True}}, who=channels.guest)
     assert pinned["fields"]["pinned"] is True
     assert [m["id"] for m in channels("GET", f"/api/records/message?channel={club['id']}&pinned=true")] == [line["id"]]
 
@@ -197,8 +197,10 @@ def test_naming_somebody_tells_them_so(channels, monkeypatch):
 
 def test_a_mention_in_a_private_channel_reaches_only_its_people(channels, monkeypatch):
     club = channels(
-        "POST", "/api/records/channel",
-        {"fields": {"name": "club", "kind": "private"}, "scope": "shared", "members": []}, expect=201,
+        "POST",
+        "/api/records/channel",
+        {"fields": {"name": "club", "kind": "private"}, "scope": "shared", "members": []},
+        expect=201,
     )
     pushed = []
     monkeypatch.setattr(PushStore, "has", lambda self, who: True)
