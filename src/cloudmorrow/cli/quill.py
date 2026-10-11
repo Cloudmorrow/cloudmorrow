@@ -52,6 +52,8 @@ from rich.table import Table
 
 from cloudmorrow.cli.common import client, console, fail, out, run
 from cloudmorrow.console import TITLE
+from cloudmorrow.icons import APP_ICONS
+from cloudmorrow.icons import get as icons_get
 from cloudmorrow.quill_reference import quill_reference
 
 app = typer.Typer(help="Quills: make one, check it, try it; add them from the catalog.", no_args_is_help=True)
@@ -320,6 +322,12 @@ def check(
         plan = _plan_offline(folder, _datamodels_folder(datamodels, Path(tmp)))
     print_plan(plan)
     out.print(preview(plan), markup=False, highlight=False)
+    icon = plan.get("icon") or ""
+    if icon and icon not in APP_ICONS and icons_get(icon) is None:
+        console.print(
+            f"[yellow]![/] icon {icon!r} is not in the icon library; the tab shows the quill mark"
+            " — see cloudmorrow.com/resources/icons"
+        )
     if plan.get("code"):
         # Handlers in the code that nothing names: harmless, and usually a typo.
         try:

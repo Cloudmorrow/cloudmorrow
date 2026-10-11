@@ -1,0 +1,571 @@
+# Cloudmorrow icons, theme "Sport": CC0 1.0, free to use anywhere, no attribution needed.
+
+[[icons]]
+id = "football"
+name = "Football"
+tags = ["soccer", "ball", "sport"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XX....XX..",
+  ".X...XX...X.",
+  ".X..XXXX..X.",
+  "X..XXXXXX..X",
+  "X...XXXX...X",
+  "X.X......X.X",
+  ".X.X....X.X.",
+  ".X..X..X..X.",
+  "..XX....XX..",
+  "....XXXX....",
+]
+
+[[icons]]
+id = "basketball"
+name = "Basketball"
+tags = ["ball", "hoop", "sport"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XX.XX.XX..",
+  ".X...XX...X.",
+  ".X...XX...X.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".X...XX...X.",
+  ".X...XX...X.",
+  "..XX.XX.XX..",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "tennis"
+name = "Tennis"
+tags = ["racket", "ball", "sport"]
+rows = [
+  "............",
+  "....XXXX....",
+  "...X.X.X....",
+  "..XX.X.XX...",
+  "..X.X.X.X...",
+  "..XX.X.XX...",
+  "...X.X.X....",
+  "....XXXX....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "goal"
+name = "Goal"
+tags = ["net", "football", "sport"]
+rows = [
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "X.X.X.X.X.XX",
+  "XX.X.X.X.X.X",
+  "X.X.X.X.X.XX",
+  "XX.X.X.X.X.X",
+  "X.X.X.X.X.XX",
+  "XX.X.X.X.X.X",
+  "X..........X",
+  "XX........XX",
+  "............",
+]
+
+[[icons]]
+id = "baseball"
+name = "Baseball"
+tags = ["ball", "stitches", "sport"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XX....XX..",
+  ".X.X....X.X.",
+  ".XX......XX.",
+  "X.X......X.X",
+  "X.X......X.X",
+  ".XX......XX.",
+  ".X.X....X.X.",
+  "..XX....XX..",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "golf"
+name = "Golf"
+tags = ["flag", "green", "sport"]
+rows = [
+  "............",
+  ".....X......",
+  ".....XXXXX..",
+  ".....XXXXX..",
+  ".....XXXXX..",
+  ".....X......",
+  ".....X......",
+  ".....X......",
+  "..XX.X......",
+  "..XX.X......",
+  ".XXXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "rugby"
+name = "Rugby"
+tags = ["american football", "ball", "sport"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "....XXXX....",
+  "..XXX..XXX..",
+  ".XXXX.X.XXX.",
+  "XXXXX..XXXXX",
+  "XXXXX.X.XXXX",
+  ".XXXX..XXXX.",
+  "..XXX..XXX..",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "hockey"
+name = "Hockey"
+tags = ["stick", "puck", "ice", "sport"]
+rows = [
+  "............",
+  "........XX..",
+  "........XX..",
+  ".......XX...",
+  ".......XX...",
+  "......XX....",
+  "......XX....",
+  ".....XX.....",
+  "....XX......",
+  "XXXXX..XXX..",
+  ".......XXX..",
+  "............",
+]
+
+[[icons]]
+id = "cricket-bat"
+name = "Cricket bat"
+tags = ["bat", "ball", "sport"]
+rows = [
+  "............",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  "....XXXX....",
+  "....XXXX....",
+  "....XXXX....",
+  "....XXXX..XX",
+  "....XXXX..XX",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "table-tennis"
+name = "Table tennis"
+tags = ["ping pong", "paddle", "sport"]
+rows = [
+  "............",
+  "...XXXXX....",
+  "..XXXXXXX...",
+  ".XXXXXXXXX..",
+  ".XXXXXXXXX..",
+  ".XXXXXXXXX..",
+  "..XXXXXXX...",
+  "...XXXXX..XX",
+  ".....XX...XX",
+  ".....XX.....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "badminton"
+name = "Badminton"
+tags = ["shuttlecock", "sport"]
+rows = [
+  "............",
+  "..XX....XX..",
+  "..X......X..",
+  "..X.X..X.X..",
+  "...X.XX.X...",
+  "...X....X...",
+  "....X..X....",
+  "....XXXX....",
+  "....XXXX....",
+  ".....XX.....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "bowling"
+name = "Bowling"
+tags = ["ball", "pins", "sport"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXX.XX.XXX.",
+  "XXXXXXXXXXXX",
+  "XXXXX.XXXXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "....XXXX....",
+]
+
+[[icons]]
+id = "dumbbell"
+name = "Dumbbell"
+tags = ["weights", "gym", "sport"]
+rows = [
+  "............",
+  "............",
+  "............",
+  ".XXX....XXX.",
+  ".XXX....XXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXX....XXX.",
+  ".XXX....XXX.",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "kettlebell"
+name = "Kettlebell"
+tags = ["weights", "gym", "sport"]
+rows = [
+  "............",
+  "....XXXX....",
+  "...XX..XX...",
+  "...X....X...",
+  "...X....X...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "barbell"
+name = "Barbell"
+tags = ["weights", "lifting", "sport"]
+rows = [
+  "............",
+  "............",
+  "XX........XX",
+  "XX.X....X.XX",
+  "XX.X....X.XX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XX.X....X.XX",
+  "XX.X....X.XX",
+  "XX........XX",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "medal"
+name = "Medal"
+tags = ["award", "ribbon", "sport"]
+rows = [
+  "............",
+  "...XX..XX...",
+  "...XX..XX...",
+  "....X..X....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXX..XXX..",
+  "..XX.XX.XX..",
+  "..XXX..XXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "trophy"
+name = "Trophy"
+tags = ["cup", "winner", "sport"]
+rows = [
+  "............",
+  ".XXXXXXXXXX.",
+  ".X.XXXXXX.X.",
+  ".X.XXXXXX.X.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  ".....XX.....",
+  ".....XX.....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "podium"
+name = "Podium"
+tags = ["winners", "first", "sport"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "....XXXX....",
+  "....X..X....",
+  "....X..X....",
+  "XXXXX..XXXXX",
+  "X...X..X...X",
+  "X...X..X...X",
+  "X...X..X...X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "whistle"
+name = "Whistle"
+tags = ["referee", "coach", "sport"]
+rows = [
+  "............",
+  "............",
+  ".....XXXXXXX",
+  "...XXXXXXXXX",
+  "..XXXXXXX...",
+  ".XXXXXXXX...",
+  ".XXXXXXX....",
+  ".XXXXXXX....",
+  "..XXXXX.....",
+  "...XXX......",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "stopwatch"
+name = "Stopwatch"
+tags = ["timer", "time", "sport"]
+rows = [
+  "............",
+  ".....XX.....",
+  "....XXXX..X.",
+  "....XXXXXX..",
+  "...X....X...",
+  "..X......X..",
+  ".X...X....X.",
+  ".X...X....X.",
+  ".X...XXX..X.",
+  "..X......X..",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "running-shoe"
+name = "Running shoe"
+tags = ["sneaker", "run", "sport"]
+rows = [
+  "............",
+  "............",
+  "............",
+  ".......XX...",
+  "......XXXX..",
+  ".....XX.XXX.",
+  "....XX..XXX.",
+  "..XXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "bike-helmet"
+name = "Bike helmet"
+tags = ["helmet", "safety", "sport"]
+rows = [
+  "............",
+  "............",
+  "....XXXX....",
+  "..XX.XX.XX..",
+  ".XXX.XX.XXX.",
+  "XXXX.XX.XXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "............",
+  "...X....X...",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "swimmer"
+name = "Swimmer"
+tags = ["swimming", "pool", "sport"]
+rows = [
+  "............",
+  "............",
+  ".........XX.",
+  "....XXX..XX.",
+  "...X...X....",
+  "..X.....X...",
+  ".X.......X..",
+  "............",
+  "XX...XX...XX",
+  "..XXX..XXX..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "skier"
+name = "Skier"
+tags = ["ski", "snow", "sport"]
+rows = [
+  "............",
+  ".....XX.....",
+  ".....XX.....",
+  "..X..XX..X..",
+  "...X.XX.X...",
+  "....XXXX....",
+  ".....XX.....",
+  "....X.X.....",
+  "...X...X....",
+  "..X.....X...",
+  ".XXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "skater"
+name = "Skater"
+tags = ["ice skate", "skating", "sport"]
+rows = [
+  "............",
+  "............",
+  "...XXX......",
+  "...X.X......",
+  "...X.X......",
+  "...X.XXXXX..",
+  "...X.....XX.",
+  "...XXXXXXXX.",
+  "............",
+  "..XXXXXXXXX.",
+  "....X....X..",
+  "............",
+]
+
+[[icons]]
+id = "carabiner"
+name = "Carabiner"
+tags = ["climbing", "climber", "sport"]
+rows = [
+  "............",
+  "....XXXX....",
+  "...X....X...",
+  "..X......X..",
+  "..X......X..",
+  "..X......X..",
+  "..X......X..",
+  "..X......X..",
+  "..X.XX...X..",
+  "...X....X...",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "yoga"
+name = "Yoga"
+tags = ["meditation", "stretch", "sport"]
+rows = [
+  "............",
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  "....XXXX....",
+  ".X..XXXX..X.",
+  "..X.XXXX.X..",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XX......XX.",
+  "............",
+]
+
+[[icons]]
+id = "boxing-glove"
+name = "Boxing glove"
+tags = ["boxing", "punch", "sport"]
+rows = [
+  "............",
+  "............",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  ".....XXXXX..",
+  ".....XXXXX..",
+  ".....XXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "target"
+name = "Target"
+tags = ["bullseye", "archery", "aim", "sport"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XX....XX..",
+  ".X..XXXX..X.",
+  ".X.X....X.X.",
+  "X.X..XX..X.X",
+  "X.X..XX..X.X",
+  ".X.X....X.X.",
+  ".X..XXXX..X.",
+  "..XX....XX..",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "flag-finish"
+name = "Finish flag"
+tags = ["chequered", "race", "sport"]
+rows = [
+  "............",
+  ".X..........",
+  ".XXXXXXXXXX.",
+  ".XX.XX.XX.X.",
+  ".XX.XX.XX.X.",
+  ".X.XX.XX.XX.",
+  ".X.XX.XX.XX.",
+  ".XXXXXXXXXX.",
+  ".X..........",
+  ".X..........",
+  ".X..........",
+  "............",
+]

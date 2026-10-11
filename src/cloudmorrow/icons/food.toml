@@ -1,0 +1,571 @@
+# Cloudmorrow icons, theme "Food": CC0 1.0, free to use anywhere, no attribution needed.
+
+[[icons]]
+id = "apple"
+name = "Apple"
+tags = ["fruit", "healthy", "snack"]
+rows = [
+  ".....XX.....",
+  "......X.....",
+  "..XXX.X.XXX.",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXX..XXX..",
+  "............",
+]
+
+[[icons]]
+id = "pear"
+name = "Pear"
+tags = ["fruit", "green", "sweet"]
+rows = [
+  "......X.....",
+  ".....X......",
+  "....XXXX....",
+  "....XXXX....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+]
+
+[[icons]]
+id = "banana"
+name = "Banana"
+tags = ["fruit", "yellow", "tropical"]
+rows = [
+  "..X.........",
+  "..XX........",
+  "...XX.......",
+  "...XXX......",
+  "....XXX.....",
+  "....XXXX....",
+  ".....XXXX...",
+  ".....XXXXXX.",
+  "......XXXXXX",
+  ".......XXXXX",
+  ".........XX.",
+  "............",
+]
+
+[[icons]]
+id = "cherry"
+name = "Cherries"
+tags = ["fruit", "red", "berry"]
+rows = [
+  "......X.....",
+  ".....X.X....",
+  "....X...X...",
+  "...X.....X..",
+  "...X.....X..",
+  "..XXX...XXX.",
+  ".XXXXX.XXXXX",
+  ".XXXXX.XXXXX",
+  ".XXXXX.XXXXX",
+  "..XXX...XXX.",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "grapes"
+name = "Grapes"
+tags = ["fruit", "bunch", "vine"]
+rows = [
+  ".......XX...",
+  "......X.X...",
+  "..XX.XX.XX..",
+  "..XX.XX.XX..",
+  "...XX.XX....",
+  "...XX.XX....",
+  ".....XX.....",
+  ".....XX.....",
+  "............",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "lemon"
+name = "Lemon"
+tags = ["fruit", "citrus", "sour"]
+rows = [
+  "............",
+  "............",
+  ".........XX.",
+  "...XXXXXXXX.",
+  "..XXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXX..",
+  ".XXXXXXXX...",
+  ".XX.........",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "carrot"
+name = "Carrot"
+tags = ["vegetable", "root", "orange"]
+rows = [
+  ".........X..",
+  "........XX..",
+  ".......XXXX.",
+  "......XXXX..",
+  ".....XXXX...",
+  "....XXXXX...",
+  "...XXXXX....",
+  "..XXXXX.....",
+  ".XXXXX......",
+  ".XXXX.......",
+  "XXX.........",
+  "............",
+]
+
+[[icons]]
+id = "broccoli"
+name = "Broccoli"
+tags = ["vegetable", "green", "greens"]
+rows = [
+  "............",
+  "...XXXX.....",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "mushroom"
+name = "Mushroom"
+tags = ["fungus", "vegetable", "cooking"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XXXXXXXX..",
+  ".XXX.XXXX.X.",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  ".....XX.....",
+  "....XXXX....",
+  "....XXXX....",
+  "....XXXX....",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "bread"
+name = "Bread"
+tags = ["loaf", "bakery", "toast"]
+rows = [
+  "............",
+  "..XX.XX.XX..",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "cheese"
+name = "Cheese"
+tags = ["dairy", "wedge", "holes"]
+rows = [
+  "............",
+  "............",
+  "..........X.",
+  "........XXXX",
+  "......XXXXXX",
+  "....XXXXXXXX",
+  "..XXXX.XXXXX",
+  "XXXXXXXXX.XX",
+  "XXX.XXXXXXXX",
+  "XXXXXXXX.XXX",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "egg"
+name = "Fried egg"
+tags = ["breakfast", "yolk", "protein"]
+rows = [
+  "............",
+  "...XXXXXX...",
+  "..X......X..",
+  ".X........X.",
+  ".X..XXXX..X.",
+  "X...XXXX...X",
+  "X...XXXX...X",
+  ".X..XXXX..X.",
+  ".X........X.",
+  "..X......X..",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "drumstick"
+name = "Drumstick"
+tags = ["chicken", "meat", "poultry"]
+rows = [
+  "............",
+  ".......XXX..",
+  "......XXXXX.",
+  ".....XXXXXX.",
+  "....XXXXXXX.",
+  "...XXXXXXX..",
+  "..XXXXXXX...",
+  ".XXXXXX.....",
+  "XXXXXX......",
+  "XXX.........",
+  "XX..........",
+  "............",
+]
+
+[[icons]]
+id = "meat"
+name = "Steak"
+tags = ["beef", "meat", "grill"]
+rows = [
+  "............",
+  "..XXXXXXX...",
+  ".XXXXXXXXXX.",
+  "XXXX.XXXX.XX",
+  "XXX.XXXX.XXX",
+  "XX.XXXX.XXXX",
+  "X.XXXX.XXXXX",
+  ".XXXX.XXXX..",
+  "..XXX.XXX...",
+  "...XXXXX....",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "pizza"
+name = "Pizza"
+tags = ["slice", "italian", "takeaway"]
+rows = [
+  "............",
+  "XXXXXXXXXXXX",
+  "XX.XXXXX.XXX",
+  "XXXXXXXXXXXX",
+  ".XXXX.XXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "..XXX.XXXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "burger"
+name = "Burger"
+tags = ["hamburger", "fast food", "bun"]
+rows = [
+  "............",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "............",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+  ".X.X.X.X.X.X",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "hot-dog"
+name = "Hot dog"
+tags = ["sausage", "bun", "fast food"]
+rows = [
+  "............",
+  "............",
+  "............",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "X.X.X.X.X.XX",
+  "XX.X.X.X.X.X",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "taco"
+name = "Taco"
+tags = ["mexican", "wrap", "shell"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "....XXXX....",
+  "..XX.XX.XX..",
+  ".X.X.XX.X.X.",
+  ".X.XXXXXX.X.",
+  ".X.XXXXXX.X.",
+  ".X.XXXXXX.X.",
+  "..X.XXXX.X..",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "bowl"
+name = "Bowl"
+tags = ["dish", "rice", "cereal"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "soup"
+name = "Soup"
+tags = ["hot", "bowl", "steam"]
+rows = [
+  "...X..X..X..",
+  "..X..X..X...",
+  "...X..X..X..",
+  "............",
+  "XXXXXXXXXXXX",
+  ".X........X.",
+  ".X........X.",
+  "..X......X..",
+  "...XXXXXX...",
+  "....XXXX....",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "cake"
+name = "Cake"
+tags = ["birthday", "candle", "dessert"]
+rows = [
+  ".....X......",
+  ".....XX.....",
+  ".....XX.....",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "X.X.X.X.X.XX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "cupcake"
+name = "Cupcake"
+tags = ["muffin", "dessert", "bakery"]
+rows = [
+  ".....XX.....",
+  "....XXXX....",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  ".X.X.X.X.X..",
+  ".XX.X.X.X.X.",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "cookie"
+name = "Cookie"
+tags = ["biscuit", "chocolate chip", "snack"]
+rows = [
+  "............",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXX.XXXXXX.",
+  ".XXXXXXX.XX.",
+  "XXXXXXXXXXXX",
+  "XX.XXXXXXXXX",
+  "XXXXXX.XXXXX",
+  ".XXXXXXXXXX.",
+  ".XXX.XXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+]
+
+[[icons]]
+id = "ice-cream"
+name = "Ice cream"
+tags = ["cone", "dessert", "summer"]
+rows = [
+  "....XXXX....",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "....XXXX....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "takeaway-cup"
+name = "Takeaway cup"
+tags = ["coffee", "paper cup", "to go"]
+rows = [
+  "............",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  ".X........X.",
+  ".X........X.",
+  ".XXXXXXXXXX.",
+  "..X......X..",
+  "..X......X..",
+  "..X......X..",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "tea"
+name = "Tea"
+tags = ["cup", "teabag", "hot drink"]
+rows = [
+  "...........X",
+  "..........X.",
+  ".XXXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXX.X",
+  ".XXXXXXXXX.X",
+  "..XXXXXXXXX.",
+  "...XXXXXX...",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "bottle"
+name = "Bottle"
+tags = ["drink", "water", "juice"]
+rows = [
+  "....XXXX....",
+  "....XXXX....",
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "glass"
+name = "Glass"
+tags = ["drink", "water", "tumbler"]
+rows = [
+  "............",
+  ".XXXXXXXXXX.",
+  ".X........X.",
+  ".X........X.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "beer"
+name = "Beer"
+tags = ["pint", "mug", "pub"]
+rows = [
+  "............",
+  ".XX.XX.XX...",
+  ".XXXXXXXX...",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXX.X.",
+  ".XXXXXXXX.X.",
+  ".XXXXXXXX.X.",
+  ".XXXXXXXX.X.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXX...",
+  ".XXXXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "wine"
+name = "Wine"
+tags = ["glass", "red", "drink"]
+rows = [
+  "............",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "..XXXXXXXX..",
+  "............",
+]

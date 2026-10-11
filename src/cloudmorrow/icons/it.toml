@@ -1,0 +1,572 @@
+# IT: machines, networks, code and what keeps them safe.
+# Every icon here is CC0: public domain, free to use anywhere, in anything, no attribution owed.
+
+[[icons]]
+id = "laptop"
+name = "Laptop"
+tags = ["it", "computer", "notebook"]
+rows = [
+  "............",
+  ".XXXXXXXXXX.",
+  ".X........X.",
+  ".X........X.",
+  ".X........X.",
+  ".X........X.",
+  ".X........X.",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "desktop"
+name = "Desktop"
+tags = ["it", "computer", "monitor", "screen"]
+rows = [
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  ".....XX.....",
+  ".....XX.....",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "server"
+name = "Server"
+tags = ["it", "rack", "host", "machine"]
+rows = [
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X.X.X....XXX",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X.X.X....XXX",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X.X.X....XXX",
+  "XXXXXXXXXXXX",
+]
+
+[[icons]]
+id = "database"
+name = "Database"
+tags = ["it", "data", "storage", "sql"]
+rows = [
+  "..XXXXXXXX..",
+  ".X........X.",
+  "X..........X",
+  ".XXXXXXXXXX.",
+  "X..........X",
+  "X..........X",
+  ".XXXXXXXXXX.",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  ".X........X.",
+  "..XXXXXXXX..",
+]
+
+[[icons]]
+id = "cloud"
+name = "Cloud"
+tags = ["it", "online", "hosting", "sky"]
+rows = [
+  "............",
+  "............",
+  ".....XXXX...",
+  "....X....X..",
+  "..XXX.....X.",
+  ".X.........X",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  ".X........X.",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "cloud-upload"
+name = "Cloud upload"
+tags = ["it", "cloud", "upload", "send", "backup"]
+rows = [
+  "............",
+  ".....XXXX...",
+  "....XXXXXX..",
+  "..XXXXXXXXX.",
+  ".XXXX..XXXXX",
+  "XXXX....XXXX",
+  "XXXXX..XXXXX",
+  "XXXXX..XXXXX",
+  "XXXXX..XXXXX",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "cloud-download"
+name = "Cloud download"
+tags = ["it", "cloud", "download", "fetch", "restore"]
+rows = [
+  "............",
+  ".....XXXX...",
+  "....XXXXXX..",
+  "..XXXXXXXXX.",
+  ".XXXXXXXXXXX",
+  "XXXXX..XXXXX",
+  "XXXXX..XXXXX",
+  "XXXX....XXXX",
+  "XXXXX..XXXXX",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "terminal"
+name = "Terminal"
+tags = ["it", "shell", "command line", "console"]
+rows = [
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X.X........X",
+  "X..X.......X",
+  "X...X......X",
+  "X..X.......X",
+  "X.X........X",
+  "X....XXXX..X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "code"
+name = "Code"
+tags = ["it", "source", "program", "developer", "tags"]
+rows = [
+  "............",
+  "...X...X.X..",
+  "..X....X..X.",
+  ".X....X....X",
+  "X.....X....X",
+  "X....X.....X",
+  ".X...X....X.",
+  "..X.X....X..",
+  "...XX...X...",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "bug"
+name = "Bug"
+tags = ["it", "error", "defect", "insect", "debug"]
+rows = [
+  "..X......X..",
+  "...X....X...",
+  "....XXXX....",
+  "...XXXXXX...",
+  "X..XXXXXX..X",
+  ".XXXXXXXXXX.",
+  "...XXXXXX...",
+  "X..XXXXXX..X",
+  ".X.XXXXXX.X.",
+  "...XXXXXX...",
+  "X...XXXX...X",
+  ".XXX....XXX.",
+]
+
+[[icons]]
+id = "chip"
+name = "Chip"
+tags = ["it", "cpu", "processor", "hardware"]
+rows = [
+  "..X..X..X...",
+  ".XXXXXXXXXX.",
+  "XX........XX",
+  ".X.XXXXXX.X.",
+  "XX.X....X.XX",
+  ".X.X....X.X.",
+  "XX.X....X.XX",
+  ".X.XXXXXX.X.",
+  "XX........XX",
+  ".XXXXXXXXXX.",
+  "..X..X..X...",
+  "............",
+]
+
+[[icons]]
+id = "usb"
+name = "USB"
+tags = ["it", "stick", "drive", "plug", "memory"]
+rows = [
+  "....XXXX....",
+  "....X..X....",
+  "....X..X....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XX....XX..",
+  "..X......X..",
+  "..X......X..",
+  "..X......X..",
+  "..X......X..",
+  "..X......X..",
+  "..XXXXXXXX..",
+]
+
+[[icons]]
+id = "wifi"
+name = "Wi-Fi"
+tags = ["it", "wireless", "network", "signal"]
+rows = [
+  "............",
+  "...XXXXXX...",
+  ".XX......XX.",
+  "X..........X",
+  "....XXXX....",
+  "..XX....XX..",
+  ".X........X.",
+  ".....XX.....",
+  "....X..X....",
+  "............",
+  ".....XX.....",
+  ".....XX.....",
+]
+
+[[icons]]
+id = "bluetooth"
+name = "Bluetooth"
+tags = ["it", "wireless", "pair", "signal"]
+rows = [
+  ".....X......",
+  ".....XX.....",
+  ".....X.X....",
+  ".X...X..X...",
+  "..X..X.X....",
+  "...X.XX.....",
+  "...X.XX.....",
+  "..X..X.X....",
+  ".X...X..X...",
+  ".....X.X....",
+  ".....XX.....",
+  ".....X......",
+]
+
+[[icons]]
+id = "router"
+name = "Router"
+tags = ["it", "network", "wifi", "modem", "internet"]
+rows = [
+  "......X.....",
+  ".....X.X....",
+  "....X...X...",
+  "......X.....",
+  "......X.....",
+  "......X.....",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X.X.X.X....X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "keyboard"
+name = "Keyboard"
+tags = ["it", "type", "keys", "input"]
+rows = [
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X.X.X.X.X..X",
+  "X..........X",
+  "X.X.X.X.X..X",
+  "X..........X",
+  "X..XXXXXX..X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "mouse-pointer"
+name = "Pointer"
+tags = ["it", "cursor", "arrow", "click", "mouse"]
+rows = [
+  "X...........",
+  "XX..........",
+  "XXX.........",
+  "XXXX........",
+  "XXXXX.......",
+  "XXXXXX......",
+  "XXXXXXX.....",
+  "XXXXXXXX....",
+  "XXXXX.......",
+  "XX.XXX......",
+  "X...XXX.....",
+  ".....XX.....",
+]
+
+[[icons]]
+id = "disk"
+name = "Disk"
+tags = ["it", "save", "floppy", "storage"]
+rows = [
+  "XXXXXXXXXX..",
+  "X........XX.",
+  "X.XXXXXX..X.",
+  "X.X....X..X.",
+  "X.XXXXXX..X.",
+  "X.........X.",
+  "X.........X.",
+  "X..XXXXXX.X.",
+  "X..X....X.X.",
+  "X..X....X.X.",
+  "X..X....X.X.",
+  "XXXXXXXXXXX.",
+]
+
+[[icons]]
+id = "key"
+name = "Key"
+tags = ["it", "password", "access", "unlock", "secret"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "..XXXX......",
+  ".X....X.....",
+  "X......XXXXX",
+  "X......XXXXX",
+  ".X....X..X.X",
+  "..XXXX...X.X",
+  ".........X..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "lock"
+name = "Lock"
+tags = ["it", "locked", "secure", "private", "padlock"]
+rows = [
+  "....XXXX....",
+  "...X....X...",
+  "...X....X...",
+  "...X....X...",
+  "...X....X...",
+  ".XXXXXXXXXX.",
+  ".X........X.",
+  ".X...XX...X.",
+  ".X...XX...X.",
+  ".X....X...X.",
+  ".X........X.",
+  ".XXXXXXXXXX.",
+]
+
+[[icons]]
+id = "unlock"
+name = "Unlock"
+tags = ["it", "open", "unlocked", "padlock"]
+rows = [
+  "......XXXX..",
+  ".....X....X.",
+  ".....X....X.",
+  "..........X.",
+  "..........X.",
+  ".XXXXXXXXXX.",
+  ".X........X.",
+  ".X...XX...X.",
+  ".X...XX...X.",
+  ".X....X...X.",
+  ".X........X.",
+  ".XXXXXXXXXX.",
+]
+
+[[icons]]
+id = "shield"
+name = "Shield"
+tags = ["it", "security", "protect", "safe", "guard"]
+rows = [
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  ".X........X.",
+  ".X........X.",
+  "..X......X..",
+  "...X....X...",
+  "....X..X....",
+  ".....XX.....",
+]
+
+[[icons]]
+id = "globe"
+name = "Globe"
+tags = ["it", "world", "internet", "web", "earth"]
+rows = [
+  "....XXXX....",
+  "..XX.X..XX..",
+  ".X...X....X.",
+  ".X...X....X.",
+  "X....X.....X",
+  "XXXXXXXXXXXX",
+  "X....X.....X",
+  ".X...X....X.",
+  ".X...X....X.",
+  "..XX.X..XX..",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "link"
+name = "Link"
+tags = ["it", "chain", "url", "connect"]
+rows = [
+  "............",
+  "......XXXX..",
+  ".....X....X.",
+  "....X......X",
+  "...X....X..X",
+  "..X....X..X.",
+  ".X..X.X..X..",
+  "X..X....X...",
+  "X......X....",
+  ".X....X.....",
+  "..XXXX......",
+  "............",
+]
+
+[[icons]]
+id = "plug"
+name = "Plug"
+tags = ["it", "power", "socket", "electric"]
+rows = [
+  "..X.....X...",
+  "..X.....X...",
+  "..X.....X...",
+  "XXXXXXXXXXX.",
+  "X.........X.",
+  "X.........X.",
+  ".X.......X..",
+  "..X.....X...",
+  "...XXXXX....",
+  ".....X......",
+  ".....X......",
+  ".....X......",
+]
+
+[[icons]]
+id = "battery"
+name = "Battery"
+tags = ["it", "power", "charge", "energy"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "XXXXXXXXXX..",
+  "X........X..",
+  "X.XXXXX..XXX",
+  "X.XXXXX..X.X",
+  "X.XXXXX..X.X",
+  "X.XXXXX..XXX",
+  "X........X..",
+  "XXXXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "power"
+name = "Power"
+tags = ["it", "on", "off", "switch", "start"]
+rows = [
+  ".....XX.....",
+  ".....XX.....",
+  "..X..XX..X..",
+  ".X...XX...X.",
+  "X....XX....X",
+  "X....XX....X",
+  "X..........X",
+  "X..........X",
+  ".X........X.",
+  ".X........X.",
+  "..XX....XX..",
+  "....XXXX....",
+]
+
+[[icons]]
+id = "git-branch"
+name = "Branch"
+tags = ["it", "git", "version", "fork", "merge"]
+rows = [
+  ".XX.........",
+  "XXXX........",
+  ".XX.........",
+  ".X..........",
+  ".X.......XX.",
+  ".X......XXXX",
+  ".X.......XX.",
+  ".XX.....X...",
+  ".X.XXXXX....",
+  ".XX.........",
+  "XXXX........",
+  ".XX.........",
+]
+
+[[icons]]
+id = "package"
+name = "Package"
+tags = ["it", "box", "module", "release", "parcel"]
+rows = [
+  ".....XX.....",
+  "...XX..XX...",
+  ".XX......XX.",
+  "X....XX....X",
+  "X..XX..XX..X",
+  "XXX......XXX",
+  "X....XX....X",
+  "X....XX....X",
+  "X....XX....X",
+  ".X...XX...X.",
+  "...X.XX.X...",
+  ".....XX.....",
+]
+
+[[icons]]
+id = "robot"
+name = "Robot"
+tags = ["it", "bot", "assistant", "ai", "automation"]
+rows = [
+  ".....XX.....",
+  "....XXXX....",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X.XX....XX.X",
+  "X.XX....XX.X",
+  "X..........X",
+  "X..XXXXXX..X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "...X....X...",
+  "..XXX..XXX..",
+]

@@ -1,0 +1,552 @@
+# Cloudmorrow icons, theme "Health": CC0 1.0, free to use anywhere, no attribution needed.
+
+[[icons]]
+id = "heart-pulse"
+name = "Heartbeat"
+tags = ["heart", "pulse", "cardio"]
+rows = [
+  "............",
+  "..XXX..XXX..",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXX.XXXXX",
+  "X....X.X...X",
+  ".XXXXX.XXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "stethoscope"
+name = "Stethoscope"
+tags = ["doctor", "listen", "exam"]
+rows = [
+  ".X.....X....",
+  ".X.....X....",
+  ".X.....X....",
+  ".X.....X....",
+  "..X...X.....",
+  "...XXX......",
+  "....X.......",
+  "....X.......",
+  "....XXXX....",
+  ".......XXX..",
+  "......XXXX..",
+  ".......XX...",
+]
+
+[[icons]]
+id = "syringe"
+name = "Syringe"
+tags = ["injection", "vaccine", "needle"]
+rows = [
+  "...XXXXXX...",
+  ".....XX.....",
+  "...XXXXXX...",
+  "...X.XX.X...",
+  "...X....X...",
+  "...X....X...",
+  "...X....X...",
+  "...XXXXXX...",
+  ".....XX.....",
+  ".....XX.....",
+  "......X.....",
+  "............",
+]
+
+[[icons]]
+id = "pill"
+name = "Pill"
+tags = ["tablet", "medicine", "dose"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XX....XX..",
+  ".X........X.",
+  ".X........X.",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  ".X........X.",
+  ".X........X.",
+  "..XX....XX..",
+  "....XXXX....",
+]
+
+[[icons]]
+id = "capsule"
+name = "Capsule"
+tags = ["medicine", "pill", "dose"]
+rows = [
+  "............",
+  ".......XXX..",
+  "......XXXXX.",
+  ".....XXXXXX.",
+  "....XXXXXXX.",
+  "...X.XXXXX..",
+  "..X....XXX..",
+  ".X......X...",
+  ".X.....X....",
+  "..X...X.....",
+  "...XXX......",
+  "............",
+]
+
+[[icons]]
+id = "bandage"
+name = "Bandage"
+tags = ["wound", "roll", "wrap"]
+rows = [
+  "............",
+  "............",
+  "....XXXX....",
+  "...X....X...",
+  "...X.XX.X...",
+  "...X.XX.X...",
+  "...X....X...",
+  "....XXXX.XXX",
+  ".........X..",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "first-aid"
+name = "First aid kit"
+tags = ["emergency", "kit", "cross"]
+rows = [
+  "............",
+  "....XXXX....",
+  "....X..X....",
+  ".XXXXXXXXXX.",
+  ".X........X.",
+  ".X...XX...X.",
+  ".X..XXXX..X.",
+  ".X..XXXX..X.",
+  ".X...XX...X.",
+  ".X........X.",
+  ".XXXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "thermometer-medical"
+name = "Thermometer"
+tags = ["fever", "temperature", "medical"]
+rows = [
+  ".....XX.....",
+  "....X..X....",
+  "....X..X....",
+  "....X..X....",
+  "....XXXX....",
+  "....XXXX....",
+  "....XXXX....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+]
+
+[[icons]]
+id = "tooth"
+name = "Tooth"
+tags = ["dentist", "teeth", "dental"]
+rows = [
+  "............",
+  "..XXX..XXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "..XXX..XXX..",
+  "..XXX..XXX..",
+  "...X....X...",
+  "............",
+]
+
+[[icons]]
+id = "bone"
+name = "Bone"
+tags = ["skeleton", "dog", "orthopaedic"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "XX........XX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XX........XX",
+  "............",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "brain"
+name = "Brain"
+tags = ["mind", "neurology", "think"]
+rows = [
+  "............",
+  "...XXXXXX...",
+  "..XX.XX.XX..",
+  ".XX..XX..XX.",
+  ".XXX.XX.XXX.",
+  ".X.X.XX.X.X.",
+  ".XXX.XX.XXX.",
+  "..XX.XX.XX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "lungs"
+name = "Lungs"
+tags = ["breath", "respiratory", "chest"]
+rows = [
+  ".....XX.....",
+  ".....XX.....",
+  "..X..XX..X..",
+  ".XXX.XX.XXX.",
+  ".XXX.XX.XXX.",
+  "XXXX.XX.XXXX",
+  "XXXX....XXXX",
+  "XXXX....XXXX",
+  "XXXX....XXXX",
+  ".XXX....XXX.",
+  "..XX....XX..",
+  "............",
+]
+
+[[icons]]
+id = "eye-test"
+name = "Eye"
+tags = ["sight", "optician", "vision"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "....XXXX....",
+  "..XX....XX..",
+  ".X...XX...X.",
+  "X...XXXX...X",
+  ".X...XX...X.",
+  "..XX....XX..",
+  "....XXXX....",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "glasses"
+name = "Glasses"
+tags = ["spectacles", "sight", "optician"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "............",
+  "..XX....XX..",
+  ".X..X..X..X.",
+  "X...XXXX...X",
+  ".X..X..X..X.",
+  "..XX....XX..",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "hearing"
+name = "Hearing"
+tags = ["ear", "audiology", "sound"]
+rows = [
+  "............",
+  "...XXXX.....",
+  "..X....X....",
+  ".X......X...",
+  ".X..XX..X...",
+  ".X.X..X.X...",
+  ".X.X....X...",
+  "..X.....X...",
+  "...XX...X...",
+  ".....XXXX...",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "ambulance"
+name = "Ambulance"
+tags = ["emergency", "van", "hospital"]
+rows = [
+  "............",
+  "............",
+  "..XXXXXXX...",
+  "..X.....XX..",
+  "..X..X..X.X.",
+  "..X.XXX.X.XX",
+  "..X..X..X..X",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "..XX....XX..",
+  "............",
+]
+
+[[icons]]
+id = "hospital"
+name = "Hospital"
+tags = ["building", "clinic", "care"]
+rows = [
+  ".....XX.....",
+  "....XXXX....",
+  ".....XX.....",
+  ".XXXXXXXXXX.",
+  ".X........X.",
+  ".X.X.XX.X.X.",
+  ".X........X.",
+  ".X.X.XX.X.X.",
+  ".X........X.",
+  ".X...XX...X.",
+  ".XXXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "cross-medical"
+name = "Medical cross"
+tags = ["health", "aid", "plus"]
+rows = [
+  "............",
+  "....XXXX....",
+  "....XXXX....",
+  "....XXXX....",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "....XXXX....",
+  "....XXXX....",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "dna"
+name = "DNA"
+tags = ["genetics", "helix", "biology"]
+rows = [
+  "..X......X..",
+  "...XXXXXX...",
+  "....X..X....",
+  ".....XX.....",
+  "....X..X....",
+  "...XXXXXX...",
+  "..X......X..",
+  "..X......X..",
+  "...XXXXXX...",
+  "....X..X....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "microscope"
+name = "Microscope"
+tags = ["lab", "science", "research"]
+rows = [
+  "......XX....",
+  ".....XX.....",
+  "....XXXX....",
+  "....XXXX....",
+  "...XXXX.....",
+  "...XXX......",
+  "..XXXXXXX...",
+  "..X.....X...",
+  "........X...",
+  "........X...",
+  ".XXXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "mask"
+name = "Face mask"
+tags = ["protection", "virus", "surgical"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "...XXXXXX...",
+  "X.XX....XX.X",
+  ".XX......XX.",
+  ".XX......XX.",
+  "X.XX....XX.X",
+  "...XXXXXX...",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "soap"
+name = "Soap"
+tags = ["wash", "hygiene", "bubbles"]
+rows = [
+  "............",
+  "........X...",
+  "......X..XX.",
+  "..........X.",
+  ".XXXXXXXX...",
+  "X........X..",
+  "X..XXXX..X..",
+  "X........X..",
+  ".XXXXXXXX...",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "sanitizer"
+name = "Hand sanitizer"
+tags = ["hygiene", "pump", "clean"]
+rows = [
+  ".....XXX....",
+  ".....X......",
+  "....XXXX....",
+  ".....XX.....",
+  "...XXXXXX...",
+  "..X......X..",
+  "..X......X..",
+  "..X..XX..X..",
+  "..X.XXXX.X..",
+  "..X..XX..X..",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "pill-bottle"
+name = "Pill bottle"
+tags = ["medicine", "prescription", "pharmacy"]
+rows = [
+  "....XXXX....",
+  "....XXXX....",
+  "...X....X...",
+  "..X......X..",
+  "..X......X..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..X......X..",
+  "..X......X..",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "sleep"
+name = "Sleep"
+tags = ["rest", "night", "zzz"]
+rows = [
+  "............",
+  ".XXXXX......",
+  ".....X......",
+  "....X.......",
+  "...X........",
+  "..X.........",
+  ".XXXXX......",
+  "........XXX.",
+  "..........X.",
+  ".........X..",
+  "........XXX.",
+  "............",
+]
+
+[[icons]]
+id = "meditation"
+name = "Meditation"
+tags = ["calm", "yoga", "mindfulness"]
+rows = [
+  ".....XX.....",
+  "....XXXX....",
+  "....XXXX....",
+  ".....XX.....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..X.XXXX.X..",
+  ".X..XXXX..X.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XX..XX...",
+  "............",
+]
+
+[[icons]]
+id = "scale-weight"
+name = "Bathroom scale"
+tags = ["weight", "weigh", "fitness"]
+rows = [
+  "............",
+  "............",
+  ".XXXXXXXXXX.",
+  ".X...XX...X.",
+  ".X..X..X..X.",
+  ".X..XXXX..X.",
+  ".X........X.",
+  ".X........X.",
+  ".XXXXXXXXXX.",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "crutch"
+name = "Crutch"
+tags = ["injury", "walk", "support"]
+rows = [
+  "....XXXX....",
+  "....X..X....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  "....X..X....",
+  "....X..X....",
+  "....X..X....",
+  "....X..X....",
+  "....X..X....",
+  "............",
+]
+
+[[icons]]
+id = "plaster"
+name = "Plaster"
+tags = ["bandaid", "wound", "strip"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "............",
+  ".XXXXXXXXXX.",
+  "XX.XXXXXX.XX",
+  "XX.X.XX.X.XX",
+  "XX.XXXXXX.XX",
+  ".XXXXXXXXXX.",
+  "............",
+  "............",
+  "............",
+]

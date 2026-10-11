@@ -324,8 +324,9 @@ const PIXELS = {
     "........",
   ],
 };
-/** Eight-by-eight rows of `X` and `.`, drawn as the tab icons are. A
-    feature with a glyph of its own — the weather — hands its rows here. */
+/** Square rows of `X` and `.` — eight by eight for the app's own, twelve
+    by twelve in the library — drawn as the tab icons are. A feature with a
+    glyph of its own — the weather — hands its rows here. */
 export function pixelArt(rows, className = "pixel-icon") {
   let dots = "";
   rows.forEach((row, y) => {
@@ -333,12 +334,31 @@ export function pixelArt(rows, className = "pixel-icon") {
       if (cell === "X") dots += `<rect x="${x + 0.08}" y="${y + 0.08}" width="0.84" height="0.84" rx="0.16"/>`;
     });
   });
-  return `<svg class="${className}" viewBox="0 0 8 8" fill="currentColor" aria-hidden="true">${dots}</svg>`;
+  const n = rows.length;
+  return `<svg class="${className}" viewBox="0 0 ${n} ${n}" fill="currentColor" aria-hidden="true">${dots}</svg>`;
+}
+
+// The icon library (cloudmorrow.icons, served at /icons.json): hundreds of
+// marks a Quill may name, read once and kept. Until it is read, or if it
+// cannot be, a name not in PIXELS draws nothing and the caller's glyph stands.
+const library = new Map();
+let libraryLoading = null;
+export function loadIcons() {
+  libraryLoading = libraryLoading || (async () => {
+    try {
+      const response = await fetch("/icons.json");
+      if (!response.ok) return;
+      const data = await response.json();
+      for (const [name, icon] of Object.entries(data.icons || {})) library.set(name, icon.rows);
+    } catch { /* offline, or an older server: the app's own icons still draw */ }
+  })();
+  return libraryLoading;
 }
 /** The named icon, or nothing when there is no such name — a Quill names
     its own, and one this app has not drawn yet falls back to the caller's. */
 export function pixelIcon(name) {
-  return PIXELS[name] ? pixelArt(PIXELS[name]) : "";
+  const rows = PIXELS[name] || library.get(name);
+  return rows ? pixelArt(rows) : "";
 }
 
 // The icons more than one feature uses. A feature keeps its own beside it.

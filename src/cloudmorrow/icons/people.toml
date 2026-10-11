@@ -1,0 +1,571 @@
+# Cloudmorrow icons, theme "People": CC0 1.0, free to use anywhere, no attribution needed.
+
+[[icons]]
+id = "person"
+name = "Person"
+tags = ["user", "account", "profile"]
+rows = [
+  "............",
+  ".....XX.....",
+  "....XXXX....",
+  "....XXXX....",
+  ".....XX.....",
+  "............",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "people"
+name = "People"
+tags = ["users", "two", "pair"]
+rows = [
+  "............",
+  "..XX....XX..",
+  ".XXXX..XXXX.",
+  ".XXXX..XXXX.",
+  "..XX....XX..",
+  "............",
+  ".XXXXX.XXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "group"
+name = "Group"
+tags = ["team", "crowd", "members"]
+rows = [
+  "............",
+  ".....XX.....",
+  "....XXXX....",
+  ".XX.XXXX.XX.",
+  "XXXX.XX.XXXX",
+  "XXXX....XXXX",
+  ".XX......XX.",
+  "...XXXXXX...",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "baby"
+name = "Baby"
+tags = ["infant", "newborn", "child"]
+rows = [
+  ".....X......",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XX.XX.XX..",
+  "..XXXXXXXX..",
+  "..XX....XX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "child"
+name = "Child"
+tags = ["kid", "young", "small"]
+rows = [
+  "............",
+  "............",
+  ".....XX.....",
+  "....XXXX....",
+  "....XXXX....",
+  ".....XX.....",
+  "............",
+  "....XXXX....",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "family"
+name = "Family"
+tags = ["parent", "child", "household"]
+rows = [
+  "............",
+  "..XX........",
+  ".XXXX.......",
+  ".XXXX...XX..",
+  "..XX...XXXX.",
+  "........XX..",
+  "XXXXXX......",
+  "XXXXXX.XXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "couple"
+name = "Couple"
+tags = ["pair", "love", "partners"]
+rows = [
+  "............",
+  "XXX......XXX",
+  "XXX......XXX",
+  ".X.XX.XX..X.",
+  "...XXXXXX...",
+  "....XXXX....",
+  ".....XX.....",
+  "XXXXX..XXXXX",
+  "XXXXXX.XXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "handshake"
+name = "Handshake"
+tags = ["deal", "agreement", "greeting"]
+rows = [
+  "............",
+  "............",
+  "XXX......XXX",
+  "XXXX.XX.XXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  ".XX.XX.XX.X.",
+  "..XXXXXXXX..",
+  "...XX..XX...",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "wave-hand"
+name = "Waving hand"
+tags = ["hello", "greeting", "hand"]
+rows = [
+  "......X.X...",
+  "....X.X.X.X.",
+  "....X.X.X.X.",
+  "X...XXXXXXX.",
+  ".X..XXXXXXX.",
+  "X.X.XXXXXXX.",
+  ".X..XXXXXXX.",
+  "X....XXXXX..",
+  ".....XXXXX..",
+  "......XXX...",
+  "......XXX...",
+  "............",
+]
+
+[[icons]]
+id = "thumbs-up"
+name = "Thumbs up"
+tags = ["like", "approve", "good"]
+rows = [
+  ".....XX.....",
+  "....XXX.....",
+  "....XXX.....",
+  "....XXX.....",
+  "XX.XXXXXXXX.",
+  "XX.XXXXXXXX.",
+  "XX.XXXXXXXX.",
+  "XX.XXXXXXX..",
+  "XX.XXXXXXX..",
+  "XX.XXXXXX...",
+  "XX..XXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "speech"
+name = "Speech"
+tags = ["bubble", "talk", "comment"]
+rows = [
+  "............",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XX.XX.XX.XXX",
+  "XX.XX.XX.XXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "...XXX......",
+  "..XX........",
+  ".X..........",
+  "............",
+]
+
+[[icons]]
+id = "face-smile"
+name = "Smiling face"
+tags = ["happy", "emoji", "mood"]
+rows = [
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "XXX.XXXX.XXX",
+  "XXX.XXXX.XXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XX.XXXXXX.XX",
+  "XXX......XXX",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+]
+
+[[icons]]
+id = "face-sad"
+name = "Sad face"
+tags = ["unhappy", "emoji", "mood"]
+rows = [
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "XXX.XXXX.XXX",
+  "XXX.XXXX.XXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXX......XXX",
+  "XX.XXXXXX.XX",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+]
+
+[[icons]]
+id = "face-neutral"
+name = "Neutral face"
+tags = ["meh", "emoji", "mood"]
+rows = [
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "XXX.XXXX.XXX",
+  "XXX.XXXX.XXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXX......XXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+]
+
+[[icons]]
+id = "eye"
+name = "Eye"
+tags = ["see", "watch", "view"]
+rows = [
+  "............",
+  "............",
+  "....XXXX....",
+  "..XX....XX..",
+  ".X..XXXX..X.",
+  "X..XX..XX..X",
+  "X..XX..XX..X",
+  ".X..XXXX..X.",
+  "..XX....XX..",
+  "....XXXX....",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "ear"
+name = "Ear"
+tags = ["hear", "listen", "sound"]
+rows = [
+  "............",
+  "....XXXXX...",
+  "...X.....X..",
+  "..X.......X.",
+  "..X..XXX..X.",
+  "..X.X...X.X.",
+  "..X.X...X.X.",
+  "...X.XXX..X.",
+  "....X....XX.",
+  "....X...XX..",
+  "....XXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "hand"
+name = "Hand"
+tags = ["palm", "stop", "touch"]
+rows = [
+  ".....X.X....",
+  "...X.X.X.X..",
+  "...X.X.X.X..",
+  "...XXXXXXX..",
+  ".X.XXXXXXX..",
+  "..XXXXXXXX..",
+  "...XXXXXXX..",
+  "....XXXXX...",
+  "....XXXXX...",
+  ".....XXX....",
+  ".....XXX....",
+  "............",
+]
+
+[[icons]]
+id = "footprint"
+name = "Footprint"
+tags = ["foot", "step", "walk"]
+rows = [
+  ".....XX.X...",
+  "...XXXXX.X..",
+  "..XXXXXX....",
+  "..XXXXXXX...",
+  "..XXXXXXX...",
+  "...XXXXX....",
+  "...XXXX.....",
+  "...XXXX.....",
+  "...XXXX.....",
+  "...XXXXX....",
+  "....XXX.....",
+  "............",
+]
+
+[[icons]]
+id = "heart"
+name = "Heart"
+tags = ["love", "like", "favourite"]
+rows = [
+  "............",
+  "..XXX..XXX..",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "crown"
+name = "Crown"
+tags = ["king", "queen", "royal", "premium"]
+rows = [
+  "............",
+  "............",
+  "X....XX....X",
+  "XX...XX...XX",
+  "XXX.XXXX.XXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "graduate"
+name = "Graduate"
+tags = ["student", "school", "degree"]
+rows = [
+  ".....XX.....",
+  "..XXXXXXXX..",
+  "XXXXXXXXXXXX",
+  "..XXXXXXXXX.",
+  "....XXXX..X.",
+  "....XXXX..X.",
+  ".....XX...X.",
+  "............",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "doctor"
+name = "Doctor"
+tags = ["medical", "nurse", "health"]
+rows = [
+  "............",
+  ".....XX.....",
+  "....XXXX....",
+  "....XXXX....",
+  ".....XX.....",
+  "............",
+  "...XXXXXX...",
+  "..XXX..XXX..",
+  "..XX....XX..",
+  "..XXX..XXX..",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "worker"
+name = "Worker"
+tags = ["builder", "helmet", "construction"]
+rows = [
+  ".....XX.....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "....XXXX....",
+  "....XXXX....",
+  ".....XX.....",
+  "............",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "chef"
+name = "Chef"
+tags = ["cook", "kitchen", "hat"]
+rows = [
+  "...XX..XX...",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "....XXXX....",
+  "....XXXX....",
+  ".....XX.....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "artist"
+name = "Artist"
+tags = ["painter", "beret", "creative"]
+rows = [
+  "............",
+  "...XXXXXX...",
+  "..XXXXXXXXX.",
+  "....XXXX....",
+  "....XXXX....",
+  ".....XX.....",
+  "............",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "scientist"
+name = "Scientist"
+tags = ["researcher", "lab", "glasses"]
+rows = [
+  "............",
+  ".....XX.....",
+  "..XXXXXXXX..",
+  "..X.X..X.X..",
+  "..XXXXXXXX..",
+  ".....XX.....",
+  "............",
+  "...XXX.XXX..",
+  "..XXX...XXX.",
+  "..XX.....XX.",
+  "..XXX...XXX.",
+  "............",
+]
+
+[[icons]]
+id = "runner"
+name = "Runner"
+tags = ["run", "sport", "jogging"]
+rows = [
+  "............",
+  "........XX..",
+  "........XX..",
+  "....XXXXX...",
+  "...X.XXX....",
+  "......XXX.X.",
+  ".....XXXXX..",
+  "....XX.XX...",
+  "...XX...XX..",
+  "..XX.....X..",
+  ".X..........",
+  "............",
+]
+
+[[icons]]
+id = "walker"
+name = "Walker"
+tags = ["walk", "pedestrian", "stroll"]
+rows = [
+  "............",
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  "...X.XX.X...",
+  "...X.XX.X...",
+  ".....XX.....",
+  "....XXXX....",
+  "....X..X....",
+  "...XX..XX...",
+  "...X....X...",
+  "............",
+]
+
+[[icons]]
+id = "wheelchair"
+name = "Wheelchair"
+tags = ["accessible", "disability", "mobility"]
+rows = [
+  ".....XX.....",
+  ".....XX.....",
+  ".....XXXX...",
+  ".....X..X...",
+  "..XXXXX.X...",
+  ".X...XXXXX..",
+  "X.....X.....",
+  "X.....X.XX..",
+  "X.....X.X...",
+  ".X...X......",
+  "..XXX.......",
+  "............",
+]
+
+[[icons]]
+id = "user-plus"
+name = "Add person"
+tags = ["invite", "new", "add"]
+rows = [
+  "............",
+  "..XX........",
+  ".XXXX...XX..",
+  ".XXXX...XX..",
+  "..XX..XXXXXX",
+  "......XXXXXX",
+  "XXXXXX..XX..",
+  "XXXXXX..XX..",
+  "XXXXXX......",
+  "XXXXXX......",
+  "XXXXXX......",
+  "............",
+]
