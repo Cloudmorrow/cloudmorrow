@@ -1,0 +1,20 @@
+# The themes of the icon library, in the order they are shown. Each file is
+# one theme. Every icon is CC0: public domain, free to use anywhere.
+
+[[themes]]
+id = "animals"
+name = "Animals"
+description = "Pets, the farm, the wild, and the small things in the garden."
+file = "animals.toml"
+
+[[themes]]
+id = "office"
+name = "Office"
+description = "Paper, desks and the things on them."
+file = "office.toml"
+
+[[themes]]
+id = "it"
+name = "IT"
+description = "Machines, networks, code and what keeps them safe."
+file = "it.toml"

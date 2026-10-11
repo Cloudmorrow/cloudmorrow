@@ -1,0 +1,572 @@
+# Office: paper, desks and the things on them.
+# Every icon here is CC0: public domain, free to use anywhere, in anything, no attribution owed.
+
+[[icons]]
+id = "document"
+name = "Document"
+tags = ["office", "paper", "page", "file", "text"]
+rows = [
+  "..XXXXXX....",
+  "..X....XX...",
+  "..X....X.X..",
+  "..X....XXXX.",
+  "..X.......X.",
+  "..X.XXXXX.X.",
+  "..X.......X.",
+  "..X.XXXXX.X.",
+  "..X.......X.",
+  "..X.XXX...X.",
+  "..X.......X.",
+  "..XXXXXXXXX.",
+]
+
+[[icons]]
+id = "folder"
+name = "Folder"
+tags = ["office", "files", "directory"]
+rows = [
+  "............",
+  "............",
+  ".XXXX.......",
+  "X....X......",
+  "XXXXXXXXXXX.",
+  "X.........X.",
+  "X.........X.",
+  "X.........X.",
+  "X.........X.",
+  "X.........X.",
+  "XXXXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "envelope"
+name = "Envelope"
+tags = ["office", "mail", "letter", "email", "post"]
+rows = [
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "XX........XX",
+  "X.X......X.X",
+  "X..X....X..X",
+  "X.X.XXXX.X.X",
+  "XX........XX",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "paperclip"
+name = "Paperclip"
+tags = ["office", "attach", "clip"]
+rows = [
+  "....XXXX....",
+  "...X....X...",
+  "...X....X...",
+  ".X.X....X...",
+  ".X.X....X...",
+  ".X.X.XX.X...",
+  ".X.X.XX.X...",
+  ".X.X.XX.X...",
+  ".X.X.XX.X...",
+  ".X.XXX..X...",
+  ".X......X...",
+  "..XXXXXX....",
+]
+
+[[icons]]
+id = "stapler"
+name = "Stapler"
+tags = ["office", "staple", "desk"]
+rows = [
+  "............",
+  "............",
+  "............",
+  ".XXXXXXXX...",
+  ".X......XXX.",
+  ".XXXXXXXXXX.",
+  "........XXX.",
+  "..XXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "pen"
+name = "Pen"
+tags = ["office", "write", "ink", "sign"]
+rows = [
+  ".........XX.",
+  "........XXXX",
+  ".......XXXXX",
+  "......XXXXX.",
+  ".....XXXXX..",
+  "....XXXXX...",
+  "...XXXXX....",
+  "..XXXXX.....",
+  ".XXXXX......",
+  ".XXXX.......",
+  "XXX.........",
+  "XX..........",
+]
+
+[[icons]]
+id = "pencil"
+name = "Pencil"
+tags = ["office", "write", "draw", "sketch", "edit"]
+rows = [
+  ".........XX.",
+  "........XXXX",
+  ".......X..XX",
+  "......X..XX.",
+  ".....X..XX..",
+  "....X..XX...",
+  "...X..XX....",
+  "..X..XX.....",
+  ".X...X......",
+  ".X..X.......",
+  ".XXX........",
+  "X...........",
+]
+
+[[icons]]
+id = "printer"
+name = "Printer"
+tags = ["office", "print", "paper"]
+rows = [
+  "...XXXXXX...",
+  "...X....X...",
+  "...X....X...",
+  ".XXXXXXXXXX.",
+  "X..........X",
+  "X.XXXXXXXX.X",
+  "X.X......X.X",
+  "XXX......XXX",
+  "..X......X..",
+  "..X......X..",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "calendar"
+name = "Calendar"
+tags = ["office", "date", "month", "schedule"]
+rows = [
+  "..X......X..",
+  "..X......X..",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "X.XX.XX.XX.X",
+  "X..........X",
+  "X.XX.XX.XX.X",
+  "X..........X",
+  "X.XX.XX....X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+]
+
+[[icons]]
+id = "clock"
+name = "Clock"
+tags = ["office", "time", "hour", "watch"]
+rows = [
+  "....XXXX....",
+  "..XX....XX..",
+  ".X........X.",
+  ".X....X...X.",
+  "X.....X....X",
+  "X.....X....X",
+  "X.....XXX..X",
+  "X..........X",
+  ".X........X.",
+  ".X........X.",
+  "..XX....XX..",
+  "....XXXX....",
+]
+
+[[icons]]
+id = "chart-bar"
+name = "Bar chart"
+tags = ["office", "chart", "graph", "report", "statistics"]
+rows = [
+  "X...........",
+  "X...........",
+  "X.......XX..",
+  "X.......XX..",
+  "X...XX..XX..",
+  "X...XX..XX..",
+  "X...XX..XX..",
+  "XXX.XX..XX..",
+  "XXX.XX..XX..",
+  "XXX.XX..XX..",
+  "X...........",
+  "XXXXXXXXXXXX",
+]
+
+[[icons]]
+id = "chart-line"
+name = "Line chart"
+tags = ["office", "chart", "graph", "trend", "report"]
+rows = [
+  "X...........",
+  "X...........",
+  "X.........X.",
+  "X........X.X",
+  "X.......X...",
+  "X...X..X....",
+  "X..X.X.X....",
+  "X.X...X.....",
+  "XX..........",
+  "X...........",
+  "X...........",
+  "XXXXXXXXXXXX",
+]
+
+[[icons]]
+id = "pie"
+name = "Pie chart"
+tags = ["office", "chart", "share", "report"]
+rows = [
+  "....XXXX....",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXX.....",
+  "XXXXXXX.....",
+  "XXXXXXX.....",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "....XXXX....",
+]
+
+[[icons]]
+id = "briefcase"
+name = "Briefcase"
+tags = ["office", "work", "business", "bag"]
+rows = [
+  "............",
+  "...XXXXXX...",
+  "...X....X...",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X..........X",
+  "X....XX....X",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "badge"
+name = "Badge"
+tags = ["office", "id", "name", "card", "pass"]
+rows = [
+  ".....XX.....",
+  ".....XX.....",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X.XX.......X",
+  "X.XX..XXXX.X",
+  "X.XX.......X",
+  "X.....XXXX.X",
+  "X..........X",
+  "X..XXXXXX..X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+]
+
+[[icons]]
+id = "clipboard"
+name = "Clipboard"
+tags = ["office", "checklist", "form", "tasks"]
+rows = [
+  "....XXXX....",
+  ".XXXX..XXXX.",
+  ".X........X.",
+  ".X........X.",
+  ".X.XXXXXX.X.",
+  ".X........X.",
+  ".X.XXXXXX.X.",
+  ".X........X.",
+  ".X.XXXX...X.",
+  ".X........X.",
+  ".X........X.",
+  ".XXXXXXXXXX.",
+]
+
+[[icons]]
+id = "note"
+name = "Note"
+tags = ["office", "notepad", "memo", "write"]
+rows = [
+  ".X..X..X..X.",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X.XXXXXXXX.X",
+  "X..........X",
+  "X.XXXXXXXX.X",
+  "X..........X",
+  "X.XXXXXXXX.X",
+  "X..........X",
+  "X.XXXX.....X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+]
+
+[[icons]]
+id = "sticky"
+name = "Sticky note"
+tags = ["office", "post-it", "reminder", "memo"]
+rows = [
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  "X.......X..X",
+  "X.......XX.X",
+  "X.......XXXX",
+  "XXXXXXXXX...",
+]
+
+[[icons]]
+id = "stamp"
+name = "Stamp"
+tags = ["office", "approve", "seal", "rubber"]
+rows = [
+  "....XXXX....",
+  "....X..X....",
+  "....X..X....",
+  "....XXXX....",
+  "..XXXXXXXX..",
+  ".X........X.",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  "............",
+  ".XXXXXXXXXX.",
+  ".X.XX.XX.XX.",
+]
+
+[[icons]]
+id = "scissors"
+name = "Scissors"
+tags = ["office", "cut", "craft"]
+rows = [
+  "X..........X",
+  ".X........X.",
+  "..X......X..",
+  "...X....X...",
+  "....X..X....",
+  ".....XX.....",
+  ".....XX.....",
+  "....X..X....",
+  ".XX.X..X.XX.",
+  "X..X....X..X",
+  "X..X....X..X",
+  ".XX......XX.",
+]
+
+[[icons]]
+id = "phone"
+name = "Phone"
+tags = ["office", "call", "telephone", "handset"]
+rows = [
+  ".XXX........",
+  "XXXXX.......",
+  "XXXXX.......",
+  "XXXX........",
+  ".XXX........",
+  ".XXXX.......",
+  "..XXXX......",
+  "...XXXXX....",
+  "....XXXXXXX.",
+  ".....XXXXXXX",
+  ".......XXXXX",
+  "........XXX.",
+]
+
+[[icons]]
+id = "desk-lamp"
+name = "Desk lamp"
+tags = ["office", "light", "desk", "lamp"]
+rows = [
+  "..XXXXXX....",
+  ".X......X...",
+  "X........X..",
+  "XXXXXXXXXX..",
+  ".....X......",
+  "......X.....",
+  ".......X....",
+  "........X...",
+  "........X...",
+  "........X...",
+  ".....XXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "coffee"
+name = "Coffee"
+tags = ["office", "cup", "mug", "tea", "break"]
+rows = [
+  "...X..X.....",
+  "..X..X......",
+  "...X..X.....",
+  "............",
+  "XXXXXXXXX...",
+  "X.......XXX.",
+  "X.......X.X.",
+  "X.......X.X.",
+  "X.......XXX.",
+  ".X.....X....",
+  "..XXXXX.....",
+  ".XXXXXXXXX..",
+]
+
+[[icons]]
+id = "chair"
+name = "Chair"
+tags = ["office", "desk", "seat", "furniture"]
+rows = [
+  "..XXXXXXX...",
+  "..X.....X...",
+  "..X.....X...",
+  "..X.....X...",
+  "..XXXXXXX...",
+  ".XXXXXXXXX..",
+  ".XXXXXXXXX..",
+  ".....X......",
+  ".....X......",
+  "..XXXXXXX...",
+  ".X...X...X..",
+  "X....X....X.",
+]
+
+[[icons]]
+id = "trash"
+name = "Trash"
+tags = ["office", "bin", "delete", "waste", "rubbish"]
+rows = [
+  "....XXXX....",
+  ".XXXXXXXXXX.",
+  "............",
+  "..XXXXXXXX..",
+  "..X.X..X.X..",
+  "..X.X..X.X..",
+  "..X.X..X.X..",
+  "..X.X..X.X..",
+  "..X.X..X.X..",
+  "..X.X..X.X..",
+  "..X......X..",
+  "...XXXXXX...",
+]
+
+[[icons]]
+id = "archive"
+name = "Archive"
+tags = ["office", "box", "store", "old"]
+rows = [
+  "............",
+  "XXXXXXXXXXXX",
+  "X..........X",
+  "XXXXXXXXXXXX",
+  ".X........X.",
+  ".X........X.",
+  ".X..XXXX..X.",
+  ".X........X.",
+  ".X........X.",
+  ".X........X.",
+  ".XXXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "calculator"
+name = "Calculator"
+tags = ["office", "numbers", "maths", "sum", "count"]
+rows = [
+  ".XXXXXXXXX..",
+  ".X.......X..",
+  ".X.XXXXX.X..",
+  ".X.......X..",
+  ".X.X.X.X.X..",
+  ".X.......X..",
+  ".X.X.X.X.X..",
+  ".X.......X..",
+  ".X.X.X.X.X..",
+  ".X.......X..",
+  ".XXXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "inbox"
+name = "Inbox"
+tags = ["office", "tray", "incoming", "mail", "received"]
+rows = [
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "..X..XX..X..",
+  "...X.XX.X...",
+  "....XXXX....",
+  ".....XX.....",
+  "XX........XX",
+  "X.XX....XX.X",
+  "X..XXXXXX..X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+]
+
+[[icons]]
+id = "outbox"
+name = "Outbox"
+tags = ["office", "tray", "outgoing", "mail", "sent"]
+rows = [
+  ".....XX.....",
+  "....XXXX....",
+  "...X.XX.X...",
+  "..X..XX..X..",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "XX........XX",
+  "X.XX....XX.X",
+  "X..XXXXXX..X",
+  "X..........X",
+  "XXXXXXXXXXXX",
+]
+
+[[icons]]
+id = "pin"
+name = "Pin"
+tags = ["office", "push pin", "board", "fix", "mark"]
+rows = [
+  "....XXXX....",
+  "....X..X....",
+  "....X..X....",
+  "....X..X....",
+  "...XX..XX...",
+  "..X......X..",
+  "..XXXXXXXX..",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  ".....X......",
+  "............",
+]

@@ -98,7 +98,7 @@ name = "Tasks"
 version = "1.0.0"
 summary = "Boards with three lanes: To Do, Doing, Done."
 category = "personal"
-icon = "tasks"                            # a kit icon name
+icon = "tasks"                            # one of the icon library's, or the app's own
 publisher = "Cloudmorrow"
 license = "AGPL-3.0-or-later"
 features = [                              # what it does, for the catalog and the install sheet
@@ -135,6 +135,17 @@ model = "board"
 seed = "per-owner"                        # once for each person who has none
 records = [{ title = "{owner}'s tasks" }]
 ```
+
+The tab's icon is a pixel mark from the icon library
+(`src/cloudmorrow/icons/`, listed by theme at
+[cloudmorrow.com/resources/icons](https://cloudmorrow.com/resources/icons)):
+`icon = "hedgehog"` names one, and every surface draws it from the same
+rows. The app's own nine (`notes`, `tasks`, `files`, `secrets`, `settings`,
+`chat`, `calendar`, `me`, `today`) and the CRM's `funnel` may be named too.
+A name the library does not have shows the quill mark, and `cm quill check`
+says so. The library is CC0 — public domain, free to use anywhere — and the
+web app reads all of it once from `GET /icons.json`; the package README says
+how to add one.
 
 ### The data
 

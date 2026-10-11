@@ -135,6 +135,16 @@ def _asset(filename: str) -> FileResponse:
     )
 
 
+@router.get("/icons.json", include_in_schema=False)
+def icon_library() -> JSONResponse:
+    """The pixel icon library (cloudmorrow.icons): every theme and icon, for the
+    app's tabs and for anybody. Public domain, so no sign-in; an hour of caching,
+    since it changes with a deploy and not more often."""
+    from cloudmorrow.icons import as_json
+
+    return JSONResponse(as_json(), headers={"Cache-Control": "public, max-age=3600"})
+
+
 @router.get("/app/{version}/{filename}", include_in_schema=False)
 def app_versioned_asset(version: str, filename: str) -> FileResponse:
     """The script and stylesheet, and everything they import."""
