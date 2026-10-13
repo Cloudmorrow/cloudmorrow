@@ -4,6 +4,18 @@ The long-form reference: every feature, every command, every config key,
 and the reasoning behind them. If you just want to get a server running,
 start with the [README](../README.md); this is the page to come back to.
 
+Cloudmorrow is one thing on three surfaces — the **web app** (on a phone,
+in a browser, and in the desktop app), the **terminal app**, and the
+**command line** — and every how-to here shows all three, under headings
+of their own: *In the web app*, *In the terminal app*, *On the command
+line*. On [cloudmorrow.com](https://cloudmorrow.com/guide) they are tabs:
+pick one and the whole guide follows.
+
+Notes, Tasks, Calendar, Channels and the rest are Quills — software from
+the [Quill Catalog](https://cloudmorrow.com/quills) — and each one's own
+guide is on its page there. This manual is the platform under them, and
+mentions them only as examples.
+
 ## What it does
 
 - **Secrets.** Your keys and passwords, in **vaults** you name (`default`
@@ -12,37 +24,27 @@ start with the [README](../README.md); this is the page to come back to.
   files out, `secret run` to hand them to a process without a file, and
   values never in a listing unless you ask. Part of the foundation: an app
   is *given* a secret when you say so, and never owns one.
-- **Notes.** Markdown by title, yours. `note show`
-  writes raw text to stdout, so redirection and pipes do what you expect.
-- **Tasks.** Boards, picked from a dropdown that is also where you make one,
-  and three lanes on each: ToDo, Doing, Done. Drag a card with the mouse to
-  move it, or press `[` and `]` on the one you are on. A task is a title and a
-  markdown body, so its detail and its `- [ ]` subtasks are the same thing the
-  note editor already knows how to write and tick. **Done empties itself**: a
-  task deleted a week after it got there, with every card saying how long it
-  has left, so the lane stays what you finished recently rather than
-  everything you ever finished.
-- **Calendar.** Your own calendar, made for you the first time you look at
-  it, plus the ones you share. A **shared** calendar works the way a private
-  channel does — you put people in it and they are in it — and a **public**
-  one is everybody's, in every list and open to write in. Every calendar you
-  can see is drawn at once, each event in its calendar's colour, because a
-  calendar you have to switch between is a calendar that lets you
-  double-book yourself. Times are the times on the wall: what you typed is
-  what every screen shows, in June and in December alike.
-- **A TUI you can click.** Six tabs — notes, tasks, calendar, chat,
-  secrets, files — because those are the kinds of thing there are. A vault
-  is a row in a list, the same shape as a note, and its keys are beside it.
-  Every row and button is a click target with a key beside it. The markdown
-  editor is live: the line the cursor is on stays raw source, and every
-  other line renders as you leave it.
+- **Quills.** Everything beyond the foundation is a Quill from the
+  [Quill Catalog](https://cloudmorrow.com/quills): Notes, Tasks, Calendar,
+  Channels, Files and Secrets on a fresh server, and whatever is there next.
+  One description is a tab on the phone, in the browser and in the terminal,
+  a `cm <quill>` command, and tools for an assistant. Each Quill's own guide
+  is on its catalog page; see [Quills](#quills) for how they are added, used
+  and made.
+- **A terminal app you can click.** `cm` on its own opens the workspace: a
+  card per Quill — Notes, Tasks, Files, Calendar, Channels, Secrets — because
+  those are the kinds of thing there are. A vault is a row in a list, the
+  same shape as a note, and its keys are beside it. Every row and button is a
+  click target with a key beside it. The markdown editor is live: the line the
+  cursor is on stays raw source, and every other line renders as you leave it.
 - **Encrypted at rest.** Everything you write into the database — chat,
   events, tasks, secrets, synced dotfiles — is ciphertext on the server's
   disk, under one key the server holds. You never handle a key; you sign in
   with a password. See [Encryption at rest](#encryption-at-rest).
-- **Notes are files.** Each note is a Markdown file in the `Notes` folder of
-  your drive on the server, folders are folders, and a copy of the tree is a
-  backup. `grep` works, `rsync` works, and so does any editor.
+- **Files are files.** Your drive on the server is a folder: a note the
+  Notes Quill writes is a Markdown file in its `Notes` folder, folders are
+  folders, and a copy of the tree is a backup. `grep` works, `rsync` works,
+  and so does any editor.
 - **A local agent** on each machine — registers itself when you sign in, runs
   as you, for backups and whatever comes next. The server has one too, so the
   box that holds everything is in the list with the rest of them.
@@ -63,19 +65,11 @@ start with the [README](../README.md); this is the page to come back to.
   does the mounting on macOS with nothing installed; on Linux it is
   `rclone`. Made, shared and mounted from the **Files** tab as well, which
   is the Files Quill: the files themselves stay where they are.
-- **Chat.** Channels and direct messages, between everyone on the server —
-  a Quill, like Tasks, offered when you install. A **public** channel is
-  everybody's, in everyone's list and open to write in; a **private** one is
-  the people you pick, and they are *added* rather than invited — nobody
-  accepts anything, they are simply in it and told so. A **direct** channel
-  is two people, and it is never made from a form: pick somebody and it is
-  there. Unread is when you last looked, per person per channel, so reading
-  on the laptop is reading on the phone.
-- **The count on the icon.** Chat is why the web app has push. An app on a
-  home screen is not running most of the time, so nothing it could poll
-  would keep its badge right — a real Web Push wakes a service worker,
-  which shows the banner and sets the number. The badge is everything
-  waiting: what is unread in your channels plus unread notifications. See
+- **The count on the icon.** Channels is why the web app has push. An app
+  on a home screen is not running most of the time, so nothing it could poll
+  would keep its badge right — a real Web Push wakes a service worker, which
+  shows the banner and sets the number. The badge is everything waiting:
+  what is unread in the spaces you are in plus unread notifications. See
   [Push notifications](#push-notifications).
 - **Users.** Password login, bearer tokens, per-user trees, and an admin API for
   creating more accounts. Every account has a **role** — Administrator, User,
@@ -83,18 +77,18 @@ start with the [README](../README.md); this is the page to come back to.
   and a **type**, which is what is behind it rather than what it may do:
   Human, Agent, or SystemsUser for the machinery itself.
 - **Administration.** An administrator has one more thing on the top bar of
-  the TUI, left of Settings: Administration, which puts the whole workspace
+  the terminal app, left of Settings: Administration, which puts the whole workspace
   aside for the server's own panel — and the same panel is in the web app,
   behind a row in **Me** that only administrators are shown. **Users** is
-  every account, added and edited there. **Features** is every area of the
-  app — Notes, Tasks, Calendar, Chat, Projects, Files — with a tick box
-  each: switch one off and its tab is gone from every client and its API
-  answers 403, because off ought to mean off rather than hidden.
+  every account, added and edited there. **Features** is every Quill and
+  every area of the app with a tick box each: switch one off and its tab is
+  gone from every client and its API answers 403, because off ought to mean
+  off rather than hidden.
 - **And a switch of your own.** The same list is in your own settings, in
   the terminal app and in **Me** on the phone, with your answer on each.
   Switching one off there takes its tab out of your clients, on every
-  machine you sign in from — an account that never opens Projects can stop
-  being offered them. Only what the server offers is listed: a feature an
+  machine you sign in from — an account that never opens Calendar can stop
+  being offered it. Only what the server offers is listed: a feature an
   administrator has switched off is not something you are shown at all,
   because a tick box you cannot have an opinion about is worse than no tick
   box. Yours hides where theirs forbids; see [Two switches on every
@@ -104,19 +98,98 @@ start with the [README](../README.md); this is the page to come back to.
   with OAuth in front of it: add the address to Claude Desktop, claude.ai or
   Claude Code, sign in on the page that opens, and from then on "put milk on
   my shopping list" or "what did I write about the greenhouse" is a tool call
-  on your own notes, tasks and projects — and only yours. Nothing to
+  on your own records — and only yours. Nothing to
   configure, and every assistant you let in can be cut off again; see
   [An assistant working as you](#an-assistant-working-as-you).
-- **Notes on the phone.** The same server serves a small web app at `/app`:
-  sign in, and your notes are there to read and write, laid out the way a
-  phone's notes app is — folders, a list, a note. Add it to the home screen and
-  it opens like an app. The pixel B in its bar says which app you are in, and
-  the photo button beside the note — or a paste, or a drop — puts a picture in
-  it; see [Pictures](#pictures). It follows a deploy on its own: an app on the
-  home screen is opened and hidden for weeks without ever being loaded, so the
-  page asks which deploy the server is serving whenever it comes back to the
-  front, and reloads itself when the answer has changed — with no force close,
-  and never out from under a note you are writing.
+- **The web app.** The same server serves it at `/app`: sign in, and every
+  Quill is a tab, laid out the way a phone's apps are — a list, then the
+  thing — and on a computer with a rail down the left. Add it to the home
+  screen and it opens like an app. The pixel B in its bar says which
+  app you are in. It follows a deploy on its own: an app on the home screen
+  is opened and hidden for weeks without ever being loaded, so the page asks
+  which deploy the server is serving whenever it comes back to the front,
+  and reloads itself when the answer has changed — with no force close, and
+  never out from under something you are writing.
+
+## Three ways in
+
+One server, one account, three ways to use it — and all three show the
+same records the moment they change:
+
+- **The web app**, at `<your server>/app`: on a phone (add it to the home
+  screen), in any browser, and in [the desktop app](#the-desktop-app),
+  which is the same page in a window of its own.
+- **The terminal app**, `cm` with nothing after it: the workspace in a
+  terminal, with a mouse and with keys.
+- **The command line**, `cm <resource> <action>`: for scripts, pipes, and
+  the hundredth time in a day.
+
+A Quill is a tab in the first two and a command in the third, from one
+description. Nothing is kept from a surface on purpose — only by what the
+surface can do: a browser cannot mount a share, and a terminal has no
+camera.
+
+**Signing in.** The same username and password everywhere.
+
+#### In the web app
+
+Open `https://<your server>/app` and sign in. The token stays in the
+browser for as long as the server's `token_ttl_hours` says (thirty days by
+default), so it is one sign-in, not one per visit. On a phone, share-sheet
+→ **Add to Home Screen** makes it an app of its own: an icon, no browser
+chrome, and it opens where you left it.
+
+#### In the terminal app
+
+`cm` opens the workspace. The first time it asks for the server's address,
+your username and your password, and keeps all three — in
+`~/.config/cloudmorrow/`, where the command line finds them too — so the
+next `cm` opens straight on your notes.
+
+#### On the command line
+
+```sh
+curl -fsSL https://<your server>/install.sh | sh   # once per machine: cm, the terminal app, the desktop app
+cm login -u ada                                     # asks for the password; with no server set, finds one on the home network
+cm whoami                                           # who you are, where, and the default vault
+```
+
+---
+
+**Adding a device.** Everything a new device needs, at the address you are
+signed in to: a computer runs the install command, a phone opens `/app`
+and is added to the home screen, an assistant that speaks MCP is given
+`/mcp`.
+
+#### In the web app
+
+**Me → Add a device**: the command to copy for a computer, a QR code for a
+phone, and the address for an assistant.
+
+#### In the terminal app
+
+**Settings** (`ctrl+g`) → **Add a device**: the same, as text to copy.
+
+#### On the command line
+
+The install command *is* the device being added:
+
+```sh
+curl -fsSL https://<your server>/install.sh | sh
+cm login
+```
+
+---
+
+**Where things are.** The same thing, on each surface:
+
+| | the web app | the terminal app | the command line |
+| --- | --- | --- | --- |
+| a Quill | its tab | its card (`f1`, `f2`, …) | `cm <quill> list`, `add`, `show`, … |
+| one record | tap its row: the sheet | `enter` on its row: the sheet | `cm <quill> show <id>` |
+| you, and your switches | **Me**, top right | **Settings**, `ctrl+g` | `cm whoami`, `cm config` |
+| what the machines did | not yet | the bell, `f8` | `cm agent list`, `cm agent jobs <id>` |
+| administration | **Me → Administration** | **Administration**, `f9` | `cm circle`, `cm quill`; accounts with `cloudmorrow-server user` on the box |
 
 ## Layout
 
@@ -132,7 +205,6 @@ src/cloudmorrow/
     dev.py           `--dev`: run the checkout you are standing in
     progress.py      the spinner, the bar, and the line saying what is happening
     secret.py        list, get, set, remove, import, export, run, vaults
-    note.py          list, show, add, edit, remove
     share.py         list, show, add, with, unshare, leave, move, remove, mount, unmount
   client/            talking to a server: config, credentials, HTTP
     mounts.py        which share is mounted where on this machine, and by what
@@ -193,7 +265,7 @@ cloudmorrow update  [server | all]
 ```
 
 `cm` is the same command in two letters — `cm notes list`, or `cm` on its own
-for the TUI — for the hundredth time in a day. An update never overwrites a
+for the terminal app — for the hundredth time in a day. An update never overwrites a
 `cm` that is somebody else's program.
 
 No invented syntax, no arrows. Data goes to stdout, status goes to stderr,
@@ -569,22 +641,18 @@ in fifteen minutes and twenty for one account in an hour, at sign-in and
 for WebDAV alike; past either, sign-in answers 429 until the window has
 passed.
 
-**Adding a device.** **Me → Add a device** (in the terminal: Settings, *Add
-a device*) has everything, at the address you are signed in to:
+**Adding a device** — a computer, a phone, an assistant — is **Me → Add a
+device** in the web app and *Add a device* in the terminal app's Settings;
+see [Three ways in](#three-ways-in).
 
-- a computer runs `curl -fsSL <address>/install.sh | sh`, which installs
-  `cm`, the TUI and, on a Linux desktop, the desktop app, and signs you in
-  with your name and password;
-- a phone opens `<address>/app`, signs in, and is added to the home screen;
-- an assistant that speaks MCP is given `<address>/mcp`.
-
-## Notes on the phone
+## The web app
 
 The install page is for machines. A phone gets the other thing on it: **Sign
-in**, which opens `https://cm.hl.bramlabs.io/app`. Sign in with the same
-username and password as `cloudmorrow login`, and the token stays in the browser
+in**, which opens `https://<your server>/app`. Sign in with the same
+username and password as `cm login`, and the token stays in the browser
 for as long as the server's `token_ttl_hours` says (thirty days by default),
-so it is one sign-in, not one per visit.
+so it is one sign-in, not one per visit. The same page is the whole of the
+app in a browser on a computer, and of [the desktop app](#the-desktop-app).
 
 It opens on **Today**: the time, the weather, a line worth a second thought,
 and what the calendar has for the day, so the front page is a glance rather
@@ -603,24 +671,23 @@ the top-right corner of every tab rather than a tab of its own, which is
 where a phone keeps it. What a screen makes — a note, a task, an event, a
 file — is the button beside its title.
 
-Notes is a Quill (the first in the catalog, and its tab is where Notes
-always was), drawn by the kit's **editor**. On the phone that is three
-screens, the way a phone's notes app is: **Folders**, the notes in one
-(newest first, with the first lines of each), and the note; on a computer the
-list and the note are side by side. The pen beside the title starts a new
-note in the folder you are looking at; the title is the file name, and the
-note saves itself as you type. Back out of a note you never wrote anything in
-and it is thrown away. Search looks inside the notes, not only at their
-names.
-
-It writes the same files the TUI does. A new note starts with a `# Title`
-heading matching its file name, as the TUI's do, and the app shows that heading
-as the title rather than as a line of the body. Rename the title and the file
-is renamed. Delete is the bin in the top corner, and asks first.
+Every installed Quill is a tab along the bottom — Notes, Tasks, Files,
+Calendar, Channels, Secrets on a fresh server — drawn by the kit the way a
+phone draws things: a list, then the thing you picked. Notes, say, is three
+screens, **Folders**, the notes in one, and the note, with the pen beside
+the title for a new one; Tasks is a board whose cards are dragged between
+lanes; Files is folders and tiles. Each Quill's own guide is on its page in
+the [catalog](https://cloudmorrow.com/quills). Every row opens the record's
+sheet: every field, editable, with delete.
 
 On iOS, share-sheet → **Add to Home Screen** makes it an app of its own: an
 icon, no browser chrome, and it opens where you left it. Anything that can
 reach the API can use it; there is nothing to configure on the server.
+
+Everything about you is under **Me**, and a few things are only there: the
+push switch ([Push notifications](#push-notifications)), **Add a device**,
+**Your Quills** ([Quills of your own](#quills-of-your-own)), and, for an
+administrator, **Administration**.
 
 ### The same app on a computer
 
@@ -668,14 +735,153 @@ Two sections under a switch, the same two the terminal app has:
   show you**.
 
 One thing the terminal app does not have yet: **May sign in**. The API has
-always taken it and the TUI's table has always shown it, with no way to
+always taken it and the terminal app's table has always shown it, with no way to
 change it; the web form has the switch. Turning it off keeps the account and
 its files and turns away the password.
 
+## The terminal app
+
+`cm` with no command opens the workspace on the first card — **Notes**, on
+a fresh server. There is a card per installed Quill, and fewer when one of
+them is switched off, by the server for everybody or by you in Settings,
+since a tab follows its feature.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Notes  Tasks  Files  Calendar  Chat  Secrets             │
+├─────────────┬────────────────────────────────────────────┤
+│ default   3 │ verticore                                  │
+│ home      8 │ [New vault ^n] [Add a] [Reveal v] [Copy c] …│
+│▎verticore 5 │ [local 3] [production 2] [＋]              │
+│             │ ┌────────────────────────────────────────┐ │
+│             │ │ key        value    len  updated       │ │
+│             │ │ API_URL    ••••••   21   2026-09-10    │ │
+└─────────────┴─┴────────────────────────────────────────┴─┘
+```
+
+A vault is not a frame the rest of the app hangs inside — it is an item in a
+list, laid out like notes: the list on the left, what you picked on the right.
+One vault to a line, its name dotted out if the column is too narrow for it,
+and how many secrets it holds at the end of the row. A vault you have just
+named is a row before it holds anything, so there is somewhere to stand while
+you add the first key.
+
+**Picking a vault shows it in the pane, and nowhere else.** There is no
+selected vault in the top bar, nothing else changes with it, and the CLI's
+own default vault is left alone. (The pane is the kit's grouped list, so the
+same layout draws any Quill's list with a `group` and `subgroup`.)
+
+**Machines** are not a tab: the agents enrol themselves at
+sign-in and get on with it, `cm agent` lists them and their jobs,
+and what they have done is behind the bell.
+
+**Files** is a Quill card (f5): My Files and your shares in a table — which
+of them is mounted on this machine and where, and the buttons that make,
+mount, unmount and remove one — and enter opens one. See
+[Fileshares](#fileshares).
+
+It is meant to be used with a mouse: the tabs, the sub-tabs, the buttons above
+each pane, the rows in every table, the vaults in the list and the notes in
+the tree are all click targets, and every one of them has a key as well.
+Sweeping the pointer across text selects it, and selecting *is* copying: the
+moment the button comes up, what was swept is on the clipboard and a toast
+says so. There is no copy step to find, because a terminal has no menu to
+find it in. In the editor the copy is what is on screen — the line being
+edited as source, every other line as it renders. Escape clears the highlight.
+Tables, lists and the note tree are not sweepable; a row there is something
+you pick, and the buttons beside it copy what a row has to copy.
+Neither way is the real one, so the key is written on the thing it works —
+`Notes  f1` in the strip, `⚙ Settings  ^g`, `🔔 f8` — and the bar along the
+bottom carries a few of the rest: status on the left, at most five keys on
+the right, the focused thing's first and quit last.
+
+### Keys
+
+Anywhere:
+
+| key | action |
+| --- | --- |
+| `f1` … `f7` | notes, tasks (`f2`), secrets, files, calendar; the other Quills take `f4`, `f10`, `f11`, `f12` in turn — Channels is `f4` |
+| `f8` | notifications: what the machines have been up to |
+| `f9` | administration (administrators): users, features, circles, Quills |
+| `ctrl+g` | settings: your switches, this machine, and its config sync |
+| `ctrl+r` | refresh |
+| `ctrl+c` | quit — pressed twice; the first press asks in the bottom bar |
+
+In secrets — the vault list:
+
+| key | action |
+| --- | --- |
+| `n` | new vault |
+
+In secrets — the keys:
+
+| key | action |
+| --- | --- |
+| `ctrl+n` | add a secret in the vault and environment on screen |
+| `enter` | open it: key, value (hidden; `ctrl+r` shows it), vault, environment |
+| `v` | reveal the selected value, or hide it again |
+| `c` | copy it to the clipboard without showing it |
+| `del` | delete it |
+| `e` | work in another environment |
+
+Importing and exporting `.env` files are `cm secret import` and `export`.
+
+In files:
+
+| key | action |
+| --- | --- |
+| `1` / `2` | its own tabs: local backups, fileshares |
+| `ctrl+n` | new share |
+| `m` / `u` | mount the selected share on this machine / unmount it |
+| `c` | copy its WebDAV address |
+| `d` | remove it (its files stay on the server) |
+
+In an editor (Notes, and any Quill drawn by the kit's editor) — the tree:
+
+| key | action |
+| --- | --- |
+| `n` / `N` | new page / new folder (inside the selected folder) |
+| `r` | rename or move |
+| `d` | delete |
+| `/` | search |
+
+In an editor — anywhere:
+
+| key | action |
+| --- | --- |
+| `ctrl+s` | save now |
+| `ctrl+n` / `ctrl+o` | new page / new folder |
+| `ctrl+f` | search |
+| `f6` / `f7` | import a file / export the open page |
+| `ctrl+p` | put a picture from this machine in the page |
+
+In the editor's text:
+
+| key | action |
+| --- | --- |
+| `enter` | new line, continuing the list you are in |
+| `ctrl+t` | make a task, or tick/untick it |
+| `ctrl+k` / `ctrl+d` | cut line / duplicate line |
+| `alt+↑` / `alt+↓` | move the line |
+| `ctrl+z` / `ctrl+y` | undo / redo |
+| `tab` / `shift+tab` | indent / dedent |
+
+In any dialog:
+
+| key | action |
+| --- | --- |
+| `←` `→` `↑` `↓` | move between the buttons |
+| `enter` | press the one you are on |
+| `escape` | leave without answering |
+
+The arrows reach the dialog only when what has focus has no use for them, so
+the cursor still moves in an input and the selection still moves in a list.
+
 ## Two switches on every feature
 
-A feature — Notes, Tasks, Calendar, Chat, Projects, Files — has two
-switches, and they are not the same kind of thing.
+A feature — every Quill, and every area of the app — has two switches,
+and they are not the same kind of thing.
 
 **The server's** is an administrator's, in the Administration panel. Off
 means off everywhere: the tab goes from every client, for everybody, and
@@ -702,6 +908,42 @@ you have not got is a count of something you cannot go and read. And with
 every tab switched off the terminal app says so and points at Settings,
 rather than leaving a pane up that nothing points at.
 
+**Switching one off for yourself:**
+
+#### In the web app
+
+**Me → What your apps show you**: a tick box per feature.
+
+#### In the terminal app
+
+**Settings** (`ctrl+g`) → *what this app shows you*: the same tick boxes.
+
+#### On the command line
+
+Not there: a hidden tab is a preference of the apps, and `cm <quill>` answers
+whatever the server offers. The switch itself is `PATCH /api/me/features/<key>`
+with `{"enabled": false}`.
+
+---
+
+**Switching one off for everybody** (administrators):
+
+#### In the web app
+
+**Me → Administration → Features**: a tick box per feature, what goes dark
+when it is off, and who last switched it.
+
+#### In the terminal app
+
+**Administration** (`f9`) → **Features**: the same list.
+
+#### On the command line
+
+No `cm` command yet; it is `PATCH /api/server/features/<key>` with
+`{"enabled": false}`, as an administrator.
+
+---
+
 Two endpoints, and the difference between them is the whole of the story:
 `/api/server/features` is the server's list, readable by anybody and
 switchable by an administrator; `/api/me/features` is the same catalogue
@@ -718,10 +960,24 @@ not the customers.
 
 A fresh server, and one upgraded from before circles, has one: **Members**,
 with everything, and everybody in it. Nothing changes until an
-administrator changes it — in Administration, Circles, on the phone or in
-the terminal app, or with `cm circle`:
+administrator changes it:
 
-```
+#### In the web app
+
+**Me → Administration → Circles**: **New circle**, then who is in it and,
+for each kind of data, *write*, *read* or nothing. A person's own row under
+**Users** shows what their circles give them, and takes rules of their own
+beside them.
+
+#### In the terminal app
+
+**Administration** (`f9`) → **Circles**: `n` makes one, `p` is who is in
+it, `a` is what its people may do with each kind of data, `t` says whether
+new accounts go into it.
+
+#### On the command line
+
+```sh
 cm circle add Kids
 cm circle rule Kids task write
 cm circle rule Kids event read
@@ -729,6 +985,8 @@ cm circle join Kids alice
 cm circle leave Members alice
 cm access                          # what you may do, and why
 ```
+
+---
 
 Your access is the most any of your circles gives, and there is no deny:
 children are not given less, parents are given more. Administrators are
@@ -745,10 +1003,12 @@ and a mounted share reach no more than you do. The whole of it, and why, is
 
 ## Quills
 
-Everything beyond the foundation is a **Quill**: Notes, Tasks, Files and
-Calendar today, and whatever the
-[Quill Catalog](https://github.com/Cloudmorrow/quill-catalog) has next.
-The contract is [QUILLS.md](QUILLS.md); this is how to use them.
+Everything beyond the foundation is a **Quill**: Notes, Tasks, Files,
+Calendar, Channels and Secrets today, and whatever the
+[Quill Catalog](https://cloudmorrow.com/quills) has next. The contract is
+[QUILLS.md](QUILLS.md); this is how to use them. What each one does, and
+how, is on its own page in the catalog — this manual only borrows them as
+examples.
 
 **On a fresh server** the catalog's foundation Quills are installed at first
 boot. A server from before each was a Quill gets it the first time the new
@@ -758,8 +1018,21 @@ Calendar with its calendars and events moved the same way. Nothing
 needs doing by hand. The server needs to reach GitHub for both; if it cannot,
 it says so in the log and tries again at the next start.
 
-**Adding one** is Administration → Quills on the phone or in the browser, the
-Quills section of the TUI's Administration panel, or:
+**Adding one** (administrators):
+
+#### In the web app
+
+**Me → Administration → Quills**: the catalog by category. A Quill's sheet
+says what it adds — datamodels, screens, jobs, and whether it runs code —
+then **Install**. The installed ones are above the catalog, each with its
+switch and **Remove**.
+
+#### In the terminal app
+
+**Administration** (`f9`) → **Quills**: `i` on one in the catalog shows its
+sheet and installs it, `d` removes the selected one.
+
+#### On the command line
 
 ```sh
 cm quill catalog          # what there is, by category
@@ -768,7 +1041,23 @@ cm quill list
 cm quill remove tasks     # its tabs and jobs go; your records stay
 ```
 
-**Using one** is its tab, on every client, and the command line:
+---
+
+**Using one** is its tab, on every surface, and its command — Tasks, say:
+
+#### In the web app
+
+The **Tasks** tab: a board, picked from the dropdown that is also where a
+new one is made, three lanes on it, and the plus beside the title for a new
+task. Drag a card between lanes; tap one for its sheet.
+
+#### In the terminal app
+
+The **Tasks** card (`f2`): `ctrl+n` makes a task in the first lane, `[` and
+`]` move the one under the cursor between lanes, `ctrl+b` makes a board,
+`enter` opens the card's sheet.
+
+#### On the command line
 
 ```sh
 cm tasks list             # the board, lane by lane
@@ -777,6 +1066,12 @@ cm tasks done fig         # by the start of its id, or its title
 cm tasks move 8f2c doing
 cm tasks groups           # the boards
 ```
+
+Every kit screen has the same verbs — `list`, `add`, `show`, `set`, `move`,
+`done`, `delete`, `groups`, `search`, `get`, `put`, `say` — and a Quill's own
+actions are `cm <quill> actions`.
+
+---
 
 A Quill is a feature like the built-in ones: an administrator can switch it
 off for the server, and each person can hide its tab (see *Two switches on
@@ -822,18 +1117,30 @@ What that means on the server:
   the Quill says it may. **Its APIs** are at `/api/q/<quill>/…`, for anybody
   signed in; the program is told who is asking, never given their token.
 
-**Watching it** is Administration → Quills: under the catalog, each service
-and whether it is running, restarting or stopped; on the Quill's own sheet,
-each service's state, last exit and the end of its log, its jobs and when
-they last ran, and each webhook's full address to copy, with a new secret
-per webhook, a new token, and restart. In the TUI it is **Running…** (`r`)
-on the selected Quill. From the command line:
+**Watching it:**
+
+#### In the web app
+
+**Me → Administration → Quills**: under the catalog, each service and
+whether it is running, restarting or stopped; on the Quill's own sheet, each
+service's state, last exit and the end of its log, its jobs and when they
+last ran, and each webhook's full address to copy, with a new secret per
+webhook, a new token, and restart.
+
+#### In the terminal app
+
+**Administration** (`f9`) → **Quills**, then **Running…** (`r`) on the
+selected Quill: the same services, logs and addresses.
+
+#### On the command line
 
 ```sh
 cm quill services         # every Quill's code: state, since, last exit, as whom; webhook addresses
 cm quill logs fleet       # the last lines of each of its services' logs
 cm quill logs fleet sync -n 500
 ```
+
+---
 
 If `allowed_client_ips` is set, a Quill's own programs still reach the
 server over loopback: a request from 127.0.0.1, not through the proxy, with
@@ -855,8 +1162,22 @@ the GitHub URL by default, or a local folder.
 
 Anybody on the server may have Quills of their own: software they added or
 made for themselves, on their shelf alone, over their own data, run as them
-(the contract is [SHARING.md](SHARING.md)). Under **Me → Your Quills** on
-the phone and in the browser, or from the command line:
+(the contract is [SHARING.md](SHARING.md)).
+
+#### In the web app
+
+**Me → Your Quills**: the catalog, with **Add … for me** on a Quill's
+sheet; yours, each with who has it and **Offer it** to pick people; what
+you were offered, to accept or decline; and your requests to an
+administrator.
+
+#### In the terminal app
+
+Not there yet. The terminal app has the administrator's side of it
+(**Shelves…**, below) and nothing of your own; use the web app or the
+command line.
+
+#### On the command line
 
 ```sh
 cm quill add budget --mine          # from the catalog, for yourself: the sheet, then a yes
@@ -868,6 +1189,8 @@ cm quill export budget              # a folder in the template's shape, to test,
 cm quill fork budget spending       # a copy of your own, under a new id, to change
 ```
 
+---
+
 Your assistant can do the same: `quill_check` and `quill_dev_install` build
 one of your own when you are not an administrator; `quill_share` offers it;
 `quill_request` asks.
@@ -878,13 +1201,22 @@ are named after you (`~alice.budget.envelope`) and nobody else can reach
 them until you share the Quill — and then each person has their own
 records of them, not yours.
 
-**For an administrator**, Administration → Quills has the rest, under the
-catalog: the three settings (may people have Quills of their own — `on`,
-`ask`, or `off`; may they run code; may they be shared), the open requests
-with *for everyone*, *for the asker* and *decline*, and every personal Quill
-there is, whose it is and who has it, with **Promote** — the server's, for
-everyone, every record of its datamodels moved with it — and a switch. In
-the TUI it is **Shelves…** (`s`) on the Quills side. From the command line:
+**For an administrator**, the rest: the three settings (may people have
+Quills of their own — `on`, `ask`, or `off`; may they run code; may they be
+shared), the open requests with *for everyone*, *for the asker* and
+*decline*, and every personal Quill there is, whose it is and who has it,
+with **Promote** — the server's, for everyone, every record of its
+datamodels moved with it — and a switch.
+
+#### In the web app
+
+**Me → Administration → Quills**, under the catalog.
+
+#### In the terminal app
+
+**Administration** (`f9`) → **Quills**, then **Shelves…** (`s`).
+
+#### On the command line
 
 ```sh
 cm quill policy --personal ask      # or on, off; --code on|off; --sharing on|off
@@ -894,144 +1226,6 @@ cm quill promote alice/budget       # the server's now, records and all
 cm quill add fleet --for Warehouse  # a server Quill for a circle, not everyone
 cm quill audience fleet --for Warehouse --person carol
 ```
-
-## Chat
-
-Everything else in Cloudmorrow is one person's. Chat is the exception, and it
-is the reason the server knows how to talk to somebody who is not asking.
-
-Chat is a Quill — [`Cloudmorrow/quill-chat`](https://github.com/Cloudmorrow/quill-chat),
-in the catalog with Tasks and offered, ticked, when you install. It has no
-code: a channel is a record of the foundational `channel` datamodel (a
-*space*), a message one of `message` (in a channel, its author's), and its one
-screen is the kit's `thread`. A server that had Chat before it was a Quill
-gets the Quill at boot, switched on or off as the feature was, and its
-channels, messages and read marks move into records once; the old tables stay
-where they were.
-
-There are three kinds of channel, and the kind *is* the access rule — there
-is nothing else to check, and no permissions screen:
-
-- **Public.** Everybody is in it. It is in everyone's list, anyone may write
-  in it, and nobody can leave — leaving a room everybody is in is a mute, and
-  a mute is not this. `#general` is one, made once for the whole server the
-  first time anybody opens Chat.
-- **Private.** The people in it. Anyone can make one and put people in it;
-  there is no invitation to accept, because an invitation you have to accept
-  is a second thing to build and a second thing to forget. You are added, you
-  get a notification saying so, and you can leave. Its maker can take
-  somebody out, and anybody in it can add somebody.
-- **Direct.** Two people, and it is never made from a form. Pick `ada` and the
-  conversation with her is there, whether or not it existed a moment ago;
-  `ada` picking you finds the same one. It is called after the other person.
-
-Everyone can write to everyone. There is no setting for that. A channel is
-its maker's to rename, re-topic or delete (and an administrator's); a message
-is its author's to change or take back.
-
-**Unread** is when you last looked: everything somebody else wrote in a
-channel after that is unread, and opening the channel — on any device — moves
-it on. Writing in a channel reads it, since you cannot reply to what you have
-not looked at. Somebody added to a channel counts from when they were added,
-and a new account counts the public channels from when it was made: the
-history is there to scroll back through, but a year of it is not a badge.
-
-It is on every surface. On the phone it is the channels, then a conversation;
-on a computer both side by side. In the terminal it is the **Chat** card
-(`f4`), channels on the left and the conversation on the right, with `n` for a
-new channel, `m` to write to one person, `a` to add somebody, `e` to rename or
-delete one of yours and `l` to leave. On the command line:
-
-```
-cm chat list                     # the channels, with what is unread in each
-cm chat show general             # the conversation, newest at the bottom
-cm chat say ada "on my way"      # a channel by name, or the person
-```
-
-An assistant reaches it with the generic record tools.
-
-Neither client holds a socket open. A conversation that is on screen asks for
-what changed since the newest line it has, every few seconds, and a push wakes
-it the moment something arrives — so the common case is instant, the fallback
-is a small request that usually answers with nothing, and the server stays a
-plain request-and-response thing that a phone on a train reconnects to
-without noticing.
-
-An administrator can switch it off in the Administration panel, like any
-other Quill: the tab goes and the API answers 403. Removing the Quill takes
-its tab and nothing else; the channels and messages are records, and stay.
-
-## Calendar
-
-Calendar is a Quill — `calendar` in the catalog, offered and ticked on a
-fresh server — drawn by the kit's `calendar` element (see [QUILLS.md](QUILLS.md)).
-Its data is the foundational `calendar` and `event` datamodels: a calendar is
-a **space**, and an event is a record in one, so who may see what is the
-record store's rule for spaces and nothing of its own.
-
-- **Personal.** Yours. Everybody has one, made the first time they look and
-  named after them (the `yours` dataset). Nobody else sees it, and it has no
-  one to add. If you want one other people can see, make a shared one.
-- **Shared.** Its maker's and the people in it. Anyone can make one and put
-  people in it; there is nothing to accept — you are added, told so behind
-  the bell and with a push, and can leave again. Whoever made it (and an
-  administrator) can rename it, recolour it and delete it; everybody in it
-  can write in it, because a shared calendar you cannot write in is one you
-  are being *shown*.
-- **Public.** Everybody's: one is made for the server the first time anybody
-  looks (the `everybody` dataset). In everyone's list, anyone may put
-  something in it, and nobody can leave it.
-
-**An event is a title and two moments**, plus where it is and notes.
-Whoever wrote it may change or delete it, and so may whoever manages the
-calendar it is on (`authored = "or-manager"` on the datamodel) — a shared
-calendar with somebody's stale event stuck on it, and only that somebody
-able to fix it, is a worse rule than this one. The kit fills in an end when
-none is given — an hour, or the day it is on — and
-moving the start on a record sheet keeps how long it is: an hour at ten,
-moved to half eleven, is an hour at half eleven.
-
-**The times are the times on the wall.** A `datetime` sent without a zone is
-kept as it was typed — `2026-09-19T14:00` — and an all-day event is a bare
-date whose end is the last day it is on. No zone, no conversion: "the
-dentist at ten" is at ten on every screen, in October and in June alike. It
-also makes "what is on this month" one call with a range on each moment —
-`GET /api/records/event?starts_at__lte=2026-09-30T23:59&ends_at__gte=2026-09-01`
-— because ISO sorts the way time does.
-
-Every calendar you can see is drawn at once, each event in its calendar's
-colour (cyan, violet, green, amber or rose), because a calendar you have to
-switch between is a calendar that lets you double-book yourself.
-
-- **On the phone**, a month with a dot per event and the day you tap written
-  out under it; the add row takes "10:00 Dentist" for a time, or just a title
-  for a whole day, into the calendar picked beside it. The people icon is the
-  list of calendars — yours, shared, everybody's — where one is made (its
-  name, who can see it, who is in it), and a calendar's own sheet is where it
-  is renamed, recoloured, shared, left and deleted.
-- **On a computer**, a week of hours with whole-day things along the top, or
-  the month with the events written in its cells; the switch is beside the
-  month's name.
-- **In the terminal**, the **Calendar** card (`f7`): the calendars on the
-  left, the month beside them with a coloured dot per event, the day you are
-  standing on underneath. `n` makes an event on that day, `e` (or enter)
-  opens the one under the cursor on its record sheet, `del` removes it, `c`
-  makes a calendar, `p` (or enter on a calendar) is who is in it — add, take
-  out, leave — `r` renames and recolours it, `t` is today, and `[` and `]`
-  are the months. The list on the left is not a filter: it picks which
-  calendar a new event goes in.
-- **On the command line**, `cm calendar list --from 2026-10-01 --to 2026-10-31`,
-  and `cm calendar add "Dentist" starts=2026-10-01T10:00` (into your own,
-  or `calendar=House`).
-
-An event does not notify anybody: a house calendar that pinged everybody for
-every appointment is one nobody reads. An administrator can switch the Quill
-off like any other feature: the tab goes and the API answers 403.
-
-**From before it was a Quill.** A server that had the built-in calendar gets
-the Quill installed at boot, and its calendars (with their people) and events
-move into records once, keeping names, colours, owners, times and when they
-were made. The old tables stay in the database, untouched.
 
 ## Push notifications
 
@@ -1129,7 +1323,7 @@ Open `https://cm.hl.bramlabs.io/` and copy the one command it shows:
 ```bash
 curl -fsSL https://cm.hl.bramlabs.io/install.sh | sh
 cloudmorrow login -u bram
-cloudmorrow                              # opens the TUI
+cloudmorrow                              # opens the terminal app
 ```
 
 It needs Python 3.11+ and nothing else: it makes a venv under
@@ -1288,7 +1482,27 @@ does not deliver them; `notify()` is there for when the app sends its own.
 Keys and passwords, yours. A secret lives in a **vault** and an
 **environment**. The vault is `default` until you name one — `home`,
 `work`, `verticore` — and the environment is `local` until you say
-`production`. Both have a default, so the common case is bare:
+`production`. Everywhere, a value is hidden until you ask for it.
+
+#### In the web app
+
+The **Secrets** tab: your vaults, then an environment's keys. A value is
+dots until the eye beside it is tapped, and the copy button copies it
+without showing it. The plus beside the title adds one; a row opens its
+sheet, with the value in a password box with the same eye.
+
+#### In the terminal app
+
+**Secrets** (`f3`): your vaults down the left, and for the one picked, its
+environments across the top and that environment's keys below. `ctrl+n`
+adds one, `v` reveals the value under the cursor (or hides it again), `c`
+copies it without showing it, `enter` opens it (`ctrl+r` shows the value on
+the sheet), `e` works in another environment, `n` in the vault list names a
+new vault.
+
+#### On the command line
+
+Both have a default, so the common case is bare:
 
 ```bash
 cloudmorrow secret list                            # keys only; values stay hidden
@@ -1302,7 +1516,10 @@ cloudmorrow secret vaults                          # what vaults hold something
 cloudmorrow secret environments                    # what environments this vault has
 ```
 
-`-v` names the vault, `-e` the environment, and the config remembers a
+---
+
+The rest is the command line's, because it reads and writes files on your
+machine. `-v` names the vault, `-e` the environment, and the config remembers a
 default for each:
 
 ```bash
@@ -1360,24 +1577,14 @@ environment you asked for is empty and others are not, the answer says which.
 Vaults are the same shape, and a vault exists exactly as long as it holds
 something: there is nothing to create and nothing to delete but the secrets.
 
-**Secrets is a Quill.** The store, `/api/secrets` and everything above are
-the foundation and work without it; the Secrets Quill (installed on a fresh
-server, and at boot on one that had Secrets built in) is the screens, and it
-brings Secrets to the phone and the web app for the first time. It draws a
-kit `list` of the `secret` datamodel, picked through by vault and then
+**Secrets is a Quill.** The store, `/api/secrets` and `cm secret` are the
+foundation and work without it; the Secrets Quill (installed on a fresh
+server, and at boot on one that had Secrets built in) is the screens: a kit
+`list` of the `secret` datamodel, picked through by vault and then
 environment, served by the core's `vaults` backend from this same store.
-Everywhere, a value is dots until you ask: the eye on a row (or `v` in the
-terminal) fetches that one secret and shows it, the copy button (`c`) copies
-it without showing it, and the record sheet has the value in a password box
-with the same eye (`ctrl+r` in the terminal). `cm secrets list -g work/production`
-and `cm secrets show KEY --reveal` are the same screen on the command line.
-Importing and exporting `.env` files and `secret run` stay here, in
-`cm secret`: they read and write files on your machine. No assistant ever
-reaches a secret — the `secret` datamodel is refused to every MCP tool.
-
-In the TUI, `f3` opens **Secrets**: your vaults down the left, and for the
-one picked, its environments across the top and that environment's keys
-below. See [The TUI](#the-tui).
+`cm secrets list -g work/production` and `cm secrets show KEY --reveal` are
+that screen on the command line. No assistant ever reaches a secret — the
+`secret` datamodel is refused to every MCP tool.
 
 **What a vault used to be.** Secrets belonged to a *project* — a name, a
 git URL, and a checkout `project add` read `.env` files out of and `project
@@ -1474,7 +1681,7 @@ things make sure that is the only plain hop:
   no proxy header: `http://<ip>:8787` in a browser at home answers. A plain
   request the proxy relayed, or one from off the local network, still gets
   426. To keep the LAN off the port, use `allowed_client_ips`.
-- **The clients refuse.** The TUI, the CLI and the agent will not talk to a
+- **The clients refuse.** The terminal app, the command line and the agent will not talk to a
   plain `http://` address unless it is this machine, or the config says
   `allow_insecure_http = true`, which is a decision for a box you have
   reasons to reach in the clear, not a default.
@@ -1484,81 +1691,6 @@ There were machine shares once — a directory served by the agent on one of
 your machines, over plain HTTP on the LAN — and they are gone, so nothing
 Cloudmorrow sends crosses a wire unencrypted unless you chose plain HTTP
 for the whole server.
-
-## Notes
-
-A note is a Markdown file in the `Notes` folder of your drive: a plain file,
-in My Files, on WebDAV, in a backup of the directory, and open to any
-editor. The Notes Quill is an editor over those files and nothing more,
-drawn by the kit on the phone, the web app, the terminal and the command
-line from the `file` datamodel within that folder, with `.md` saying which
-files are pages (see *Backends* in [DATAMODELS.md](DATAMODELS.md)). A path
-with slashes in it is folders.
-
-```bash
-cm notes list
-cm notes show ideas/garden          # the Markdown, as it is
-cm notes add ideas/garden           # from stdin, or $EDITOR
-cm notes edit ideas/garden
-cm notes search tomatoes            # names and every line
-cm notes delete ideas/garden
-```
-
-Text comes from stdin when there is any, and from `$EDITOR` when there is
-not. `show` writes the raw text to stdout, so redirection and pipes work:
-
-```bash
-cat architecture.md | cm notes add architecture
-cm notes show architecture > architecture.md
-```
-
-In the TUI, `f1` opens notes — the first card, and the one the workspace
-opens on: the tree on the left, with every folder, empty ones too, and the
-live editor on the right. `ctrl+o` makes a folder, `r` renames or moves what
-is selected in the tree (a folder takes what is in it along), `d` deletes it,
-`ctrl+f` searches. `f6` imports a file into the selected folder and `f7`
-writes the open note back out.
-
-Everybody with no notes at all gets one the first time they open Notes, on
-how the editor works. An assistant reaches the same files through the
-record tools on `file`, and the Quill's *Add to the end* action. A server
-that had Notes before it was a Quill gets the Quill at its first start on
-the new version, unless an administrator had switched Notes off; the switch
-keeps its meaning either way.
-
-### Pictures
-
-A note can carry pictures. On the phone, tap the photo button in the bar, or
-paste one, or drop one on the note; in the TUI it is **Photo** (`ctrl+p`),
-which asks for a file on this machine. Either way the picture is sent to the
-server as it is, kept beside your notes, and a line is written where the
-cursor was:
-
-```markdown
-![rack front](img/20260917-135026-8e642c-rack.png)
-```
-
-**Where they are.** `<notes root>/img/`, one flat folder. The name says when
-the picture arrived, carries six random characters so two pastes in a second
-cannot collide, and ends with what the file was called, so `ls img/` still
-reads. The type is taken from the bytes, never from the name: PNG, JPEG, GIF
-and WebP, up to 25 MB. The folder never shows in the note list — a picture
-is something a note shows, not a thing to find — and a copy of the notes
-tree takes the pictures with it, because they are files like everything else.
-
-**How they show.** The phone and the web app put each picture where the
-note has it, between the text above and below it; tap one to see it full
-size.
-The TUI draws the picture the cursor is on — or the note's first, when the
-cursor is elsewhere — in a panel beside the editor. Where the terminal speaks
-Kitty's graphics protocol or Sixel (Kitty, Ghostty, WezTerm, foot, iTerm2)
-that is the real picture; anywhere else it is coloured half-cells, which is
-enough to tell the right photo from the wrong one. The editor itself still
-shows the line as `🖼 rack front`: it draws one line per line of source, and
-a picture is not a line.
-
-Nothing deletes a picture yet: take the line out of the note and the file
-stays in `img/` until something prunes it.
 
 ## Fileshares
 
@@ -1618,6 +1750,26 @@ the checks are of two kinds:
 Somebody who is not an administrator is never asked for a path: their
 share is the folder of its name, and that is the whole of where it can be.
 
+**Making one, and sharing it:**
+
+#### In the web app
+
+**Files → New share**: a name, who has it (a menu per person, circle and —
+for an administrator — Everybody, each *change* or *read*), and, for an
+administrator, the path, filled in as the name is typed and checked as it
+is changed. Under each share is whose it is and who has it, which opens the
+share's own page: the same menus, changed as they are chosen, the path, and
+**Remove** — or, for a share somebody else made, whose it is, who has it,
+and **Leave**.
+
+#### In the terminal app
+
+**Files** (`f5`): `ctrl+n` makes one, `s` changes who has the one under the
+cursor, as one line to edit — `ann, circle:kids (read), everyone` — and `d`
+removes it; the files stay.
+
+#### On the command line
+
 ```bash
 cloudmorrow share add family --with ann --with circle:kids   # yours, shared with Ann and Kids
 cloudmorrow share add library --with everyone --read          # administrators: everybody may read it
@@ -1626,22 +1778,38 @@ cloudmorrow share with family sam --read                       # Sam may read it
 cloudmorrow share unshare family circle:kids
 cloudmorrow share leave recipes                                # somebody shared it with you
 cloudmorrow share move media /srv/films                        # administrators; --back for Shares
-cloudmorrow share mount family                                 # ~/Fileshares/family, or /Volumes/family
-cloudmorrow share unmount family
 cloudmorrow share remove family                                # for everybody; the files stay
 cloudmorrow share remove family --files                        # …and deletes its folder in Shares
 ```
 
-The same things are on the **Files** tab. On the phone and the web app a
-**New share** button sits above the list: a name, who has it (a menu per
-person, circle and — for an administrator — Everybody), and, for an
-administrator, the path, filled in as the name is typed and checked as it
-is changed. Under each share is whose it is and who has it, which opens
-the share's own page: the same menus, changed as they are chosen, the
-path, and Remove — or, for a share somebody else made, whose it is, who
-has it and Leave. In the terminal app, ctrl+n makes one and `s` changes
-who has the one the cursor is on, as one line to edit:
-`ann, circle:kids (read), everyone`.
+---
+
+**Mounting one** on the machine you are at, as a folder:
+
+#### In the web app
+
+A browser cannot mount anything. In [the desktop app](#the-desktop-app)
+every share in **Files** has **Mount on this computer**, then *Mounted at
+~/Fileshares/media* with **Open folder** and **Unmount**. In a browser, the
+share's page says its address under *Mount at*, for any WebDAV client —
+a phone's file manager, a Windows drive letter — with your username and
+password.
+
+#### In the terminal app
+
+**Files** (`f5`): `m` mounts the selected share on this machine, `u`
+unmounts it, `c` copies its WebDAV address. The table says which shares are
+mounted here, and where.
+
+#### On the command line
+
+```bash
+cloudmorrow share mount family                                 # ~/Fileshares/family, or /Volumes/family
+cloudmorrow share unmount family
+cloudmorrow share list                                         # with where each is mounted here
+```
+
+---
 
 **When an account or a circle goes.** What an account was given goes with
 it; the shares it made pass to the administrator who removed it, with their
@@ -1668,8 +1836,11 @@ and a new file put with `POST /api/records/file/upload`. The Quill is only
 the screen, drawn by the kit's `grid`, so the same thing is on every
 surface, and to an assistant through the generic record tools.
 
-On the phone and the web app, **Files** lists My Files, then your shares
-and the ones shared with you.
+**What is in them:**
+
+#### In the web app
+
+**Files** lists My Files, then your shares and the ones shared with you.
 One opens as its folders and files, the way a file manager shows them —
 sorted by name, date, size or type, folders first — as a list, or as tiles
 with a picture of each photo (the switch beside the sort; the choice is
@@ -1681,17 +1852,21 @@ folder; on a computer a file dragged onto the folder or pasted goes in too.
 The “…” beside a folder's name renames, moves or deletes it. A share you
 may only read opens with none of that: no plus, nothing dropped or pasted
 in, and no rename, move or delete — the Files Quill's `group_writes` reads
-the share's `writable` field. The terminal app hides the same keys.
+the share's `writable` field.
 
-The terminal app has the same, on the Files card: the shares, then enter
-on one for its folders and files. The same sort (`s` is the next one, `S`
-turns it around), `v` for thumbnails, and the picture the cursor is on
-drawn beside the listing — the real picture in Kitty or a Sixel terminal,
-coloured half-cells anywhere else. In a folder, `p` puts a file from this
-machine there, `g` gets the one the cursor is on, ctrl+n makes a folder,
-`e` renames, `M` moves and delete deletes.
+#### In the terminal app
 
-On the command line, `cm files` is the same grid:
+The **Files** card: the shares, then `enter` on one for its folders and
+files. The same sort (`s` is the next one, `S` turns it around), `v` for
+thumbnails, and the picture the cursor is on drawn beside the listing — the
+real picture in Kitty or a Sixel terminal, coloured half-cells anywhere
+else. In a folder, `p` puts a file from this machine there, `g` gets the
+one the cursor is on, `ctrl+n` makes a folder, `e` renames, `M` moves and
+`del` deletes. A share you may only read hides the same keys.
+
+#### On the command line
+
+`cm files` is the same grid; `cm share` is for the shares themselves.
 
 ```bash
 cm files list                                  # My Files and your shares
@@ -1702,7 +1877,7 @@ cm files add my-files Photos/2026              # a new folder
 cm files delete my-files Photos/old.jpg
 ```
 
-`cm share` is for making, sharing, mounting and removing shares.
+---
 
 **Thumbnails.** The server makes them, once, with the long edge at one of
 a few sizes, and keeps them under `<data_dir>/thumbs/`. The key includes
@@ -1855,9 +2030,29 @@ list and pointing the agent at the local port with `--url`.
 Every machine already runs an agent, and the agents already talk to the server
 every half minute. That is most of a config sync — the rest is one tick box.
 
-Open **Settings** (`ctrl+g`, or the button in the top bar next to your name).
-It names the machine you are sitting at, says whether it is an Omarchy box,
-and offers one thing:
+The tick box is about the machine you are sitting at, so it is in the
+terminal app on that machine:
+
+#### In the web app
+
+Not there. **Me → This computer** (in the desktop app) says whether this
+machine's agent is running; the switch itself is the terminal app's.
+
+#### In the terminal app
+
+Open **Settings** (`ctrl+g`, or the button in the top bar next to your
+name). It names the machine you are sitting at, says whether it is an
+Omarchy box, and offers one thing: **Keep Omarchy config in sync**.
+
+#### On the command line
+
+No command for the tick box; `cloudmorrow-agent status` says which
+revision this machine holds and `cloudmorrow-agent sync` does a pass now
+(see *By hand*, below).
+
+---
+
+What Settings shows:
 
 ```
   omarchy config
@@ -1934,7 +2129,7 @@ cloudmorrow-agent status         # which revision this machine is on
 ### Notifications
 
 Every claim, every push and every machine that adopts a config leaves a note
-on the server. The bell at the far right of the TUI's top bar carries the
+on the server. The bell at the far right of the terminal app's top bar carries the
 count of the unread ones; ringing it (`f8`, or a click) opens the list, with
 one button to say you have read them. They are facts, not messages — nothing
 pushes them at you yet, which is what makes them the right thing to hang a
@@ -1943,145 +2138,6 @@ live channel off later.
 ```bash
 curl -s $CLOUDMORROW/api/notifications -H "Authorization: Bearer $TOKEN"
 ```
-
-## The TUI
-
-`cloudmorrow` with no command opens the workspace on **Notes**, which is what
-this is mostly open for. The tab strip has six, because there are six kinds
-of thing here — and fewer when one of them is switched off, by the server
-for everybody or by you in Settings, since a tab follows its feature.
-
-```
-┌──────────────────────────────────────────────────────────┐
-│ Notes  Tasks  Files  Calendar  Chat  Secrets             │
-├─────────────┬────────────────────────────────────────────┤
-│ default   3 │ verticore                                  │
-│ home      8 │ [New vault ^n] [Add a] [Reveal v] [Copy c] …│
-│▎verticore 5 │ [local 3] [production 2] [＋]              │
-│             │ ┌────────────────────────────────────────┐ │
-│             │ │ key        value    len  updated       │ │
-│             │ │ API_URL    ••••••   21   2026-09-10    │ │
-└─────────────┴─┴────────────────────────────────────────┴─┘
-```
-
-A vault is not a frame the rest of the app hangs inside — it is an item in a
-list, laid out like notes: the list on the left, what you picked on the right.
-One vault to a line, its name dotted out if the column is too narrow for it,
-and how many secrets it holds at the end of the row. A vault you have just
-named is a row before it holds anything, so there is somewhere to stand while
-you add the first key.
-
-**Picking a vault shows it in the pane, and nowhere else.** There is no
-selected vault in the top bar, nothing else changes with it, and the CLI's
-own default vault is left alone. (The pane is the kit's grouped list, so the
-same layout draws any Quill's list with a `group` and `subgroup`.)
-
-**Notes are not.** They are yours, and they stay put whichever vault you are
-looking at. **Machines** are not a tab: the agents enrol themselves at
-sign-in and get on with it, `cloudmorrow agent` lists them and their jobs,
-and what they have done is behind the bell.
-
-**Files** is a Quill card (f5): My Files and your shares in a table — which
-of them is mounted on this machine and where, and the buttons that make,
-mount, unmount and remove one — and enter opens one. See
-[Fileshares](#fileshares).
-
-It is meant to be used with a mouse: the tabs, the sub-tabs, the buttons above
-each pane, the rows in every table, the vaults in the list and the notes in
-the tree are all click targets, and every one of them has a key as well.
-Sweeping the pointer across text selects it, and selecting *is* copying: the
-moment the button comes up, what was swept is on the clipboard and a toast
-says so. There is no copy step to find, because a terminal has no menu to
-find it in. In the editor the copy is what is on screen — the line being
-edited as source, every other line as it renders. Escape clears the highlight.
-Tables, lists and the note tree are not sweepable; a row there is something
-you pick, and the buttons beside it copy what a row has to copy.
-Neither way is the real one, so the key is written on the thing it works —
-`Notes  f1` in the strip, `⚙ Settings  ^g`, `🔔 f8` — and the bar along the
-bottom carries a few of the rest: status on the left, at most five keys on
-the right, the focused thing's first and quit last.
-
-### Keys
-
-Anywhere:
-
-| key | action |
-| --- | --- |
-| `f1` … `f7` | notes, tasks (`f2`), secrets, files, calendar; the other Quills take `f4`, `f10`, `f11`, `f12` in turn — Chat is `f4` |
-| `f8` | notifications: what the machines have been up to |
-| `ctrl+g` | settings: this machine, and its config sync |
-| `ctrl+r` | refresh |
-| `ctrl+c` | quit — pressed twice; the first press asks in the bottom bar |
-
-In secrets — the vault list:
-
-| key | action |
-| --- | --- |
-| `n` | new vault |
-
-In secrets — the keys:
-
-| key | action |
-| --- | --- |
-| `ctrl+n` | add a secret in the vault and environment on screen |
-| `enter` | open it: key, value (hidden; `ctrl+r` shows it), vault, environment |
-| `v` | reveal the selected value, or hide it again |
-| `c` | copy it to the clipboard without showing it |
-| `del` | delete it |
-| `e` | work in another environment |
-
-Importing and exporting `.env` files are `cm secret import` and `export`.
-
-In files:
-
-| key | action |
-| --- | --- |
-| `1` / `2` | its own tabs: local backups, fileshares |
-| `ctrl+n` | new share |
-| `m` / `u` | mount the selected share on this machine / unmount it |
-| `c` | copy its WebDAV address |
-| `d` | remove it (its files stay on the server) |
-
-In notes — the list:
-
-| key | action |
-| --- | --- |
-| `n` / `N` | new note / new folder (inside the selected folder) |
-| `r` | rename or move |
-| `d` | delete |
-| `/` | search |
-
-In notes — anywhere:
-
-| key | action |
-| --- | --- |
-| `ctrl+s` | save now |
-| `ctrl+n` / `ctrl+o` | new note / new folder |
-| `ctrl+f` | search |
-| `f6` / `f7` | import a file / export the open note |
-| `ctrl+p` | put a picture from this machine in the note |
-
-In the editor:
-
-| key | action |
-| --- | --- |
-| `enter` | new line, continuing the list you are in |
-| `ctrl+t` | make a task, or tick/untick it |
-| `ctrl+k` / `ctrl+d` | cut line / duplicate line |
-| `alt+↑` / `alt+↓` | move the line |
-| `ctrl+z` / `ctrl+y` | undo / redo |
-| `tab` / `shift+tab` | indent / dedent |
-
-In any dialog:
-
-| key | action |
-| --- | --- |
-| `←` `→` `↑` `↓` | move between the buttons |
-| `enter` | press the one you are on |
-| `escape` | leave without answering |
-
-The arrows reach the dialog only when what has focus has no use for them, so
-the cursor still moves in an input and the selection still moves in a list.
 
 ## API
 
@@ -2268,11 +2324,10 @@ CLOUDMORROW_NOTES_DIR=/tmp/notes CLOUDMORROW_DATA_DIR=/tmp/cloudmorrow-data \
   days by default), at which point `share mount` again. Nothing remounts it
   for you yet — that is a job for the agent, along with the Local backups
   tab, which is a placeholder.
-- Fileshares belong to one account, like everything else. There is no
-  read-only share and no sharing between accounts.
-- A picture taken out of a note is not taken out of `img/`: nothing prunes
-  the folder yet. The TUI shows one picture at a time, beside the text rather
-  than in it, and a terminal without Kitty or Sixel graphics gets half-cells.
+- A picture put in a page by the kit's editor and taken out again is not
+  taken out of `img/`: nothing prunes the folder yet. The terminal app shows
+  one picture at a time, beside the text rather than in it, and a terminal
+  without Kitty or Sixel graphics gets half-cells.
 
 ## License
 
