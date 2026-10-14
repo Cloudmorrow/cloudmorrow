@@ -267,3 +267,13 @@ def test_update_all_installs_nothing_here_when_the_deploy_fails(monkeypatch):
 
     assert result.exit_code == 1
     assert installed == []
+
+
+def test_a_deploy_that_could_not_link_cm_on_the_server_says_what_to_do():
+    lines, waiting = _deploy_lines(_result(commands_unlinked=["cm"]), restart=True, force=False)
+    text = "\n".join(lines)
+    assert "cm installed on the server, but not on its PATH" in text
+    assert "install-server.sh again with --update" in text
+    assert waiting
+    # Nothing to say when everything landed.
+    assert "PATH" not in "\n".join(_deploy_lines(_result(), restart=True, force=False)[0])

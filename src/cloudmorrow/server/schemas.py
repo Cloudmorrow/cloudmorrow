@@ -349,6 +349,10 @@ class ServerUpdateOut(BaseModel):
     discarded: int = 0
     reinstalled: bool = False
     published_wheel: str = ""
+    # Commands the reinstall brought to the venv but could not put on the
+    # server's PATH: `cm`, on a server from before it was there, since the
+    # service user may not write /usr/local/bin. Root's to finish.
+    commands_unlinked: list[str] = []
     # Whether the server is on its way down to come back on the new code, and
     # if it is not, why not.
     restarting: bool = False

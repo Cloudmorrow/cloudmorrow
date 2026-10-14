@@ -14,7 +14,7 @@ import socket
 from dataclasses import dataclass
 from pathlib import Path
 
-from cloudmorrow import __version__
+from cloudmorrow import __version__, localserver
 from cloudmorrow.agent import service
 from cloudmorrow.agent.config import AgentConfig
 from cloudmorrow.agent.config import default_config_path as agent_config_path
@@ -46,7 +46,14 @@ async def ensure_agent(
 
     *api* is an authenticated CloudmorrowClient. Safe to call on every login:
     re-enrolling rotates this machine's token rather than failing.
+
+    Not on the server itself. That machine has an agent already, the
+    server's own, enrolled under the first administrator and named after
+    the box — and so is the one a sign-in would make, so enrolling it
+    again would rotate the server's token out from under its service.
     """
+    if localserver.is_here():
+        return SetupResult(False, False, "", "this machine is the server, which has an agent of its own")
     path = config_path or agent_config_path()
     agent_config = AgentConfig.load(path)
     agent_config.server_url = api.config.api_url

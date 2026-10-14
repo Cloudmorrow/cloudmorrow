@@ -32,10 +32,11 @@ import sys
 import tempfile
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import cloudmorrow
+from cloudmorrow.links import link_server_commands
 
 # A branch to deploy, not an option for git to read and not a path to escape.
 BRANCH = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$")
@@ -63,6 +64,11 @@ class UpdateResult:
     # Commits the checkout had that the remote does not, thrown away to get
     # here. Nought on every ordinary deploy; anything else is worth saying.
     discarded: int = 0
+    # Commands the reinstall brought to the venv that it could not put on
+    # the PATH beside cloudmorrow-server — `cm`, on a server from before it
+    # was there, when the update runs as the service user and /usr/local/bin
+    # is root's. Said, so somebody with root can.
+    unlinked: list[str] = field(default_factory=list)
 
     @property
     def changed(self) -> bool:
@@ -98,7 +104,7 @@ def find_source_dir(explicit: Path | None = None) -> Path:
         raise UpdateError(
             f"{candidate} is not a git checkout.\n"
             "Updating from git needs an editable install "
-            "(`pip install -e '.[server,agent]'`), which is what "
+            "(`pip install -e '.[server,agent,tui]'`), which is what "
             "deploy/install-server.sh sets up. "
             "Pass --source to point at the checkout, or set CLOUDMORROW_SOURCE_DIR."
         )
@@ -326,6 +332,7 @@ def update(
         changed_files = len(diff.splitlines())
 
     did_reinstall = False
+    unlinked: list[str] = []
     if reinstall and (new_commit != old_commit or force):
         # sys.executable is the venv the server runs from, so the reinstall
         # lands in the right place no matter who invoked the update.
@@ -337,12 +344,17 @@ def update(
                 "install",
                 "--quiet",
                 "--editable",
-                # Both extras: the server runs an agent of its own, and that
-                # needs the agent's dependencies, not just the API's.
-                f"{checkout}[server,agent]",
+                # Three extras: the server runs an agent of its own, and that
+                # needs the agent's dependencies, not just the API's; and the
+                # terminal app is on the server too, for `cm` at the box.
+                f"{checkout}[server,agent,tui]",
             ]
         )
         did_reinstall = True
+        # `cm` beside cloudmorrow-server on the PATH, which an update is the
+        # first chance to do on a server from before it was there. Only root
+        # may write /usr/local/bin; what the update could not link, it says.
+        unlinked = link_server_commands(Path(sys.executable).resolve().parent.parent)[1]
 
     did_restart = False
     if restart and (new_commit != old_commit or force):
@@ -360,4 +372,5 @@ def update(
         old_version=old_version,
         new_version=new_version,
         discarded=discarded,
+        unlinked=unlinked,
     )

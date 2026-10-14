@@ -322,3 +322,22 @@ def test_no_linking_is_left_in_it():
     assert "ReadWritePaths=$FILES_DIR $DATA_DIR $PREFIX${SHARES_OUTSIDE:+ $SHARES_OUTSIDE}\n" in text
     for gone in ("--link", "access link", "tailscale ", "acmedns", "CADDY_DIR", "relay", "cmtunnel"):
         assert gone not in text, gone
+
+
+def test_the_terminal_app_is_installed_on_the_server_too():
+    """`cm` at the box: the tui extra in the venv, and the command linked beside cloudmorrow-server."""
+    text = INSTALLER.read_text()
+    assert '"$SRC[server,agent,tui]"' in text
+    assert '"$SRC[server,agent,tui,postgres]"' in text
+    assert '[server,agent]"' not in text
+    result = dry_run("--name", "T", "--public-url", "https://cloud.test", "--user", "alice", "--quills", "all")
+    assert result.returncode == 0, result.stderr + result.stdout
+    out = result.stdout
+    assert "linking cm and cloudmorrow, the terminal app, into /usr/local/bin" in out
+    assert "would run: ln -sf /opt/cloudmorrow/venv/bin/cm /usr/local/bin/cm" in out
+    assert "would run: ln -sf /opt/cloudmorrow/venv/bin/cloudmorrow /usr/local/bin/cloudmorrow" in out
+    # And the closing page says so, under a heading of its own.
+    page = out[out.index("would be installed") :]
+    assert "Or here, in this terminal" in page
+    assert "\n    cm\n" in page
+    assert "Administration" in page

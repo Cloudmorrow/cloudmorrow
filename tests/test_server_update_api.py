@@ -162,3 +162,14 @@ def test_health_says_which_commit_is_running(client):
     """The only honest answer to "did my deploy land": the version never moves."""
     body = client.get("/api/health").json()
     assert "commit" in body
+
+
+def test_a_deploy_says_which_commands_it_could_not_put_on_the_path(client, auth, deploy):
+    """`cm` reaches the venv as the service user; /usr/local/bin is root's, and the answer says so."""
+    from dataclasses import replace
+
+    deploy["result"] = replace(DEPLOYED, unlinked=["cm"])
+    body = client.post("/api/server/update", json={}, headers=auth).json()
+    assert body["commands_unlinked"] == ["cm"]
+    deploy["result"] = DEPLOYED
+    assert client.post("/api/server/update", json={}, headers=auth).json()["commands_unlinked"] == []

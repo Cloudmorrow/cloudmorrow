@@ -319,6 +319,7 @@ What it leaves behind:
 | `/etc/cloudmorrow/server.toml` | the config — yours to edit, never rewritten |
 | `/etc/systemd/system/cloudmorrow.service` | runs as the `cloudmorrow` system user |
 | `/usr/local/bin/cloudmorrow-update` | the updater, below |
+| `/usr/local/bin/cm` | the terminal app, here on the server too (`cloudmorrow` beside it is the same command) |
 | `/etc/sudoers.d/cloudmorrow` | lets `--admin` run exactly those two commands |
 | `/var/lib/cloudmorrow/.ssh/` | the deploy key the service pulls with, if the repo needed one |
 | `/etc/cloudmorrow/cloudmorrow.key` | the key everything is sealed with at rest |
@@ -329,6 +330,20 @@ reinstalls, and leaves your config, notes, database and accounts alone. It
 reads the name, address and database back out of the existing config
 rather than asking again, and asks for an account only while the server
 has none.
+
+**The terminal app is on the server too.** `cm` at the box opens it, you
+sign in with your own name and password, and an administrator has
+Administration on the top bar, as on any other machine. It needs no
+address: a client on the server with no config of its own reads where the
+server listens off `/etc/cloudmorrow/server.toml` (or wherever
+`CLOUDMORROW_SERVER_CONFIG` says) and reaches it there — loopback when it
+answers there or on every address, else the first address it was given —
+whichever addresses were chosen at install, and whether or not a proxy
+and a `public_url` sit in front. Plain http to an address the server here
+listens on is this machine, so nothing has to be allowed. `cm login
+--server`, or `cm config set api_url`, points it somewhere else as on any
+machine, and then that config wins. Signing in on the server enrols no
+agent: the box has the server's own already, and it is the machine's.
 
 ### The database
 
@@ -602,6 +617,19 @@ safe to run again) or edit `Restart=` in `/etc/systemd/system/cloudmorrow.servic
 and `sudo systemctl daemon-reload`. After that, `cloudmorrow update server` is
 the API path. Until the unit is right the deploy still lands — the server just
 reports that it did not restart itself, and says why.
+
+`cm` on the server arrives the same way. An update installs the terminal app
+into the server's venv, and puts it on the PATH beside `cloudmorrow-server`
+when it may; from the API it runs as the service user, which owns the venv
+and not `/usr/local/bin`, so it says `cm installed on the server, but not on
+its PATH` instead. Then either re-run `deploy/install-server.sh --update`,
+which links it along with everything else, or make the one link yourself:
+
+```bash
+sudo ln -s /opt/cloudmorrow/venv/bin/cm /usr/local/bin/cm
+```
+
+Any run of `cloudmorrow-server` as root does the same, quietly, the first time.
 
 ### Where the client comes from
 
@@ -2015,10 +2043,11 @@ nothing is duplicated.
 Its backup roots are the server's own `data_dir` and `notes_dir`, so
 `cloudmorrow agent run <id> backup` on it backs up the thing worth backing up.
 
-The server's venv installs `cloudmorrow[server,agent]` for this — it runs an
-agent, so it needs what an agent needs. A deployment from before that was true
-has only `[server]`, and one `cloudmorrow update server --force` reinstalls it
-with both.
+The server's venv installs `cloudmorrow[server,agent,tui]` for this — it runs an
+agent, so it needs what an agent needs, and it has the terminal app, so it
+needs what that needs. A deployment from before that was true has only
+`[server]`, and one `cloudmorrow update server --force` reinstalls it with all
+three.
 
 The agent talks to the API like any other client, so it has to be able to
 reach it. On a server that answers only its reverse proxy

@@ -314,6 +314,11 @@ def _deploy_lines(result: dict, *, restart: bool, force: bool) -> tuple[list[str
     ]
     if done:
         lines.append(f"   [{MUTED}]{' · '.join(done)}[/]")
+    if unlinked := result.get("commands_unlinked"):
+        # The terminal app reached the server's venv; its PATH is root's.
+        names = " and ".join(unlinked)
+        lines.append(f" [{WARN}]![/] {names} installed on the server, but not on its PATH")
+        lines.append(f"   [{MUTED}]on the server: run install-server.sh again with --update, which links it[/]")
 
     if result.get("restart_blocked"):
         lines.append(f" [{WARN}]![/] Not restarted: {result['restart_blocked']}")

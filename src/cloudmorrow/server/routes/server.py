@@ -111,6 +111,7 @@ def update_server(
         discarded=result.discarded,
         reinstalled=result.reinstalled,
         published_wheel=published,
+        commands_unlinked=result.unlinked,
     )
     if payload.restart and (result.changed or payload.force):
         blocker = self_restart_blocker(config.service_name)
