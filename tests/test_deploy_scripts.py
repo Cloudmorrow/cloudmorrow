@@ -341,3 +341,23 @@ def test_the_terminal_app_is_installed_on_the_server_too():
     assert "Or here, in this terminal" in page
     assert "\n    cm\n" in page
     assert "Administration" in page
+
+
+def test_a_server_that_is_well_is_asked_about_before_it_is_updated():
+    """Run again at a terminal on a running server, the installer asks; Enter says yes.
+
+    The check needs a running server, which a test has not got, so what a
+    test can hold is the question, its default, and that a run with no
+    terminal still leaves a well server as it is.
+    """
+    text = INSTALLER.read_text()
+    asked = text[text.index("is already here, running and answering") :]
+    assert "Update it? (settings, files and accounts are kept)" in asked
+    assert "[Y/n]" in asked
+    # Yes by default, and the two spellings of it.
+    assert '"" | [Yy] | [Yy][Ee][Ss])' in asked
+    # Without a terminal: the old answer, and the ways to update anyway.
+    assert "Nothing to do. To update it anyway" in asked
+    assert "sudo sh -s -- --update" in asked
+    # The terminal is known before the question, not only before the others.
+    assert text.index('TTY=""') < text.index("is already here, running and answering")

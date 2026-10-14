@@ -133,9 +133,11 @@ encryption key, starts the service and makes your account. The terminal
 app is on the server too: `cm` at the box signs in to the server beside
 it, whichever addresses it answers on, and an administrator has
 Administration there as anywhere. Run it again any time: if the server is running and answering, it
-says so and changes nothing; if not, it updates and reinstalls it and checks
-again (`--update` does that either way). It keeps your config, notes,
-database and accounts, and never asks a question it already has the answer to.
+asks whether to update it, and Enter says yes; if not, it updates and
+reinstalls it and checks again (`--update` does that without asking, and
+without a terminal a server that is well is left alone). It keeps your
+config, notes, database and accounts, and never asks a question it already
+has the answer to.
 
 Every answer can be a flag instead, for a script or a machine with no
 terminal, and `--dry-run` says what it would do without doing any of it:
