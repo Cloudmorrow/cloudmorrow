@@ -329,7 +329,9 @@ Re-running the script is safe: it puts the checkout on the remote branch,
 reinstalls, and leaves your config, notes, database and accounts alone. It
 reads the name, address and database back out of the existing config
 rather than asking again, and asks for an account only while the server
-has none.
+has none. On a server that is running and answering it asks first
+whether to update it, and Enter says yes; `--update` skips the question,
+and without a terminal a server that is well is left as it is.
 
 **The terminal app is on the server too.** `cm` at the box opens it, you
 sign in with your own name and password, and an administrator has

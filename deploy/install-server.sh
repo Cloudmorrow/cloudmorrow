@@ -21,9 +21,10 @@
 # server beside it, whichever addresses it was told to answer on.
 #
 # Run it again on a machine that already has Cloudmorrow and it checks the
-# server first: running and answering, it says so and changes nothing;
-# otherwise it updates and reinstalls it, and checks again. --update does
-# that whatever the check says. It never overwrites an existing
+# server first: running and answering, it asks whether to update it (Enter
+# says yes; without a terminal it changes nothing); otherwise it updates
+# and reinstalls it, and checks again. --update does that without asking.
+# It never overwrites an existing
 # /etc/cloudmorrow/server.toml, everyone's files, or the database, and it never
 # asks a question it already has the answer to. For routine "I pushed a
 # change" updates, use `cloudmorrow update server` from any machine, or the
@@ -482,6 +483,15 @@ wait_healthy() {
 	done
 }
 
+# Questions are asked on the terminal, not stdin: the script itself may be
+# what is on stdin when it arrives through `curl | sh`. Nothing is asked at
+# all without a terminal or with --dry-run, so a script that gives every
+# answer as a flag runs straight through.
+TTY=""
+if [ -z "$DRY_RUN" ] && ( : </dev/tty ) 2>/dev/null; then
+	TTY="1"
+fi
+
 if [ -z "$UPDATE" ] && [ -z "$DRY_RUN" ] && [ -f "$CONFIG" ] && [ -x "$VENV/bin/cloudmorrow-server" ]; then
 	if problem="$(health)"; then
 		NAME_NOW="$(config_value name)"
@@ -490,27 +500,42 @@ if [ -z "$UPDATE" ] && [ -z "$DRY_RUN" ] && [ -f "$CONFIG" ] && [ -x "$VENV/bin/
 		printf "\n  ${GOOD}✓${OFF} %s is already here, running and answering.\n" "${NAME_NOW:-Cloudmorrow}"
 		heading "Open it"
 		line "${URL_NOW:-$LOCAL_NOW}/app"
-		heading "Nothing to do. To update it anyway"
-		item "here" "cloudmorrow-update"
-		item "anywhere" "cloudmorrow update server"
-		item "all again" "... | sudo sh -s -- --update"
 		printf '\n'
-		exit 0
+		# Somebody at a terminal ran the installer again on purpose, and the
+		# usual purpose is an update: the newest code, the packages, the unit,
+		# the commands, all of it, with the config, files and database left as
+		# they are. Enter says yes. Without a terminal nothing is asked, and a
+		# server that is well is left as it is — --update says otherwise.
+		if [ -n "$TTY" ]; then
+			printf '\033[1m%s\033[0m [Y/n]: ' "Update it? (settings, files and accounts are kept)" >/dev/tty
+			read -r answer </dev/tty || answer="n"
+			case "$answer" in
+			"" | [Yy] | [Yy][Ee][Ss])
+				printf '\n' >/dev/tty
+				say "updating and reinstalling it, then checking again"
+				;;
+			*)
+				printf '\n  Left as it is.\n\n'
+				exit 0
+				;;
+			esac
+		else
+			heading "Nothing to do. To update it anyway"
+			item "here" "cloudmorrow-update"
+			item "anywhere" "cloudmorrow update server"
+			item "all again" "... | sudo sh -s -- --update"
+			printf '\n'
+			exit 0
+		fi
+	else
+		warn "Cloudmorrow is installed here, but $problem"
+		say "updating and reinstalling it, then checking again"
 	fi
-	warn "Cloudmorrow is installed here, but $problem"
-	say "updating and reinstalling it, then checking again"
 fi
 
 # --- the questions ---------------------------------------------------------
-# Asked on the terminal, not stdin: the script itself may be what is on stdin
-# when it arrives through `curl | sh`. Nothing is asked twice — an existing
-# config keeps its name and address, an existing account is left alone — and
-# nothing is asked at all without a terminal or with --dry-run, so a script
-# that gives every answer as a flag runs straight through.
-TTY=""
-if [ -z "$DRY_RUN" ] && ( : </dev/tty ) 2>/dev/null; then
-	TTY="1"
-fi
+# Nothing is asked twice — an existing config keeps its name and address, an
+# existing account is left alone.
 
 ask() {
 	# ask VAR "question" "default": sets VAR unless it already has a value.
