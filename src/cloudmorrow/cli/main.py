@@ -21,6 +21,7 @@ from typing import Annotated
 
 import typer
 
+from cloudmorrow import localserver
 from cloudmorrow.agent.setup import ensure_agent, stop_agent
 from cloudmorrow.cli import (
     agent,
@@ -108,8 +109,10 @@ def login(
     if server:
         config.api_url = server.rstrip("/")
         config.save()
-    elif not config_path().exists() and not os.environ.get("CLOUDMORROW_API_URL"):
+    elif not config_path().exists() and not os.environ.get("CLOUDMORROW_API_URL") and not localserver.is_here():
         # Nothing given and nothing configured: look on the home network.
+        # Not on the server itself, which the config found beside it, and
+        # which may answer on no network at all.
         choose_cloud(config)
     username = username or input("Username: ").strip()
     password = getpass.getpass("Password: ")

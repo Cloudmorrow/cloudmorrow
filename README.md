@@ -129,7 +129,10 @@ standard quills it should have (Notes, Tasks, Calendar, Channels, Files,
 Secrets; all of them unless you untick some). Then it creates a service
 user, clones the code into `/opt/cloudmorrow` (or where you said), builds a
 virtualenv, writes the config and the systemd unit, generates the
-encryption key, starts the service and makes your account. Run it again any time: if the server is running and answering, it
+encryption key, starts the service and makes your account. The terminal
+app is on the server too: `cm` at the box signs in to the server beside
+it, whichever addresses it answers on, and an administrator has
+Administration there as anywhere. Run it again any time: if the server is running and answering, it
 says so and changes nothing; if not, it updates and reinstalls it and checks
 again (`--update` does that either way). It keeps your config, notes,
 database and accounts, and never asks a question it already has the answer to.

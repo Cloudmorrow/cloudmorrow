@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 import pytest
 from fastapi.testclient import TestClient
 
+from cloudmorrow import localserver
 from cloudmorrow.client.config import ClientConfig
 from cloudmorrow.server import database
 from cloudmorrow.server.app import create_app
@@ -31,6 +32,11 @@ def isolated_client_config(tmp_path_factory, monkeypatch):
     that needs this is always the one that forgot to ask for it.
     """
     monkeypatch.setenv("CLOUDMORROW_CONFIG_DIR", str(tmp_path_factory.mktemp("client-config")))
+    # And no server on this machine, whatever is in /etc where the tests run:
+    # a client with no config of its own would otherwise sign in to it
+    # (cloudmorrow.localserver). A test about that points this at a config.
+    monkeypatch.delenv("CLOUDMORROW_SERVER_CONFIG", raising=False)
+    monkeypatch.setattr(localserver, "CONFIG_PATH", tmp_path_factory.mktemp("no-server") / "server.toml")
 
 
 # A local copy of the Quill Catalog, so no test reaches the network.

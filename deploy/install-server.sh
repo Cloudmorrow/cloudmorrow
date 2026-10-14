@@ -17,6 +17,8 @@
 # The cloud is reached at this machine's address, and on a home network at
 # <name>.local. Reaching it from outside is your own setup: a domain and a
 # reverse proxy of your own (--public-url), or a VPN such as Tailscale.
+# On the server itself, `cm` opens the terminal app and signs in to the
+# server beside it, whichever addresses it was told to answer on.
 #
 # Run it again on a machine that already has Cloudmorrow and it checks the
 # server first: running and answering, it says so and changes nothing;
@@ -57,7 +59,7 @@ HOST_GIVEN=""
 DATABASE=""
 
 usage() {
-	sed -n '2,18p' "$0"
+	sed -n '2,20p' "$0"
 	cat <<EOF
 
 Options:
@@ -812,13 +814,33 @@ if [ ! -x "$VENV/bin/python" ]; then
 	say "creating the virtualenv at $VENV"
 	run sudo -u "$SERVICE_USER" "$PYTHON" -m venv "$VENV"
 fi
-# Both extras: the server runs an agent of its own, so it needs what an agent
-# needs as well as what the API needs.
-say "installing cloudmorrow[server,agent] (editable, so updates are a git pull)"
+# Three extras: the server runs an agent of its own, so it needs what an
+# agent needs as well as what the API needs; and the terminal app is here
+# too, for `cm` at the box.
+say "installing cloudmorrow[server,agent,tui] (editable, so updates are a git pull)"
 run sudo -u "$SERVICE_USER" "$VENV/bin/python" -m pip install --quiet --upgrade pip
-run sudo -u "$SERVICE_USER" "$VENV/bin/python" -m pip install --quiet --editable "$SRC[server,agent]"
+run sudo -u "$SERVICE_USER" "$VENV/bin/python" -m pip install --quiet --editable "$SRC[server,agent,tui]"
 
 run ln -sf "$VENV/bin/cloudmorrow-server" /usr/local/bin/cloudmorrow-server
+
+# The terminal app, on the server as on any other machine: `cm` (or
+# `cloudmorrow`) signs in with a name and a password and has Administration.
+# It needs no address: with no config of their own, a client on this box
+# reads where the server listens off server.toml (cloudmorrow/localserver.py)
+# and reaches it there, whichever addresses were chosen above. A `cm` on
+# this machine that is not ours is left where it is.
+link_command() {
+	if [ -e "/usr/local/bin/$1" ] || [ -L "/usr/local/bin/$1" ]; then
+		case "$(readlink "/usr/local/bin/$1" 2>/dev/null)" in
+		"$VENV/bin/$1") ;;
+		*) warn "/usr/local/bin/$1 is not ours, so it stays; the terminal app here is $VENV/bin/$1"; return 0 ;;
+		esac
+	fi
+	run ln -sf "$VENV/bin/$1" "/usr/local/bin/$1"
+}
+say "linking cm and cloudmorrow, the terminal app, into /usr/local/bin"
+link_command cm
+link_command cloudmorrow
 
 
 # --- where it answers -----------------------------------------------------
@@ -993,7 +1015,7 @@ builtin) ;;
 container | postgresql://* | postgres://*)
 	# The driver, on top of what is installed already.
 	say "installing the PostgreSQL driver (cloudmorrow[postgres])"
-	run sudo -u "$SERVICE_USER" "$VENV/bin/python" -m pip install --quiet --editable "$SRC[server,agent,postgres]"
+	run sudo -u "$SERVICE_USER" "$VENV/bin/python" -m pip install --quiet --editable "$SRC[server,agent,tui,postgres]"
 	;;
 *) die "--database is builtin, container, or a postgresql:// URL, not \"$DATABASE\"" ;;
 esac
@@ -1307,6 +1329,16 @@ if [ -z "$PUBLIC_URL" ]; then
 fi
 if [ -n "$ACCOUNT_MADE" ]; then
 	line "and sign in as $ACCOUNT"
+fi
+
+heading "Or here, in this terminal"
+line "cm"
+if [ -n "$ACCOUNT_MADE" ]; then
+	line "sign in as $ACCOUNT; Administration"
+	line "is on the top bar (f9)"
+else
+	line "sign in as an administrator;"
+	line "Administration is on the top bar (f9)"
 fi
 
 if [ -z "$PUBLIC_URL" ]; then

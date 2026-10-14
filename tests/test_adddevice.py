@@ -95,3 +95,24 @@ async def test_add_a_device_from_settings(app):
         assert f"{app.client_config.api_url}/install.sh" in plain(str(text.content))
         await pilot.click("#close")
         await dialog(pilot)
+
+
+def test_on_the_server_the_address_to_hand_a_device_is_the_public_one(tmp_path, monkeypatch):
+    """`cm` at the box signs in over loopback, which is no address for a phone."""
+    from cloudmorrow import localserver
+    from cloudmorrow.tui.screens.adddevice import device_base
+
+    path = tmp_path / "server.toml"
+    monkeypatch.setattr(localserver, "CONFIG_PATH", path)
+    # Not on the server: whatever this client signed in to.
+    assert device_base("https://cloud.example.com") == "https://cloud.example.com"
+    assert device_base("http://127.0.0.1:8787") == "http://127.0.0.1:8787"
+    # On it, with an address of its own: that one.
+    path.write_text('[server]\nhost = "192.168.1.5"\npublic_url = "https://cloud.example.com/"\n')
+    assert device_base("http://192.168.1.5:8787") == "https://cloud.example.com"
+    assert device_base("http://127.0.0.1:8787") == "https://cloud.example.com"
+    # Signed in to some other cloud from the server box: that cloud, as anywhere.
+    assert device_base("https://other.example") == "https://other.example"
+    # On it, with none: the address it signed in over is all there is.
+    path.write_text('[server]\nhost = "0.0.0.0"\n')
+    assert device_base("http://127.0.0.1:8787") == "http://127.0.0.1:8787"

@@ -18,6 +18,7 @@ from rich.table import Table
 from cloudmorrow import __version__
 from cloudmorrow.console import TITLE
 from cloudmorrow.console import console as make_console
+from cloudmorrow.links import ensure_commands_linked
 from cloudmorrow.logo import banner
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.db import (
@@ -320,8 +321,8 @@ def agent_install(
         # needs. A deployment from before that was true has only [server].
         console.print(
             f"[red]The agent's dependencies are not installed here[/] ({exc.name}).\n"
-            "[dim]The server's venv needs both extras now that it runs an agent:[/]\n"
-            "  pip install --editable '/path/to/checkout[server,agent]'\n"
+            "[dim]The server's venv needs the agent's extra now that it runs an agent:[/]\n"
+            "  pip install --editable '/path/to/checkout[server,agent,tui]'\n"
             "[dim]`cloudmorrow update server --force` does that for you.[/]"
         )
         raise typer.Exit(code=1) from None
@@ -453,6 +454,15 @@ def update(
         )
     if result.reinstalled:
         console.print("[dim]reinstalled the package[/]")
+    if result.unlinked:
+        # The terminal app is in the venv now; onto the PATH is root's to do.
+        names = " and ".join(result.unlinked)
+        venv = Path(sys.executable).resolve().parent.parent
+        console.print(
+            f"[yellow]{names} installed, but not on this machine's PATH[/] (only root can link it):\n"
+            f"  sudo ln -s {venv}/bin/cm /usr/local/bin/cm\n"
+            "[dim]or run install-server.sh again with --update, which does that and the rest.[/]"
+        )
     if result.changed or force:
         try:
             published = build_wheel(result.source, load_config(config_path).dist_dir)
@@ -545,6 +555,10 @@ def version() -> None:
 
 
 def main() -> None:
+    # A run with the right to write /usr/local/bin — root's — puts `cm`
+    # beside cloudmorrow-server there, if an update, as the service user,
+    # could not. Quietly; nothing here may stop what was asked for.
+    ensure_commands_linked()
     app()
 
 

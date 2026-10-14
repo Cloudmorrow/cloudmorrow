@@ -13,7 +13,9 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, Label, Static
 
+from cloudmorrow import localserver
 from cloudmorrow.qrtext import qr_markup
+from cloudmorrow.transport import is_local_url
 from cloudmorrow.tui.screens.modals import Modal
 
 
@@ -56,7 +58,19 @@ class AddDeviceModal(Modal[None]):
 
     def _base(self) -> str:
         config = getattr(self.app, "client_config", None)
-        return getattr(config, "api_url", "") or ""
+        return device_base(getattr(config, "api_url", "") or "")
+
+
+def device_base(api_url: str) -> str:
+    """The address to hand another device: the one this client uses, unless that is the server here.
+
+    On the server itself `cm` signs in over the server's own address — a
+    loopback, or one of the box's — which is no address for a phone. The
+    server's `public_url`, when it has one, is.
+    """
+    if localserver.is_here() and (is_local_url(api_url) or localserver.answers_on(api_url)):
+        return localserver.public_url() or api_url
+    return api_url
 
     def on_mount(self) -> None:
         self.query_one("#add-device-body", VerticalScroll).can_focus = False
