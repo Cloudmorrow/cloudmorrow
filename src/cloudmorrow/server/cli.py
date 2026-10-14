@@ -98,6 +98,7 @@ def serve(
         f"  per-user  : [cyan]{config.per_user_dirs}[/]\n"
         f"  listening : [cyan]{', '.join(f'{h}:{config.port}' for h in config.hosts)}[/]\n"
         f"  public url: [cyan]{config.public_url or 'derived from each request'}[/]\n"
+        f"  proxies   : [cyan]{config.forwarded_allow_ips or '127.0.0.1 (this machine only)'}[/]\n"
         f"  config    : [cyan]{config.config_path or 'defaults + environment'}[/]\n"
     )
     if _store(config).count() == 0:
@@ -112,6 +113,7 @@ def serve(
             host=config.hosts[0],
             port=config.port,
             reload=True,
+            forwarded_allow_ips=config.forwarded_allow_ips,
             timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
         )
     else:
@@ -123,12 +125,19 @@ def serve(
                 create_app(config),
                 host=hosts[0],
                 port=config.port,
+                forwarded_allow_ips=config.forwarded_allow_ips,
                 timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
             )
             return
         # Several addresses: uvicorn takes one host, but serves any sockets
         # it is handed, so each is bound here.
-        server = uvicorn.Server(uvicorn.Config(create_app(config), timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS))
+        server = uvicorn.Server(
+            uvicorn.Config(
+                create_app(config),
+                forwarded_allow_ips=config.forwarded_allow_ips,
+                timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
+            )
+        )
         server.run(sockets=[_listen(h, config.port) for h in hosts])
 
 
