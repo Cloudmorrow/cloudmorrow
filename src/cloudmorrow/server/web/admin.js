@@ -15,7 +15,8 @@
    Two screens. The panel, which is the sections under a switch, and one
    account's page, which is the same form whether it is a new account or one
    that already exists. The circles (circlesadmin.js) and the Quills
-   (quillsadmin.js, with its install sheet) are files of their own. */
+   (quillsadmin.js, with its install sheet) are files of their own; the
+   server's own section — what it runs, and updating it — is below. */
 
 import {
   api, app, esc, formatDate, heading, icons, mount, nav, onSignOut, registerScreen, renderRoute,
@@ -68,7 +69,7 @@ export const isAdmin = (who) => Boolean(who && who.is_admin);
 export function adminRow() {
   return `<div class="group"><a class="row admin-link" href="#/admin">
     <span class="main"><span class="title">Administration</span>
-    <span class="meta"><span class="preview">The accounts, their circles, what this server offers, its Quills, and how it is reached</span></span></span>
+    <span class="meta"><span class="preview">The accounts, their circles, what this server offers, its Quills, and the server itself</span></span></span>
     ${icons.chevronRight}</a></div>`;
 }
 
@@ -76,7 +77,7 @@ export function adminRow() {
 async function renderAdmin() {
   if (!(await requireAdmin())) return;
   const side = store.get("admin.side");
-  const which = ["circles", "features", "quills"].includes(side) ? side : "users";
+  const which = ["circles", "features", "quills", "server"].includes(side) ? side : "users";
   // The + beside the heading makes whatever this side lists.
   const making = { users: ["#/adminuser", "New account"], circles: ["#/admincircle", "New circle"] }[which];
   mount(nav({ back: "#/me", backLabel: "Me", title: "Administration" }) + `
@@ -89,6 +90,7 @@ async function renderAdmin() {
         <button data-side="circles"${which === "circles" ? ' class="active"' : ""}>Circles</button>
         <button data-side="features"${which === "features" ? ' class="active"' : ""}>Features</button>
         <button data-side="quills"${which === "quills" ? ' class="active"' : ""}>Quills</button>
+        <button data-side="server"${which === "server" ? ' class="active"' : ""}>Server</button>
       </div>
       <div class="panel"><p class="empty"><b>…</b></p></div>
     </main>`);
@@ -107,6 +109,7 @@ async function renderAdmin() {
   if (which === "users") await drawUsers(panel);
   else if (which === "circles") await drawCircles(panel);
   else if (which === "features") await drawFeatures(panel);
+  else if (which === "server") await drawServer(panel);
   else await drawQuills(panel);
 }
 
@@ -191,6 +194,147 @@ function featureRow(feature) {
     </span>
     <input type="checkbox" data-key="${esc(feature.key)}"${feature.enabled ? " checked" : ""}
       aria-label="${esc(feature.label)}"></label>`;
+}
+
+// -- the server itself -----------------------------------------------------------------------
+// What this server runs, and the way to the newest: the same deploy
+// `cloudmorrow update server` asks for, from the phone. The server puts its
+// checkout on what its remote branch says, reinstalls, republishes the
+// client wheel and restarts onto the new code — and this screen, like the
+// command, watches it go away and come back, then reloads onto the new
+// app. `/api/health` is the witness at both ends: the version never moves
+// between commits, so the commit is the only honest answer to "did it land".
+const HEALTH_WAIT = 60 * 1000;
+
+async function drawServer(panel) {
+  const health = await api("GET", "/api/health");
+  panel.innerHTML = `
+    <p class="group-label">Running</p>
+    <div class="group">
+      <div class="row"><span class="main">Version</span><span class="value">${esc(health.version || "?")}</span></div>
+      <div class="row"><span class="main">Commit</span><span class="value">${esc(shortCommit(health.commit) || "not a checkout")}</span></div>
+      <div class="row"><span class="main">Accounts</span><span class="value">${esc(String(health.users ?? "?"))}</span></div>
+    </div>
+    <p class="group-label">Updating</p>
+    <p class="note">The server fetches the newest code from its git remote, reinstalls,
+      republishes the app the computers install, and restarts onto it. Everybody is
+      offline for a few seconds, and this app comes back on the new version by itself.
+      The same as <code>cloudmorrow update server</code> from a computer.</p>
+    <div class="group"><button class="row primary update-server" type="button">Update server</button></div>
+    <div class="update-log" hidden></div>`;
+
+  const button = panel.querySelector(".update-server");
+  const log = panel.querySelector(".update-log");
+  button.addEventListener("click", async () => {
+    const sure = confirm(
+      "Update the server?\n\nIt fetches the newest code, reinstalls and restarts. "
+      + "Everybody is offline for a few seconds.",
+    );
+    if (!sure) return;
+    button.disabled = true;
+    button.textContent = "Updating…";
+    log.hidden = false;
+    log.innerHTML = "";
+    const line = (text, tone = "") => {
+      const p = document.createElement("p");
+      if (tone) p.className = tone;
+      p.textContent = text;
+      log.append(p);
+      return p;
+    };
+    let result;
+    try {
+      result = await api("POST", "/api/server/update", {});
+    } catch (err) {
+      const why = err.status === 404
+        ? "This server is from before updates over the API. Update it once with `cloudmorrow update server --ssh`."
+        : err.message;
+      line(why, "bad");
+      button.disabled = false;
+      button.textContent = "Update server";
+      return;
+    }
+    for (const [text, tone] of deployLines(result)) line(text, tone);
+    if (!result.restarting) {
+      button.disabled = false;
+      button.textContent = "Update server";
+      return;
+    }
+    const waiting = line("Restarting — waiting for the server to come back…", "muted");
+    const back = await waitForServer(result.new_commit);
+    if (back === null) {
+      waiting.textContent = "The server has not answered yet. It may still be starting; this app reloads when it does.";
+      waiting.className = "warn";
+      button.disabled = false;
+      button.textContent = "Update server";
+      return;
+    }
+    waiting.textContent = back === result.new_commit
+      ? `Back up on ${shortCommit(back)}. Reloading…`
+      : `Back up, but on ${shortCommit(back)} rather than ${shortCommit(result.new_commit)} — something else deployed at the same time? Reloading…`;
+    waiting.className = back === result.new_commit ? "good" : "warn";
+    // The page is last week's app by now; the server has the new one.
+    setTimeout(() => location.reload(), 1200);
+  });
+}
+
+const shortCommit = (commit) => (commit || "").slice(0, 8);
+
+// What to call one end of a deploy: its release, or its commit. A tagged
+// commit is a release and says so; anything else is named by its commit,
+// rather than read as a release it is not. The same words the command prints.
+function deployName(result, end) {
+  const version = (result[`${end}_version`] || "").trim();
+  const commit = shortCommit(result[`${end}_commit`]);
+  return version && !version.includes(".dev") ? `v${version}` : commit;
+}
+
+/** The lines that say what a deploy did, each with its tone. */
+export function deployLines(result) {
+  const lines = [];
+  if (result.discarded) {
+    lines.push([`Rewound onto origin/${result.branch}, discarding ${result.discarded} commit${
+      result.discarded === 1 ? "" : "s"} the remote does not have`, "warn"]);
+  }
+  if (result.changed) {
+    let from = deployName(result, "old");
+    let to = deployName(result, "new");
+    if (from === to) { from = shortCommit(result.old_commit); to = shortCommit(result.new_commit); }
+    lines.push([`Updated ${from} → ${to} · ${result.changed_files} files · ${result.branch}`, "good"]);
+  } else {
+    lines.push([`Already up to date · ${deployName(result, "new")} · ${result.branch}`, "good"]);
+  }
+  if (result.commit_subject) lines.push([result.commit_subject, "muted"]);
+  const done = [];
+  if (result.reinstalled) done.push("reinstalled");
+  if (result.published_wheel) done.push(`published ${result.published_wheel}`);
+  if (done.length) lines.push([done.join(" · "), "muted"]);
+  if (result.restart_blocked) {
+    lines.push([`Not restarted: ${result.restart_blocked}`, "warn"]);
+    lines.push(["The new code is on disk; the old code is still serving.", "muted"]);
+  }
+  return lines;
+}
+
+// The server going away and coming back: /api/health answers again, and
+// says which commit it is on. Null when it has not answered in time. A
+// moment first, or the old process, still draining, answers for the new.
+// Through `api` like every other call, so a server that comes back and
+// turns the token away signs out the way it does everywhere; the clock on
+// the address keeps a browser from answering from its cache.
+async function waitForServer(expect) {
+  const deadline = Date.now() + HEALTH_WAIT;
+  await new Promise((r) => setTimeout(r, 2000));
+  while (Date.now() < deadline) {
+    try {
+      const body = await api("GET", "/api/health?t=" + Date.now());
+      const commit = body.commit || "";
+      // The old process answering with the old commit is not "back".
+      if (commit === expect || !commit) return commit;
+    } catch { /* down: that is the restart */ }
+    await new Promise((r) => setTimeout(r, 700));
+  }
+  return null;
 }
 
 // -- one account -------------------------------------------------------------------------
