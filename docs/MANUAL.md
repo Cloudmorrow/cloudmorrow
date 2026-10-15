@@ -604,7 +604,13 @@ the first of those, `--branch` deploys something other than the current branch,
 and `--no-restart` leaves the new code on disk with the old code still serving.
 
 Under the hood the ssh path is `cloudmorrow-server update`, which also takes
-`--source` if you need it.
+`--source` if you need it. The checkout belongs to the service user, and git
+refuses to touch a checkout owned by somebody else ("dubious ownership"), so
+`cloudmorrow-server update` run as root does what `cloudmorrow-update` does:
+the update as the owner, only the restart as root. Run as any other user it
+stops and says whose checkout it is. Do not add the `safe.directory`
+exception git suggests: files root writes there are files the service user
+cannot update past.
 
 **Upgrading a server installed before any of this existed.** The endpoint and
 the `Restart=always` unit both arrive *in* an update, so the first one still

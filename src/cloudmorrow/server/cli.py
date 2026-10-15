@@ -8,6 +8,7 @@ import os
 import platform
 import shutil
 import socket
+import subprocess
 import sys
 from pathlib import Path
 from typing import Annotated
@@ -31,7 +32,14 @@ from cloudmorrow.server.db import (
 from cloudmorrow.server.quills.cli import app as quill_app
 from cloudmorrow.server.sealed import Sealer, key_for, rotate
 from cloudmorrow.server.security import hash_password
-from cloudmorrow.server.update import UpdateError, build_wheel, describe, find_source_dir
+from cloudmorrow.server.update import (
+    UpdateError,
+    build_wheel,
+    describe,
+    find_source_dir,
+    owned_by_someone_else,
+    restart_service,
+)
 from cloudmorrow.server.update import update as do_update
 
 app = typer.Typer(help="Cloudmorrow API server.", no_args_is_help=True)
@@ -412,6 +420,24 @@ def update(
 ) -> None:
     """Pull the latest code from git and restart the server."""
     try:
+        checkout = find_source_dir(source)
+        owner = owned_by_someone_else(checkout)
+        if owner and os.geteuid() == 0:
+            # Root, in the service user's checkout: git would refuse, and the
+            # files root left behind would be worse. Do what cloudmorrow-update
+            # does — the update as the owner, the restart as root.
+            _update_as(
+                owner,
+                checkout,
+                config_path=config_path,
+                branch=branch,
+                service=service,
+                restart=restart,
+                reinstall=reinstall,
+                force=force,
+                exit_status=exit_status,
+            )
+            return
         result = do_update(
             source=source,
             branch=branch,
@@ -475,6 +501,69 @@ def update(
         # --no-restart is what cloudmorrow-update passes before restarting the
         # service itself, so this is a note, not a warning.
         console.print("[dim]not restarted, as asked[/]")
+
+
+def _update_as(
+    owner: str,
+    checkout: Path,
+    *,
+    config_path: Path | None,
+    branch: str | None,
+    service: str,
+    restart: bool,
+    reinstall: bool,
+    force: bool,
+    exit_status: bool,
+) -> None:
+    """Run this same command as *owner* with --no-restart, then restart as root."""
+    command = [
+        "sudo",
+        "-u",
+        owner,
+        "-H",
+        *_this_command(),
+        "update",
+        "--source",
+        str(checkout),
+        "--no-restart",
+        "--exit-status",
+    ]
+    if config_path is not None:
+        command += ["--config", str(config_path)]
+    if branch:
+        command += ["--branch", branch]
+    if not reinstall:
+        command.append("--no-reinstall")
+    if force:
+        command.append("--force")
+    console.print(f"[dim]{checkout} belongs to {owner}; updating as {owner}[/]")
+    try:
+        # stdio inherited: the update's own output arrives as it happens.
+        completed = subprocess.run(command)
+    except OSError as exc:
+        console.print(f"[red]cannot run sudo: {exc}[/]")
+        raise typer.Exit(code=1) from None
+    if completed.returncode == 3:
+        # Nothing to pull, so nothing to restart.
+        raise typer.Exit(code=3 if exit_status else 0)
+    if completed.returncode != 0:
+        raise typer.Exit(code=completed.returncode)
+    if restart:
+        try:
+            restart_service(service)
+        except UpdateError as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(code=1) from None
+        console.print(f"[green]Restarted[/] {service}")
+
+
+def _this_command() -> list[str]:
+    """How to run cloudmorrow-server again: the console script when that is what
+    is running, otherwise this interpreter and the module."""
+    script = Path(sys.argv[0]) if sys.argv and sys.argv[0] else None
+    if script is not None and script.name.startswith("cloudmorrow-server") and script.is_file():
+        return [str(script.resolve())]
+    return [sys.executable, "-m", "cloudmorrow.server.cli"]
 
 
 @app.command()
