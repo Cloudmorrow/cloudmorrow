@@ -70,6 +70,14 @@ allowed_client_ips = []
 # command it hands out, so set it when you run behind a reverse proxy.
 public_url = "https://cm.hl.bramlabs.io"
 
+# The reverse proxy, when it is another machine: addresses or CIDR ranges the
+# server believes X-Forwarded-Proto (and -For) from, or "*" for any. What the
+# proxy says is what makes a request https; a proxy on another box that is not
+# named here reaches the server as plain http, which an https public_url
+# refuses with 426. The loopback is always believed.
+#   trusted_proxies = ["100.115.4.117"]
+trusted_proxies = []
+
 # What /install.sh pip-installs. A wheel published with
 # `cloudmorrow-server publish` overrides this, which is what lets a machine with
 # no route to PyPI install from the server itself.

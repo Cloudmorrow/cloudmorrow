@@ -403,9 +403,9 @@ data volume unless the `postgres` profile is on, which runs PostgreSQL as
 a third container on a volume of its own (`COMPOSE_PROFILES=postgres
 POSTGRES_PASSWORD=… docker compose up -d`), or `CLOUDMORROW_DATABASE_URL`
 names a server of your own. Updating is replacing the image, so
-`allow_api_update` is off inside it, and `FORWARDED_ALLOW_IPS=*` lets
-uvicorn believe a proxy that is another container rather than the
-loopback. The wheel the image was built from is copied into `/data/dist`
+`allow_api_update` is off inside it, and `FORWARDED_ALLOW_IPS=*` (the
+same as `trusted_proxies = ["*"]`) lets uvicorn believe a proxy that is
+another container rather than the loopback. The wheel the image was built from is copied into `/data/dist`
 on every start, so `/install.sh` hands out the code that is running.
 
 Accounts can also be made from the server at any time; the first one on a
@@ -471,6 +471,19 @@ Three places, and only the first two matter for a normal setup:
   	reverse_proxy 100.71.157.19:8787
   }
   ```
+
+  A proxy on a different machine also has to be **trusted**, or the server
+  takes everything through it for plain http — refused with 426 once
+  `public_url` is https, and an `http://` install command before that:
+
+  ```toml
+  trusted_proxies = ["100.115.4.117"]   # the proxy's address, as the server sees it
+  ```
+
+  Addresses or CIDR ranges, or `"*"`; the loopback is always trusted, so a
+  proxy on the same box needs nothing. `--trusted-proxy` on the installer
+  writes it. What a trusted proxy says in `X-Forwarded-Proto` and
+  `X-Forwarded-For` is believed; from anyone else those headers are ignored.
 
 - **each client** — `cloudmorrow config set api_url https://cm.hl.bramlabs.io`,
   which the install script does for you.
@@ -1705,7 +1718,8 @@ things make sure that is the only plain hop:
 - **The server insists.** With `require_tls` on, which it is whenever
   `public_url` is https, a request that did not come over TLS is refused with
   426, and every TLS answer carries HSTS. What uvicorn reads from the proxy's
-  `X-Forwarded-Proto` is what counts. A call from the box itself with no
+  `X-Forwarded-Proto` is what counts — from the loopback, or a proxy named
+  in `trusted_proxies`. A call from the box itself with no
   proxy header — `curl 127.0.0.1:8787` — is let through; it crosses no wire.
   So is one straight to the port from the local network or the tailnet, with
   no proxy header: `http://<ip>:8787` in a browser at home answers. A plain

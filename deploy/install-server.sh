@@ -44,6 +44,7 @@ FILES_DIR=""
 SHARES_DIR=""
 CLOUD_NAME=""
 PUBLIC_URL=""
+TRUSTED_PROXIES=""
 HOST="0.0.0.0"
 PORT="8787"
 SERVICE_USER="cloudmorrow"
@@ -67,6 +68,9 @@ Options:
   --name TEXT         what your cloud is called         (asked if not given)
   --public-url URL    an address of your own, behind a reverse proxy of your
                       own
+  --trusted-proxy IP  that proxy, when it is another machine: its address
+                      (or CIDR; several comma-separated), so the server
+                      believes what it says about https
   --user NAME         the first account, an administrator (asked if not given;
                       its password is asked for, or read from
                       \$CLOUDMORROW_ADMIN_PASSWORD)
@@ -108,6 +112,7 @@ while [ $# -gt 0 ]; do
 	case "$1" in
 	--name) CLOUD_NAME="$2"; shift 2 ;;
 	--public-url) PUBLIC_URL="$2"; shift 2 ;;
+	--trusted-proxy) TRUSTED_PROXIES="$2"; shift 2 ;;
 	--user) ACCOUNT="$2"; shift 2 ;;
 	--quills) QUILLS="$2"; shift 2 ;;
 	--repo) REPO="$2"; shift 2 ;;
@@ -1062,6 +1067,7 @@ else
 	else
 		SHARES_LINE="# shares_dir = \"/srv/shares\""
 	fi
+	TRUSTED_PROXIES_LINE="$(printf '%s' "$TRUSTED_PROXIES" | tr ',' '\n' | sed -e 's/^ *//' -e 's/ *$//' -e '/^$/d' -e 's/.*/"&"/' | paste -sd, - | sed 's/,/, /g')"
 	if [ -n "$DATABASE_URL" ]; then
 		DATABASE_LINE="database_url = \"$DATABASE_URL\""
 	else
@@ -1105,6 +1111,13 @@ key_file = "$KEY_FILE"
 # own domain, behind your own reverse proxy. Empty, the page uses the
 # address it was opened at.
 public_url = "$PUBLIC_URL"
+
+# The reverse proxy, when it is another machine: its address or CIDR range,
+# so the server believes the proxy's X-Forwarded-Proto. That is what makes
+# a request https: without it, a proxy on another box reaches the server
+# as plain http, refused with 426 once public_url is https. A proxy on this
+# machine (127.0.0.1) is believed without being named.
+trusted_proxies = [$TRUSTED_PROXIES_LINE]
 
 token_ttl_hours = 720
 cors_origins = []
@@ -1344,6 +1357,10 @@ https://*)
 	heading "First, a proxy in front, for TLS"
 	line "With Caddy, this is the whole file:"
 	printf '\n      %s {\n          reverse_proxy %s:%s\n      }\n' "$PUBLIC_HOST" "$HEALTH_HOST" "$PORT"
+	if [ -z "$TRUSTED_PROXIES" ]; then
+		line "On another machine, name it: trusted_proxies"
+		line "in the settings, or --trusted-proxy here."
+	fi
 	;;
 esac
 
