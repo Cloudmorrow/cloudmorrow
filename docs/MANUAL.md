@@ -474,7 +474,7 @@ Three places, and only the first two matter for a normal setup:
 
   A proxy on a different machine also has to be **trusted**, or the server
   takes everything through it for plain http — refused with 426 once
-  `public_url` is https, and an `http://` install command before that:
+  `public_url` is https:
 
   ```toml
   trusted_proxies = ["100.115.4.117"]   # the proxy's address, as the server sees it
@@ -484,6 +484,12 @@ Three places, and only the first two matter for a normal setup:
   proxy on the same box needs nothing. `--trusted-proxy` on the installer
   writes it. What a trusted proxy says in `X-Forwarded-Proto` and
   `X-Forwarded-For` is believed; from anyone else those headers are ignored.
+  One thing needs neither: the address the install page shows, the script
+  bakes in and `cm` signs in to is taken from `X-Forwarded-Proto` and
+  `X-Forwarded-Host` (or `Forwarded`) whoever sent them, because they change
+  only the address handed back to the one who asked. So an untrusted proxy
+  still hands out an `https://` command; it just cannot let the sign-in
+  through until it is trusted or `public_url` is set.
 
 - **each client** — `cloudmorrow config set api_url https://cm.hl.bramlabs.io`,
   which the install script does for you.

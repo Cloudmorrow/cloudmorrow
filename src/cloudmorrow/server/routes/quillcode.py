@@ -33,6 +33,7 @@ from cloudmorrow.server.quills.proxy import MAX_BODY, forward, read_body
 from cloudmorrow.server.quills.tokens import runs_as
 from cloudmorrow.server.records import Principal
 from cloudmorrow.server.routes.errors import ERRORS, http_error
+from cloudmorrow.server.routes.install import base_url
 
 api_router = APIRouter(prefix="/api/q", tags=["quill code"])
 hooks_router = APIRouter(prefix="/hooks", tags=["quill code"])
@@ -207,7 +208,7 @@ def _supervisor(state: AppState):
 
 
 def _base(state: AppState, request: Request) -> str:
-    return (state.config.public_url or str(request.base_url)).rstrip("/")
+    return base_url(request, state)
 
 
 @admin_router.get("")
