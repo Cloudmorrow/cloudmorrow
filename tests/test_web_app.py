@@ -157,7 +157,7 @@ def test_a_screen_is_mounted_between_the_bars_not_written_over_the_page():
     one page with no bars, and the one allowed to clear the page."""
     core = (WEB / "core.js").read_text()
     assert "export function mount(html)" in core
-    assert 'header.innerHTML = newNav.innerHTML;' in core
+    assert "header.innerHTML = newNav.innerHTML;" in core
     assert "function placeTabs(newTabs)" in core
     for path in sorted(WEB.glob("*.js")):
         script = path.read_text()
