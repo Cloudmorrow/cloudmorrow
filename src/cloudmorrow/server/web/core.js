@@ -466,10 +466,26 @@ export const forgetHistory = () => { visited.length = 0; };
 
 let rendering = Promise.resolve();
 export function route() {
-  rendering = rendering.then(renderRoute).catch((err) => {
+  rendering = rendering.then(() => transition(renderRoute)).catch((err) => {
     console.error(err);
     if (!(err instanceof ApiError && err.status === 401)) toast(err.message || "Something went wrong");
   });
+}
+
+// A screen replaces the last one whole — bar, page and tabs — the moment
+// its data is in. A phone paints that in two goes: the page's background
+// first and the new screen a frame or more later, which on a dark page is
+// a flash of black between every tab. A view transition keeps the last
+// screen on the glass until the next one is painted, then fades between
+// them over a few frames (base.css says how). The update runs inside the
+// transition so the fetch is covered too: the old screen stays, still,
+// rather than giving way to nothing. A browser without the API draws as
+// before.
+function transition(update) {
+  if (!document.startViewTransition) return update();
+  let result;
+  const change = document.startViewTransition(async () => { result = await update(); });
+  return change.updateCallbackDone.then(() => result);
 }
 
 export async function renderRoute() {
