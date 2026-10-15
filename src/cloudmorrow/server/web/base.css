@@ -122,6 +122,20 @@ svg { display: block; }
 
 #app { min-height: 100dvh; display: flex; flex-direction: column; }
 
+/* -- from one screen to the next ----------------------------------------- */
+/* core.js draws the next screen inside a view transition: the last one
+   stays until the next is painted, and the two cross-fade. The bars keep
+   their place through it — named, each is its own fade, so the wordmark
+   and the tabs never go dark with the page between them. Short, because it
+   is a cut made smooth, not an effect; none at all for whoever asked for
+   less motion, and the hold until the next screen is painted still stands. */
+.nav { view-transition-name: nav; }
+.tabs { view-transition-name: tabs; }
+::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: .16s; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+
 /* -- the bar at the top ------------------------------------------------- */
 .nav {
   position: sticky;
