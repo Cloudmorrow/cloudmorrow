@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import re
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -19,15 +20,50 @@ VENV_HINT = "~/.local/share/cloudmorrow/venv"
 router = APIRouter(tags=["install"])
 
 
-def base_url(request: Request, state: AppState) -> str:
-    """The URL a new machine should curl.
+# A host as a proxy may name one: a name or an address, a port at most. Not a
+# path, not a userinfo, nothing that would make the URL built around it lie.
+HOST = re.compile(r"(?:[A-Za-z0-9.\-]+|\[[0-9A-Fa-f:.]+\])(?::\d{1,5})?")
 
-    `public_url` in the config wins, because behind a reverse proxy the request
-    the app sees is the proxy's, not the one the user typed.
+
+def forwarded(headers) -> tuple[str, str]:
+    """What a reverse proxy says the request was: (scheme, host), each empty when unsaid.
+
+    X-Forwarded-Proto and X-Forwarded-Host first, then the RFC 7239 Forwarded
+    header for what they left out; the first hop of each, which is the one
+    that heard the person.
+    """
+    scheme = headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+    host = headers.get("x-forwarded-host", "").split(",")[0].strip()
+    for part in headers.get("forwarded", "").split(",")[0].split(";"):
+        key, _, value = part.strip().partition("=")
+        value = value.strip().strip('"')
+        if key.lower() == "proto" and not scheme:
+            scheme = value.lower()
+        elif key.lower() == "host" and not host:
+            host = value
+    if scheme not in {"http", "https"}:
+        scheme = ""
+    if not HOST.fullmatch(host):
+        host = ""
+    return scheme, host
+
+
+def base_url(request: Request, state: AppState) -> str:
+    """The address a new machine should curl, and that `cm` then signs in to.
+
+    `public_url` in the config wins. Without it the request says, and when a
+    reverse proxy relayed it, what the proxy was asked rather than what it
+    asked us: a proxy on another machine reaches the server as plain http, and
+    unless it is in `trusted_proxies` uvicorn leaves the request that way, but
+    its X-Forwarded-* headers still carry what the person typed. Believing
+    them here is safe. They change only the address handed back to whoever
+    sent them; nothing that lets a request in or keeps one out reads this.
     """
     if state.config.public_url:
         return state.config.public_url.rstrip("/")
-    return str(request.base_url).rstrip("/")
+    scheme, host = forwarded(request.headers)
+    url = request.base_url.replace(scheme=scheme or request.url.scheme, netloc=host or request.url.netloc)
+    return str(url).rstrip("/")
 
 
 def page_css() -> str:
