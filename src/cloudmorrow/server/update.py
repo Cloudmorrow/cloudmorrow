@@ -24,6 +24,7 @@ back.
 from __future__ import annotations
 
 import os
+import pwd
 import re
 import shutil
 import signal
@@ -109,6 +110,46 @@ def find_source_dir(explicit: Path | None = None) -> Path:
             "Pass --source to point at the checkout, or set CLOUDMORROW_SOURCE_DIR."
         )
     return candidate
+
+
+def user_name(uid: int) -> str:
+    """The name for a uid, or the number when the system has no name for it."""
+    try:
+        return pwd.getpwuid(uid).pw_name
+    except KeyError:
+        return str(uid)
+
+
+def checkout_owner(checkout: Path) -> tuple[int, str]:
+    """Who owns the checkout: the uid, and its name."""
+    uid = checkout.stat().st_uid
+    return uid, user_name(uid)
+
+
+def owned_by_someone_else(checkout: Path) -> str | None:
+    """The owner's name when the checkout is not ours, else None.
+
+    git refuses to work in a checkout owned by another user ("dubious
+    ownership"), and it is right to: a `reset --hard` or a `pip install`
+    run as root in the service user's checkout leaves root's files behind,
+    which the service user then cannot update past. So the update runs as
+    the owner or not at all. On a server the owner is the service user, and
+    `cloudmorrow-update` is what runs it as them.
+    """
+    uid, name = checkout_owner(checkout)
+    return None if uid == os.geteuid() else name
+
+
+def not_the_owner(checkout: Path, owner: str) -> UpdateError:
+    me = user_name(os.geteuid())
+    return UpdateError(
+        f"{checkout} belongs to {owner}, and this is running as {me}.\n"
+        "git refuses a checkout owned by somebody else, and updating it as the wrong "
+        "user would leave files the owner cannot touch.\n"
+        f"Run `cloudmorrow-update`, which updates as {owner} and only restarts as root; "
+        f"or `sudo -u {owner} -H {sys.argv[0] or 'cloudmorrow-server'} update --no-restart` "
+        "and restart the service yourself."
+    )
 
 
 def current_commit(source: Path) -> str:
@@ -301,6 +342,8 @@ def update(
 ) -> UpdateResult:
     """Match the checkout to its remote branch, reinstall, restart the service."""
     checkout = find_source_dir(source)
+    if owner := owned_by_someone_else(checkout):
+        raise not_the_owner(checkout, owner)
     if working_tree_is_dirty(checkout) and not force:
         raise UpdateError(
             f"{checkout} has uncommitted changes.\n"

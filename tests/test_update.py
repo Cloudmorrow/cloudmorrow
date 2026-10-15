@@ -307,6 +307,131 @@ def test_exit_status_is_zero_when_something_was_pulled(deployment):
     assert "Updated" in result.stdout
 
 
+# -- whose checkout it is ---------------------------------------------------------
+def test_a_checkout_owned_by_somebody_else_is_refused_with_the_way_to_run_it(deployment, monkeypatch):
+    """git says "dubious ownership"; this says whose it is and what to run instead."""
+    import cloudmorrow.server.update as module
+
+    _, checkout = deployment
+    monkeypatch.setattr(module, "checkout_owner", lambda path: (999, "cloudmorrow"))
+    monkeypatch.setattr(module.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(module, "user_name", lambda uid: {1000: "jimmi"}.get(uid, str(uid)))
+    with pytest.raises(UpdateError) as caught:
+        update(source=checkout, restart=False, reinstall=False)
+    message = str(caught.value)
+    assert f"{checkout} belongs to cloudmorrow, and this is running as jimmi" in message
+    assert "cloudmorrow-update" in message
+    assert "sudo -u cloudmorrow -H" in message
+    # Nothing was touched: git never ran.
+    assert not working_tree_is_dirty(checkout)
+
+
+def test_ones_own_checkout_is_not_questioned(deployment):
+    from cloudmorrow.server.update import owned_by_someone_else
+
+    _, checkout = deployment
+    assert owned_by_someone_else(checkout) is None
+
+
+def test_root_hands_the_update_to_the_owner_and_restarts_itself(deployment, monkeypatch):
+    """`sudo cloudmorrow-server update` does what cloudmorrow-update does, rather than
+    running git as root in the service user's checkout."""
+    from typer.testing import CliRunner
+
+    import cloudmorrow.server.cli as cli
+
+    origin, checkout = deployment
+    push_commit(origin)
+    monkeypatch.setattr(cli, "owned_by_someone_else", lambda path: "cloudmorrow")
+    monkeypatch.setattr(cli.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(cli, "_this_command", lambda: ["cloudmorrow-server"])
+    ran: list[list[str]] = []
+    restarted: list[str] = []
+
+    class Done:
+        def __init__(self, code):
+            self.returncode = code
+
+    real_run = subprocess.run
+
+    def fake_run(command, **kwargs):
+        if command[0] != "sudo":
+            return real_run(command, **kwargs)
+        ran.append(command)
+        return Done(0)
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli, "restart_service", lambda service: restarted.append(service))
+
+    result = CliRunner().invoke(
+        cli.app, ["update", "--source", str(checkout), "--branch", "main", "--force", "--no-reinstall"]
+    )
+    assert result.exit_code == 0, result.stdout
+    assert ran == [
+        [
+            "sudo",
+            "-u",
+            "cloudmorrow",
+            "-H",
+            "cloudmorrow-server",
+            "update",
+            "--source",
+            str(checkout),
+            "--no-restart",
+            "--exit-status",
+            "--branch",
+            "main",
+            "--no-reinstall",
+            "--force",
+        ]
+    ]
+    assert restarted == ["cloudmorrow"]
+    assert "updating as cloudmorrow" in result.stdout
+    assert "Restarted cloudmorrow" in result.stdout
+    # The checkout itself was left to the owner: still on the old commit here.
+    assert current_commit(checkout) != current_commit(origin)
+
+
+def test_root_does_not_restart_when_the_owner_found_nothing_to_pull(deployment, monkeypatch):
+    from typer.testing import CliRunner
+
+    import cloudmorrow.server.cli as cli
+
+    _, checkout = deployment
+    monkeypatch.setattr(cli, "owned_by_someone_else", lambda path: "cloudmorrow")
+    monkeypatch.setattr(cli.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(cli, "_this_command", lambda: ["cloudmorrow-server"])
+
+    class Done:
+        returncode = 3
+
+    monkeypatch.setattr(cli.subprocess, "run", lambda command, **kwargs: Done())
+    monkeypatch.setattr(cli, "restart_service", lambda service: pytest.fail("restarted for nothing"))
+
+    runner = CliRunner()
+    args = ["update", "--source", str(checkout)]
+    assert runner.invoke(cli.app, args).exit_code == 0
+    assert runner.invoke(cli.app, [*args, "--exit-status"]).exit_code == 3
+
+
+def test_root_passes_the_owners_failure_on(deployment, monkeypatch):
+    from typer.testing import CliRunner
+
+    import cloudmorrow.server.cli as cli
+
+    _, checkout = deployment
+    monkeypatch.setattr(cli, "owned_by_someone_else", lambda path: "cloudmorrow")
+    monkeypatch.setattr(cli.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(cli, "_this_command", lambda: ["cloudmorrow-server"])
+
+    class Done:
+        returncode = 1
+
+    monkeypatch.setattr(cli.subprocess, "run", lambda command, **kwargs: Done())
+    monkeypatch.setattr(cli, "restart_service", lambda service: pytest.fail("restarted a failed update"))
+    assert CliRunner().invoke(cli.app, ["update", "--source", str(checkout)]).exit_code == 1
+
+
 def test_build_wheel_publishes_the_checkout(tmp_path):
     """The server is where clients get Cloudmorrow, so it builds its own wheel."""
     from cloudmorrow.server.update import build_wheel
