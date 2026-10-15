@@ -320,7 +320,7 @@ What it leaves behind:
 | `/etc/systemd/system/cloudmorrow.service` | runs as the `cloudmorrow` system user |
 | `/usr/local/bin/cloudmorrow-update` | the updater, below |
 | `/usr/local/bin/cm` | the terminal app, here on the server too (`cloudmorrow` beside it is the same command) |
-| `/etc/sudoers.d/cloudmorrow` | lets `--admin` run exactly those two commands |
+| `/etc/sudoers.d/cloudmorrow` | lets `--admin` run exactly what the updater needs: the update as the service user, the restart, and linking `cm` |
 | `/var/lib/cloudmorrow/.ssh/` | the deploy key the service pulls with, if the repo needed one |
 | `/etc/cloudmorrow/cloudmorrow.key` | the key everything is sealed with at rest |
 | `/etc/cloudmorrow/postgres.pgpass` | the database password, when the installer ran PostgreSQL in a container |

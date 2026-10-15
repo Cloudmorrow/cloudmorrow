@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import cloudmorrow
-from cloudmorrow.links import link_server_commands
+from cloudmorrow.links import link_server_commands, venv_prefix
 
 # A branch to deploy, not an option for git to read and not a path to escape.
 BRANCH = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$")
@@ -354,7 +354,7 @@ def update(
         # `cm` beside cloudmorrow-server on the PATH, which an update is the
         # first chance to do on a server from before it was there. Only root
         # may write /usr/local/bin; what the update could not link, it says.
-        unlinked = link_server_commands(Path(sys.executable).resolve().parent.parent)[1]
+        unlinked = link_server_commands(venv_prefix())[1]
 
     did_restart = False
     if restart and (new_commit != old_commit or force):

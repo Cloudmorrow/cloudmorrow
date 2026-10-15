@@ -343,6 +343,29 @@ def test_the_terminal_app_is_installed_on_the_server_too():
     assert "Administration" in page
 
 
+def test_the_updater_links_the_terminal_app_as_root():
+    """`cloudmorrow-update` pulls as the service user, which cannot write /usr/local/bin.
+
+    So the updater itself links `cm` and `cloudmorrow` there afterwards, through
+    sudo, and the sudoers rule allows exactly those two commands beside the
+    restart. That is how a server from before `cm` gets it on an update, and
+    how an admin without a root shell gets it at all.
+    """
+    text = INSTALLER.read_text()
+    updater = text[text.index("write_file /usr/local/bin/cloudmorrow-update") :]
+    updater = updater[: updater.index("\nEOF\n")]
+    assert "for name in cm cloudmorrow; do" in updater
+    assert "sudo -n $LN -s $VENV/bin/\\$name /usr/local/bin/\\$name" in updater
+    # Only what is missing, and never somebody else's cm.
+    assert '[ ! -e "/usr/local/bin/\\$name" ] && [ ! -L "/usr/local/bin/\\$name" ]' in updater
+    # Linked before the exit-3 shortcut, so a server with nothing to pull still gets it.
+    assert updater.index("for name in cm cloudmorrow") < updater.index('if [ "\\$status" = 3 ]')
+    sudoers = text[text.index('write_file "$SUDOERS"') :]
+    sudoers = sudoers[: sudoers.index("\nEOF\n")]
+    assert "$LN -s $VENV/bin/cm /usr/local/bin/cm" in sudoers
+    assert "$LN -s $VENV/bin/cloudmorrow /usr/local/bin/cloudmorrow" in sudoers
+
+
 def test_a_server_that_is_well_is_asked_about_before_it_is_updated():
     """Run again at a terminal on a running server, the installer asks; Enter says yes.
 

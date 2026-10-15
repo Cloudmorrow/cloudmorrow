@@ -23,6 +23,18 @@ COMMANDS = ("cloudmorrow", "cm", "cloudmorrow-agent")
 SERVER_COMMANDS = ("cloudmorrow", "cm")
 
 
+def venv_prefix() -> Path:
+    """The virtualenv this is running from: where its `bin/` is.
+
+    `sys.prefix`, and not `sys.executable` resolved: a venv's python is a
+    symlink to the interpreter it was made from, so resolving it lands in
+    /usr, and /usr/bin is not where our commands are. That mistake made
+    every link below a quiet no-op on a server whose venv was made the
+    ordinary way.
+    """
+    return Path(sys.prefix)
+
+
 def link_new_commands(prefix: Path, *, which=None) -> list[Path]:
     """Link commands new to this release beside the `cloudmorrow` already on the PATH.
 
@@ -91,7 +103,7 @@ def ensure_commands_linked() -> list[Path]:
     On a server, a run with the right to write /usr/local/bin — root's —
     is also when `cm` gets there, if an update could not put it there.
     """
-    prefix = Path(sys.executable).resolve().parent.parent
+    prefix = venv_prefix()
     try:
         linked = link_new_commands(prefix)
         linked += link_server_commands(prefix)[0]

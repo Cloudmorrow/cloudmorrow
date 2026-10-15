@@ -1195,6 +1195,7 @@ EOF
 fi
 
 # --- the updater your user runs -------------------------------------------
+LN="$(command -v ln || echo /bin/ln)"
 say "installing /usr/local/bin/cloudmorrow-update"
 write_file /usr/local/bin/cloudmorrow-update 0755 <<EOF
 #!/bin/sh
@@ -1208,6 +1209,20 @@ status=0
 sudo -u $SERVICE_USER -H $VENV/bin/cloudmorrow-server update --no-restart --exit-status "\$@" \
 	|| status=\$?
 [ "\$status" = 0 ] || [ "\$status" = 3 ] || exit "\$status"
+# The terminal app beside cloudmorrow-server on the PATH. The update above
+# runs as $SERVICE_USER, which cannot write /usr/local/bin, so whatever it
+# brought to the venv and could not link is linked here, as root: the
+# sudoers rule allows exactly these two commands. A cm that is not ours
+# is left alone.
+for name in cm cloudmorrow; do
+	if [ -x "$VENV/bin/\$name" ] && [ ! -e "/usr/local/bin/\$name" ] && [ ! -L "/usr/local/bin/\$name" ]; then
+		if sudo -n $LN -s $VENV/bin/\$name /usr/local/bin/\$name 2>/dev/null; then
+			printf 'linked /usr/local/bin/%s\\n' "\$name"
+		else
+			printf 'note: could not link %s onto the PATH; as root: ln -s %s /usr/local/bin/%s\\n' "\$name" "$VENV/bin/\$name" "\$name"
+		fi
+	fi
+done
 if [ "\$status" = 3 ]; then
 	exit 0
 fi
@@ -1226,12 +1241,14 @@ EOF
 if [ -n "$ADMIN_USER" ] && id "$ADMIN_USER" >/dev/null 2>&1; then
 	SYSTEMCTL="$(command -v systemctl || echo /usr/bin/systemctl)"
 	SUDOERS="/etc/sudoers.d/cloudmorrow"
-	say "granting $ADMIN_USER the two commands cloudmorrow-update needs"
+	say "granting $ADMIN_USER the commands cloudmorrow-update needs"
 	write_file "$SUDOERS" 0440 <<EOF
 # Installed by install-server.sh. Exactly what cloudmorrow-update needs, nothing more.
 $ADMIN_USER ALL=($SERVICE_USER) NOPASSWD: $VENV/bin/cloudmorrow-server update *
 $ADMIN_USER ALL=(root) NOPASSWD: $SYSTEMCTL restart $SERVICE_NAME, \\
-	$SYSTEMCTL start $SERVICE_NAME, $SYSTEMCTL stop $SERVICE_NAME
+	$SYSTEMCTL start $SERVICE_NAME, $SYSTEMCTL stop $SERVICE_NAME, \\
+	$LN -s $VENV/bin/cm /usr/local/bin/cm, \\
+	$LN -s $VENV/bin/cloudmorrow /usr/local/bin/cloudmorrow
 EOF
 	if [ -z "$DRY_RUN" ] && command -v visudo >/dev/null 2>&1; then
 		visudo -cf "$SUDOERS" >/dev/null || die "the sudoers drop-in did not validate"

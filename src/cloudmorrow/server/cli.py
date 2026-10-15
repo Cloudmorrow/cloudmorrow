@@ -18,7 +18,7 @@ from rich.table import Table
 from cloudmorrow import __version__
 from cloudmorrow.console import TITLE
 from cloudmorrow.console import console as make_console
-from cloudmorrow.links import ensure_commands_linked
+from cloudmorrow.links import ensure_commands_linked, venv_prefix
 from cloudmorrow.logo import banner
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.db import (
@@ -457,11 +457,11 @@ def update(
     if result.unlinked:
         # The terminal app is in the venv now; onto the PATH is root's to do.
         names = " and ".join(result.unlinked)
-        venv = Path(sys.executable).resolve().parent.parent
+        venv = venv_prefix()
         console.print(
             f"[yellow]{names} installed, but not on this machine's PATH[/] (only root can link it):\n"
             f"  sudo ln -s {venv}/bin/cm /usr/local/bin/cm\n"
-            "[dim]or run install-server.sh again with --update, which does that and the rest.[/]"
+            "[dim]or run cloudmorrow-update, or install-server.sh again with --update: either does that.[/]"
         )
     if result.changed or force:
         try:
