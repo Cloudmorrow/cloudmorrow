@@ -4,8 +4,8 @@
 
    A feature is a file of its own. It imports what it needs from here,
    registers its screens with `registerScreen` and its tab with
-   `registerTab`, and is listed once in app.js. Nothing in this file knows
-   what the features are. */
+   `registerTab`, puts each screen on the page with `mount`, and is listed
+   once in app.js. Nothing in this file knows what the features are. */
 
 export const app = document.getElementById("app");
 const toastEl = document.getElementById("toast");
@@ -466,31 +466,22 @@ export const forgetHistory = () => { visited.length = 0; };
 
 let rendering = Promise.resolve();
 export function route() {
-  rendering = rendering.then(() => transition(renderRoute)).catch((err) => {
+  // While a screen is being fetched the page says so — a line under the bar
+  // after a moment, drawn by the stylesheet — and the old screen stays put
+  // until the new one is ready: a tap always does something, and a blank
+  // page is never one of the things it does.
+  app.classList.add("routing");
+  rendering = rendering.then(renderRoute).catch((err) => {
     console.error(err);
     if (!(err instanceof ApiError && err.status === 401)) toast(err.message || "Something went wrong");
-  });
-}
-
-// A screen replaces the last one whole — bar, page and tabs — the moment
-// its data is in. A phone paints that in two goes: the page's background
-// first and the new screen a frame or more later, which on a dark page is
-// a flash of black between every tab. A view transition keeps the last
-// screen on the glass until the next one is painted, then fades between
-// them over a few frames (base.css says how). The update runs inside the
-// transition so the fetch is covered too: the old screen stays, still,
-// rather than giving way to nothing. A browser without the API draws as
-// before.
-function transition(update) {
-  if (!document.startViewTransition) return update();
-  let result;
-  const change = document.startViewTransition(async () => { result = await update(); });
-  return change.updateCallbackDone.then(() => result);
+  }).finally(() => app.classList.remove("routing"));
 }
 
 export async function renderRoute() {
   const { name, arg } = parseHash();
   remember(location.hash);
+  // How far down the screen being left was, for when it is come back to.
+  scrollAt.set(shownHash, scrollY);
   if (!session.token && name !== "login") { replace("#/login"); return renderRoute(); }
   if (occupant && !occupant.stays(name, arg)) {
     const leaving = occupant;
@@ -521,6 +512,139 @@ export function signOut(message) {
   replace("#/login");
   screens.get("login")("", { message: message || "", bad: message !== "Signed out." });
 }
+
+// -- putting a screen on the page ------------------------------------------------------
+// The bar above and the tabs below stay where they are from one screen to
+// the next; only what is between them is swapped. Every screen used to be
+// written over the whole page, bars and all, and taking a fixed bar down
+// and putting it up again on every tap is a repaint the eye sees as a
+// blink. Now the bar's contents change, the tabs' highlight moves, and the
+// new screen fades in under them, the way a screen in an app does.
+//
+// A screen's HTML is still `nav(...) + <main>…</main> + tabs(...)`, and
+// what a screen does afterwards — `app.querySelector`, `wireShell` — still
+// works, because by the time this returns the new screen is on the page.
+let ownTabs = true;             // whether the screen on the page drew its tabs
+let shownHash = "";             // the address of the screen on the page
+const scrollAt = new Map();     // address → how far down it was
+const stillMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+export function mount(html) {
+  // Parsed in an element rather than a <template>: `:scope >` finds
+  // nothing in a fragment, and the bars are picked out by being top-level.
+  const fresh = document.createElement("div");
+  fresh.innerHTML = html;
+  const newNav = fresh.querySelector(":scope > header.nav");
+  const newTabs = fresh.querySelector(":scope > nav.tabs");
+  if (newNav) newNav.remove();
+  if (newTabs) newTabs.remove();
+
+  // The bar: the same element, with the new screen's buttons in it.
+  const header = app.querySelector(":scope > header.nav");
+  if (newNav && header) {
+    header.innerHTML = newNav.innerHTML;
+    header.className = newNav.className;
+  } else if (newNav) {
+    app.prepend(newNav);
+  } else if (header) {
+    header.remove();
+  }
+
+  // The screen: everything that is neither bar. When the address changed,
+  // the last screen's page stays on the glass as a ghost — a copy, fixed
+  // where it was — and fades out as the new one fades in: a cut made
+  // smooth, with no frame of bare background between two screens, which
+  // on a dark page is a flash of black. A screen drawn again where it is
+  // simply changes, and so does every screen for whoever asked the phone
+  // for less motion.
+  const arriving = location.hash !== shownHash;
+  const fading = arriving && !stillMotion.matches;
+  const ghosts = [];
+  for (const el of [...app.children]) {
+    if (el.matches("header.nav, nav.tabs")) continue;
+    if (fading && el.matches("main")) ghosts.push(ghostOf(el));
+    el.remove();
+  }
+  const bar = app.querySelector(":scope > nav.tabs");
+  for (const el of [...fresh.children]) {
+    if (fading && el.matches("main")) el.classList.add("entering");
+    app.insertBefore(el, bar);
+  }
+  for (const ghost of ghosts) document.body.append(ghost);
+
+  // The tabs: the highlight moves; the bar stays.
+  ownTabs = !!newTabs;
+  if (newTabs) placeTabs(newTabs);
+
+  // Where the page is scrolled to: the top of a screen not seen before, or
+  // where it was left — each tab keeps its place, as on a phone.
+  if (arriving) scrollTo(0, scrollAt.get(location.hash) || 0);
+  shownHash = location.hash;
+}
+
+// A page as it was, to fade out over the next: a copy pinned to where
+// the page stood in the window, so the scroll moving under it for the new
+// screen does not move it. It takes no taps and is read by nothing; the
+// stylesheet fades it, and it leaves when the fade ends — or on a timer,
+// should the fade never run.
+function ghostOf(main) {
+  const rect = main.getBoundingClientRect();
+  const ghost = main.cloneNode(true);
+  ghost.className = "ghost";
+  ghost.setAttribute("aria-hidden", "true");
+  ghost.setAttribute("inert", "");
+  for (const el of ghost.querySelectorAll("[id]")) el.removeAttribute("id");
+  ghost.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;` +
+    `width:${rect.width}px;height:${rect.height}px;margin:0;`;
+  ghost.addEventListener("animationend", () => ghost.remove(), { once: true });
+  setTimeout(() => ghost.remove(), 600);
+  return ghost;
+}
+
+// The tabs drawn for a screen, laid over the ones on the page. The same
+// set of tabs only has its highlight moved — a pip a feature put on one
+// stays — and a different set (a Quill installed, a feature switched)
+// replaces them, in the same element.
+function placeTabs(newTabs) {
+  const bar = app.querySelector(":scope > nav.tabs");
+  if (!bar) { app.append(newTabs); return; }
+  const shown = [...bar.querySelectorAll(":scope > .tab")];
+  const wanted = [...newTabs.querySelectorAll(":scope > .tab")];
+  const same = shown.length === wanted.length &&
+    shown.every((t, i) => t.dataset.tab === wanted[i].dataset.tab && t.innerHTML === wanted[i].innerHTML);
+  if (!same) { bar.innerHTML = newTabs.innerHTML; return; }
+  shown.forEach((t, i) => {
+    t.classList.toggle("active", wanted[i].classList.contains("active"));
+    t.setAttribute("href", wanted[i].getAttribute("href"));
+    if (wanted[i].hasAttribute("aria-current")) t.setAttribute("aria-current", "page");
+    else t.removeAttribute("aria-current");
+  });
+}
+
+/** Light one tab, before its screen is fetched: the answer to the tap is
+    the tap itself, not the server's reply a moment later. */
+function lightTab(name) {
+  for (const t of app.querySelectorAll(":scope > nav.tabs > .tab")) {
+    const on = t.dataset.tab === name;
+    t.classList.toggle("active", on);
+    if (on) t.setAttribute("aria-current", "page");
+    else t.removeAttribute("aria-current");
+  }
+}
+
+app.addEventListener("click", (event) => {
+  const tab = event.target.closest("nav.tabs > .tab");
+  if (!tab || tab.parentElement.parentElement !== app) return;
+  if (event.defaultPrevented || event.metaKey || event.ctrlKey) return;
+  // The tab you are on, tapped again, takes you to the top of it.
+  if (tab.classList.contains("active") && tab.getAttribute("href") === location.hash) {
+    event.preventDefault();
+    scrollAt.delete(location.hash);
+    scrollTo({ top: 0, behavior: stillMotion.matches ? "auto" : "smooth" });
+    return;
+  }
+  lightTab(tab.dataset.tab);
+});
 
 // -- the shell -----------------------------------------------------------------------------
 export function nav({ back: backTo, backLabel, title, right = "" }) {
@@ -588,12 +712,12 @@ addEventListener("scroll", onScroll, { passive: true });
 export function wireShell() {
   // A screen that draws no tabs — an editor, a thread — drew none because
   // a phone keyboard needs the room. A computer does not, and a rail that
-  // comes and goes is worse than no rail at all, so the bar goes in and
-  // the shell says it was put there rather than asked for: the stylesheet
-  // leaves it out everywhere but the rail.
-  const own = !!app.querySelector(".tabs");
-  if (!own) app.insertAdjacentHTML("beforeend", tabs(lastTab));
-  app.classList.toggle("aside-tabs", !own);
+  // comes and goes is worse than no rail at all, so the bar stays in (or
+  // goes in, on a page that has none yet) and the shell says it was put
+  // there rather than asked for: the stylesheet leaves it out everywhere
+  // but the rail.
+  if (!ownTabs && !app.querySelector(":scope > nav.tabs")) app.insertAdjacentHTML("beforeend", tabs(lastTab));
+  app.classList.toggle("aside-tabs", !ownTabs);
   // Where the tabs scroll, the one you are on is in sight.
   const active = app.querySelector(".tabs .tab.active");
   if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest", inline: "nearest" });

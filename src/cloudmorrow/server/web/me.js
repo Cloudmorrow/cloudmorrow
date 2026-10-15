@@ -1,7 +1,7 @@
 /* Me: who you are signed in as, and the way out. */
 
 import {
-  VERSION, api, app, esc, homeHash, nav, previousHash, registerScreen, seconds, session,
+  VERSION, api, app, esc, homeHash, mount, nav, previousHash, registerScreen, seconds, session,
   signOut, store, wireShell,
 } from "./core.js";
 import { featuresCard, loadFeatures, wireFeaturesCard } from "./features.js";
@@ -30,7 +30,7 @@ async function renderMe() {
   // front page stands in.
   const from = previousHash();
   const back = from && from !== "#/me" ? from : homeHash();
-  app.innerHTML = nav({ back, backLabel: "Back", title: "Me" }) + `
+  mount(nav({ back, backLabel: "Back", title: "Me" }) + `
     <main>
       <h1 class="large">Me</h1>
       <div class="who">
@@ -47,7 +47,7 @@ async function renderMe() {
       ${myQuillsRow()}
       ${isAdmin(me) ? adminRow() : ""}
       <div class="group"><button class="row signout">Sign out</button></div>
-    </main>`;
+    </main>`);
   wireShell();
   wirePushCard(app);
   wireFeaturesCard(app);

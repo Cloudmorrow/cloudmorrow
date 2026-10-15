@@ -21,7 +21,7 @@
    back when the view is drawn again. */
 
 import {
-  api, apiRaw, app, esc, go, heading, nav, recordsUrl, tabs, toast, wireShell,
+  api, apiRaw, app, esc, go, heading, mount, nav, recordsUrl, tabs, toast, wireShell,
 } from "./core.js";
 import { canDrag, fieldOf, mayWrite, read, segments, sheetHash, spoken, titleOf, widget } from "./kit.js";
 import {
@@ -43,11 +43,11 @@ const glyphs = {
 
 export async function renderView(at, arg) {
   const params = Object.fromEntries(new URLSearchParams(arg || ""));
-  app.innerHTML = nav({ title: at.screen.label }) + `
+  mount(nav({ title: at.screen.label }) + `
     <main class="view-screen">
       ${heading(at.screen.label)}
       <div class="quill-view" aria-busy="true"></div>
-    </main>` + tabs(at.tab);
+    </main>` + tabs(at.tab));
   wireShell();
   const root = app.querySelector(".quill-view");
   // Everything one drawing of the view needs, and what it keeps between

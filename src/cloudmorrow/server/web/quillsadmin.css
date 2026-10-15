@@ -72,7 +72,7 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 13px;
+  font-size: 16px; /* not smaller: a phone zooms in on a field under 16px when it is tapped */
 }
 .own-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: auto; }
 .own-buttons .quill-chip { margin-left: 0; }

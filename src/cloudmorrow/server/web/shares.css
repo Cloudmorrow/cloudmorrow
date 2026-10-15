@@ -17,8 +17,9 @@
   font-size: 16px;
 }
 .share-form input::placeholder { color: var(--muted); }
-/* A path is data: set as data, and read whole. */
-.share-form input[name="path"] { font-family: var(--mono); font-size: 15px; }
+/* A path is data: set as data, and read whole. Not under 16px: a phone
+   zooms in on a smaller field when it is tapped, and does not zoom back. */
+.share-form input[name="path"] { font-family: var(--mono); font-size: 16px; }
 
 .share-form .hint {
   margin: -6px 4px 18px;

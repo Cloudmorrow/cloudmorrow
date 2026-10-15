@@ -103,6 +103,10 @@
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
+/* No zooming in on a double tap: this is an app, and a second tap on a
+   row is a second tap on the row, not a request to make the page bigger.
+   Pinching still zooms, for anybody who needs it to. */
+html, body { touch-action: manipulation; }
 body {
   margin: 0;
   background: var(--bg);
@@ -122,20 +126,6 @@ svg { display: block; }
 
 #app { min-height: 100dvh; display: flex; flex-direction: column; }
 
-/* -- from one screen to the next ----------------------------------------- */
-/* core.js draws the next screen inside a view transition: the last one
-   stays until the next is painted, and the two cross-fade. The bars keep
-   their place through it — named, each is its own fade, so the wordmark
-   and the tabs never go dark with the page between them. Short, because it
-   is a cut made smooth, not an effect; none at all for whoever asked for
-   less motion, and the hold until the next screen is painted still stands. */
-.nav { view-transition-name: nav; }
-.tabs { view-transition-name: tabs; }
-::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: .16s; }
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
-}
-
 /* -- the bar at the top ------------------------------------------------- */
 .nav {
   position: sticky;
@@ -151,6 +141,34 @@ svg { display: block; }
   padding: var(--bar-top) 8px 0;
   background: var(--bar);
   color: var(--bar-ink);
+  /* The bar and the tabs are the app's chrome, not its text: a long
+     press on them selects nothing and offers no link preview. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* While the next screen is on its way: a line that slides along the
+   bottom of the bar. Only after a moment — a screen that comes at once
+   never shows it — and only while core.js says the page is between screens. */
+.nav::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent) 35%, var(--accent) 65%, transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  opacity: 0;
+  pointer-events: none;
+}
+#app.routing > .nav::after {
+  animation: routing 1.1s ease-in-out .35s infinite alternate;
+}
+@keyframes routing {
+  from { opacity: 1; background-position: -60% 0; }
+  to { opacity: 1; background-position: 160% 0; }
 }
 .nav .left { justify-self: start; }
 .nav .right { justify-self: end; }
@@ -199,6 +217,23 @@ main {
   margin: 0 auto;
   padding: 0 16px calc(72px + var(--bottom));
 }
+/* -- from one screen to the next ----------------------------------------- */
+/* A screen arriving under the bars fades in, and a ghost of the one it
+   replaces — core.js pins a copy where the page stood — fades out over it:
+   a cross-fade, so there is never a frame of bare background between two
+   screens. Short, because it is a cut made smooth, not an effect. core.js
+   marks both only when the address changed, so a screen drawn again where
+   it is does not flicker, and not at all for whoever asked the phone for
+   less motion. The ghost sits under the bars (z-index 5) and takes no taps. */
+main.entering { animation: screen-in .16s ease-out; }
+main.ghost {
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  animation: screen-out .16s ease-out forwards;
+}
+@keyframes screen-in { from { opacity: 0; } }
+@keyframes screen-out { to { opacity: 0; } }
 h1.large {
   font-family: var(--display);
   font-size: 32px;
@@ -318,6 +353,9 @@ h1.large {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .tabs::-webkit-scrollbar { display: none; }
 .tab {

@@ -61,7 +61,7 @@ def test_the_way_in_is_drawn_only_for_an_administrator():
 
 def test_it_calls_the_endpoints_that_exist(client, auth):
     """Every path the panel asks for answers an administrator."""
-    for path in ("/api/users", "/api/server/features"):
+    for path in ("/api/users", "/api/server/features", "/api/health"):
         assert path in ADMIN_JS, path
         assert client.get(path, headers=auth).status_code == 200, path
 
@@ -133,3 +133,32 @@ def test_the_install_sheet_gives_ticked_circles_the_new_data(client, auth):
         "calendar": "write",
         "event": "write",
     }
+
+
+# -- the server itself -------------------------------------------------------------
+def test_the_server_section_updates_through_the_api_the_command_uses(client, auth):
+    """`Update server` on the phone is `cloudmorrow update server` without the
+    computer: the same POST, the same words for what it did, and the same
+    witness — /api/health's commit — for whether the restart landed."""
+    assert 'data-side="server"' in ADMIN_JS
+    assert '"server"' in ADMIN_JS.split("const which = ", 1)[1].split("\n", 1)[0]
+    assert 'api("POST", "/api/server/update", {})' in ADMIN_JS
+    assert 'api("GET", "/api/health?t=" + Date.now())' in ADMIN_JS
+    # A restart puts everybody offline for a moment: it is asked about first.
+    assert "confirm(" in ADMIN_JS.split("async function drawServer", 1)[1].split("const shortCommit", 1)[0]
+    # The page is the old app once the server is back: it reloads onto the new one.
+    assert "location.reload()" in ADMIN_JS
+    # The same route, which only an administrator may call (test_server_update_api.py).
+    guest = {"Authorization": f"Bearer {token_for(client, *GUEST)}"}
+    assert client.post("/api/server/update", json={}, headers=guest).status_code == 403
+
+
+def test_the_server_section_says_what_a_deploy_did_in_the_commands_words():
+    """The CLI's lines and the phone's are written apart; these are the phrases
+    a person would notice differing between the two."""
+    cli = (WEB.parents[1] / "cli" / "update.py").read_text(encoding="utf-8")
+    web = ADMIN_JS.split("export function deployLines", 1)[1]
+    for phrase in ("Already up to date", "Rewound onto origin/", "Not restarted:", "reinstalled", "published "):
+        assert phrase in cli, phrase
+        assert phrase in web, phrase
+    assert "the old code is still serving" in cli and "the old code is still serving" in web

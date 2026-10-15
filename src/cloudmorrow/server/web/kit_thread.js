@@ -42,8 +42,8 @@
    Nothing in this file knows what a channel or a message is. */
 
 import {
-  api, app, esc, formatDate, heading, icons, nav, occupy, onShell, onSignOut, recordsUrl,
-  replace, renderRoute, seconds, session, store, tabs, toast, vacate, wireShell,
+  api, app, esc, formatDate, heading, icons, mount, nav, occupy, onShell, onSignOut, recordsUrl,
+  renderRoute, replace, seconds, session, store, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { onPush, refreshBadge, onBadge, lastCounts } from "./push.js";
 import {
@@ -189,11 +189,11 @@ function headActions(at, s) {
 }
 
 function drawList(at, s, spaces) {
-  app.innerHTML = nav({ title: at.screen.label }) + `
+  mount(nav({ title: at.screen.label }) + `
     <main class="kit-thread">
       ${heading(at.screen.label, headActions(at, s))}
       <div class="listing">${spaceGroups(at, s, spaces, "")}</div>
-    </main>` + tabs(at.tab);
+    </main>` + tabs(at.tab));
   wireShell();
   let asked = Date.now();
   const refresh = async () => {
@@ -218,7 +218,7 @@ function drawList(at, s, spaces) {
 
 // -- side by side ----------------------------------------------------------------------
 function drawSplit(at, s, spaces, open, thread = "") {
-  app.innerHTML = nav({ title: at.screen.label }) + `
+  mount(nav({ title: at.screen.label }) + `
     <main class="kit-thread split thread${thread ? " with-thread" : ""}">
       <section class="spaces">
         ${heading(at.screen.label, headActions(at, s))}
@@ -226,7 +226,7 @@ function drawSplit(at, s, spaces, open, thread = "") {
       </section>
       <section class="conversation"></section>
       ${thread ? '<section class="thread-panel"></section>' : ""}
-    </main>` + tabs(at.tab);
+    </main>` + tabs(at.tab));
   wireShell();
   if (open) return drawConversation(at, s, spaces, open, { phone: false, thread });
   app.querySelector(".conversation").innerHTML =
@@ -361,16 +361,16 @@ async function drawConversation(at, s, spaces, id, { phone, thread = "", page = 
   const pinButton = s.pinned ? `<button type="button" class="icon-button pins" aria-label="Pinned" hidden>${glyphs.pin}<span class="n"></span></button>` : "";
   if (phone && page) {
     // A thread as a page of its own: the conversation's machinery, the thread's screen.
-    app.innerHTML = nav({ back: `${at.base}/${encodeURIComponent(id)}`, backLabel: name, title: "Thread" }) +
-      `<main class="kit-thread thread"></main>`;
+    mount(nav({ back: `${at.base}/${encodeURIComponent(id)}`, backLabel: name, title: "Thread" }) +
+      `<main class="kit-thread thread"></main>`);
     wireShell();
   } else if (phone) {
-    app.innerHTML = nav({
+    mount(nav({
       back: at.base,
       backLabel: at.screen.label,
       title: name,
       right: pinButton + `<a class="icon-button" href="${aboutHref}" aria-label="About ${esc(name)}">${glyphs.info}</a>`,
-    }) + `<main class="kit-thread thread"><p class="about"><b>${esc(name)}</b>${about ? ` · ${esc(about)}` : ""}</p>${composer}</main>`;
+    }) + `<main class="kit-thread thread"><p class="about"><b>${esc(name)}</b>${about ? ` · ${esc(about)}` : ""}</p>${composer}</main>`);
     wireShell();
   } else {
     app.querySelector(".conversation").innerHTML = `

@@ -18,7 +18,7 @@
    group and a subgroup, as a customer and a project would be. */
 
 import {
-  api, app, esc, go, heading, icons, nav, recordsUrl, replace, store, tabs, toast, wireShell,
+  api, app, esc, go, heading, icons, mount, nav, recordsUrl, replace, store, tabs, toast, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
 import {
@@ -124,7 +124,7 @@ export async function renderGroupedList(at, arg) {
   const where = chosen.filter((v) => v !== null).map((v, i) =>
     levels[i].kind === "link" ? (offered[i].find(([c]) => c === v) || [v, v])[1] : String(v));
 
-  app.innerHTML = nav({ title: screen.label }) + `
+  mount(nav({ title: screen.label }) + `
     <main>
       ${heading(screen.label, writes ? `<button class="compose" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</button>` : "")}
       ${levels.map(chipRow).join("")}
@@ -132,7 +132,7 @@ export async function renderGroupedList(at, arg) {
         where.length ? ` to ${esc(where.join(" · "))}` : ""}" autocapitalize="off" autocomplete="off" spellcheck="false" enterkeyhint="done"></form>` : ""}
       <div class="install-slot">${installCard()}</div>
       <div class="listing"></div>
-    </main>` + tabs(at.tab);
+    </main>` + tabs(at.tab));
   wireShell();
   const listing = app.querySelector(".listing");
   // What has been revealed, by record id, for as long as this screen is up.

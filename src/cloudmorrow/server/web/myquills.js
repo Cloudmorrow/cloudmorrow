@@ -12,7 +12,7 @@
    them. The screen shows what is allowed and says, in a line, what is not. */
 
 import {
-  api, apiRaw, app, esc, nav, registerScreen, renderRoute, replace, toast, wireShell,
+  api, apiRaw, app, esc, mount, nav, registerScreen, renderRoute, replace, toast, wireShell,
 } from "./core.js";
 import { refreshQuills } from "./quills.js";
 import { sections } from "./quillsadmin.js";
@@ -39,7 +39,7 @@ async function renderMine() {
     return renderRoute();
   }
   const may = mine.may || {};
-  app.innerHTML = nav({ back: "#/me", backLabel: "Me", title: "Your Quills" }) + `
+  mount(nav({ back: "#/me", backLabel: "Me", title: "Your Quills" }) + `
     <main class="myquills">
       <h1 class="large">Your Quills</h1>
       ${allowed(may)}
@@ -48,7 +48,7 @@ async function renderMine() {
       ${requests(mine.requests || [])}
       ${may.have && (may.install || may.ask) ? `<p class="group-label">Add one</p>${await catalogRows(may)}` : ""}
       ${Object.keys(mine.broken || {}).length ? broken(mine.broken) : ""}
-    </main>`;
+    </main>`);
   wireShell();
   wire(mine, me);
 }
@@ -245,7 +245,7 @@ async function exportIt(quill) {
 async function addSheet(quill, name, me) {
   let plan;
   try { plan = await api("POST", "/api/quills/mine/plan", { id: quill }); } catch (err) { toast(err.message); return; }
-  app.innerHTML = nav({ back: "#/myquills", backLabel: "Your Quills", title: name }) + `
+  mount(nav({ back: "#/myquills", backLabel: "Your Quills", title: name }) + `
     <main class="quill-sheet">
       <h1 class="large">${esc(plan.name || name)}</h1>
       <p class="quill-lede">${esc(plan.summary || "")}</p>
@@ -254,7 +254,7 @@ async function addSheet(quill, name, me) {
       <p class="shelf-note">On your shelf and nobody else's. Its data of its own is yours and nobody else
         can reach it; what it uses of the rest is what your circles let you reach, no more.</p>
       <div class="group"><button class="row primary add-mine" type="button">Add ${esc(plan.name || name)} for me</button></div>
-    </main>`;
+    </main>`);
   wireShell();
   const button = app.querySelector(".add-mine");
   button.addEventListener("click", async () => {
