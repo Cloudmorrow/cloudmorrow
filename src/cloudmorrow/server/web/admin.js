@@ -18,7 +18,7 @@
    (quillsadmin.js, with its install sheet) are files of their own. */
 
 import {
-  api, app, esc, formatDate, heading, icons, nav, onSignOut, registerScreen, renderRoute,
+  api, app, esc, formatDate, heading, icons, mount, nav, onSignOut, registerScreen, renderRoute,
   replace, seconds, store, toast, wireShell,
 } from "./core.js";
 import { loadFeatures } from "./features.js";
@@ -79,7 +79,7 @@ async function renderAdmin() {
   const which = ["circles", "features", "quills"].includes(side) ? side : "users";
   // The + beside the heading makes whatever this side lists.
   const making = { users: ["#/adminuser", "New account"], circles: ["#/admincircle", "New circle"] }[which];
-  app.innerHTML = nav({ back: "#/me", backLabel: "Me", title: "Administration" }) + `
+  mount(nav({ back: "#/me", backLabel: "Me", title: "Administration" }) + `
     <main>
       ${heading("Administration", making
         ? `<button class="compose" aria-label="${making[1]}">${icons.compose}</button>`
@@ -91,7 +91,7 @@ async function renderAdmin() {
         <button data-side="quills"${which === "quills" ? ' class="active"' : ""}>Quills</button>
       </div>
       <div class="panel"><p class="empty"><b>…</b></p></div>
-    </main>`;
+    </main>`);
   wireShell();
 
   for (const button of app.querySelectorAll(".seg button")) {
@@ -229,7 +229,7 @@ async function renderUser(username) {
     shelves = domainsOf(models);
   }
 
-  app.innerHTML = nav({
+  mount(nav({
     back: "#/admin",
     // Short on purpose: the bar's left column is narrow and the wordmark
     // sits in the middle of it, so a long label runs into the mark.
@@ -279,7 +279,7 @@ async function renderUser(username) {
         ${yourself || making ? "" :
           `<div class="group"><button class="row bad delete" type="button">Delete this account</button></div>`}
       </form>
-    </main>`;
+    </main>`);
   wireShell();
 
   const form = app.querySelector("form.account");

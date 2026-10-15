@@ -6,7 +6,7 @@
 
 import { qrSvg } from "./qr.js";
 import {
-  app, esc, icons, nav, previousHash, registerScreen, toast, wireShell,
+  app, esc, icons, mount, nav, previousHash, registerScreen, toast, wireShell,
 } from "./core.js";
 
 /** The row on Me that leads here. */
@@ -33,7 +33,7 @@ function renderAddDevice() {
   const base = window.location.origin;
   const install = `curl -fsSL ${base}/install.sh | sh`;
 
-  app.innerHTML = head + `
+  mount(head + `
     <main class="add-device">
       <h1 class="large">Add a device</h1>
       <p class="note">Everything signs in to <b>${esc(base)}</b> with your own name and password.</p>
@@ -66,7 +66,7 @@ function renderAddDevice() {
           works with this cloud as you once you say yes. Its address:
           <code class="add-url">${esc(base)}/mcp</code></span></div>
       </div>
-    </main>`;
+    </main>`);
   wireShell();
 
   app.querySelector(".copy-install").addEventListener("click", () => copy(install));

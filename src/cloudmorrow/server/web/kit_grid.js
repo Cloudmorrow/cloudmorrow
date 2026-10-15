@@ -33,9 +33,9 @@
    still opens, and is still sent on or saved. */
 
 import {
-  api, apiRaw, app, baseName, encodePath, esc, folderOf, formatDate, heading, icons, joinPath,
-  localDay, nav, onSignOut, pad2, recordsUrl, renderRoute, replace, route, seconds, store, tabs,
-  toast, wireShell, back,
+  api, apiRaw, app, back, baseName, encodePath, esc, folderOf, formatDate, heading, icons, joinPath,
+  localDay, mount, nav, onSignOut, pad2, recordsUrl, renderRoute, replace, route, seconds, store,
+  tabs, toast, wireShell,
 } from "./core.js";
 import { mayWrite, plural } from "./kit.js";
 
@@ -245,7 +245,7 @@ async function renderGroups(at, b) {
       <span class="chevron">${icons.chevronRight}</span></a>`;
   };
   const [first, ...rest] = records;
-  app.innerHTML = nav({ title: at.screen.label }) + `
+  mount(nav({ title: at.screen.label }) + `
     <main class="grid-groups">
       ${heading(at.screen.label)}
       ${top}
@@ -253,7 +253,7 @@ async function renderGroups(at, b) {
       ${rest.length ? `<div class="group-label">${esc(plural(b.groupModel.label))}</div>
         <div class="group">${rest.map((r, i) => rowOf(r, i + 1) + after(r)).join("")}</div>` : ""}
       ${records.length ? "" : `<p class="empty mascot"><b>Nothing here yet</b>There is nowhere to open yet.</p>`}
-    </main>` + tabs(at.tab);
+    </main>` + tabs(at.tab));
   wireShell();
   for (const x of extras) if (x.wire) x.wire(app);
 }
@@ -288,7 +288,7 @@ async function renderFolder(at, b, group, folder) {
   const title = folder ? baseName(folder) : groupName;
   const moreButton = folder && b.writes
     ? `<button class="more" aria-label="${esc(title)}: rename, move or delete">${own.more}</button>` : "";
-  app.innerHTML = nav({ back: parent, backLabel: parentLabel, title }) + `
+  mount(nav({ back: parent, backLabel: parentLabel, title }) + `
     <main>
       ${heading(title, moreButton + (b.writes ? `<button class="add" aria-label="Add">${own.plus}</button>` : ""))}
       <div class="sort-row">
@@ -298,7 +298,7 @@ async function renderFolder(at, b, group, folder) {
       <div class="listing"></div>
       ${b.writes ? `<input type="file" class="pick-input" multiple hidden>
       <input type="file" class="camera-input" accept="image/*" capture="environment" hidden>` : ""}
-    </main>` + tabs(at.tab);
+    </main>` + tabs(at.tab));
   wireShell();
 
   const sortEl = app.querySelector(".sort");
@@ -455,7 +455,7 @@ async function renderFolder(at, b, group, folder) {
 // -- putting something in ----------------------------------------------------------------
 // The folder on the screen, for a paste with nothing focused. Set by every
 // folder drawn; the listener checks the screen it names is still on the
-// page, because `app.innerHTML` leaves the old one detached.
+// page, because `mount` leaves the old one detached.
 let openFolder = null;
 
 addEventListener("paste", async (event) => {
@@ -715,7 +715,7 @@ export async function renderGridItem(at, id) {
     ["Where", groupName + (entry.folder ? "/" + entry.folder : "")],
   ];
   const sending = canSendFiles();
-  app.innerHTML = nav({
+  mount(nav({
     back: parent, backLabel: entry.folder ? baseName(entry.folder) : groupName, title: entry.name,
     right: `<button class="download" aria-label="${sending ? "Send" : "Save"}">${sending ? own.send : own.download}</button>`,
   }) + `
@@ -731,7 +731,7 @@ export async function renderGridItem(at, id) {
         <button class="row has-icon" data-do="move"><span class="icon">${own.move}</span><span class="main"><span class="title">Move to another folder</span></span></button>
         <button class="row has-icon danger" data-do="delete"><span class="icon">${icons.trash}</span><span class="main"><span class="title">Delete</span></span></button>
       </div>` : ""}
-    </main>`;
+    </main>`);
   wireShell();
   app.querySelector(".nav").classList.add("lined");
 

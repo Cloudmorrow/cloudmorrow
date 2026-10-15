@@ -17,8 +17,9 @@
    {quill, screen, tab, base}, where base is the screen's own hash. */
 
 import {
-  SAVE_DELAY, api, app, back, esc, formatDate, heading, icons, localMinute, nav, occupy,
-  recordsUrl, renderRoute, replace, seconds, session, setStatus, store, tabs, toast, vacate, wireShell,
+  SAVE_DELAY, api, app, back, esc, formatDate, heading, icons, localMinute, mount, nav, occupy,
+  recordsUrl, renderRoute, replace, seconds, session, setStatus, store, tabs, toast, vacate,
+  wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
 import { drawsHere, renderGroupedList, secretWidget, wireSecretWidgets } from "./kit_grouped.js";
@@ -151,9 +152,9 @@ export async function renderKitScreen(at, arg) {
   if (kit === "list" && drawsHere(at.quill.models[at.screen.model], at.screen)) return renderGroupedList(at, arg);
   if (kit === "grid") return renderGrid(at, arg);
   if (DRAWS.includes(kit)) return renderList(at);
-  app.innerHTML = nav({ title: at.screen.label }) + `<main>${heading(at.screen.label)}
+  mount(nav({ title: at.screen.label }) + `<main>${heading(at.screen.label)}
     <p class="empty"><b>Not on this app yet</b>This screen is a ${esc(kit)}, which this
-      version of the app cannot draw. Reload to fetch the newest.</p></main>` + tabs(at.tab);
+      version of the app cannot draw. Reload to fetch the newest.</p></main>` + tabs(at.tab));
   wireShell();
 }
 
@@ -223,14 +224,14 @@ async function renderBoard(at, arg) {
     ? `<a class="button" href="${sheetHash(at, groupModel.id, group.id)}" aria-label="${esc(groupModel.label)} details">${own.more}</a>`
     : "") + (writes ? `<button class="compose" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</button>` : "");
   const canAdd = (!groupModel || group) && writes && (!laneModel || lanes.length > 0);
-  app.innerHTML = nav({ title: name }) + `
+  mount(nav({ title: name }) + `
     <main>
       ${heading(name, !groupModel || group ? actions : "")}
       ${chips}
       ${canAdd ? `<form class="add">${circle("")}<input placeholder="Add ${esc(aOr(model.label))}" autocapitalize="sentences" enterkeyhint="done"></form>` : ""}
       <div class="install-slot">${installCard()}</div>
       <div class="listing"></div>
-    </main>` + tabs(at.tab);
+    </main>` + tabs(at.tab));
   wireShell();
   const listing = app.querySelector(".listing");
 
@@ -439,13 +440,13 @@ async function renderList(at) {
   let records = await api("GET", recordsUrl(model.id));
   const links = await linkTitles(quill, underFields);
 
-  app.innerHTML = nav({ title: screen.label }) + `
+  mount(nav({ title: screen.label }) + `
     <main>
       ${heading(screen.label, writes ? `<button class="compose" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</button>` : "")}
       ${writes ? `<form class="add">${tick ? circle("") : ""}<input placeholder="Add ${esc(aOr(model.label))}" autocapitalize="sentences" enterkeyhint="done"></form>` : ""}
       <div class="install-slot">${installCard()}</div>
       <div class="listing"></div>
-    </main>` + tabs(at.tab);
+    </main>` + tabs(at.tab));
   wireShell();
   const listing = app.querySelector(".listing");
 
@@ -756,7 +757,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   const hint = body && onScreen && body.name === screen.body && screen.kit === "board"
     ? ", and subtasks as “- [ ]” lines…" : "…";
   const left = timeLeft(record.expires_at);
-  app.innerHTML = nav({
+  mount(nav({
     back: parent, backLabel, title: titleOf(model, record, title),
     right: (looked ? "" : `<button class="done strong" hidden>Done</button>`) +
       (deletable ? `<button class="delete" aria-label="Delete ${esc(model.label.toLowerCase())}">${icons.trash}</button>` : ""),
@@ -778,7 +779,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
       ${people}
       ${sheetSection(model.id)}
       <div class="history-slot"></div>
-    </main>`;
+    </main>`);
   wireShell();
   app.querySelector(".nav").classList.add("lined");
   drawHistory(app.querySelector(".history-slot"), model, id);

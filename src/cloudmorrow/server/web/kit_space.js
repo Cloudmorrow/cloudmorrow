@@ -34,8 +34,8 @@
    {quill, screen, tab, base}. */
 
 import {
-  api, app, esc, heading, icons, nav, onSignOut, recordsUrl, renderRoute, replace, session, tabs,
-  toast, wireShell,
+  api, app, esc, heading, icons, mount, nav, onSignOut, recordsUrl, renderRoute, replace, session,
+  tabs, toast, wireShell,
 } from "./core.js";
 import { mayWrite, sheetHash } from "./kit.js";
 
@@ -104,14 +104,14 @@ export async function renderSpaceList(at, model, { dot = () => "", back, backLab
       ${icons.chevronRight}</a>`;
   const group = (label, rows) => (rows.length
     ? `<p class="group-label">${label}</p><div class="group">${rows.map(row).join("")}</div>` : "");
-  app.innerHTML = nav({ back, backLabel, title: plural }) + `
+  mount(nav({ back, backLabel, title: plural }) + `
     <main>
       ${heading(plural, mayWrite(model) ? `<a class="button compose" href="${at.base}/newspace" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</a>` : "")}
       ${group("Yours", spaces.filter((s) => s.scope === "personal"))}
       ${group("Shared", spaces.filter((s) => s.scope === "shared"))}
       ${group("Everybody's", spaces.filter((s) => s.scope === "public"))}
       ${spaces.length ? "" : `<p class="empty mascot"><b>None yet</b>${mayWrite(model) ? "Make one with the pen above." : "When there is one, it will show up here."}</p>`}
-    </main>` + tabs(at.tab);
+    </main>` + tabs(at.tab));
   wireShell();
 }
 
@@ -164,7 +164,7 @@ export async function renderNewSpace(at, model, { back, backLabel, fields = asyn
   const extra = typedFields(model, screen);
   const noun = model.label.toLowerCase();
   const title = model.fields.find((f) => f.name === model.title);
-  app.innerHTML = nav({ back, backLabel: backLabel || `${model.label}s`, title: `New ${noun}` }) + `
+  mount(nav({ back, backLabel: backLabel || `${model.label}s`, title: `New ${noun}` }) + `
     <main>
       <h1 class="large">New ${esc(noun)}</h1>
       <form class="new-space">
@@ -189,7 +189,7 @@ export async function renderNewSpace(at, model, { back, backLabel, fields = asyn
         </div>
         <div class="group"><button class="row primary" type="submit">Make the ${esc(noun)}</button></div>
       </form>
-    </main>`;
+    </main>`);
   wireShell();
   const form = app.querySelector("form.new-space");
   const whoList = form.querySelector(".who-list");
@@ -224,7 +224,7 @@ export async function renderNewSpace(at, model, { back, backLabel, fields = asyn
 export async function renderWriteTo(at, model, { back, backLabel, opened }) {
   if (!mayWrite(model)) return notYours(model, back || at.base);
   const everyone = await people();
-  app.innerHTML = nav({ back, backLabel, title: "New message" }) + `
+  mount(nav({ back, backLabel, title: "New message" }) + `
     <main>
       <h1 class="large">New message</h1>
       ${everyone.length ? `<div class="group">${everyone.map((p) => `
@@ -234,7 +234,7 @@ export async function renderWriteTo(at, model, { back, backLabel, opened }) {
           ${p.display_name ? `<span class="meta"><span class="preview">${esc(p.username)}</span></span>` : ""}</span>
           ${icons.chevronRight}</button>`).join("")}</div>`
         : `<p class="empty"><b>Nobody else yet</b>There is only your account on this server.</p>`}
-    </main>`;
+    </main>`);
   wireShell();
   for (const button of app.querySelectorAll(".person")) {
     button.addEventListener("click", async () => {
@@ -349,14 +349,14 @@ export async function renderSpaceAbout(at, model, id, { back, backLabel, gone })
     .map((f) => [f.label, String(space.fields[f.name])]);
   const people = await spaceSection(model, space, { fixed: two });
   const manages = space.can_manage && !two && mayWrite(model);
-  app.innerHTML = nav({ back, backLabel, title: "About" }) + `
+  mount(nav({ back, backLabel, title: "About" }) + `
     <main>
       ${heading(name, manages ? `<a class="button edit" href="${sheetHash(at, model.id, id)}" aria-label="Edit ${esc(model.label.toLowerCase())}">${icons.compose}</a>` : "")}
       ${facts.length ? `<div class="group facts">${facts.map(([label, value]) =>
         `<div class="row"><span class="main">${esc(label)}</span><span class="said">${esc(value)}</span></div>`).join("")}</div>` : ""}
       ${people}
       ${manages ? `<div class="group"><button class="row bad delete">Delete this ${esc(model.label.toLowerCase())}</button></div>` : ""}
-    </main>`;
+    </main>`);
   wireShell();
   const leftTo = () => { gone(); };
   // Out of it, you are back at the screen's start: it is not yours to open any more.

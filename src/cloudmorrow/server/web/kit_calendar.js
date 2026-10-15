@@ -28,7 +28,7 @@
    on a sheet that says them. */
 
 import {
-  api, app, esc, heading, icons, localDay, localMinute, nav, pad2, recordsUrl, renderRoute,
+  api, app, esc, heading, icons, localDay, localMinute, mount, nav, pad2, recordsUrl, renderRoute,
   replace, store, tabs, toast, wireShell,
 } from "./core.js";
 import { aOr, mayWrite, sheetHash } from "./kit.js";
@@ -292,7 +292,7 @@ export async function renderCalendar(at, arg) {
       ? `<div class="group">${onThatDay.map((e) => eventRow(href(e), e)).join("")}</div>`
       : `<p class="empty"><b>Nothing on</b>${adds ? "Add something above, and it will show up here." : ""}</p>`}</div>`;
 
-  app.innerHTML = nav({ title: screen.label }) + `
+  mount(nav({ title: screen.label }) + `
     <main class="kit-calendar view-${view}">
       ${heading(screen.label, actions)}
       <div class="month-bar">
@@ -304,7 +304,7 @@ export async function renderCalendar(at, arg) {
       ${addLine}
       ${view === "week" ? weekGrid(days, filed, picked, href) + dayList
         : monthGrid(picked, filed) + dayList}
-    </main>` + tabs(at.tab);
+    </main>` + tabs(at.tab));
   wireShell();
 
   const go = (day) => { replace(`${at.base}/${day}`); renderRoute(); };

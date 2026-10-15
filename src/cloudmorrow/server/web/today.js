@@ -10,7 +10,7 @@
    altogether when there is none, or it is switched off. */
 
 import {
-  api, app, esc, featureOff, heading, nav, pixelArt, pixelIcon, registerScreen, registerTab,
+  api, app, esc, featureOff, heading, mount, nav, pixelArt, pixelIcon, registerScreen, registerTab,
   setHome, tabs, wireShell,
 } from "./core.js";
 import { sheetHash } from "./kit.js";
@@ -229,7 +229,7 @@ async function renderToday() {
   const events = eventsResult.status === "fulfilled" ? eventsResult.value : "";
   if (todayResult.status === "rejected") console.error(todayResult.reason);
 
-  app.innerHTML = nav({ title: "Today" }) + `
+  mount(nav({ title: "Today" }) + `
     <main class="today">
       ${heading("Today")}
       <div class="now">
@@ -241,7 +241,7 @@ async function renderToday() {
       </div>
       ${quoteCard(today)}
       ${events}
-    </main>` + tabs("today");
+    </main>` + tabs("today"));
   wireShell();
   startClock(app.querySelector(".clock .time"), app.querySelector(".clock .date"));
 }

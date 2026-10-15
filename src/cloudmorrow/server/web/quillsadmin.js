@@ -21,7 +21,7 @@
    may write it. A circle with `* = write` has it already, and says so. */
 
 import {
-  api, app, esc, nav, registerScreen, renderRoute, replace, store, toast, wireShell,
+  api, app, esc, mount, nav, registerScreen, renderRoute, replace, store, toast, wireShell,
 } from "./core.js";
 import { refreshQuills } from "./quills.js";
 import { drawRunning, drawRunningList } from "./quillservices.js";
@@ -239,7 +239,7 @@ async function renderQuill(id) {
   }
   const audience = plan.audience || { circles: [], people: [] };
 
-  app.innerHTML = nav({ back: "#/admin", backLabel: "Admin", title: name }) + `
+  mount(nav({ back: "#/admin", backLabel: "Admin", title: name }) + `
     <main class="quill-sheet">
       <h1 class="large">${esc(name)}</h1>
       <p class="quill-lede">${esc(plan.summary || "")}</p>
@@ -254,7 +254,7 @@ async function renderQuill(id) {
       ${installed ? `<div class="quill-running"></div>` : ""}
       ${verb ? `<div class="group"><button class="row primary add-quill" type="button">${esc(verb)}</button></div>` : ""}
       ${installed ? `<div class="group"><button class="row bad remove-quill" type="button">Remove ${esc(name)}</button></div>` : ""}
-    </main>`;
+    </main>`);
   wireShell();
   const running = app.querySelector(".quill-running");
   if (running) drawRunning(running, id);

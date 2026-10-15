@@ -18,7 +18,7 @@
    One given its own line keeps it when `*` changes: a named rule beats `*`. */
 
 import {
-  api, app, esc, nav, registerScreen, renderRoute, replace, store, toast, wireShell,
+  api, app, esc, mount, nav, registerScreen, renderRoute, replace, store, toast, wireShell,
 } from "./core.js";
 
 export const EVERY = "*";
@@ -202,7 +202,7 @@ async function renderCircle(id) {
   const seesAll = circles.some((c) => c.members.includes(me.username) && c.rules[EVERY]);
   const shelves = domainsOf(models);
 
-  app.innerHTML = nav({
+  mount(nav({
     back: "#/admin",
     backLabel: "Admin",
     title: making ? "New circle" : circle.name,
@@ -237,7 +237,7 @@ async function renderCircle(id) {
         ${making ? "" :
           `<div class="group"><button class="row bad delete" type="button">Delete this circle</button></div>`}
       </form>
-    </main>`;
+    </main>`);
   wireShell();
 
   const form = app.querySelector("form.circle-form");

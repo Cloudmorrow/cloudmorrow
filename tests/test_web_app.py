@@ -144,3 +144,60 @@ def test_a_calendar_screen_has_a_title_like_every_other_tab():
     # One h1 per page — the month's name stepped down so the bar watches the title.
     assert "<h2>${esc(title)}</h2>" in calendar
     assert ".month-bar h2" in (WEB / "kit_calendar.css").read_text()
+
+
+# -- moving between screens, like an app ------------------------------------------
+def test_a_screen_is_mounted_between_the_bars_not_written_over_the_page():
+    """Every screen goes on through `mount`, which keeps the bar and the tabs
+    where they are and swaps only what is between them. Writing the whole
+    page over on every tap took the fixed bars down and put them up again,
+    and that repaint is what made the phone blink. The sign-in form is the
+    one page with no bars, and the one allowed to clear the page."""
+    core = (WEB / "core.js").read_text()
+    assert "export function mount(html)" in core
+    assert 'header.innerHTML = newNav.innerHTML;' in core
+    assert "function placeTabs(newTabs)" in core
+    for path in sorted(WEB.glob("*.js")):
+        script = path.read_text()
+        if path.name in ("core.js", "login.js", "brand.js"):
+            continue
+        assert "app.innerHTML =" not in script, f"{path.name} writes over the whole page"
+        if "nav({" in script:
+            assert "mount(" in script, f"{path.name} draws a bar but does not mount it"
+
+
+def test_a_tap_on_a_tab_answers_at_once_and_the_screen_fades_in():
+    core = (WEB / "core.js").read_text()
+    css = (WEB / "base.css").read_text()
+    # The tab lights before the server has answered, and the page says a
+    # screen is on its way; the stylesheet draws both.
+    assert "function lightTab(name)" in core
+    assert 'app.classList.add("routing")' in core
+    assert "#app.routing > .nav::after" in css
+    # A screen that arrives at a new address fades in; one drawn again where
+    # it is does not, and nobody who asked for less motion sees it move.
+    assert 'el.classList.add("entering")' in core
+    assert "prefers-reduced-motion: reduce" in core
+    assert "main.entering { animation: screen-in" in css
+
+
+def test_each_tab_keeps_its_place_and_a_second_tap_goes_to_the_top():
+    core = (WEB / "core.js").read_text()
+    assert "scrollAt.set(shownHash, scrollY)" in core
+    assert "scrollTo(0, scrollAt.get(location.hash) || 0)" in core
+    assert 'tab.getAttribute("href") === location.hash' in core
+
+
+def test_the_page_does_not_zoom_under_a_double_tap_or_a_small_field():
+    """An app, not a web page: a double tap is two taps, and a field that is
+    tapped is not a reason to zoom in. Pinching still zooms, so nothing is
+    taken from anybody who needs it bigger."""
+    base = (WEB / "base.css").read_text()
+    assert "html, body { touch-action: manipulation; }" in base
+    assert "user-scalable" not in (WEB / "app.html").read_text()
+    # iOS zooms in on a text field set under 16px when it gets focus, and
+    # does not zoom out again; no field here is.
+    small = re.compile(r"(?<![\w-])(input|textarea|select)\b[^{};]*\{[^}]*?font-size:\s*([\d.]+)px")
+    for path in sorted(WEB.glob("*.css")):
+        for match in small.finditer(path.read_text()):
+            assert float(match.group(2)) >= 16, f"{path.name}: {match.group(0)}"

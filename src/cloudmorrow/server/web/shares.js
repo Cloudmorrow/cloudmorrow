@@ -18,7 +18,8 @@
      #/share/<name>    one share: whose, who has it, where it is */
 
 import {
-  api, app, back, esc, nav, previousHash, registerScreen, replace, renderRoute, session, toast, wireShell,
+  api, app, back, esc, mount, nav, previousHash, registerScreen, renderRoute, replace, session,
+  toast, wireShell,
 } from "./core.js";
 import { registerGridHook } from "./kit_grid.js";
 
@@ -101,7 +102,7 @@ async function renderNewShare() {
   const admin = !!candidates.everyone;
   const directory = String(candidates.directory || "").replace(/\/+$/, "");
   const defaultPath = (name) => (directory && name ? `${directory}/${name}` : "");
-  app.innerHTML = nav({ back: backTo(), backLabel: "Files", title: "New share" }) + `
+  mount(nav({ back: backTo(), backLabel: "Files", title: "New share" }) + `
     <main>
       <h1 class="large">New share</h1>
       <form class="share-form">
@@ -121,7 +122,7 @@ async function renderNewShare() {
         ${whoRows(candidates)}
         <div class="group"><button class="row primary" type="submit">Make the share</button></div>
       </form>
-    </main>`;
+    </main>`);
   wireShell();
   const form = app.querySelector("form.share-form");
   const nameInput = form.elements.name;
@@ -195,7 +196,7 @@ async function renderShare(name) {
   const admin = !!(candidates && candidates.everyone);
   const byName = (share.members || []).some((m) => m.kind === "user" && m.who === session.user);
   const whose = mine ? "Yours" : `${share.owner}'s — you ${accessSaid(share.access)}`;
-  app.innerHTML = nav({ back: backTo(), backLabel: "Files", title: share.name }) + `
+  mount(nav({ back: backTo(), backLabel: "Files", title: share.name }) + `
     <main>
       <h1 class="large">${esc(share.name)}</h1>
       <div class="group facts">
@@ -221,7 +222,7 @@ async function renderShare(name) {
         `<div class="row"><span class="main">${esc(m.label || m.who)}</span><span class="said">${esc(accessSaid(m.access))}</span></div>`)
         .join("")}</div>
       ${byName ? `<div class="group"><button class="row bad" type="button" data-leave>Leave it</button></div>` : ""}`}
-    </main>`;
+    </main>`);
   wireShell();
   const form = app.querySelector("form.share-form");
   if (form) {

@@ -103,6 +103,10 @@
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
+/* No zooming in on a double tap: this is an app, and a second tap on a
+   row is a second tap on the row, not a request to make the page bigger.
+   Pinching still zooms, for anybody who needs it to. */
+html, body { touch-action: manipulation; }
 body {
   margin: 0;
   background: var(--bg);
@@ -137,6 +141,34 @@ svg { display: block; }
   padding: var(--bar-top) 8px 0;
   background: var(--bar);
   color: var(--bar-ink);
+  /* The bar and the tabs are the app's chrome, not its text: a long
+     press on them selects nothing and offers no link preview. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* While the next screen is on its way: a line that slides along the
+   bottom of the bar. Only after a moment — a screen that comes at once
+   never shows it — and only while core.js says the page is between screens. */
+.nav::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent) 35%, var(--accent) 65%, transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  opacity: 0;
+  pointer-events: none;
+}
+#app.routing > .nav::after {
+  animation: routing 1.1s ease-in-out .35s infinite alternate;
+}
+@keyframes routing {
+  from { opacity: 1; background-position: -60% 0; }
+  to { opacity: 1; background-position: 160% 0; }
 }
 .nav .left { justify-self: start; }
 .nav .right { justify-self: end; }
@@ -185,6 +217,12 @@ main {
   margin: 0 auto;
   padding: 0 16px calc(72px + var(--bottom));
 }
+/* A screen arriving under the bars fades in, as a screen in an app does;
+   core.js marks it so only when the address changed, so a screen drawn
+   again where it is does not flicker. Not for anybody who asked the
+   phone for less motion: core.js leaves the mark off then. */
+main.entering { animation: screen-in .18s ease-out; }
+@keyframes screen-in { from { opacity: 0; } }
 h1.large {
   font-family: var(--display);
   font-size: 32px;
@@ -304,6 +342,9 @@ h1.large {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .tabs::-webkit-scrollbar { display: none; }
 .tab {

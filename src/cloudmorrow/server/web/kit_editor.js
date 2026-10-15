@@ -29,8 +29,8 @@
 
 import {
   SAVE_DELAY, SEARCH_DELAY, api, app, back, baseName, encodePath, esc, fileStem, folderOf,
-  formatDate, heading, icons, joinPath, nav, occupy, previousHash, recordsUrl, renderRoute,
-  replace, sectionOf, seconds, setStatus, tabs, toast, vacate, wireShell,
+  formatDate, heading, icons, joinPath, mount, nav, occupy, previousHash, recordsUrl, renderRoute,
+  replace, seconds, sectionOf, setStatus, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
 import { mayWrite } from "./kit.js";
@@ -298,15 +298,15 @@ export async function renderEditor(at, arg) {
   const data = await load(b);
   const view = listView(b, data, key);
   if (wide()) {
-    app.innerHTML = nav({ title: view.title }) + `
+    mount(nav({ title: view.title }) + `
       <main class="split">
         <section class="side">${sideBack(view)}${view.html}</section>
         <section class="page"><p class="empty mascot"><b>Nothing open</b>Choose ${esc(aOr(b.noun))} on the left${
           b.writes ? ", or start one with the pen" : ""}.</p></section>
-      </main>` + tabs(at.tab);
+      </main>` + tabs(at.tab));
   } else {
-    app.innerHTML = nav({ back: view.backTo, backLabel: view.backLabel, title: view.title }) +
-      `<main>${view.html}</main>` + tabs(at.tab);
+    mount(nav({ back: view.backTo, backLabel: view.backLabel, title: view.title }) +
+      `<main>${view.html}</main>` + tabs(at.tab));
   }
   wireShell();
   view.wire(app.querySelector("main"));
@@ -391,14 +391,14 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
   let view = null;
   if (wide()) {
     view = listView(b, await load(b), listKey, ed.id);
-    app.innerHTML = nav({ title: ed.stem || "New", right: actions }) + `
+    mount(nav({ title: ed.stem || "New", right: actions }) + `
       <main class="split">
         <section class="side">${sideBack(view)}${view.html}</section>
         <section class="page">${page}</section>
-      </main>` + tabs(b.at.tab);
+      </main>` + tabs(b.at.tab));
   } else {
-    app.innerHTML = nav({ back: parent, backLabel: parentLabel, title: ed.stem, right: actions }) +
-      `<main>${page}</main>`;
+    mount(nav({ back: parent, backLabel: parentLabel, title: ed.stem, right: actions }) +
+      `<main>${page}</main>`);
   }
   wireShell();
   if (view) view.wire(app.querySelector(".side"));
