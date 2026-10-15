@@ -10,6 +10,7 @@ from pathlib import Path
 
 import tomli_w
 
+from cloudmorrow import localserver
 from cloudmorrow.locations import config_dir
 from cloudmorrow.privatefile import write_private
 
@@ -45,9 +46,14 @@ class ClientConfig:
     def load(cls) -> ClientConfig:
         config = cls()
         path = config_path()
+        # Nothing of their own says where the cloud is: no config, or one that
+        # leaves the address out. Then it is the server on this machine, when
+        # there is one, before it is anywhere else.
+        unaddressed = True
         if path.exists():
             data = tomllib.loads(path.read_text(encoding="utf-8"))
             section = data.get("client", data)
+            unaddressed = "api_url" not in section
             for key in (
                 "api_url",
                 "autosave_seconds",
@@ -66,6 +72,11 @@ class ClientConfig:
         config.vault = config.vault.strip().lower() or "default"
         if env_url := os.environ.get("CLOUDMORROW_API_URL"):
             config.api_url = env_url
+        elif unaddressed and (here := localserver.url()):
+            # On the server itself: the server beside it, at whichever address
+            # it answers on. Plain http to that is this machine (transport.py),
+            # so nothing has to be allowed.
+            config.api_url = here
         config.api_url = config.api_url.rstrip("/")
         return config
 

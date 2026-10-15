@@ -18,8 +18,9 @@ are kit elements, or views built from primitives every surface draws.
 3. `cm quill preview <view>` draws a view as text; `cm quill dev --local` is a
    throwaway server on this machine, reinstalled as you save; `cm quill dev`
    installs this folder on your own server as a development Quill.
-4. Tag a release (`v1.0.0`) and open a pull request on
-   `Cloudmorrow/quill-catalog` adding the Quill to `catalog.toml`.
+4. Tag a release (`v1.0.0`); the first time, open a pull request on
+   `Cloudmorrow/quill-catalog` adding the Quill to `catalog.toml`; after
+   that the catalog follows your releases by itself.
 
 Over MCP an assistant has the first loop: `quill_schema`, `quill_check`,
 `quill_dev_install`. An administrator's assistant builds the server's
@@ -39,7 +40,7 @@ name = "Plants"
 version = "1.0.0"                  # major.minor.patch
 summary = "Your plants, and when you last watered each."
 category = "home"                  # home, personal, business, developer, …
-icon = "plants"
+icon = "plants"                    # from the icon library (cloudmorrow.com/resources/icons), or the app's own
 publisher = "you"
 license = "MIT"
 features = ["One line per thing it does, for the catalog"]
@@ -326,7 +327,7 @@ and has every surface draw it hidden until asked for.
 | calendar | model, starts, ends (indexed datetime/date), space (a link to a space datamodel); optional all_day (bool), colour (a field of the space), subtitle | every space's things at once: a month, a week, the day's list; the spaces and their people |
 | editor | model, title, body (markdown); optional path (a string like folder/sub/title: the folders) | a tree of folders and records beside a page of Markdown; pictures where the backend keeps attachments |
 | grid | a model with bytes beside its fields (the foundational `file`); group (link: the places, picked first), folder (string), kind (an enum with "folder"); optional size, modified, mime, group_subtitle, group_open and group_writes (fields of the group's model; group_open and group_writes are bools: false and the group is listed but not opened, or opened with nothing that writes) | the groups, then folders and tiles with pictures; put in, get, new folder, rename, move, delete |
-| thread | model (in a space), space (its link to the space), body; optional about (a field of the space), made_as | the spaces with unread counts, then a conversation: newest at the bottom, grouped by author and day, a box to write in |
+| thread | model (in a space), space (its link to the space), body; optional about (a field of the space), made_as; a team's: reply_to (a link of the model to itself: a reply, in a thread under its parent), pinned (a bool: kept at the top; `managed` in the datamodel lets the space's manager pin), reactions (a datamodel of the Quill's with a link to the model, an `emoji` string, authored: one per person per emoji per line, toggled), mentions = true (@name lights up and tells that person) | the spaces with unread counts, then a conversation: newest at the bottom, grouped by author and day, a box to write in; threads beside it, reactions under each line, pinned lines in the header |
 
 A thread's `made_as` says what fields a space gets for how it is made — by
 scope, or `direct`: a shared space found-or-made between you and the person
@@ -340,7 +341,10 @@ direct = { kind = "direct" }
 ```
 
 On the command line a thread is `cm <quill> list` (the spaces, with unread),
-`show <space>` and `say <space> "text"`.
+`show <space>` and `say <space> "text"`; with the team's bindings also
+`reply <space> <line> "text"`, `react <space> <line> 👍`, `pin <space> <line>`
+and `show <space> --thread <line>`, a line named by the start of its id as
+`show` prints it in the margin.
 
 Every screen opens a record sheet when a row or card is chosen: every field,
 with the widget for its kind, editable, with delete. An editor opens its page

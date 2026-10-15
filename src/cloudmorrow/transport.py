@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from urllib.parse import urlsplit
 
+from cloudmorrow import localserver
+
 __all__ = ["InsecureUrlError", "check_url", "is_local_url"]
 
 # This machine — and the name Starlette's test client answers to, which is
@@ -35,9 +37,14 @@ class InsecureUrlError(ValueError):
 
 
 def is_local_url(url: str) -> bool:
-    """True for an address on this machine, where plain http hurts nobody."""
+    """True for an address on this machine, where plain http hurts nobody.
+
+    Loopback by any name; and, on a machine that runs the server, any
+    address the server here listens on — it was told to answer on
+    192.168.1.5 alone, say, and that is still this box.
+    """
     host = (urlsplit(url).hostname or "").lower()
-    return host in LOCAL_HOSTS or host.endswith(".localhost")
+    return host in LOCAL_HOSTS or host.endswith(".localhost") or localserver.answers_on(url)
 
 
 def check_url(url: str, *, allow_insecure: bool = False) -> str:

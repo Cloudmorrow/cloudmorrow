@@ -165,6 +165,12 @@ services_detail=""
 [ -f "$AGENT_UNIT" ] && services_detail="${services_detail:+$services_detail, }$AGENT_NAME"
 commands=""
 [ -L /usr/local/bin/cloudmorrow-server ] && commands="cloudmorrow-server"
+# The terminal app's links, when they point into this server's venv: the
+# installer's, or an update's. One that points elsewhere is somebody else's.
+our_link() { [ -L "/usr/local/bin/$1" ] && [ "$(readlink "/usr/local/bin/$1")" = "$PREFIX/venv/bin/$1" ]; }
+for command in cm cloudmorrow cloudmorrow-agent; do
+	our_link "$command" && commands="${commands:+$commands, }$command"
+done
 grep -qs "install-server.sh" /usr/local/bin/cloudmorrow-update && commands="${commands:+$commands, }cloudmorrow-update"
 grep -qs "install-server.sh" /etc/sudoers.d/cloudmorrow && commands="${commands:+$commands, }the sudo rule"
 if [ -n "$services_detail" ] || [ -n "$commands" ]; then
@@ -370,6 +376,9 @@ if chose services; then
 	# The commands, and the rule that lets them run.
 	say "removing the commands"
 	[ ! -L /usr/local/bin/cloudmorrow-server ] || run rm -f /usr/local/bin/cloudmorrow-server
+	for command in cm cloudmorrow cloudmorrow-agent; do
+		! our_link "$command" || run rm -f "/usr/local/bin/$command"
+	done
 	if grep -qs "install-server.sh" /usr/local/bin/cloudmorrow-update; then
 		run rm -f /usr/local/bin/cloudmorrow-update
 	fi

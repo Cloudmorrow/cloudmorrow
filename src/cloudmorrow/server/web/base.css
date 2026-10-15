@@ -217,12 +217,23 @@ main {
   margin: 0 auto;
   padding: 0 16px calc(72px + var(--bottom));
 }
-/* A screen arriving under the bars fades in, as a screen in an app does;
-   core.js marks it so only when the address changed, so a screen drawn
-   again where it is does not flicker. Not for anybody who asked the
-   phone for less motion: core.js leaves the mark off then. */
-main.entering { animation: screen-in .18s ease-out; }
+/* -- from one screen to the next ----------------------------------------- */
+/* A screen arriving under the bars fades in, and a ghost of the one it
+   replaces — core.js pins a copy where the page stood — fades out over it:
+   a cross-fade, so there is never a frame of bare background between two
+   screens. Short, because it is a cut made smooth, not an effect. core.js
+   marks both only when the address changed, so a screen drawn again where
+   it is does not flicker, and not at all for whoever asked the phone for
+   less motion. The ghost sits under the bars (z-index 5) and takes no taps. */
+main.entering { animation: screen-in .16s ease-out; }
+main.ghost {
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  animation: screen-out .16s ease-out forwards;
+}
 @keyframes screen-in { from { opacity: 0; } }
+@keyframes screen-out { to { opacity: 0; } }
 h1.large {
   font-family: var(--display);
   font-size: 32px;

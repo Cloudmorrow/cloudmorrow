@@ -182,7 +182,7 @@ def test_the_first_run_after_an_update_links_its_own_commands(tmp_path, monkeypa
 
     prefix, bindir = _installed(tmp_path, "cloudmorrow", "cm")
     (bindir / "cloudmorrow").symlink_to(prefix / "bin" / "cloudmorrow")
-    monkeypatch.setattr(links.sys, "executable", str(prefix / "bin" / "python"))
+    monkeypatch.setattr(links.sys, "prefix", str(prefix))
     monkeypatch.setattr(links.shutil, "which", lambda _: str(bindir / "cloudmorrow"))
 
     assert links.ensure_commands_linked() == [bindir / "cm"]
@@ -191,12 +191,35 @@ def test_the_first_run_after_an_update_links_its_own_commands(tmp_path, monkeypa
     assert links.ensure_commands_linked() == []
 
 
+def test_the_venv_is_found_through_its_prefix_not_its_python(tmp_path, monkeypatch):
+    """A venv's python is a symlink to the system one; resolving it lands in /usr.
+
+    That is what left every `cm` unlinked on a real server: the prefix came
+    out as /usr, /usr/bin is not the venv's bin, and nothing was linked.
+    """
+    from cloudmorrow import links
+
+    prefix, bindir = _installed(tmp_path, "cloudmorrow-server", "cloudmorrow", "cm")
+    system = tmp_path / "usr" / "bin"
+    system.mkdir(parents=True)
+    (system / "python3.13").write_text("#!/bin/sh\n")
+    (prefix / "bin" / "python").symlink_to(system / "python3.13")
+    (bindir / "cloudmorrow-server").symlink_to(prefix / "bin" / "cloudmorrow-server")
+    monkeypatch.setattr(links.sys, "prefix", str(prefix))
+    monkeypatch.setattr(links.sys, "executable", str(prefix / "bin" / "python"))
+    monkeypatch.setattr(links.shutil, "which", lambda _: str(bindir / "cloudmorrow-server"))
+
+    assert links.venv_prefix() == prefix
+    assert sorted(links.ensure_commands_linked()) == [bindir / "cloudmorrow", bindir / "cm"]
+    assert (bindir / "cm").resolve() == (prefix / "bin" / "cm").resolve()
+
+
 def test_a_first_run_that_cannot_link_says_nothing_and_carries_on(tmp_path, monkeypatch):
     from cloudmorrow import links
 
     prefix, bindir = _installed(tmp_path, "cloudmorrow", "cm")
     (bindir / "cloudmorrow").symlink_to(prefix / "bin" / "cloudmorrow")
-    monkeypatch.setattr(links.sys, "executable", str(prefix / "bin" / "python"))
+    monkeypatch.setattr(links.sys, "prefix", str(prefix))
     monkeypatch.setattr(links.shutil, "which", lambda _: str(bindir / "cloudmorrow"))
 
     def refuse(self, target):
@@ -267,3 +290,13 @@ def test_update_all_installs_nothing_here_when_the_deploy_fails(monkeypatch):
 
     assert result.exit_code == 1
     assert installed == []
+
+
+def test_a_deploy_that_could_not_link_cm_on_the_server_says_what_to_do():
+    lines, waiting = _deploy_lines(_result(commands_unlinked=["cm"]), restart=True, force=False)
+    text = "\n".join(lines)
+    assert "cm installed on the server, but not on its PATH" in text
+    assert "install-server.sh again with --update" in text
+    assert waiting
+    # Nothing to say when everything landed.
+    assert "PATH" not in "\n".join(_deploy_lines(_result(), restart=True, force=False)[0])

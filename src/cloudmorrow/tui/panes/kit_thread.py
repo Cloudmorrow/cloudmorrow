@@ -20,20 +20,29 @@ It polls. An open conversation asks for what changed since the newest thing
 it has, every few seconds, and the counts beside the others come with it —
 a socket would be a second way for the server to talk to a client, and this
 is a house with four machines in it.
+
+A screen may bind four more, a team's (docs/QUILLS.md): `reply_to` draws a
+line's replies under it as a thread, and `r` replies to one; `reactions`
+draws each line's emoji with their counts, and `x` toggles yours; `pinned`
+marks a pinned line and `p` pins or unpins one; `mentions` lights every
+@name. Picking the line is a list of the last ones said, by its words.
 """
 
 from __future__ import annotations
+
+import re
 
 from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import DataTable, Input, Static
+from textual.widgets import Button, DataTable, Input, Label, OptionList, Static
+from textual.widgets.option_list import Option
 
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.kitdata import can_write, field_of
 from cloudmorrow.tui.panes.kit import KitPane
-from cloudmorrow.tui.screens.modals import ConfirmModal
+from cloudmorrow.tui.screens.modals import ConfirmModal, Modal, PromptModal
 from cloudmorrow.tui.theme import ACCENT, BAD, MUTED, SECOND
 from cloudmorrow.tui.widgets.kit_space import (
     NewSpaceModal,
@@ -50,6 +59,12 @@ from cloudmorrow.tui.words import escape, plural
 POLL_SECONDS = 5.0
 # How much of one is read back when it opens.
 PAGE = 80
+# The reactions on offer: a short, fixed row, the same on every surface.
+EMOJI = ("👍", "❤️", "😂", "🎉", "👀", "✅")
+# @name in a line: after an @, at the start or after a space or bracket.
+MENTION = re.compile(r"(^|[\s(\[])@([a-z0-9][a-z0-9._-]*)")
+# How many of the last lines a Reply, React or Pin picks from.
+PICK = 20
 
 
 def _clock(stamp: str | None) -> str:
@@ -61,17 +76,84 @@ def _day(stamp: str | None) -> str:
     return (stamp or "")[:10]
 
 
-def render_lines(lines: list[dict], body: str, me: str) -> str:
+def _said(text: str, mentions: bool) -> str:
+    """Whatever somebody typed is text, not markup; an @name is lit when the screen has mentions."""
+    safe = escape(text)
+    if not mentions:
+        return safe
+    return MENTION.sub(lambda m: f"{m.group(1)}[{ACCENT}]@{m.group(2)}[/]", safe)
+
+
+def tally(reactions: list[dict], link: str, me: str) -> dict[str, list[tuple[str, int, bool]]]:
+    """Each line's reactions as (emoji, count, mine), the row's order first."""
+    rows: dict[str, dict[str, list]] = {}
+    for r in reactions:
+        line = str((r.get("fields") or {}).get(link) or "")
+        emoji = str((r.get("fields") or {}).get("emoji") or "")
+        if not line or not emoji:
+            continue
+        cell = rows.setdefault(line, {}).setdefault(emoji, [emoji, 0, False])
+        cell[1] += 1
+        if r.get("owner") == me:
+            cell[2] = True
+
+    def order(emoji: str) -> tuple[int, str]:
+        return (EMOJI.index(emoji) if emoji in EMOJI else len(EMOJI), emoji)
+
+    return {line: [tuple(c) for c in sorted(cells.values(), key=lambda c: order(c[0]))] for line, cells in rows.items()}
+
+
+def render_lines(
+    lines: list[dict],
+    body: str,
+    me: str,
+    *,
+    reply_to: str = "",
+    pinned: str = "",
+    mentions: bool = False,
+    reactions: dict[str, list[tuple[str, int, bool]]] | None = None,
+) -> str:
     """The conversation, as one block of markup.
 
     A run of lines from one person carries one name, and a new day gets a
-    rule across the pane — what makes a log read as a conversation.
+    rule across the pane — what makes a log read as a conversation. With
+    `reply_to`, a reply is drawn under its parent, indented, as a thread.
     """
     if not lines:
         return f"[{MUTED}]Nothing said here yet.[/]"
+    replies: dict[str, list[dict]] = {}
+    tops = lines
+    if reply_to:
+        tops = []
+        for line in lines:
+            parent = str((line.get("fields") or {}).get(reply_to) or "")
+            if parent:
+                replies.setdefault(parent, []).append(line)
+            else:
+                tops.append(line)
+        # A reply whose parent is off the page is shown where it is.
+        shown = {line["id"] for line in tops}
+        for parent, rows in list(replies.items()):
+            if parent not in shown:
+                tops.extend(rows)
+                del replies[parent]
+        tops.sort(key=lambda line: str(line.get("created_at") or ""))
     out: list[str] = []
     author = day = ""
-    for line in lines:
+
+    def words(line: dict, indent: str) -> None:
+        when = str(line.get("created_at") or "")
+        edited = f" [{MUTED}](edited)[/]" if line.get("updated_at") not in (None, when) else ""
+        mark = f"[{ACCENT}]📌[/] " if pinned and (line.get("fields") or {}).get(pinned) else ""
+        for text in str((line.get("fields") or {}).get(body) or "").splitlines() or [""]:
+            out.append(f"{indent}{mark}{_said(text, mentions)}{edited}")
+            edited = mark = ""
+        for emoji, count, mine in (reactions or {}).get(line["id"], []):
+            cell = f"{emoji} {count}"
+            out[-1:] = [out[-1]]
+            out.append(f"{indent}[{ACCENT if mine else MUTED}]{cell}[/]")
+
+    for line in tops:
         when = str(line.get("created_at") or "")
         if _day(when) != day:
             day = _day(when)
@@ -82,13 +164,104 @@ def render_lines(lines: list[dict], body: str, me: str) -> str:
             colour = ACCENT if author == me else SECOND
             who = "you" if author == me else author
             out.append(f"[{colour}]{escape(who)}[/] [{MUTED}]{_clock(when)}[/]")
-        edited = f" [{MUTED}](edited)[/]" if line.get("updated_at") not in (None, when) else ""
-        # Whatever somebody typed is text, not markup: square brackets in a
-        # message are square brackets.
-        for text in str((line.get("fields") or {}).get(body) or "").splitlines() or [""]:
-            out.append(f"  {escape(text)}{edited}")
-            edited = ""
+        words(line, "  ")
+        for reply in replies.get(line["id"], []):
+            owner = str(reply.get("owner") or "")
+            who = "you" if owner == me else owner
+            colour = ACCENT if owner == me else SECOND
+            at = _clock(str(reply.get("created_at") or ""))
+            out.append(f"    [{MUTED}]↳[/] [{colour}]{escape(who)}[/] [{MUTED}]{at}[/]")
+            words(reply, "      ")
+            author = ""
     return "\n".join(out)
+
+
+class PickLineModal(Modal[str | None]):
+    """One of the last lines said, by its words: which one to reply to, react to, or pin."""
+
+    BINDINGS = [("escape", "cancel", "Cancel")]
+
+    DEFAULT_CSS = """
+    PickLineModal #line-list { height: auto; max-height: 14; margin-bottom: 1; }
+    """
+
+    def __init__(self, title: str, lines: list[dict], body: str, *, detail: str = "") -> None:
+        super().__init__()
+        self._title = title
+        self.lines = lines
+        self._body = body
+        self._detail = detail
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal", id="line-modal"):
+            yield Label(self._title, classes="modal-title")
+            if self._detail:
+                yield Static(self._detail, classes="modal-detail")
+            if self.lines:
+                yield OptionList(
+                    *[Option(self._label(line), id=line["id"]) for line in self.lines],
+                    id="line-list",
+                )
+            else:
+                yield Static(f"[{MUTED}]Nothing said here yet.[/]")
+            with Horizontal(classes="modal-buttons"):
+                yield Button("Cancel", id="cancel")
+
+    def _label(self, line: dict) -> str:
+        words = str((line.get("fields") or {}).get(self._body) or "").splitlines() or [""]
+        return f"[{MUTED}]{escape(str(line.get('owner') or ''))}:[/] {escape(words[0][:60])}"
+
+    def on_mount(self) -> None:
+        if self.lines:
+            box = self.query_one("#line-list", OptionList)
+            box.highlighted = len(self.lines) - 1
+            box.focus()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        event.stop()
+        self.dismiss(event.option.id)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        event.stop()
+        self.dismiss(None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+class PickEmojiModal(Modal[str | None]):
+    """One of the reactions on offer; the ones already yours are marked."""
+
+    BINDINGS = [("escape", "cancel", "Cancel")]
+
+    def __init__(self, mine: set[str]) -> None:
+        super().__init__()
+        self.mine = mine
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal", id="emoji-modal"):
+            yield Label("React", classes="modal-title")
+            yield Static(f"[{MUTED}]Yours again takes it back.[/]", classes="modal-detail")
+            yield OptionList(
+                *[Option(f"{e}" + (f"  [{ACCENT}]yours[/]" if e in self.mine else ""), id=e) for e in EMOJI],
+                id="emoji-list",
+            )
+            with Horizontal(classes="modal-buttons"):
+                yield Button("Cancel", id="cancel")
+
+    def on_mount(self) -> None:
+        self.query_one("#emoji-list", OptionList).focus()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        event.stop()
+        self.dismiss(event.option.id)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        event.stop()
+        self.dismiss(None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
 
 
 class ThreadPane(KitPane):
@@ -110,10 +283,13 @@ class ThreadPane(KitPane):
         ("a", "fire('add')", "Add people"),
         ("l", "fire('leave')", "Leave"),
         ("e", "fire('edit_space')", "Edit"),
+        ("r", "fire('reply')", "Reply"),
+        ("x", "fire('react')", "React"),
+        ("p", "fire('pin')", "Pin"),
     ]
-    # Writing here is saying something; what is done to the spaces is
-    # the space datamodel's to allow.
-    WRITING = frozenset({"say"})
+    # Writing here is saying something — a reply, a pin and a reaction are
+    # that too; what is done to the spaces is the space datamodel's to allow.
+    WRITING = frozenset({"say", "reply", "react", "pin"})
 
     def __init__(self, quill: dict, screen: dict, **kwargs) -> None:
         super().__init__(quill, screen, **kwargs)
@@ -123,6 +299,27 @@ class ThreadPane(KitPane):
         self.space_model: dict = self.models.get(self.space_model_id) or {"id": self.space_model_id, "fields": []}
         self.body: str = str(screen.get("body") or self.model.get("title") or "body")
         self.about: str = str(screen.get("about") or "")
+        # The team's four, each there or not.
+        self.reply_to: str = str(screen.get("reply_to") or "")
+        self.pinned: str = str(screen.get("pinned") or "")
+        self.mentions: bool = bool(screen.get("mentions"))
+        self.reactions_model_id: str = str(screen.get("reactions") or "")
+        reactions_model = self.models.get(self.reactions_model_id) or {}
+        self.reaction_link: str = next(
+            (
+                f["name"]
+                for f in reactions_model.get("fields", [])
+                if f.get("kind") == "link" and f.get("to") == self.model_id
+            ),
+            "",
+        )
+        self.reaction_space: str = str(reactions_model.get("in_space") or "")
+        if not self.reply_to:
+            self.refused.add("reply")
+        if not self.pinned:
+            self.refused.add("pin")
+        if not (self.reactions_model_id and self.reaction_link) or not can_write(reactions_model):
+            self.refused.add("react")
         if not can_write(self.space_model):
             # Leaving is taking yourself out of it, which is writing it too.
             self.refused |= {"new_record", "new_space", "write_to", "add", "leave", "edit_space"}
@@ -133,6 +330,9 @@ class ThreadPane(KitPane):
         if made_as(screen).get("direct"):
             actions.append(Action("write_to", "Message", "m", hint="Write to one person"))
         actions += [
+            Action("reply", "Reply", "r", hint="Answer a line, in its thread"),
+            Action("react", "React", "x", hint="An emoji on a line; yours again takes it back"),
+            Action("pin", "Pin", "p", hint="Keep a line at the top, or let it go"),
             Action("add", "Add people", "a", hint=f"Put somebody in this {noun}"),
             Action("edit_space", "Edit", "e", hint=f"Rename this {noun}, or delete it"),
             Action("leave", "Leave", "l", variant="error"),
@@ -140,6 +340,7 @@ class ThreadPane(KitPane):
         self.ACTIONS = self.offer(actions)
         self.spaces: list[dict] = []
         self.lines: list[dict] = []
+        self.reactions: list[dict] = []
         # Which space should be showing, and which one the lines in hand
         # belong to: between picking one and its lines arriving those are
         # different, and a reply for one you have moved off is not drawn.
@@ -272,12 +473,14 @@ class ThreadPane(KitPane):
             return
         try:
             lines = await self.api.records(self.model_id, last=PAGE, **{self.link: space_id})
+            reactions = await self._fetch_reactions(space_id)
         except ApiError as exc:
             await self.went_wrong(exc)
             return
         if space_id != self._open:
             return  # moved on while this was in the air
         self.lines = lines
+        self.reactions = reactions
         self._loaded = space_id
         space = self.space or {}
         about = "" if is_between(self.spec, space) else str((space.get("fields") or {}).get(self.about) or "")
@@ -287,8 +490,25 @@ class ThreadPane(KitPane):
         self._draw()
         await self._seen()
 
+    async def _fetch_reactions(self, space_id: str) -> list[dict]:
+        """Every reaction in the space: a handful of small records, read whole,
+        because a reaction taken back is not in a `since`."""
+        if not self.reactions_model_id or not self.reaction_space or self.api is None:
+            return []
+        return await self.api.records(self.reactions_model_id, **{self.reaction_space: space_id})
+
     def _draw(self) -> None:
-        self.query_one("#conversation-text", Static).update(render_lines(self.lines, self.body, self.me))
+        self.query_one("#conversation-text", Static).update(
+            render_lines(
+                self.lines,
+                self.body,
+                self.me,
+                reply_to=self.reply_to,
+                pinned=self.pinned,
+                mentions=self.mentions,
+                reactions=tally(self.reactions, self.reaction_link, self.me) if self.reaction_link else None,
+            )
+        )
         scroll = self.query_one("#conversation-scroll", VerticalScroll)
         # The newest line is the one you want to be looking at.
         self.call_after_refresh(scroll.scroll_end, animate=False)
@@ -338,9 +558,14 @@ class ThreadPane(KitPane):
             newest = max((str(line.get("updated_at") or "") for line in self.lines), default="")
             try:
                 fresh = await self.api.records(self.model_id, since=newest or None, **{self.link: self._open})
+                reactions = await self._fetch_reactions(self._open)
             except ApiError:
                 return
-            if self._merge(fresh):
+            changed = self._merge(fresh)
+            if [(r["id"], r.get("rev")) for r in reactions] != [(r["id"], r.get("rev")) for r in self.reactions]:
+                self.reactions = reactions
+                changed = True
+            if changed:
                 self._draw()
                 await self._seen()
         try:
@@ -387,6 +612,105 @@ class ThreadPane(KitPane):
             self._merge([sent])
             self._draw()
         self.status()
+
+    # -- a line: reply, react, pin -------------------------------------------------------
+    def _line(self, line_id: str) -> dict | None:
+        return next((line for line in self.lines if line["id"] == line_id), None)
+
+    async def _pick_line(self, title: str, *, detail: str = "", tops_only: bool = False) -> dict | None:
+        """One of the last lines said here, chosen by its words."""
+        if not self._open:
+            self.status("Pick a conversation first.", error=True)
+            return None
+        lines = self.lines
+        if tops_only and self.reply_to:
+            lines = [line for line in lines if not (line.get("fields") or {}).get(self.reply_to)]
+        chosen = await self.app.push_screen_wait(PickLineModal(title, lines[-PICK:], self.body, detail=detail))
+        return self._line(chosen) if chosen else None
+
+    @work(group="ui")
+    async def act_reply(self) -> None:
+        if self.api is None or "reply" in self.refused:
+            return
+        parent = await self._pick_line("Reply to which line?", detail="A reply is a thread under it.", tops_only=True)
+        if parent is None:
+            return
+        said = str((parent.get("fields") or {}).get(self.body) or "").splitlines()[:1]
+        text = await self.app.push_screen_wait(
+            PromptModal(
+                f"Reply to {parent.get('owner', '')}", detail=said[0][:80] if said else "", placeholder="Your reply…"
+            )
+        )
+        text = (text or "").strip()
+        if not text:
+            return
+        try:
+            sent = await self.api.create_record(
+                self.model_id, {self.link: self._open, self.body: text, self.reply_to: parent["id"]}
+            )
+        except ApiError as exc:
+            self.status(str(exc), error=True)
+            return
+        self._merge([sent])
+        self._draw()
+        self.status("Replied.")
+
+    @work(group="ui")
+    async def act_react(self) -> None:
+        if self.api is None or "react" in self.refused:
+            return
+        line = await self._pick_line("React to which line?")
+        if line is None:
+            return
+        mine = {
+            str((r.get("fields") or {}).get("emoji") or "")
+            for r in self.reactions
+            if r.get("owner") == self.me and (r.get("fields") or {}).get(self.reaction_link) == line["id"]
+        }
+        emoji = await self.app.push_screen_wait(PickEmojiModal(mine))
+        if not emoji:
+            return
+        try:
+            if emoji in mine:
+                own = next(
+                    r
+                    for r in self.reactions
+                    if r.get("owner") == self.me
+                    and (r.get("fields") or {}).get(self.reaction_link) == line["id"]
+                    and (r.get("fields") or {}).get("emoji") == emoji
+                )
+                await self.api.delete_record(self.reactions_model_id, own["id"])
+                self.reactions = [r for r in self.reactions if r["id"] != own["id"]]
+            else:
+                made = await self.api.create_record(
+                    self.reactions_model_id,
+                    {self.reaction_space: self._open, self.reaction_link: line["id"], "emoji": emoji},
+                )
+                self.reactions.append(made)
+        except ApiError as exc:
+            self.status(str(exc), error=True)
+            return
+        self._draw()
+        self.status()
+
+    @work(group="ui")
+    async def act_pin(self) -> None:
+        if self.api is None or "pin" in self.refused:
+            return
+        line = await self._pick_line(
+            "Pin or unpin which line?", detail="Its author may, or whoever manages this space."
+        )
+        if line is None:
+            return
+        pinned = not (line.get("fields") or {}).get(self.pinned)
+        try:
+            changed = await self.api.update_record(self.model_id, line["id"], {self.pinned: pinned})
+        except ApiError as exc:
+            self.status(str(exc), error=True)
+            return
+        self._merge([changed])
+        self._draw()
+        self.status("Pinned." if pinned else "Unpinned.")
 
     # -- the spaces' own actions ------------------------------------------------------
     def act_new_record(self) -> None:

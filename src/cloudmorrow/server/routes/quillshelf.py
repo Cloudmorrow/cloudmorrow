@@ -36,6 +36,7 @@ from cloudmorrow.server.quills.manifest import Manifest
 from cloudmorrow.server.quills.sharing import ACCEPTED, APPROVED, DECLINED, OFFERED, WITHDRAWN, SharingError
 from cloudmorrow.server.quills.shelf import audience_of
 from cloudmorrow.server.records import Principal
+from cloudmorrow.server.routes.install import base_url
 from cloudmorrow.server.routes.quills import QuillSource, _resolve
 
 router = APIRouter(prefix="/api/quills", tags=["quills"])
@@ -124,7 +125,7 @@ def _describe_mine(state: AppState, manifest: Manifest, request: Request | None 
     row["shared_with"] = state.sharing.shared_with(manifest.owner, manifest.id)
     row["enabled"] = state.features.enabled(manifest.key)
     if request is not None and manifest.webhooks and state.quill_tokens is not None:
-        base = (state.config.public_url or str(request.base_url)).rstrip("/")
+        base = base_url(request, state)
         row["webhook_urls"] = [
             {
                 "id": h["id"],

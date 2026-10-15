@@ -8,6 +8,7 @@ import os
 import platform
 import shutil
 import socket
+import subprocess
 import sys
 from pathlib import Path
 from typing import Annotated
@@ -18,6 +19,7 @@ from rich.table import Table
 from cloudmorrow import __version__
 from cloudmorrow.console import TITLE
 from cloudmorrow.console import console as make_console
+from cloudmorrow.links import ensure_commands_linked, venv_prefix
 from cloudmorrow.logo import banner
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.db import (
@@ -30,7 +32,14 @@ from cloudmorrow.server.db import (
 from cloudmorrow.server.quills.cli import app as quill_app
 from cloudmorrow.server.sealed import Sealer, key_for, rotate
 from cloudmorrow.server.security import hash_password
-from cloudmorrow.server.update import UpdateError, build_wheel, describe, find_source_dir
+from cloudmorrow.server.update import (
+    UpdateError,
+    build_wheel,
+    describe,
+    find_source_dir,
+    owned_by_someone_else,
+    restart_service,
+)
 from cloudmorrow.server.update import update as do_update
 
 app = typer.Typer(help="Cloudmorrow API server.", no_args_is_help=True)
@@ -97,6 +106,7 @@ def serve(
         f"  per-user  : [cyan]{config.per_user_dirs}[/]\n"
         f"  listening : [cyan]{', '.join(f'{h}:{config.port}' for h in config.hosts)}[/]\n"
         f"  public url: [cyan]{config.public_url or 'derived from each request'}[/]\n"
+        f"  proxies   : [cyan]{config.forwarded_allow_ips or '127.0.0.1 (this machine only)'}[/]\n"
         f"  config    : [cyan]{config.config_path or 'defaults + environment'}[/]\n"
     )
     if _store(config).count() == 0:
@@ -111,6 +121,7 @@ def serve(
             host=config.hosts[0],
             port=config.port,
             reload=True,
+            forwarded_allow_ips=config.forwarded_allow_ips,
             timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
         )
     else:
@@ -122,12 +133,19 @@ def serve(
                 create_app(config),
                 host=hosts[0],
                 port=config.port,
+                forwarded_allow_ips=config.forwarded_allow_ips,
                 timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
             )
             return
         # Several addresses: uvicorn takes one host, but serves any sockets
         # it is handed, so each is bound here.
-        server = uvicorn.Server(uvicorn.Config(create_app(config), timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS))
+        server = uvicorn.Server(
+            uvicorn.Config(
+                create_app(config),
+                forwarded_allow_ips=config.forwarded_allow_ips,
+                timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
+            )
+        )
         server.run(sockets=[_listen(h, config.port) for h in hosts])
 
 
@@ -320,8 +338,8 @@ def agent_install(
         # needs. A deployment from before that was true has only [server].
         console.print(
             f"[red]The agent's dependencies are not installed here[/] ({exc.name}).\n"
-            "[dim]The server's venv needs both extras now that it runs an agent:[/]\n"
-            "  pip install --editable '/path/to/checkout[server,agent]'\n"
+            "[dim]The server's venv needs the agent's extra now that it runs an agent:[/]\n"
+            "  pip install --editable '/path/to/checkout[server,agent,tui]'\n"
             "[dim]`cloudmorrow update server --force` does that for you.[/]"
         )
         raise typer.Exit(code=1) from None
@@ -411,6 +429,24 @@ def update(
 ) -> None:
     """Pull the latest code from git and restart the server."""
     try:
+        checkout = find_source_dir(source)
+        owner = owned_by_someone_else(checkout)
+        if owner and os.geteuid() == 0:
+            # Root, in the service user's checkout: git would refuse, and the
+            # files root left behind would be worse. Do what cloudmorrow-update
+            # does — the update as the owner, the restart as root.
+            _update_as(
+                owner,
+                checkout,
+                config_path=config_path,
+                branch=branch,
+                service=service,
+                restart=restart,
+                reinstall=reinstall,
+                force=force,
+                exit_status=exit_status,
+            )
+            return
         result = do_update(
             source=source,
             branch=branch,
@@ -453,6 +489,15 @@ def update(
         )
     if result.reinstalled:
         console.print("[dim]reinstalled the package[/]")
+    if result.unlinked:
+        # The terminal app is in the venv now; onto the PATH is root's to do.
+        names = " and ".join(result.unlinked)
+        venv = venv_prefix()
+        console.print(
+            f"[yellow]{names} installed, but not on this machine's PATH[/] (only root can link it):\n"
+            f"  sudo ln -s {venv}/bin/cm /usr/local/bin/cm\n"
+            "[dim]or run cloudmorrow-update, or install-server.sh again with --update: either does that.[/]"
+        )
     if result.changed or force:
         try:
             published = build_wheel(result.source, load_config(config_path).dist_dir)
@@ -465,6 +510,69 @@ def update(
         # --no-restart is what cloudmorrow-update passes before restarting the
         # service itself, so this is a note, not a warning.
         console.print("[dim]not restarted, as asked[/]")
+
+
+def _update_as(
+    owner: str,
+    checkout: Path,
+    *,
+    config_path: Path | None,
+    branch: str | None,
+    service: str,
+    restart: bool,
+    reinstall: bool,
+    force: bool,
+    exit_status: bool,
+) -> None:
+    """Run this same command as *owner* with --no-restart, then restart as root."""
+    command = [
+        "sudo",
+        "-u",
+        owner,
+        "-H",
+        *_this_command(),
+        "update",
+        "--source",
+        str(checkout),
+        "--no-restart",
+        "--exit-status",
+    ]
+    if config_path is not None:
+        command += ["--config", str(config_path)]
+    if branch:
+        command += ["--branch", branch]
+    if not reinstall:
+        command.append("--no-reinstall")
+    if force:
+        command.append("--force")
+    console.print(f"[dim]{checkout} belongs to {owner}; updating as {owner}[/]")
+    try:
+        # stdio inherited: the update's own output arrives as it happens.
+        completed = subprocess.run(command)
+    except OSError as exc:
+        console.print(f"[red]cannot run sudo: {exc}[/]")
+        raise typer.Exit(code=1) from None
+    if completed.returncode == 3:
+        # Nothing to pull, so nothing to restart.
+        raise typer.Exit(code=3 if exit_status else 0)
+    if completed.returncode != 0:
+        raise typer.Exit(code=completed.returncode)
+    if restart:
+        try:
+            restart_service(service)
+        except UpdateError as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(code=1) from None
+        console.print(f"[green]Restarted[/] {service}")
+
+
+def _this_command() -> list[str]:
+    """How to run cloudmorrow-server again: the console script when that is what
+    is running, otherwise this interpreter and the module."""
+    script = Path(sys.argv[0]) if sys.argv and sys.argv[0] else None
+    if script is not None and script.name.startswith("cloudmorrow-server") and script.is_file():
+        return [str(script.resolve())]
+    return [sys.executable, "-m", "cloudmorrow.server.cli"]
 
 
 @app.command()
@@ -545,6 +653,10 @@ def version() -> None:
 
 
 def main() -> None:
+    # A run with the right to write /usr/local/bin — root's — puts `cm`
+    # beside cloudmorrow-server there, if an update, as the service user,
+    # could not. Quietly; nothing here may stop what was asked for.
+    ensure_commands_linked()
     app()
 
 

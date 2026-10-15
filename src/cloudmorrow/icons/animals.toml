@@ -1,0 +1,572 @@
+# Animals: pets, the farm, the wild, and the small things in the garden.
+# Every icon here is CC0: public domain, free to use anywhere, in anything, no attribution owed.
+
+[[icons]]
+id = "cat"
+name = "Cat"
+tags = ["animal", "pet", "kitten"]
+rows = [
+  "..X......X..",
+  "..XX....XX..",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XX.XXXX.XX.",
+  ".XXXXXXXXXX.",
+  ".XXXX..XXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "dog"
+name = "Dog"
+tags = ["animal", "pet", "puppy"]
+rows = [
+  ".XX......XX.",
+  "XXXX....XXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXX.XXXX.XXX",
+  "XXXXXXXXXXXX",
+  ".XXXX..XXXX.",
+  ".XXXXXXXXXX.",
+  "..XXX..XXX..",
+  "...XXXXXX...",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "bird"
+name = "Bird"
+tags = ["animal", "fly", "wing"]
+rows = [
+  "............",
+  ".....XXXX...",
+  "....XXXXXX..",
+  "....XX.XXXXX",
+  "....XXXXXX..",
+  "XX..XXXXX...",
+  ".XXXXXXXXX..",
+  "..XXXXXXXXX.",
+  "...XXXXXXX..",
+  "....XXXXX...",
+  "......X.X...",
+  ".....XX.XX..",
+]
+
+[[icons]]
+id = "fish"
+name = "Fish"
+tags = ["animal", "sea", "water"]
+rows = [
+  "............",
+  "............",
+  "......XXXX..",
+  ".X..XXXXXXX.",
+  ".XX.XXX.XXXX",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  ".XX.XXXXXXX.",
+  ".X...XXXXX..",
+  "......XXX...",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "rabbit"
+name = "Rabbit"
+tags = ["animal", "pet", "bunny", "hare"]
+rows = [
+  "...XX..XX...",
+  "...XX..XX...",
+  "...XX..XX...",
+  "...XX..XX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".XX.XXXX.XX.",
+  ".XXXXXXXXXX.",
+  ".XXXXX.XXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "mouse"
+name = "Mouse"
+tags = ["animal", "rodent", "small"]
+rows = [
+  "............",
+  "............",
+  "......XXX...",
+  ".....XXXXX..",
+  ".....XXXXX..",
+  "...XXXXXXXX.",
+  "..XXXXXXXXXX",
+  "XXXXX.XXXXXX",
+  ".XXXXXXXXXXX",
+  "..XXXXXXXX..",
+  "...XX..XX.X.",
+  "..........X.",
+]
+
+[[icons]]
+id = "horse"
+name = "Horse"
+tags = ["animal", "farm", "pony"]
+rows = [
+  ".....XX.....",
+  "....XXXX....",
+  "...XXXXXXX..",
+  "..XXXX.XXXX.",
+  "..XXXXXXXXX.",
+  ".XXXXXXXX.XX",
+  "XXXXXXXXXXX.",
+  "XX.XXXXXX...",
+  ".X.XXXXXX...",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+]
+
+[[icons]]
+id = "cow"
+name = "Cow"
+tags = ["animal", "farm", "cattle", "milk"]
+rows = [
+  "XX........XX",
+  "XXX......XXX",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".XX.XXXX.XX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "..XX.XX.XX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+]
+
+[[icons]]
+id = "pig"
+name = "Pig"
+tags = ["animal", "farm", "hog"]
+rows = [
+  ".XX......XX.",
+  "XXXX....XXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXX.XXXX.XXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  ".XXX.XX.XXX.",
+  ".XXX.XX.XXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "sheep"
+name = "Sheep"
+tags = ["animal", "farm", "wool", "lamb"]
+rows = [
+  "............",
+  ".....XXXXXX.",
+  "...XXXXXXXXX",
+  "..XXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  "XX.XXXXXXXXX",
+  "XXXXXXXXXXX.",
+  ".XX.XXXXXXX.",
+  "....XX..XX..",
+  "....XX..XX..",
+  "............",
+]
+
+[[icons]]
+id = "chicken"
+name = "Chicken"
+tags = ["animal", "farm", "hen", "bird"]
+rows = [
+  "....XX......",
+  "...XXXXX....",
+  "...XXXXXXX..",
+  "..XX.XXX.XX.",
+  "..XXXXXXX...",
+  "X.XXXXXXX...",
+  "XXXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  ".....X.X....",
+  "....XX.XX...",
+]
+
+[[icons]]
+id = "duck"
+name = "Duck"
+tags = ["animal", "bird", "pond", "water"]
+rows = [
+  "............",
+  "...XXXX.....",
+  "..XXXXXX....",
+  "..XX.XXXXXX.",
+  "..XXXXXX....",
+  "...XXX......",
+  "XX.XXXXXXX..",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXXX.",
+  "...XXXXXXX..",
+  "....XXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "owl"
+name = "Owl"
+tags = ["animal", "bird", "night", "wise"]
+rows = [
+  ".XX......XX.",
+  ".XXX....XXX.",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XX..XXXX..XX",
+  "XX..XXXX..XX",
+  "XXXXX..XXXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XX..XX...",
+]
+
+[[icons]]
+id = "butterfly"
+name = "Butterfly"
+tags = ["animal", "insect", "wing", "garden"]
+rows = [
+  "..X......X..",
+  "...X....X...",
+  "....XXXX....",
+  ".XXX.XX.XXX.",
+  "XXXX.XX.XXXX",
+  "XXXX.XX.XXXX",
+  ".XXX.XX.XXX.",
+  "..XX.XX.XX..",
+  ".XXX.XX.XXX.",
+  "XXXX.XX.XXXX",
+  ".XX..XX..XX.",
+  "............",
+]
+
+[[icons]]
+id = "bee"
+name = "Bee"
+tags = ["animal", "insect", "honey", "garden"]
+rows = [
+  "............",
+  ".....XX.XX..",
+  "....XXXXXXX.",
+  "....XXXXXXX.",
+  ".....XXXXX..",
+  ".XXXXXXXXXXX",
+  "XXX.XX.XX.XX",
+  "XXX.XX.XX.XX",
+  ".XXXXXXXXXXX",
+  "..XXXXXXXXX.",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "snail"
+name = "Snail"
+tags = ["animal", "garden", "slow", "shell"]
+rows = [
+  "............",
+  ".........X..",
+  "........X...",
+  "...XXXX.X...",
+  "..XXXXXX.XX.",
+  ".XXX..XXXXX.",
+  ".XX.XX.XXXX.",
+  ".XX.X.XXXXX.",
+  ".XXX..XXXX..",
+  "..XXXXXXX...",
+  "XXXXXXXXXXX.",
+  "............",
+]
+
+[[icons]]
+id = "frog"
+name = "Frog"
+tags = ["animal", "pond", "amphibian", "toad"]
+rows = [
+  ".XXX....XXX.",
+  "XX.XX..XX.XX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XX.XXXXXX.XX",
+  "XXX......XXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  ".XX......XX.",
+  "XXX......XXX",
+]
+
+[[icons]]
+id = "turtle"
+name = "Turtle"
+tags = ["animal", "reptile", "tortoise", "shell", "slow"]
+rows = [
+  ".....XX.....",
+  "....X..X....",
+  ".X..XXXX..X.",
+  "X.XXXXXXXX.X",
+  "X.XX.XX.XX.X",
+  ".XXXXXXXXXX.",
+  ".XXX.XX.XXX.",
+  ".XXXXXXXXXX.",
+  "X.XX.XX.XX.X",
+  "X.XXXXXXXX.X",
+  ".X..XXXX..X.",
+  ".....XX.....",
+]
+
+[[icons]]
+id = "snake"
+name = "Snake"
+tags = ["animal", "reptile", "serpent"]
+rows = [
+  ".....XXXXX..",
+  "....XXXXXXX.",
+  "....XX.XXXX.",
+  "....XXXXXXXX",
+  ".....XXXX...",
+  ".......XXX..",
+  "........XXX.",
+  ".........XX.",
+  "XX.......XX.",
+  ".XXX....XXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+]
+
+[[icons]]
+id = "elephant"
+name = "Elephant"
+tags = ["animal", "wild", "trunk", "big"]
+rows = [
+  "............",
+  "..XXXXXXX...",
+  ".XXXXXXXXXX.",
+  "XXXXXXXX.XXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXX.XX",
+  "..XX.XX...XX",
+  "..XX.XX...XX",
+  "..XX.XX..XX.",
+  "............",
+]
+
+[[icons]]
+id = "whale"
+name = "Whale"
+tags = ["animal", "sea", "ocean", "big"]
+rows = [
+  "............",
+  "............",
+  "..........XX",
+  ".........XXX",
+  "..XXXXXX.XX.",
+  ".XXXXXXXXXX.",
+  "XX.XXXXXXXX.",
+  "XXXXXXXXXXX.",
+  "XXXXXXXXXX..",
+  ".XXXXXXXXX..",
+  "..XXXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "crab"
+name = "Crab"
+tags = ["animal", "sea", "beach", "shellfish"]
+rows = [
+  "XX........XX",
+  "X.X......X.X",
+  ".XX......XX.",
+  "..X......X..",
+  "..XXXXXXXX..",
+  ".XXXXXXXXXX.",
+  "XXXX.XX.XXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  ".X.X.XX.X.X.",
+  "X..X....X..X",
+]
+
+[[icons]]
+id = "hedgehog"
+name = "Hedgehog"
+tags = ["animal", "garden", "morrow", "mascot", "spikes"]
+rows = [
+  "............",
+  "...X.X.X....",
+  "..XXXXXXX...",
+  ".X.X.X.X.XX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXX.X",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "..XX...XX...",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "fox"
+name = "Fox"
+tags = ["animal", "wild", "forest"]
+rows = [
+  "X..........X",
+  "XX........XX",
+  "XXX......XXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XX.XXXXXX.XX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "....XXXX....",
+  ".....XX.....",
+]
+
+[[icons]]
+id = "bear"
+name = "Bear"
+tags = ["animal", "wild", "forest", "teddy"]
+rows = [
+  ".XXX....XXX.",
+  "XXXXX..XXXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XX.XXXX.XX.",
+  ".XXXXXXXXXX.",
+  ".XXXX..XXXX.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "deer"
+name = "Deer"
+tags = ["animal", "wild", "forest", "antlers", "stag"]
+rows = [
+  "X.X......X.X",
+  "XXX......XXX",
+  ".X........X.",
+  ".X.XX..XX.X.",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "..XX.XX.XX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "...XXX.XX...",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "penguin"
+name = "Penguin"
+tags = ["animal", "bird", "ice", "cold"]
+rows = [
+  "....XXXX....",
+  "...XXXXXX...",
+  "...X.XX.X...",
+  "...XXXXXX...",
+  "....X..X....",
+  "..XXXXXXXX..",
+  ".XXX....XXX.",
+  ".XXX....XXX.",
+  ".XXX....XXX.",
+  "..XX....XX..",
+  "..XXXXXXXX..",
+  ".XXX....XXX.",
+]
+
+[[icons]]
+id = "bat"
+name = "Bat"
+tags = ["animal", "night", "wing", "cave"]
+rows = [
+  "............",
+  "............",
+  "X....XX....X",
+  "XX..XXXX..XX",
+  "XXX.X..X.XXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XX.XXXXXX.XX",
+  "X..XX..XX..X",
+  "....X..X....",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "spider"
+name = "Spider"
+tags = ["animal", "insect", "web", "eight"]
+rows = [
+  "............",
+  "X....XX....X",
+  ".X..XXXX..X.",
+  "..X.X..X.X..",
+  "...XXXXXX...",
+  "XXXXXXXXXXXX",
+  "X..XXXXXX..X",
+  ".X.XXXXXX.X.",
+  "..XXXXXXXX..",
+  ".X..XXXX..X.",
+  "X....XX....X",
+  "............",
+]
+
+[[icons]]
+id = "ladybird"
+name = "Ladybird"
+tags = ["animal", "insect", "garden", "ladybug", "beetle"]
+rows = [
+  "............",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XX.XX.XX..",
+  ".XXXXXXXXXX.",
+  ".XXX.XX.XXX.",
+  "XXXXXXXXXXXX",
+  "XXX.XXXXX.XX",
+  "XXXXX.XXXXXX",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "....XXXX....",
+]

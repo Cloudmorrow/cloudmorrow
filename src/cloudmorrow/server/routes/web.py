@@ -34,6 +34,7 @@ MEDIA_TYPES = {
     ".js": "text/javascript; charset=utf-8",
     ".webmanifest": "application/manifest+json",
     ".png": "image/png",
+    ".ico": "image/x-icon",
     # The type, vendored with its licence: Barlow, as the brand guide sets it.
     ".woff2": "font/woff2",
 }
@@ -121,27 +122,47 @@ def app_alias() -> RedirectResponse:
     return RedirectResponse("/app", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
-def _asset(filename: str) -> FileResponse:
+def _asset(filename: str, cache: str = "public, max-age=31536000, immutable") -> FileResponse:
     path = WEB / filename
     media_type = MEDIA_TYPES.get(path.suffix)
     if media_type is None or "/" in filename or filename.startswith(".") or path.parent != WEB or not path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such file")
-    return FileResponse(
-        path,
-        media_type=media_type,
-        # Named with the deploy in the URL, so it may be kept for as long
-        # as the browser likes; a deploy names them anew.
-        headers={"Cache-Control": "public, max-age=31536000, immutable"},
-    )
+    return FileResponse(path, media_type=media_type, headers={"Cache-Control": cache})
+
+
+# The icons are named without a deploy, since they rarely change — so they
+# are not immutable, and a day is as long as a browser may keep one. When one
+# does change it gets a new name as well, for the browsers that kept the old.
+ICON_CACHE = "public, max-age=86400"
+
+
+@router.get("/favicon.ico", include_in_schema=False)
+def favicon() -> FileResponse:
+    """Morrow, for the browsers and bookmarks that ask here rather than read the page."""
+    return _asset("morrow.ico", cache=ICON_CACHE)
+
+
+@router.get("/icons.json", include_in_schema=False)
+def icon_library() -> JSONResponse:
+    """The pixel icon library (cloudmorrow.icons): every theme and icon, for the
+    app's tabs and for anybody. Public domain, so no sign-in; an hour of caching,
+    since it changes with a deploy and not more often."""
+    from cloudmorrow.icons import as_json
+
+    return JSONResponse(as_json(), headers={"Cache-Control": "public, max-age=3600"})
 
 
 @router.get("/app/{version}/{filename}", include_in_schema=False)
 def app_versioned_asset(version: str, filename: str) -> FileResponse:
-    """The script and stylesheet, and everything they import."""
+    """The script and stylesheet, and everything they import.
+
+    Named with the deploy in the URL, so they may be kept for as long as
+    the browser likes; a deploy names them anew.
+    """
     return _asset(filename)
 
 
 @router.get("/app/{filename}", include_in_schema=False)
 def app_asset(filename: str) -> FileResponse:
-    """The manifest and the icons: named without a deploy, since they rarely change."""
-    return _asset(filename)
+    """The icons, which the manifest and the home screen name without a deploy."""
+    return _asset(filename, cache=ICON_CACHE)

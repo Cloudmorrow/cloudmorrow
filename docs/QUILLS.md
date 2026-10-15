@@ -98,7 +98,7 @@ name = "Tasks"
 version = "1.0.0"
 summary = "Boards with three lanes: To Do, Doing, Done."
 category = "personal"
-icon = "tasks"                            # a kit icon name
+icon = "tasks"                            # one of the icon library's, or the app's own
 publisher = "Cloudmorrow"
 license = "AGPL-3.0-or-later"
 features = [                              # what it does, for the catalog and the install sheet
@@ -136,6 +136,17 @@ seed = "per-owner"                        # once for each person who has none
 records = [{ title = "{owner}'s tasks" }]
 ```
 
+The tab's icon is a pixel mark from the icon library
+(`src/cloudmorrow/icons/`, listed by theme at
+[cloudmorrow.com/resources/icons](https://cloudmorrow.com/resources/icons)):
+`icon = "hedgehog"` names one, and every surface draws it from the same
+rows. The app's own nine (`notes`, `tasks`, `files`, `secrets`, `settings`,
+`chat`, `calendar`, `me`, `today`) and the CRM's `funnel` may be named too.
+A name the library does not have shows the quill mark, and `cm quill check`
+says so. The library is CC0 — public domain, free to use anywhere — and the
+web app reads all of it once from `GET /icons.json`; the package README says
+how to add one.
+
 ### The data
 
 What a Quill declares in `[uses]`, `[[extends]]`, its `datamodels/` folder
@@ -158,7 +169,7 @@ each element needs:
 | `board` | `model`, `lane` (an enum, or a link: see below), `title`, optional `group` (link), `subtitle` (a field or a list of them), `body`, `done` | lanes stacked | lanes as columns, drag and drop | lanes as columns, drag and keys | `cm <quill> list`, `add`, `move` |
 | `detail` / `form` | `model`, `fields` | a sheet | a panel | a modal | `cm <quill> show`, `set` |
 | `calendar` | `model`, `starts`, `ends` (indexed datetime or date fields), `space` (a link to a space: the calendars), optional `all_day` (bool), `colour` (a field of the space: cyan, violet, green, amber, rose), `title`, `subtitle` | a month with a dot per thing, and the day's list | a week of hours or a month written in | the spaces, a month, and the day's list | `cm <quill> list --from --to`, `add "<title>" starts=… ends=…` |
-| `thread` | `model` (in a space), `space` (its link to the space), `body`; optional `about` (a field of the space), `made_as` | the spaces with unread, then a conversation | both side by side | both side by side | `cm <quill> list`, `show`, `say` |
+| `thread` | `model` (in a space), `space` (its link to the space), `body`; optional `about` (a field of the space), `made_as`; a team's: `reply_to` (a link of the model to itself), `pinned` (a bool), `reactions` (a datamodel with a link to the model and an `emoji`), `mentions = true` | the spaces with unread, then a conversation; a line's thread as a page | both side by side, a thread beside them | both side by side, replies under their lines | `cm <quill> list`, `show`, `say`, `reply`, `react`, `pin` |
 | `editor` | `model`, `title`, `body` (markdown), optional `path` (a string, `folder/sub/title`: the folders) | a tree, then a list, then the page | the list and the page side by side | the tree and the live editor side by side | `cm <quill> list`, `show`, `add`, `edit`, `search` |
 | `grid` | `model` with content (`file`), `group` (a link: the places, picked first), `folder`, `kind` (an enum with `folder`), optional `size`, `modified`, `mime`, `group_subtitle`, `group_open` (a bool on the group: false and it is listed, not opened), `group_writes` (a bool on the group: false and it opens with nothing that writes) | the groups, then folders and tiles | the same, wider; drag and drop in | the groups in a table, then the folder, with the picture beside | `cm <quill> list [group] [folder]`, `get`, `put`, `add` |
 
@@ -204,21 +215,43 @@ A `thread` is the kit's conversation: things written (`body`) in spaces. Its
 `made_as` says what fields a space gets for how it is made — by its scope, or
 `direct`, a shared space found-or-made between you and the person you pick
 and named for them — and the kit draws around it what every space has: making
-one, the people in it, adding and taking out, leaving. Chat is:
+one, the people in it, adding and taking out, leaving. Channels is:
 
 ```toml
 [[screens]]
-id = "chat"
+id = "channels"
 kit = "thread"
 model = "message"
 space = "channel"
 body = "body"
 about = "topic"
+reply_to = "reply_to"       # a message with it is a reply, in a thread under its parent
+pinned = "pinned"           # kept at the top of the channel
+reactions = "reaction"      # one emoji per person per message
+mentions = true             # @name tells that person
 [screens.made_as]
 public = { kind = "public" }
 shared = { kind = "private" }
 direct = { kind = "direct" }
 ```
+
+The last four are a team's, and each is there or not; without them a
+thread is the conversation Chat was. `reply_to` names a link of the model
+to itself: a line with it set is a reply, written in its parent's space,
+counted under the parent as *N replies*, and opened as a thread — beside
+the conversation on a computer, a page on a phone, indented under its line
+in the terminal — with a box of its own. `pinned` names a bool: a pinned
+line is marked, the space's header counts them and opens the list; its
+author pins it, or whoever manages the space (the field is `managed` in
+the datamodel, which is what lets a manager change that one field on
+somebody else's record). `reactions` names a datamodel of the Quill's with
+a link to the model, an `emoji` string and `authored = true`: each line
+shows its emoji with their counts, yours lit, and tapping one toggles
+yours — one record per person per emoji per line, theirs alone to take
+back, never unread. `mentions = true` lights every `@name` in a line, the
+box offers names as an `@` is typed, and the person named gets their own
+push — *bram mentioned you in #general* — if they are in the space; what
+the line says is otherwise the space's business, as before.
 
 A conversation opens on its newest page (`?_last=100`), listens to
 `/api/changes` and asks what changed since (`?_since=`) when it hears of a
@@ -409,6 +442,38 @@ above by default), fetches a Quill as the tarball of its pinned `ref` — no git
 needed on the server — and keeps it under `<data_dir>/quills/<id>/`. A source
 can also be a local directory, which is how you develop one.
 
+A Quill is released in its own repository: a pushed tag (`v1.2.0`, the same
+as `version` in `quill.toml`), a release made on github.com, or the
+**release** workflow run from the Actions tab, which tags `main` with the
+manifest's version once the checks pass. The template carries that
+workflow, so every Quill releases the same way.
+
+The catalog follows the releases. Its **releases** workflow runs every
+fifteen minutes and finds the newest release of every `Cloudmorrow/quill-*`
+repository, of the datamodels, and of every other repository the catalog
+lists; it works out the catalog as it should be and runs the check — every
+Quill fetched at its pin, planned against the pinned datamodels, as a server
+would before installing — and then:
+
+- **Cloudmorrow's Quills** are committed to `main` with no review and no
+  further step, a new one included, with its name, summary and category
+  from its `quill.toml`. The template is excluded.
+- **The datamodels** move the same way, but only when every Quill still
+  checks out against the new release; otherwise the pin stays and the run
+  names the Quill that breaks.
+- **Everyone else's listed Quills** get a pull request per release, opened
+  by the workflow with the check result and the install sheet in its body.
+  One of us merges it, or closes it; a release turned down is not proposed
+  again. The submitter may open that pull request themselves; the result is
+  the same.
+- **A new Quill from someone else** is a pull request from its author adding
+  one `[[quills]]` block, and the check runs on it.
+
+The workflow is the only writer of `catalog.toml`'s refs; nobody edits them
+by hand. The `foundation` flag and the categories are product decisions, and
+stay hand edits. The catalog's history is the record of every release a
+server could ever install.
+
 ## Building one, with an assistant
 
 The loop is meant to be a conversation, and every step of it has a command
@@ -425,8 +490,10 @@ and an MCP tool, so an assistant can drive it as well as you can.
 3. **Try** with `cm quill dev --local` (a throwaway server here) or `cm quill dev .`: installs the folder on your own server as a
    development Quill, and reinstalls it when a file changes. It is on your
    phone and in your terminal at once.
-4. **Publish** with a release tag in your repository and a pull request adding
-   three lines to the catalog.
+4. **Publish** with a release in your repository (a tag, a release on
+   github.com, or the release workflow by hand) and, the first time, a pull
+   request adding one block to the catalog; after that the catalog follows
+   your releases by itself (*The catalog*, above).
 
 Over MCP, an administrator's assistant has `quill_schema`, `quill_check` and
 `quill_dev_install`: "make me a place to track the car's services" is a
@@ -463,7 +530,9 @@ manifest written, checked and installed in one conversation.
 2. Services, webhooks and APIs run, with Quill tokens and the gate on them.
    (They run, as the installing administrator; a service per person is next.)
 3. `calendar` and `thread` in the kit; Calendar and Chat become Quills.
-   (Both are Quills: `calendar` and `thread` are drawn on every surface.)
+   (Both are Quills: `calendar` and `thread` are drawn on every surface.
+   Channels replaced Chat over the same datamodels, with threads, mentions,
+   reactions and pins on the kit.)
 4. `grid` and `editor`; Files and Notes become Quills. (Both are drawn,
    and both are Quills.) Secrets is a Quill too, a grouped `list` of the
    `secret` datamodel, while its store stays foundation, and it is the one

@@ -137,22 +137,40 @@ def test_notes_keep_the_system_face():
 
 
 # -- the hedgehog ------------------------------------------------------------------
-def test_the_icon_is_the_hedgehog(client):
+def test_the_icon_is_morrow(client):
+    """The same Morrow as the website, so the tab and the home screen match it."""
     page = client.get("/app").text
-    assert 'href="/app/favicon-32.png"' in page and 'href="/app/favicon-16.png"' in page
-    assert 'rel="apple-touch-icon" href="/app/icon-180.png"' in page
+    assert 'href="/app/morrow-32.png"' in page and 'href="/app/morrow-16.png"' in page
+    assert 'rel="apple-touch-icon" href="/app/morrow-180.png"' in page
     for name, size in (
-        ("favicon-16.png", 16),
-        ("favicon-32.png", 32),
-        ("icon-180.png", 180),
-        ("icon-192.png", 192),
-        ("icon-512.png", 512),
+        ("morrow-16.png", 16),
+        ("morrow-32.png", 32),
+        ("morrow-180.png", 180),
+        ("morrow-192.png", 192),
+        ("morrow-512.png", 512),
     ):
         data = (WEB / name).read_bytes()
         assert data.startswith(b"\x89PNG"), name
         width = int.from_bytes(data[16:20], "big")
         assert width == size, name
-        assert client.get(f"/app/{name}").status_code == 200, name
+        icon = client.get(f"/app/{name}")
+        assert icon.status_code == 200, name
+        # Not immutable: an icon is named without a deploy, so a browser may
+        # keep it for a day and no longer, or a new face would never reach it.
+        assert icon.headers["cache-control"] == "public, max-age=86400", name
+    # The old names are gone, so nothing still cached under them is served again.
+    for old in ("favicon-32.png", "favicon-16.png", "icon-180.png", "icon-192.png", "icon-512.png"):
+        assert client.get(f"/app/{old}").status_code == 404, old
+
+
+def test_favicon_ico_is_morrow_too(client):
+    """For the browsers and bookmarks that ask at the root rather than read the page."""
+    icon = client.get("/favicon.ico")
+    assert icon.status_code == 200
+    assert icon.headers["content-type"] == "image/x-icon"
+    assert icon.content[:4] == b"\x00\x00\x01\x00"
+    assert icon.headers["cache-control"] == "public, max-age=86400"
+    assert (WEB / "morrow.ico").read_bytes() == icon.content
 
 
 def test_empty_screens_may_show_the_hedgehog(client):

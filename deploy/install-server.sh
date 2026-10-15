@@ -17,11 +17,14 @@
 # The cloud is reached at this machine's address, and on a home network at
 # <name>.local. Reaching it from outside is your own setup: a domain and a
 # reverse proxy of your own (--public-url), or a VPN such as Tailscale.
+# On the server itself, `cm` opens the terminal app and signs in to the
+# server beside it, whichever addresses it was told to answer on.
 #
 # Run it again on a machine that already has Cloudmorrow and it checks the
-# server first: running and answering, it says so and changes nothing;
-# otherwise it updates and reinstalls it, and checks again. --update does
-# that whatever the check says. It never overwrites an existing
+# server first: running and answering, it asks whether to update it (Enter
+# says yes; without a terminal it changes nothing); otherwise it updates
+# and reinstalls it, and checks again. --update does that without asking.
+# It never overwrites an existing
 # /etc/cloudmorrow/server.toml, everyone's files, or the database, and it never
 # asks a question it already has the answer to. For routine "I pushed a
 # change" updates, use `cloudmorrow update server` from any machine, or the
@@ -41,6 +44,7 @@ FILES_DIR=""
 SHARES_DIR=""
 CLOUD_NAME=""
 PUBLIC_URL=""
+TRUSTED_PROXIES=""
 HOST="0.0.0.0"
 PORT="8787"
 SERVICE_USER="cloudmorrow"
@@ -57,13 +61,16 @@ HOST_GIVEN=""
 DATABASE=""
 
 usage() {
-	sed -n '2,18p' "$0"
+	sed -n '2,20p' "$0"
 	cat <<EOF
 
 Options:
   --name TEXT         what your cloud is called         (asked if not given)
   --public-url URL    an address of your own, behind a reverse proxy of your
                       own
+  --trusted-proxy IP  that proxy, when it is another machine: its address
+                      (or CIDR; several comma-separated), so the server
+                      believes what it says about https
   --user NAME         the first account, an administrator (asked if not given;
                       its password is asked for, or read from
                       \$CLOUDMORROW_ADMIN_PASSWORD)
@@ -105,6 +112,7 @@ while [ $# -gt 0 ]; do
 	case "$1" in
 	--name) CLOUD_NAME="$2"; shift 2 ;;
 	--public-url) PUBLIC_URL="$2"; shift 2 ;;
+	--trusted-proxy) TRUSTED_PROXIES="$2"; shift 2 ;;
 	--user) ACCOUNT="$2"; shift 2 ;;
 	--quills) QUILLS="$2"; shift 2 ;;
 	--repo) REPO="$2"; shift 2 ;;
@@ -480,6 +488,15 @@ wait_healthy() {
 	done
 }
 
+# Questions are asked on the terminal, not stdin: the script itself may be
+# what is on stdin when it arrives through `curl | sh`. Nothing is asked at
+# all without a terminal or with --dry-run, so a script that gives every
+# answer as a flag runs straight through.
+TTY=""
+if [ -z "$DRY_RUN" ] && ( : </dev/tty ) 2>/dev/null; then
+	TTY="1"
+fi
+
 if [ -z "$UPDATE" ] && [ -z "$DRY_RUN" ] && [ -f "$CONFIG" ] && [ -x "$VENV/bin/cloudmorrow-server" ]; then
 	if problem="$(health)"; then
 		NAME_NOW="$(config_value name)"
@@ -488,27 +505,42 @@ if [ -z "$UPDATE" ] && [ -z "$DRY_RUN" ] && [ -f "$CONFIG" ] && [ -x "$VENV/bin/
 		printf "\n  ${GOOD}✓${OFF} %s is already here, running and answering.\n" "${NAME_NOW:-Cloudmorrow}"
 		heading "Open it"
 		line "${URL_NOW:-$LOCAL_NOW}/app"
-		heading "Nothing to do. To update it anyway"
-		item "here" "cloudmorrow-update"
-		item "anywhere" "cloudmorrow update server"
-		item "all again" "... | sudo sh -s -- --update"
 		printf '\n'
-		exit 0
+		# Somebody at a terminal ran the installer again on purpose, and the
+		# usual purpose is an update: the newest code, the packages, the unit,
+		# the commands, all of it, with the config, files and database left as
+		# they are. Enter says yes. Without a terminal nothing is asked, and a
+		# server that is well is left as it is — --update says otherwise.
+		if [ -n "$TTY" ]; then
+			printf '\033[1m%s\033[0m [Y/n]: ' "Update it? (settings, files and accounts are kept)" >/dev/tty
+			read -r answer </dev/tty || answer="n"
+			case "$answer" in
+			"" | [Yy] | [Yy][Ee][Ss])
+				printf '\n' >/dev/tty
+				say "updating and reinstalling it, then checking again"
+				;;
+			*)
+				printf '\n  Left as it is.\n\n'
+				exit 0
+				;;
+			esac
+		else
+			heading "Nothing to do. To update it anyway"
+			item "here" "cloudmorrow-update"
+			item "anywhere" "cloudmorrow update server"
+			item "all again" "... | sudo sh -s -- --update"
+			printf '\n'
+			exit 0
+		fi
+	else
+		warn "Cloudmorrow is installed here, but $problem"
+		say "updating and reinstalling it, then checking again"
 	fi
-	warn "Cloudmorrow is installed here, but $problem"
-	say "updating and reinstalling it, then checking again"
 fi
 
 # --- the questions ---------------------------------------------------------
-# Asked on the terminal, not stdin: the script itself may be what is on stdin
-# when it arrives through `curl | sh`. Nothing is asked twice — an existing
-# config keeps its name and address, an existing account is left alone — and
-# nothing is asked at all without a terminal or with --dry-run, so a script
-# that gives every answer as a flag runs straight through.
-TTY=""
-if [ -z "$DRY_RUN" ] && ( : </dev/tty ) 2>/dev/null; then
-	TTY="1"
-fi
+# Nothing is asked twice — an existing config keeps its name and address, an
+# existing account is left alone.
 
 ask() {
 	# ask VAR "question" "default": sets VAR unless it already has a value.
@@ -812,13 +844,33 @@ if [ ! -x "$VENV/bin/python" ]; then
 	say "creating the virtualenv at $VENV"
 	run sudo -u "$SERVICE_USER" "$PYTHON" -m venv "$VENV"
 fi
-# Both extras: the server runs an agent of its own, so it needs what an agent
-# needs as well as what the API needs.
-say "installing cloudmorrow[server,agent] (editable, so updates are a git pull)"
+# Three extras: the server runs an agent of its own, so it needs what an
+# agent needs as well as what the API needs; and the terminal app is here
+# too, for `cm` at the box.
+say "installing cloudmorrow[server,agent,tui] (editable, so updates are a git pull)"
 run sudo -u "$SERVICE_USER" "$VENV/bin/python" -m pip install --quiet --upgrade pip
-run sudo -u "$SERVICE_USER" "$VENV/bin/python" -m pip install --quiet --editable "$SRC[server,agent]"
+run sudo -u "$SERVICE_USER" "$VENV/bin/python" -m pip install --quiet --editable "$SRC[server,agent,tui]"
 
 run ln -sf "$VENV/bin/cloudmorrow-server" /usr/local/bin/cloudmorrow-server
+
+# The terminal app, on the server as on any other machine: `cm` (or
+# `cloudmorrow`) signs in with a name and a password and has Administration.
+# It needs no address: with no config of their own, a client on this box
+# reads where the server listens off server.toml (cloudmorrow/localserver.py)
+# and reaches it there, whichever addresses were chosen above. A `cm` on
+# this machine that is not ours is left where it is.
+link_command() {
+	if [ -e "/usr/local/bin/$1" ] || [ -L "/usr/local/bin/$1" ]; then
+		case "$(readlink "/usr/local/bin/$1" 2>/dev/null)" in
+		"$VENV/bin/$1") ;;
+		*) warn "/usr/local/bin/$1 is not ours, so it stays; the terminal app here is $VENV/bin/$1"; return 0 ;;
+		esac
+	fi
+	run ln -sf "$VENV/bin/$1" "/usr/local/bin/$1"
+}
+say "linking cm and cloudmorrow, the terminal app, into /usr/local/bin"
+link_command cm
+link_command cloudmorrow
 
 
 # --- where it answers -----------------------------------------------------
@@ -993,7 +1045,7 @@ builtin) ;;
 container | postgresql://* | postgres://*)
 	# The driver, on top of what is installed already.
 	say "installing the PostgreSQL driver (cloudmorrow[postgres])"
-	run sudo -u "$SERVICE_USER" "$VENV/bin/python" -m pip install --quiet --editable "$SRC[server,agent,postgres]"
+	run sudo -u "$SERVICE_USER" "$VENV/bin/python" -m pip install --quiet --editable "$SRC[server,agent,tui,postgres]"
 	;;
 *) die "--database is builtin, container, or a postgresql:// URL, not \"$DATABASE\"" ;;
 esac
@@ -1015,6 +1067,7 @@ else
 	else
 		SHARES_LINE="# shares_dir = \"/srv/shares\""
 	fi
+	TRUSTED_PROXIES_LINE="$(printf '%s' "$TRUSTED_PROXIES" | tr ',' '\n' | sed -e 's/^ *//' -e 's/ *$//' -e '/^$/d' -e 's/.*/"&"/' | paste -sd, - | sed 's/,/, /g')"
 	if [ -n "$DATABASE_URL" ]; then
 		DATABASE_LINE="database_url = \"$DATABASE_URL\""
 	else
@@ -1058,6 +1111,13 @@ key_file = "$KEY_FILE"
 # own domain, behind your own reverse proxy. Empty, the page uses the
 # address it was opened at.
 public_url = "$PUBLIC_URL"
+
+# The reverse proxy, when it is another machine: its address or CIDR range,
+# so the server believes the proxy's X-Forwarded-Proto. That is what makes
+# a request https: without it, a proxy on another box reaches the server
+# as plain http, refused with 426 once public_url is https. A proxy on this
+# machine (127.0.0.1) is believed without being named.
+trusted_proxies = [$TRUSTED_PROXIES_LINE]
 
 token_ttl_hours = 720
 cors_origins = []
@@ -1148,6 +1208,7 @@ EOF
 fi
 
 # --- the updater your user runs -------------------------------------------
+LN="$(command -v ln || echo /bin/ln)"
 say "installing /usr/local/bin/cloudmorrow-update"
 write_file /usr/local/bin/cloudmorrow-update 0755 <<EOF
 #!/bin/sh
@@ -1161,6 +1222,20 @@ status=0
 sudo -u $SERVICE_USER -H $VENV/bin/cloudmorrow-server update --no-restart --exit-status "\$@" \
 	|| status=\$?
 [ "\$status" = 0 ] || [ "\$status" = 3 ] || exit "\$status"
+# The terminal app beside cloudmorrow-server on the PATH. The update above
+# runs as $SERVICE_USER, which cannot write /usr/local/bin, so whatever it
+# brought to the venv and could not link is linked here, as root: the
+# sudoers rule allows exactly these two commands. A cm that is not ours
+# is left alone.
+for name in cm cloudmorrow; do
+	if [ -x "$VENV/bin/\$name" ] && [ ! -e "/usr/local/bin/\$name" ] && [ ! -L "/usr/local/bin/\$name" ]; then
+		if sudo -n $LN -s $VENV/bin/\$name /usr/local/bin/\$name 2>/dev/null; then
+			printf 'linked /usr/local/bin/%s\\n' "\$name"
+		else
+			printf 'note: could not link %s onto the PATH; as root: ln -s %s /usr/local/bin/%s\\n' "\$name" "$VENV/bin/\$name" "\$name"
+		fi
+	fi
+done
 if [ "\$status" = 3 ]; then
 	exit 0
 fi
@@ -1179,12 +1254,14 @@ EOF
 if [ -n "$ADMIN_USER" ] && id "$ADMIN_USER" >/dev/null 2>&1; then
 	SYSTEMCTL="$(command -v systemctl || echo /usr/bin/systemctl)"
 	SUDOERS="/etc/sudoers.d/cloudmorrow"
-	say "granting $ADMIN_USER the two commands cloudmorrow-update needs"
+	say "granting $ADMIN_USER the commands cloudmorrow-update needs"
 	write_file "$SUDOERS" 0440 <<EOF
 # Installed by install-server.sh. Exactly what cloudmorrow-update needs, nothing more.
 $ADMIN_USER ALL=($SERVICE_USER) NOPASSWD: $VENV/bin/cloudmorrow-server update *
 $ADMIN_USER ALL=(root) NOPASSWD: $SYSTEMCTL restart $SERVICE_NAME, \\
-	$SYSTEMCTL start $SERVICE_NAME, $SYSTEMCTL stop $SERVICE_NAME
+	$SYSTEMCTL start $SERVICE_NAME, $SYSTEMCTL stop $SERVICE_NAME, \\
+	$LN -s $VENV/bin/cm /usr/local/bin/cm, \\
+	$LN -s $VENV/bin/cloudmorrow /usr/local/bin/cloudmorrow
 EOF
 	if [ -z "$DRY_RUN" ] && command -v visudo >/dev/null 2>&1; then
 		visudo -cf "$SUDOERS" >/dev/null || die "the sudoers drop-in did not validate"
@@ -1297,6 +1374,10 @@ https://*)
 	heading "First, a proxy in front, for TLS"
 	line "With Caddy, this is the whole file:"
 	printf '\n      %s {\n          reverse_proxy %s:%s\n      }\n' "$PUBLIC_HOST" "$HEALTH_HOST" "$PORT"
+	if [ -z "$TRUSTED_PROXIES" ]; then
+		line "On another machine, name it: trusted_proxies"
+		line "in the settings, or --trusted-proxy here."
+	fi
 	;;
 esac
 
@@ -1307,6 +1388,16 @@ if [ -z "$PUBLIC_URL" ]; then
 fi
 if [ -n "$ACCOUNT_MADE" ]; then
 	line "and sign in as $ACCOUNT"
+fi
+
+heading "Or here, in this terminal"
+line "cm"
+if [ -n "$ACCOUNT_MADE" ]; then
+	line "sign in as $ACCOUNT; Administration"
+	line "is on the top bar (f9)"
+else
+	line "sign in as an administrator;"
+	line "Administration is on the top bar (f9)"
 fi
 
 if [ -z "$PUBLIC_URL" ]; then

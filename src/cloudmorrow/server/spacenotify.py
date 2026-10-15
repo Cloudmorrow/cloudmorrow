@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import queue
+import re
 import threading
 
 from cloudmorrow.server.badge import notify_message
@@ -73,6 +74,16 @@ def _space_of(state: AppState, record: Record) -> tuple[str, str, Record | None]
 
 
 log = logging.getLogger("cloudmorrow.spacenotify")
+
+# @name in a line: a username is lowercase letters, digits, dots, dashes and
+# underscores, and the @ stands at the start or after a space or bracket.
+MENTION = re.compile(r"(?:^|(?<=[\s(\[]))@([a-z0-9][a-z0-9._-]*)")
+
+
+def mentioned(text: str) -> list[str]:
+    """The usernames an @ names in *text*, once each, in order."""
+    return list(dict.fromkeys(m.group(1).rstrip(".") for m in MENTION.finditer(text or "")))
+
 
 # The notices waiting their turn, and the one thread that takes them. A
 # push is best effort: past this many waiting, the newest is dropped and
@@ -133,7 +144,16 @@ def install(state: AppState) -> None:
             title = record.owner
         else:
             title = f"{record.owner} in {name}" if name else record.owner
-        _later(lambda: notify_message(state, people, title=title, body=line, url=url, tag=f"{space_model}-{space_id}"))
+        tag = f"{space_model}-{space_id}"
+        # On a screen with mentions, @name in the line is for that person:
+        # their push says so, and comes first.
+        named = [p for p in mentioned(line) if p in people] if screen.get("mentions") else []
+        if named:
+            people = [p for p in people if p not in named]
+            said = f"{record.owner} mentioned you in {name}" if name else f"{record.owner} mentioned you"
+            _later(lambda: notify_message(state, named, title=said, body=line, url=url, tag=tag))
+        if people:
+            _later(lambda: notify_message(state, people, title=title, body=line, url=url, tag=tag))
 
     def added(space: Record, username: str, by: str) -> None:
         if not state.records.readable(Principal.person(username), space.model):

@@ -28,7 +28,9 @@ def test_app_page_is_installable_on_a_phone(client):
     assert manifest.json()["name"] == "Cloudmorrow"
     assert manifest.json()["short_name"] == "Cloudmorrow"
     assert 'name="apple-mobile-web-app-title" content="Cloudmorrow"' in body
-    for name in ("icon-180.png", "icon-192.png", "icon-512.png"):
+    icons = [i["src"] for i in manifest.json()["icons"]]
+    assert icons == ["/app/morrow-180.png", "/app/morrow-192.png", "/app/morrow-512.png"]
+    for name in ("morrow-180.png", "morrow-192.png", "morrow-512.png"):
         icon = client.get(f"/app/{name}")
         assert icon.status_code == 200
         assert icon.headers["content-type"] == "image/png"

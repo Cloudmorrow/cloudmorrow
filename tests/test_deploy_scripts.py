@@ -322,3 +322,65 @@ def test_no_linking_is_left_in_it():
     assert "ReadWritePaths=$FILES_DIR $DATA_DIR $PREFIX${SHARES_OUTSIDE:+ $SHARES_OUTSIDE}\n" in text
     for gone in ("--link", "access link", "tailscale ", "acmedns", "CADDY_DIR", "relay", "cmtunnel"):
         assert gone not in text, gone
+
+
+def test_the_terminal_app_is_installed_on_the_server_too():
+    """`cm` at the box: the tui extra in the venv, and the command linked beside cloudmorrow-server."""
+    text = INSTALLER.read_text()
+    assert '"$SRC[server,agent,tui]"' in text
+    assert '"$SRC[server,agent,tui,postgres]"' in text
+    assert '[server,agent]"' not in text
+    result = dry_run("--name", "T", "--public-url", "https://cloud.test", "--user", "alice", "--quills", "all")
+    assert result.returncode == 0, result.stderr + result.stdout
+    out = result.stdout
+    assert "linking cm and cloudmorrow, the terminal app, into /usr/local/bin" in out
+    assert "would run: ln -sf /opt/cloudmorrow/venv/bin/cm /usr/local/bin/cm" in out
+    assert "would run: ln -sf /opt/cloudmorrow/venv/bin/cloudmorrow /usr/local/bin/cloudmorrow" in out
+    # And the closing page says so, under a heading of its own.
+    page = out[out.index("would be installed") :]
+    assert "Or here, in this terminal" in page
+    assert "\n    cm\n" in page
+    assert "Administration" in page
+
+
+def test_the_updater_links_the_terminal_app_as_root():
+    """`cloudmorrow-update` pulls as the service user, which cannot write /usr/local/bin.
+
+    So the updater itself links `cm` and `cloudmorrow` there afterwards, through
+    sudo, and the sudoers rule allows exactly those two commands beside the
+    restart. That is how a server from before `cm` gets it on an update, and
+    how an admin without a root shell gets it at all.
+    """
+    text = INSTALLER.read_text()
+    updater = text[text.index("write_file /usr/local/bin/cloudmorrow-update") :]
+    updater = updater[: updater.index("\nEOF\n")]
+    assert "for name in cm cloudmorrow; do" in updater
+    assert "sudo -n $LN -s $VENV/bin/\\$name /usr/local/bin/\\$name" in updater
+    # Only what is missing, and never somebody else's cm.
+    assert '[ ! -e "/usr/local/bin/\\$name" ] && [ ! -L "/usr/local/bin/\\$name" ]' in updater
+    # Linked before the exit-3 shortcut, so a server with nothing to pull still gets it.
+    assert updater.index("for name in cm cloudmorrow") < updater.index('if [ "\\$status" = 3 ]')
+    sudoers = text[text.index('write_file "$SUDOERS"') :]
+    sudoers = sudoers[: sudoers.index("\nEOF\n")]
+    assert "$LN -s $VENV/bin/cm /usr/local/bin/cm" in sudoers
+    assert "$LN -s $VENV/bin/cloudmorrow /usr/local/bin/cloudmorrow" in sudoers
+
+
+def test_a_server_that_is_well_is_asked_about_before_it_is_updated():
+    """Run again at a terminal on a running server, the installer asks; Enter says yes.
+
+    The check needs a running server, which a test has not got, so what a
+    test can hold is the question, its default, and that a run with no
+    terminal still leaves a well server as it is.
+    """
+    text = INSTALLER.read_text()
+    asked = text[text.index("is already here, running and answering") :]
+    assert "Update it? (settings, files and accounts are kept)" in asked
+    assert "[Y/n]" in asked
+    # Yes by default, and the two spellings of it.
+    assert '"" | [Yy] | [Yy][Ee][Ss])' in asked
+    # Without a terminal: the old answer, and the ways to update anyway.
+    assert "Nothing to do. To update it anyway" in asked
+    assert "sudo sh -s -- --update" in asked
+    # The terminal is known before the question, not only before the others.
+    assert text.index('TTY=""') < text.index("is already here, running and answering")

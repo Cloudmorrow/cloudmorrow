@@ -12,7 +12,7 @@ a desktop; `cloudmorrow uninstall` takes it away again.
 TODO(macos): an `.app` bundle in `~/Applications`: `Contents/MacOS/Cloudmorrow`
 a two-line shell script that execs `<venv>/bin/cloudmorrow app`,
 `Contents/Info.plist` naming it, and the hedgehog as `Contents/Resources/
-Cloudmorrow.icns` (made with `iconutil` from icon-512.png). Without it a Mac
+Cloudmorrow.icns` (made with `iconutil` from morrow-512.png). Without it a Mac
 runs `cm app` from a terminal.
 
 TODO(windows): a Start-menu shortcut, `%APPDATA%\\Microsoft\\Windows\\Start

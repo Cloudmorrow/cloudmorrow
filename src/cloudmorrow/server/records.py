@@ -506,20 +506,28 @@ class RecordStore:
             raise UnknownRecordError(record_id)
         return row
 
-    def _writable(self, conn: Connection, principal: Principal, model: Datamodel, row: Row) -> None:
+    def _writable(
+        self, conn: Connection, principal: Principal, model: Datamodel, row: Row, changing: Iterable[str] = ()
+    ) -> None:
         """Seeing is not always changing: a space is its manager's, a message its author's,
-        and an event its writer's or its calendar's manager's."""
+        and an event its writer's or its calendar's manager's.
+
+        *changing* names the fields a change touches: whoever manages the
+        space may change a `managed` field (a message's pin) on anybody's record."""
         if model.space and not self._may_manage(principal, row):
             raise Refused(f"only whoever made this {model.label.lower()} may change it")
         if not model.authored or row["owner"] == principal.username:
             return
-        if model.authored == "or-manager":
+        touched = [n for n in changing if n in model.by_name]
+        managed = bool(touched) and all(model.by_name[n].managed for n in touched)
+        if model.authored == "or-manager" or managed:
             space = self._space_of(conn, model, json.loads(row["indexed"] or "{}"))
             if space is not None and self._may_manage(principal, space):
                 return
-            raise Refused(
-                f"only whoever wrote this {model.label.lower()}, or whoever manages where it is, may change it"
-            )
+            if model.authored == "or-manager":
+                raise Refused(
+                    f"only whoever wrote this {model.label.lower()}, or whoever manages where it is, may change it"
+                )
         raise Refused(f"only whoever wrote this {model.label.lower()} may change it")
 
     def _visible_clause(self, model: Datamodel, username: str) -> tuple[str, list[object]]:
@@ -1270,7 +1278,7 @@ class RecordStore:
             # the revision check. Anything raised below rolls the lot back.
             conn.lock()
             row = self._row(conn, principal, model, record_id)
-            self._writable(conn, principal, model, row)
+            self._writable(conn, principal, model, row, changing=incoming)
             owner = row["owner"]
             current = self._record(conn, model, row, principal)
             if rev is not None and rev != current.rev:

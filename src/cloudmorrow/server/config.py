@@ -75,6 +75,14 @@ class ServerConfig:
     # The URL clients reach this server on. Needed for the install page, because
     # behind a reverse proxy the server only sees the proxy's request.
     public_url: str = ""
+    # The reverse proxies whose X-Forwarded-* headers the server believes:
+    # addresses or CIDR ranges, or "*" for any. What the proxy says is what
+    # makes a request https (and so lets it through when public_url is
+    # https, and puts https in the install command), and the client address
+    # the sign-in limits go by. The loopback is always believed, so a proxy
+    # on this machine needs nothing; one on another box has to be named here,
+    # or every request through it reaches the server as plain http.
+    trusted_proxies: list[str] = field(default_factory=list)
     # What the install script pip-installs. A wheel published into data_dir/dist
     # takes precedence, so a server with no route to PyPI still works.
     package_spec: str = "cloudmorrow[tui,agent]"
@@ -110,6 +118,18 @@ class ServerConfig:
         if self.require_tls is not None:
             return self.require_tls
         return self.public_url.lower().startswith("https://")
+
+    @property
+    def forwarded_allow_ips(self) -> str | None:
+        """What uvicorn is told to believe proxy headers from: the loopback and
+        `trusted_proxies`. None when nothing is configured, which leaves uvicorn
+        to its own default (the loopback) or the FORWARDED_ALLOW_IPS variable."""
+        found = [p.strip() for p in self.trusted_proxies if p.strip()]
+        if not found:
+            return None
+        if "*" in found:
+            return "*"
+        return ", ".join(dict.fromkeys(["127.0.0.1", *found]))
 
     @property
     def hosts(self) -> list[str]:
@@ -267,6 +287,7 @@ def load_config(path: Path | None = None) -> ServerConfig:
             "cors_origins",
             "allowed_client_ips",
             "public_url",
+            "trusted_proxies",
             "package_spec",
             "push_subject",
             "allow_api_update",
@@ -287,6 +308,8 @@ def load_config(path: Path | None = None) -> ServerConfig:
                     value = Path(str(value)).expanduser()
                 if key == "host" and isinstance(value, list):
                     value = ", ".join(str(v) for v in value)
+                if key == "trusted_proxies" and isinstance(value, str):
+                    value = [v.strip() for v in value.split(",") if v.strip()]
                 setattr(config, key, value)
         config.config_path = source
 
@@ -309,6 +332,10 @@ def load_config(path: Path | None = None) -> ServerConfig:
             lambda v: [o.strip() for o in v.split(",") if o.strip()],
         ),
         "PUBLIC_URL": ("public_url", str),
+        "TRUSTED_PROXIES": (
+            "trusted_proxies",
+            lambda v: [o.strip() for o in v.split(",") if o.strip()],
+        ),
         "PACKAGE_SPEC": ("package_spec", str),
         "PUSH_SUBJECT": ("push_subject", str),
         "ALLOW_API_UPDATE": ("allow_api_update", _env_bool),

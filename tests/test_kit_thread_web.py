@@ -90,7 +90,7 @@ def test_a_conversation_you_may_only_read_has_no_box_to_write_in():
     assert 'const box = form && form.querySelector("textarea");' in thread
     assert thread.index("if (!form) return;") < thread.index('form.addEventListener("submit"')
     assert "const own = says && line.owner === me;" in thread
-    assert thread.count("renderLines(state.lines, s.body, me, s.says)") == 3
+    assert thread.count("renderLines(state.lines, s.body, me, s.says, extras())") == 3
     # Making a space, or writing to somebody, is the spaces' datamodel's.
     assert 'if (!s.makes) return "";' in thread
     assert ".composer-none {" in THREAD_CSS

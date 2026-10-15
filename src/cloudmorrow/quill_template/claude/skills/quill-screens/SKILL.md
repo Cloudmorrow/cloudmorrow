@@ -21,6 +21,7 @@ surface. Reach for a **view** only when no kit element says it.
 | columns people add, rename and reorder (a pipeline's stages) | `kit = "board"` with `lane` a **link** to the records that are the columns |
 | things on days | `kit = "calendar"` |
 | a conversation | `kit = "thread"` |
+| a team's conversation: threads, @mentions, reactions, pinned lines | `kit = "thread"` with `reply_to`, `mentions`, `reactions`, `pinned` |
 | pages of Markdown in folders | `kit = "editor"` |
 | files | `kit = "grid"` |
 | a summary, a dashboard, numbers, a mix of the above, a record's own page | a **view** |

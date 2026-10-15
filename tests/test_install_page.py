@@ -45,6 +45,63 @@ def test_install_script_uses_the_public_url_when_configured(config, users):
         assert 'PACKAGE="cloudmorrow[tui,agent]"' in client.get("/install.sh").text
 
 
+# -- behind a proxy the server was not told about ------------------------------------
+PROXIED = {"X-Forwarded-Proto": "https", "X-Forwarded-Host": "cm.example.net"}
+
+
+def test_the_install_command_is_the_address_the_proxy_was_asked_for(client):
+    """A proxy on another machine reaches us as http; the page still says https."""
+    page = client.get("/install", headers=PROXIED).text
+    assert "curl -fsSL https://cm.example.net/install.sh | sh" in page
+    assert "http://testserver" not in page
+
+
+def test_the_script_and_the_client_sign_in_where_the_person_did(client):
+    script = client.get("/install.sh", headers=PROXIED).text
+    assert 'CLOUDMORROW_URL="https://cm.example.net"' in script
+    assert "http://testserver" not in script
+    release = client.get("/api/client", headers=PROXIED).json()
+    assert release["base_url"] == "https://cm.example.net"
+
+
+def test_a_proxy_that_keeps_the_host_only_needs_to_say_https(client):
+    script = client.get("/install.sh", headers={"X-Forwarded-Proto": "https"}).text
+    assert 'CLOUDMORROW_URL="https://testserver"' in script
+
+
+def test_the_rfc_7239_forwarded_header_counts_too(client):
+    headers = {"Forwarded": 'for=203.0.113.9;proto=https;host="cm.example.net", for=10.0.0.2'}
+    script = client.get("/install.sh", headers=headers).text
+    assert 'CLOUDMORROW_URL="https://cm.example.net"' in script
+
+
+def test_nonsense_in_the_forwarded_headers_is_ignored(client):
+    """A host with a path or a userinfo, or a scheme that is neither, is not an address."""
+    for host in ("evil.example/steal?x=", "user@cm.example.net", "cm.example.net/", " "):
+        script = client.get("/install.sh", headers={"X-Forwarded-Host": host}).text
+        assert 'CLOUDMORROW_URL="http://testserver"' in script, host
+    script = client.get("/install.sh", headers={"X-Forwarded-Proto": "gopher"}).text
+    assert 'CLOUDMORROW_URL="http://testserver"' in script
+
+
+def test_without_a_proxy_the_request_itself_is_the_address(client):
+    assert 'CLOUDMORROW_URL="http://testserver"' in client.get("/install.sh").text
+
+
+def test_public_url_still_wins_over_what_a_proxy_says(config, users):
+    from fastapi.testclient import TestClient
+
+    from cloudmorrow.server.app import create_app
+
+    config.public_url = "https://cm.hl.bramlabs.io"
+    # An https public_url requires https, and a proxy nobody trusts gets a 426
+    # for its trouble; that is the other half of the story, and not this test's.
+    config.require_tls = False
+    with TestClient(create_app(config)) as client:
+        script = client.get("/install.sh", headers=PROXIED).text
+        assert 'CLOUDMORROW_URL="https://cm.hl.bramlabs.io"' in script
+
+
 def test_published_wheel_is_served_and_used(config, users):
     from fastapi.testclient import TestClient
 

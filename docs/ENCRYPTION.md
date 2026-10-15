@@ -26,7 +26,7 @@ range over stays plain.
 
 | Store | Sealed | Plain |
 | --- | --- | --- |
-| Chat (records) | message bodies, channel names and topics — sealed to the channel | channel kind and scope, who is in a channel, authors, timestamps, when each person last looked |
+| Channels (records) | message bodies, channel names and topics — sealed to the channel; a reaction's emoji likewise | channel kind and scope, who is in a channel, authors, timestamps, when each person last looked |
 | Calendar | event titles, notes, locations | calendar slugs and names, colours, members, start and end times, all-day flag |
 | Tasks | board titles, task titles and bodies | board slugs, lanes, positions, timestamps |
 | Notifications | title and body | kind, machine, timestamps, read state |
@@ -162,7 +162,7 @@ and it is on the loopback. Three things make sure it stays the only one.
 https (set it explicitly to override). A request whose scheme is not https
 is answered 426 Upgrade Required. The scheme is what uvicorn's
 proxy-header handling says it is: `X-Forwarded-Proto` from a trusted proxy
-(127.0.0.1 by default; set uvicorn's `forwarded_allow_ips` if the proxy is
+(the loopback, and whatever `trusted_proxies` names when the proxy is
 another box), else the socket's own. A request that comes straight to the
 port with no proxy header, from this machine or from the local network — a
 `curl 127.0.0.1:8787` on the box, a browser on the LAN or the tailnet

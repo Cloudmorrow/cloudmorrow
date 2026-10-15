@@ -24,6 +24,7 @@ back.
 from __future__ import annotations
 
 import os
+import pwd
 import re
 import shutil
 import signal
@@ -32,10 +33,11 @@ import sys
 import tempfile
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import cloudmorrow
+from cloudmorrow.links import link_server_commands, venv_prefix
 
 # A branch to deploy, not an option for git to read and not a path to escape.
 BRANCH = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$")
@@ -63,6 +65,11 @@ class UpdateResult:
     # Commits the checkout had that the remote does not, thrown away to get
     # here. Nought on every ordinary deploy; anything else is worth saying.
     discarded: int = 0
+    # Commands the reinstall brought to the venv that it could not put on
+    # the PATH beside cloudmorrow-server — `cm`, on a server from before it
+    # was there, when the update runs as the service user and /usr/local/bin
+    # is root's. Said, so somebody with root can.
+    unlinked: list[str] = field(default_factory=list)
 
     @property
     def changed(self) -> bool:
@@ -98,11 +105,51 @@ def find_source_dir(explicit: Path | None = None) -> Path:
         raise UpdateError(
             f"{candidate} is not a git checkout.\n"
             "Updating from git needs an editable install "
-            "(`pip install -e '.[server,agent]'`), which is what "
+            "(`pip install -e '.[server,agent,tui]'`), which is what "
             "deploy/install-server.sh sets up. "
             "Pass --source to point at the checkout, or set CLOUDMORROW_SOURCE_DIR."
         )
     return candidate
+
+
+def user_name(uid: int) -> str:
+    """The name for a uid, or the number when the system has no name for it."""
+    try:
+        return pwd.getpwuid(uid).pw_name
+    except KeyError:
+        return str(uid)
+
+
+def checkout_owner(checkout: Path) -> tuple[int, str]:
+    """Who owns the checkout: the uid, and its name."""
+    uid = checkout.stat().st_uid
+    return uid, user_name(uid)
+
+
+def owned_by_someone_else(checkout: Path) -> str | None:
+    """The owner's name when the checkout is not ours, else None.
+
+    git refuses to work in a checkout owned by another user ("dubious
+    ownership"), and it is right to: a `reset --hard` or a `pip install`
+    run as root in the service user's checkout leaves root's files behind,
+    which the service user then cannot update past. So the update runs as
+    the owner or not at all. On a server the owner is the service user, and
+    `cloudmorrow-update` is what runs it as them.
+    """
+    uid, name = checkout_owner(checkout)
+    return None if uid == os.geteuid() else name
+
+
+def not_the_owner(checkout: Path, owner: str) -> UpdateError:
+    me = user_name(os.geteuid())
+    return UpdateError(
+        f"{checkout} belongs to {owner}, and this is running as {me}.\n"
+        "git refuses a checkout owned by somebody else, and updating it as the wrong "
+        "user would leave files the owner cannot touch.\n"
+        f"Run `cloudmorrow-update`, which updates as {owner} and only restarts as root; "
+        f"or `sudo -u {owner} -H {sys.argv[0] or 'cloudmorrow-server'} update --no-restart` "
+        "and restart the service yourself."
+    )
 
 
 def current_commit(source: Path) -> str:
@@ -295,6 +342,8 @@ def update(
 ) -> UpdateResult:
     """Match the checkout to its remote branch, reinstall, restart the service."""
     checkout = find_source_dir(source)
+    if owner := owned_by_someone_else(checkout):
+        raise not_the_owner(checkout, owner)
     if working_tree_is_dirty(checkout) and not force:
         raise UpdateError(
             f"{checkout} has uncommitted changes.\n"
@@ -326,6 +375,7 @@ def update(
         changed_files = len(diff.splitlines())
 
     did_reinstall = False
+    unlinked: list[str] = []
     if reinstall and (new_commit != old_commit or force):
         # sys.executable is the venv the server runs from, so the reinstall
         # lands in the right place no matter who invoked the update.
@@ -337,12 +387,17 @@ def update(
                 "install",
                 "--quiet",
                 "--editable",
-                # Both extras: the server runs an agent of its own, and that
-                # needs the agent's dependencies, not just the API's.
-                f"{checkout}[server,agent]",
+                # Three extras: the server runs an agent of its own, and that
+                # needs the agent's dependencies, not just the API's; and the
+                # terminal app is on the server too, for `cm` at the box.
+                f"{checkout}[server,agent,tui]",
             ]
         )
         did_reinstall = True
+        # `cm` beside cloudmorrow-server on the PATH, which an update is the
+        # first chance to do on a server from before it was there. Only root
+        # may write /usr/local/bin; what the update could not link, it says.
+        unlinked = link_server_commands(venv_prefix())[1]
 
     did_restart = False
     if restart and (new_commit != old_commit or force):
@@ -360,4 +415,5 @@ def update(
         old_version=old_version,
         new_version=new_version,
         discarded=discarded,
+        unlinked=unlinked,
     )

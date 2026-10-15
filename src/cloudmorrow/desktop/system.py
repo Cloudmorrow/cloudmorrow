@@ -23,7 +23,7 @@ MACOS = "macos"
 WINDOWS = "windows"
 
 # What `notify` passes for an icon, where the system takes one.
-ICON = Path(__file__).resolve().parent.parent / "server" / "web" / "icon-512.png"
+ICON = Path(__file__).resolve().parent.parent / "server" / "web" / "morrow-512.png"
 
 
 class Unsupported(RuntimeError):

@@ -17,7 +17,7 @@ self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
 const APP = "/app";
-const ICON = "/app/icon-192.png";
+const ICON = "/app/morrow-192.png";
 
 // The count on the icon. Wrapped because Safari throws rather than returning
 // a rejected promise when the app is not installed, and a worker that throws

@@ -1,0 +1,571 @@
+# Cloudmorrow icons, theme "Travel": CC0 1.0, free to use anywhere, no attribution needed.
+
+[[icons]]
+id = "car"
+name = "Car"
+tags = ["auto", "vehicle", "drive", "travel"]
+rows = [
+  "............",
+  "............",
+  "....XXXX....",
+  "...XX..XX...",
+  "..XX....XX..",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".XX......XX.",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "bus"
+name = "Bus"
+tags = ["coach", "transit", "travel"]
+rows = [
+  "............",
+  "............",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".X.X.X.X.XX.",
+  ".X.X.X.X.XX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  "..XX....XX..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "truck"
+name = "Truck"
+tags = ["lorry", "haul", "freight", "travel"]
+rows = [
+  "............",
+  "............",
+  "............",
+  ".XXXXXXX....",
+  ".XXXXXXX....",
+  ".XXXXXXXXXX.",
+  ".XXXXXXXX.XX",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  "..XX....XX..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "van"
+name = "Van"
+tags = ["minibus", "delivery", "travel"]
+rows = [
+  "............",
+  "............",
+  ".XXXXXXXXX..",
+  ".XXXXXXXXXX.",
+  ".X..X..XXXX.",
+  ".X..X..XX.XX",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  "..XX....XX..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "bicycle"
+name = "Bicycle"
+tags = ["bike", "cycle", "travel"]
+rows = [
+  "............",
+  "............",
+  "............",
+  "...XX...XX..",
+  "....X..X....",
+  "....XXXX....",
+  ".XXX.X..XXX.",
+  "X...XX.X...X",
+  "X...X..X...X",
+  "X...X..X...X",
+  ".XXX....XXX.",
+  "............",
+]
+
+[[icons]]
+id = "motorbike"
+name = "Motorbike"
+tags = ["motorcycle", "bike", "travel"]
+rows = [
+  "............",
+  "............",
+  "............",
+  ".....XXX.XX.",
+  "....XXXXXX..",
+  "...XXXXXXX..",
+  "..XXXXXXXXX.",
+  ".XXXXXXXXXX.",
+  ".XX..XX..XX.",
+  "X..X....X..X",
+  "X..X....X..X",
+  ".XX......XX.",
+]
+
+[[icons]]
+id = "scooter"
+name = "Scooter"
+tags = ["kick", "ride", "travel"]
+rows = [
+  "............",
+  "........XXX.",
+  ".........X..",
+  ".........X..",
+  ".........X..",
+  ".........X..",
+  ".........X..",
+  "........XX..",
+  "..XXXXXXX...",
+  ".XX.....XX..",
+  ".XX.....XX..",
+  "............",
+]
+
+[[icons]]
+id = "train"
+name = "Train"
+tags = ["rail", "locomotive", "travel"]
+rows = [
+  "............",
+  "............",
+  "..XX........",
+  "..XX.XXXXXXX",
+  ".XXXXXXXXXXX",
+  ".XXXXXXXXXXX",
+  ".X..XX..XX.X",
+  ".X..XX..XX.X",
+  ".XXXXXXXXXXX",
+  "..XX..XX..XX",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "tram"
+name = "Tram"
+tags = ["streetcar", "transit", "travel"]
+rows = [
+  "............",
+  ".....XXX....",
+  "......X.....",
+  "...XXXXXXXX.",
+  "..XXXXXXXXX.",
+  "..X.X.X.X.X.",
+  "..X.X.X.X.X.",
+  "..XXXXXXXXX.",
+  "..XXXXXXXXX.",
+  "...XX...XX..",
+  "XXXXXXXXXXXX",
+  "............",
+]
+
+[[icons]]
+id = "metro"
+name = "Metro"
+tags = ["subway", "underground", "travel"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XX....XX..",
+  ".X........X.",
+  ".X..XXXX..X.",
+  ".X.XXXXXX.X.",
+  ".X.X.XX.X.X.",
+  ".X.XXXXXX.X.",
+  ".X.X....X.X.",
+  ".X.XXXXXX.X.",
+  ".X..X..X..X.",
+  "............",
+]
+
+[[icons]]
+id = "plane"
+name = "Plane"
+tags = ["flight", "airport", "travel"]
+rows = [
+  "............",
+  ".....XX.....",
+  ".....XX.....",
+  ".....XX.....",
+  "....XXXX....",
+  ".XXXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "....XXXX....",
+  ".....XX.....",
+  ".....XX.....",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "helicopter"
+name = "Helicopter"
+tags = ["chopper", "flight", "travel"]
+rows = [
+  "............",
+  ".XXXXXXXXXX.",
+  ".....XX.....",
+  ".....XX.....",
+  "...XXXXXX...",
+  "..XXXXXXXXXX",
+  "..X..XXXX..X",
+  "..XXXXXXX.X.",
+  "...XXXXXX...",
+  ".....X.X....",
+  "...XXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "rocket"
+name = "Rocket"
+tags = ["launch", "space", "travel"]
+rows = [
+  "............",
+  ".....XX.....",
+  "....XXXX....",
+  "....XXXX....",
+  "....X..X....",
+  "....XXXX....",
+  "....XXXX....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  ".XX.XXXX.XX.",
+  "....X..X....",
+  ".....XX.....",
+]
+
+[[icons]]
+id = "boat"
+name = "Boat"
+tags = ["sail", "sailing", "travel"]
+rows = [
+  "............",
+  ".......X....",
+  "......XX....",
+  ".....XXX....",
+  "....XXXX....",
+  "...XXXXX....",
+  "..XXXXXX....",
+  ".......X....",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "ship"
+name = "Ship"
+tags = ["cruise", "vessel", "sea", "travel"]
+rows = [
+  "............",
+  "............",
+  "...XX..XX...",
+  "..XXXXXXXXX.",
+  "..X.X.X.X.X.",
+  "..XXXXXXXXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "..XXXXXXXX..",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "ferry"
+name = "Ferry"
+tags = ["crossing", "boat", "travel"]
+rows = [
+  "............",
+  "............",
+  "............",
+  ".....XXXXX..",
+  ".XXXXXXXXXX.",
+  ".X.X.X.X.X.X",
+  ".XXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".XXXXXXXXXX.",
+  "..X.X.X.X.X.",
+  "............",
+]
+
+[[icons]]
+id = "anchor"
+name = "Anchor"
+tags = ["harbour", "sea", "travel"]
+rows = [
+  "............",
+  ".....XX.....",
+  "....X..X....",
+  ".....XX.....",
+  "...XXXXXX...",
+  ".....XX.....",
+  ".X...XX...X.",
+  "X....XX....X",
+  "X....XX....X",
+  ".X..XXXX..X.",
+  "..XXX..XXX..",
+  "............",
+]
+
+[[icons]]
+id = "taxi"
+name = "Taxi"
+tags = ["cab", "ride", "travel"]
+rows = [
+  "............",
+  "....XXXX....",
+  "............",
+  "...XXXXXX...",
+  "..XX.XX.XX..",
+  ".XXX.XX.XXX.",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  ".XX......XX.",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "fuel"
+name = "Fuel"
+tags = ["petrol", "gas", "pump", "travel"]
+rows = [
+  "............",
+  ".XXXXXXX....",
+  ".X.....X..X.",
+  ".X.....X.XX.",
+  ".X.....X.X.X",
+  ".XXXXXXX.X.X",
+  ".XXXXXXX.X.X",
+  ".XXXXXXX.XX.",
+  ".XXXXXXX.X..",
+  ".XXXXXXXXX..",
+  "XXXXXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "charging"
+name = "Charging"
+tags = ["electric", "ev", "charger", "travel"]
+rows = [
+  "............",
+  "..XXXXXXX...",
+  "..X.....X...",
+  "..X..X..X...",
+  "..X.XX..XXX.",
+  "..XXXXX.X.X.",
+  "..X..X..X.X.",
+  "..X.X...X.X.",
+  "..X.....XXX.",
+  "..XXXXXXX...",
+  ".XXXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "road"
+name = "Road"
+tags = ["highway", "street", "travel"]
+rows = [
+  "............",
+  "....XXXX....",
+  "....X..X....",
+  "...X....X...",
+  "...X.XX.X...",
+  "..X......X..",
+  "..X......X..",
+  ".X...XX...X.",
+  ".X...XX...X.",
+  "X..........X",
+  "X....XX....X",
+  "............",
+]
+
+[[icons]]
+id = "bridge"
+name = "Bridge"
+tags = ["crossing", "river", "travel"]
+rows = [
+  "............",
+  "............",
+  "XXXXXXXXXXXX",
+  "XXXXXXXXXXXX",
+  "XX...XX...XX",
+  "X.X.X..X.X.X",
+  "X..X....X..X",
+  "X..X....X..X",
+  "X..X....X..X",
+  "............",
+  "............",
+  "............",
+]
+
+[[icons]]
+id = "tunnel"
+name = "Tunnel"
+tags = ["underpass", "mountain", "travel"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XX....XX..",
+  ".X........X.",
+  ".X........X.",
+  "X..........X",
+  "X..........X",
+  "X..........X",
+  "X....XX....X",
+  "X..........X",
+  "X....XX....X",
+  "XXXXXXXXXXXX",
+]
+
+[[icons]]
+id = "signpost"
+name = "Signpost"
+tags = ["direction", "sign", "travel"]
+rows = [
+  "............",
+  ".....XX.....",
+  "..XXXXXXXXX.",
+  ".XXXXXXXXXXX",
+  "..XXXXXXXXX.",
+  ".....XX.....",
+  ".XXXXXXXXX..",
+  "XXXXXXXXXXX.",
+  ".XXXXXXXXX..",
+  ".....XX.....",
+  ".....XX.....",
+  "............",
+]
+
+[[icons]]
+id = "map"
+name = "Map"
+tags = ["folded", "atlas", "travel"]
+rows = [
+  "............",
+  "............",
+  "XXXX.XXX.XXX",
+  "X..XX.X.XX.X",
+  "X...X.X.X..X",
+  "X...X.X.X..X",
+  "X...X.X.X..X",
+  "X...X.X.X..X",
+  "X...X.X.X..X",
+  "X..XX.X.XX.X",
+  "XXXX.XXX.XXX",
+  "............",
+]
+
+[[icons]]
+id = "compass"
+name = "Compass"
+tags = ["navigation", "needle", "travel"]
+rows = [
+  "............",
+  "....XXXX....",
+  "..XX....XX..",
+  ".X...XX...X.",
+  ".X..XXXX..X.",
+  "X..XXXXXX..X",
+  "X...X..X...X",
+  ".X...XX...X.",
+  ".X........X.",
+  "..XX....XX..",
+  "....XXXX....",
+  "............",
+]
+
+[[icons]]
+id = "suitcase"
+name = "Suitcase"
+tags = ["luggage", "trolley", "travel"]
+rows = [
+  "............",
+  ".....XX.....",
+  "....X..X....",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "...X.XX.X...",
+  "...X.XX.X...",
+  "...X.XX.X...",
+  "...XXXXXX...",
+  "...XXXXXX...",
+  "....X..X....",
+  "............",
+]
+
+[[icons]]
+id = "backpack"
+name = "Backpack"
+tags = ["rucksack", "hiking", "travel"]
+rows = [
+  "............",
+  ".....XX.....",
+  "....X..X....",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "..XX....XX..",
+  "..XX....XX..",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+  "...XXXXXX...",
+  "............",
+]
+
+[[icons]]
+id = "passport"
+name = "Passport"
+tags = ["identity", "border", "travel"]
+rows = [
+  "............",
+  "..XXXXXXXX..",
+  "..X......X..",
+  "..X.XXXX.X..",
+  "..X.X..X.X..",
+  "..X.XXXX.X..",
+  "..X......X..",
+  "..X.XXXX.X..",
+  "..X......X..",
+  "..X......X..",
+  "..XXXXXXXX..",
+  "............",
+]
+
+[[icons]]
+id = "ticket"
+name = "Ticket"
+tags = ["admission", "stub", "travel"]
+rows = [
+  "............",
+  "............",
+  ".XXXXXXXXXX.",
+  "XXXXXXX.XXXX",
+  "XXXXXXX.XXXX",
+  ".XXXXXX.XXX.",
+  ".XXXXXX.XXX.",
+  "XXXXXXX.XXXX",
+  "XXXXXXX.XXXX",
+  ".XXXXXXXXXX.",
+  "............",
+  "............",
+]

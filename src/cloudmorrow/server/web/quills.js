@@ -19,7 +19,7 @@
    first bar is already right rather than growing a tab a beat later. */
 
 import {
-  api, go, onShell, onSignOut, parseHash, pixelArt, pixelIcon, registerScreen, renderRoute, replace,
+  api, go, loadIcons, onShell, onSignOut, parseHash, pixelArt, pixelIcon, registerScreen, renderRoute, replace,
   session, store, tabSlot, toast,
 } from "./core.js";
 import { knowQuills, placeActionBar } from "./actions.js";
@@ -70,6 +70,9 @@ function place(list) {
 }
 
 try { place(JSON.parse(store.get("quills") || "[]")); } catch { place([]); }
+// The tabs drawn from the cache went up before the icon library was read:
+// once it is, they are placed again with the icons their Quills name.
+loadIcons().then(() => { if (quills.length) { place(quills); redrawTabs(); } });
 
 /** Ask the server which Quills there are, and put their tabs in the bar. */
 export function loadQuills() {
@@ -78,6 +81,7 @@ export function loadQuills() {
     try {
       const list = await api("GET", "/api/quills");
       store.set("quills", JSON.stringify(list));
+      await loadIcons();
       place(list);
       redrawTabs();
       // The switches are asked about per tab, and these tabs are new since

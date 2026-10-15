@@ -324,8 +324,9 @@ const PIXELS = {
     "........",
   ],
 };
-/** Eight-by-eight rows of `X` and `.`, drawn as the tab icons are. A
-    feature with a glyph of its own — the weather — hands its rows here. */
+/** Square rows of `X` and `.` — eight by eight for the app's own, twelve
+    by twelve in the library — drawn as the tab icons are. A feature with a
+    glyph of its own — the weather — hands its rows here. */
 export function pixelArt(rows, className = "pixel-icon") {
   let dots = "";
   rows.forEach((row, y) => {
@@ -333,12 +334,31 @@ export function pixelArt(rows, className = "pixel-icon") {
       if (cell === "X") dots += `<rect x="${x + 0.08}" y="${y + 0.08}" width="0.84" height="0.84" rx="0.16"/>`;
     });
   });
-  return `<svg class="${className}" viewBox="0 0 8 8" fill="currentColor" aria-hidden="true">${dots}</svg>`;
+  const n = rows.length;
+  return `<svg class="${className}" viewBox="0 0 ${n} ${n}" fill="currentColor" aria-hidden="true">${dots}</svg>`;
+}
+
+// The icon library (cloudmorrow.icons, served at /icons.json): hundreds of
+// marks a Quill may name, read once and kept. Until it is read, or if it
+// cannot be, a name not in PIXELS draws nothing and the caller's glyph stands.
+const library = new Map();
+let libraryLoading = null;
+export function loadIcons() {
+  libraryLoading = libraryLoading || (async () => {
+    try {
+      const response = await fetch("/icons.json");
+      if (!response.ok) return;
+      const data = await response.json();
+      for (const [name, icon] of Object.entries(data.icons || {})) library.set(name, icon.rows);
+    } catch { /* offline, or an older server: the app's own icons still draw */ }
+  })();
+  return libraryLoading;
 }
 /** The named icon, or nothing when there is no such name — a Quill names
     its own, and one this app has not drawn yet falls back to the caller's. */
 export function pixelIcon(name) {
-  return PIXELS[name] ? pixelArt(PIXELS[name]) : "";
+  const rows = PIXELS[name] || library.get(name);
+  return rows ? pixelArt(rows) : "";
 }
 
 // The icons more than one feature uses. A feature keeps its own beside it.
@@ -530,16 +550,27 @@ export function mount(html) {
     header.remove();
   }
 
-  // The screen: everything that is neither bar.
-  for (const el of [...app.children]) {
-    if (!el.matches("header.nav, nav.tabs")) el.remove();
-  }
+  // The screen: everything that is neither bar. When the address changed,
+  // the last screen's page stays on the glass as a ghost — a copy, fixed
+  // where it was — and fades out as the new one fades in: a cut made
+  // smooth, with no frame of bare background between two screens, which
+  // on a dark page is a flash of black. A screen drawn again where it is
+  // simply changes, and so does every screen for whoever asked the phone
+  // for less motion.
   const arriving = location.hash !== shownHash;
-  for (const el of fresh.children) {
-    if (arriving && el.matches("main") && !stillMotion.matches) el.classList.add("entering");
+  const fading = arriving && !stillMotion.matches;
+  const ghosts = [];
+  for (const el of [...app.children]) {
+    if (el.matches("header.nav, nav.tabs")) continue;
+    if (fading && el.matches("main")) ghosts.push(ghostOf(el));
+    el.remove();
   }
   const bar = app.querySelector(":scope > nav.tabs");
-  for (const el of [...fresh.children]) app.insertBefore(el, bar);
+  for (const el of [...fresh.children]) {
+    if (fading && el.matches("main")) el.classList.add("entering");
+    app.insertBefore(el, bar);
+  }
+  for (const ghost of ghosts) document.body.append(ghost);
 
   // The tabs: the highlight moves; the bar stays.
   ownTabs = !!newTabs;
@@ -549,6 +580,25 @@ export function mount(html) {
   // where it was left — each tab keeps its place, as on a phone.
   if (arriving) scrollTo(0, scrollAt.get(location.hash) || 0);
   shownHash = location.hash;
+}
+
+// A page as it was, to fade out over the next: a copy pinned to where
+// the page stood in the window, so the scroll moving under it for the new
+// screen does not move it. It takes no taps and is read by nothing; the
+// stylesheet fades it, and it leaves when the fade ends — or on a timer,
+// should the fade never run.
+function ghostOf(main) {
+  const rect = main.getBoundingClientRect();
+  const ghost = main.cloneNode(true);
+  ghost.className = "ghost";
+  ghost.setAttribute("aria-hidden", "true");
+  ghost.setAttribute("inert", "");
+  for (const el of ghost.querySelectorAll("[id]")) el.removeAttribute("id");
+  ghost.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;` +
+    `width:${rect.width}px;height:${rect.height}px;margin:0;`;
+  ghost.addEventListener("animationend", () => ghost.remove(), { once: true });
+  setTimeout(() => ghost.remove(), 600);
+  return ghost;
 }
 
 // The tabs drawn for a screen, laid over the ones on the page. The same
