@@ -32,12 +32,29 @@ class ServerError(RuntimeError):
         return cls(f"cannot reach {url}: {exc}")
 
     @classmethod
+    def behind_proxy(cls, url: str, status_code: int) -> Self:
+        """A 502, 503 or 504 that is not the server's own: whatever is in front
+        of it answered, and could not reach it."""
+        return cls(
+            f"{url} answers, but the Cloudmorrow server behind it does not "
+            f"(HTTP {status_code} from its reverse proxy): the server is down, "
+            "or the proxy points at the wrong address.",
+            status_code=status_code,
+        )
+
+    @classmethod
     def refuse_insecure(cls, url: str, *, allow_insecure: bool) -> None:
         """check_url, raising this kind of error instead of InsecureUrlError."""
         try:
             check_url(url, allow_insecure=allow_insecure)
         except InsecureUrlError as exc:
             raise cls(str(exc)) from exc
+
+
+def from_the_server(response: httpx.Response) -> bool:
+    """Whether the answer is the server's own, and not its proxy's: the server
+    always answers in JSON, and a proxy that could not reach it never does."""
+    return "json" in response.headers.get("content-type", "").lower()
 
 
 def detail(response: httpx.Response) -> Any:

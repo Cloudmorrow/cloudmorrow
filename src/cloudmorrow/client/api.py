@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 
 from cloudmorrow.client.config import ClientConfig, StoredCredentials
-from cloudmorrow.httpcommon import ServerError
+from cloudmorrow.httpcommon import ServerError, from_the_server
 from cloudmorrow.httpcommon import detail as _detail
 
 TIMEOUT = httpx.Timeout(10.0, connect=5.0)
@@ -111,6 +111,8 @@ class CloudmorrowClient:
                     content=str(detail.get("content", "")),
                 )
             raise ApiError(str(detail), status_code=409, payload=detail)
+        if response.status_code in (502, 503, 504) and not from_the_server(response):
+            raise ApiError.behind_proxy(self.config.api_url, response.status_code)
         if response.status_code >= 400:
             detail = _detail(response)
             # A Quill's code answers {kind, message}: the words are the message.
