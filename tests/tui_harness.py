@@ -48,32 +48,20 @@ def agent_row(name: str, **extra) -> dict:
         "hostname": f"{name}.local",
         "platform": extra.get("platform", "Linux-6.10-arch"),
         "version": "0.9.0",
-        "capabilities": extra.get("capabilities", ["ping", "sysinfo", "omarchy"]),
+        "capabilities": extra.get("capabilities", ["ping", "sysinfo"]),
         "last_seen": "2026-09-11T09:00:00",
         "enrolled_at": "2026-08-01T09:00:00",
         "online": extra.get("online", True),
-        "sync_bundles": extra.get("sync_bundles", []),
     }
 
-
-BUNDLE = {
-    "bundle": "omarchy",
-    "revision": 0,
-    "origin": "",
-    "claimed_by": "",
-    "claimed_at": "",
-    "updated_at": "",
-    "files": [],
-    "machines": [],
-}
 
 NOTIFICATIONS = [
     {
         "id": 2,
-        "kind": "config.updated",
+        "kind": "quill.requested",
         "machine": "desktop",
-        "title": "omarchy config changed on desktop",
-        "body": "Revision 2, 4 files.",
+        "title": "sam asks for crm",
+        "body": "Under Administration, Quills.",
         "created_at": "2026-09-11T08:30:00",
         "read_at": None,
         "unread": True,
@@ -223,9 +211,7 @@ class FakeClient(FakeSpaces, FakeNotes, FakeFiles, FakeQuills, FakeCircles):
         # different thing from what the server has switched off.
         self.features_off: set[str] = set()
         self.my_feature_calls: list[tuple[str, bool]] = []
-        self.bundle: dict = dict(BUNDLE)
         self.notes: list[dict] = [dict(note) for note in NOTIFICATIONS]
-        self.sync_calls: list[tuple[int, list[str]]] = []
 
     async def aclose(self) -> None: ...
 
@@ -406,17 +392,6 @@ class FakeClient(FakeSpaces, FakeNotes, FakeFiles, FakeQuills, FakeCircles):
 
     async def jobs(self, agent_id: int, limit: int = 25) -> list[dict]:
         return []
-
-    async def set_agent_sync(self, agent_id: int, bundles: list[str]) -> dict:
-        self.sync_calls.append((agent_id, list(bundles)))
-        for agent in self.agent_list:
-            if agent["id"] == agent_id:
-                agent["sync_bundles"] = list(bundles)
-                return agent
-        raise AssertionError(f"no such agent: {agent_id}")
-
-    async def config_bundle(self, bundle: str) -> dict:
-        return dict(self.bundle)
 
     async def notifications(self, *, limit: int = 50, unread: bool = False) -> list[dict]:
         # The bell asks for the unread ones only, so the fake filters like the

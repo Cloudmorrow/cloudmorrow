@@ -160,16 +160,6 @@ LoginScreen, SplashScreen {
     margin-bottom: 1;
 }
 
-#settings-omarchy {
-    height: auto;
-    margin: 1 0 0 0;
-}
-
-#settings-bundle {
-    height: auto;
-    margin-bottom: 1;
-}
-
 #settings-modal Checkbox {
     background: transparent;
     border: none;

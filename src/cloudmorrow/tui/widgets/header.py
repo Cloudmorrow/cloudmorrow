@@ -108,7 +108,7 @@ class Header(Horizontal):
                 account.tooltip = "Change your password"
                 yield account
                 settings = Button("⚙ Settings  ^g", id="open-settings", compact=True, flat=True)
-                settings.tooltip = "This machine, and its Omarchy config"
+                settings.tooltip = "This machine, and which of the app you want"
                 yield settings
             with Horizontal(id="topbar-status", classes="topbar-row"):
                 yield Static(health_line(""), id="topbar-health")

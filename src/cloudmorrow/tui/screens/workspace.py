@@ -9,7 +9,7 @@
     ╰───────── f1 ╯  │ …                                          │
     ╭ Tasks ───────╮  ╰──────────────────────────────────────────╯
     │ ● 3 to do    │  ╭ LOG ─────────────────────────────────────╮
-    ╰───────── f2 ╯  │ 12:03:04 omarchy config changed on desktop │
+    ╰───────── f2 ╯  │ 12:03:04 sam asks for crm                  │
     YOUR CLOUD        ╰──────────────────────────────────────────╯
       Calendar  f7 …   ^r Refresh   ^c Quit
     ADMINISTRATION

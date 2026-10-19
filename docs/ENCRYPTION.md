@@ -30,7 +30,6 @@ range over stays plain.
 | Calendar | event titles, notes, locations | calendar slugs and names, colours, members, start and end times, all-day flag |
 | Tasks | board titles, task titles and bodies | board slugs, lanes, positions, timestamps |
 | Notifications | title and body | kind, machine, timestamps, read state |
-| Config sync | the contents of every synced dotfile | bundle name, file paths, hashes, modes, revisions |
 | Agent jobs | payload and result | type, status, timestamps |
 | Web push | the subscription's `p256dh` and `auth` keys | the endpoint URL (needed to send, and unique) |
 | Secrets | values | vaults, key names, environments, lengths, a keyed fingerprint per value |

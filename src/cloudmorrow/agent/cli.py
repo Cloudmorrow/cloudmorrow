@@ -13,11 +13,9 @@ import typer
 from rich.table import Table
 
 from cloudmorrow import __version__
-from cloudmorrow.agent import omarchy
 from cloudmorrow.agent.client import AgentApiError, AgentClient
 from cloudmorrow.agent.config import AgentConfig, default_config_path
 from cloudmorrow.agent.runner import AgentRunner
-from cloudmorrow.agent.sync import BUNDLES, SyncState, state_dir, sync_all
 from cloudmorrow.agent.tasks import TaskError, run_task
 from cloudmorrow.console import TITLE
 from cloudmorrow.console import console as make_console
@@ -121,16 +119,6 @@ def status(config_path: ConfigOption = None) -> None:
     table.add_row("backup dir", config.backup_dir)
     table.add_row("backup retention", str(config.backup_retention))
     table.add_row("allow shell", str(config.allow_shell))
-    table.add_row("allow config sync", str(config.allow_config_sync))
-    table.add_row("omarchy", omarchy.describe())
-    for bundle in sorted(BUNDLES):
-        state = SyncState.load(bundle)
-        held = (
-            f"revision {state.revision} from {state.origin or '?'} ({len(state.files)} files)"
-            if state.revision
-            else "never synced here"
-        )
-        table.add_row(f"config: {bundle}", held)
     console.print(table)
 
 
@@ -147,55 +135,6 @@ def try_task(
     except (TaskError, ValueError) as exc:
         fail(str(exc))
     console.print_json(json.dumps(result))
-
-
-@app.command()
-def sync(
-    bundle: Annotated[
-        list[str] | None,
-        typer.Option("--bundle", "-b", help=f"Which bundle ({', '.join(sorted(BUNDLES))})."),
-    ] = None,
-    config_path: ConfigOption = None,
-    reset: Annotated[
-        bool,
-        typer.Option(help="Forget what this machine holds, so it adopts the server's copy."),
-    ] = False,
-) -> None:
-    """Sync this machine's config now, instead of waiting for the next poll.
-
-    The agent does this on its own every poll. This is for when you have just
-    changed something and would rather not wait, or want to see why it is not
-    doing what you expected.
-    """
-    config = _load(config_path)
-    _require_enrolled(config)
-    bundles = list(bundle) if bundle else sorted(BUNDLES)
-    if reset:
-        for name in bundles:
-            SyncState.load(name).clear()
-        console.print(f"[dim]forgot what this machine held; state in {state_dir()}[/]")
-
-    with AgentClient(config) as client:
-        try:
-            outcomes = sync_all(client, config, bundles)
-        except AgentApiError as exc:
-            fail(str(exc))
-
-    for outcome in outcomes:
-        colour = {
-            "failed": "red",
-            "refused": "yellow",
-            "stale": "yellow",
-            "idle": "dim",
-            "skipped": "dim",
-        }.get(outcome.action, "green")
-        revision = f" rev {outcome.revision}" if outcome.revision else ""
-        console.print(
-            f"[{colour}]{outcome.action}[/] {outcome.bundle}{revision}"
-            + (f"  [dim]{outcome.detail}[/]" if outcome.detail else "")
-        )
-    if any(outcome.action == "failed" for outcome in outcomes):
-        raise typer.Exit(code=1)
 
 
 @app.command()

@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from cloudmorrow.agent.client import AgentApiError, AgentClient
 from cloudmorrow.agent.config import AgentConfig
 from cloudmorrow.agent.quills import MachineQuills
-from cloudmorrow.agent.sync import sync_all
 from cloudmorrow.agent.tasks import TaskError, run_task
 
 log = logging.getLogger("cloudmorrow.agent")
@@ -27,7 +26,6 @@ class RunnerStats:
     jobs_failed: int = 0
     heartbeats: int = 0
     # Passes over a config bundle that actually moved something.
-    config_syncs: int = 0
 
 
 class AgentRunner:
@@ -94,27 +92,13 @@ class AgentRunner:
             log.exception("a Quill's machine handler failed")
 
     def tick(self) -> None:
-        """One heartbeat, the config, then drain whatever work is waiting."""
-        beat = self.client.heartbeat(socket.gethostname(), platform.platform())
+        """One heartbeat, then drain whatever work is waiting."""
+        self.client.heartbeat(socket.gethostname(), platform.platform())
         self.stats.heartbeats += 1
-        self.sync_config(beat.get("sync_bundles") or [])
         while not self._stop and self.run_one_job():
             pass
         if self.config.allow_quill_code:
             self.run_quills()
-
-    def sync_config(self, bundles: list[str]) -> None:
-        """Keep whatever the server says this machine syncs in step.
-
-        The list comes back on the heartbeat, so switching sync on for a
-        machine takes effect within one poll and needs nothing restarted.
-        """
-        if not bundles:
-            return
-        for outcome in sync_all(self.client, self.config, bundles):
-            if outcome.notable:
-                self.stats.config_syncs += 1
-                log.info("config %s", outcome)
 
     # -- the loop ----------------------------------------------------------
     def run_forever(self, *, max_ticks: int | None = None) -> RunnerStats:

@@ -87,25 +87,6 @@ class AgentClient:
     def report(self, job_id: int, status: str, result: dict) -> None:
         self._post(f"/api/agent/jobs/{job_id}/result", {"status": status, "result": result})
 
-    # -- config bundles ----------------------------------------------------
-    def config_state(self, bundle: str) -> dict:
-        """The manifest: revision and hashes, without the contents."""
-        return self._get(f"/api/agent/config/{bundle}") or {}
-
-    def config_files(self, bundle: str) -> dict:
-        """The whole bundle, contents and all."""
-        return self._get(f"/api/agent/config/{bundle}/files") or {}
-
-    def push_config(self, bundle: str, files: list[dict], *, base_revision: int | None) -> dict:
-        """Offer this machine's copy. 409 means somebody else got there first."""
-        return (
-            self._post(
-                f"/api/agent/config/{bundle}",
-                {"files": files, "base_revision": base_revision},
-            )
-            or {}
-        )
-
     # -- a Quill's code on this machine -------------------------------------
     def machine_quills(self) -> list[dict]:
         """The Quills with machine handlers that are on for this machine's owner."""

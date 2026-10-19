@@ -119,7 +119,7 @@ async def test_what_is_said_goes_in_the_log_with_the_time(app):
         log = screen.query_one(LogStrip)
         assert [line.text for line in log.lines][-1] == "saved it"
         # And the machines' notifications are in there too.
-        assert "omarchy config changed on desktop" in [line.text for line in log.lines]
+        assert "sam asks for crm" in [line.text for line in log.lines]
 
 
 async def test_clicking_a_vault_moves_nothing_but_the_pane(app):

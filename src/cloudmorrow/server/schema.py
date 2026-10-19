@@ -66,8 +66,9 @@ CREATE TABLE IF NOT EXISTS agents (
     version      TEXT    NOT NULL DEFAULT '',
     -- Capabilities the agent reports at enrolment, comma separated.
     capabilities TEXT    NOT NULL DEFAULT '',
-    -- Config bundles this machine keeps in step with the others, comma
-    -- separated. Set from the TUI; the agent reads it off its heartbeat.
+    -- Config bundles this machine kept in step with the others, when there
+    -- was Omarchy config sync. Unused since; kept, since a column is not
+    -- taken off a database.
     sync_bundles TEXT    NOT NULL DEFAULT '',
     -- Where this agent serves its machine shares, from its last heartbeat.
     dav_base     TEXT    NOT NULL DEFAULT '',
@@ -198,37 +199,10 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     created_at TEXT    NOT NULL,
     edited_at  TEXT
 );
-CREATE TABLE IF NOT EXISTS config_bundles (
-    owner      TEXT    NOT NULL,
-    -- One synced set of dotfiles. "omarchy" is the only one so far.
-    bundle     TEXT    NOT NULL,
-    -- Bumped on every accepted push. 0 means nobody has claimed it yet.
-    revision   INTEGER NOT NULL DEFAULT 0,
-    -- The machine this revision came from.
-    origin     TEXT    NOT NULL DEFAULT '',
-    -- The machine that got here first, and so decided what the others adopt.
-    claimed_by TEXT    NOT NULL DEFAULT '',
-    claimed_at TEXT    NOT NULL DEFAULT '',
-    updated_at TEXT    NOT NULL,
-    PRIMARY KEY (owner, bundle)
-);
-CREATE TABLE IF NOT EXISTS config_files (
-    owner      TEXT    NOT NULL,
-    bundle     TEXT    NOT NULL,
-    -- Relative to the bundle's root on the machine: hypr/hyprland.conf, say.
-    path       TEXT    NOT NULL,
-    sha256     TEXT    NOT NULL,
-    -- Config files are text. Anything that is not is left where it is.
-    content    TEXT    NOT NULL,
-    -- The permission bits, so an executable script stays executable.
-    mode       INTEGER NOT NULL DEFAULT 420,
-    updated_at TEXT    NOT NULL,
-    PRIMARY KEY (owner, bundle, path)
-);
 CREATE TABLE IF NOT EXISTS notifications (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     owner      TEXT    NOT NULL,
-    -- A dotted name: config.claimed, config.updated, config.applied, …
+    -- A dotted name: quill.offered, quill.requested, …
     kind       TEXT    NOT NULL DEFAULT 'info',
     -- The machine it happened on, or '' when it was the server itself.
     machine    TEXT    NOT NULL DEFAULT '',
@@ -252,6 +226,7 @@ ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     # and `_migrate` gives every account that had it the matching role.
     ("users", "role", "TEXT NOT NULL DEFAULT 'user'"),
     ("users", "user_type", "TEXT NOT NULL DEFAULT 'human'"),
+    # Omarchy config sync's, which is gone; the column stays like dav_base.
     ("agents", "sync_bundles", "TEXT NOT NULL DEFAULT ''"),
     # Where an agent served its machine shares. Unused since machine shares
     # went (step 4); kept, since a column is not taken off a database.

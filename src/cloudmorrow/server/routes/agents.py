@@ -12,7 +12,6 @@ from cloudmorrow.server.agents import (
     UnknownAgentError,
     UnknownJobError,
 )
-from cloudmorrow.server.configsync import UnknownBundleError, validate_bundle
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import (
     AppState,
@@ -22,7 +21,6 @@ from cloudmorrow.server.deps import (
 )
 from cloudmorrow.server.schemas import (
     AgentOut,
-    AgentSyncUpdate,
     EnrollRequest,
     EnrollResponse,
     EnrollSelfRequest,
@@ -86,29 +84,6 @@ def enroll_self(
 @router.get("", response_model=list[AgentOut])
 def list_agents(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> list[AgentOut]:
     return [AgentOut(**agent.to_dict()) for agent in state.agents.list(user.username)]
-
-
-@router.patch("/{agent_id}/sync", response_model=AgentOut)
-def set_agent_sync(
-    agent_id: int,
-    payload: AgentSyncUpdate,
-    state: AppState = Depends(get_state),
-    user: User = Depends(get_current_user),
-) -> AgentOut:
-    """Turn config syncing on or off for one machine.
-
-    The machine itself is not asked: it finds out on its next heartbeat, which
-    is what makes the tick in the TUI feel like it did something.
-    """
-    try:
-        bundles = [validate_bundle(name) for name in payload.sync_bundles]
-    except UnknownBundleError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"no such config bundle: {exc}") from exc
-    try:
-        agent = state.agents.set_sync_bundles(user.username, agent_id, bundles)
-    except UnknownAgentError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such agent") from exc
-    return AgentOut(**agent.to_dict())
 
 
 @router.delete("/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -197,11 +172,6 @@ def heartbeat(
     return HeartbeatResponse(
         agent_id=agent.id,
         queued_jobs=state.jobs.queued_count(agent.id),
-        # Only bundles the machine says it can handle. Ticking the box for a
-        # machine that has since stopped being an Omarchy box does nothing.
-        sync_bundles=[
-            bundle for bundle in agent.sync_bundles if bundle in (payload.capabilities or agent.capabilities)
-        ],
     )
 
 
