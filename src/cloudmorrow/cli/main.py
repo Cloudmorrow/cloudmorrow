@@ -38,7 +38,7 @@ from cloudmorrow.cli import (
 )
 from cloudmorrow.cli.common import client, console, run
 from cloudmorrow.client import discover
-from cloudmorrow.client.api import CloudmorrowClient
+from cloudmorrow.client.api import ApiError, CloudmorrowClient
 from cloudmorrow.client.config import (
     ClientConfig,
     StoredCredentials,
@@ -119,7 +119,11 @@ def login(
 
     async def _login() -> None:
         async with CloudmorrowClient(config) as api:
-            session = await api.login(username, password)
+            try:
+                session = await api.login(username, password)
+            except ApiError as exc:
+                console.print(signin_refused(exc, config.api_url, username))
+                raise typer.Exit(code=1) from None
             StoredCredentials(
                 api_url=config.api_url,
                 username=session.username,
@@ -140,6 +144,33 @@ def login(
                     )
 
     run(_login())
+
+
+def signin_refused(exc: ApiError, server: str, username: str) -> str:
+    """What to say when a sign-in did not happen: where, why, and what to do.
+
+    The server's word on it is kept — it is the truest thing there is — and
+    what the server leaves unsaid, on purpose or because it cannot know, is
+    said here instead.
+    """
+    if exc.status_code == 401:
+        return (
+            f"[red]Not signed in to {server}:[/] {exc}.\n"
+            f"  The cloud does not say which. You gave [b]{username}[/]: the username is the "
+            "account's name on this cloud, the one chosen when the account was made, "
+            "not an email address and not the cloud's own name.\n"
+            "  An administrator sees every account under Administration, "
+            "and can set a new password there."
+        )
+    if exc.status_code == 429:
+        return (
+            f"[red]Not signed in to {server}:[/] {exc}.\n"
+            "  The cloud counts wrong passwords per address and per account, and waits them out; "
+            "the right password does not get through any sooner."
+        )
+    if exc.status_code in (502, 503, 504):
+        return f"[red]Not signed in:[/] {exc}"
+    return f"[red]Not signed in to {server}:[/] {exc}"
 
 
 def choose_cloud(config: ClientConfig, found: list[discover.Found] | None = None) -> None:

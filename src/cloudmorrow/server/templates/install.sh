@@ -166,7 +166,7 @@ if [ -z "$NO_LOGIN" ]; then
 		if "$BINDIR/cloudmorrow" login --server "$CLOUDMORROW_URL" </dev/tty; then
 			SIGNED_IN="1"
 		else
-			note "not signed in; afterwards: cloudmorrow login"
+			note "not signed in; afterwards: cloudmorrow login -u <your account name on this cloud>"
 		fi
 	fi
 fi
