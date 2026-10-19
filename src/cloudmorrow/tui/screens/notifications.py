@@ -16,7 +16,7 @@ from textual.widgets import Button, Label, Static
 
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.screens.modals import Modal
-from cloudmorrow.tui.theme import ACCENT, BAD, GOOD, MUTED
+from cloudmorrow.tui.theme import ACCENT, BAD, MUTED
 from cloudmorrow.tui.words import short_stamp
 
 # How many of the server's notifications the modal shows.
@@ -42,10 +42,10 @@ def render(notes: list[dict]) -> str:
     """The list itself, so the bell and the modal draw it the same way."""
     if not notes:
         return f"[{MUTED}]Nothing has happened yet.[/]"
-    colours = {"config.failed": BAD, "config.claimed": ACCENT, "config.updated": GOOD}
     lines = []
     for note in notes:
-        colour = colours.get(note["kind"], MUTED)
+        # Red for what failed, as the log strip has it; the rest soft.
+        colour = BAD if "fail" in note["kind"] else MUTED
         mark = f"[{ACCENT}]•[/]" if note["unread"] else " "
         where = f" [{MUTED}]{note['machine']}[/]" if note["machine"] else ""
         lines.append(

@@ -1,7 +1,6 @@
-"""The settings screen: the machine you are at, and the tick box on it.
+"""The settings screen: the machine you are at, and the tabs you want.
 
-The claim the screen makes is that one tick is the whole of the feature — so
-these press the button in the top bar, then the box, and check what the server
+These press the button in the top bar, then a box, and check what the server
 was told. What the machines have been doing is the bell's, and is tested with
 it in `test_notifications_modal.py`.
 """
@@ -19,8 +18,6 @@ from tests.tui_harness import agent_row, settle, start
 def this_machine(monkeypatch):
     """Name the machine the tests are sitting at, whatever it is really called."""
     monkeypatch.setattr("cloudmorrow.tui.screens.settings.machine_name", lambda: "laptop")
-    monkeypatch.setattr("cloudmorrow.tui.screens.settings.describe", lambda: "Omarchy — ~/.config")
-    monkeypatch.setattr("cloudmorrow.tui.screens.settings.is_omarchy", lambda: True)
 
 
 async def open_settings(app, pilot) -> SettingsScreen:
@@ -53,71 +50,15 @@ async def test_the_keyboard_opens_it_too(app):
         assert isinstance(app.screen, SettingsScreen)
 
 
-async def test_an_omarchy_machine_can_be_ticked(app):
+async def test_there_is_no_config_sync_on_it(app):
+    """Omarchy config sync is gone: no tick box for it, and nothing asked about it."""
     app.client.agent_list = [agent_row("laptop")]
     async with app.run_test() as pilot:
         screen = await open_settings(app, pilot)
-        box = screen.query_one("#sync-omarchy", Checkbox)
-        assert not box.disabled
-        assert box.value is False
-        # Unclaimed: the screen says what ticking it would mean.
-        assert "first machine" in text_of(screen, "#settings-bundle")
-
-        await pilot.click("#sync-omarchy")
-        await settle(app, pilot)
-
-        assert app.client.sync_calls == [(1, ["omarchy"])]
-
-
-async def test_unticking_tells_the_server_to_stop(app):
-    app.client.agent_list = [agent_row("laptop", sync_bundles=["omarchy"])]
-    async with app.run_test() as pilot:
-        screen = await open_settings(app, pilot)
-        assert screen.query_one("#sync-omarchy", Checkbox).value is True
-        # Reading the state back must not post it: only a click does that.
-        assert app.client.sync_calls == []
-
-        await pilot.click("#sync-omarchy")
-        await settle(app, pilot)
-        assert app.client.sync_calls == [(1, [])]
-
-
-async def test_a_machine_that_is_not_omarchy_cannot_be_ticked(app, monkeypatch):
-    monkeypatch.setattr("cloudmorrow.tui.screens.settings.is_omarchy", lambda: False)
-    monkeypatch.setattr("cloudmorrow.tui.screens.settings.describe", lambda: "no ~/.config/hypr on this machine")
-    app.client.agent_list = [agent_row("laptop", capabilities=["ping", "sysinfo"])]
-    async with app.run_test() as pilot:
-        screen = await open_settings(app, pilot)
-        assert screen.query_one("#sync-omarchy", Checkbox).disabled
-        assert "nothing to sync" in text_of(screen, "#settings-omarchy")
-
-
-async def test_a_machine_with_no_agent_says_so(app):
-    app.client.agent_list = [agent_row("some-other-box", id=7)]
-    async with app.run_test() as pilot:
-        screen = await open_settings(app, pilot)
-        assert screen.query_one("#sync-omarchy", Checkbox).disabled
-        assert "No agent enrolled" in text_of(screen, "#settings-omarchy")
-
-
-async def test_a_claimed_bundle_shows_where_it_came_from(app):
-    app.client.agent_list = [agent_row("laptop", sync_bundles=["omarchy"])]
-    app.client.bundle = {
-        "bundle": "omarchy",
-        "revision": 4,
-        "origin": "desktop",
-        "claimed_by": "desktop",
-        "claimed_at": "2026-09-01T10:00:00",
-        "updated_at": "2026-09-11T08:30:00",
-        "files": [{"path": "hypr/hyprland.conf", "sha256": "abc", "mode": 420}],
-        "machines": ["desktop", "laptop"],
-    }
-    async with app.run_test() as pilot:
-        screen = await open_settings(app, pilot)
-        bundle = text_of(screen, "#settings-bundle")
-        assert "revision 4" in bundle
-        assert "desktop" in bundle
-        assert "1 files" in bundle
+        assert not screen.query("#sync-omarchy")
+        assert not screen.query("#settings-omarchy")
+        ids = [box.id or "" for box in screen.query(Checkbox)]
+        assert all(box_id.startswith("myfeature-") for box_id in ids)
 
 
 async def test_escape_closes_it(app):

@@ -804,22 +804,6 @@ class CloudmorrowClient:
     async def jobs(self, agent_id: int, limit: int = 25) -> list[dict]:
         return (await self._request("GET", f"/api/agents/{agent_id}/jobs", params={"limit": limit})).json()
 
-    # -- config sync -------------------------------------------------------
-    async def set_agent_sync(self, agent_id: int, bundles: list[str]) -> dict:
-        """Switch config syncing on or off for a machine. [] switches it off."""
-        return (await self._request("PATCH", f"/api/agents/{agent_id}/sync", json={"sync_bundles": bundles})).json()
-
-    async def config_bundle(self, bundle: str) -> dict:
-        """One bundle: its revision, who claimed it, and who is keeping it."""
-        return (await self._request("GET", f"/api/config/{bundle}")).json()
-
-    async def config_bundles(self) -> list[dict]:
-        return (await self._request("GET", "/api/config")).json()
-
-    async def forget_config_bundle(self, bundle: str) -> dict:
-        """Unclaim it, so the next machine to switch syncing on decides again."""
-        return (await self._request("DELETE", f"/api/config/{bundle}")).json()
-
     # -- notifications -----------------------------------------------------
     async def notifications(self, *, limit: int = 50, unread: bool = False) -> list[dict]:
         return (await self._request("GET", "/api/notifications", params={"limit": limit, "unread": unread})).json()

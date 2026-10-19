@@ -13,7 +13,7 @@ import hashlib
 import json
 import re
 import secrets
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from cloudmorrow.server.database import Connection, Database, IntegrityError, Row
@@ -87,9 +87,6 @@ class Agent:
     capabilities: list[str]
     last_seen: str | None
     enrolled_at: str
-    # Config bundles this machine has been told to keep in sync. The agent
-    # learns them from its heartbeat, so a tick in the TUI is all it takes.
-    sync_bundles: list[str] = field(default_factory=list)
 
     @property
     def online(self) -> bool:
@@ -110,7 +107,6 @@ class Agent:
             "last_seen": self.last_seen,
             "enrolled_at": self.enrolled_at,
             "online": self.online,
-            "sync_bundles": self.sync_bundles,
         }
 
 
@@ -143,10 +139,6 @@ class Job:
         }
 
 
-def _list(raw: str | None) -> list[str]:
-    return [part for part in (raw or "").split(",") if part]
-
-
 def _agent(row: Row) -> Agent:
     return Agent(
         id=row["id"],
@@ -158,7 +150,6 @@ def _agent(row: Row) -> Agent:
         capabilities=[c for c in row["capabilities"].split(",") if c],
         last_seen=row["last_seen"],
         enrolled_at=row["enrolled_at"],
-        sync_bundles=_list(row["sync_bundles"]),
     )
 
 
@@ -337,22 +328,6 @@ class AgentStore:
                 f"UPDATE agents SET last_seen = ?{assignments} WHERE id = ?",
                 (_stamp(), *updates.values(), agent_id),
             )
-
-    def set_sync_bundles(self, owner: str, agent_id: int, bundles: list[str]) -> Agent:
-        """Tell a machine which config bundles to keep in step with the others."""
-        cleaned = sorted({b.strip().lower() for b in bundles if b.strip()})
-        with self.db.connect() as conn:
-            cursor = conn.execute(
-                "UPDATE agents SET sync_bundles = ? WHERE owner = ? AND id = ?",
-                (",".join(cleaned), owner, agent_id),
-            )
-            if cursor.rowcount == 0:
-                raise UnknownAgentError(str(agent_id))
-        return self.require(owner, agent_id)
-
-    def syncing(self, owner: str, bundle: str) -> list[Agent]:
-        """Every machine of this owner's that is keeping *bundle* in sync."""
-        return [agent for agent in self.list(owner) if bundle in agent.sync_bundles]
 
     def delete(self, owner: str, agent_id: int) -> None:
         with self.db.connect() as conn:

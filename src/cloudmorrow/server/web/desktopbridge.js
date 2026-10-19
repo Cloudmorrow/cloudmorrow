@@ -148,12 +148,12 @@ export const computerCard = () => (bridge ? `<div class="computer-slot"></div>` 
 
 const agentWords = (agent) => {
   if (agent.error) return ["Not known", agent.error, ""];
-  if (!agent.enrolled) return ["Not set up", "Nothing here makes a backup or syncs its settings yet", "warn"];
+  if (!agent.enrolled) return ["Not set up", "Nothing here makes a backup yet", "warn"];
   if (agent.running === false) {
     return ["Stopped", `Enrolled as ${agent.name}, but not running`, "warn"];
   }
   if (agent.running == null) return ["Enrolled", `As ${agent.name}`, ""];
-  return ["Running", `As ${agent.name} — backs up and syncs this computer`, "good"];
+  return ["Running", `As ${agent.name} — backs up this computer`, "good"];
 };
 
 /** Fill in the group `computerCard` left room for. */

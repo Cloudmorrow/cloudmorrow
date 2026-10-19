@@ -10,7 +10,7 @@ def test_they_come_back_newest_first(config):
     config.ensure_dirs()
     store = NotificationStore(config.db_path)
     store.add("bram", title="first")
-    store.add("bram", title="second", kind="config.updated", machine="laptop")
+    store.add("bram", title="second", kind="quill.offered", machine="laptop")
 
     listed = store.list("bram")
 
@@ -73,7 +73,7 @@ def test_an_agent_signs_its_own_notifications(client, auth):
 
     posted = client.post(
         "/api/agent/notifications",
-        json={"kind": "config.applied", "title": "wrote the config", "body": "3 files"},
+        json={"kind": "quill.ran", "title": "ran a Quill here", "body": "crm"},
         headers=agent_auth,
     )
 
@@ -81,7 +81,7 @@ def test_an_agent_signs_its_own_notifications(client, auth):
     # The machine name is the server's, from the token — not the body's.
     assert posted.json()["machine"] == "laptop"
     listed = client.get("/api/notifications", headers=auth).json()
-    assert [note["title"] for note in listed] == ["wrote the config"]
+    assert [note["title"] for note in listed] == ["ran a Quill here"]
 
 
 def test_another_user_cannot_read_them(client, auth):

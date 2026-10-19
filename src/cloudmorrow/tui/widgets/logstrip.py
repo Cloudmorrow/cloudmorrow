@@ -1,7 +1,7 @@
 """The log along the bottom: what happened, newest last, with the time.
 
 Two things write to it: the machines, through the notifications the bell
-counts ("omarchy config changed on desktop"), and the app itself, whenever it
+counts ("sam asks for crm"), and the app itself, whenever it
 says something in passing ("Password changed.", "added to To Do"). Each is one
 line — `12:03:04 what happened` — coloured by how it went: red for what
 failed, orange for what wants a look, the rest soft. The bell still opens the

@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING
 from cloudmorrow.server.agents import AgentStore, JobStore
 from cloudmorrow.server.circles import CircleStore
 from cloudmorrow.server.config import ServerConfig
-from cloudmorrow.server.configsync import ConfigStore
 from cloudmorrow.server.database import Database
 from cloudmorrow.server.db import UserStore
 from cloudmorrow.server.features import FeatureStore
@@ -48,7 +47,6 @@ class AppState:
     agents: AgentStore
     jobs: JobStore
     secrets: SecretStore
-    config_sync: ConfigStore
     notifications: NotificationStore
     features: FeatureStore
     shares: ShareStore

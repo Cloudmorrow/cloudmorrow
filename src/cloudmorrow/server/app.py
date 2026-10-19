@@ -18,7 +18,6 @@ from cloudmorrow.server.agents import AgentStore, JobStore
 from cloudmorrow.server.backends import SharesBackend, VaultsBackend
 from cloudmorrow.server.circles import CircleStore
 from cloudmorrow.server.config import ServerConfig, load_config
-from cloudmorrow.server.configsync import ConfigStore
 from cloudmorrow.server.dav import MOUNT_PATH, CredentialCheck, build_dav_app
 from cloudmorrow.server.db import UserStore
 from cloudmorrow.server.drive import user_drive
@@ -38,7 +37,6 @@ from cloudmorrow.server.routes import (
     agents,
     auth,
     circles,
-    configsync,
     features,
     install,
     mcp,
@@ -137,7 +135,6 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         agents=AgentStore(db),
         jobs=JobStore(db),
         secrets=SecretStore(db, sealer.master),
-        config_sync=ConfigStore(db),
         notifications=NotificationStore(db),
         features=feature_store,
         push=PushStore(
@@ -267,8 +264,6 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.include_router(agents.router)
     app.include_router(agents.agent_router)
     app.include_router(agentquills.router)
-    app.include_router(configsync.router)
-    app.include_router(configsync.agent_router)
     app.include_router(notifications.router)
     app.include_router(notifications.agent_router)
     app.include_router(push.router)

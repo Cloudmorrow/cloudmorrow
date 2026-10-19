@@ -17,7 +17,7 @@ from tests.tui_harness import settle, start
 def note(index: int, **extra) -> dict:
     return {
         "id": index,
-        "kind": extra.get("kind", "config.updated"),
+        "kind": extra.get("kind", "quill.requested"),
         "machine": "desktop",
         "title": extra.get("title", f"something happened {index}"),
         "body": extra.get("body", "and here is a line about it"),
@@ -64,7 +64,7 @@ async def test_a_quiet_bell_is_a_bell_with_no_count(app):
 async def test_clicking_the_bell_lists_what_happened(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_bell(app, pilot)
-        assert "omarchy config changed on desktop" in listed(screen)
+        assert "sam asks for crm" in listed(screen)
 
 
 async def test_the_keyboard_opens_it_too(app):

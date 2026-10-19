@@ -56,12 +56,6 @@ class AgentConfig:
     allow_shell: bool = False
     shell_timeout_seconds: int = 300
 
-    # Config syncing writes into this machine's ~/.config, so this is its
-    # veto. It is on by default because the opt-in is the tick in the TUI —
-    # nothing is synced until a bundle is switched on for this machine there —
-    # and this is how a machine says "never, whatever the server thinks".
-    allow_config_sync: bool = True
-
     # Backups may only read below these roots, and only write into backup_dir.
     allow_backup: bool = True
     backup_roots: list[str] = field(default_factory=lambda: [str(Path.home())])
@@ -82,29 +76,15 @@ class AgentConfig:
 
     @property
     def capabilities(self) -> list[str]:
-        """What this machine can be asked to do, and what it is.
-
-        `omarchy` is not a job type — it is how a machine says it has a
-        Hyprland config worth syncing, so the settings screen knows which
-        machines to offer the tick box on.
-        """
+        """What this machine can be asked to do."""
         caps = ["ping", "sysinfo"]
         if self.allow_backup:
             caps.append("backup")
         if self.allow_shell:
             caps.append("shell")
-        if self.allow_config_sync and self.is_omarchy():
-            caps.append("omarchy")
         if self.allow_quill_code:
             caps.append("quills")
         return caps
-
-    @staticmethod
-    def is_omarchy() -> bool:
-        """Whether this is a Hyprland box. Imported late: it reads the disk."""
-        from cloudmorrow.agent.omarchy import is_omarchy
-
-        return is_omarchy()
 
     @classmethod
     def load(cls, path: Path | None = None) -> AgentConfig:
@@ -122,7 +102,6 @@ class AgentConfig:
                 "allow_insecure_http",
                 "allow_shell",
                 "shell_timeout_seconds",
-                "allow_config_sync",
                 "allow_backup",
                 "backup_roots",
                 "backup_dir",
@@ -156,7 +135,6 @@ class AgentConfig:
                 "allow_insecure_http": self.allow_insecure_http,
                 "allow_shell": self.allow_shell,
                 "shell_timeout_seconds": self.shell_timeout_seconds,
-                "allow_config_sync": self.allow_config_sync,
                 "allow_backup": self.allow_backup,
                 "backup_roots": self.backup_roots,
                 "backup_dir": self.backup_dir,

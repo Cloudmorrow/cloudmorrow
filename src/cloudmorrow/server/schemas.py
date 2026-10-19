@@ -241,22 +241,14 @@ class AgentOut(BaseModel):
     last_seen: str | None = None
     enrolled_at: str = ""
     online: bool = False
-    # Config bundles this machine keeps in step with the others.
-    sync_bundles: list[str] = Field(default_factory=list)
-
-
-class AgentSyncUpdate(BaseModel):
-    """Which bundles a machine should keep in sync. [] switches it all off."""
-
-    sync_bundles: list[str] = Field(default_factory=list)
 
 
 class HeartbeatRequest(BaseModel):
     hostname: str = ""
     platform: str = ""
     version: str = ""
-    # Re-reported every time, so a machine that grows a capability — Omarchy
-    # installed since enrolment — says so without enrolling again.
+    # Re-reported every time, so a machine that grows a capability since
+    # enrolment says so without enrolling again.
     capabilities: list[str] = Field(default_factory=list)
 
 
@@ -264,9 +256,6 @@ class HeartbeatResponse(BaseModel):
     agent_id: int
     queued_jobs: int
     poll_seconds: int = 30
-    # What this machine has been told to keep in sync. The agent asks for
-    # nothing else: the tick in the TUI arrives here.
-    sync_bundles: list[str] = Field(default_factory=list)
     # Always empty. Agents served machine shares once, and one from then
     # reads this list as what to serve: empty, it stops.
     shares: list[dict] = Field(default_factory=list)

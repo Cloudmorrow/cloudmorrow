@@ -48,11 +48,6 @@ mentions them only as examples.
 - **A local agent** on each machine — registers itself when you sign in, runs
   as you, for backups and whatever comes next. The server has one too, so the
   box that holds everything is in the list with the rest of them.
-- **Omarchy config sync.** Tick one box in Settings and this machine's
-  `~/.config/hypr` is kept in step with every other machine that ticked it.
-  Change a keybind on the laptop and the desktop has it within the minute,
-  without either of them being told to. The first machine to tick the box
-  claims the configuration; the rest adopt it.
 - **My Files.** A drive of your own on the server, there because your
   account is: `cloudmorrow share mount my-files` and it is a folder on this
   machine; in the app it is the first thing under Files.
@@ -200,7 +195,6 @@ src/cloudmorrow/
   dotenv.py          the .env format, and the default vault and environment, shared by both ends
   slugs.py           ids for boards and shares, derived the same way on both ends
   palette.py         the colours, named once, for the TUI and the CLI alike
-  bundles.py         what a config bundle's file names may be, checked at both ends
   cli/               the `cloudmorrow` command line, one module per resource
     dev.py           `--dev`: run the checkout you are standing in
     progress.py      the spinner, the bar, and the line saying what is happening
@@ -214,7 +208,6 @@ src/cloudmorrow/
     crypto.py        sealing secret values (AES-256-GCM)
     secrets.py       the secret store: vaults, environments, keys
     tasks.py         boards, lanes, and the week a finished task has left
-    configsync.py    the one copy of the shared config, and its revisions
     notifications.py what the machines did, kept where all of them can leave it
     webpush.py       VAPID, aes128gcm, and the devices to push
     shares.py        the fileshares: a name, a folder, whose it is and who it is shared with
@@ -222,8 +215,6 @@ src/cloudmorrow/
     templates/       the install page and install.sh
     web/             the app for the browser: one page, a core, and a file per feature
   agent/             the local agent: config, tasks, poll loop
-    omarchy.py       what "my Omarchy config" means on disk, read and written
-    sync.py          claim, adopt, push, pull — one pass per poll
   desktop/           the desktop app: the web app in a pywebview window, and the
                      bridge that lets it mount shares here (`cloudmorrow app`)
   tui/               Textual client
@@ -859,7 +850,7 @@ Anywhere:
 | `f1` … `f7` | notes, tasks (`f2`), secrets, files, calendar; the other Quills take `f4`, `f10`, `f11`, `f12` in turn — Channels is `f4` |
 | `f8` | notifications: what the machines have been up to |
 | `f9` | administration (administrators): users, features, circles, Quills |
-| `ctrl+g` | settings: your switches, this machine, and its config sync |
+| `ctrl+g` | settings: your switches, and this machine |
 | `ctrl+r` | refresh |
 | `ctrl+c` | quit — pressed twice; the first press asks in the bottom bar |
 
@@ -2039,10 +2030,6 @@ What a job can be:
 | `backup` | tar.gz some paths into the agent's backup dir, with retention |
 | `shell` | run a command — **off unless that machine enables it** |
 
-Config sync is not one of these. It is not queued work at all: the agent does
-it on its own every poll, for whichever bundles the server says this machine
-keeps — see [Omarchy config in sync](#omarchy-config-in-sync).
-
 Everything a machine may do is declared in its own `~/.config/cloudmorrow/agent.toml`
 rather than decided by the server: backups only read below `backup_roots`
 (your home, by default), and `shell` needs `allow_shell = true` there.
@@ -2082,111 +2069,10 @@ reach it. On a server that answers only its reverse proxy
 (`allowed_client_ips`), that means adding the machine's own address to the
 list and pointing the agent at the local port with `--url`.
 
-## Omarchy config in sync
-
-Every machine already runs an agent, and the agents already talk to the server
-every half minute. That is most of a config sync — the rest is one tick box.
-
-The tick box is about the machine you are sitting at, so it is in the
-terminal app on that machine:
-
-#### In the web app
-
-Not there. **Me → This computer** (in the desktop app) says whether this
-machine's agent is running; the switch itself is the terminal app's.
-
-#### In the terminal app
-
-Open **Settings** (`ctrl+g`, or the button in the top bar next to your
-name). It names the machine you are sitting at, says whether it is an
-Omarchy box, and offers one thing: **Keep Omarchy config in sync**.
-
-#### On the command line
-
-No command for the tick box; `cloudmorrow-agent status` says which
-revision this machine holds and `cloudmorrow-agent sync` does a pass now
-(see *By hand*, below).
-
----
-
-What Settings shows:
-
-```
-  omarchy config
-  ● online
-  Omarchy — ~/.config/omarchy
-  syncing ~/.config/hypr
-
-  [X] Keep Omarchy config in sync
-
-  revision 4 from desktop at 2026-09-11 13:03
-  claimed by laptop · 6 files · kept by desktop, laptop
-```
-
-Tick it and this machine's agent hears about it on its next heartbeat. From
-then on, changing something in `~/.config/hypr` on any of these machines puts
-it on all of them — nothing to run, nothing to remember.
-
-### Who wins
-
-**The first machine to tick the box decides.** Its copy becomes revision 1,
-and every machine that ticks the box afterwards adopts that instead of arguing
-with it. This is the whole conflict story, and it is deliberately blunt: one
-of the copies has to win, and "whoever asked first" is the only rule that
-needs no adjudication.
-
-After that, each change makes a new revision. A machine pushes when its own
-files differ from the revision it holds, and pulls when the server has moved
-past it. Two machines editing at the same time do not merge: the one that
-pushes first wins the revision, and the other notices the higher number on its
-next pass and takes it.
-
-**Nothing is thrown away.** Before a file is overwritten, anything that is not
-the copy Cloudmorrow itself put there — never seen before, or edited here since
-— is copied to `<name>.cloudmorrow-backup` first, and those backups are never
-synced anywhere. So adopting somebody else's config leaves yours next to it.
-
-### What travels
-
-`~/.config/hypr`, and nothing else yet. The rest of `~/.config` is full of
-things that are about one machine — monitor layouts, caches an app decided to
-keep next to its settings — and a sync that overwrites those is worse than no
-sync at all. Growing the list is a line in `PATHS` in
-`src/cloudmorrow/agent/omarchy.py`, once a directory has earned it.
-
-Text files only, nothing over 512 KiB, no symlinks (a link into a dotfiles
-repo is that machine's arrangement, not something to copy onto everybody
-else), and none of the droppings — `.swp`, `~`, `.bak`.
-
-### Switching it off
-
-Untick the box. The machine keeps every file it has and stops following the
-others; the bundle carries on without it. To make the *next* machine decide
-again from scratch, throw the server's copy away — the machines keep theirs:
-
-```bash
-curl -X DELETE $CLOUDMORROW/api/config/omarchy -H "Authorization: Bearer $TOKEN"
-```
-
-A machine can also refuse outright, whatever the server says, with
-`allow_config_sync = false` in its own `~/.config/cloudmorrow/agent.toml`. Same
-principle as `allow_shell`: what a machine will do to itself is declared on
-that machine.
-
-### By hand
-
-The agent does this every poll, but you do not have to wait for it:
-
-```bash
-cloudmorrow-agent sync           # do a pass now, and say what it did
-cloudmorrow-agent sync --reset   # forget what this machine holds, adopt the server's
-cloudmorrow-agent status         # which revision this machine is on
-```
-
 ### Notifications
 
-Every claim, every push and every machine that adopts a config leaves a note
-on the server. The bell at the far right of the terminal app's top bar carries the
+What happens to you elsewhere — a Quill shared with you, somebody asking
+an administrator for one — leaves a note on the server. The bell at the far right of the terminal app's top bar carries the
 count of the unread ones; ringing it (`f8`, or a click) opens the list, with
 one button to say you have read them. They are facts, not messages — nothing
 pushes them at you yet, which is what makes them the right thing to hang a
@@ -2241,9 +2127,6 @@ curl -s $CLOUDMORROW/api/notifications -H "Authorization: Bearer $TOKEN"
 | `*` | `/dav/{name}/…` | the share itself, as WebDAV — Basic auth with your password or token |
 | `GET`/`POST`/`DELETE` | `/api/agents…` | your machines |
 | `POST` | `/api/agents/{id}/jobs` | queue work |
-| `PATCH` | `/api/agents/{id}/sync` | `{sync_bundles}` — what that machine keeps in step |
-| `GET` | `/api/config`, `/api/config/{bundle}` | the shared config: revision, origin, who keeps it |
-| `DELETE` | `/api/config/{bundle}` | unclaim it, so the next machine to tick the box decides |
 | `GET`/`POST` | `/api/notifications` | what the machines have been doing |
 | `POST` | `/api/notifications/read` | mark them read; omit `ids` for all of them |
 | `GET` | `/api/push/key` | the VAPID public key, to subscribe a browser with |
@@ -2253,7 +2136,6 @@ curl -s $CLOUDMORROW/api/notifications -H "Authorization: Bearer $TOKEN"
 | `GET` | `/api/push/badge` | `{messages, notifications, badge}` — the number on the icon |
 | `POST` | `/api/push/test` | push yourself, to find out whether this phone is wired up |
 | `POST` | `/api/agent/enroll`, `/heartbeat`, `/jobs/claim` | the agent's own endpoints |
-| `GET`/`POST` | `/api/agent/config/{bundle}` | the agent's side of config sync |
 | `POST` | `/api/agent/notifications` | a machine saying what it just did |
 | `GET` | `/api/server/features` | what this server offers |
 | `PATCH` | `/api/server/features/{key}` | `{enabled}` — switch one for everybody, admin only |
@@ -2289,11 +2171,6 @@ Agent tokens are a separate credential from user tokens: an agent token cannot
 read notes, and a user token cannot claim jobs.
 MCP tokens are a third: handed out by `/oauth/token` after somebody said yes
 on the sign-in page, kept hashed, and good for `/mcp` alone.
-
-A config push is conditional: it carries the revision the machine was working
-from, and a push from an older one comes back `409` with the current revision
-rather than overwriting. `base_revision: null` claims an unclaimed bundle,
-which succeeds exactly once.
 
 ## Development
 
@@ -2361,21 +2238,6 @@ CLOUDMORROW_NOTES_DIR=/tmp/notes CLOUDMORROW_DATA_DIR=/tmp/cloudmorrow-data \
 - Agents poll rather than hold a connection, so a job waits up to
   `poll_seconds` before it starts. There is no schedule yet — jobs are queued by
   hand or by whatever cron you point at `cloudmorrow agent run`.
-- Config sync is whole-file and last-push-wins: it never merges two edits to
-  one file. The loser's copy is kept as `.cloudmorrow-backup` rather than being
-  reconciled, and putting the two back together is your job.
-- It syncs `~/.config/hypr` and nothing else. Themes, waybar, everything else
-  in `~/.config` stays where it is until a directory has earned a line in
-  `PATHS`.
-- A change is noticed by comparing hashes on a poll, not by watching the
-  filesystem, so a config edit takes up to `poll_seconds` to leave the machine
-  and another poll to arrive on the next one. Under a minute in practice, but
-  it is not instant, and nothing pushes it.
-- Nothing tells you a sync happened while you are looking at something else.
-  The notifications are all on the server, waiting for a channel to carry
-  them.
-- Binary files and symlinks in a synced directory are skipped silently: they
-  stay exactly as they are on each machine, and nothing says so.
 - A fileshare mount is for the session: it does not come back after a
   reboot, and it stops working when the token it signed in with expires (30
   days by default), at which point `share mount` again. Nothing remounts it
