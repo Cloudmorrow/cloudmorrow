@@ -335,12 +335,17 @@ class QuillRegistry:
             plan = self.plan(folder, datamodels_source, owner=owner, catalog=catalog)
             manifest_id = plan["id"]
             wanted = list(plan.get("requires", {}).get("runtimes", []))
-            if wanted:
-                fetched = self.runtimes.ensure(
-                    wanted, None if catalog is None else catalog.runtimes, base=catalog.base if catalog else None
-                )
-                plan["runtimes"] = self.runtimes.describe(wanted, catalog.runtimes if catalog else None)
+            if wanted and catalog is not None:
+                fetched = self.runtimes.ensure(wanted, catalog.runtimes, base=catalog.base)
+                plan["runtimes"] = self.runtimes.describe(wanted, catalog.runtimes)
                 plan["runtimes_fetched"] = fetched
+            elif wanted:
+                # No catalog to fetch from: a test harness, an offline check, a
+                # server whose catalog is unreachable. The Quill is installed
+                # all the same; its services wait and say what for, and an
+                # install with the catalog reachable fetches it (services.py).
+                plan["runtimes_fetched"] = []
+                plan["runtimes_skipped"] = wanted
             self.datamodels_dir.mkdir(parents=True, exist_ok=True)
             for model_id, path in self._pending_paths.items():
                 shutil.copyfile(path, self.datamodels_dir / f"{model_id}.toml")

@@ -202,7 +202,7 @@ def test_no_catalog_no_build_and_no_such_runtime_are_each_said(tmp_path, catalog
     rows = elsewhere.describe(["ffmpeg"], catalog.runtimes)
     assert rows[0]["available"] is False and "no build" in rows[0]["problem"]
     offline = store.describe(["ffmpeg"], None)
-    assert offline[0]["id"] == "ffmpeg" and "not looked up in the catalog" in offline[0]["problem"]
+    assert offline[0]["id"] == "ffmpeg" and "catalog could not be read" in offline[0]["problem"]
 
 
 # -- the registry: the sheet, the install, the removal ------------------------------------
@@ -231,6 +231,19 @@ def test_a_runtime_the_catalog_lacks_is_refused_before_anything_is_installed(reg
     with pytest.raises(QuillError, match="catalog does not have"):
         registry.install(folder, QUILL_CATALOG / "datamodels")
     assert registry.quills == {}
+
+
+def test_without_a_catalog_the_quill_installs_and_its_service_waits_for_the_runtime(tmp_path):
+    # A test harness, an offline check, a server whose catalog is unreachable:
+    # nothing is fetched, nothing is refused, and the service says what it waits for.
+    registry = QuillRegistry(tmp_path / "quills", tmp_path / "datamodels", str(tmp_path / "no-catalog"))
+    folder = write_quill(tmp_path / "src", CLIPS)
+    plan = registry.plan(folder, QUILL_CATALOG / "datamodels")
+    assert "catalog could not be read" in plan["runtimes"][0]["problem"]
+    done = registry.install(folder, QUILL_CATALOG / "datamodels")
+    assert done["runtimes_fetched"] == [] and done["runtimes_skipped"] == ["ffmpeg"]
+    assert "clips" in registry.quills and registry.runtimes.installed() == {}
+    assert registry.runtimes.missing(registry.quills["clips"].runtimes) == ["ffmpeg"]
 
 
 def test_the_remove_sheet_offers_a_runtime_only_when_nothing_else_needs_it(registry, tmp_path):

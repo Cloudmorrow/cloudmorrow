@@ -286,7 +286,7 @@ class RuntimeStore:
                 "problem": "",
             }
             if catalog_runtimes is None:
-                row["problem"] = "not looked up in the catalog here; the install sheet says what it is and how big"
+                row["problem"] = "not fetched: the catalog could not be read here"
                 rows.append(row)
                 continue
             spec = catalog_runtimes.get(name)
@@ -315,7 +315,7 @@ class RuntimeStore:
         for name in names:
             row = {"id": name, "label": name, "summary": "", "version": "", "license": "", "size": 0, "problem": ""}
             if catalog_runtimes is None:
-                row["problem"] = "not looked up in the catalog here; the install sheet says what it is and how big"
+                row["problem"] = "not fetched: the catalog could not be read here"
             elif (spec := catalog_runtimes.get(name)) is None:
                 raise self.error(f"a machine handler requires runtime {name!r}, which the catalog does not have")
             else:
