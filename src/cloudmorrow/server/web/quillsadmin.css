@@ -1,8 +1,78 @@
-/* Quills, for an administrator: the catalog rows and the install sheet.
+/* Quills, for an administrator: the three tabs, their rows, and the sheet.
 
    Plain, like the rest of Administration. The sheet is a list of facts to
    read before saying yes, and the only colour on it is for what is new to
-   this server, what will not run yet, and the one button it is for. */
+   this server, what will not run yet, and the one button it is for. On a
+   computer the sheet stands beside the list, the way an editor's page
+   stands beside its pages (kit_editor.css). */
+
+/* -- the three tabs over the list -------------------------------------------- */
+/* Not another segmented switch under the section's own: a line of names
+   with the chosen one underlined, so the two rows read as two levels. */
+.quill-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+.quill-tabs button {
+  padding: 8px 10px 9px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: 14.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.quill-tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* -- the rows that open a sheet ---------------------------------------------- */
+.row.quill-row[role="button"] { cursor: pointer; }
+.quill-row svg { flex: none; color: var(--muted); }
+.quill-row .run-state { margin-left: auto; }
+.pick-row { padding-left: 12px; }
+.pick-row input.pick {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.pick-row input.pick:disabled { opacity: .35; }
+
+/* Update selected, update all: chips, not the screen's one amber fill. */
+.quill-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 4px 12px; }
+.quill-actions .chip-button:disabled { opacity: .5; cursor: default; }
+.quill-actions .chip-button:disabled:hover { border-color: var(--line-bright); color: var(--ink); }
+
+/* -- the sheet beside the list ----------------------------------------------- */
+@media (min-width: 900px) and (min-height: 600px) {
+  #app:has(.panel.quills-split) { --column: 1180px; }
+  .panel.quills-split {
+    display: grid;
+    grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
+    gap: 28px;
+    align-items: start;
+  }
+  .quills-split .side {
+    position: sticky;
+    top: calc(var(--bar-h) + 8px);
+    max-height: calc(100vh - var(--bar-h) - 24px);
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .quills-split .page {
+    min-width: 0;
+    padding-left: 28px;
+    border-left: 1px solid var(--line);
+  }
+  .quills-split .page > .empty { margin-top: 18vh; }
+  .quills-split .page h1.large { font-size: 26px; margin-top: 0; }
+  /* The sheet that is open is the row lit in the list: Sky, as current is. */
+  .quills-split .row.current { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+  .quills-split .row.current .title { color: var(--accent); }
+}
 
 .shelf-note {
   margin: -2px 4px 10px;
@@ -48,6 +118,12 @@
 .sheet-fact .preview, .sheet-fact .meta { white-space: normal; overflow: visible; }
 .sheet-fact .quill-chip { margin-top: 2px; }
 .quill-sheet .group:has(.primary) { margin-top: 22px; }
+/* Update, install again, remove: the installed Quill's three, together under
+   its switch. Update is the amber one when there is one to do. */
+.quill-sheet .group.sheet-actions { margin-top: 0; }
+.sheet-actions .row { justify-content: center; font-weight: 600; }
+.sheet-actions .row:disabled { color: var(--muted); font-weight: 400; }
+.quill-sheet .quill-facts .quill-chip.new { margin-left: 0; }
 .quill-sheet .readme { margin-top: 22px; }
 .quill-sheet .readme summary { cursor: pointer; font-weight: 600; list-style-position: inside; }
 .quill-sheet .readme pre {

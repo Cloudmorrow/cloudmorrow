@@ -1,15 +1,13 @@
 /* What a Quill's code is doing on this server, for an administrator.
 
-   Drawn into two places Administration already has. On the Quills side,
-   under the catalog, a group of every service that is meant to be running
-   and how it is — running, restarting, stopped — each a link to its Quill's
-   sheet. On an installed Quill's sheet, everything: each service's state,
-   since when, how it last exited and the last lines of its log; each `run`
-   job and when it last ran; each webhook's address with its secret, to copy
-   into whatever sends it; who it all runs as; and the three things to do to
-   running code — restart it, give it a new token, give a webhook a new
-   secret. None of those is the sheet's one amber button: that stays
-   Install. */
+   Drawn on an installed Quill's sheet, in Administration: each service's
+   state, since when, how it last exited and the last lines of its log;
+   each `run` job and when it last ran; each webhook's address with its
+   secret, to copy into whatever sends it; who it all runs as; and the
+   three things to do to running code — restart it, give it a new token,
+   give a webhook a new secret. None of those is the sheet's one amber
+   button: that stays Install. The list of Server Quills (quillsadmin.js)
+   reads the same status for the chip on each row. */
 
 import { api, esc, toast } from "./core.js";
 
@@ -22,19 +20,6 @@ async function rows() {
 
 const chip = (state) =>
   `<span class="quill-chip run-state ${STATES[state] || ""}">${esc(state)}</span>`;
-
-/** Under the catalog: every service that should be up, and whether it is. */
-export async function drawRunningList(panel) {
-  const found = (await rows()).filter((q) => (q.services || []).some((s) => !s.scheduled));
-  if (!found.length) return;
-  const items = found.flatMap((q) => q.services.filter((s) => !s.scheduled).map((s) =>
-    `<a class="row quill-row" href="#/adminquill/${encodeURIComponent(q.id)}">
-      <span class="main"><span class="title">${esc(q.name)} · ${esc(s.id)}</span>
-      <span class="meta"><span class="preview">${esc(s.problem || `since ${s.since}`)}</span></span></span>
-      ${chip(s.state)}</a>`));
-  panel.insertAdjacentHTML("beforeend",
-    `<p class="group-label">Running on this server</p><div class="group">${items.join("")}</div>`);
-}
 
 /** On an installed Quill's sheet: its running code, and what can be done to it. */
 export async function drawRunning(holder, id) {
