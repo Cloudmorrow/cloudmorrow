@@ -42,7 +42,7 @@ from cloudmorrow.tui.panes.base import Pane
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
 from cloudmorrow.tui.theme import ACCENT, FAINT, GOOD, MUTED, WARN
 from cloudmorrow.tui.widgets.toolbar import Action
-from cloudmorrow.tui.words import plural
+from cloudmorrow.tui.words import megabytes, plural
 
 # How the install sheet words each way a Quill can touch a datamodel.
 HOW = {
@@ -127,8 +127,36 @@ def sheet_text(plan: dict) -> str:
             what = f"{amount} of {dataset.get('model')}{per}"
             lines.append(f"  [b]{dataset['id']}[/] [{MUTED}]{what}[/]")
 
+    lines += runtime_lines(plan)
     lines += code_lines(plan)
     return "\n".join(lines)
+
+
+def runtime_lines(plan: dict) -> list[str]:
+    """The programs the Quill needs, which the server fetches for it: said with their size."""
+    runtimes = plan.get("runtimes") or []
+    if not runtimes:
+        return []
+    lines = ["", f"[b {ACCENT}]Adds to this server[/]"]
+    for runtime in runtimes:
+        name = escape(str(runtime.get("label") or runtime.get("id", "?")))
+        if runtime.get("version"):
+            name += f" {escape(str(runtime['version']))}"
+        facts = [
+            escape(str(runtime.get("summary") or "")),
+            megabytes(int(runtime.get("size") or 0)) if runtime.get("size") else "",
+            escape(str(runtime.get("license") or "")),
+        ]
+        if runtime.get("installed"):
+            facts.append(f"[{GOOD}]here already[/]")
+        elif runtime.get("available"):
+            facts.append("downloaded, checked against the catalog's checksum")
+        if runtime.get("problem"):
+            facts.append(f"[{WARN}]{escape(str(runtime['problem']))}[/]")
+        lines.append(f"  [b]{name}[/]")
+        lines.append(f"    [{MUTED}]{' · '.join(f for f in facts if f)}[/]")
+    lines.append(f"  [{MUTED}]Kept by the server for its Quills; nothing is installed on the system itself.[/]")
+    return lines
 
 
 def code_lines(plan: dict) -> list[str]:
@@ -254,11 +282,23 @@ class RemoveSheet(Modal[list[str] | None]):
             yield Static(
                 f"[{MUTED}]Its tabs and jobs go, for everybody. What it brought stays, ticked: a "
                 "datamodel's records are there again the day it comes back, and a field stays on "
-                "the records, read-only. Untick what should go with it — records and all, for good.[/]",
+                "the records, read-only. Untick what should go with it — records and all, for good."
+                + (
+                    " A program only this Quill needed is unticked: it goes too, unless you tick it.[/]"
+                    if any(row.get("kind") == "runtime" for row in self.brought)
+                    else "[/]"
+                ),
                 classes="modal-detail",
             )
             with Vertical(id="remove-brought"):
                 for index, row in enumerate(self.brought):
+                    if row.get("kind") == "runtime":
+                        # A program it fetched that nothing else needs: unticked,
+                        # it goes with the Quill, because nothing runs on it.
+                        size = row.get("size_said") or megabytes(int(row.get("size") or 0))
+                        label = f"{row.get('label') or row['id']}  (a program it added, {size}, nothing else needs it)"
+                        yield Checkbox(label, value=False, id=f"remove-keep-{index}")
+                        continue
                     what = "a datamodel it introduced" if row.get("kind") == "datamodel" else "a field it added"
                     count = int(row.get("records") or 0)
                     label = f"{row.get('label') or row['id']}  ({what}, {count} record{'' if count == 1 else 's'})"
@@ -576,7 +616,11 @@ class QuillsView(Pane):
             self.status(str(exc), error=True)
             return
         dropped = sum(int(n) for n in ((gone or {}).get("dropped") or {}).values())
-        self.status(f"Removed {name}. " + (f"{dropped} records went with it." if dropped else "Its records are kept."))
+        programs = (gone or {}).get("runtimes") or []
+        said = f"{dropped} records went with it." if dropped else "Its records are kept."
+        if programs:
+            said += f" {', '.join(programs)} went too."
+        self.status(f"Removed {name}. {said}")
         self._workspace_follows()
         self.reload()
 

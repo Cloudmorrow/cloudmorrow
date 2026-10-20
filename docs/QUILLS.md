@@ -331,7 +331,7 @@ nothing:
 | `CLOUDMORROW_QUILL`, `CLOUDMORROW_SERVICE` | which Quill, which service |
 | `PORT` | a free loopback port the core picked, for a service that serves an API or a forwarded webhook |
 | `HOME` | `<data_dir>/quill-homes/<id>`, kept across updates |
-| `PATH`, `LANG`, `PYTHONUNBUFFERED` | the server's own PATH and LANG, and unbuffered output |
+| `PATH`, `LANG`, `PYTHONUNBUFFERED` | the server's own PATH and LANG, with the Quill's runtimes first (see *Runtimes*), and unbuffered output |
 
 `python` as the first word of `command` is the server's own interpreter, so
 a script needs nothing installed; the standard library is what it can count
@@ -344,6 +344,34 @@ to `<data_dir>/logs/quills/<id>/<service>.log`, one megabyte and one older
 file. Switching the Quill off, removing it and stopping the server stop its
 processes: SIGTERM to the process group, SIGKILL five seconds later.
 Reinstalling restarts them on the new code.
+
+**Runtimes** (`server/quills/runtimes.py`). A service that needs a program
+the server does not have — ffmpeg for video, say — names it, and the
+install brings it:
+
+```toml
+[requires]
+runtimes = ["ffmpeg"]      # ids from the catalog's [runtimes] table
+```
+
+Nobody opens a shell on the server for that, and the server could not run
+`apt` if it wanted to: it runs as an unprivileged user on a read-only system.
+Instead the catalog says, per runtime, where a static build is for each OS
+and architecture and what its SHA-256 is; the install downloads the one for
+this machine, checks it, unpacks it under `<data_dir>/runtimes/<id>/` and
+links its programs into `bin/` there, which goes first on the PATH of the
+Quill's services. Nothing is installed system-wide, nothing needs root, and
+it is the same on bare metal, in a container and on a Raspberry Pi. The
+install sheet says what would be added and how big it is (*Adds to this
+server: ffmpeg 7.1.5 · 119 MB · GPL-3.0-or-later*) before the yes; a
+download that does not match the checksum installs nothing, Quill included.
+A runtime is shared: two Quills naming `ffmpeg` share one copy at the
+catalog's version. Removing the last Quill that needs one puts it on the
+remove sheet, unticked — a program nothing runs on goes with the Quill
+unless the administrator ticks it to keep. A service whose runtime is
+missing from disk (a restore without it) waits, and its state says what for,
+rather than failing in a loop. A Quill of somebody's own runs no services,
+so it has no runtimes.
 
 **APIs** (`/api/q/<quill>/<path>`) are for anybody signed in. The request goes
 to the service's `PORT` at `/<path>` without the caller's `Authorization` or
@@ -429,6 +457,21 @@ id = "personal"
 label = "Personal"
 description = "Your own lists, notes and plans."
 
+[runtimes.ffmpeg]          # a program a Quill may require (see *Runtimes*)
+label = "ffmpeg"
+summary = "Reads, writes and converts video and sound."
+version = "7.1.5"
+license = "GPL-3.0-or-later"
+homepage = "https://ffmpeg.org"
+
+[[runtimes.ffmpeg.builds]] # one per OS and architecture; the server picks its own
+os = "linux"
+arch = "x86_64"            # x86_64, aarch64, armv7, armv6, x86
+url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/…/ffmpeg-…-linux64-gpl-7.1.tar.xz"
+sha256 = "c1e6caf4…"       # the download is refused when it differs
+size = 119007364           # bytes, for the install sheet
+programs = ["ffmpeg", "ffprobe"]   # found by name in what unpacks, linked into bin/
+
 [[quills]]
 id = "tasks"
 repo = "https://github.com/Cloudmorrow/quill-tasks"
@@ -470,8 +513,9 @@ would before installing — and then:
   one `[[quills]]` block, and the check runs on it.
 
 The workflow is the only writer of `catalog.toml`'s refs; nobody edits them
-by hand. The `foundation` flag and the categories are product decisions, and
-stay hand edits. The catalog's history is the record of every release a
+by hand. The `foundation` flag, the categories and the runtimes are product
+decisions, and stay hand edits: a runtime is added, or moved to a newer
+build, by a pull request that pins a release somebody has checked. The catalog's history is the record of every release a
 server could ever install.
 
 ## Building one, with an assistant

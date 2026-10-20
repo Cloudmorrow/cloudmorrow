@@ -55,6 +55,7 @@ from cloudmorrow.console import TITLE
 from cloudmorrow.icons import APP_ICONS
 from cloudmorrow.icons import get as icons_get
 from cloudmorrow.quill_reference import quill_reference
+from cloudmorrow.tui.words import megabytes
 
 app = typer.Typer(help="Quills: make one, check it, try it; add them from the catalog.", no_args_is_help=True)
 
@@ -268,6 +269,16 @@ def print_plan(plan: dict) -> None:
     for service in plan["services"]:
         always = ", kept running" if service.get("always") else ""
         table.add_row("service", escape(service["id"]), escape(" ".join(service["command"]) + always))
+    for runtime in plan.get("runtimes", []):
+        name = f"{runtime.get('label') or runtime['id']} {runtime.get('version', '')}".strip()
+        facts = [megabytes(int(runtime["size"])) if runtime.get("size") else "", runtime.get("license", "")]
+        if runtime.get("installed"):
+            facts.append("on the server already")
+        elif runtime.get("available"):
+            facts.append("downloaded for it")
+        if runtime.get("problem"):
+            facts.append(runtime["problem"])
+        table.add_row("runtime", escape(name), escape(", ".join(f for f in facts if f)))
     for hook in plan["webhooks"]:
         what = (
             f"→ {hook['model']}"
@@ -299,6 +310,9 @@ def print_plan(plan: dict) -> None:
             console.print(f"  reaches {escape(item['host'])} — {escape(item['why'])}")
         for item in code.get("secrets", []):
             console.print(f"  reads your secret {escape(item['key'])} — {escape(item['why'])}")
+    if plan.get("runtimes"):
+        names = ", ".join(f"{r.get('label') or r['id']}" for r in plan["runtimes"])
+        console.print(f"[yellow]Adds to the server:[/] {escape(names)} — fetched for it, checked, kept for its Quills")
     if plan.get("runs_code") or plan["webhooks"]:
         who = plan.get("runs_as") or "the administrator who installs it"
         reach = ", ".join(plan.get("reach") or []) or "nothing"

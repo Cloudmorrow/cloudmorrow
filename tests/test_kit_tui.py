@@ -299,6 +299,28 @@ def test_the_install_sheet_says_what_a_quill_adds():
     plain = Text.from_markup(text).plain
     assert "Runs code on this server: python services/isbn.py" in plain
     assert "Runs as you, the administrator who installs it, and can read and write only: reading.book" in plain
+    assert "Adds to this server" not in plain
+    # A program it needs, which the install fetches: said with its size.
+    with_runtime = dict(
+        READING_QUILL,
+        installed_version=None,
+        runtimes=[
+            {
+                "id": "ffmpeg",
+                "label": "ffmpeg",
+                "summary": "Reads, writes and converts video and sound.",
+                "version": "7.1.5",
+                "license": "GPL-3.0-or-later",
+                "size": 119007364,
+                "installed": "",
+                "available": True,
+                "problem": "",
+            }
+        ],
+    )
+    plain = Text.from_markup(sheet_text(with_runtime)).plain
+    assert "Adds to this server" in plain and "ffmpeg 7.1.5" in plain
+    assert "Reads, writes and converts video and sound. · 119 MB · GPL-3.0-or-later · downloaded" in plain
 
 
 async def test_installing_shows_the_sheet_then_adds_the_tab(app):
@@ -386,6 +408,16 @@ async def test_removing_a_quill_that_brought_data_asks_what_goes_with_it(app):
         "tasks": [
             {"id": "tasks.sprint", "kind": "datamodel", "label": "Sprint", "model": "tasks.sprint", "records": 4},
             {"id": "tasks.effort", "kind": "field", "label": "Effort on Task", "model": "task", "records": 2},
+            # A program only Tasks needed: offered unticked, so it goes unless kept.
+            {
+                "id": "runtime:ffmpeg",
+                "kind": "runtime",
+                "label": "ffmpeg 7.1.5",
+                "model": "",
+                "records": 0,
+                "size": 119007364,
+                "size_said": "119 MB",
+            },
         ]
     }
     async with app.run_test(size=(120, 36)) as pilot:
@@ -402,10 +434,11 @@ async def test_removing_a_quill_that_brought_data_asks_what_goes_with_it(app):
         assert [str(b.label) for b in boxes] == [
             "Sprint  (a datamodel it introduced, 4 records)",
             "Effort on Task  (a field it added, 2 records)",
+            "ffmpeg 7.1.5  (a program it added, 119 MB, nothing else needs it)",
         ]
-        assert all(b.value for b in boxes)
+        assert [b.value for b in boxes] == [True, True, False]
         boxes[1].value = False
         await pilot.click("#remove")
         await settle(app, pilot)
-        assert ("uninstall", "tasks", ["tasks.effort"]) in app.client.quill_calls
+        assert ("uninstall", "tasks", ["tasks.effort", "runtime:ffmpeg"]) in app.client.quill_calls
         assert not screen.query("#nav-tasks")

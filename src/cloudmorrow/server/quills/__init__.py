@@ -41,6 +41,7 @@ from cloudmorrow.server.quills.manifest import (
     parse_manifest,
 )
 from cloudmorrow.server.quills.registry import QuillRegistry
+from cloudmorrow.server.quills.runtimes import RuntimeStore
 
 __all__ = [
     "KIT",
@@ -52,6 +53,7 @@ __all__ = [
     "Manifest",
     "QuillError",
     "QuillRegistry",
+    "RuntimeStore",
     "code_summary",
     "describe",
     "fetch",

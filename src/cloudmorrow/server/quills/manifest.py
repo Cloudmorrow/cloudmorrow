@@ -47,6 +47,8 @@ ID_RE = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
 HOOK_PATH_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 API_PREFIX_RE = re.compile(r"^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$")
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$")
+# A runtime's id, as the catalog's [runtimes] table names it.
+RUNTIME_RE = re.compile(r"^[a-z][a-z0-9_-]{1,31}$")
 
 # Surfaces a kit screen is drawn on, for the install sheet to say so.
 SURFACES = ("phone", "web", "terminal", "command line", "assistant")
@@ -87,6 +89,9 @@ class Manifest:
     fetch: tuple[dict, ...] = ()
     secrets: tuple[dict, ...] = ()
     machine: tuple[dict, ...] = ()
+    # Programs its services need on the server, fetched for it from the
+    # catalog's runtimes at install (quills/runtimes.py): `[requires]`.
+    runtimes: tuple[str, ...] = ()
     readme: str = ""
     folder: Path | None = None
     origin: dict = field(default_factory=dict)
@@ -162,6 +167,7 @@ class Manifest:
             "fetch": list(self.fetch),
             "secrets": list(self.secrets),
             "machine": list(self.machine),
+            "requires": {"runtimes": list(self.runtimes)},
             "origin": dict(self.origin),
             "owner": self.owner,
             "key": self.key,
@@ -367,6 +373,7 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
             raise QuillError(f"{where}: service {service['id']!r} always is true or false")
     _ids_unique(webhooks, "webhook", where)
     _ids_unique(apis, "api", where)
+    runtimes = _requires(data, where, bool(services))
     service_ids = {s["id"] for s in services}
     for job in jobs:
         if job["action"] == "run":
@@ -417,6 +424,7 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
         fetch=code.fetch,
         secrets=code.secrets,
         machine=code.machine,
+        runtimes=runtimes,
         readme=readme,
         folder=folder,
     )
@@ -451,6 +459,26 @@ def _check_webhook(hook: dict, service_ids: set[str], paths: set[str], where: st
     signature = hook.get("signature", "")
     if signature and not (isinstance(signature, str) and re.match(r"^[A-Za-z0-9-]+$", signature)):
         raise QuillError(f"{where}: {thing} signature is the name of a header")
+
+
+def _requires(data: dict, where: str, has_services: bool) -> tuple[str, ...]:
+    """`[requires] runtimes`: programs the server fetches for the Quill's services."""
+    table = data.get("requires", {})
+    if not isinstance(table, dict):
+        raise QuillError(f"{where}: [requires] is a table")
+    unknown = sorted(set(table) - {"runtimes"})
+    if unknown:
+        raise QuillError(f"{where}: [requires] knows runtimes, not {', '.join(unknown)}")
+    runtimes = table.get("runtimes", [])
+    if not isinstance(runtimes, list) or not all(isinstance(r, str) and RUNTIME_RE.match(r) for r in runtimes):
+        raise QuillError(f'{where}: requires.runtimes is a list of runtime ids, like ["ffmpeg"]')
+    if len(set(runtimes)) != len(runtimes):
+        raise QuillError(f"{where}: requires.runtimes names a runtime twice")
+    if runtimes and not has_services:
+        raise QuillError(
+            f"{where}: requires runtimes, but has no [[services]] to run them; a runtime is on a service's PATH"
+        )
+    return tuple(runtimes)
 
 
 def _features(head: dict, where: str) -> tuple[str, ...]:

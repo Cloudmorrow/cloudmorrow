@@ -27,7 +27,7 @@ from pydantic import BaseModel
 from cloudmorrow.server.circles import NONE, Access
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_admin_user, get_current_user, get_state
-from cloudmorrow.server.quills import MANIFEST, MAX_DOWNLOAD, QuillError, fetch, load_catalog, removal
+from cloudmorrow.server.quills import MANIFEST, MAX_DOWNLOAD, Catalog, QuillError, fetch, load_catalog, removal
 from cloudmorrow.server.quills.code import CodeError
 from cloudmorrow.server.quills.shelf import audience_of
 
@@ -175,8 +175,9 @@ def catalog(state: AppState = Depends(get_state), _: User = Depends(get_current_
     }
 
 
-def _resolve(state: AppState, payload: QuillSource, tmp: Path) -> tuple[Path, Path | None, dict]:
-    """The folder a request names, the datamodels to go with it, and where it came from."""
+def _resolve(state: AppState, payload: QuillSource, tmp: Path) -> tuple[Path, Path | None, dict, Catalog | None]:
+    """The folder a request names, the datamodels to go with it, where it came from,
+    and the catalog (for the runtimes it may require), when there is one."""
     if bool(payload.id) == bool(payload.source):
         raise QuillError("name a Quill from the catalog, or a source, one of them")
     if payload.id:
@@ -193,16 +194,24 @@ def _resolve(state: AppState, payload: QuillSource, tmp: Path) -> tuple[Path, Pa
                 "ref": entry.get("ref", ""),
                 "position": found.quills.index(entry),
             },
+            found,
         )
     folder = fetch(payload.source, payload.ref, into=tmp / "q")
+    catalog = _catalog(state)
     if payload.datamodels:
         models = fetch(payload.datamodels, "", into=tmp / "m")
+    elif catalog is not None:
+        models = state.quills.datamodels_source(catalog, tmp / "m")
     else:
-        try:
-            models = state.quills.datamodels_source(load_catalog(state.config.quill_catalog), tmp / "m")
-        except QuillError:
-            models = None
-    return folder, models, {"catalog": False, "repo": payload.source, "ref": payload.ref}
+        models = None
+    return folder, models, {"catalog": False, "repo": payload.source, "ref": payload.ref}, catalog
+
+
+def _catalog(state: AppState) -> Catalog | None:
+    try:
+        return load_catalog(state.config.quill_catalog)
+    except QuillError:
+        return None
 
 
 @router.post("/plan")
@@ -214,8 +223,8 @@ def plan(
     """What installing would add, without installing: the install sheet."""
     with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
         try:
-            folder, models, _origin = _resolve(state, payload, Path(tmp))
-            return state.quills.plan(folder, models)
+            folder, models, _origin, catalog = _resolve(state, payload, Path(tmp))
+            return state.quills.plan(folder, models, catalog=catalog)
         except QuillError as exc:
             raise _bad(exc) from exc
 
@@ -228,11 +237,13 @@ def install(
 ) -> dict:
     with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
         try:
-            folder, models, origin = _resolve(state, payload, Path(tmp))
+            folder, models, origin, catalog = _resolve(state, payload, Path(tmp))
             # Its code, if it has any, runs as whoever said yes.
             if payload.audience is not None:
                 origin["audience"] = payload.audience
-            plan = state.quills.install(folder, models, origin=origin | {"installed_by": admin.username})
+            plan = state.quills.install(
+                folder, models, origin=origin | {"installed_by": admin.username}, catalog=catalog
+            )
             plan["adopted"] = _adopt(state, plan["id"], payload.adopt)
             return plan
         except QuillError as exc:
@@ -277,17 +288,19 @@ async def upload(
         if not manifests:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"there is no {MANIFEST} in what was sent")
         folder = manifests[0].parent
+        catalog = _catalog(state)
         try:
-            models = state.quills.datamodels_source(load_catalog(state.config.quill_catalog), Path(tmp) / "m")
+            models = state.quills.datamodels_source(catalog, Path(tmp) / "m") if catalog else None
         except QuillError:
             models = None
         try:
             if plan_only:
-                return state.quills.plan(folder, models)
+                return state.quills.plan(folder, models, catalog=catalog)
             return state.quills.install(
                 folder,
                 models,
                 origin={"catalog": False, "dev": True, "installed_by": admin.username},
+                catalog=catalog,
             )
         except QuillError as exc:
             raise _bad(exc) from exc

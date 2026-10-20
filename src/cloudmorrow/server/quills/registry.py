@@ -35,6 +35,7 @@ from cloudmorrow.server.datamodels import (
 from cloudmorrow.server.quills.catalog import Catalog, fetch, load_catalog
 from cloudmorrow.server.quills.checks import _assemble, _check_bindings, describe
 from cloudmorrow.server.quills.manifest import ORIGIN, Manifest, QuillError, load_manifest
+from cloudmorrow.server.quills.runtimes import RUNTIMES_DIR, RuntimeStore
 
 PERSONAL_DIR = "quills-personal"
 
@@ -80,12 +81,19 @@ class QuillRegistry:
     """
 
     def __init__(
-        self, quills_dir: Path, datamodels_dir: Path, catalog: str = "", personal_dir: Path | None = None
+        self,
+        quills_dir: Path,
+        datamodels_dir: Path,
+        catalog: str = "",
+        personal_dir: Path | None = None,
+        runtimes: RuntimeStore | None = None,
     ) -> None:
         self.quills_dir = quills_dir
         self.datamodels_dir = datamodels_dir
         self.personal_dir = personal_dir or quills_dir.parent / PERSONAL_DIR
         self.catalog_location = catalog
+        # The programs Quills' services need, fetched for them (quills/runtimes.py).
+        self.runtimes = runtimes or RuntimeStore(quills_dir.parent / RUNTIMES_DIR)
         self._lock = threading.RLock()
         # The server's Quills, by id.
         self.quills: dict[str, Manifest] = {}
@@ -198,11 +206,15 @@ class QuillRegistry:
         ]
 
     # -- what a Quill would add ------------------------------------------------------
-    def plan(self, folder: Path, datamodels_source: Path | None = None, *, owner: str = "") -> dict:
+    def plan(
+        self, folder: Path, datamodels_source: Path | None = None, *, owner: str = "", catalog: Catalog | None = None
+    ) -> dict:
         """Everything installing *folder* would add, checked, for the install sheet.
 
         With *owner*, as that person's own Quill: read under their name, held to
         what such a Quill may do, and refused an id that is taken on their shelf.
+        *catalog* is where the runtimes it requires are described; without one,
+        this server's own is read when it needs to be.
         """
         manifest = load_manifest(folder, owner=owner)
         if owner:
@@ -226,6 +238,8 @@ class QuillRegistry:
             new_foundation=sorted(set(needed) - set(self.foundation)),
             installed=installed,
         )
+        # The programs it needs on this server, and whether they are here.
+        plan["runtimes"] = self.runtimes.describe(manifest.runtimes, self._runtimes_of(catalog, manifest))
         # The datamodels as they would be after installing, for a preview.
         touched = set(manifest.models)
         touched |= {f.to for m in touched if m in models for f in models[m].fields if f.kind == "link"}
@@ -240,6 +254,19 @@ class QuillRegistry:
                 if mine.id == manifest.id and set(mine.renamed) <= {m.id for m in manifest.introduces}
             ]
         return plan
+
+    def _catalog(self, catalog: Catalog | None, manifest: Manifest) -> Catalog | None:
+        """*catalog*, or this server's, read only when *manifest* needs one; None when it cannot be."""
+        if catalog is not None or not manifest.runtimes or not self.catalog_location:
+            return catalog
+        try:
+            return load_catalog(self.catalog_location)
+        except QuillError:
+            return None
+
+    def _runtimes_of(self, catalog: Catalog | None, manifest: Manifest) -> dict | None:
+        found = self._catalog(catalog, manifest)
+        return None if found is None else found.runtimes
 
     def _needed_foundation(self, manifest: Manifest, source: Path | None) -> dict[str, Datamodel]:
         """The foundational datamodels *manifest* needs that this server lacks, found in *source*."""
@@ -290,14 +317,25 @@ class QuillRegistry:
         *,
         origin: dict | None = None,
         owner: str = "",
+        catalog: Catalog | None = None,
     ) -> dict:
         """Install the Quill in *folder*, replacing an earlier version of it. Returns the plan.
 
         With *owner*, as that person's own Quill, under `quills-personal/<owner>/`.
+        The runtimes it requires are fetched first, from where *catalog* (or
+        this server's) says: a download that fails installs nothing.
         """
         with self._lock:
-            plan = self.plan(folder, datamodels_source, owner=owner)
+            catalog = self._catalog(catalog, load_manifest(folder, owner=owner))
+            plan = self.plan(folder, datamodels_source, owner=owner, catalog=catalog)
             manifest_id = plan["id"]
+            wanted = list(plan.get("requires", {}).get("runtimes", []))
+            if wanted:
+                fetched = self.runtimes.ensure(
+                    wanted, None if catalog is None else catalog.runtimes, base=catalog.base if catalog else None
+                )
+                plan["runtimes"] = self.runtimes.describe(wanted, catalog.runtimes if catalog else None)
+                plan["runtimes_fetched"] = fetched
             self.datamodels_dir.mkdir(parents=True, exist_ok=True)
             for model_id, path in self._pending_paths.items():
                 shutil.copyfile(path, self.datamodels_dir / f"{model_id}.toml")
@@ -366,6 +404,7 @@ class QuillRegistry:
             return self.install(
                 folder,
                 models,
+                catalog=catalog,
                 origin={
                     "catalog": True,
                     "repo": entry["repo"],
@@ -400,7 +439,10 @@ class QuillRegistry:
         return sorted(manifests, key=place)
 
     def describe(self, manifest: Manifest) -> dict:
-        return describe(manifest, self.datamodels, installed=manifest)
+        """An installed Quill as a client is told it, its runtimes as they are on this server."""
+        told = describe(manifest, self.datamodels, installed=manifest)
+        told["runtimes"] = self.runtimes.describe_installed(manifest.runtimes)
+        return told
 
     def installed(self) -> list[dict]:
         """Every one of the server's Quills, in the order its tabs appear in."""
