@@ -64,7 +64,9 @@ def check_personal(manifest: Manifest) -> None:
         plain = manifest.plain(model.id)
         if model.space or model.in_space:
             raise QuillError(f"{where}: {plain} is a space, or in one; a Quill of your own keeps to personal records")
-        if set(model.scopes) - {"personal"}:
+        # The files say personal; the server keeps the Quill's own data as the
+        # Quill's, public within it (manifest.personalise), so both pass.
+        if set(model.scopes) - {"personal", "public"}:
             raise QuillError(f"{where}: {plain} is {', '.join(model.scopes)}; a Quill of your own is personal only")
     for model_id in (*manifest.uses, *(g["model"] for g in manifest.grants)):
         if model_id.startswith(OWNER_PREFIX) and not model_id.startswith(f"{OWNER_PREFIX}{manifest.owner}."):

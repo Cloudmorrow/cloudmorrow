@@ -431,8 +431,17 @@ class CloudmorrowClient:
         return (await self._request("GET", "/api/quills/policy")).json()
 
     async def set_quill_policy(self, **settings: str) -> dict:
-        """personal_quills (on, ask, off), personal_quill_code, personal_quill_sharing (on, off). Admin."""
+        """personal_quills (on, ask, off), personal_quill_code, personal_quill_sharing,
+        personal_quill_create (on, off). Admin."""
         return (await self._request("PUT", "/api/quills/policy", json=settings)).json()
+
+    async def quill_policy_for(self, username: str) -> dict:
+        """What stands for one person: the server's, their own, the effective. Admin."""
+        return (await self._request("GET", f"/api/quills/policy/{username}")).json()
+
+    async def set_quill_policy_for(self, username: str, **settings: str) -> dict:
+        """The same settings for one person, or `inherit` for the server's answer. Admin."""
+        return (await self._request("PUT", f"/api/quills/policy/{username}", json=settings)).json()
 
     async def my_quills(self) -> dict:
         """Your own Quills and who has them, what you were offered, what you asked for."""
@@ -463,8 +472,14 @@ class CloudmorrowClient:
         params = {"drop": ",".join(drop)} if drop else {}
         return (await self._request("DELETE", f"/api/quills/mine/{quill_id}", params=params)).json()
 
-    async def share_my_quill(self, quill_id: str, *, people: list[str] = (), circles: list[str] = ()) -> list[dict]:
-        body = {"people": list(people), "circles": list(circles)}
+    async def share_my_quill(
+        self, quill_id: str, *, people: list[str] = (), circles: list[str] = (), rules: dict | None = None
+    ) -> list[dict]:
+        """Offer it, with what each may do with its own datamodels (`rules`: write or read per
+        datamodel; nothing named is write). Offered again to somebody who has it, only their rules change."""
+        body: dict = {"people": list(people), "circles": list(circles)}
+        if rules:
+            body["rules"] = dict(rules)
         return (await self._request("PUT", f"/api/quills/mine/{quill_id}/share", json=body)).json()
 
     async def unshare_my_quill(self, quill_id: str, username: str) -> list[dict]:
@@ -483,8 +498,15 @@ class CloudmorrowClient:
         verb = "accept" if accept else "decline"
         return (await self._request("POST", f"/api/quills/offers/{owner}/{quill_id}/{verb}")).json()
 
-    async def leave_quill(self, owner: str, quill_id: str) -> dict:
-        return (await self._request("DELETE", f"/api/quills/offers/{owner}/{quill_id}")).json()
+    async def leave_quill(self, owner: str, quill_id: str, drop: list[str] | None = None) -> dict:
+        """Take a Quill shared with you off your shelf. The last to have it takes it off the
+        server, and *drop* names what it brought that goes with it."""
+        params = {"drop": ",".join(drop)} if drop else {}
+        return (await self._request("DELETE", f"/api/quills/offers/{owner}/{quill_id}", params=params)).json()
+
+    async def shared_quill_brought(self, owner: str, quill_id: str) -> list[dict]:
+        """What a Quill shared with you brought, and how many records hold each."""
+        return (await self._request("GET", f"/api/quills/offers/{owner}/{quill_id}/brought")).json()
 
     async def quill_requests(self, *, all: bool = False) -> list[dict]:  # noqa: A002
         return (await self._request("GET", "/api/quills/requests", params={"all": str(all).lower()})).json()

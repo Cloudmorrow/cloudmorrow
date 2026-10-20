@@ -240,6 +240,9 @@ ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     # The order records were written in, for a tie on created_at. A SQLite
     # database from before the column counted by rowid; step 3 copies it.
     ("records", "seq", "INTEGER AUTONUMBER"),
+    # What a person a Quill is shared with may do with each of its own
+    # datamodels (quills/sharing.py); step 6 puts it on older databases.
+    ("quill_shares", "rules", "TEXT NOT NULL DEFAULT ''"),
 )
 
 
@@ -370,12 +373,26 @@ def _quill_sharing(conn: Connection) -> None:
     conn.commit()
 
 
+def _quill_data_is_the_quills(conn: Connection) -> None:
+    """A Quill of somebody's own keeps its data as the Quill's, for everybody the
+    Quill stands with (docs/SHARING.md, rule 3): the records of its own
+    datamodels (`~owner.quill.model`) are public within it rather than each
+    writer's alone. The seal on a record's body is to its owner and id, not
+    its scope, so the rows are only re-marked. And a share says what each
+    person may do with those datamodels: the column, on databases past step 1.
+    """
+    _columns(conn)
+    conn.execute("UPDATE records SET scope = 'public' WHERE model LIKE '~%' AND scope = 'personal'")
+    conn.commit()
+
+
 STEPS: tuple[Step, ...] = (
     Step(1, "the tables as they stood before they were versioned", _baseline),
     Step(2, "indexes for what an open screen and the retention sweep ask", _indexes_for_scale),
     Step(3, "the columns added since, and the order records were written in", _columns_since),
     Step(4, "shares shared with people and circles, and no machine shares", _shares_shared),
     Step(5, "who a Quill of somebody's own is shared with, and what people asked for", _quill_sharing),
+    Step(6, "a Quill of somebody's own keeps its data as the Quill's, shared by rule", _quill_data_is_the_quills),
 )
 
 VERSION = STEPS[-1].version

@@ -96,3 +96,5 @@ def delete_user(
     # Quills stay on disk, for an administrator to promote or remove.
     if state.sharing is not None:
         state.sharing.forget_person(username)
+        if state.policy is not None:
+            state.policy.forget(username)

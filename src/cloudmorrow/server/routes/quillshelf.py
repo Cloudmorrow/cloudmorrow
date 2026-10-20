@@ -9,7 +9,8 @@ and `all` are not read as a Quill's id:
   source, or an upload), remove one, share it, export it, fork one you have.
 * `/api/quills/offers/…` — a Quill somebody offered you: yes, no, or leave.
 * `/api/quills/requests` — asking an administrator for a Quill, and their answer.
-* `/api/quills/policy` — the three switches an administrator sets.
+* `/api/quills/policy` — the four switches an administrator sets, for the
+  server and, under `/policy/{username}`, for one person in particular.
 * `/api/quills/promote`, `/api/quills/all` — an administrator's: somebody's
   Quill made the server's, and everything there is, whose it is and who has it.
 
@@ -33,7 +34,16 @@ from cloudmorrow.server.deps import AppState, get_admin_user, get_current_user, 
 from cloudmorrow.server.quills import MANIFEST, MAX_DOWNLOAD, QuillError, load_catalog, promotion, removal
 from cloudmorrow.server.quills import export as exporting
 from cloudmorrow.server.quills.manifest import Manifest
-from cloudmorrow.server.quills.sharing import ACCEPTED, APPROVED, DECLINED, OFFERED, WITHDRAWN, SharingError
+from cloudmorrow.server.quills.sharing import (
+    ACCEPTED,
+    APPROVED,
+    DECLINED,
+    INHERIT,
+    OFFERED,
+    POLICY,
+    WITHDRAWN,
+    SharingError,
+)
 from cloudmorrow.server.quills.shelf import audience_of
 from cloudmorrow.server.records import Principal
 from cloudmorrow.server.routes.install import base_url
@@ -52,6 +62,11 @@ class Audience(BaseModel):
 class ShareIn(BaseModel):
     people: list[str] = []
     circles: list[str] = []
+    # What each of them may do with the datamodels of the Quill's own, by the
+    # name the server knows them by (`~alice.budget.envelope`) or the plain
+    # one (`budget.envelope`): write or read. Nothing named is write. Offered
+    # again to somebody who has it, this changes their rules and nothing else.
+    rules: dict[str, str] = {}
 
 
 class RequestIn(BaseModel):
@@ -83,6 +98,7 @@ class PolicyIn(BaseModel):
     personal_quills: str | None = None
     personal_quill_code: str | None = None
     personal_quill_sharing: str | None = None
+    personal_quill_create: str | None = None
 
 
 class PromoteIn(BaseModel):
@@ -103,27 +119,51 @@ def _shelf(state: AppState):
 
 
 def _may(state: AppState, user: User) -> dict:
-    policy = state.policy.get()
+    """What the policy means for this person: the server's answers, with what an
+    administrator said about them in particular in front."""
+    policy = state.policy.get_for(user.username)
     return {
-        "have": state.policy.may_have(),
-        "install": state.policy.may_install(),
+        "have": state.policy.may_have(user.username),
+        "install": state.policy.may_install(user.username),
         "ask": policy["personal_quills"] == "ask",
-        "code": state.policy.may_code(),
-        "share": state.policy.may_share(),
+        "code": state.policy.may_code(user.username),
+        "share": state.policy.may_share(user.username),
+        "create": state.policy.may_create(user.username),
         "admin": user.is_admin,
     }
 
 
-def _check_personal_plan(state: AppState, plan: dict) -> None:
+def _check_personal_plan(state: AppState, plan: dict, user: User) -> None:
     """What the policy says about a Quill of somebody's own, before it is installed."""
-    if plan.get("code") and not state.policy.may_code():
+    if plan.get("code") and not state.policy.may_code(user.username):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Quills of your own may not run code on this server")
+
+
+def _require_create(state: AppState, user: User) -> None:
+    """Making a Quill of one's own — from a folder, a source, a fork — rather than
+    taking one from the catalog, when the policy allows that for this person."""
+    if not state.policy.may_create(user.username):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "making Quills of your own is switched off for you on this server; the catalog is open",
+        )
+
+
+def _holder(state: AppState, user: User, owner: str, quill_id: str) -> Manifest:
+    """*owner*'s Quill, which stands with *user*: theirs, or shared with them and accepted."""
+    manifest = state.quills.personal.get(owner, {}).get(quill_id)
+    if manifest is None or user.username not in state.shelf.holders(manifest):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"{owner}'s {quill_id} is not on your shelf")
+    return manifest
 
 
 def _describe_mine(state: AppState, manifest: Manifest, request: Request | None = None) -> dict:
     row = state.quills.describe(manifest)
     row["shared_with"] = state.sharing.shared_with(manifest.owner, manifest.id)
     row["enabled"] = state.features.enabled(manifest.key)
+    # Who it stands with, and whether its owner took it off their own shelf.
+    row["holders"] = state.shelf.holders(manifest)
+    row["owner_left"] = state.sharing.owner_left(manifest.owner, manifest.id)
     if request is not None and manifest.webhooks and state.quill_tokens is not None:
         base = base_url(request, state)
         row["webhook_urls"] = [
@@ -157,6 +197,43 @@ def set_policy(payload: PolicyIn, state: AppState = Depends(get_state), admin: U
     return {**state.policy.get(), "may": _may(state, admin)}
 
 
+def _person_policy(state: AppState, username: str) -> dict:
+    return {
+        "username": username,
+        "server": state.policy.get(),
+        "own": state.policy.overrides(username),
+        "effective": state.policy.get_for(username),
+        "settings": {key: [*values, INHERIT] for key, values in POLICY.items()},
+    }
+
+
+@router.get("/policy/{username}")
+def person_policy(username: str, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> dict:
+    """What stands for one person: the server's settings, what was said about them in
+    particular (`own`), and the two together (`effective`)."""
+    _shelf(state)
+    if state.users.get(username) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"no such account: {username}")
+    return _person_policy(state, username)
+
+
+@router.put("/policy/{username}")
+def set_person_policy(
+    username: str, payload: PolicyIn, state: AppState = Depends(get_state), admin: User = Depends(get_admin_user)
+) -> dict:
+    """Say something about one person: a value per setting, or `inherit` for the server's."""
+    _shelf(state)
+    if state.users.get(username) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"no such account: {username}")
+    try:
+        for key, value in payload.model_dump().items():
+            if value is not None:
+                state.policy.set_for(username, key, value, changed_by=admin.username)
+    except SharingError as exc:
+        raise _bad(exc) from exc
+    return _person_policy(state, username)
+
+
 # -- mine ----------------------------------------------------------------------------------
 @router.get("/mine")
 def mine(request: Request, state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> dict:
@@ -165,6 +242,8 @@ def mine(request: Request, state: AppState = Depends(get_state), user: User = De
     own = state.quills.personal.get(user.username, {})
     return {
         "may": _may(state, user),
+        # Theirs, the ones they took off their shelf while others still have
+        # them included, said so (`owner_left`).
         "quills": [_describe_mine(state, m, request) for m in state.quills.ordered(own.values())],
         "shadowed": [{"id": m.id, "owner": m.owner, "name": m.name} for m in shelf.shadowed(user.username)],
         "offers": _offers(state, user.username),
@@ -192,8 +271,8 @@ def _offers(state: AppState, username: str) -> list[dict]:
 
 
 def _require_install(state: AppState, user: User) -> None:
-    if not state.policy.may_install():
-        if state.policy.may_have():
+    if not state.policy.may_install(user.username):
+        if state.policy.may_have(user.username):
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN,
                 "on this server a Quill of your own comes through a request: ask with POST /api/quills/requests",
@@ -208,6 +287,8 @@ def plan_mine(
     """What installing would add, as a Quill of your own, without installing."""
     _shelf(state)
     _require_install(state, user)
+    if payload.source:
+        _require_create(state, user)
     with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
         try:
             # A Quill of one's own runs no services, so it has no runtimes: the catalog is not needed.
@@ -215,7 +296,7 @@ def plan_mine(
             plan = state.quills.plan(folder, models, owner=user.username)
         except QuillError as exc:
             raise _bad(exc) from exc
-    _check_personal_plan(state, plan)
+    _check_personal_plan(state, plan, user)
     return plan
 
 
@@ -223,13 +304,16 @@ def plan_mine(
 def install_mine(
     payload: QuillSource, state: AppState = Depends(get_state), user: User = Depends(get_current_user)
 ) -> dict:
-    """Install a Quill from the catalog or a source, as your own: on your shelf and nobody else's."""
+    """Install a Quill from the catalog or a source, as your own: on your shelf and nobody else's —
+    or again, which is how it is updated, for everybody it stands with."""
     _shelf(state)
     _require_install(state, user)
+    if payload.source:
+        _require_create(state, user)
     with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
         try:
             folder, models, origin, _catalog = _resolve(state, payload, Path(tmp))
-            _check_personal_plan(state, state.quills.plan(folder, models, owner=user.username))
+            _check_personal_plan(state, state.quills.plan(folder, models, owner=user.username), user)
             return state.quills.install(
                 folder, models, origin=origin | {"installed_by": user.username}, owner=user.username
             )
@@ -247,6 +331,7 @@ async def upload_mine(
     """A folder you are working on, as a .tar.gz, installed as your own: `cm quill dev` for anybody."""
     _shelf(state)
     _require_install(state, user)
+    _require_create(state, user)
     data = await request.body()
     if len(data) > MAX_DOWNLOAD:
         raise HTTPException(413, "bigger than a Quill should be")
@@ -267,7 +352,7 @@ async def upload_mine(
             models = None
         try:
             plan = state.quills.plan(folder, models, owner=user.username)
-            _check_personal_plan(state, plan)
+            _check_personal_plan(state, plan, user)
             if plan_only:
                 return plan
             return state.quills.install(
@@ -299,8 +384,9 @@ def get_mine(
 def brought_mine(
     quill_id: str, state: AppState = Depends(get_state), user: User = Depends(get_current_user)
 ) -> list[dict]:
-    """What your Quill brought — the datamodels it introduced — and how many records hold each,
-    yours and those of the people you shared it with."""
+    """What your Quill brought — the datamodels it introduced — and how many records hold each:
+    the Quill's, from everybody it stands with. The choice of what goes with it is the last
+    holder's; until then the Quill, and all of it, stays."""
     _shelf(state)
     _own(state, user, quill_id)
     try:
@@ -309,22 +395,53 @@ def brought_mine(
         raise _bad(exc) from exc
 
 
+@router.get("/offers/{owner}/{quill_id}/brought")
+def brought_shared(
+    owner: str, quill_id: str, state: AppState = Depends(get_state), user: User = Depends(get_current_user)
+) -> list[dict]:
+    """The same, for a Quill shared with you: what it brought, for the day you are the last
+    to have it and choose what goes."""
+    _shelf(state)
+    _holder(state, user, owner, quill_id)
+    try:
+        return removal.brought(state.quills, state.records, quill_id, owner)
+    except QuillError as exc:
+        raise _bad(exc) from exc
+
+
+def _take_off_shelf(state: AppState, user: User, manifest: Manifest, drop: str) -> dict:
+    """Take a personal Quill off *user*'s shelf. The last to have it takes it off the server,
+    dropping what *drop* names of what it brought; anybody before that leaves it standing,
+    the Quill's data and all, for the others (docs/SHARING.md, rule 8)."""
+    others = [p for p in state.shelf.holders(manifest) if p != user.username]
+    if others:
+        if user.username == manifest.owner:
+            state.sharing.leave_owner(manifest.owner, manifest.id)
+        else:
+            state.sharing.revoke(manifest.owner, manifest.id, user.username)
+        return {"left": manifest.key, "stays_with": others}
+    try:
+        done = removal.remove(
+            state.quills, state.records, manifest.id, [d for d in drop.split(",") if d], owner=manifest.owner
+        )
+    except QuillError as exc:
+        raise _bad(exc) from exc
+    state.sharing.forget(manifest.owner, manifest.id)
+    return {**done, "removed": manifest.key}
+
+
 @router.delete("/mine/{quill_id}")
 def remove_mine(
     quill_id: str, drop: str = "", state: AppState = Depends(get_state), user: User = Depends(get_current_user)
 ) -> dict:
-    """Take your Quill away. Its records stay, unless `?drop=` names a datamodel of its own to
-    go with it. The people you shared it with lose it too."""
+    """Take your Quill off your shelf. While others still have it, it stays for them — the
+    Quill's data and all — and comes off the server when the last of them takes it off
+    theirs; then `?drop=` names a datamodel of its own to go with it, records and all."""
     _shelf(state)
-    _own(state, user, quill_id)
-    try:
-        done = removal.remove(
-            state.quills, state.records, quill_id, [d for d in drop.split(",") if d], owner=user.username
-        )
-    except QuillError as exc:
-        raise _bad(exc) from exc
-    state.sharing.forget(user.username, quill_id)
-    return done
+    manifest = _own(state, user, quill_id)
+    if state.sharing.owner_left(user.username, quill_id):
+        raise HTTPException(status.HTTP_409_CONFLICT, f"{quill_id} is off your shelf already; others still have it")
+    return _take_off_shelf(state, user, manifest, drop)
 
 
 # -- sharing -----------------------------------------------------------------------------------
@@ -347,16 +464,26 @@ def _people_of(state: AppState, payload: ShareIn) -> list[str]:
 def share_mine(
     quill_id: str, payload: ShareIn, state: AppState = Depends(get_state), user: User = Depends(get_current_user)
 ) -> list[dict]:
-    """Offer your Quill to people, or to everybody in a circle. Each says yes before it is theirs."""
+    """Offer your Quill to people, or to everybody in a circle, with what each may do with its
+    own datamodels (`rules`: write, or read; nothing named is write). Each says yes before it
+    is theirs. Offered again to somebody who has it, only their rules change."""
     _shelf(state)
     manifest = _own(state, user, quill_id)
-    if not state.policy.may_share():
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "sharing Quills of your own is switched off on this server")
+    if not state.policy.may_share(user.username):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "sharing Quills of your own is switched off for you")
+    if state.sharing.owner_left(user.username, quill_id):
+        raise HTTPException(status.HTTP_409_CONFLICT, f"{quill_id} is off your shelf; it is not yours to offer")
+    rules = {}
+    for model, access in payload.rules.items():
+        prefixed = manifest.resolve(model) if not model.startswith("~") else model
+        if prefixed not in manifest.renamed.values():
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{model} is not a datamodel {quill_id} introduces")
+        rules[prefixed] = access
     for who in _people_of(state, payload):
         if who == user.username:
             continue
         try:
-            share = state.sharing.offer(user.username, quill_id, who, by=user.username)
+            share = state.sharing.offer(user.username, quill_id, who, by=user.username, rules=rules)
         except SharingError as exc:
             raise _bad(exc) from exc
         if share["state"] == OFFERED:
@@ -364,7 +491,7 @@ def share_mine(
                 who,
                 kind="quill.offered",
                 title=f"{user.display_name or user.username} shared {manifest.name} with you",
-                body="Say yes under Me, Your Quills, and it is on your shelf, over your own data.",
+                body="Say yes under Me, Your Quills, and it is on your shelf: its data, shared, as they set it.",
             )
     return state.sharing.shared_with(user.username, quill_id)
 
@@ -373,9 +500,11 @@ def share_mine(
 def unshare_mine(
     quill_id: str, username: str, state: AppState = Depends(get_state), user: User = Depends(get_current_user)
 ) -> list[dict]:
-    """Take your Quill back from somebody. Their records of its datamodels stay theirs."""
+    """Take your Quill back from somebody. What they wrote in it stays the Quill's."""
     _shelf(state)
     _own(state, user, quill_id)
+    if username == user.username:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "to take it off your own shelf, remove it")
     state.sharing.revoke(user.username, quill_id, username)
     return state.sharing.shared_with(user.username, quill_id)
 
@@ -418,6 +547,7 @@ def fork_mine(payload: ForkIn, state: AppState = Depends(get_state), user: User 
     datamodels works on the same records; one over the original's own datamodels starts empty."""
     shelf = _shelf(state)
     _require_install(state, user)
+    _require_create(state, user)
     original = shelf.find(user.username, payload.id)
     if original is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"{payload.id} is not on your shelf")
@@ -434,7 +564,7 @@ def fork_mine(payload: ForkIn, state: AppState = Depends(get_state), user: User 
                 models = state.quills.datamodels_source(load_catalog(state.config.quill_catalog), Path(tmp) / "m")
             except QuillError:
                 models = None
-            _check_personal_plan(state, state.quills.plan(folder, models, owner=user.username))
+            _check_personal_plan(state, state.quills.plan(folder, models, owner=user.username), user)
             return state.quills.install(
                 folder,
                 models,
@@ -450,9 +580,9 @@ def fork_mine(payload: ForkIn, state: AppState = Depends(get_state), user: User 
 def accept_offer(
     owner: str, quill_id: str, state: AppState = Depends(get_state), user: User = Depends(get_current_user)
 ) -> dict:
-    """Yes: the Quill is on your shelf, over your own data, as you."""
+    """Yes: the Quill is on your shelf — its data shared, as its owner set it — run as you."""
     _shelf(state)
-    if not state.policy.may_have():
+    if not state.policy.may_have(user.username):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Quills of people's own are switched off on this server")
     if quill_id in state.quills.quills or quill_id in state.quills.personal.get(user.username, {}):
         raise HTTPException(status.HTTP_409_CONFLICT, f"you have a Quill called {quill_id} already")
@@ -475,10 +605,19 @@ def decline_offer(
 
 @router.delete("/offers/{owner}/{quill_id}")
 def leave_offer(
-    owner: str, quill_id: str, state: AppState = Depends(get_state), user: User = Depends(get_current_user)
+    owner: str,
+    quill_id: str,
+    drop: str = "",
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
 ) -> dict:
-    """Leave a Quill somebody shared with you. Your records of its datamodels stay yours."""
+    """Leave a Quill somebody shared with you, or decline what was offered. What you wrote in
+    it stays the Quill's. The last to have it takes it off the server, and `?drop=` names a
+    datamodel of its own to go with it, records and all."""
     _shelf(state)
+    manifest = state.quills.personal.get(owner, {}).get(quill_id)
+    if manifest is not None and user.username in state.shelf.holders(manifest):
+        return _take_off_shelf(state, user, manifest, drop)
     state.sharing.revoke(owner, quill_id, user.username)
     return {"left": f"~{owner}.{quill_id}"}
 

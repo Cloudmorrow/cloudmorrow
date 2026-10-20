@@ -29,7 +29,7 @@ import {
 } from "./core.js";
 import { loadFeatures } from "./features.js";
 import { refreshQuills } from "./quills.js";
-import { sections } from "./quillsadmin.js";
+import { removeSheet, sections } from "./quillsadmin.js";
 
 const mineUrl = (id) => "/api/quills/mine/" + encodeURIComponent(id);
 const quillUrl = (id) => "/api/quills/" + encodeURIComponent(id);
@@ -145,7 +145,9 @@ function allowed(may) {
       can switch them on under Administration, Quills.</p>`;
   }
   const bits = [
-    may.install ? "You may add Quills for yourself: from the catalog, or with <code>cm quill dev</code> in a folder your assistant wrote."
+    may.install
+      ? (may.create ? "You may add Quills for yourself: from the catalog, or with <code>cm quill dev</code> in a folder your assistant wrote."
+        : "You may add Quills for yourself, from the catalog.")
       : "On this server a Quill of your own comes through a request: ask from the catalog, and an administrator says yes.",
     may.code ? "" : "They may not run code of their own here.",
     may.share ? "You may share yours with people; each says yes before it is theirs." : "Sharing them is switched off.",
@@ -404,6 +406,7 @@ async function buildSheet(id, data) {
   const own = place === "mine" ? data.mine.quills.find((q) => q.id === id) || plan : null;
   const mySwitch = place === "server" ? data.features.find((f) => f.key === id) : null;
   const shelfRow = data.shelf.find((q) => q.id === id);
+  const holders = plan.holders || [];
   const facts = [
     `v${esc(plan.version || entry?.ref || "")}`, esc(plan.publisher || ""), esc(plan.license || ""),
     place === "server" ? `<span class="quill-chip on">the server's</span>` : "",
@@ -431,7 +434,9 @@ async function buildSheet(id, data) {
       <button class="row promote-mine" type="button">Ask to promote</button>
       <button class="row bad remove-mine" type="button">Remove ${esc(name)}</button>
     </div>
-    <p class="shelf-note">${esc(stood.said.charAt(0).toUpperCase() + stood.said.slice(1))}. Export writes it the way a repository holds it, ready for
+    <p class="shelf-note">${esc(stood.said.charAt(0).toUpperCase() + stood.said.slice(1))}.${holders.length > 1
+      ? ` Stands with ${esc(listed(holders.filter((h) => h !== me.username)))} too: its data is the Quill's, shared as you set it, and it stays for them if you take it off your shelf.`
+      : " Its own data is yours and nobody else's until you share it."} Export writes it the way a repository holds it, ready for
       <code>cm quill test</code>, a push and the Quill Catalog. Asking to promote asks an administrator to
       make it the server's, for everyone, your records going with it.</p>
     <div class="share-slot"></div>` : ""}
@@ -512,48 +517,83 @@ async function buildSheet(id, data) {
       if (note === null) return;
       try { await api("POST", "/api/quills/requests", { kind: "promote", id, note }); await done("Asked"); } catch (err) { toast(err.message); }
     });
-    on(".remove-mine", async () => {
+    // Off your shelf: while others still have it, it stays for them; the last
+    // to have it is asked what it brought should go with it.
+    const offShelf = async (button, url, broughtUrl, whose) => {
+      const others = holders.filter((h) => h !== me.username);
+      if (others.length) {
+        if (!confirm(`Take ${name} off your shelf?\n\nIt stays for ${listed(others)}, its data and all; what you wrote stays the Quill's.`)) return;
+        try {
+          await api("DELETE", url);
+          await done(`${name} is off your shelf; it stays with ${listed(others)}`, { gone: true });
+        } catch (err) { toast(err.message); }
+        return;
+      }
       let brought = [];
-      try { brought = await api("GET", mineUrl(id) + "/brought"); } catch (err) { toast(err.message); return; }
-      const held = brought.filter((b) => b.records);
-      const words = held.length
-        ? `\n\nIts own data stays: ${held.map((b) => `${plural(b.records, "record")} of ${b.label}`).join(", ")}.`
-        : "";
-      if (!confirm(`Remove ${name}? Its tabs go, for you and anybody you shared it with.${words}`)) return;
-      try { await api("DELETE", mineUrl(id)); await done(`${name} is removed`, { gone: true }); } catch (err) { toast(err.message); }
-    });
-    on(".leave-shared", async () => {
-      if (!confirm(`Leave ${shelfRow.shared_by}'s ${name}? Your records of its data stay yours.`)) return;
-      try {
-        await api("DELETE", `/api/quills/offers/${encodeURIComponent(shelfRow.shared_by)}/${encodeURIComponent(id)}`);
-        await done(`${name} is off your shelf`, { gone: true });
-      } catch (err) { toast(err.message); }
+      try { brought = await api("GET", broughtUrl); } catch (err) { toast(err.message); return; }
+      if (!brought.length) {
+        if (!confirm(`Remove ${whose}${name}?\n\nYou are the last to have it, so it goes from the server. Nothing it kept is deleted.`)) return;
+        try { await api("DELETE", url); await done(`${name} is removed`, { gone: true }); } catch (err) { toast(err.message); }
+        return;
+      }
+      button.closest(".group").insertAdjacentHTML("afterend", removeSheet(name, brought));
+      button.closest(".group").hidden = true;
+      const sheet = holder.querySelector(".remove-sheet");
+      sheet.querySelector(".cancel").addEventListener("click", () => { sheet.remove(); button.closest(".group").hidden = false; });
+      sheet.querySelector(".confirm").addEventListener("click", async () => {
+        const drop = [...sheet.querySelectorAll("input[type=checkbox]:not(:checked)")].map((b) => b.value);
+        try {
+          const gone = await api("DELETE", url + (drop.length ? "?drop=" + encodeURIComponent(drop.join(",")) : ""));
+          const dropped = Object.values((gone && gone.dropped) || {}).reduce((a, b) => a + b, 0);
+          await done(dropped ? `${name} is removed, and ${plural(dropped, "record")} with it` : `${name} is removed; its records are kept`, { gone: true });
+        } catch (err) { toast(err.message); }
+      });
+    };
+    on(".remove-mine", (event) => offShelf(event.currentTarget, mineUrl(id), mineUrl(id) + "/brought", ""));
+    on(".leave-shared", (event) => {
+      const base = `/api/quills/offers/${encodeURIComponent(shelfRow.shared_by)}/${encodeURIComponent(id)}`;
+      offShelf(event.currentTarget, base, base + "/brought", `${shelfRow.shared_by}'s `);
     });
   };
   return { name, html, wire };
 }
 
-/** Pick people to offer it to: everybody on the server, a tick each. */
+/** Pick people to offer it to, and what each may do with the Quill's own data:
+    write or read, per datamodel. The people who have it already are listed with
+    their rules, to be changed the same way. */
 async function shareSheet(slot, quill, name, plan, after) {
   if (!slot || slot.querySelector(".share-sheet")) return;
   let people = [];
   try { people = await api("GET", "/api/people"); } catch (err) { toast(err.message); return; }
-  const already = new Set((plan.shared_with || []).filter((s) => s.state !== "declined").map((s) => s.username));
-  const choices = people.filter((p) => !already.has(p.username));
+  const shares = (plan.shared_with || []).filter((s) => s.state !== "declined" && s.state !== "left");
+  const already = new Map(shares.map((s) => [s.username, s]));
+  const own = (plan.data || []).filter((d) => d.how === "introduces");
+  const person = (p, share) => `<label class="row"><span class="main">
+      <span class="title">${esc(p.display_name)}</span><span class="meta"><span class="preview">${esc(p.username)}${
+        share ? ` · ${share.state === "accepted" ? "has it" : "offered"}` : ""}</span></span></span>
+      <input type="checkbox" value="${esc(p.username)}"${share ? " checked" : ""} aria-label="${esc(p.display_name)}"></label>`;
   slot.innerHTML = `<div class="share-sheet">
-    <p class="shelf-note">Offer ${esc(name)} to: each says yes themselves, and then has it over their own data.</p>
-    <div class="group choices">${choices.length ? choices.map((p) => `<label class="row"><span class="main">
-      <span class="title">${esc(p.display_name)}</span><span class="meta"><span class="preview">${esc(p.username)}</span></span></span>
-      <input type="checkbox" value="${esc(p.username)}" aria-label="${esc(p.display_name)}"></label>`).join("")
-      : `<p class="empty">Everybody has been offered it already.</p>`}</div>
+    <p class="shelf-note">Offer ${esc(name)} to people: each says yes themselves, and then works on the Quill's data
+      with you, as the rules below let them. Ticked already is somebody who has it, or was offered it; offered
+      again, only their rules change.</p>
+    <div class="group choices share-people">${people.length ? people.filter((p) => p.username !== plan.owner).map((p) => person(p, already.get(p.username))).join("")
+      : `<p class="empty">Nobody else is on this server.</p>`}</div>
+    ${own.length ? `<p class="group-label">What they may do with its data</p>
+    <p class="shelf-note">Per datamodel of the Quill's own, for everybody ticked. Read is a screen looked at.</p>
+    <div class="group policy share-rules">${own.map((d) => `<label class="row">
+      <span class="main"><span class="title">${esc(d.label || d.plain || d.id)}</span></span>
+      <select data-model="${esc(d.id)}" aria-label="${esc(d.label || d.id)}">
+        <option value="write">write</option><option value="read">read</option></select></label>`).join("")}</div>` : ""}
     <div class="group"><button class="row primary confirm" type="button">Offer it</button></div>
     <div class="group"><button class="row cancel" type="button">Not now</button></div></div>`;
   slot.querySelector(".cancel").addEventListener("click", () => { slot.innerHTML = ""; });
   slot.querySelector(".confirm").addEventListener("click", async () => {
-    const chosen = [...slot.querySelectorAll("input:checked")].map((b) => b.value);
+    const chosen = [...slot.querySelectorAll(".share-people input:checked")].map((b) => b.value);
     if (!chosen.length) { slot.innerHTML = ""; return; }
+    const rules = {};
+    for (const select of slot.querySelectorAll(".share-rules select")) rules[select.dataset.model] = select.value;
     try {
-      await api("PUT", mineUrl(quill) + "/share", { people: chosen });
+      await api("PUT", mineUrl(quill) + "/share", { people: chosen, rules });
       toast(`Offered to ${chosen.join(", ")}`);
       await after();
     } catch (err) { toast(err.message); }

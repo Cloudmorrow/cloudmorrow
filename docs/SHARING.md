@@ -17,38 +17,50 @@ widens either.
 | **server Quill** | A Quill an administrator installed, for everyone or for an **audience**: the circles and people named on its install sheet. What every Quill was until this page. |
 | **personal Quill** | A Quill of somebody's own: installed by them, for them, under `<data_dir>/quills-personal/<owner>/<id>/`. Its **key** is `~owner.id` — `~alice.budget` — wherever one name must do for every Quill on the server: the feature switch, the logs, the sandbox, a webhook's address. |
 | **owner** | Whose personal Quill it is. Its jobs, webhooks and APIs run as them; its datamodels are named after them. |
-| **shared** | Offered by its owner to people, and accepted by each. Then it stands on their shelf too — over *their* data, run as *them*. |
+| **shared** | Offered by its owner to people, and accepted by each. Then it stands on their shelf too — over the Quill's data, as the owner's rules let them, run as *them*. |
+| **holders** | Everybody a personal Quill stands with: its owner, unless they took it off their shelf, and whoever accepted it. The Quill stays as long as one of them has it. |
+| **rules** | What a share lets a person do with each datamodel of the Quill's own: `write`, or `read`. Set by the owner, per person. Nothing named is write. |
 | **promoted** | Made the server's by an administrator: the same folder installed as a server Quill, with every record of its datamodels moved under the server's name for them. |
 | **adopted** | The other order: a server Quill of the same id arrives (from the catalog, say) and somebody's own folds into it, records and all. |
 | **exported** | Written as a repository would hold it — the folder in the template's shape — to be tested, pushed, released and submitted. |
 | **forked** | A copy of a Quill one has, as one's own, under a new id, to change. |
-| **the policy** | Three settings an administrator sets: may people have Quills of their own (`on`, `ask`, `off`), may those run code, may they be shared. |
+| **the policy** | Four settings an administrator sets: may people have Quills of their own (`on`, `ask`, `off`), may those run code, may they be shared, may people make their own rather than only take them from the catalog. Each for the server, and each again per person, in front of the server's. |
 
 ## The rules
 
-1. **A Quill never gives anybody data.** Sharing a Quill shares software:
-   the person it is shared with runs it as themselves, through the gate,
-   narrowed by their own circles, over records that are theirs. A Quill
-   over `contact` on the shelf of somebody whose circles do not give
-   `contact` draws no contact screen, for them. Nothing on this page lets
-   one person see another's records; that is what spaces are for.
+1. **A Quill never gives anybody the server's data.** Over the server's
+   datamodels — `contact`, `task` — a shared Quill runs as the person it is
+   shared with, through the gate, narrowed by their own circles, over
+   records that are theirs to see. A Quill over `contact` on the shelf of
+   somebody whose circles do not give `contact` draws no contact screen,
+   for them. Nothing on this page widens what anybody sees of the server's
+   data; that is what circles and spaces are for.
 2. **A personal Quill changes nothing other people see.** It adds no fields
    to datamodels everybody shares (a field on a record is seen by everyone
    who sees the record), and it runs no services (a service runs outside
-   the sandbox, as the server). Its own datamodels are personal in scope,
-   never spaces nor in one. Everything else a Quill may do, it may: screens,
-   views, actions, hooks, jobs, webhooks, handler APIs, machine handlers,
-   fetch, secrets from the owner's vault.
-3. **Its datamodels carry its owner's name.** What the folder calls
-   `budget.envelope` the server knows as `~alice.budget.envelope`, so two
-   people's Budgets never meet in the record store, and the one store knows
-   every shape there is. The code is given its own names (`Manifest.resolve`,
-   `plain`): it reads and writes `budget.envelope` and never sees the prefix.
-   The files are left as written, so they publish as they are.
-4. **Only a shelf it stands on reaches its datamodels.** `~alice.budget.*`
-   is reachable by alice and whoever accepted her Budget, whatever the
-   circles say about `*`; to anybody else it is absent: not listed, 404.
-   The gate asks the shelf before it asks the circles (`Shelf.access_for`).
+   the sandbox, as the server). Its own datamodels are never spaces nor in
+   one. Everything else a Quill may do, it may: screens, views, actions,
+   hooks, jobs, webhooks, handler APIs, machine handlers, fetch, secrets
+   from the owner's vault.
+3. **Its own data is the Quill's, and carries its owner's name.** What the
+   folder calls `budget.envelope` the server knows as `~alice.budget.envelope`,
+   so two people's Budgets never meet in the record store, and the one
+   store knows every shape there is. The code is given its own names
+   (`Manifest.resolve`, `plain`): it reads and writes `budget.envelope` and
+   never sees the prefix. The files are left as written, so they publish as
+   they are. The records of such a datamodel are one pool, the Quill's —
+   public within it (`scope = 'public'`), not each writer's alone — so
+   everybody the Quill stands with works on the same envelopes. Isolated
+   from everybody else, and tied to the Quill: see rule 8.
+4. **Access to a Quill's own data is a rule on the datamodel, set by its
+   owner.** `~alice.budget.*` is reachable by alice (write) and by whoever
+   accepted her Budget, each as her share's rules say — `write`, or `read`,
+   per datamodel, per person; nothing named is write. The circles are not
+   asked: it is the Quill's data, not the server's, whatever `*` says. To
+   anybody else it is absent: not listed, 404. The gate asks the shelf
+   (`Shelf.access_for`, `Narrowed`), which is the one gate every read and
+   write already passes ([CIRCLES.md](CIRCLES.md), rule 5). Rights are set
+   on data, never on a Quill.
 5. **Nothing installs without a yes, and it is the right person's.** An
    administrator says yes to a server Quill, for everyone or an audience.
    A person says yes to one of their own, and to one shared with them, on
@@ -62,17 +74,27 @@ widens either.
 7. **Code is per person.** A personal Quill's views, actions and hooks run
    as the person using it, in a sandbox of that person's own, so code one
    person wrote shares no interpreter with the people it was shared with.
-   Its jobs, webhooks and APIs run as its owner. A hook of a shared Quill
-   runs for each person who has it and can see the record — as them.
-8. **Records survive everything.** Removing a personal Quill, leaving one,
-   having one taken back, switching one off: the records of its datamodels
-   stay, each owner's own, to be read again the day the Quill is back. Only
-   the owner removing it may drop a datamodel of its own, records and all,
-   as an administrator may for a server Quill.
-9. **The administrator decides what the server allows,** and sees all of
-   it: every personal Quill, whose it is, who has it, what it runs; every
-   request; every switch. Switching a personal Quill off (by its key, as
-   any feature) takes it from everybody who has it until it is on again.
+   Its jobs, webhooks and APIs run as its owner — or, once the owner took
+   it off their shelf, as the first of the people who still have it. A hook
+   runs once per change, as whoever made the change (as the Quill's own
+   runner, for a change from outside the Quill's holders).
+8. **A Quill stays as long as somebody has it, and its data with it.**
+   Taking a personal Quill off your shelf — the owner's included — takes it
+   off *your* shelf: while others still have it, it stays for them, data
+   and all, and its owner is its owner in name (`owner_left`). The last to
+   have it takes it off the server, and only then may a datamodel of its
+   own go with it, records and all (`?drop=`), as an administrator may
+   choose for a server Quill. Having it taken back, leaving it, switching
+   it off: what you wrote stays the Quill's. Until the last holder says
+   otherwise, nothing of a Quill's data is deleted.
+9. **The administrator decides what the server allows, and what each person
+   may,** and sees all of it: every personal Quill, whose it is, who has it,
+   what it runs; every request; every switch. Each of the four settings is
+   the server's, and may be said again for one person (`PUT /api/quills/
+   policy/{username}`): no Quills of their own for the children, no sharing
+   for the intern, the catalog only for somebody who should not be writing
+   code here. Switching a personal Quill off (by its key, as any feature)
+   takes it from everybody who has it until it is on again.
 
 ## The ladder
 
@@ -104,19 +126,37 @@ What the policy says decides which are open: `on`, all three; `ask`, none
 of them, and a **request** instead (below); `off`, none, and every personal
 Quill there is goes dark until it is `on` again. `personal_quill_code = off`
 refuses a personal Quill with `code`, and stops the code of those installed.
+`personal_quill_create = off` keeps the second and third way shut — and a
+fork, and an assistant's `quill_dev_install` — while the catalog stays
+open: one takes a Quill, one does not make one. Each setting is answered
+for the server, and again for a person an administrator said something
+about in particular (`cm quill policy alice`, Administration → Users →
+the account, *Quills of their own*); the person's answer stands in front.
 
 ### Shared
 
 The owner offers it to people (`PUT /api/quills/mine/{id}/share`, Your
 Quills → Share, `cm quill share budget bob carol`, or `quill_share` for an
-assistant), or to everybody in a circle, which is the people in it today.
-Each is told, and says yes or no (`cm quill accept alice/budget`); yes puts
-it on their shelf. The owner sees who has it and may take it back; a person
-may leave. Both leave the person's records where they are.
+assistant), or to everybody in a circle, which is the people in it today —
+with **rules**: what each may do with the datamodels of the Quill's own,
+`write` or `read`, per datamodel (`"rules": {"budget.envelope": "read"}`;
+nothing named is write). Each is told, and says yes or no (`cm quill accept
+alice/budget`); yes puts it on their shelf, and the Quill's data in their
+reach, as the rules say. Offered again to somebody who has it, only their
+rules change. The owner sees who has it and may take it back; a person may
+leave. What anybody wrote stays the Quill's.
 
 An update is the owner installing again: everybody who has it has the new
 version at once. (A version that asks for more — a new host, a new secret —
 waiting on each person's yes is *not yet*, below.)
+
+**Taking it off a shelf.** The owner's Remove, and a holder's Leave, are
+the same thing: the Quill comes off *that* shelf (`DELETE /api/quills/mine/
+{id}`, `DELETE /api/quills/offers/{owner}/{id}`). While others still have
+it, it stays for them — the data, the code, which runs as the first of them
+now — and the owner may neither offer it nor take it off again; it is
+theirs in name. The last to have it is asked what goes with it (`GET …/
+brought`, then `?drop=`), and takes it off the server.
 
 ### Server
 
@@ -188,14 +228,15 @@ TRACKER_KEY from your vault.*
 | call | what |
 | --- | --- |
 | `GET /api/quills` | your shelf: each Quill with `key`, `owner`, `personal`, `mine`, `shared_by`, and a server Quill's `audience` |
-| `GET /api/quills/policy`, `PUT …` (admin) | the three settings, and `may`: what they mean for you |
+| `GET /api/quills/policy`, `PUT …` (admin) | the four settings, and `may`: what they mean for you |
+| `GET /api/quills/policy/{username}`, `PUT …` (admin) | one person's: the server's, their `own`, the `effective`; a value per setting, or `inherit` |
 | `GET /api/quills/mine` | your own Quills with `shared_with` and `webhook_urls`, what you were `offered`, your `requests`, the `shadowed` |
 | `POST /api/quills/mine/plan`, `POST /api/quills/mine`, `POST /api/quills/mine/upload` | install one of your own: the sheet, from the catalog or a source, from a tarball (`cm quill dev`) |
-| `GET /api/quills/mine/{id}`, `GET …/brought`, `DELETE …?drop=` | one of yours; what it brought and how many records; remove it |
-| `PUT /api/quills/mine/{id}/share`, `DELETE …/share/{username}` | offer it to `people` and `circles`; take it back |
+| `GET /api/quills/mine/{id}`, `GET …/brought`, `DELETE …?drop=` | one of yours, with its `holders` and `owner_left`; what it brought and how many records; take it off your shelf — off the server, dropping, when you are the last to have it |
+| `PUT /api/quills/mine/{id}/share`, `DELETE …/share/{username}` | offer it to `people` and `circles`, with `rules`; take it back |
 | `GET /api/quills/mine/{id}/export?datasets=` | the tarball |
 | `POST /api/quills/mine/fork` | `{id, new_id, name}` |
-| `POST /api/quills/offers/{owner}/{id}/accept`, `…/decline`, `DELETE …` | yes, no, leave |
+| `POST /api/quills/offers/{owner}/{id}/accept`, `…/decline`, `DELETE …?drop=`, `GET …/brought` | yes, no, leave — off the server, dropping, when you are the last to have it; what it brought |
 | `GET /api/quills/requests?all=`, `POST …` | open requests (everybody's for an administrator); ask |
 | `POST /api/quills/requests/{n}/approve`, `…/decline`, `DELETE …` | `{audience, give_to, note}`; a word back; withdraw |
 | `GET /api/quills/all` (admin) | everything: server Quills with audiences, personal Quills with shares, requests, the policy, what is broken |
@@ -221,22 +262,32 @@ On the command line it is all under `cm quill`: `add --mine`, `add --for`,
 In the database, beside the features:
 
 ```
-quill_shares(owner, quill, username, state, offered_by, offered_at, answered_at)   -- offered, accepted, declined
+quill_shares(owner, quill, username, state, offered_by, offered_at, answered_at, rules)
+    -- offered, accepted, declined; the owner's own row says 'left'; rules is {model: "read"}
 quill_requests(id, username, kind, quill, source, ref, note, state, asked_at, answered_by, answered_at, answer)
-settings: personal_quills, personal_quill_code, personal_quill_sharing
+settings: personal_quills, personal_quill_code, personal_quill_sharing, personal_quill_create,
+          and quill_policy:<username> for what was said about one person (JSON)
 ```
 
 A personal Quill's records are rows in the one `records` table like any
-other's, under their prefixed datamodel id, each its owner's.
+other's, under their prefixed datamodel id, with `scope = 'public'`: the
+Quill's, for everybody it stands with. The seal on each is to its owner
+and id, as ever. Schema step 6 marks the rows of older servers so.
 
 ## Not yet
 
 - **Consent on update.** A new version that asks for more than the people
   who have it said yes to should wait for each of them; today an update
   reaches them at once, as the owner's own install does.
-- **Sharing a personal datamodel's records.** A personal Quill's datamodels
-  are personal in scope. Sharing the budget itself, not only the Budget,
-  is promotion first, then a space.
+- **Fields a personal Quill adds to the server's datamodels.** Still
+  refused (rule 2): a field on a record is seen by everybody who sees the
+  record, so there is no keeping it to the Quill's holders. A Quill that
+  wants to say more about a contact introduces a datamodel of its own with
+  a link to the contact, which is the Quill's and isolated as rule 3 says.
+- **Passing a Quill on.** Once its owner took it off their shelf, nobody
+  offers it to anybody new, and nobody updates it; the people who have it
+  keep it as it is until the last of them takes it off, or an administrator
+  promotes it. A holder taking over as owner is next.
 - **Maintainers.** After promotion the server Quill is updated by an
   administrator, like any other. A named maintainer whose new versions
   ship when they ask for nothing new is next.

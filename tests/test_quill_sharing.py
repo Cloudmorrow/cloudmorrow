@@ -195,35 +195,119 @@ def share_with_bob(client, who):
     assert accepted.status_code == 200, accepted.text
 
 
-def test_sharing_is_an_offer_bob_says_yes_to_and_then_it_is_over_his_own_data(budget):
+def test_sharing_is_an_offer_bob_says_yes_to_and_then_the_quills_data_is_his_too(budget):
+    """A Quill's own data is the Quill's: one pool for everybody it stands with."""
     client, who = budget
-    add_envelope(client, who["alice"], "Food")
+    food = add_envelope(client, who["alice"], "Food")
     offered = client.put("/api/quills/mine/budget/share", json={"people": ["bob"]}, headers=who["alice"])
     assert offered.status_code == 200, offered.text
-    # Told, and not yet his.
+    # Told, and not yet his: the data is out of his reach until he says yes.
     assert any(n["kind"] == "quill.offered" for n in client.get("/api/notifications", headers=who["bob"]).json())
     mine = client.get("/api/quills/mine", headers=who["bob"]).json()
     assert mine["offers"][0]["state"] == "offered" and mine["offers"][0]["name"] == "Budget"
     assert "budget" not in {q["id"] for q in client.get("/api/quills", headers=who["bob"]).json()}
+    assert client.get("/api/records/~alice.budget.envelope", headers=who["bob"]).status_code == 404
     assert client.post("/api/quills/offers/alice/budget/accept", headers=who["bob"]).status_code == 200
     shelf = {q["id"]: q for q in client.get("/api/quills", headers=who["bob"]).json()}
     assert shelf["budget"]["shared_by"] == "alice" and shelf["budget"]["mine"] is False
-    # His envelopes are his; hers stay hers.
-    assert client.get("/api/records/~alice.budget.envelope", headers=who["bob"]).json() == []
-    pot = add_envelope(client, who["bob"], "Beer")
+    assert shelf["budget"]["models"]["~alice.budget.envelope"]["access"] == "write"
+    # Her Food is there for him; his Beer is there for her: the Quill's, both.
     assert [
-        r["fields"]["name"] for r in client.get("/api/records/~alice.budget.envelope", headers=who["alice"]).json()
+        r["fields"]["name"] for r in client.get("/api/records/~alice.budget.envelope", headers=who["bob"]).json()
     ] == ["Food"]
-    assert client.get("/api/records/~alice.budget.envelope", headers=who["bob"]).json()[0]["owner"] == "bob"
-    # Her hook runs for his write, as him, on his record.
-    client.post("/api/quills/budget/actions/spend", json={"record": pot, "fields": {"amount": 3}}, headers=who["bob"])
+    pot = add_envelope(client, who["bob"], "Beer")
+    names = [
+        r["fields"]["name"] for r in client.get("/api/records/~alice.budget.envelope", headers=who["alice"]).json()
+    ]
+    assert names == ["Food", "Beer"]
+    # He may change hers, with write; the hook runs once, as him.
+    client.post("/api/quills/budget/actions/spend", json={"record": food, "fields": {"amount": 3}}, headers=who["bob"])
     state_of(client).code.drain()
-    assert client.get(f"/api/records/~alice.budget.envelope/{pot}", headers=who["bob"]).json()["fields"]["total"] == 3
-    # Alice sees who has it; bob may leave, and then it is gone from his shelf, his records kept.
-    assert client.get("/api/quills/mine/budget", headers=who["alice"]).json()["shared_with"][0]["state"] == "accepted"
-    assert client.delete("/api/quills/offers/alice/budget", headers=who["bob"]).status_code == 200
+    assert (
+        client.get(f"/api/records/~alice.budget.envelope/{food}", headers=who["alice"]).json()["fields"]["total"] == 3
+    )
+    # Alice sees who has it; bob may leave, and then it is gone from his shelf, what he wrote kept.
+    alices = client.get("/api/quills/mine/budget", headers=who["alice"]).json()
+    assert alices["shared_with"][0]["state"] == "accepted" and alices["holders"] == ["alice", "bob"]
+    assert client.delete("/api/quills/offers/alice/budget", headers=who["bob"]).json()["left"] == "~alice.budget"
     assert "budget" not in {q["id"] for q in client.get("/api/quills", headers=who["bob"]).json()}
+    assert client.get(f"/api/records/~alice.budget.envelope/{pot}", headers=who["bob"]).status_code == 404
     assert state_of(client).records.count_all("~alice.budget.envelope") == 2
+
+
+def test_the_owner_says_what_each_person_may_do_with_the_quills_data(budget):
+    """A share's rules: read on a datamodel is a datamodel looked at. Offered again, only the rules change."""
+    client, who = budget
+    food = add_envelope(client, who["alice"], "Food")
+    offered = client.put(
+        "/api/quills/mine/budget/share",
+        json={"people": ["bob"], "rules": {"budget.envelope": "read"}},
+        headers=who["alice"],
+    )
+    assert offered.status_code == 200, offered.text
+    assert offered.json()[0]["rules"] == {"~alice.budget.envelope": "read"}
+    client.post("/api/quills/offers/alice/budget/accept", headers=who["bob"])
+    bobs = {q["id"]: q for q in client.get("/api/quills", headers=who["bob"]).json()}["budget"]
+    assert bobs["models"]["~alice.budget.envelope"]["access"] == "read"
+    assert bobs["models"]["~alice.budget.entry"]["access"] == "write"
+    assert [r["id"] for r in client.get("/api/records/~alice.budget.envelope", headers=who["bob"]).json()] == [food]
+    refused = client.post("/api/records/~alice.budget.envelope", json={"fields": {"name": "Beer"}}, headers=who["bob"])
+    assert refused.status_code == 403, refused.text
+    # A name the server knows is a name too; and nothing named is write again.
+    assert (
+        client.put(
+            "/api/quills/mine/budget/share",
+            json={"people": ["bob"], "rules": {"~alice.budget.envelope": "write"}},
+            headers=who["alice"],
+        ).json()[0]
+        == client.put("/api/quills/mine/budget/share", json={"people": ["bob"]}, headers=who["alice"]).json()[0]
+    )
+    assert client.get("/api/quills/mine/budget", headers=who["alice"]).json()["shared_with"][0]["state"] == "accepted"
+    assert (
+        client.post(
+            "/api/records/~alice.budget.envelope", json={"fields": {"name": "Beer"}}, headers=who["bob"]
+        ).status_code
+        == 201
+    )
+    unknown = client.put(
+        "/api/quills/mine/budget/share", json={"people": ["bob"], "rules": {"contact": "read"}}, headers=who["alice"]
+    )
+    assert unknown.status_code == 400
+    # Nobody else reaches it, whatever `*` says: not listed, 404.
+    assert client.get("/api/records/~alice.budget.envelope", headers=who[ADMIN[0]]).status_code == 404
+
+
+def test_the_owner_taking_it_off_their_shelf_leaves_it_standing_for_the_others(budget):
+    """The last to have it takes it off the server, choosing what goes with it."""
+    client, who = budget
+    share_with_bob(client, who)
+    food = add_envelope(client, who["alice"], "Food")
+    gone = client.delete("/api/quills/mine/budget", headers=who["alice"])
+    assert gone.status_code == 200 and gone.json() == {"left": "~alice.budget", "stays_with": ["bob"]}
+    assert "budget" not in {q["id"] for q in client.get("/api/quills", headers=who["alice"]).json()}
+    assert client.get("/api/records/~alice.budget.envelope", headers=who["alice"]).status_code == 404
+    # Still bob's, data and all; its code runs as him now; alice may not offer it, nor leave twice.
+    assert [r["id"] for r in client.get("/api/records/~alice.budget.envelope", headers=who["bob"]).json()] == [food]
+    state = state_of(client)
+    manifest = state.quills.personal["alice"]["budget"]
+    assert state.shelf.holders(manifest) == ["bob"] and state.code._runs_as(manifest) == "bob"
+    mine = client.get("/api/quills/mine", headers=who["alice"]).json()["quills"][0]
+    assert mine["owner_left"] is True and mine["holders"] == ["bob"]
+    assert (
+        client.put("/api/quills/mine/budget/share", json={"people": ["bob"]}, headers=who["alice"]).status_code == 409
+    )
+    assert client.delete("/api/quills/mine/budget", headers=who["alice"]).status_code == 409
+    everything = client.get("/api/quills/all", headers=who[ADMIN[0]]).json()
+    assert everything["personal"][0]["holders"] == ["bob"]
+    # The last to have it: what it brought is his to keep or drop, and then it is gone.
+    brought = client.get("/api/quills/offers/alice/budget/brought", headers=who["bob"]).json()
+    assert {b["id"]: b["records"] for b in brought} == {"~alice.budget.envelope": 1, "~alice.budget.entry": 0}
+    last = client.delete("/api/quills/offers/alice/budget?drop=~alice.budget.envelope", headers=who["bob"])
+    assert last.status_code == 200, last.text
+    assert last.json()["removed"] == "~alice.budget" and last.json()["dropped"] == {"~alice.budget.envelope": 1}
+    assert state.quills.personal == {}
+    assert state.records.count_all("~alice.budget.envelope") == 0
+    assert state.sharing.shared_with("alice", "budget") == []
 
 
 def test_a_shared_quill_is_narrowed_by_the_other_persons_circles(budget):
@@ -284,6 +368,45 @@ def test_sharing_can_be_switched_off(budget):
     assert (
         client.put("/api/quills/mine/budget/share", json={"people": ["bob"]}, headers=who["alice"]).status_code == 403
     )
+
+
+def test_an_administrator_says_what_one_person_may_in_particular(budget):
+    """Each setting again per person, in front of the server's: alice may not share
+    while the server allows it; bob may not make his own, only take from the catalog."""
+    client, who = budget
+    admin = who[ADMIN[0]]
+    assert client.get("/api/quills/policy/alice", headers=who["alice"]).status_code == 403
+    assert client.get("/api/quills/policy/nobody", headers=admin).status_code == 404
+    said = client.put("/api/quills/policy/alice", json={"personal_quill_sharing": "off"}, headers=admin)
+    assert said.status_code == 200, said.text
+    assert said.json()["own"] == {"personal_quill_sharing": "off"}
+    assert said.json()["effective"]["personal_quill_sharing"] == "off"
+    assert said.json()["server"]["personal_quill_sharing"] == "on"
+    assert "inherit" in said.json()["settings"]["personal_quill_sharing"]
+    assert client.get("/api/quills/policy", headers=who["alice"]).json()["may"]["share"] is False
+    assert client.get("/api/quills/policy", headers=who["bob"]).json()["may"]["share"] is True
+    assert (
+        client.put("/api/quills/mine/budget/share", json={"people": ["bob"]}, headers=who["alice"]).status_code == 403
+    )
+    # Said again, nothing: the server's answer stands.
+    back = client.put("/api/quills/policy/alice", json={"personal_quill_sharing": "inherit"}, headers=admin)
+    assert back.json()["own"] == {} and back.json()["effective"]["personal_quill_sharing"] == "on"
+    assert client.put("/api/quills/policy/alice", json={"personal_quills": "maybe"}, headers=admin).status_code == 400
+    # Making one's own, switched off for bob: the folder is refused, the catalog is open.
+    client.put("/api/quills/policy/bob", json={"personal_quill_create": "off"}, headers=admin)
+    refused = client.post("/api/quills/mine/upload", content=_tarball(BUDGET), headers=who["bob"])
+    assert refused.status_code == 403 and "making" in refused.json()["detail"]
+    fork = client.post("/api/quills/mine/fork", json={"id": "budget", "new_id": "spend"}, headers=who["bob"])
+    assert fork.status_code == 403
+    assert client.get("/api/quills/policy", headers=who["bob"]).json()["may"]["create"] is False
+    assert client.post("/api/quills/mine/plan", json={"id": "tasks"}, headers=who["bob"]).status_code == 200
+    # Quills of their own switched off for one person: theirs go dark, for them alone.
+    client.put("/api/quills/policy/alice", json={"personal_quills": "off"}, headers=admin)
+    assert "budget" not in {q["id"] for q in client.get("/api/quills", headers=who["alice"]).json()}
+    assert client.get("/api/records/~alice.budget.envelope", headers=who["alice"]).status_code == 404
+    assert client.post("/api/quills/mine/upload", content=_tarball(BUDGET), headers=who["bob"]).status_code == 403
+    client.put("/api/quills/policy/bob", json={"personal_quill_create": "inherit"}, headers=admin)
+    assert client.post("/api/quills/mine/upload", content=_tarball(BUDGET), headers=who["bob"]).status_code == 201
 
 
 # -- asked for, and approved ---------------------------------------------------------------------------
@@ -354,11 +477,12 @@ def test_promotion_makes_it_the_servers_and_moves_everybodys_records(budget):
     for person in ("alice", "bob", ADMIN[0]):
         shelf = {q["id"]: q for q in client.get("/api/quills", headers=who[person]).json()}
         assert shelf["budget"]["key"] == "budget" and shelf["budget"]["personal"] is False, person
-    # Everybody's records came with it, still their own, sealed again under the new name.
+    # The Quill's records came with it, one pool still, sealed again under the new name.
     alices = client.get("/api/records/budget.envelope", headers=who["alice"]).json()
-    assert [(r["fields"]["name"], r["fields"]["total"]) for r in alices] == [("Food", 7)]
+    assert [(r["fields"]["name"], r["fields"]["total"]) for r in alices] == [("Food", 7), ("Beer", 0)]
     assert [r["fields"]["name"] for r in client.get("/api/records/budget.envelope", headers=who["bob"]).json()] == [
-        "Beer"
+        "Food",
+        "Beer",
     ]
     assert client.get(f"/api/records/budget.envelope/{food}/history", headers=who["alice"]).status_code == 200
     # And the code runs on, as the server's, for anybody.

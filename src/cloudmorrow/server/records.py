@@ -495,8 +495,11 @@ class RecordStore:
                 space = self._space_of(conn, model, indexed)
                 return space is not None and self._space_visible(conn, principal, space)
         # Kept out of any space, a record of a datamodel that lives in them is
-        # its writer's alone, like any personal record.
-        return row["owner"] == principal.username
+        # its writer's alone, like any personal record. A public record of a
+        # plain datamodel — a Quill of somebody's own keeps its data so, for
+        # everybody the Quill stands with — is anybody's who reaches the
+        # datamodel at all, which the gate has already asked.
+        return row["owner"] == principal.username or row["scope"] == "public"
 
     def _row(self, conn: Connection, principal: Principal, model: Datamodel, record_id: str) -> Row:
         row = conn.execute("SELECT * FROM records WHERE id = ? AND model = ?", (record_id, model.id)).fetchone()
@@ -545,7 +548,7 @@ class RecordStore:
                 f"({link} IN ({spaces}) OR (COALESCE({link}, '') = '' AND owner = ?))",
                 [space_model, username, username, username],
             )
-        return "owner = ?", [username]
+        return "(owner = ? OR scope = 'public')", [username]
 
     def _unread_children(self, space_model: Datamodel) -> list[Datamodel]:
         """The datamodels written in this kind of space that count as unread."""
@@ -1229,11 +1232,14 @@ class RecordStore:
         return self.get(principal, model.id, found) if found else None
 
     def _scope_for(self, model: Datamodel, asked: str | None) -> str:
-        """A space's scope is chosen when it is made; everything else is personal."""
+        """A space's scope is chosen when it is made; everything else is personal —
+        or public, for a plain datamodel that is public and nothing else: a Quill
+        of somebody's own keeps its data so, for everybody the Quill stands with."""
         if not model.space:
-            if asked not in (None, "", "personal"):
+            kept = "personal" if "personal" in model.scopes or not model.scopes else model.scopes[0]
+            if asked not in (None, "", kept):
                 raise RecordError(f"a {model.label.lower()} is not a space; it has no scope to choose")
-            return "personal"
+            return kept
         if asked in (None, ""):
             return "shared" if "shared" in model.scopes else model.scopes[0]
         if asked not in model.scopes:
@@ -1468,6 +1474,9 @@ class RecordStore:
                 found = []
             if found:
                 return []
+        elif "personal" not in self.model(model_id).scopes and self.count_all(model_id):
+            # Kept as one pool for everybody who reaches it, so seeded once for all.
+            return []
         elif self.count(principal.username, model_id, scope=scope):
             return []
         # The Quill's dataset landing, not the person acting: it is written

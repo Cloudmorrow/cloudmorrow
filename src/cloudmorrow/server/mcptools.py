@@ -227,18 +227,20 @@ def _builds_for(state: AppState, user: User) -> str:
     if user.is_admin:
         return ""
     policy = getattr(state, "policy", None)
-    if policy is None or not policy.may_install():
-        if policy is not None and policy.may_have():
+    if policy is None or not policy.may_install(user.username):
+        if policy is not None and policy.may_have(user.username):
             raise ToolError(
                 "on this server a Quill of your own comes through a request: quill_request asks an administrator"
             )
         raise ToolError("only an administrator's assistant may build Quills on this server")
+    if not policy.may_create(user.username):
+        raise ToolError("making Quills of your own is switched off for you on this server; the catalog is open")
     return user.username
 
 
-def _personal_allowed(state: AppState, plan: dict) -> None:
+def _personal_allowed(state: AppState, plan: dict, username: str = "") -> None:
     policy = getattr(state, "policy", None)
-    if plan.get("code") and policy is not None and not policy.may_code():
+    if plan.get("code") and policy is not None and not policy.may_code(username):
         raise ToolError("Quills of your own may not run code on this server; leave the code out")
 
 
@@ -290,7 +292,7 @@ def quill_check(state: AppState, user: User, args: dict[str, Any]) -> Any:
         except QuillError as exc:
             raise ToolError(f"not yet: {exc}") from exc
         if owner:
-            _personal_allowed(state, plan)
+            _personal_allowed(state, plan, owner)
         return {"ok": True, "adds": plan, "whose": owner or "the server's"}
 
 
@@ -301,7 +303,7 @@ def quill_dev_install(state: AppState, user: User, args: dict[str, Any]) -> Any:
         try:
             source = _datamodels_for(state, Path(tmp))
             if owner:
-                _personal_allowed(state, state.quills.plan(folder, source, owner=owner))
+                _personal_allowed(state, state.quills.plan(folder, source, owner=owner), owner)
             plan = state.quills.install(
                 folder,
                 source,
@@ -344,8 +346,8 @@ def quill_share(state: AppState, user: User, args: dict[str, Any]) -> Any:
     quill_id = _str(args, "quill", required=True).strip()
     if quill_id not in state.quills.personal.get(user.username, {}):
         raise ToolError(f"{user.username} has no Quill of their own called {quill_id}")
-    if not policy.may_share():
-        raise ToolError("sharing Quills of your own is switched off on this server")
+    if not policy.may_share(user.username):
+        raise ToolError("sharing Quills of your own is switched off for you on this server")
     people = args.get("people")
     if not isinstance(people, list) or not all(isinstance(p, str) for p in people) or not people:
         raise ToolError("people is a list of usernames")
