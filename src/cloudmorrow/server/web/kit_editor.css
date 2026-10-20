@@ -63,6 +63,11 @@
     padding-right: 4px;
   }
   main.split .side .heading h1 { font-size: 26px; }
+  /* The pen's negative margin (base.css) puts its glyph on the column's
+     edge. Here the column is the pane, whose edge is 4px of padding away —
+     and a glyph past the edge of a pane that scrolls is a scrollbar along
+     the bottom of the list, for good. */
+  main.split .side .heading .actions { margin-right: -4px; }
   main.split .page {
     min-width: 0;
     padding-left: 28px;
