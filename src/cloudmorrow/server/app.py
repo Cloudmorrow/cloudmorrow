@@ -50,6 +50,7 @@ from cloudmorrow.server.routes import (
     setup,
     sharefiles,
     shares,
+    snapshots,
     today,
     users,
     web,
@@ -61,6 +62,7 @@ from cloudmorrow.server.secrets import SecretStore
 from cloudmorrow.server.settings import SettingsStore
 from cloudmorrow.server.shares import Protected, ShareStore
 from cloudmorrow.server.signin_limits import SigninLimits
+from cloudmorrow.server.snapshots import SnapshotStore, install_datamodels
 from cloudmorrow.server.state import AppState
 from cloudmorrow.server.today import Weather
 from cloudmorrow.server.transport import install as require_tls
@@ -177,6 +179,13 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     # Secrets stay in their own store, sealed under the key itself; the
     # Secrets Quill draws them from here, and no assistant is ever let in.
     record_store.backends["vaults"] = VaultsBackend(app.state.cloudmorrow.secrets)
+    # Frozen copies of a space's records, and the signed word on them. The
+    # two datamodels they are records of come with the core (snapshots.py).
+    if install_datamodels(config.datamodels_dir):
+        quill_registry.reload()
+    app.state.cloudmorrow.snapshots = SnapshotStore(
+        db, record_store, identity_key=config.identity_key_path, public_url=lambda: config.public_url
+    )
     # A Quill's code: its token and webhook secrets, and the processes that
     # run it, kept in line with what is installed and switched on.
     state = app.state.cloudmorrow
@@ -254,6 +263,9 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         ],
     )
     app.include_router(records.router)
+    app.include_router(snapshots.router)
+    app.include_router(snapshots.guest_router)
+    app.include_router(snapshots.attest_router)
     app.include_router(changefeed.router)
     app.include_router(records.models_router)
     app.include_router(records.people_router)

@@ -1,0 +1,31 @@
+[datamodel]
+id = "snapshot"
+version = 1
+label = "Snapshot"
+description = "A frozen copy of a space's records at one moment — the books at year end — with a digest of it that never changes. Shared with whoever may see it, and stamped by whoever validates it."
+domain = "attestations"
+scopes = ["personal", "shared", "public"]
+title = "title"
+space = true
+# Made only by the server (POST /api/snapshots), which takes the copy and
+# computes the digest; and sealed from the start: never changed or deleted,
+# only withdrawn. docs/ATTESTATIONS.md
+server_made = true
+locked = { field = "status", value = "sealed", allow = ["withdrawn"] }
+
+[fields]
+title = { kind = "string", required = true }
+series = { kind = "string", indexed = true, description = "What this is one version of: Books 2025, Members at year end" }
+version = { kind = "int", indexed = true, default = 1, description = "The next number in the series, counted by the server" }
+supersedes = { kind = "link", to = "snapshot", on_delete = "clear", description = "The version before this one in the series" }
+of_model = { kind = "string", indexed = true, label = "Of", description = "The datamodel of the space it copies: ledger, book, association" }
+of_space = { kind = "string", indexed = true, label = "Space", description = "The id of the space it copies" }
+of_title = { kind = "string", label = "Space name", description = "What the space was called when the copy was taken" }
+datamodels = { kind = "json", description = "The datamodels copied, as a list of ids" }
+period = { kind = "json", description = "The period kept, if one was: { field, from, to }" }
+records = { kind = "int", default = 0, description = "How many records the copy holds" }
+digest = { kind = "string", indexed = true, description = "SHA-256 of the bundle's bytes, which is what a stamp binds to" }
+status = { kind = "enum", values = ["sealed", "withdrawn"], labels = ["Sealed", "Withdrawn"], default = "sealed", indexed = true }
+sealed_at = { kind = "datetime", indexed = true, label = "Sealed", description = "When the copy was taken and sealed" }
+withdrawn_at = { kind = "datetime", indexed = true, label = "Withdrawn", stamp = { field = "status", value = "withdrawn" } }
+notes = { kind = "markdown" }

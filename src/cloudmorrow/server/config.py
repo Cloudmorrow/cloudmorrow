@@ -158,6 +158,13 @@ class ServerConfig:
         return self.key_file or self.data_dir / "secrets.key"
 
     @property
+    def identity_key_path(self) -> Path:
+        """The Ed25519 key this server signs attestations with, for its own
+        people (docs/ATTESTATIONS.md). Made on first use; back it up with the
+        data, since a stamp given under it names its public half."""
+        return self.data_dir / "identity.key"
+
+    @property
     def vapid_key_path(self) -> Path:
         """The key web pushes are signed with. Lose it and every phone
         subscribed under it has to be asked again — nothing else breaks."""

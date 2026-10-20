@@ -370,12 +370,21 @@ def _quill_sharing(conn: Connection) -> None:
     conn.commit()
 
 
+def _snapshots(conn: Connection) -> None:
+    """Snapshots' bundles, and the links guests are given to them (snapshots.py)."""
+    from cloudmorrow.server import snapshots
+
+    conn.executescript(snapshots.TABLES)
+    conn.commit()
+
+
 STEPS: tuple[Step, ...] = (
     Step(1, "the tables as they stood before they were versioned", _baseline),
     Step(2, "indexes for what an open screen and the retention sweep ask", _indexes_for_scale),
     Step(3, "the columns added since, and the order records were written in", _columns_since),
     Step(4, "shares shared with people and circles, and no machine shares", _shares_shared),
     Step(5, "who a Quill of somebody's own is shared with, and what people asked for", _quill_sharing),
+    Step(6, "snapshots' bundles, and the links guests are given to them", _snapshots),
 )
 
 VERSION = STEPS[-1].version

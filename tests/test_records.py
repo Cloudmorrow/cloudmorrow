@@ -221,15 +221,18 @@ def test_the_gate():
 
 def test_datamodels_are_listed_with_who_uses_them(api):
     models = {m["id"]: m for m in api("GET", "/api/datamodels")}
-    assert set(models) == {"board", "task"}
+    # Two come with the core itself (docs/ATTESTATIONS.md), used by no Quill.
+    assert set(models) == {"board", "task", "snapshot", "attestation"}
     assert models["task"]["used_by"] == ["tasks"] and models["task"]["foundation"]
+    assert models["snapshot"]["used_by"] == [] and models["snapshot"]["foundation"]
     lane = next(f for f in models["task"]["fields"] if f["name"] == "lane")
     assert lane["labels"] == ["To Do", "Doing", "Done"] and lane["indexed"]
 
 
 def test_without_the_quill_there_is_no_datamodel(client, auth):
     assert client.get("/api/records/task", headers=auth).status_code == 404
-    assert client.get("/api/datamodels", headers=auth).json() == []
+    # Only what the core brings on its own: snapshots, and the attestations on them.
+    assert [m["id"] for m in client.get("/api/datamodels", headers=auth).json()] == ["attestation", "snapshot"]
 
 
 def test_store_rejects_unknown_fields_directly(tasks_quill):

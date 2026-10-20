@@ -99,6 +99,8 @@ SEALED: dict[int, tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...]] = {
     # Tables that are gone. The number stays, so a database that got this
     # far is not migrated again.
     4: (),
+    # A snapshot's bundle (snapshots.py): born sealed, bound to its snapshot.
+    5: (("snapshot_bundles", ("snapshot_id",), ("bundle",)),),
 }
 SEALED_VERSION = max(SEALED)
 
