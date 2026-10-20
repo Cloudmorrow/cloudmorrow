@@ -42,6 +42,8 @@ HOST_RE = re.compile(r"^(\*\.)?([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63
 KEY_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
 FOLDER_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 PROGRAM_RE = re.compile(r"^[A-Za-z0-9._+-]{1,64}$")
+# A runtime's id, as the catalog's [runtimes] table names it (cloudmorrow.runtimes).
+RUNTIME_RE = re.compile(r"^[a-z][a-z0-9_-]{1,31}$")
 
 
 class CodeSpecError(ValueError):
@@ -239,6 +241,15 @@ def parse_code(
             raise CodeSpecError(f'{where}: {thing} needs.run is a list of program names, like ["lp"]')
         item["folders"] = folders
         item["run"] = run
+        # Programs the agent fetches for the machine from the catalog's
+        # runtimes when the handler is switched on there; their programs
+        # may be started without being in the machine's quill_programs.
+        runtimes = needs_table.get("runtimes", [])
+        if not isinstance(runtimes, list) or not all(isinstance(r, str) and RUNTIME_RE.match(r) for r in runtimes):
+            raise CodeSpecError(f'{where}: {thing} needs.runtimes is a list of runtime ids, like ["ffmpeg"]')
+        if len(set(runtimes)) != len(runtimes):
+            raise CodeSpecError(f"{where}: {thing} needs.runtimes names a runtime twice")
+        item["runtimes"] = list(runtimes)
 
     if any(needs.values()) and not code:
         kinds = ", ".join(k for k, v in needs.items() if v)

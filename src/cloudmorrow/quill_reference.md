@@ -142,6 +142,8 @@ why = "…"
 every = "15m"
 [machine.needs]
 folders = [{ name = "exports", access = "read" }]
+# run = ["lp"]                     # programs already there it may start, if the machine allows them
+# runtimes = ["ffmpeg"]            # programs the agent fetches for it on that machine, from the catalog
 ```
 
 ```python
@@ -170,7 +172,8 @@ def log_service(ctx, vehicle, date, km):
 fields)`, `move`, `delete` — each a `Record`: fields by `record["name"]`,
 envelope as `.id`, `.rev`, `.model`), `ctx.fetch(url, method=, headers=,
 json=)`, `ctx.secret(key)`, `ctx.now()`, `ctx.log(...)`, and on a machine
-`ctx.folder(name)` and `ctx.run([...])`. A refusal raises `Refused`,
+`ctx.folder(name)` and `ctx.run([...])` (a program in `needs.run` the machine
+allows, or one of a runtime in `needs.runtimes`). A refusal raises `Refused`,
 `NotFound`, `Invalid` or `Conflict`. `print` goes to the Quill's log
 (`cm quill logs <quill> code`).
 

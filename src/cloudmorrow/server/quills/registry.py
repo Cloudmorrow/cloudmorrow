@@ -239,7 +239,10 @@ class QuillRegistry:
             installed=installed,
         )
         # The programs it needs on this server, and whether they are here.
-        plan["runtimes"] = self.runtimes.describe(manifest.runtimes, self._runtimes_of(catalog, manifest))
+        catalog_runtimes = self._runtimes_of(catalog, manifest)
+        plan["runtimes"] = self.runtimes.describe(manifest.runtimes, catalog_runtimes)
+        # What its machine handlers would add to a machine they are switched on on.
+        plan["machine_runtimes"] = self.runtimes.describe_for_machines(manifest.machine_runtimes, catalog_runtimes)
         # The datamodels as they would be after installing, for a preview.
         touched = set(manifest.models)
         touched |= {f.to for m in touched if m in models for f in models[m].fields if f.kind == "link"}
@@ -257,7 +260,9 @@ class QuillRegistry:
 
     def _catalog(self, catalog: Catalog | None, manifest: Manifest) -> Catalog | None:
         """*catalog*, or this server's, read only when *manifest* needs one; None when it cannot be."""
-        if catalog is not None or not manifest.runtimes or not self.catalog_location:
+        if catalog is not None or not self.catalog_location:
+            return catalog
+        if not manifest.runtimes and not manifest.machine_runtimes:
             return catalog
         try:
             return load_catalog(self.catalog_location)

@@ -92,6 +92,10 @@ class AgentClient:
         """The Quills with machine handlers that are on for this machine's owner."""
         return self._get("/api/agent/quills") or []  # type: ignore[return-value]
 
+    def runtimes(self) -> dict:
+        """The catalog's runtimes, for a handler that needs a program fetched for this machine."""
+        return self._get("/api/agent/quills/runtimes") or {}  # type: ignore[return-value]
+
     def quill_code(self, quill: str) -> bytes:
         """The installed copy of a Quill, as a tarball."""
         try:

@@ -134,7 +134,8 @@ why = "to read the tracker's CSV exports into your vans"
 every = "15m"
 [machine.needs]
 folders = [{ name = "exports", access = "read" }]
-run = []                              # programs it may start there
+run = []                              # programs already on the machine it may start, if the machine allows
+runtimes = []                         # programs the agent fetches for it there, e.g. ["ffmpeg"] (QUILLS.md, Runtimes)
 ```
 
 And `quill.py`:
@@ -321,8 +322,14 @@ computer, in the same sandbox. Nothing runs there because a server says so:
    agent's token (`POST /api/agent/quills/<id>/host`), and is answered as the
    machine's owner, through the gate, bound by the manifest.
 4. `ctx.run` starts a program only when it is in the handler's `needs.run`
-   and in the machine's own `quill_programs`. It is the one thing outside
-   the sandbox, and the switching-on says so.
+   and in the machine's own `quill_programs` — or when it is a program of a
+   runtime the handler names in `needs.runtimes`: the agent fetched that
+   from the catalog when the handler was switched on (the switching-on says
+   *adds ffmpeg 7.1.5 to this machine (119 MB)* first), checked it, and
+   keeps it under its own data folder, so nothing is installed on the
+   machine itself and nobody runs a package manager. Switching the last
+   handler that needs it off asks whether it goes too. It is the one thing
+   outside the sandbox, and the switching-on says so.
 
 ## Testing a Quill locally
 
