@@ -19,17 +19,18 @@
    first bar is already right rather than growing a tab a beat later. */
 
 import {
-  api, go, loadIcons, onShell, onSignOut, parseHash, pixelArt, pixelIcon, registerScreen, renderRoute, replace,
-  session, store, tabSlot, toast,
+  api, go, loadIcons, onShell, onSignOut, parseHash, pixelArt, pixelIcon, redrawTabs, registerScreen, renderRoute,
+  replace, session, store, tabSlot, toast,
 } from "./core.js";
 import { knowQuills, placeActionBar } from "./actions.js";
-import { loadFeatures, redrawTabs } from "./features.js";
+import { loadFeatures } from "./features.js";
 import { renderKitScreen, renderRecordSheet } from "./kit.js";
 import { markThreadTabs } from "./kit_thread.js";
 
 // A quill, for a Quill whose icon names nothing this app draws yet: the
-// nib down at the left, the feather up to the right.
-const QUILL_GLYPH = [
+// nib down at the left, the feather up to the right. Administration's
+// Quills page borrows it for the same want.
+export const QUILL_GLYPH = [
   "......XX",
   ".....X.X",
   "....X.X.",
@@ -71,8 +72,10 @@ function place(list) {
 
 try { place(JSON.parse(store.get("quills") || "[]")); } catch { place([]); }
 // The tabs drawn from the cache went up before the icon library was read:
-// once it is, they are placed again with the icons their Quills name.
-loadIcons().then(() => { if (quills.length) { place(quills); redrawTabs(); } });
+// once it is, they are placed again with the icons their Quills name — and
+// the bar is drawn again either way, for the tabs whose icon is a name in
+// the library rather than a drawing of this app's own.
+loadIcons().then(() => { if (quills.length) place(quills); redrawTabs(); });
 
 /** Ask the server which Quills there are, and put their tabs in the bar. */
 export function loadQuills() {

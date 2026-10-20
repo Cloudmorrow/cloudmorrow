@@ -19,6 +19,10 @@
    well; neither is for it. */
 .tabs .rail-head { display: none; }
 .aside-tabs .tabs { display: none; }
+/* The rail's Administration section and the pages under it. A phone's bar
+   has no room for a section; it keeps them behind a row in Me. */
+.tabs .rail-section { display: none; }
+.tabs .tab.admin { display: none; }
 
 @media (min-width: 900px) and (min-height: 600px) {
   :root {
@@ -92,6 +96,26 @@
     left: auto;
     margin: 0 0 0 auto;
   }
+
+  /* -- administration ------------------------------------------------------- */
+  /* The server's own pages, under a label of their own at the foot of the
+     rail, the way the terminal app's sidebar lists them. The phone's way
+     between them — the row in Me, the switch above the page — is not
+     needed where the rail is, and would say the same thing twice. */
+  .tabs .rail-section {
+    display: block;
+    margin: 18px 0 4px;
+    padding: 0 12px;
+    font-family: var(--display);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--bar-muted);
+  }
+  .tabs .tab.admin { display: flex; }
+  main.admin .seg { display: none; }
+  .admin-group { display: none; }
 
   /* -- the bar -------------------------------------------------------------- */
   /* Its buttons belong to the column, not to the window: a Compose out at

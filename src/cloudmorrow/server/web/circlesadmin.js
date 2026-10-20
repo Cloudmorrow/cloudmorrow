@@ -38,8 +38,7 @@ const plural = (n, word, many = word + "s") => `${n} ${n === 1 ? word : many}`;
 
 /** Back to the list, on the Circles side of Administration. */
 async function backToCircles() {
-  store.set("admin.side", "circles");
-  replace("#/admin");
+  replace("#/admin/circles");
   await renderRoute();
 }
 
@@ -203,8 +202,8 @@ async function renderCircle(id) {
   const shelves = domainsOf(models);
 
   mount(nav({
-    back: "#/admin",
-    backLabel: "Admin",
+    back: "#/admin/circles",
+    backLabel: "Circles",
     title: making ? "New circle" : circle.name,
   }) + `
     <main>

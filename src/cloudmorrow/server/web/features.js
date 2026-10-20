@@ -18,7 +18,7 @@
    than a tab disappearing a beat after you look at it. */
 
 import {
-  api, esc, gatedFeatures, onShell, onSignOut, session, setFeaturesOff, store, tabs, toast,
+  api, esc, gatedFeatures, onShell, onSignOut, redrawTabs, session, setFeaturesOff, store, toast,
 } from "./core.js";
 
 let features = [];
@@ -29,14 +29,6 @@ let asked = false;
 // moves and not otherwise. Held here rather than read back out of storage,
 // which is allowed to be a hole in the ground in a private window.
 let handed = store.get("features.off") || "";
-
-/** Redraw the bar at the bottom in place, keeping the tab you are on. */
-export function redrawTabs() {
-  const bar = document.querySelector(".tabs");
-  if (!bar) return;
-  const active = bar.querySelector(".tab.active");
-  bar.outerHTML = tabs(active ? active.dataset.tab : "");
-}
 
 /** Ask the server what this account has, tell the shell, and redraw if it moved. */
 export async function loadFeatures() {
