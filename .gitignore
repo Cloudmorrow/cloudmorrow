@@ -11,3 +11,7 @@ notes-data/
 
 # Where agent sessions make their own worktrees.
 .claude/worktrees/
+
+# A virtual environment is the machine's, never the repository's; one was committed by mistake once.
+.venv
+.venv-*/
