@@ -90,7 +90,7 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
 
     for screen in manifest.screens:
         thing = f"screen {screen['id']!r}"
-        if screen["kit"] == "view":
+        if screen["kit"] in ("view", "data"):
             if screen.get("model"):
                 model_of(thing, screen["model"])
             continue
@@ -253,7 +253,7 @@ def _surfaces(manifest: Manifest) -> list[str]:
     """Where its screens are drawn: everywhere, but to an assistant only what one may reach."""
     if not manifest.screens:
         return []
-    if all(screen["model"] in NEVER_FOR_ASSISTANTS for screen in manifest.screens):
+    if all(screen.get("model") in NEVER_FOR_ASSISTANTS for screen in manifest.screens):
         return [s for s in SURFACES if s != "assistant"]
     return list(SURFACES)
 

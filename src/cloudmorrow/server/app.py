@@ -18,6 +18,7 @@ from cloudmorrow.server.agents import AgentStore, JobStore
 from cloudmorrow.server.backends import SharesBackend, VaultsBackend
 from cloudmorrow.server.circles import CircleStore
 from cloudmorrow.server.config import ServerConfig, load_config
+from cloudmorrow.server.dataview import DATA_FEATURE
 from cloudmorrow.server.dav import MOUNT_PATH, CredentialCheck, build_dav_app
 from cloudmorrow.server.db import UserStore
 from cloudmorrow.server.drive import user_drive
@@ -118,12 +119,16 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     # Who may use which datamodels: asked by the gate on every read and write.
     circle_store = CircleStore(db)
     # Each installed Quill is one more thing to switch, at both levels; a
-    # Quill of somebody's own by its key, `~alice.budget`.
+    # Quill of somebody's own by its key, `~alice.budget`; and Data, the
+    # tab the server composes for everybody (dataview.py), last.
     feature_store = FeatureStore(
         db,
         lambda: (
-            Feature(q.key, q.name if not q.owner else f"{q.name} ({q.owner}'s)", q.summary, tuple(sorted(q.models)))
-            for q in quill_registry.all()
+            *(
+                Feature(q.key, q.name if not q.owner else f"{q.name} ({q.owner}'s)", q.summary, tuple(sorted(q.models)))
+                for q in quill_registry.all()
+            ),
+            DATA_FEATURE,
         ),
     )
     # Whose Quills are whose, and the access that follows: a datamodel of

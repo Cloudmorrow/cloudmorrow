@@ -30,10 +30,10 @@ MANIFEST = "quill.toml"
 ORIGIN = ".origin.json"
 
 # The screens every surface draws. A Quill has these and nothing else.
-KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor", "view")
+KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor", "view", "data")
 # The ones every surface draws *today*. A screen of another kind is refused at
 # install, so a Quill never lands with a tab that draws nothing somewhere.
-KIT_READY = frozenset({"list", "board", "detail", "form", "calendar", "grid", "editor", "thread", "view"})
+KIT_READY = frozenset({"list", "board", "detail", "form", "calendar", "grid", "editor", "thread", "view", "data"})
 
 # How a thread screen may make a space: in one of the scopes, or `direct`,
 # found-or-made between the people picked.
@@ -345,6 +345,9 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
         if kit == "view":
             if not str(screen.get("label", "")).strip():
                 raise QuillError(f"{where}: screen {screen['id']!r} is a view, so it says its label")
+            continue
+        if kit == "data":
+            # The Quill's datamodels, every one, to look at: it names none.
             continue
         if not screen.get("model"):
             raise QuillError(f"{where}: screen {screen['id']!r} names a model")

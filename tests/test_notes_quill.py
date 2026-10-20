@@ -112,7 +112,7 @@ def test_the_quill_goes_first_whenever_it_was_installed(client, auth):
     state.quills.install_from_catalog("notes")
     # Where the catalog puts it, not when it came: Notes has always been
     # the first tab, and a server that had Tasks first keeps Notes first.
-    assert [q["id"] for q in client.get("/api/quills", headers=auth).json()] == ["notes", "tasks"]
+    assert [q["id"] for q in client.get("/api/quills", headers=auth).json()] == ["notes", "tasks", "data"]
 
 
 # -- the welcome note ---------------------------------------------------------------

@@ -109,7 +109,8 @@ def test_a_view_screen_is_drawn_by_its_own_file():
 
 def test_every_record_sheet_has_the_actions_on_its_datamodel():
     sheet = js_code(_function(KIT_JS, "renderRecordSheet"))
-    assert "${sheetSection(model.id)}" in sheet
+    # Every sheet but a data screen's, which is for looking (kit_data.js).
+    assert '${screen.kit === "data" ? "" : sheetSection(model.id)}' in sheet
     assert "wireSheetSection(app," in sheet
     # Read-only sheets have them too: the gate says no if the code writes.
     assert sheet.index("wireSheetSection(app,") < sheet.index("if (looked) return;")
@@ -159,6 +160,10 @@ def test_every_installed_screen_is_one_the_kit_draws(client, auth, tasks_quill):
     for quill in quills:
         for screen in quill["screens"]:
             assert screen["kit"] in KIT_READY
+            if not screen.get("model"):
+                # A data screen is over every datamodel the Quill has.
+                assert screen["kit"] == "data"
+                continue
             model = quill["models"][screen["model"]]
             for name in ("title", "lane", "body", "group", "subtitle", "tick"):
                 if screen.get(name):
@@ -279,9 +284,9 @@ def test_the_calendar_asks_the_record_api_for_a_window_of_days():
         code = re.sub(r"/\*.*?\*/|//[^\n]*", "", calendar, flags=re.DOTALL)
         assert field not in code, field
     # Drawn by the kit, and its sheet changed by it, from its own file.
-    own = "const OWN = { calendar: renderCalendar, thread: renderThread, view: renderView };"
+    own = "const OWN = { calendar: renderCalendar, thread: renderThread, view: renderView, data: renderData };"
     assert own in KIT_JS
-    assert "const SHEETS = { calendar: calendarSheet };" in KIT_JS
+    assert "const SHEETS = { calendar: calendarSheet, data: dataSheet };" in KIT_JS
 
 
 def test_a_space_has_its_people_on_its_sheet():

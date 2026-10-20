@@ -228,11 +228,14 @@ Attestations domain, for the registry page and for Quills that use them.
 
 ## Not yet
 
-- **Screens.** A Quill over `snapshot` and `attestation` — a list, a sheet
-  with the badge "validated by Jane Doe, Acme Accounting, 20 January", a
-  "close the year" action on the accounting Quill — is the kit's work and
-  waits for an accounting Quill to put it on. The API and the command line
-  are whole without it.
+- **Screens of their own.** The **Data** tab shows every snapshot and
+  attestation a person may see: a snapshot's sheet carries its digest,
+  whether its bundle is intact, a download of it, and each attestation with
+  its verdict; a space's sheet lists the snapshots taken of it
+  ([QUILLS.md](QUILLS.md), *Screens*, `data`). Taking one, giving out a
+  link and bringing a stamp back are the API's and `cm snapshot`'s. A
+  "close the year" action on an accounting Quill, with the stamp as a badge
+  on the ledger, waits for that Quill.
 - **Verified signers.** The registry publishing signers' keys, so a stamp
   carries a name a reader can trust rather than a fingerprint to compare.
 - **A statement page.** A printable page of a snapshot's digest and its
@@ -257,4 +260,5 @@ Attestations domain, for the registry page and for Quills that use them.
 | the routes | `server/routes/snapshots.py` |
 | the sealed column and the tables | `server/sealed.py` (5), `server/schema.py` (step 6) |
 | the command line and the client | `cli/snapshot.py`, `cli/attest.py`, `client/api.py` |
+| the Data tab's snapshot section, on every surface | `web/kit_data.js`, `cli/quillrun/data.py` |
 | the tests | `tests/test_snapshots.py` |
