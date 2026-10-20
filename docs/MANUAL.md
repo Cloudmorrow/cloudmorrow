@@ -125,6 +125,14 @@ description. Nothing is kept from a surface on purpose — only by what the
 surface can do: a browser cannot mount a share, and a terminal has no
 camera.
 
+The Tasks Quill, on each:
+
+![The web app on a phone: the Tasks board with its lanes To Do, Doing and Done stacked, and the tabs along the bottom](images/phone-tasks.webp)
+
+![The web app in a desktop browser: the same board as three columns, with every Quill in the sidebar](images/desktop-tasks.webp)
+
+![The terminal app: the same board as three columns, the Quills down the left, the keys along the bottom](images/tui-tasks.webp)
+
 **Signing in.** The same username and password everywhere.
 
 #### In the web app
