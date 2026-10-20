@@ -1,0 +1,32 @@
+/* The kit's data screen (kit_data.js): the datamodels by domain, the records
+   of one, and on a record's sheet what links to it and — for a snapshot —
+   its digest and the attestations on it. Nothing here is named for one
+   Quill or one datamodel. */
+
+.data-about { margin: -6px 4px 14px; color: var(--muted); font-size: 15px; line-height: 1.4; }
+.data-note { margin: 4px 4px 0; color: var(--muted); font-size: 15px; }
+.data-more { color: var(--muted); font-weight: 400; font-size: 14px; }
+.heading .count { color: var(--muted); font-size: 15px; align-self: flex-end; padding-bottom: 6px; }
+
+/* A digest is read a few characters at a time, in the face that tells 0 from O. */
+.row .meta .preview.digest { font-family: var(--mono); font-size: 12px; white-space: normal; word-break: break-all; }
+
+/* A verdict is a word in a colour: the word is the meaning, the colour the glance. */
+.verdict {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line-bright);
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+  vertical-align: 1px;
+}
+.verdict.good { border-color: var(--good); color: var(--good); }
+.verdict.warn { border-color: var(--warn); color: var(--warn); }
+.verdict.bad { border-color: var(--bad); color: var(--bad); }
+
+.row.attestation .title { white-space: normal; }
+.data-snapshot .row .main { padding-right: 8px; }
+.data-snapshot .chip { flex: none; }

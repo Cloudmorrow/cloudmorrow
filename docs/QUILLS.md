@@ -180,6 +180,7 @@ each element needs:
 | `thread` | `model` (in a space), `space` (its link to the space), `body`; optional `about` (a field of the space), `made_as`; a team's: `reply_to` (a link of the model to itself), `pinned` (a bool), `reactions` (a datamodel with a link to the model and an `emoji`), `mentions = true` | the spaces with unread, then a conversation; a line's thread as a page | both side by side, a thread beside them | both side by side, replies under their lines | `cm <quill> list`, `show`, `say`, `reply`, `react`, `pin` |
 | `editor` | `model`, `title`, `body` (markdown), optional `path` (a string, `folder/sub/title`: the folders) | a tree, then a list, then the page | the list and the page side by side | the tree and the live editor side by side | `cm <quill> list`, `show`, `add`, `edit`, `search` |
 | `grid` | `model` with content (`file`), `group` (a link: the places, picked first), `folder`, `kind` (an enum with `folder`), optional `size`, `modified`, `mime`, `group_subtitle`, `group_open` (a bool on the group: false and it is listed, not opened), `group_writes` (a bool on the group: false and it opens with nothing that writes) | the groups, then folders and tiles | the same, wider; drag and drop in | the groups in a table, then the folder, with the picture beside | `cm <quill> list [group] [folder]`, `get`, `put`, `add` |
+| `data` | nothing: every datamodel the Quill has, or `models` (a list of ids) | the datamodels by domain, the records of one, the sheet of each — to look at | the same, wider | the datamodels down the left, a table of the records of one | `cm <quill> list [datamodel]`, `show <datamodel> <id>` |
 
 A board's lanes are an enum's values, fixed by the datamodel — To Do,
 Doing, Done — or, when `lane` is a link, the records it links to, in their
@@ -218,6 +219,14 @@ spaces: a list of them — yours, shared, everybody's — the way to make one
 in it, adding somebody, taking somebody out and leaving. That is the kit's,
 not the calendar's: every surface has it once (web `kit_space.js`, terminal
 `widgets/kit_space.py`), for any element that draws things in spaces.
+
+A `data` screen is the kit's look at everything: the datamodels a Quill has
+(or the ones it names), each with its records in a table and each record on
+the sheet every record has, marked read whatever the circles give. The
+**Data** tab on every shelf is one, composed by the server for whoever asks
+with every datamodel their circles give them (`server/dataview.py`); under a
+record's fields it shows what links to it, and a snapshot with its digest
+and attestations ([ATTESTATIONS.md](ATTESTATIONS.md)).
 
 A `thread` is the kit's conversation: things written (`body`) in spaces. Its
 `made_as` says what fields a space gets for how it is made — by its scope, or

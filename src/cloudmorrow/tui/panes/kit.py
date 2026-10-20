@@ -27,6 +27,8 @@ task board has to go on as much as a list of car services does.
   you are on to the right, and a line to write in.
 - `view` is not the kit's: the Quill's own code draws it, as a tree of
   primitives, and kit_view.py turns the tree into widgets (widgets/view_nodes.py).
+- `data` is in kit_data.py: the Quill's datamodels down the left, the
+  records of one beside them, each opened in the sheet to look at.
 
 Every one of them opens a record in the record sheet, where every field has
 the widget its kind calls for.
@@ -454,6 +456,7 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     """
     from cloudmorrow.tui.panes.kit_board import BoardPane
     from cloudmorrow.tui.panes.kit_calendar import CalendarPane
+    from cloudmorrow.tui.panes.kit_data import DataPane
     from cloudmorrow.tui.panes.kit_editor import EditorPane
     from cloudmorrow.tui.panes.kit_grid import GridPane
     from cloudmorrow.tui.panes.kit_grouped import GroupedListPane, draws_here
@@ -464,6 +467,9 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     if kit == "view":
         # About no datamodel, or one the server kept it for (docs/CIRCLES.md).
         return ViewPane(quill, screen, **kwargs)
+    if kit == "data":
+        # Over every datamodel the Quill has, to look at (kit_data.py).
+        return DataPane(quill, screen, **kwargs)
     if screen.get("model") not in (quill.get("models") or {}):
         return None
     if kit == "board":

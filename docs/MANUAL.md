@@ -737,6 +737,16 @@ lanes; Files is folders and tiles. Each Quill's own guide is on its page in
 the [catalog](https://cloudmorrow.com/quills). Every row opens the record's
 sheet: every field, editable, with delete.
 
+The last tab is **Data**: every kind of data on the server your circles give
+you, by domain, and the records in each — the same records the Quills draw,
+to look at rather than change, each on the sheet every record has, with its
+history, what links to it and, for a snapshot, its digest and the
+attestations on it ([ATTESTATIONS.md](ATTESTATIONS.md)). It is there for
+everybody without any Quill, and shows nothing a Quill would not. In the
+terminal it is a card under the Quills with the datamodels down the left; on
+the command line it is `cm data list`, `cm data list <datamodel>` and
+`cm data show <datamodel> <id>`.
+
 On iOS, share-sheet → **Add to Home Screen** makes it an app of its own: an
 icon, no browser chrome, and it opens where you left it. Anything that can
 reach the API can use it; there is nothing to configure on the server.

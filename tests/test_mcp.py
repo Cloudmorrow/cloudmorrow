@@ -475,7 +475,8 @@ def test_an_administrators_assistant_builds_a_quill_in_a_conversation(client, au
     # It is on the server, for the person, at once.
     made = client.post("/api/records/plants.plant", headers=auth, json={"fields": {"name": "Fig"}})
     assert made.status_code == 201 and made.json()["fields"]["healthy"] is True
-    assert [q["id"] for q in client.get("/api/quills", headers=auth).json()] == ["plants"]
+    # Last is Data, which the server composes for everybody (dataview.py).
+    assert [q["id"] for q in client.get("/api/quills", headers=auth).json()] == ["plants", "data"]
 
 
 def test_anybody_elses_assistant_builds_a_quill_of_their_own(client, auth, guest_auth):

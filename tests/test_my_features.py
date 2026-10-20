@@ -37,7 +37,8 @@ def server_switch(client, auth, key: str, enabled: bool):
 # -- what you are offered ---------------------------------------------------------
 def test_everything_is_on_for_a_fresh_account(client, auth):
     listed = mine(client, auth)
-    assert [row["key"] for row in listed] == list(FEATURE_KEYS)
+    # The built-ins, then Data, which the server composes for everybody (dataview.py).
+    assert [row["key"] for row in listed] == [*FEATURE_KEYS, "data"]
     assert all(row["enabled"] for row in listed)
     # It says what each one is, so a client need not carry its own copy.
     assert all(row["label"] and row["description"] for row in listed)

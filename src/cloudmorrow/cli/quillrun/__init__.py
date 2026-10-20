@@ -46,6 +46,10 @@ A `grid` (files) takes its group and folder as words instead:
 A `thread` screen is spaces and what is said in them:
 
     cm chat list                       # the channels, with what is unread
+
+    cm data list                       # every datamodel you may see, by domain
+    cm data list deal                  # the records of one, to look at
+    cm data show snapshot 9f8e         # one record; a snapshot with its attestations
     cm chat show general               # the conversation, newest at the bottom
     cm chat say general "on my way"    # a channel by name, id, or the person
 
@@ -79,6 +83,7 @@ import typer
 from cloudmorrow.cli.common import client, console, emit, fail, out, run  # noqa: F401
 from cloudmorrow.cli.quillrun.actions import _list_actions, _press, _view
 from cloudmorrow.cli.quillrun.board import _lane_named, _lanes  # noqa: F401
+from cloudmorrow.cli.quillrun.data import _act_data
 from cloudmorrow.cli.quillrun.editor import _act_editor
 from cloudmorrow.cli.quillrun.grid import _act_grid
 from cloudmorrow.cli.quillrun.history import _history
@@ -179,6 +184,10 @@ async def dispatch(
         words = [*ACTIONS, "actions", *declared]
         fail(f"{action!r}: {found['id']} does {', '.join(words)}")
     spec = _screen_spec(found, screen_id)
+    if spec["kit"] == "data":
+        # Over every datamodel the Quill has, to look at: data.py.
+        await _act_data(api, found, spec, action, args, plain)
+        return
     if spec["kit"] == "view":
         if action not in ("list", "show"):
             fail(f"{spec['id']} is a view: `cm {found['id']} --screen {spec['id']}` prints it")

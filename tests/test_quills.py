@@ -210,11 +210,12 @@ def test_an_administrator_installs_from_the_catalog_and_the_tabs_follow(client, 
     plan = client.post("/api/quills/plan", headers=auth, json={"id": "tasks"}).json()
     assert [row["id"] for row in plan["data"]] == ["board", "task"]
     assert all(row["new"] for row in plan["data"])
-    assert client.get("/api/quills", headers=auth).json() == []
+    # Nothing installed: only Data, which the server composes for everybody (dataview.py).
+    assert [q["id"] for q in client.get("/api/quills", headers=auth).json()] == ["data"]
     installed = client.post("/api/quills", headers=auth, json={"id": "tasks"})
     assert installed.status_code == 201, installed.text
     quills = client.get("/api/quills", headers=auth).json()
-    assert [(q["id"], q["enabled"]) for q in quills] == [("tasks", True)]
+    assert [(q["id"], q["enabled"]) for q in quills] == [("tasks", True), ("data", True)]
     assert set(quills[0]["models"]) == {"board", "task"}
     after = {q["id"]: q for q in client.get("/api/quills/catalog", headers=auth).json()["quills"]}
     assert after["tasks"]["installed_version"] == "1.2.0"
@@ -225,7 +226,7 @@ def test_an_administrator_installs_from_the_catalog_and_the_tabs_follow(client, 
     mine = {row["key"] for row in client.get("/api/me/features", headers=auth).json()}
     assert "tasks" in mine
     assert client.delete("/api/quills/tasks", headers=auth).status_code == 200
-    assert client.get("/api/quills", headers=auth).json() == []
+    assert [q["id"] for q in client.get("/api/quills", headers=auth).json()] == ["data"]
 
 
 def test_the_catalog_says_when_a_newer_release_is_out():

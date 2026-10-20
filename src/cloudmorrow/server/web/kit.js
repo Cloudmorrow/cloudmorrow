@@ -31,6 +31,7 @@ import { renderGrid, renderGridItem } from "./kit_grid.js";
 import { renderThread } from "./kit_thread.js";
 // A view is a Quill's own screen, drawn from the tree its code returns.
 import { renderView } from "./kit_view.js";
+import { dataSheet, renderData } from "./kit_data.js";
 // And a Quill's actions, on every record's sheet.
 import { sheetSection, wireSheetSection } from "./actions.js";
 
@@ -136,12 +137,12 @@ export const canDrag = () => matchMedia("(hover: hover) and (pointer: fine)").ma
 // The kit elements this file draws. The server refuses to install a screen
 // of any other kind until every surface draws it, and a test holds this
 // list to the server's; the check below is for a server newer than the page.
-export const DRAWS = ["list", "board", "detail", "form", "calendar", "grid", "editor", "thread", "view"];
+export const DRAWS = ["list", "board", "detail", "form", "calendar", "grid", "editor", "thread", "view", "data"];
 
 // Each element that is more than rows is a file of its own: kit_<kit>.js.
-const OWN = { calendar: renderCalendar, thread: renderThread, view: renderView };
+const OWN = { calendar: renderCalendar, thread: renderThread, view: renderView, data: renderData };
 // And what it changes on the record sheet, if anything: kit_<kit>.js again.
-const SHEETS = { calendar: calendarSheet };
+const SHEETS = { calendar: calendarSheet, data: dataSheet };
 
 export async function renderKitScreen(at, arg) {
   const { kit } = at.screen;
@@ -689,7 +690,8 @@ export async function renderRecordSheet(at, modelId, id, arg) {
     replace(at.base);
     return renderRoute();
   }
-  const onScreen = model.id === screen.model;
+  // A data screen is over every datamodel it has: each is its own.
+  const onScreen = model.id === screen.model || screen.kit === "data";
   const title = titleField(at, model);
   const wanted = onScreen && screen.fields && screen.fields.length ? new Set([title, ...screen.fields]) : null;
   // What the screen's `made_as` sets is how the space was made, not a thing to change.
@@ -727,6 +729,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   const own = SHEETS[screen.kit] ? SHEETS[screen.kit](at, model) : null;
   // Back to the day it is on, rather than to wherever the screen starts.
   if (own && own.parent && onScreen) parent = own.parent(record) || parent;
+  if (own && own.backLabel) backLabel = own.backLabel;
   // A space is its manager's to change; everybody in it reads the same sheet.
   // And a record of a datamodel you may only read is read: its fields said,
   // not boxes to type in, and nothing to save or delete it with.
@@ -777,12 +780,16 @@ export async function renderRecordSheet(at, modelId, id, arg) {
           body.kind === "json" && record.fields[body.name] != null ? JSON.stringify(record.fields[body.name], null, 2) : record.fields[body.name] ?? "")}</textarea>` : ""}
       </div>
       ${people}
-      ${sheetSection(model.id)}
+      ${screen.kit === "data" ? "" : sheetSection(model.id)}
+      <div class="own-slot"></div>
       <div class="history-slot"></div>
     </main>`);
   wireShell();
   app.querySelector(".nav").classList.add("lined");
   drawHistory(app.querySelector(".history-slot"), model, id);
+  // What the kit adds under the fields, when it does: what links here, a
+  // snapshot's attestations. Filled as it arrives; a failure leaves it empty.
+  if (own && own.section) own.section(app.querySelector(".own-slot"), record).catch(() => {});
   // A secret is still a password box with its eye, only not one to type in.
   if (looked) for (const el of app.querySelectorAll(".editor input")) el.readOnly = true;
   if (own && own.wire && !looked) own.wire(app.querySelector(".editor"));

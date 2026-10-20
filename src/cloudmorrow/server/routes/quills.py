@@ -25,6 +25,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
 from cloudmorrow.server.circles import NONE, Access
+from cloudmorrow.server.dataview import data_quill
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_admin_user, get_current_user, get_state
 from cloudmorrow.server.quills import MANIFEST, MAX_DOWNLOAD, Catalog, QuillError, fetch, load_catalog, removal
@@ -87,7 +88,7 @@ WITHIN = ("group", "subgroup", "space")
 
 def _screen_needs(screen: dict, models: dict[str, dict]) -> set[str]:
     """Every datamodel a screen cannot be drawn without: its own, and what it is within."""
-    if screen.get("kit") == "view" and not screen.get("model"):
+    if screen.get("kit") in ("view", "data") and not screen.get("model"):
         return set()
     model = models.get(screen["model"])
     if model is None:
@@ -158,8 +159,11 @@ def _told(state: AppState, user: User, manifest) -> dict:
 
 @router.get("")
 def list_quills(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> list[dict]:
-    """Every Quill on your shelf, with whether it is on for you, and what it draws."""
-    return [_for(state, user, _told(state, user, manifest)) for manifest in _shelf_of(state, user)]
+    """Every Quill on your shelf, with whether it is on for you, and what it draws —
+    and, last, Data: every datamodel you may see, to look at (dataview.py)."""
+    shelf = [_for(state, user, _told(state, user, manifest)) for manifest in _shelf_of(state, user)]
+    access = state.shelf or state.circles
+    return [*shelf, data_quill(state, user.username, access.access_for(user.username) if access else None)]
 
 
 @router.get("/catalog")
