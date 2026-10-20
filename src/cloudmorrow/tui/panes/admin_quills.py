@@ -469,8 +469,8 @@ def own_widgets(everything: dict) -> list:
             f"[{MUTED}]What this server allows (docs/SHARING.md) — "
             f"people's own: [b]{policy.get('personal_quills', 'on')}[/]"
             f" · code: [b]{policy.get('personal_quill_code', 'on')}[/] · sharing: "
-            f"[b]{policy.get('personal_quill_sharing', 'on')}[/]  — `cm quill policy` changes it. A Quill somebody adds "
-            f"for themselves is on their shelf alone, over their own data, run as them.[/]",
+            f"[b]{policy.get('personal_quill_sharing', 'on')}[/]  — `cm quill policy` changes it. "
+            f"A Quill somebody adds for themselves is on their shelf alone, over their own data, run as them.[/]",
             id="own-policy",
         )
     ]
