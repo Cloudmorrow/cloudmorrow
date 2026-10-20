@@ -31,6 +31,7 @@ from cloudmorrow.cli import (
     dev,
     quill,
     quillrun,
+    role,
     secret,
     settings,
     share,
@@ -67,6 +68,12 @@ app.add_typer(snapshot.app, name="snapshot")
 app.add_typer(attest.app, name="attest")
 # Your own access: what your circles give you, per datamodel.
 app.command("access")(circle.access)
+# Roles, the approvals asked of them, and flows (docs/FLOWS.md).
+app.add_typer(role.app, name="role")
+app.add_typer(role.flow_app, name="flow")
+app.command("approvals")(role.approvals)
+app.command("approve")(role.approve)
+app.command("decline")(role.decline)
 # The way out: `cloudmorrow uninstall`, in its own file beside the way in.
 app.command("uninstall")(uninstall.uninstall)
 # The desktop app: the web app in a window, with this computer behind it.

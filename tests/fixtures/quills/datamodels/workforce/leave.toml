@@ -1,0 +1,17 @@
+[datamodel]
+id = "leave"
+version = 1
+label = "Leave"
+description = "Time off asked for and answered: holiday, sickness, parental leave — from when to when, and whether it was approved."
+domain = "workforce"
+scopes = ["personal", "shared"]
+title = "what"
+
+[fields]
+employment = { kind = "link", to = "employment", required = true, indexed = true, on_delete = "cascade" }
+what = { kind = "string", required = true, description = "Summer holiday, dentist" }
+kind = { kind = "enum", values = ["holiday", "sick", "parental", "other"], labels = ["Holiday", "Sick", "Parental", "Other"], default = "holiday", indexed = true }
+starts = { kind = "date", required = true, indexed = true }
+ends = { kind = "date", required = true, indexed = true }
+status = { kind = "enum", values = ["requested", "approved", "declined"], labels = ["Requested", "Approved", "Declined"], default = "requested", indexed = true }
+notes = { kind = "markdown" }

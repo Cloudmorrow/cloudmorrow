@@ -195,10 +195,12 @@ hook started by an assistant's change is the same.
 
 | | what |
 | --- | --- |
-| `ctx.user` | who it runs for: `.username`, `.name`, `.admin`, `.circles` |
+| `ctx.user` | who it runs for: `.username`, `.name`, `.admin`, `.circles`, `.roles` |
 | `ctx.quill`, `ctx.where` | this Quill's id; `"server"` or `"machine"` |
 | `ctx.params` | a view's parameters, by name and as attributes; `.record` when opened on one |
 | `ctx.records` | `list(model, q=, last=, **where)`, `get`, `create(model, fields=None, **values)`, `patch(model, id, fields, rev=)`, `move(model, id, fields, index=)`, `delete` — the record API, through the gate |
+| `ctx.people(role=, circle=)` | who holds a role, as usernames ([FLOWS.md](FLOWS.md)) |
+| `ctx.approvals.ask(record, role=, question=)` | a yes or no asked of whoever holds the role; the answer comes back as a hook on `approval` |
 | `ctx.fetch(url, method=, headers=, json=, body=)` | https to a host in `[[fetch]]`, and there only after a redirect too; a `Response` (`.status`, `.ok`, `.json()`, `.text`) |
 | `ctx.secret(key)` | a key in `[[secrets]]`, from the person's own vault |
 | `ctx.now()`, `ctx.log(...)` | the time; a line in the Quill's log |
@@ -266,6 +268,7 @@ written with them, and move out of the core into the Quill that uses it.
 | `go(screen, **params)` | another screen of this Quill |
 | `confirm("…", then=action, **fields)` | ask first, then run another action with those fields |
 | `error("…")` | the form stays open with the message |
+| `result(**values)` | what the action found out, for a flow that pressed it ([FLOWS.md](FLOWS.md)); a screen ignores it |
 | nothing, `redraw()` | the screen is drawn again |
 
 ## The sandbox

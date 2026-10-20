@@ -35,7 +35,10 @@ from cloudmorrow.server.webpush import PushStore
 
 if TYPE_CHECKING:
     from cloudmorrow.server.access_lan import LanAnnouncer
+    from cloudmorrow.server.approvals import Approvals
     from cloudmorrow.server.changefeed import ChangeFeed
+    from cloudmorrow.server.flows import FlowRunner
+    from cloudmorrow.server.roles import RoleStore
     from cloudmorrow.server.snapshots import SnapshotStore
 
 
@@ -85,6 +88,11 @@ class AppState:
     changes: ChangeFeed | None = None
     # Frozen copies of a space's records, and the signed word on them (snapshots.py).
     snapshots: SnapshotStore | None = None
+    # Who holds which role (roles.py), the approvals asked of them
+    # (approvals.py), and the flows that run when things happen (flows.py).
+    roles: RoleStore | None = None
+    approvals: Approvals | None = None
+    flows: FlowRunner | None = None
 
     def cloud_name(self) -> str:
         """What this cloud is called: set from the app, else from the config."""

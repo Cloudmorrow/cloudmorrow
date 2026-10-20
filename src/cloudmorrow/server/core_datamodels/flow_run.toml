@@ -1,0 +1,25 @@
+# One run of a flow: where it is, what it has gathered, and why it stopped.
+[datamodel]
+id = "flow_run"
+version = 1
+label = "Flow run"
+description = "One run of a flow: which step it is at, what it has gathered so far, and how it ended."
+domain = "flows"
+scopes = ["personal"]
+title = "name"
+
+[fields]
+flow = { kind = "link", to = "flow", required = true, indexed = true, on_delete = "cascade" }
+name = { kind = "string", required = true }
+status = { kind = "enum", values = ["running", "waiting", "done", "failed", "stopped"], labels = ["Running", "Waiting", "Done", "Failed", "Stopped"], default = "running", indexed = true }
+# The index of the step it is at, or finished at.
+step = { kind = "int", default = 0 }
+# Everything the steps may read: the trigger, the results so far.
+context = { kind = "json", default = {} }
+# The approval it waits on, when it does.
+waiting_on = { kind = "string", indexed = true }
+# When a wait step ends, when it waits on the clock.
+wake_at = { kind = "datetime", indexed = true }
+error = { kind = "text" }
+started_at = { kind = "datetime", indexed = true }
+finished_at = { kind = "datetime", indexed = true }

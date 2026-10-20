@@ -92,6 +92,9 @@ class Manifest:
     # Programs its services need on the server, fetched for it from the
     # catalog's runtimes at install (quills/runtimes.py): `[requires]`.
     runtimes: tuple[str, ...] = ()
+    # The roles it expects somebody to hold — `[[roles]]`, each with why —
+    # made on the server, empty, when it is installed (roles.py, docs/FLOWS.md).
+    roles: tuple[dict, ...] = ()
     readme: str = ""
     folder: Path | None = None
     origin: dict = field(default_factory=dict)
@@ -173,6 +176,7 @@ class Manifest:
             "secrets": list(self.secrets),
             "machine": list(self.machine),
             "requires": {"runtimes": list(self.runtimes)},
+            "roles": list(self.roles),
             "origin": dict(self.origin),
             "owner": self.owner,
             "key": self.key,
@@ -410,6 +414,8 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
         if prefix and not (isinstance(prefix, str) and API_PREFIX_RE.match(prefix)):
             raise QuillError(f"{where}: api {api['id']!r} prefix is a path like v1/public")
 
+    roles = _roles(data, where)
+
     readme = ""
     if folder is not None and (folder / "README.md").is_file():
         readme = (folder / "README.md").read_text(encoding="utf-8")
@@ -442,9 +448,33 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
         secrets=code.secrets,
         machine=code.machine,
         runtimes=runtimes,
+        roles=roles,
         readme=readme,
         folder=folder,
     )
+
+
+ROLE_RE = re.compile(r"^[a-z][a-z0-9_]{0,47}$")
+
+
+def _roles(data: dict, where: str) -> tuple[dict, ...]:
+    """`[[roles]]`: a hat the Quill expects somebody to wear, and why."""
+    out = []
+    seen: set[str] = set()
+    for item in _table_list(data, "roles", where):
+        role = str(item.get("id", ""))
+        if not ROLE_RE.match(role):
+            raise QuillError(f"{where}: a role's id is lowercase words with _, like team_lead")
+        if role in seen:
+            raise QuillError(f"{where}: two roles called {role!r}")
+        seen.add(role)
+        if not str(item.get("why", "")).strip():
+            raise QuillError(f"{where}: the role {role} says why; a person reads it when picking who holds it")
+        unknown = sorted(set(item) - {"id", "label", "why"})
+        if unknown:
+            raise QuillError(f"{where}: role {role} has unknown keys {unknown}")
+        out.append({"id": role, "label": str(item.get("label", "")).strip(), "why": str(item["why"]).strip()})
+    return tuple(out)
 
 
 def _check_webhook(hook: dict, service_ids: set[str], paths: set[str], where: str) -> None:

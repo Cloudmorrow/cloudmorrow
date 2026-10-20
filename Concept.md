@@ -37,7 +37,10 @@ what it may see and change, and a switch to cut it. Installing an app
 shows what it asks for, in plain words, and waits for a yes. One gate
 checks every read and write. People are in circles — Parents, Kids, Sales
 — that say which kinds of data they may use, and an app does what the data
-lets its person do ([docs/CIRCLES.md](docs/CIRCLES.md)).
+lets its person do ([docs/CIRCLES.md](docs/CIRCLES.md)). Who is *responsible* for
+something — the team lead, the product owner — is a role, not a circle,
+and a procedure is a flow: when this happens, ask that role, then do these
+steps ([docs/FLOWS.md](docs/FLOWS.md)).
 
 **Everything is on every device.** An app is a manifest: the elements it
 uses, the access it asks for, its screens built from a small kit — list,

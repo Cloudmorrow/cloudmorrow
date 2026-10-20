@@ -85,6 +85,7 @@ def test_each_side_is_a_tab_of_the_rail_for_an_administrator():
     assert re.findall(r'^\s*\["([a-z]+)", "([A-Za-z]+)"', sides, re.MULTILINE) == [
         ("users", "Users"),
         ("circles", "Circles"),
+        ("roles", "Roles"),
         ("quills", "Quills"),
         ("server", "Server"),
     ]
@@ -98,7 +99,7 @@ def test_each_side_is_a_tab_of_the_rail_for_an_administrator():
     assert "setAdmin(data.user.is_admin)" in core
     assert "setAdmin(me.is_admin)" in ADMIN_JS
     # The pages inside a side come back to that side, not to a bare #/admin.
-    for js, side in (("circlesadmin.js", "circles"), ("quillsadmin.js", "quills")):
+    for js, side in (("circlesadmin.js", "circles"), ("rolesadmin.js", "roles"), ("quillsadmin.js", "quills")):
         assert f'replace("#/admin/{side}")' in (WEB / js).read_text(encoding="utf-8"), js
         assert 'replace("#/admin")' not in (WEB / js).read_text(encoding="utf-8"), js
 

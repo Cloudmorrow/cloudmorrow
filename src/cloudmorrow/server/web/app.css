@@ -25,6 +25,9 @@
 @import "./me.css";
 @import "./admin.css";
 @import "./circlesadmin.css";
+@import "./rolesadmin.css";
+@import "./approvals.css";
+@import "./flows.css";
 @import "./quillsadmin.css";
 @import "./myquills.css";
 @import "./adddevice.css";

@@ -202,6 +202,11 @@ class Datamodel:
     # through the generic record API: a snapshot, which carries a digest only
     # the server can vouch for.
     server_made: bool = False
+    # A record of it is seen, and may be changed, by whoever holds the role a
+    # field of it names — within the circle another field names, when one
+    # does: {"role": "role", "circle": "circle"}. How an approval reaches
+    # the people who may answer it (docs/FLOWS.md). Empty for most.
+    seen_by_role: dict = field(default_factory=dict)
 
     @property
     def by_name(self) -> dict[str, Field]:
@@ -253,6 +258,7 @@ class Datamodel:
             backend=self.backend,
             lock=self.lock,
             server_made=self.server_made,
+            seen_by_role=self.seen_by_role,
         )
 
     def to_dict(self) -> dict:
@@ -273,6 +279,7 @@ class Datamodel:
             "backend": self.backend,
             "locked": self.lock.to_dict() if self.lock else False,
             "server_made": self.server_made,
+            "seen_by_role": dict(self.seen_by_role),
             "fields": [f.to_dict() for f in self.fields],
         }
 
@@ -471,6 +478,7 @@ def parse_datamodel(data: dict, *, source: str = "foundation", where: str = "") 
     lock = _lock(head.get("locked", False), by_name, where)
     if lock is not None and backend:
         raise DatamodelError(f"{where}: a datamodel kept by a backend is not locked")
+    seen_by_role = _seen_by_role(head.get("seen_by_role"), by_name, where)
     return Datamodel(
         id=model_id,
         version=version,
@@ -489,6 +497,7 @@ def parse_datamodel(data: dict, *, source: str = "foundation", where: str = "") 
         backend=backend,
         lock=lock,
         server_made=bool(head.get("server_made", False)),
+        seen_by_role=seen_by_role,
     )
 
 
@@ -512,6 +521,25 @@ def _lock(value: object, by_name: dict[str, Field], where: str) -> Lock | None:
     if locks_on in allow:
         raise DatamodelError(f"{where}: locked allows the value it locks on")
     return Lock(field=name, value=locks_on, allow=allow)
+
+
+def _seen_by_role(value: object, by_name: dict[str, Field], where: str) -> dict:
+    """`seen_by_role = { role = "role", circle = "circle" }`: the indexed string
+    fields that name the role whose holders see a record, and the circle it
+    is held in. A plain string is the role field alone."""
+    if value is None:
+        return {}
+    if isinstance(value, str):
+        value = {"role": value}
+    if not isinstance(value, dict) or not value.get("role") or set(value) - {"role", "circle"}:
+        raise DatamodelError(f'{where}: seen_by_role is {{ role = "<field>", circle = "<field>" }}')
+    out = {}
+    for key, name in value.items():
+        found = by_name.get(str(name))
+        if found is None or found.kind != "string" or not found.indexed:
+            raise DatamodelError(f"{where}: seen_by_role {key} names {name!r}, which must be an indexed string field")
+        out[key] = str(name)
+    return out
 
 
 AUTHORED = (False, True, "or-manager")

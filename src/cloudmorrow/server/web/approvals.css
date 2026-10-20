@@ -1,0 +1,17 @@
+/* Waiting for you: a question per row, with its two answers on the right. */
+
+.approvals .approval-row { align-items: center; flex-wrap: wrap; }
+.approvals .approval-row .main { min-width: 0; flex: 1 1 200px; }
+.approvals .approval-row .preview { white-space: normal; }
+.approvals .approval-row .dim { color: var(--muted); }
+.approval-buttons { flex: none; display: flex; gap: 6px; }
+.approvals-link .count.badge {
+  flex: none;
+  min-width: 24px;
+  padding: 0 7px;
+  border-radius: 12px;
+  background: var(--fill);
+  color: var(--fill-ink);
+  font-size: 14px;
+  text-align: center;
+}

@@ -211,8 +211,11 @@ def delete_circle(circle_id: str, state: AppState = Depends(get_state), _: User 
         _circles(state).delete(circle.id)
     except UnknownCircleError as exc:
         raise _failed(exc) from exc
-    # The shares that were shared with it are not any more.
+    # The shares that were shared with it are not any more, and the hats
+    # worn in it come off.
     state.shares.forget_circle(circle.id)
+    if state.roles is not None:
+        state.roles.forget_circle(circle.id)
 
 
 @router.put("/{circle_id}/members/{username}")

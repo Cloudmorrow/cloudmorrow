@@ -1,0 +1,19 @@
+# A flow: when something happens, do these steps, as the person who made it
+# (docs/FLOWS.md). Part of the core, like approval.
+[datamodel]
+id = "flow"
+version = 1
+label = "Flow"
+description = "A procedure: one trigger, and the steps that follow it, run as whoever made the flow."
+domain = "flows"
+scopes = ["personal"]
+title = "name"
+
+[fields]
+name = { kind = "string", required = true }
+description = { kind = "text" }
+on = { kind = "bool", default = true, indexed = true, label = "Switched on" }
+# {"kind": "record", "model": "leave", "when": "created"}; see flows.py.
+trigger = { kind = "json", required = true }
+# A list of steps, each {"id", "kind", ...}; see flows.py.
+steps = { kind = "json", default = [] }

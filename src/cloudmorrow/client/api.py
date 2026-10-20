@@ -264,6 +264,45 @@ class CloudmorrowClient:
         """Take one of a person's own rules away: the datamodel follows their circles again."""
         return (await self._request("DELETE", f"/api/access/{username}/{model}")).json()
 
+    # -- roles, approvals and flows (docs/FLOWS.md) --------------------------
+    async def roles(self) -> list[dict]:
+        """Every role, with who holds it."""
+        return (await self._request("GET", "/api/roles")).json()
+
+    async def my_roles(self) -> dict:
+        return (await self._request("GET", "/api/me/roles")).json()
+
+    async def create_role(self, name: str, description: str = "") -> dict:
+        body = {"name": name, "description": description}
+        return (await self._request("POST", "/api/roles", json=body)).json()
+
+    async def delete_role(self, role: str) -> None:
+        await self._request("DELETE", f"/api/roles/{role}")
+
+    async def give_role(self, role: str, username: str, circle: str = "") -> dict:
+        params = {"circle": circle} if circle else None
+        return (await self._request("PUT", f"/api/roles/{role}/holders/{username}", params=params)).json()
+
+    async def take_role(self, role: str, username: str, circle: str = "") -> dict:
+        params = {"circle": circle} if circle else None
+        return (await self._request("DELETE", f"/api/roles/{role}/holders/{username}", params=params)).json()
+
+    async def approvals(self) -> dict:
+        """What waits for your answer, and what you asked: {"waiting": [...], "asked": [...]}."""
+        return (await self._request("GET", "/api/approvals")).json()
+
+    async def ask_approval(self, role: str, question: str, **rest: object) -> dict:
+        body = {"role": role, "question": question, **rest}
+        return (await self._request("POST", "/api/approvals", json=body)).json()
+
+    async def answer_approval(self, approval_id: str, status: str, note: str = "") -> dict:
+        body = {"status": status, "note": note}
+        return (await self._request("POST", f"/api/approvals/{approval_id}/answer", json=body)).json()
+
+    async def run_flow(self, flow_id: str, *, model: str = "", record: str = "") -> dict:
+        body = {"model": model, "record": record}
+        return (await self._request("POST", f"/api/flows/{flow_id}/run", json=body)).json()
+
     # -- secrets -----------------------------------------------------------
     async def secrets(
         self,

@@ -1,9 +1,11 @@
 """`ctx`: everything a handler can reach, and nothing else.
 
-    ctx.user            who it runs for: .username, .name, .admin, .circles
+    ctx.user            who it runs for: .username, .name, .admin, .circles, .roles
     ctx.quill           this Quill's id
     ctx.params          a view's parameters; .record when opened on one
     ctx.records         list, get, create, patch, move, delete — through the gate
+    ctx.people(role=)   who holds a role, as usernames; circle= narrows to one circle
+    ctx.approvals       ask(record, role=, question=) a yes or no of whoever holds a role
     ctx.fetch(url)      HTTP, to a host the manifest lists in [[fetch]] only
     ctx.secret(key)     a secret the manifest lists in [[secrets]], from the person's vault
     ctx.now()           the time, as an aware datetime in UTC
@@ -227,9 +229,49 @@ class User:
         self.name: str = data.get("name", "") or self.username
         self.admin: bool = bool(data.get("admin", False))
         self.circles: list[str] = list(data.get("circles", []))
+        # The roles they hold, by id: "team_lead". Held in a circle or everywhere alike.
+        self.roles: list[str] = list(data.get("roles", []))
 
     def __repr__(self) -> str:
         return f"User({self.username})"
+
+
+class Approvals:
+    """Asking somebody responsible, by role rather than by name (docs/FLOWS.md).
+
+    `ask` makes an `approval` record as the person: whoever holds the role
+    sees it under *Waiting for you* and answers. The Quill hears the answer
+    as a hook on `approval` when its `status` changes — for that it lists
+    `approval` in `[uses]`; asking needs nothing declared.
+    """
+
+    def __init__(self, host: Host) -> None:
+        self._host = host
+
+    def ask(
+        self,
+        about=None,
+        *,
+        role: str,
+        question: str,
+        circle: str = "",
+        due=None,
+        title: str = "",
+    ) -> Record:
+        """Ask the holders of *role* about *about* (a Record, or nothing). Returns the approval."""
+        args: dict = {"role": role, "question": str(question), "circle": circle}
+        if about is not None:
+            args["about_model"] = getattr(about, "model", "")
+            args["about"] = _plain(about)
+        if title:
+            args["about_title"] = title
+        if due is not None:
+            args["due"] = _plain(due)
+        return Record(self._host("approvals.ask", args))
+
+    def get(self, id: str) -> Record:  # noqa: A002
+        """One approval the person may see: asked by them, or asked of a role they hold."""
+        return Record(self._host("approvals.get", {"id": _plain(id)}))
 
 
 class Params(dict):
@@ -254,6 +296,7 @@ class Context:
         if data.get("record"):
             self.params.record = Record(data["record"])
         self.records = Records(host)
+        self.approvals = Approvals(host)
         # Where it runs: "server", or "machine" in an agent.
         self.where: str = data.get("where", "server")
         self._folders: dict[str, str] = dict(data.get("folders", {}))
@@ -289,6 +332,10 @@ class Context:
                 },
             )
         )
+
+    def people(self, *, role: str, circle: str = "") -> list[str]:
+        """Who holds *role*: everywhere, and in *circle* when one is named. Usernames."""
+        return [str(u) for u in self._host("people", {"role": role, "circle": circle})]
 
     def secret(self, key: str) -> str:
         """A secret the manifest names in [[secrets]], from the person's own vault."""

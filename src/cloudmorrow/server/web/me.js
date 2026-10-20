@@ -11,10 +11,14 @@ import { adminRow, isAdmin } from "./admin.js";
 import { computerCard, wireComputerCard } from "./desktopbridge.js";
 import { addDeviceRow } from "./adddevice.js";
 import { myQuillsRow } from "./myquills.js";
+import { approvalsRow } from "./approvals.js";
+import { flowsRow } from "./flows.js";
 
 
 async function renderMe() {
-  const [me] = await Promise.all([api("GET", "/api/auth/me"), loadFeatures()]);
+  const [me, , waiting] = await Promise.all([
+    api("GET", "/api/auth/me"), loadFeatures(), api("GET", "/api/approvals/count").catch(() => ({ waiting: 0 })),
+  ]);
   session.user = me.username;
   store.set("user", session.user);
   setAdmin(me.is_admin);
@@ -43,6 +47,8 @@ async function renderMe() {
       ${featuresCard()}
       <div class="group">${facts.map(([label, value]) =>
         `<div class="row"><span class="main">${esc(label)}</span><span class="value">${esc(value)}</span></div>`).join("")}</div>
+      ${approvalsRow(waiting.waiting)}
+      ${flowsRow()}
       ${computerCard()}
       ${addDeviceRow()}
       ${myQuillsRow()}

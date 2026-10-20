@@ -1,0 +1,17 @@
+/* Roles, for an administrator: the list, and one role with who holds it. */
+
+.role-row .main { min-width: 0; }
+.role-row .preview { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.role-form .holders .row { align-items: center; }
+.role-form .holder-row .take { flex: none; }
+.role-form .give select {
+  flex: 1;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--line-bright);
+  border-radius: var(--radius-control);
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}

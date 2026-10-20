@@ -403,7 +403,7 @@ def test_an_assistant_adds_a_task_through_the_record_tools(tasks_quill, auth):
     client = tasks_quill
     token = connect(client)["access_token"]
     models = call(client, token, "list_datamodels")["structuredContent"]["datamodels"]
-    assert {m["id"] for m in models} == {"board", "task", "snapshot", "attestation"}
+    assert {m["id"] for m in models} == {"board", "task", "snapshot", "attestation", "approval", "flow", "flow_run"}
     boards = call(client, token, "list_records", model="board")["structuredContent"]["records"]
     assert len(boards) == 1  # the first board, seeded for the assistant as for the app
     created = call(
@@ -428,7 +428,7 @@ def test_a_datamodel_that_is_not_there_is_named_with_the_ones_that_are(tasks_qui
     token = connect(tasks_quill)["access_token"]
     refused = call(tasks_quill, token, "list_records", model="spaceship")
     assert refused["isError"] is True
-    assert "attestation, board, snapshot, task" in refused["content"][0]["text"]
+    assert "approval, attestation, board, flow, flow_run, snapshot, task" in refused["content"][0]["text"]
 
 
 PLANTS = """

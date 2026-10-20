@@ -457,6 +457,24 @@ and state pushed to the admin screen instead of fetched; and a worker model
 if the server ever runs more than one process (the supervisor lives in the
 one uvicorn process today, and two would each start every service).
 
+### Roles
+
+A Quill that expects somebody to be responsible for something — a team
+lead who approves leave, a product owner who approves features — says so,
+and the role exists on the server, empty, from the moment it is installed:
+
+```toml
+[[roles]]
+id = "team_lead"
+label = "Team lead"
+why = "to approve or decline time off"
+```
+
+An administrator picks who holds it under *Administration → Roles*; the
+code asks `ctx.people(role="team_lead")` or asks the role for a yes or a
+no with `ctx.approvals.ask(...)`. A role gives no access to data: that is a
+circle's. [FLOWS.md](FLOWS.md) has roles, approvals and flows together.
+
 ### Grants
 
 A Quill may read and write what it declared in `[uses]`, what it introduced,

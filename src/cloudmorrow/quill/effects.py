@@ -8,6 +8,7 @@ effect, or a list of them:
     go("garage", van="r_…")         another screen of this Quill
     confirm("Delete all?", then="clear_all")   ask, then run another action
     error("That van is sold")       the form stays open, with this under it
+    result(visit=visit.id)          what the action found out, for a flow that pressed it
 
 An API or a webhook returns `respond(...)`, or nothing for a 204.
 """
@@ -45,6 +46,12 @@ def error(text: str) -> dict:
 
 def redraw() -> dict:
     return {"effect": "redraw"}
+
+
+def result(**values) -> dict:
+    """What the action hands back to whatever pressed it: a flow puts it under
+    the step's id for the steps after. A screen does nothing with it."""
+    return {"effect": "result", "values": _plain(values)}
 
 
 def respond(
@@ -94,6 +101,6 @@ def normalise(result) -> list[dict]:
     effects = []
     for item in result:
         if not isinstance(item, dict) or "effect" not in item:
-            raise TypeError(f"{item!r} is not an effect: use toast(), open(), go(), confirm(), error()")
+            raise TypeError(f"{item!r} is not an effect: use toast(), open(), go(), confirm(), error(), result()")
         effects.append(item)
     return effects
