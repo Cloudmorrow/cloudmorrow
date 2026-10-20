@@ -135,7 +135,9 @@
 }
 
 /* A card: its name on a rounded top border, and one line under it with a
-   dot for how it is and the key at the end. Two rows, no bottom edge. */
+   dot for how it is and the key at the end. Two rows, no bottom edge, and
+   a line of air before the next, so the cards read as cards rather than as
+   one ruled list. */
 .nav-card {
     height: 2;
     padding: 0 1;
@@ -146,7 +148,7 @@
     border-title-style: bold;
     border-title-align: left;
     background: transparent;
-    margin-bottom: 0;
+    margin-bottom: 1;
 }
 
 .nav-card:hover {
@@ -161,11 +163,13 @@
     border-title-color: $primary;
 }
 
-/* Administration: the server, not your things — one line each. */
+/* Administration: the server, not your things — one line each, and no air
+   between; the same when the sidebar is narrow and every card is a line. */
 .nav-card.-small, .nav-card.-line {
     height: 1;
     border: none;
     padding: 0 0 0 1;
+    margin-bottom: 0;
 }
 
 .nav-card.-small:hover, .nav-card.-line:hover {
