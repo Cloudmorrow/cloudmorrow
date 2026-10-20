@@ -265,6 +265,6 @@ other's, under their prefixed datamodel id, each its owner's.
 | code per person, as its owner, under its own names | `server/quills/code.py` (`_guest`, `installed`, `_runs_as`, `_hook_people`, `plain_record`) |
 | a machine's shelf | `server/routes/agentquills.py` |
 | the web app | `web/myquills.js` (Your Quills), `web/quillsadmin.js` (policy, requests, whose, audience, adopt) |
-| the terminal app | `tui/panes/admin_quills.py` (`ShelvesModal`) |
+| the terminal app | `tui/panes/admin_quills.py` (the User Quills tab, `own_widgets`) |
 | the command line, the client, the assistant | `cli/quill.py`, `client/api.py`, `server/mcptools.py` |
 | the tests | `tests/test_quill_sharing.py`, with `tests/fixtures/quill-budget` |

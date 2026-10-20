@@ -390,8 +390,15 @@ class CloudmorrowClient:
         body = {"id": id, "source": source, "ref": ref}
         return (await self._request("POST", "/api/quills/plan", json=body)).json()
 
-    async def install_quill(self, *, id: str = "", source: str = "", ref: str = "") -> dict:
-        body = {"id": id, "source": source, "ref": ref}
+    async def install_quill(
+        self, *, id: str = "", source: str = "", ref: str = "", audience: dict | None = None
+    ) -> dict:
+        """Install a Quill — or install it again, which is how it is updated. With
+        *audience* (circles and people), who it is for goes with it; without, it is
+        for everyone."""
+        body: dict = {"id": id, "source": source, "ref": ref}
+        if audience is not None:
+            body["audience"] = audience
         return (await self._request("POST", "/api/quills", json=body)).json()
 
     async def upload_quill(self, data: bytes, *, plan_only: bool = False) -> dict:

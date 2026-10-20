@@ -1,12 +1,12 @@
 """Administration: the server itself, rather than anything in it.
 
 Everything else in the app is your notes, your tasks, your secrets. This is
-the box they sit on: who may sign in, and which parts of Cloudmorrow this
-server offers at all. It is one menu on the top bar, and only administrators
-see it; opening it puts the whole interface aside, because administering a
-server is not a sixth tab of your own stuff.
+the box they sit on: who may sign in, which data they may use, and which
+Quills this server runs. It is one menu on the top bar, and only
+administrators see it; opening it puts the whole interface aside, because
+administering a server is not a sixth tab of your own stuff.
 
-Four sections so far:
+Three sections:
 
 - **Users.** Every account, with its role and its type. The role is what it
   may do — **Administrator**, **User**, or **DashboardDisplayer**, which may
@@ -17,18 +17,19 @@ Four sections so far:
   none, that they reach no data.
 - **Circles.** Who may use which data: a named set of people, and per
   datamodel write, read or nothing. In admin_circles.py.
-- **Features.** Notes, Tasks, Projects, Files. Switching one off takes its tab
-  out of every client and closes its API — off here is off everywhere, not a
-  hidden button.
-- **Quills.** The catalog by category: install one after reading what it
-  adds, or remove one, keeping its records. In admin_quills.py.
+- **Quills.** What this server runs, under three tabs: every Quill installed
+  (with whether it is on and whether its code is running, and updating them
+  in one go), the ones people added for themselves, and the catalog to add
+  more from. There is no list of features any more: what this server offers
+  is its Quills, and each is switched on or off for everybody from here —
+  off takes its tab out of every client and closes its API. In admin_quills.py.
 """
 
 from __future__ import annotations
 
 from textual import work
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import (
     Button,
@@ -404,91 +405,6 @@ class UsersView(Pane):
         self.reload()
 
 
-class FeaturesView(Pane):
-    """What this server offers. A tick box each, and off means off."""
-
-    TAB_LABEL = "Features"
-    SUMMARY = "what this server offers"
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        # What the server last told us, keyed by feature.
-        self._features: dict[str, dict] = {}
-
-    def content(self) -> ComposeResult:
-        yield Static(
-            f"[{MUTED}]Switching a feature off takes its tab out of every client and closes its part of the API.[/]",
-            id="admin-features-note",
-        )
-        yield VerticalScroll(id="admin-feature-list")
-
-    def on_show(self) -> None:
-        self.reload()
-
-    @work(exclusive=True, group="admin-features")
-    async def reload(self) -> None:
-        client = self.api
-        if client is None:
-            return
-        try:
-            features = await client.features()
-        except ApiError as exc:
-            self.status(str(exc), error=True)
-            return
-        self._features = {feature["key"]: feature for feature in features}
-        box = self.query_one("#admin-feature-list", VerticalScroll)
-        await box.remove_children()
-        for feature in features:
-            await box.mount(self._row(feature))
-
-    @staticmethod
-    def _row(feature: dict) -> Vertical:
-        turned = ""
-        if feature.get("changed_by"):
-            state = "on" if feature["enabled"] else "off"
-            turned = f"  ·  switched {state} by {feature['changed_by']} {short_stamp(feature.get('updated_at'))}"
-        row = Vertical(
-            Checkbox(feature["label"], value=feature["enabled"], id=f"feature-{feature['key']}"),
-            Static(f"[{MUTED}]{feature['description']}{turned}[/]", classes="feature-note"),
-            classes="feature-row",
-        )
-        return row
-
-    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
-        """Only a tick from you goes to the server; drawing one does not."""
-        event.stop()
-        box_id = event.checkbox.id or ""
-        if not box_id.startswith("feature-"):
-            return
-        key = box_id[len("feature-") :]
-        known = self._features.get(key)
-        if known is None or event.value == known["enabled"]:
-            return
-        self.switch(key, event.value)
-
-    @work(group="admin-features-write")
-    async def switch(self, key: str, enabled: bool) -> None:
-        try:
-            feature = await self.api.set_feature(key, enabled)
-        except ApiError as exc:
-            self.status(str(exc), error=True)
-            self.reload()
-            return
-        self._features[key] = feature
-        self.status(f"{feature['label']} is " + ("on." if feature["enabled"] else "off — its tab is gone everywhere."))
-        # The tab strip behind this panel follows. It is asked for again
-        # rather than set from this list: the strip is what *this account*
-        # has, and an account can have switched off for itself something
-        # the server has just switched back on.
-        again = getattr(self.screen, "ask_the_server", None)
-        if callable(again):
-            again()
-            return
-        applier = getattr(self.screen, "apply_features", None)
-        if callable(applier):
-            applier([row["key"] for row in self._features.values() if row["enabled"]])
-
-
 class AdminPanel(Vertical):
     """The whole administration interface: one of its sections at a time.
 
@@ -499,7 +415,7 @@ class AdminPanel(Vertical):
     class Closed(Message):
         """Back to the workspace."""
 
-    VIEWS: tuple[type[Pane], ...] = (UsersView, CirclesView, FeaturesView, QuillsView)
+    VIEWS: tuple[type[Pane], ...] = (UsersView, CirclesView, QuillsView)
 
     def compose(self) -> ComposeResult:
         with ContentSwitcher(id="admin-views", initial="admin-view-users"):
@@ -516,7 +432,7 @@ class AdminPanel(Vertical):
 
     @property
     def current(self) -> str:
-        """The section showing: users, circles, features or quills."""
+        """The section showing: users, circles or quills."""
         return (self.query_one("#admin-views", ContentSwitcher).current or "")[len("admin-view-") :]
 
     @property

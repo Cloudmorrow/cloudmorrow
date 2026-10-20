@@ -272,13 +272,71 @@ async def test_a_new_row_from_the_sheet(app):
 # -- Administration: Quills --------------------------------------------------------
 
 
-async def open_quills(app, pilot):
+async def open_quills(app, pilot, tab: str = "catalog"):
     screen = await start(app, pilot)
     await pilot.press("f9")
     await settle(app, pilot)
     await pilot.click("#nav-admin-quills")
     await settle(app, pilot)
-    return screen, screen.query_one(QuillsView)
+    view = screen.query_one(QuillsView)
+    view.show_tab(tab)
+    await settle(app, pilot)
+    return screen, view
+
+
+def server_rows(view) -> list[list[str]]:
+    """What the Server Quills table says, with the colour markup taken off."""
+    table = view.query_one("#admin-server-table")
+    return [[Text.from_markup(str(c)).plain for c in table.get_row_at(i)] for i in range(table.row_count)]
+
+
+async def test_server_quills_is_the_tab_it_opens_on_with_how_each_is(app):
+    """Every installed Quill, whether it is on, and where it stands against the catalog."""
+    app.client.feature_list[1]["enabled"] = False  # tasks, switched off
+    async with app.run_test(size=(140, 40)) as pilot:
+        screen, view = await open_quills(app, pilot, tab="server")
+        assert view.tab == "server"
+        listed = server_rows(view)
+        names = [row[1].strip() for row in listed]
+        assert names == ["Notes", "Tasks", "Files", "Chat", "Secrets"]
+        at = names.index("Tasks")
+        assert listed[at][3] == "off" and listed[at][4] == "from the catalog"
+        # Notes is on no shelf of the catalog: it says so, and cannot be ticked.
+        assert listed[0][3] == "on" and listed[0][4] == "not in the catalog"
+        table = view.query_one("#admin-server-table")
+        table.focus()
+        table.move_cursor(row=at)
+        await settle(app, pilot)
+        # The details beside the list say the same, with everything it adds.
+        detail = view.query_one("#admin-quill-detail-text").visual.plain
+        assert "Tasks" in detail and "off" in detail and "for everyone" in detail
+        # o switches it on again, for everybody: the server's switch.
+        await pilot.press("o")
+        await settle(app, pilot)
+        assert app.client.feature_calls == [("tasks", True)]
+        assert server_rows(view)[at][3] == "on"
+
+
+async def test_ticked_quills_are_updated_in_one_go_for_the_same_people(app):
+    """Space ticks, u installs each ticked Quill again with who it is for; the
+    ticks go once it is done."""
+    tasks = next(q for q in app.client.quill_list if q["id"] == "tasks")
+    tasks["audience"] = {"circles": ["kids"], "people": []}
+    async with app.run_test(size=(140, 40)) as pilot:
+        screen, view = await open_quills(app, pilot, tab="server")
+        table = view.query_one("#admin-server-table")
+        table.focus()
+        at = [row[1].strip() for row in server_rows(view)].index("Tasks")
+        table.move_cursor(row=at)
+        await pilot.press("space")
+        await settle(app, pilot)
+        assert server_rows(view)[at][0] == "✓"
+        await pilot.press("u")
+        await breathe(pilot)
+        await pilot.click("#confirm")
+        await settle(app, pilot)
+        assert ("install", "tasks", {"circles": ["kids"], "people": []}) in app.client.quill_calls
+        assert server_rows(view)[at][0] == " "
 
 
 async def test_the_catalog_is_shelved_by_category(app):

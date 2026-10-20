@@ -20,6 +20,12 @@ def rows(screen) -> list[list[str]]:
     return [[Text.from_markup(str(cell)).plain for cell in table.get_row_at(index)] for index in range(table.row_count)]
 
 
+def server_names(screen) -> list[str]:
+    """The Quills down the Server Quills table, by name."""
+    table = screen.query_one("#admin-server-table", DataTable)
+    return [Text.from_markup(str(table.get_row_at(i)[1])).plain.strip() for i in range(table.row_count)]
+
+
 async def open_dialog(app, pilot, button: str) -> None:
     """Click a toolbar button that opens a modal.
 
@@ -43,10 +49,11 @@ async def test_an_admin_has_the_menu_and_a_user_does_not(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await start(app, pilot)
         assert screen.query_one("#nav-section-admin").display
+        # No Features card: what the server offers is its Quills, switched
+        # on or off from the Quills section.
         assert [card.name_text for card in screen.query(".admin-card") if card.display] == [
             "Users",
             "Circles",
-            "Features",
             "Quills",
         ]
 
@@ -169,12 +176,17 @@ async def test_editing_an_account_keeps_the_password_when_the_box_is_empty(app):
         assert "password" not in fields
 
 
-async def test_features_switch_a_tab_off_everywhere(app):
+async def test_switching_a_quill_off_takes_its_tab_everywhere(app):
+    """The server's switch is on the Quill, under Server Quills: o, and off is
+    off for everybody."""
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_admin(app, pilot)
-        await pilot.click("#nav-admin-features")
+        await pilot.click("#nav-admin-quills")
         await settle(app, pilot)
-        await pilot.click("#feature-tasks")
+        table = screen.query_one("#admin-server-table", DataTable)
+        table.focus()
+        table.move_cursor(row=server_names(screen).index("Tasks"))
+        await pilot.press("o")
         await settle(app, pilot)
         assert app.client.feature_calls == [("tasks", False)]
         # The strip behind the panel lost the tab, without a restart.
@@ -216,7 +228,7 @@ async def test_switching_to_a_tab_shuts_the_panel(app):
         assert screen.query_one("#panes").current == "pane-tasks"
 
 
-async def test_a_feature_the_server_refuses_to_switch_says_so(app):
+async def test_a_refused_switch_is_said_and_the_quill_stays_as_it_was(app):
     from cloudmorrow.client.api import ApiError
 
     async def refuse(key: str, enabled: bool) -> dict:
@@ -225,13 +237,17 @@ async def test_a_feature_the_server_refuses_to_switch_says_so(app):
     app.client.set_feature = refuse
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_admin(app, pilot)
-        await pilot.click("#nav-admin-features")
+        await pilot.click("#nav-admin-quills")
         await settle(app, pilot)
-        await pilot.click("#feature-notes")
+        table = screen.query_one("#admin-server-table", DataTable)
+        table.focus()
+        table.move_cursor(row=server_names(screen).index("Tasks"))
+        await pilot.press("o")
         await settle(app, pilot)
         assert "admin only" in said(screen)
-        # And the box goes back to what the server really thinks.
-        assert screen.query_one("#feature-notes", Checkbox).value is True
+        # And the row says what the server really thinks.
+        row = table.get_row_at(server_names(screen).index("Tasks"))
+        assert Text.from_markup(str(row[3])).plain == "on"
 
 
 # -- circles -----------------------------------------------------------------------
@@ -376,12 +392,14 @@ async def test_default_and_delete_are_a_key_each(app):
 
 async def test_the_install_sheet_asks_which_circles_get_the_new_data(app):
     """Reading introduces reading.book: Kids is ticked and given it; Members has `*`."""
-    from cloudmorrow.tui.panes.admin_quills import QuillSheet
+    from cloudmorrow.tui.panes.admin_quills import QuillSheet, QuillsView
 
     with_kids(app)
     async with app.run_test(size=(140, 40)) as pilot:
         screen = await start(app, pilot)
         await pilot.click("#nav-admin-quills")
+        await settle(app, pilot)
+        screen.query_one(QuillsView).show_tab("catalog")
         await settle(app, pilot)
         table = screen.query_one("#admin-quill-table", DataTable)
         table.focus()
