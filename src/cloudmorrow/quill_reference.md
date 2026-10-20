@@ -222,7 +222,18 @@ map = { name = "$.plant.name" }    # field = a path into the body: $.a.b[0].c
 id = "public"
 service = "sync"
 # prefix = "v1"                    # only paths under /api/q/<quill>/v1/
+
+[requires]                         # a program a service needs that the server may not have
+runtimes = ["ffmpeg"]              # an id from the catalog's [runtimes]; the install fetches
+                                   # a checked static build and puts it first on the services' PATH
 ```
+
+A runtime is for a service only (a Quill without `[[services]]` is refused
+one), is named on the install sheet with its size before the yes, and is
+offered for removal with the last Quill that needs it. Never tell anybody to
+`apt install` something: name it in `[requires]` instead, and if the catalog
+has no entry for it yet, that is a pull request to Cloudmorrow/quill-catalog
+adding `[runtimes.<id>]` with a build per OS and architecture and its SHA-256.
 
 A service is started in the Quill's folder with only these in its
 environment — nothing of the server's:
@@ -234,7 +245,7 @@ environment — nothing of the server's:
 | `CLOUDMORROW_QUILL`, `CLOUDMORROW_SERVICE` | its id, and which service this is |
 | `PORT` | a free loopback port to serve on, for an API or a forwarded webhook |
 | `HOME` | a folder of its own that survives updates |
-| `PATH`, `LANG`, `PYTHONUNBUFFERED` | so programs are found and output is logged as it comes |
+| `PATH`, `LANG`, `PYTHONUNBUFFERED` | so programs are found (its runtimes first) and output is logged as it comes |
 
 It uses the record API like any client: `GET/POST /api/records/<model>`,
 `GET/PATCH/DELETE /api/records/<model>/<id>`, `POST …/<id>/move`. An API

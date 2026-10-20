@@ -1148,6 +1148,14 @@ task, contact.* Install it only if you trust its author with that.
 
 What that means on the server:
 
+- **It may bring a program with it.** A Quill whose code needs ffmpeg, or
+  another program the server does not have, names it, and the sheet says so
+  before the yes: *Adds to this server: ffmpeg 7.1.5 · 119 MB*. The server
+  downloads a static build from where the catalog says, refuses it if its
+  checksum differs, and keeps it under its own data folder for its Quills;
+  nothing is installed on the system, and nobody opens a shell. When you
+  remove the last Quill that needs it, the remove sheet offers to take the
+  program too.
 - **It runs as the administrator who installed it.** Its programs act for
   that account: the records they read and write are that person's. (A
   Quill installed with nobody signed in — at first boot, or with

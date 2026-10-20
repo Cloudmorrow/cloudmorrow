@@ -19,7 +19,8 @@ process group, then SIGKILL after a grace period. A reinstall (a new
 nothing rather than copied from the server's, so no setting, path or key of
 the server's leaks into it:
 
-    PATH, LANG             the server's own, so programs are found
+    PATH, LANG             the server's own, so programs are found — with the
+                           runtimes the Quill requires first (quills/runtimes.py)
     HOME                   <data_dir>/quill-homes/<id>, the Quill's to keep things in
     PYTHONUNBUFFERED=1     so its log is written as it goes
     CLOUDMORROW_URL        this server, on loopback
@@ -351,12 +352,19 @@ class Supervisor:
                 )
             if service.scheduled:
                 continue
-            if not on or not owner:
+            missing = self.registry.runtimes.missing(manifest.runtimes)
+            if not on or not owner or missing:
                 if service.process is not None:
                     doomed.append((service, service.process))
                     service.process = None
                 service.done = False
-                service.set_state("stopped", "switched off" if not on else "runs as nobody: reinstall it")
+                if not on:
+                    why = "switched off"
+                elif not owner:
+                    why = "runs as nobody: reinstall it"
+                else:
+                    why = f"needs {', '.join(missing)}, which is not on this server: install the Quill again"
+                service.set_state("stopped", why)
                 continue
             process = service.process
             if process is not None:
@@ -428,8 +436,10 @@ class Supervisor:
         """What a Quill's process is given: this and nothing else (see the module)."""
         home = self.config.data_dir / "quill-homes" / quill
         home.mkdir(parents=True, exist_ok=True)
+        manifest = self.registry.quills.get(quill)
+        runtimes = self.registry.runtimes.path_for(manifest.runtimes if manifest else ())
         return {
-            "PATH": os.environ.get("PATH", os.defpath),
+            "PATH": os.pathsep.join([*runtimes, os.environ.get("PATH", os.defpath)]),
             "LANG": os.environ.get("LANG", "C.UTF-8"),
             "HOME": str(home),
             "PYTHONUNBUFFERED": "1",

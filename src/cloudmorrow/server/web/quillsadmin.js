@@ -326,8 +326,10 @@ async function removeQuill(id, name, drop) {
     const gone = await api("DELETE", quillUrl(id) + (drop.length ? "?drop=" + encodeURIComponent(drop.join(",")) : ""));
     await refreshQuills();
     const dropped = Object.values((gone && gone.dropped) || {}).reduce((a, b) => a + b, 0);
-    toast(dropped ? `${name} is removed, and ${dropped} record${dropped === 1 ? "" : "s"} with it`
-      : `${name} is removed; its records are kept`);
+    const programs = (gone && gone.runtimes) || [];
+    const also = programs.length ? `, and ${listed(programs)} with it` : "";
+    toast(dropped ? `${name} is removed, and ${dropped} record${dropped === 1 ? "" : "s"} with it${programs.length ? ` and ${listed(programs)}` : ""}`
+      : `${name} is removed; its records are kept${also}`);
     await backToCatalog();
   } catch (err) { toast(err.message); }
 }
@@ -336,16 +338,25 @@ async function removeQuill(id, name, drop) {
     and the fields it added, with how many records hold each. Unticked goes
     with the Quill, records and all. */
 function removeSheet(name, brought) {
-  const rows = brought.map((b) => `<label class="row"><span class="main">
+  const rows = brought.map((b) => {
+    // A program it fetched that nothing else needs is offered the other way
+    // round: unticked, it goes with the quill, because nothing runs on it.
+    const runtime = b.kind === "runtime";
+    const what = runtime ? `A program it added · ${esc(b.size_said || megabytes(b.size || 0))} · nothing else needs it`
+      : `${esc(b.kind === "datamodel" ? "A datamodel it introduced" : "A field it added")} · ${
+        b.records} record${b.records === 1 ? "" : "s"}`;
+    return `<label class="row"><span class="main">
       <span class="title">${esc(b.label)}</span>
-      <span class="meta"><span class="preview">${esc(b.kind === "datamodel" ? "A datamodel it introduced" : "A field it added")} · ${
-        b.records} record${b.records === 1 ? "" : "s"}</span></span></span>
-      <input type="checkbox" value="${esc(b.id)}" checked aria-label="Keep ${esc(b.label)}"></label>`).join("");
+      <span class="meta"><span class="preview">${what}</span></span></span>
+      <input type="checkbox" value="${esc(b.id)}" ${runtime ? "" : "checked"} aria-label="Keep ${esc(b.label)}"></label>`;
+  }).join("");
+  const programs = brought.some((b) => b.kind === "runtime");
   return `<div class="remove-sheet">
     <p class="group-label">Removing ${esc(name)}</p>
     <p class="shelf-note">Its tabs and jobs go, for everybody. What it brought stays, ticked:
       a datamodel's records are there again the day it comes back, and a field stays on the
-      records, read-only. Untick what should go with it — records and all, for good.</p>
+      records, read-only. Untick what should go with it — records and all, for good.${programs
+        ? " A program only this quill needed is unticked: it goes too, unless you tick it to keep it for later." : ""}</p>
     <div class="group choices">${rows}</div>
     <div class="group"><button class="row bad confirm" type="button">Remove ${esc(name)}</button></div>
     <div class="group"><button class="row cancel" type="button">Keep it</button></div>
@@ -441,6 +452,20 @@ export function sections(plan, me) {
 
   out.push(group("Runs on a schedule", (plan.jobs || []).map((j) => row(esc(j.id), esc(jobSaid(j, label, plan.models || {}))))));
 
+  // Programs its services need: the server fetches them from where the
+  // catalog says and keeps them for its Quills. Said with the size before
+  // the yes, because a hundred megabytes is a thing to know.
+  const runtimes = plan.runtimes || [];
+  out.push(group("Adds to this server", runtimes.map((r) => {
+    const facts = [r.summary, r.size ? megabytes(r.size) : "", r.license].filter(Boolean).map(esc);
+    if (r.problem) facts.push(`<span class="warn">${esc(r.problem)}</span>`);
+    const chip = r.installed ? `<span class="quill-chip on">here already</span>`
+      : r.available ? `<span class="quill-chip new">will download</span>` : "";
+    return row(`${esc(r.label || r.id)}${r.version ? ` ${esc(r.version)}` : ""}`, facts.join(" · "), chip);
+  }), runtimes.length ? `<p class="shelf-note">A program the quill's code runs. The server downloads it,
+    checks it against the catalog's checksum, and keeps it for its quills; nothing is installed on the
+    system itself. When the last quill that needs it is removed, you are asked whether it goes too.</p>` : ""));
+
   const code = [
     ...(plan.services || []).map((s) => row(`Service ${esc(s.id)}`, esc((s.command || []).join(" ")))),
     ...(plan.webhooks || []).map((w) => row(`Webhook ${esc(w.id)}`, `POST /hooks/${esc(plan.id)}/${esc(w.path || w.id)}`)),
@@ -502,5 +527,8 @@ function jobSaid(job, label, models) {
 
 const listed = (items) => (items.length < 2 ? items.join("")
   : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`);
+
+// A download's size as a person reads it: 119 MB, 1.5 GB.
+const megabytes = (size) => (size >= 1e9 ? `${(size / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(size / 1e6))} MB`);
 
 registerScreen("adminquill", renderQuill);

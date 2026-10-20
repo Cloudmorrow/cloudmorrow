@@ -210,7 +210,8 @@ def plan_mine(
     _require_install(state, user)
     with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
         try:
-            folder, models, _origin = _resolve(state, payload, Path(tmp))
+            # A Quill of one's own runs no services, so it has no runtimes: the catalog is not needed.
+            folder, models, _origin, _catalog = _resolve(state, payload, Path(tmp))
             plan = state.quills.plan(folder, models, owner=user.username)
         except QuillError as exc:
             raise _bad(exc) from exc
@@ -227,7 +228,7 @@ def install_mine(
     _require_install(state, user)
     with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
         try:
-            folder, models, origin = _resolve(state, payload, Path(tmp))
+            folder, models, origin, _catalog = _resolve(state, payload, Path(tmp))
             _check_personal_plan(state, state.quills.plan(folder, models, owner=user.username))
             return state.quills.install(
                 folder, models, origin=origin | {"installed_by": user.username}, owner=user.username
@@ -546,9 +547,12 @@ def approve(
         else:
             with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
                 source = QuillSource(id=found["quill"], source=found["source"], ref=found["ref"])
-                folder, models, origin = _resolve(state, source, Path(tmp))
+                folder, models, origin, catalog = _resolve(state, source, Path(tmp))
                 plan = state.quills.install(
-                    folder, models, origin=origin | {"installed_by": admin.username, "audience": audience}
+                    folder,
+                    models,
+                    origin=origin | {"installed_by": admin.username, "audience": audience},
+                    catalog=catalog,
                 )
         _give(state, plan, payload.give_to)
         done = state.sharing.settle(

@@ -15,10 +15,11 @@ import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from cloudmorrow.server.quills.manifest import QuillError
+from cloudmorrow.server.quills.runtimes import check_runtime
 
 FETCH_TIMEOUT = 30
 MAX_DOWNLOAD = 50 * 1024 * 1024
@@ -81,6 +82,9 @@ class Catalog:
     categories: list[dict]
     quills: list[dict]
     datamodels: dict
+    # Programs a Quill may require, by id: where a build is for each OS and
+    # architecture, and its checksum (quills/runtimes.py).
+    runtimes: dict = field(default_factory=dict)
     # The folder relative paths in it are relative to, when it is local.
     base: Path | None = None
 
@@ -96,10 +100,16 @@ def parse_catalog(data: dict, base: Path | None = None) -> Catalog:
     for entry in quills:
         if not entry.get("id") or not entry.get("repo"):
             raise QuillError("every Quill in the catalog has an id and a repo")
+    runtimes = data.get("runtimes", {})
+    if not isinstance(runtimes, dict):
+        raise QuillError("the catalog's [runtimes] is a table, one sub-table per runtime")
+    for runtime_id, spec in runtimes.items():
+        check_runtime(str(runtime_id), spec)
     return Catalog(
         categories=list(data.get("categories", [])),
         quills=list(quills),
         datamodels=dict(data.get("datamodels", {})),
+        runtimes=dict(runtimes),
         base=base,
     )
 

@@ -428,7 +428,9 @@ WebAssembly.
 
 - **Packages.** Pure-Python dependencies from PyPI, listed in the manifest
   and vendored into the release by the template's workflow, so the server
-  never runs pip.
+  never runs pip. (Programs — ffmpeg and the like — are *runtimes* already:
+  `[requires] runtimes`, fetched by the server from the catalog's builds;
+  [QUILLS.md](QUILLS.md), *Runtimes*.)
 - **Per-person code.** A server Quill's job, webhook or API runs as the
   installer; a job per person is the same *next* as services. (A Quill of
   somebody's own runs them as its owner: [SHARING.md](SHARING.md).)

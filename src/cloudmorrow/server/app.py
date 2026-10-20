@@ -25,7 +25,7 @@ from cloudmorrow.server.drive import user_drive
 from cloudmorrow.server.features import Feature, FeatureStore
 from cloudmorrow.server.mcp import MCPStore
 from cloudmorrow.server.notifications import NotificationStore
-from cloudmorrow.server.quills import QuillRegistry
+from cloudmorrow.server.quills import QuillRegistry, RuntimeStore
 from cloudmorrow.server.quills.code import QuillCode
 from cloudmorrow.server.quills.jobs import Clock
 from cloudmorrow.server.quills.services import Supervisor
@@ -108,7 +108,11 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     credential_check = CredentialCheck(user_store, config.ensure_secret_key(), signin_limits)
     # What is installed, and the one table every Quill's records live in.
     quill_registry = QuillRegistry(
-        config.quills_dir, config.datamodels_dir, config.quill_catalog, personal_dir=config.personal_quills_dir
+        config.quills_dir,
+        config.datamodels_dir,
+        config.quill_catalog,
+        personal_dir=config.personal_quills_dir,
+        runtimes=RuntimeStore(config.runtimes_dir),
     )
     record_store = RecordStore(db, quill_registry.models, quill_registry.expiries)
     # Who may use which datamodels: asked by the gate on every read and write.

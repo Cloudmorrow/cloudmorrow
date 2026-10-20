@@ -179,6 +179,11 @@ class ServerConfig:
         return self.data_dir / "datamodels"
 
     @property
+    def runtimes_dir(self) -> Path:
+        """Programs fetched for Quills that require them, one folder each (quills/runtimes.py)."""
+        return self.data_dir / "runtimes"
+
+    @property
     def dist_dir(self) -> Path:
         """Where `cloudmorrow-server publish` puts wheels for the install script."""
         return self.data_dir / "dist"
