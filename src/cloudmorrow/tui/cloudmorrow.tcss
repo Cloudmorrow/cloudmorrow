@@ -217,16 +217,70 @@ LoginScreen, SplashScreen {
 }
 
 
-#admin-features-note {
-    height: auto;
-    padding: 1 2 0 2;
+/* -- Quills: three tabs, and the chosen one's details beside them --------- */
+#admin-quill-tabs {
+    height: 2;
+    margin: 0 2;
+    background: transparent;
 }
 
-#admin-feature-list {
+#admin-quill-tabs Tab {
+    padding: 0 2;
+}
+
+#admin-quill-split {
     height: 1fr;
-    padding: 1 2;
-    background: $background;
+}
+
+#admin-quill-pages {
+    width: 1fr;
+    height: 1fr;
+}
+
+#quill-page-server, #quill-page-catalog {
+    height: 1fr;
+}
+
+#admin-server-note, #admin-quills-note {
+    height: auto;
+    padding: 0 2;
+}
+
+#admin-server-table, #admin-quill-table {
+    height: 1fr;
+}
+
+#quill-page-own {
+    height: 1fr;
+    padding: 0 2;
     scrollbar-size-vertical: 1;
+}
+
+#quill-page-own .own-head, #quill-page-own .own-line, #own-policy {
+    height: auto;
+}
+
+.own-buttons {
+    height: 3;
+    margin: 0 0 0 2;
+}
+
+.own-buttons Button {
+    margin-right: 1;
+    min-width: 12;
+}
+
+#admin-quill-detail {
+    width: 42%;
+    min-width: 36;
+    height: 1fr;
+    padding: 0 1 0 2;
+    border-left: tall $panel;
+    scrollbar-size-vertical: 1;
+}
+
+#admin-quill-detail-text {
+    height: auto;
 }
 
 .feature-row {

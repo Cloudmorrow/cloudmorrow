@@ -554,8 +554,29 @@ class FakeQuills:
         plan["installed_version"] = installed["version"] if installed else None
         return plan
 
-    async def install_quill(self, *, id: str = "", source: str = "", ref: str = "") -> dict:
-        self.quill_calls.append(("install", id))
+    async def all_quills(self) -> dict:
+        """What an administrator sees: the server's Quills with whether each is on,
+        people's own, the requests, and the policy."""
+        off = {row["key"] for row in self.feature_list if not row["enabled"]}
+        server = []
+        for quill in self.quill_list:
+            row = copy.deepcopy(quill)
+            row["enabled"] = quill["id"] not in off
+            row.setdefault("audience", {"circles": [], "people": []})
+            row.setdefault("origin", {"catalog": True, "ref": ""})
+            server.append(row)
+        return {
+            "policy": {"personal_quills": "on", "personal_quill_code": "on", "personal_quill_sharing": "on"},
+            "server": server,
+            "personal": list(self.__dict__.get("personal", [])),
+            "requests": list(self.__dict__.get("requests", [])),
+            "broken": {},
+        }
+
+    async def install_quill(
+        self, *, id: str = "", source: str = "", ref: str = "", audience: dict | None = None
+    ) -> dict:
+        self.quill_calls.append(("install", id) if audience is None else ("install", id, audience))
         quill = self._published(id)
         quill["installed_version"] = quill["version"]
         self.quill_list = [q for q in self.quill_list if q["id"] != id] + [quill]

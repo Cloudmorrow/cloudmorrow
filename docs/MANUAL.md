@@ -991,7 +991,9 @@ everybody**, with who last switched it.
 
 #### In the terminal app
 
-**Administration** (`f9`) → **Features**: the same list.
+**Administration** (`f9`) → **Quills**, on **Server Quills**: stand on the
+Quill and press **On/off** (`o`). The details beside the list say who last
+switched it.
 
 #### On the command line
 
@@ -1238,7 +1240,7 @@ administrator.
 #### In the terminal app
 
 Not there yet. The terminal app has the administrator's side of it
-(**Shelves…**, below) and nothing of your own; use the web app or the
+(**User Quills**, below) and nothing of your own; use the web app or the
 command line.
 
 #### On the command line
@@ -1278,7 +1280,8 @@ datamodels moved with it — and a switch.
 
 #### In the terminal app
 
-**Administration** (`f9`) → **Quills**, then **Shelves…** (`s`).
+**Administration** (`f9`) → **Quills**, on the **User Quills** tab: the
+policy, the requests with a button each, and whose is whose.
 
 #### On the command line
 

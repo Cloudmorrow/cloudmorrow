@@ -28,8 +28,8 @@ rather than built in, so installing one in Administration puts its card here
 without a restart, and the workspace opens on the first card there is:
 Notes, where it is installed. An administrator has a
 third section, ADMINISTRATION, whose entries put the server's own panel —
-accounts, features, Quills — in place of the workspace. A feature switched
-off there loses its card here, for everybody.
+accounts, circles, Quills — in place of the workspace. A Quill switched off
+there loses its card here, for everybody.
 
 A Quill's actions that are not on a record (docs/QUILLCODE.md) are in the
 actions palette, ctrl+e, from anywhere here: type to find one, enter to run
