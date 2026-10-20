@@ -1,0 +1,17 @@
+[datamodel]
+id = "employment"
+version = 1
+label = "Employment"
+description = "Somebody's job with you: their role, their team, when it started and ended, and their hours. Narrow access by default: it is personal, or shared with those who manage it."
+domain = "workforce"
+scopes = ["personal", "shared"]
+title = "role"
+
+[fields]
+contact = { kind = "link", to = "contact", required = true, indexed = true, on_delete = "clear", label = "Person" }
+role = { kind = "string", required = true }
+team = { kind = "link", to = "team", indexed = true, on_delete = "clear" }
+starts = { kind = "date", indexed = true }
+ends = { kind = "date", indexed = true }
+hours_per_week = { kind = "decimal" }
+notes = { kind = "markdown" }

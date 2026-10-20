@@ -41,7 +41,7 @@ from cloudmorrow.quill.context import (
     Request,
     Response,
 )
-from cloudmorrow.quill.effects import confirm, error, go, open, redraw, respond, toast
+from cloudmorrow.quill.effects import confirm, error, go, open, redraw, respond, result, toast
 from cloudmorrow.quill.registry import action, api, hook, job, machine, view, webhook
 
 SDK_VERSION = "1"
@@ -67,6 +67,7 @@ __all__ = [
     "open",
     "redraw",
     "respond",
+    "result",
     "toast",
     "ui",
     "view",

@@ -156,6 +156,14 @@ person_rules(username, model, access)    -- one person's own, the same shape
 Plain, not sealed: who is in which circle is what the server needs to
 answer every request, and it is no more secret than the list of accounts.
 
+## Beside circles: roles
+
+Who is *responsible* for something — the Team lead, the Expense
+Responsible — is not a circle, because it is not about data. It is a role,
+a hat with a name that an approval or a flow asks; a role gives no access
+to anything, and circles say nothing about who answers for what. The two
+sit side by side in Administration. See [FLOWS.md](FLOWS.md).
+
 ## Not yet
 
 - **Sharing a space with a circle.** A shared space's people are named one

@@ -8,14 +8,14 @@
    rail — Administration, with a page under it per side, the way the
    terminal app's sidebar lists them — and on a phone, whose bar has no room
    for a section, it is a row at the bottom of Me, with the sides under a
-   switch. Administering a server is not a sixth kind of your own stuff,
+   switch. The roles people hold (rolesadmin.js) are a side of their own. Administering a server is not a sixth kind of your own stuff,
    and most accounts never see it: the section and the row appear for
    administrators, and a non-administrator who types the address is sent
    back with a word about it. That is a courtesy, not the guard — every
    call under here is admin-only at the server, and the screen would be
    empty without it.
 
-   Four sides, each at its own address — #/admin/users and so on, so the
+   Five sides, each at its own address — #/admin/users and so on, so the
    rail can light one — and one account's page, which is the same form
    whether it is a new account or one that already exists. The circles
    (circlesadmin.js) and the Quills (quillsadmin.js, with its sheet) are
@@ -28,6 +28,7 @@ import {
   registerTab, renderRoute, replace, session, setAdmin, store, tabs, toast, wireShell,
 } from "./core.js";
 import { circlesByPerson, domainsOf, drawCircles, rulesForm, rulesFrom, rulesSaid, wireRulesForm } from "./circlesadmin.js";
+import { drawRoles } from "./rolesadmin.js";
 import { drawQuills } from "./quillsadmin.js";
 import { QUILL_GLYPH } from "./quills.js";
 
@@ -38,6 +39,7 @@ import { QUILL_GLYPH } from "./quills.js";
 const SIDES = [
   ["users", "Users", () => pixelIcon("people") || pixelIcon("me")],
   ["circles", "Circles", () => pixelIcon("group") || pixelIcon("me")],
+  ["roles", "Roles", () => pixelIcon("badge") || pixelIcon("me")],
   ["quills", "Quills", () => pixelIcon("feather") || pixelArt(QUILL_GLYPH)],
   ["server", "Server", () => pixelIcon("server") || pixelIcon("settings")],
 ];
@@ -113,7 +115,9 @@ async function renderAdmin(arg) {
   if (arg !== which) replace(sideHash(which));
   store.set("admin.side", which);
   // The + beside the heading makes whatever this side lists.
-  const making = { users: ["#/adminuser", "New account"], circles: ["#/admincircle", "New circle"] }[which];
+  const making = {
+    users: ["#/adminuser", "New account"], circles: ["#/admincircle", "New circle"], roles: ["#/adminrole", "New role"],
+  }[which];
   // A top-level screen, like a Quill's: the rail says where you are, and Me
   // is in the corner. The switch is for the phone, which has no rail.
   mount(nav({ title: SIDE_LABELS[which] }) + `
@@ -134,6 +138,7 @@ async function renderAdmin(arg) {
   const panel = app.querySelector(".panel");
   if (which === "users") await drawUsers(panel);
   else if (which === "circles") await drawCircles(panel);
+  else if (which === "roles") await drawRoles(panel);
   else if (which === "server") await drawServer(panel);
   else await drawQuills(panel);
 }

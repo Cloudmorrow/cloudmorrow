@@ -1,0 +1,46 @@
+# A Quill for the tests, and the first customer of roles, approvals and the
+# result effect (docs/FLOWS.md): time off is asked for, the Team lead is
+# asked, and the answer lands on the leave.
+[quill]
+id = "leave"
+name = "Leave"
+version = "1.0.0"
+summary = "Time off: asked for, approved by the team lead, on the calendar."
+category = "business"
+code = "quill.py"
+
+[uses]
+datamodels = ["leave", "employment", "approval"]
+
+[[roles]]
+id = "team_lead"
+label = "Team lead"
+why = "to approve or decline time off"
+
+[[screens]]
+id = "leaves"
+kit = "list"
+label = "Leave"
+model = "leave"
+title = "what"
+
+[[actions]]
+id = "request"
+label = "Ask for time off"
+tone = "primary"
+[actions.fields]
+employment = { kind = "link", to = "employment", required = true }
+what = { kind = "string", required = true }
+starts = { kind = "date", required = true }
+ends = { kind = "date", required = true }
+
+[[actions]]
+id = "who-approves"
+label = "Who approves?"
+on = "leave"
+
+[[hooks]]
+on = "approval"
+when = "changed"
+fields = ["status"]
+handler = "answered"

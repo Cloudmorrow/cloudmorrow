@@ -319,6 +319,9 @@ class RecordStore:
         # What a person may do with each datamodel, from their circles
         # (circles.py). None is a store with no circles: everybody everything.
         self.access: Callable[[str], Access] | None = None
+        # Does this person hold this role, in this circle (roles.py)? What a
+        # datamodel with `seen_by_role` is seen through. None is nobody.
+        self.holds: Callable[[str, str, str], bool] | None = None
         # Seeding per space asks and then writes; two lookers at once write once.
         self._seeding = threading.Lock()
         # The most a plain listing answers with. A test lowers it.
@@ -507,6 +510,14 @@ class RecordStore:
             if indexed.get(model.in_space):
                 space = self._space_of(conn, model, indexed)
                 return space is not None and self._space_visible(conn, principal, space)
+        if row["owner"] == principal.username:
+            return True
+        if model.seen_by_role and self.holds is not None:
+            # An approval: for whoever holds the role it asks, where it asks.
+            indexed = json.loads(row["indexed"] or "{}")
+            role = str(indexed.get(model.seen_by_role["role"]) or "")
+            circle = str(indexed.get(model.seen_by_role.get("circle", "")) or "")
+            return bool(role) and self.holds(principal.username, role, circle)
         # Kept out of any space, a record of a datamodel that lives in them is
         # its writer's alone, like any personal record. A public record of a
         # plain datamodel — a Quill of somebody's own keeps its data so, for
@@ -583,6 +594,17 @@ class RecordStore:
             return (
                 f"({link} IN ({spaces}) OR (COALESCE({link}, '') = '' AND owner = ?))",
                 [space_model, username, username, username],
+            )
+        if model.seen_by_role and self.holds is not None:
+            # Theirs, or asked of a role they hold: everywhere, or in the
+            # circle the record names. The roles live in this database.
+            role = self._extract(model.seen_by_role["role"])
+            circle_field = model.seen_by_role.get("circle")
+            circle = f"COALESCE({self._extract(circle_field)}, '')" if circle_field else "''"
+            return (
+                f"(owner = ? OR scope = 'public' OR {role} IN (SELECT role_id FROM role_holders WHERE username = ?"
+                f" AND (circle_id = '' OR circle_id = {circle})))",
+                [username, username],
             )
         return "(owner = ? OR scope = 'public')", [username]
 

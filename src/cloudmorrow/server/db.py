@@ -226,3 +226,5 @@ class UserStore:
             if cursor.rowcount == 0:
                 raise UnknownUserError(username)
             conn.execute("DELETE FROM circle_members WHERE username = ?", (username.strip().lower(),))
+            if conn.table_exists("role_holders"):
+                conn.execute("DELETE FROM role_holders WHERE username = ?", (username.strip().lower(),))

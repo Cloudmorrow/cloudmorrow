@@ -9,6 +9,7 @@ gate, as that principal:
 
     records.*   the record store, as Principal("quill", <them>, quill=<id>, models=<declared>)
                 — so the person's circles narrow it, and the Quill's manifest does too
+    people      who holds a role (roles.py); approvals.ask asks them (approvals.py)
     fetch       https, to a host in [[fetch]] only, and only there after a redirect
     secret      a key in [[secrets]], from the person's own vault; never for an assistant
     now         the time
@@ -252,6 +253,40 @@ class HostCalls:
     def op_records_delete(self, args: dict) -> int:
         return self.state.records.delete(self.principal, self._model(args), str(args.get("id", "")))
 
+    # -- roles and approvals -------------------------------------------------------------
+    def op_people(self, args: dict) -> list[str]:
+        roles = getattr(self.state, "roles", None)
+        if roles is None:
+            return []
+        return roles.people(str(args.get("role", "")), str(args.get("circle", "") or ""))
+
+    def op_approvals_ask(self, args: dict) -> dict:
+        approvals = getattr(self.state, "approvals", None)
+        if approvals is None:
+            raise sdk.Refused("approvals are not set up on this server")
+        about_model = str(args.get("about_model") or "")
+        about = str(args.get("about") or "")
+        title = str(args.get("about_title") or "")
+        if about_model:
+            about_model = self.manifest.resolve(about_model)
+        made = approvals.ask(
+            self.principal,
+            role=str(args.get("role", "")),
+            question=str(args.get("question", "")),
+            about_model=about_model,
+            about=about,
+            about_title=title,
+            circle=str(args.get("circle") or ""),
+            due=args.get("due"),
+        )
+        return self._out(made)
+
+    def op_approvals_get(self, args: dict) -> dict:
+        principal = self.principal
+        if "approval" not in principal.models:
+            principal = Principal(principal.kind, principal.username, principal.quill, principal.models | {"approval"})
+        return self._out(self.state.records.get(principal, "approval", str(args.get("id", ""))))
+
     # -- the rest ------------------------------------------------------------------------
     def op_now(self, args: dict) -> str:
         return dt.datetime.now(tz=dt.UTC).isoformat()
@@ -456,11 +491,18 @@ class QuillCode:
                 circles = [c.name for c in self.state.circles.circles_of(username)]
             except Exception:
                 circles = []
+        roles = []
+        if getattr(self.state, "roles", None) is not None:
+            try:
+                roles = sorted({r["id"] for r in self.state.roles.roles_of(username)})
+            except Exception:
+                roles = []
         return {
             "username": username,
             "name": (user.display_name if user else "") or username,
             "admin": bool(user and user.is_admin),
             "circles": circles,
+            "roles": roles,
         }
 
     def run(
@@ -566,6 +608,9 @@ class QuillCode:
         # What its writes set off runs before the screen is drawn again, as
         # long as that is quick: a hook that keeps a total is part of the press.
         self.drain(timeout=ACTION_SETTLE)
+        flows = getattr(self.state, "flows", None)
+        if flows is not None and via != "flow":
+            flows.on_action(username, manifest.id, action_id, args.get("record"), args["fields"], list(effects or []))
         screens = {s["id"] for s in manifest.screens}
         actions = {a["id"] for a in manifest.actions}
         for effect in effects or []:
@@ -673,6 +718,13 @@ class QuillCode:
         data is one pool for everybody it stands with, so a change is one event, not
         one per person who can see it."""
         if not manifest.personal:
+            # An approval answered is news to whoever asked: a record seen
+            # through a role is its owner's, and the hook runs for them, so a
+            # Quill can act on the asker's own records with the answer.
+            model = self.state.quills.datamodels.get(str(record.get("model", "")))
+            owner = str(record.get("owner") or "")
+            if model is not None and model.seen_by_role and owner and owner != changer.username:
+                return [owner]
             return [changer.username]
         shelf = self._shelf()
         people = shelf.people_of(manifest) if shelf is not None else [manifest.owner]

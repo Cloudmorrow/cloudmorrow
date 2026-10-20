@@ -30,6 +30,43 @@ A hook runs as whoever made the change, shortly after it, never in the way
 of the write. It is not told about what its own hooks wrote, and chains stop
 three deep: do not build ping-pong between two Quills.
 
+## Asking somebody responsible: roles and approvals
+
+Say which role the Quill expects, and the server makes it, empty, at install;
+an administrator picks who holds it (docs/FLOWS.md):
+
+```toml
+[[roles]]
+id = "team_lead"
+label = "Team lead"
+why = "to approve or decline time off"
+```
+
+```python
+@action
+def request(ctx, what):
+    leave = ctx.records.create("leave", what=what, ...)
+    asked = ctx.approvals.ask(leave, role="team_lead", question=f"Approve {what}?")
+    return [toast("Asked the team lead"), result(leave=leave.id, approval=asked.id)]
+```
+
+Whoever holds the role finds it under *Waiting for you* and answers; the
+answer is a change to the `approval` record, heard as a hook (list
+`approval` in `[uses]` to read it; asking needs nothing declared):
+
+```toml
+[[hooks]]
+on = "approval"
+when = "changed"
+fields = ["status"]
+handler = "answered"
+```
+
+`ctx.people(role="team_lead")` is who holds it; `ctx.user.roles` what the
+person the code runs for holds. `result(**values)` from an action is for
+a *flow* that pressed it — a procedure a person builds on a screen out of
+Quill actions, approvals and record changes, with no code of its own.
+
 ## Jobs: on a clock
 
 ```toml

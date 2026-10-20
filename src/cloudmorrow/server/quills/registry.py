@@ -123,6 +123,12 @@ class QuillRegistry:
                         self.broken[path.name] = str(exc)
                         continue
                     foundation[model.id] = model
+            # The core's own — approval, flow, flow_run — are on every server,
+            # whatever is installed, in the version this server ships.
+            for model in core_datamodels():
+                here = foundation.get(model.id)
+                if here is None or here.version < model.version:
+                    foundation[model.id] = model
             quills: dict[str, Manifest] = {}
             broken: dict[str, str] = {}
             if self.quills_dir.is_dir():
@@ -469,6 +475,14 @@ class QuillRegistry:
             row["owner"] = owner_of(model.id)
             rows.append(row)
         return sorted(rows, key=lambda r: (not r["foundation"], r["id"]))
+
+
+CORE_DATAMODELS = Path(__file__).resolve().parent.parent / "core_datamodels"
+
+
+def core_datamodels() -> list[Datamodel]:
+    """The datamodels the core itself needs, shipped with it (docs/FLOWS.md)."""
+    return [load_datamodel(path) for path in sorted(CORE_DATAMODELS.glob("*.toml"))]
 
 
 def owner_of(model_id: str) -> str:

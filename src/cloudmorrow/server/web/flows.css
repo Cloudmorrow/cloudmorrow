@@ -1,0 +1,33 @@
+/* Flows: the list, and one flow's editor — a trigger, then a card per step. */
+
+.flows .flow-row .main { min-width: 0; }
+.flows .flow-row .preview { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flows a.row.primary { justify-content: center; color: var(--accent); font-weight: 600; }
+
+.flow-form input:not([type=checkbox]), .flow-form select {
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--line-bright);
+  border-radius: var(--radius-control);
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+.flow-form .row { align-items: center; }
+.flow-form .row > .main { flex: 0 0 34%; }
+.flow-form .step-head .main { flex: 1; }
+.flow-form .step { border-color: var(--line-bright); }
+.flow-form .step.over { outline: 2px solid var(--accent); }
+.flow-form .step-head { cursor: grab; }
+.flow-form .step-head .grip { color: var(--muted); letter-spacing: -2px; }
+.flow-form .step-head .act-chip { flex: none; min-width: 34px; }
+.flow-form .condition { background: var(--card-2); gap: 6px; }
+.flow-form .condition > .main { flex: 0 0 20%; }
+.flow-form .condition select { flex: 0 0 5.5em; }
+.flow-form .note code { font-size: 13px; }
+.run-row .role-chip.ok { border-color: var(--good, #3a9); color: var(--good, #3a9); }
+.run-row .role-chip.bad { border-color: var(--bad); color: var(--bad); }
+.run-row .role-chip.warn { border-color: var(--warn); color: var(--warn); }

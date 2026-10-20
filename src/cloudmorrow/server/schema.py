@@ -393,6 +393,14 @@ def _quill_data_is_the_quills(conn: Connection) -> None:
     conn.commit()
 
 
+def _roles(conn: Connection) -> None:
+    """Roles people hold, server-wide or within a circle (roles.py)."""
+    from cloudmorrow.server import roles
+
+    conn.executescript(roles.TABLES)
+    conn.commit()
+
+
 STEPS: tuple[Step, ...] = (
     Step(1, "the tables as they stood before they were versioned", _baseline),
     Step(2, "indexes for what an open screen and the retention sweep ask", _indexes_for_scale),
@@ -401,6 +409,7 @@ STEPS: tuple[Step, ...] = (
     Step(5, "who a Quill of somebody's own is shared with, and what people asked for", _quill_sharing),
     Step(6, "snapshots' bundles, and the links guests are given to them", _snapshots),
     Step(7, "a Quill of somebody's own keeps its data as the Quill's, shared by rule", _quill_data_is_the_quills),
+    Step(8, "the roles people hold, for approvals and flows", _roles),
 )
 
 VERSION = STEPS[-1].version

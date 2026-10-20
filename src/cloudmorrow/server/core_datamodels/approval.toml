@@ -1,0 +1,30 @@
+# A yes or a no, asked of whoever holds a role (docs/FLOWS.md). Part of the
+# core: every server has it, whichever Quills are installed, because asking
+# somebody responsible before going on is what most procedures come down to.
+[datamodel]
+id = "approval"
+version = 1
+label = "Approval"
+description = "A yes or a no asked of whoever holds a role, about a record: what was asked, who answered, and what they said."
+domain = "flows"
+scopes = ["personal"]
+title = "question"
+seen_by_role = { role = "role", circle = "circle" }
+
+[fields]
+question = { kind = "string", required = true }
+# Which record it is about: its datamodel and its id, as words, since a
+# link field names one datamodel and an approval may be about any.
+about_model = { kind = "string", indexed = true, label = "About (datamodel)" }
+about = { kind = "string", indexed = true, label = "About (record)" }
+about_title = { kind = "string", label = "About" }
+role = { kind = "string", required = true, indexed = true }
+circle = { kind = "string", indexed = true }
+status = { kind = "enum", values = ["requested", "approved", "declined", "withdrawn"], labels = ["Requested", "Approved", "Declined", "Withdrawn"], default = "requested", indexed = true }
+asked_by = { kind = "string", indexed = true }
+answered_by = { kind = "string", indexed = true }
+answered_at = { kind = "datetime", indexed = true }
+note = { kind = "markdown" }
+due = { kind = "date", indexed = true }
+# The flow run waiting on the answer, if a flow asked.
+flow_run = { kind = "string", indexed = true }

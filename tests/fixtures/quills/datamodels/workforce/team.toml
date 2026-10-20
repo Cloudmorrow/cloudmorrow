@@ -1,0 +1,13 @@
+[datamodel]
+id = "team"
+version = 1
+label = "Team"
+description = "The people who work together: a department, a crew, a shift. Shared with those in it."
+domain = "workforce"
+scopes = ["personal", "shared", "public"]
+title = "name"
+space = true
+
+[fields]
+name = { kind = "string", required = true }
+description = { kind = "markdown" }

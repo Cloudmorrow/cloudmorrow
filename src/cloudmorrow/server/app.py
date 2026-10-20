@@ -15,6 +15,7 @@ from cloudmorrow.server import changefeed, spacenotify
 from cloudmorrow.server.access import is_allowed, parse_rules
 from cloudmorrow.server.access_lan import announcer
 from cloudmorrow.server.agents import AgentStore, JobStore
+from cloudmorrow.server.approvals import Approvals
 from cloudmorrow.server.backends import SharesBackend, VaultsBackend
 from cloudmorrow.server.circles import CircleStore
 from cloudmorrow.server.config import ServerConfig, load_config
@@ -22,6 +23,7 @@ from cloudmorrow.server.dav import MOUNT_PATH, CredentialCheck, build_dav_app
 from cloudmorrow.server.db import UserStore
 from cloudmorrow.server.drive import user_drive
 from cloudmorrow.server.features import Feature, FeatureStore
+from cloudmorrow.server.flows import FlowRunner
 from cloudmorrow.server.mcp import MCPStore
 from cloudmorrow.server.notifications import NotificationStore
 from cloudmorrow.server.quills import QuillRegistry, RuntimeStore
@@ -32,12 +34,15 @@ from cloudmorrow.server.quills.sharing import Policy, SharingStore
 from cloudmorrow.server.quills.shelf import Shelf
 from cloudmorrow.server.quills.tokens import QuillTokenStore
 from cloudmorrow.server.records import RecordStore
+from cloudmorrow.server.roles import RoleStore
 from cloudmorrow.server.routes import (
     agentquills,
     agents,
+    approvals,
     auth,
     circles,
     features,
+    flows,
     install,
     mcp,
     notifications,
@@ -46,6 +51,7 @@ from cloudmorrow.server.routes import (
     quills,
     quillshelf,
     records,
+    roles,
     secrets,
     setup,
     sharefiles,
@@ -117,6 +123,9 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     record_store = RecordStore(db, quill_registry.models, quill_registry.expiries)
     # Who may use which datamodels: asked by the gate on every read and write.
     circle_store = CircleStore(db)
+    # Who holds which role (roles.py): what an approval is seen through.
+    role_store = RoleStore(db)
+    record_store.holds = role_store.holds
     # Each installed Quill is one more thing to switch, at both levels; a
     # Quill of somebody's own by its key, `~alice.budget`.
     feature_store = FeatureStore(
@@ -157,6 +166,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         quills=quill_registry,
         records=record_store,
         circles=circle_store,
+        roles=role_store,
         sharing=sharing_store,
         shelf=shelf,
         policy=policy,
@@ -189,6 +199,14 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     # A Quill's code: its token and webhook secrets, and the processes that
     # run it, kept in line with what is installed and switched on.
     state = app.state.cloudmorrow
+    # The roles the installed Quills declare exist, empty, from the moment
+    # they are installed; approvals asked of them; flows that run on changes.
+    quill_registry.listeners.append(lambda: role_store.declare(quill_registry.all()))
+    role_store.declare(quill_registry.all())
+    state.approvals = Approvals(state)
+    state.flows = FlowRunner(state)
+    app.router.on_startup.append(state.flows.start)
+    app.router.on_shutdown.append(state.flows.stop)
     state.quill_tokens = QuillTokenStore(db)
     state.services = Supervisor(config, quill_registry, user_store, state.features, state.quill_tokens)
     app.router.on_startup.append(state.services.start)
@@ -200,6 +218,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     def tick() -> None:
         state.services.run_due()
         state.code.run_due()
+        state.flows.run_due()
 
     clock = Clock(db, quill_registry, record_store, on_tick=tick)
     app.router.on_startup.append(clock.start)
@@ -251,6 +270,10 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.include_router(circles.router)
     app.include_router(circles.mine_router)
     app.include_router(circles.person_router)
+    app.include_router(roles.router)
+    app.include_router(roles.mine_router)
+    app.include_router(approvals.router)
+    app.include_router(flows.router)
     app.include_router(today.router)
     app.include_router(features.router)
     app.include_router(features.mine_router)
