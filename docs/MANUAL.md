@@ -185,7 +185,7 @@ cm login
 | one record | tap its row: the sheet | `enter` on its row: the sheet | `cm <quill> show <id>` |
 | you, and your switches | **Me**, top right | **Settings**, `ctrl+g` | `cm whoami`, `cm config` |
 | what the machines did | not yet | the bell, `f8` | `cm agent list`, `cm agent jobs <id>` |
-| administration | **Me → Administration** | **Administration**, `f9` | `cm circle`, `cm quill`; accounts with `cloudmorrow-server user` on the box |
+| administration | **Administration** in the rail on a computer; **Me → Administration** on a phone | **Administration**, `f9` | `cm circle`, `cm quill`; accounts with `cloudmorrow-server user` on the box |
 
 ## Layout
 
@@ -745,28 +745,36 @@ buttons come in to meet the column they act on rather than sitting out at the
 window's edge, every row and tile says when the pointer is over it, and the
 sheet that slides up from under a thumb is a dialog in the middle. The rail
 stays put in an editor and in a thread, which on a phone drop the tab bar to
-give the keyboard the room.
+give the keyboard the room. For an administrator it has one more section at
+the foot, **Administration**, with Users, Circles, Quills and Server under
+it — the terminal app's sidebar, in the browser.
 
 The keys are the ones already on the screen: `Esc` is the back button (or the
 field you are in), `/` is the search box, `n` is the pen beside the title,
 `j` and `k` — and the arrows, once the list has the keyboard — walk the rows,
 and `Enter` opens the one you are on.
 
-None of it changes the phone: `desktop.css` is one media query, and the two
+None of it changes the phone: `desktop.css` is one media query, and the few
 rules outside it hide the parts that are only ever for the rail.
 `tests/test_desktop_web.py` is that promise, kept by a test rather than by
 hand.
 
-### Administration, from the phone
+### Administration, in the browser
 
 The server's own panel is here too, so a new account does not mean walking
-to the desk. It is a row at the bottom of **Me**, and only an administrator
-is shown it — a row nobody else can use is a row nobody else should see.
+to the desk. On a computer it is the **Administration** section of the
+rail, a page per side, as the terminal app's sidebar has it; on a phone,
+whose bar has no room for a section, it is a row at the bottom of **Me**,
+with the sides under a switch above the page. Only an administrator is
+shown either — a row nobody else can use is a row nobody else should see.
 Typing `#/admin` as anybody else lands you back on Me with a word about it,
 which is a courtesy rather than the guard: every call under it is admin-only
 at the server, and the screen would be empty without that.
 
-Two sections under a switch, the same two the terminal app has:
+Four sides, each at its own address (`#/admin/users`, `#/admin/circles`,
+`#/admin/quills`, `#/admin/server`). **Circles** is described under
+[circles](#circles-who-may-use-which-data) and **Server** is what this server runs and
+**Update server**; the two with the most in them:
 
 - **Users.** Every account, with its type and, where it is worth pointing
   at, its role on a chip — an ordinary User has no chip, because that is the

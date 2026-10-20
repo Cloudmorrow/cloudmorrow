@@ -31,7 +31,14 @@ export const store = {
 
 // Who is signed in. The token lives in local storage for as long as the
 // server says it is good; the username stays so the next sign-in is one field.
-export const session = { token: store.get("token"), user: store.get("user") || "" };
+export const session = {
+  token: store.get("token"),
+  user: store.get("user") || "",
+  // Whether this account administers the server, as the server last said.
+  // Kept so the rail is drawn with its Administration section the moment
+  // the page is, rather than growing one a beat after you look at it.
+  admin: store.get("admin") === "1",
+};
 
 // -- talking to the server -----------------------------------------------------
 export class ApiError extends Error {
@@ -373,7 +380,7 @@ export const icons = {
 
 // -- what the features register ---------------------------------------------------
 const screens = new Map();   // name in the hash → async (arg, extra) => renders it
-const tabList = [];          // [{name, label, icon, href(active), feature}] as registered, or a slot
+const tabList = [];          // [{name, label, icon, href(active), feature, admin}] as registered, or a slot
 const shellHooks = [];       // run after every screen is put on the page
 const signOutHooks = [];     // run when the session ends, to drop what was loaded
 const signInHooks = [];      // run with the server's answer when a session starts
@@ -381,7 +388,10 @@ let home = "login";          // the screen an empty hash means, once signed in
 let homeFeature = "";        // the feature that screen belongs to, if it is one
 
 export function registerScreen(name, render) { screens.set(name, render); }
-/** A tab. `feature` names the feature it belongs to; without one it is always there. */
+/** A tab. `feature` names the feature it belongs to; without one it is
+    always there. `admin` puts it under Administration, for administrators
+    only — and, since a phone's bar has no room for a section, only in the
+    rail. `icon` may be a function, for an icon the library has not read yet. */
 export function registerTab(tab) { tabList.push(tab); }
 /** A place in the tab order for tabs that arrive later — the Quills, which
     only the server knows. Held where it is called, so the order of app.js
@@ -415,13 +425,35 @@ export function setFeaturesOff(keys) {
   store.set("features.off", [...featuresOff].join(",") || null);
 }
 
-const shownTabs = () => allTabs().filter((t) => !featureOff(t.feature));
+const shownTabs = () => allTabs().filter((t) => !featureOff(t.feature) && (!t.admin || session.admin));
 
-/** Where an empty hash goes. Not into a tab this account has switched off. */
+/** Where an empty hash goes. Not into a tab this account has switched off,
+    and never into Administration. */
 export function homeHash() {
   if (!featureOff(homeFeature)) return "#/" + home;
-  const first = shownTabs()[0];
+  const first = shownTabs().find((t) => !t.admin);
   return first ? first.href(false) : "#/today";
+}
+
+// -- whether this account administers the server ----------------------------------
+// The server says, on signing in and whenever Me or Administration asks it
+// again; the answer only decides whether the rail draws its Administration
+// section. That is a courtesy, not the guard: every call under it is
+// admin-only at the server, and the screens would be empty without it.
+export function setAdmin(yes) {
+  yes = !!yes;
+  if (yes === session.admin) return;
+  session.admin = yes;
+  store.set("admin", yes ? "1" : null);
+  redrawTabs();
+}
+
+/** Redraw the tabs in place, keeping the one you are on. */
+export function redrawTabs() {
+  const bar = app.querySelector(":scope > nav.tabs");
+  if (!bar) return;
+  const active = bar.querySelector(".tab.active");
+  bar.outerHTML = tabs(active ? active.dataset.tab : "");
 }
 
 // -- who has the screen ------------------------------------------------------------
@@ -498,6 +530,7 @@ export function signIn(data) {
   session.user = data.user.username;
   store.set("token", session.token);
   store.set("user", session.user);
+  setAdmin(data.user.is_admin);
   for (const fn of signInHooks) fn(data);
   forgetHistory();
   replace(homeHash());
@@ -507,6 +540,7 @@ export function signIn(data) {
 export function signOut(message) {
   session.token = null;
   store.set("token", null);
+  setAdmin(false);
   occupant = null;
   for (const fn of signOutHooks) fn();
   replace("#/login");
@@ -686,15 +720,25 @@ export function heading(title, right = "") {
 // you to the top of it, as on a phone.
 //
 // On a screen wide enough the same markup is a rail down the left, and
-// the wordmark moves to the head of it out of the middle of the bar.
+// the wordmark moves to the head of it out of the middle of the bar. The
+// rail has one more thing the bar does not: for an administrator, a
+// section of its own at the foot — Administration, and the server's pages
+// under it — as the terminal app's sidebar has. The phone keeps those
+// behind a row in Me, and the stylesheet keeps the section off it.
 // Which tab was last lit, for the screens that draw none of their own.
 let lastTab = "";
 export function tabs(active) {
   if (active) lastTab = active;
-  return `<nav class="tabs"><div class="rail-head">${wordmark()}</div>` + shownTabs().map((t) =>
-    `<a class="tab${t.name === active ? " active" : ""}" data-tab="${t.name}"` +
+  const draw = (t) =>
+    `<a class="tab${t.admin ? " admin" : ""}${t.name === active ? " active" : ""}" data-tab="${t.name}"` +
     ` href="${t.href(t.name === active)}"` +
-    `${t.name === active ? ' aria-current="page"' : ""}>${t.icon}<span>${t.label}</span></a>`).join("") +
+    `${t.name === active ? ' aria-current="page"' : ""}>${typeof t.icon === "function" ? t.icon() : t.icon}` +
+    `<span>${t.label}</span></a>`;
+  const shown = shownTabs();
+  const admin = shown.filter((t) => t.admin).map(draw).join("");
+  return `<nav class="tabs"><div class="rail-head">${wordmark()}</div>` +
+    shown.filter((t) => !t.admin).map(draw).join("") +
+    (admin ? `<div class="rail-section">Administration</div>` + admin : "") +
     `</nav>`;
 }
 
