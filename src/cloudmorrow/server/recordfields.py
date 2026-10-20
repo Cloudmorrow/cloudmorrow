@@ -11,7 +11,7 @@ import datetime as dt
 import json
 import re
 
-from cloudmorrow.server.datamodels import Datamodel, Field
+from cloudmorrow.server.datamodels import Datamodel, Field, reads_as
 
 __all__ = [
     "RANGES",
@@ -134,13 +134,6 @@ def _wall_or_moment(where: str, text: str) -> str:
         exact = moment.second or moment.microsecond
         return moment.isoformat(timespec="seconds" if exact else "minutes")
     return moment.isoformat(timespec="seconds")
-
-
-def reads_as(value: object, target: str) -> bool:
-    """Does a field's value read as *target*? `false` is how TOML says a bool."""
-    if isinstance(value, bool):
-        return str(value).lower() == target.lower()
-    return value is not None and str(value) == target
 
 
 def stored_indexed(model: Datamodel) -> set[str]:

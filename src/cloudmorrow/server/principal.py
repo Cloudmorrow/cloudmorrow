@@ -1,7 +1,8 @@
 """Who is asking, and the gate that says what they may reach at all.
 
-A principal is a person, an assistant acting for one, or a Quill acting for
-one; `check` is the first question every read and write of a record asks.
+A principal is a person, an assistant acting for one, a Quill acting for
+one, or a guest let at one snapshot with a link (docs/ATTESTATIONS.md);
+`check` is the first question every read and write of a record asks.
 Which records of a datamodel it then reaches is the record store's to say.
 """
 
@@ -9,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-__all__ = ["ACTIONS", "DATASET", "NEVER_FOR_ASSISTANTS", "Principal", "Refused", "check"]
+__all__ = ["ACTIONS", "DATASET", "GUEST", "NEVER_FOR_ASSISTANTS", "Principal", "Refused", "check"]
 
 
 class Refused(PermissionError):
@@ -25,7 +26,7 @@ class Principal:
     account's. What differs is what it may reach of them.
     """
 
-    kind: str  # person, assistant, quill; dataset for a Quill's seed
+    kind: str  # person, assistant, quill; dataset for a Quill's seed; guest, at one snapshot
     username: str
     # For a Quill: its id, and the datamodels it declared or was granted.
     quill: str = ""
@@ -51,6 +52,10 @@ class Principal:
 # person acting, so their circles do not narrow it.
 DATASET = "dataset"
 
+# Somebody with a link to one snapshot and nothing else: reads it, and gives
+# an attestation on it, as the snapshot's owner's guest (snapshots.py).
+GUEST = "guest"
+
 # Datamodels no assistant is ever let at, whatever the person allows.
 NEVER_FOR_ASSISTANTS = frozenset({"secret"})
 
@@ -71,3 +76,5 @@ def check(principal: Principal, action: str, model: str) -> None:
         raise Refused(f"assistants never reach {model}")
     if principal.kind == "quill" and model not in principal.models:
         raise Refused(f"{principal.quill} did not ask for {model}")
+    if principal.kind == GUEST and model not in principal.models:
+        raise Refused(f"a guest reaches no {model}")

@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="400" viewBox="0 0 1000 400" role="img" aria-label="The foundational organisation datamodel on the left, the CRM quill's manifest in the middle adding a crm.status field, and on the right one stored record carrying the standard fields and the extension side by side."><style>
+text { font-family: Barlow, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11.5px; fill: #dfe5f0; }
+.eyebrow-t text { font-family: 'Barlow Semi Condensed', 'Arial Narrow', 'Segoe UI', sans-serif; font-weight: 600; font-size: 11px; letter-spacing: 0.8px; fill: #99a1b3; }
+.fields text { font-family: 'JetBrains Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace; font-size: 12.5px; }
+.rows text { font-family: 'JetBrains Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace; font-size: 11.5px; }
+.t-b { font-weight: 600; font-size: 14px; }
+.t-m { font-size: 11.5px; fill: #99a1b3; }
+.fields .t-m { font-size: 12.5px; }
+.t-f { font-size: 11px; fill: #99a1b3; opacity: .8; }
+.t-mono { font-family: 'JetBrains Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace; font-size: 12px; }
+.t-big { font-size: 16px; font-weight: 700; }
+.t-sky, tspan.t-sky { fill: #5aa6e0; }
+.t-lens, tspan.t-lens { fill: #e0a84c; }
+.t-good { fill: #5ce89b; }
+.box rect { fill: #272d39; stroke: #333a48; }
+.box rect.warm, .ext { fill: #3f3524; stroke: #e0a84c; stroke-width: 1.5; }
+.server { fill: #1f242e; stroke: #4a5364; stroke-width: 1.5; }
+.gate, .found { fill: #1d3a55; stroke: #5aa6e0; stroke-width: 1.5; }
+.panel { fill: #272d39; stroke: #333a48; }
+.panel.strong { stroke: #4a5364; stroke-width: 1.5; }
+.rows rect { fill: #1f242e; }
+.rows rect.warm { stroke: #e0a84c; }
+.flow path, .flow line { fill: none; stroke: #dfe5f0; stroke-width: 1.5; }
+.lens-line { fill: none; stroke: #e0a84c; stroke-width: 1.5; }
+.sky-line { fill: none; stroke: #5aa6e0; stroke-width: 1.5; }
+.good-line { fill: none; stroke: #5ce89b; stroke-width: 1.5; }
+.rule { stroke: #333a48; }
+</style><rect width="1000" height="400" rx="16" fill="#14171f"/>
+      <defs>
+        <marker id="dx-arrow-sky" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5aa6e0"/></marker>
+        <marker id="dx-arrow-lens" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e0a84c"/></marker>
+      </defs>
+      <g class="eyebrow-t"><text x="40" y="34">FOUNDATIONAL · Cloudmorrow/datamodels</text><text x="390" y="34">THE QUILL · quill-crm/quill.toml</text><text x="700" y="34">ONE RECORD · in your store</text></g>
+      <rect x="40" y="48" width="290" height="300" rx="12" class="found"/>
+      <text x="58" y="76" class="t-mono t-sky t-big">organisation</text><text x="312" y="76" class="t-m" text-anchor="end">domain crm · v1</text>
+      <text x="58" y="96" class="t-m">A company or body you deal with.</text>
+      <line x1="58" y1="108" x2="312" y2="108" class="rule"/>
+      <g class="t-mono fields">
+        <text x="58" y="132">book</text><text x="312" y="132" class="t-m" text-anchor="end">link → book</text>
+        <text x="58" y="156">name</text><text x="312" y="156" class="t-m" text-anchor="end">string · required</text>
+        <text x="58" y="180">industry</text><text x="312" y="180" class="t-m" text-anchor="end">string</text>
+        <text x="58" y="204">website</text><text x="312" y="204" class="t-m" text-anchor="end">url</text>
+        <text x="58" y="228">email</text><text x="312" y="228" class="t-m" text-anchor="end">email</text>
+        <text x="58" y="252">phone</text><text x="312" y="252" class="t-m" text-anchor="end">phone</text>
+        <text x="58" y="276">address</text><text x="312" y="276" class="t-m" text-anchor="end">text</text>
+        <text x="58" y="300">notes</text><text x="312" y="300" class="t-m" text-anchor="end">markdown</text>
+      </g>
+      <text x="58" y="332" class="t-m">grown by pull request, the same for every quill</text>
+      <rect x="390" y="48" width="260" height="160" rx="12" class="ext"/>
+      <text x="408" y="76" class="t-b t-lens t-big">CRM</text><text x="632" y="76" class="t-m" text-anchor="end">a quill, v1.x</text>
+      <g class="t-mono fields">
+        <text x="408" y="104" class="t-m">[uses]</text>
+        <text x="408" y="122">[<tspan class="t-sky">"organisation"</tspan>, "deal", …]</text>
+        <text x="408" y="148" class="t-m">[[extends]]</text>
+        <text x="408" y="166">model = <tspan class="t-sky">"organisation"</tspan></text>
+        <text x="408" y="186"><tspan class="t-lens t-b">status</tspan> = enum lead, prospect, …</text>
+      </g>
+      <path d="M330 90 L390 90" class="sky-line" marker-end="url(#dx-arrow-sky)"/>
+      <text x="360" y="82" class="t-b t-sky" text-anchor="middle">uses</text>
+      <path d="M650 180 L676 180 L676 268 L700 268" class="lens-line" marker-end="url(#dx-arrow-lens)"/>
+      <text x="664" y="222" class="t-b t-lens" transform="rotate(-90 664 222)" text-anchor="middle">adds crm.status</text>
+      <path d="M330 200 L360 200 L360 372 L680 372 L680 200 L700 200" class="sky-line" stroke-dasharray="4 3" marker-end="url(#dx-arrow-sky)"/>
+      <text x="530" y="366" class="t-b t-sky" text-anchor="middle">gives the record its standard fields</text>
+      <rect x="700" y="48" width="270" height="300" rx="12" class="panel strong"/>
+      <text x="718" y="74" class="t-mono t-m">r_3cdfa9b0eb</text><text x="952" y="74" class="t-m" text-anchor="end">rev 1 · written_by crm</text>
+      <text x="718" y="92" class="t-m">owner jimmi · scope shared (Customers)</text>
+      <line x1="718" y1="104" x2="952" y2="104" class="rule"/>
+      <g class="t-mono fields">
+        <text x="718" y="128" class="t-sky">name</text><text x="952" y="128" text-anchor="end">Fjordline Freight</text>
+        <text x="718" y="152" class="t-sky">industry</text><text x="952" y="152" text-anchor="end">Logistics</text>
+        <text x="718" y="176" class="t-sky">website</text><text x="952" y="176" class="t-f" text-anchor="end">—</text>
+        <text x="718" y="200" class="t-sky">email</text><text x="952" y="200" class="t-f" text-anchor="end">—</text>
+        <text x="718" y="224" class="t-sky">notes</text><text x="952" y="224" class="t-f" text-anchor="end">—</text>
+      </g>
+      <rect x="710" y="250" width="250" height="34" rx="8" class="ext"/>
+      <text x="718" y="272" class="t-mono t-lens t-b">crm.status</text><text x="952" y="272" class="t-mono" text-anchor="end">prospect</text>
+      <text x="718" y="310" class="t-m">standard and extension fields sit side by</text><text x="718" y="324" class="t-m">side, draw together on every screen, and</text><text x="718" y="338" class="t-m">export together</text>
+    </svg>

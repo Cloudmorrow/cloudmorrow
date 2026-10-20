@@ -26,6 +26,16 @@ write is encrypted before it touches the disk.
 
 It is free software under the [GNU AGPL v3](LICENSE).
 
+<p align="center">
+  <img src="docs/images/desktop-tasks.webp" width="49%" alt="The Tasks Quill in a desktop browser: three lanes, To Do, Doing and Done, beside a sidebar listing every Quill">
+  <img src="docs/images/tui-tasks.webp" width="49%" alt="The same Tasks board in the terminal app: three columns, the Quills in a sidebar, and a log along the bottom">
+</p>
+<p align="center">
+  <img src="docs/images/phone-tasks.webp" width="24%" alt="The same Tasks board in the web app on a phone: the lanes stacked, a card in each">
+  <img src="docs/images/cloud.svg" width="74%" alt="How a cloud fits together: five surfaces reach the server through its gate; inside, the installed Quills sit above one record store; the Quill Catalog supplies Quills and the datamodels they use at install; records export any time">
+</p>
+<p align="center"><sub>One Quill, Tasks, as the kit draws it in the browser, in the terminal and on the phone, and the shape of the cloud behind them. How it fits together is in <a href="docs/QUILLS.md">docs/QUILLS.md</a> and <a href="docs/DATAMODELS.md">docs/DATAMODELS.md</a>.</sub></p>
+
 ## What you get
 
 - **Notes.** Markdown files in folders, with pictures. Written on the phone,
@@ -295,6 +305,9 @@ server, so a change to the terminal app needs no deploy to try.
   API route, with the reasoning behind them.
 - [docs/ENCRYPTION.md](docs/ENCRYPTION.md): what is encrypted, how, what it
   protects against and what it does not.
+- [docs/ATTESTATIONS.md](docs/ATTESTATIONS.md): a frozen copy of a space's
+  records with a digest, and an outside party's signed word on it: the
+  books at year end, validated by the accountant.
 - [Concept.md](Concept.md): what Cloudmorrow is, in one page.
 - [docs/DATA.md](docs/DATA.md): the data concept: elements with standard
   fields, extensions apps add, scopes, storage, the change feed, export,

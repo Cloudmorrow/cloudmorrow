@@ -16,6 +16,8 @@ What the store does for every datamodel, so no Quill has to:
 * stamps a datetime when another field takes a value, and clears it when it
   leaves — how a task knows when it was finished;
 * bumps `rev` on every write, and refuses a write that names an older one;
+* refuses every change and delete of a record its datamodel has `locked`
+  (a sealed snapshot), bar the one move the lock allows (docs/ATTESTATIONS.md);
 * cascades a delete along links that say `on_delete = "cascade"`, and clears
   those that say `clear`;
 * sweeps records an `expire` job would take, when their datamodel is read;
@@ -74,6 +76,7 @@ __all__ = [
     "Record",
     "RecordConflictError",
     "RecordError",
+    "RecordLockedError",
     "RecordStore",
     "Refused",
     "UnknownModelError",
@@ -159,6 +162,12 @@ class UnknownModelError(LookupError):
 
 class UnknownRecordError(LookupError):
     pass
+
+
+class RecordLockedError(RecordError):
+    """The record is locked: its datamodel says it is never changed or deleted again."""
+
+    status = 423
 
 
 class RecordConflictError(RuntimeError):
@@ -378,6 +387,10 @@ class RecordStore:
         return self.access is None or self.access(principal.username).may("read", model_id)
 
     # -- lookups ---------------------------------------------------------------
+    def models(self) -> dict[str, Datamodel]:
+        """Every datamodel installed right now, by id."""
+        return self._models()
+
     def model(self, model_id: str) -> Datamodel:
         found = self._models().get(model_id)
         if found is None:
@@ -532,6 +545,29 @@ class RecordStore:
                     f"only whoever wrote this {model.label.lower()}, or whoever manages where it is, may change it"
                 )
         raise Refused(f"only whoever wrote this {model.label.lower()} may change it")
+
+    @staticmethod
+    def _unlocked(model: Datamodel, current: dict, incoming: dict | None) -> None:
+        """Refuse a change to, or the delete of, a record its datamodel has locked.
+
+        *incoming* is the change, or None for a delete. The one change a
+        locked record takes is its lock field moving to a value the lock
+        allows — a sealed snapshot withdrawn — and nothing with it.
+        """
+        lock = model.lock
+        if lock is None or not lock.holds(current):
+            return
+        what = model.label.lower()
+        if incoming is None:
+            raise RecordLockedError(f"this {what} is locked and cannot be deleted")
+        if (
+            lock.allow
+            and set(incoming) == {lock.field}
+            and reads_as(current.get(lock.field), lock.value)
+            and str(incoming[lock.field]) in lock.allow
+        ):
+            return
+        raise RecordLockedError(f"this {what} is locked and cannot be changed")
 
     def _visible_clause(self, model: Datamodel, username: str) -> tuple[str, list[object]]:
         """SQL that keeps the rows of *model* this person may see."""
@@ -761,6 +797,15 @@ class RecordStore:
             for name in hidden:
                 record.fields[name] = None
         return records
+
+    def every(self, principal: Principal, model_id: str, where: dict[str, object] | None = None) -> list[Record]:
+        """Every record of *model_id* the principal may see, filtered, with no cap:
+        what a snapshot copies. Only for datamodels in the store, never a backend's."""
+        self._check(principal, "read", model_id)
+        model = self.model(model_id)
+        if model.backend:
+            raise RecordError(f"{model.id} is kept by {model.backend}, which is not copied")
+        return self._list_stored(principal, model, dict(where or {}), cap=None)
 
     def get(self, principal: Principal, model_id: str, record_id: str) -> Record:
         self._check(principal, "read", model_id)
@@ -1125,15 +1170,21 @@ class RecordStore:
         scope: str | None = None,
         members: Iterable[str] = (),
         announce: bool = True,
+        by_server: bool = False,
     ) -> Record:
         """Make a record. For a shared space, *members* are put in it at once.
 
         Each of them is told, as being added later tells them — unless
         *announce* is off, for a space found-or-made between people, where the
         first thing written in it is the news.
+
+        A `server_made` datamodel's records come only from the server's own
+        route, which says so with *by_server*; the generic API is refused.
         """
         self._check(principal, "write", model_id)
         model = self.model(model_id)
+        if model.server_made and not by_server:
+            raise Refused(f"a {model.label.lower()} is made by the server, not written by hand")
         if model.backend:
             made = self._backend(model).create(principal, model, dict(incoming))
             self._changed(principal, "created", made, None)
@@ -1289,6 +1340,7 @@ class RecordStore:
             current = self._record(conn, model, row, principal)
             if rev is not None and rev != current.rev:
                 raise RecordConflictError(current)
+            self._unlocked(model, current.fields, incoming)
             fields = self._clean(conn, model, principal, incoming, current=current.fields)
             indexed, body = self._write_row(conn, model, owner, record_id, fields)
             old_group = self._group(model, current.fields)
@@ -1367,6 +1419,8 @@ class RecordStore:
             conn.lock()
             row = self._row(conn, principal, model, record_id)
             self._writable(conn, principal, model, row)
+            if model.lock is not None:
+                self._unlocked(model, self._record(conn, model, row, principal).fields, None)
             before = self._record(conn, model, row, principal) if self.on_change else None
             gone = self._delete(conn, principal, model, record_id, "deleted")
             conn.commit()

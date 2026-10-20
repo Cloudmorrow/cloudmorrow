@@ -36,6 +36,7 @@ from cloudmorrow.server.webpush import PushStore
 if TYPE_CHECKING:
     from cloudmorrow.server.access_lan import LanAnnouncer
     from cloudmorrow.server.changefeed import ChangeFeed
+    from cloudmorrow.server.snapshots import SnapshotStore
 
 
 @dataclass(slots=True)
@@ -82,6 +83,8 @@ class AppState:
     lan: LanAnnouncer | None = None
     # What tells an open screen a record changed, as it does (changefeed.py).
     changes: ChangeFeed | None = None
+    # Frozen copies of a space's records, and the signed word on them (snapshots.py).
+    snapshots: SnapshotStore | None = None
 
     def cloud_name(self) -> str:
         """What this cloud is called: set from the app, else from the config."""

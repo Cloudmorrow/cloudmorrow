@@ -272,7 +272,7 @@ settings: personal_quills, personal_quill_code, personal_quill_sharing, personal
 A personal Quill's records are rows in the one `records` table like any
 other's, under their prefixed datamodel id, with `scope = 'public'`: the
 Quill's, for everybody it stands with. The seal on each is to its owner
-and id, as ever. Schema step 6 marks the rows of older servers so.
+and id, as ever. Schema step 7 marks the rows of older servers so.
 
 ## Not yet
 

@@ -125,6 +125,14 @@ description. Nothing is kept from a surface on purpose — only by what the
 surface can do: a browser cannot mount a share, and a terminal has no
 camera.
 
+The Tasks Quill, on each:
+
+![The web app on a phone: the Tasks board with its lanes To Do, Doing and Done stacked, and the tabs along the bottom](images/phone-tasks.webp)
+
+![The web app in a desktop browser: the same board as three columns, with every Quill in the sidebar](images/desktop-tasks.webp)
+
+![The terminal app: the same board as three columns, the Quills down the left, the keys along the bottom](images/tui-tasks.webp)
+
 **Signing in.** The same username and password everywhere.
 
 #### In the web app
@@ -254,6 +262,8 @@ cloudmorrow agent   list | run | jobs | enroll-token
 cloudmorrow share   list | show | add | with | unshare | leave | move | remove | mount | unmount
 cloudmorrow config  show | set
 cloudmorrow update  [server | all]
+cloudmorrow snapshot take | list | show | bundle | attest | guest | guests | revoke | withdraw | verify
+cloudmorrow attest  sign | verify | key
 ```
 
 `cm` is the same command in two letters — `cm notes list`, or `cm` on its own
@@ -2160,6 +2170,12 @@ curl -s $CLOUDMORROW/api/notifications -H "Authorization: Bearer $TOKEN"
 | `POST` | `/api/records/{model}/{id}/members` | `{username}` — put somebody in a shared space; they are told |
 | `DELETE` | `/api/records/{model}/{id}/members/{username}` | take somebody out, or with your own name leave |
 | `POST` | `/api/records/{model}/{id}/seen` | you have looked in a space: what is in it is not unread |
+| `POST` | `/api/snapshots` | a frozen copy of a space's records, with a digest, sealed and locked ([ATTESTATIONS.md](ATTESTATIONS.md)) |
+| `GET` | `/api/snapshots/{id}`, `…/bundle` | the snapshot with its attestations and whether its bundle is intact; the bundle's bytes |
+| `POST` | `/api/snapshots/{id}/attestations` | bring somebody's signed verdict back; checked against the digest before it is kept |
+| `POST`/`GET`/`DELETE` | `/api/snapshots/{id}/guests[/{n}]` | a link that opens the one snapshot to somebody outside; the links given out; take one back |
+| `GET`/`POST` | `/api/guest/snapshots/{id}?token=`, `…/bundle`, `…/attestations` | what a guest link opens, with no account |
+| `GET`/`POST` | `/api/identity`, `/api/attest` | this server's signing key; an attestation signed with it, in your name |
 | `GET` | `/api/records/{model}?_last=50&_since=…` | the newest fifty, still in order; only what changed at or after a moment |
 | `GET` | `/api/changes` | a server-sent events stream of the records you may see being made, changed or deleted; `?since=<seq>` to catch up |
 | `GET` | `/api/people` | everybody a space could be shared with, or written to |

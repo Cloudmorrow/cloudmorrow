@@ -1,0 +1,25 @@
+[datamodel]
+id = "attestation"
+version = 1
+label = "Attestation"
+description = "Somebody's signed word on one snapshot: validated, qualified or rejected, with their statement, signed with a key of their own over the snapshot's digest. Kept with the snapshot, and never changed."
+domain = "attestations"
+scopes = ["personal", "shared", "public"]
+title = "signer_name"
+in_space = "snapshot"
+# Made only by the server, after it has checked the signature against the
+# digest; locked from the moment it is made. docs/ATTESTATIONS.md
+server_made = true
+locked = true
+
+[fields]
+snapshot = { kind = "link", to = "snapshot", required = true, indexed = true, on_delete = "cascade" }
+digest = { kind = "string", required = true, indexed = true, description = "The digest the signature is over; the snapshot's" }
+verdict = { kind = "enum", values = ["validated", "qualified", "rejected"], labels = ["Validated", "Qualified", "Rejected"], required = true, indexed = true }
+statement = { kind = "text", description = "What the signer says of it, in their words" }
+signer_name = { kind = "string", required = true, label = "Signed by" }
+signer_organisation = { kind = "string", label = "Organisation" }
+signer_key = { kind = "string", required = true, label = "Key", description = "The signer's public key: ed25519:<base64>" }
+signer_fingerprint = { kind = "string", indexed = true, label = "Fingerprint" }
+signed_at = { kind = "datetime", required = true, indexed = true, label = "Signed" }
+signature = { kind = "string", required = true, description = "Ed25519 over the canonical attestation, base64" }
