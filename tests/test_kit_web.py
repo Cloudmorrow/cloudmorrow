@@ -207,6 +207,21 @@ def test_the_quills_section_is_in_administration():
     assert 'registerScreen("adminquill", renderQuill);' in ADMIN_JS
 
 
+def test_your_quills_has_its_three_tabs_a_sheet_and_the_endpoints_that_answer_a_member(client, guest_auth):
+    """Server Quills, Yours and the Catalog; a sheet per Quill, as a screen on a
+    phone; updating a Quill of your own is installing it again."""
+    mine = (WEB / "myquills.js").read_text(encoding="utf-8")
+    for tab in ('["server", "Server Quills"]', '["mine", "Yours"]', '["catalog", "Catalog"]'):
+        assert tab in mine, tab
+    for screen in ("myquills", "myquill"):
+        assert f'registerScreen("{screen}"' in mine, screen
+    assert 'class="chip-button update-all"' in mine and 'class="row primary update-mine"' in mine
+    assert 'api("POST", "/api/quills/mine", body)' in mine
+    for path in ("/api/quills/mine", "/api/quills", "/api/me/features", "/api/quills/catalog"):
+        assert f'"{path}"' in mine, path
+        assert client.get(path, headers=guest_auth).status_code == 200, path
+
+
 def test_the_quills_side_has_its_three_tabs_and_the_update_buttons():
     """Server Quills, User Quills and the Catalog; a tick per installed Quill, and
     an update of the ticked ones or of all, each an install again from the catalog
