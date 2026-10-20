@@ -13,6 +13,14 @@ Together they supersede the "app" and "element" wording in
 [PLATFORM.md](PLATFORM.md) and [DATA.md](DATA.md); where they differ, these
 pages win, and those remain the reasoning behind them.
 
+![How a cloud fits together: the phone, the browser, the terminal, the command line and an AI agent reach the server through its gate. Inside the server the installed Quills sit above one record store that holds every record of every datamodel, beside the server's copies of the datamodels and the change feed. The Quill Catalog supplies a Quill and the datamodels it uses at install, and records export any time.](images/cloud.svg)
+
+Five surfaces, one server, one gate, one store. Every surface draws a Quill
+from the same description, and a Quill reads and writes only the
+datamodels it asked for: the amber path is CRM's, to organisations and
+deals and nothing else. Remove a Quill and its screens go; its records
+stay, in the shape every other Quill already reads.
+
 ## The words
 
 | word | what it is |

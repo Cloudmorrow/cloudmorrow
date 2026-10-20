@@ -45,6 +45,46 @@ administrator unticks what should go with it, records and all. The datamodels
 repository and cloudmorrow.com/datamodels hold only the foundational ones;
 what a Quill brings is on the Quill's own page in the catalog.
 
+![The foundational organisation datamodel on the left, with its fields book, name, industry, website, email, phone, address and notes. In the middle the CRM Quill's manifest: it uses organisation and extends it with a status field. On the right one stored record, Fjordline Freight, carrying the standard fields and crm.status side by side.](images/extending.svg)
+
+A Quill has three verbs for data, and reaches for them in this order:
+
+| verb | in the manifest | what it means |
+| --- | --- | --- |
+| **uses** | `[uses] datamodels = ["board", "task"]` | a foundational datamodel as published; Tasks adds nothing to `board` and `task` |
+| **extends** | `[[extends]] model = "organisation"` with `[extends.fields]` | fields under the Quill's own name on a shape that exists, stored as `crm.status`; the shape stays one shape |
+| **introduces** | a file in the Quill's `datamodels/` folder | a whole datamodel under the Quill's name, `vidmorrow.clip`, when nothing in the foundation fits; from then on any Quill may use it |
+
+What the store keeps for the organisation in the picture, as the record API
+returns it: the standard fields and the extension on one record, which
+every screen draws together and every export writes together. Remove CRM
+and the record keeps `crm.status` too, read-only until something writes it
+again.
+
+```json
+{
+  "id": "r_3cdfa9b0eb",
+  "model": "organisation",
+  "owner": "jimmi",
+  "scope": "shared",
+  "rev": 1,
+  "written_by": "crm",
+  "fields": {
+    "book": "r_2678732f5a",
+    "name": "Fjordline Freight",
+    "industry": "Logistics",
+    "crm.status": "prospect",
+    "website": null, "email": null, "phone": null, "address": null, "notes": null
+  }
+}
+```
+
+On every surface the extension field is a column like any other:
+
+![The CRM Quill's Organisations screen in the terminal app: a table of organisations with their name, status and when they were updated](images/tui-crm.webp)
+
+![The same Organisations screen in a desktop browser: each organisation with its status under its name](images/desktop-crm.webp)
+
 ## A datamodel
 
 A datamodel is a TOML file: in [`Cloudmorrow/datamodels`](https://github.com/Cloudmorrow/datamodels)
