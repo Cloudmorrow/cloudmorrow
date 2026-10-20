@@ -13,9 +13,9 @@ import re
 
 from cloudmorrow.server.routes.web import WEB
 
-# The only selectors allowed to reach the phone: both are for elements that
-# did not exist before this file, and both only hide them.
-PHONE_SAFE = {".tabs .rail-head", ".aside-tabs .tabs"}
+# The only selectors allowed to reach the phone: all are for elements that
+# did not exist before this file, and all only hide them.
+PHONE_SAFE = {".tabs .rail-head", ".aside-tabs .tabs", ".tabs .rail-section", ".tabs .tab.admin"}
 
 
 def strip_comments(css: str) -> str:
@@ -51,7 +51,7 @@ def test_the_stylesheet_and_the_keys_are_listed() -> None:
     assert 'import "./desktop.js";' in (WEB / "app.js").read_text()
 
 
-def test_nothing_reaches_the_phone_but_the_two_rules_that_hide_the_new_parts() -> None:
+def test_nothing_reaches_the_phone_but_the_rules_that_hide_the_new_parts() -> None:
     css = strip_comments((WEB / "desktop.css").read_text())
     for head, body in top_level_rules(css):
         if head.startswith("@media"):

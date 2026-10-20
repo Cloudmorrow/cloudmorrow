@@ -4,7 +4,9 @@
    an administrator or stops them signing in, so every row says what it is
    in words and nothing here is a clever control. */
 
-/* -- the switch above the two sections ----------------------------------- */
+/* -- the switch between the sides, on a phone ----------------------------- */
+/* A computer has the rail's Administration section instead, and desktop.css
+   leaves this out there. */
 .seg {
   display: flex;
   margin: 0 0 14px;
@@ -13,15 +15,19 @@
   border-radius: var(--radius);
   overflow: hidden;
 }
-.seg button {
+.seg a {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-height: 38px;
   font-size: 15px;
   font-weight: 600;
   color: var(--muted);
+  text-decoration: none;
 }
-.seg button + button { border-left: 1px solid var(--line); }
-.seg button.active { background: var(--fill); color: var(--fill-ink); }
+.seg a + a { border-left: 1px solid var(--line); }
+.seg a.active { background: var(--fill); color: var(--fill-ink); }
 
 .panel .note {
   margin: 0 4px 14px;
@@ -134,4 +140,4 @@
 .row.bad { justify-content: center; color: var(--bad); font-weight: 600; }
 
 /* The switch and the chips are labels: the guide's semi-condensed face. */
-.seg button, .role-chip { font-family: var(--display); }
+.seg a, .role-chip { font-family: var(--display); }

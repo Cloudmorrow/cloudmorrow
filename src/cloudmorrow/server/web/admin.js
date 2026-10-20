@@ -4,27 +4,46 @@
    which data they may use, and which Quills this server runs — and the
    same rules about them, because both ends talk to one API that decides.
 
-   It is reached from Me rather than from a tab of its own. Administering a
-   server is not a sixth kind of your own stuff, and most accounts never see
-   it: the row appears for administrators, and a non-administrator who types
-   the address is sent back with a word about it. That is a courtesy, not the
-   guard — every call under here is admin-only at the server, and the screen
-   would be empty without it.
+   Where it is depends on the room. On a computer it is a section of the
+   rail — Administration, with a page under it per side, the way the
+   terminal app's sidebar lists them — and on a phone, whose bar has no room
+   for a section, it is a row at the bottom of Me, with the sides under a
+   switch. Administering a server is not a sixth kind of your own stuff,
+   and most accounts never see it: the section and the row appear for
+   administrators, and a non-administrator who types the address is sent
+   back with a word about it. That is a courtesy, not the guard — every
+   call under here is admin-only at the server, and the screen would be
+   empty without it.
 
-   Two screens. The panel, which is the sections under a switch, and one
-   account's page, which is the same form whether it is a new account or one
-   that already exists. The circles (circlesadmin.js) and the Quills
-   (quillsadmin.js, with its sheet) are files of their own; the server's
-   own section — what it runs, and updating it — is below. There is no
-   Features side any more: what this server offers is its Quills, and
-   each is switched on or off on its own sheet. */
+   Four sides, each at its own address — #/admin/users and so on, so the
+   rail can light one — and one account's page, which is the same form
+   whether it is a new account or one that already exists. The circles
+   (circlesadmin.js) and the Quills (quillsadmin.js, with its sheet) are
+   files of their own; the server's own side — what it runs, and updating
+   it — is below. There is no Features side any more: what this server
+   offers is its Quills, and each is switched on or off on its own sheet. */
 
 import {
-  api, app, esc, heading, icons, mount, nav, onSignOut, registerScreen, renderRoute, replace, store, toast,
-  wireShell,
+  api, app, esc, heading, icons, mount, nav, onShell, onSignOut, pixelArt, pixelIcon, registerScreen,
+  registerTab, renderRoute, replace, session, setAdmin, store, tabs, toast, wireShell,
 } from "./core.js";
 import { circlesByPerson, domainsOf, drawCircles, rulesForm, rulesFrom, rulesSaid, wireRulesForm } from "./circlesadmin.js";
 import { drawQuills } from "./quillsadmin.js";
+import { QUILL_GLYPH } from "./quills.js";
+
+// The sides, in the order of the rail and of the switch: the places the
+// terminal app's sidebar lists under ADMINISTRATION. The icons are the
+// library's, read after the first paint, with one of this app's own to
+// stand in until then — or for good, on a server without the library.
+const SIDES = [
+  ["users", "Users", () => pixelIcon("people") || pixelIcon("me")],
+  ["circles", "Circles", () => pixelIcon("group") || pixelIcon("me")],
+  ["quills", "Quills", () => pixelIcon("feather") || pixelArt(QUILL_GLYPH)],
+  ["server", "Server", () => pixelIcon("server") || pixelIcon("settings")],
+];
+const SIDE_LABELS = Object.fromEntries(SIDES.map(([key, label]) => [key, label]));
+/** The address of one side. */
+export const sideHash = (side) => "#/admin/" + side;
 
 // What the server stores, and what it is called on screen. The same words
 // the terminal app uses, so a role means one thing across the two.
@@ -48,60 +67,67 @@ const userUrl = (username) => "/api/users/" + encodeURIComponent(username);
 
 // -- who is asking -----------------------------------------------------------------
 // Cached for the length of the visit: every screen here needs it, and it is
-// the same answer each time.
+// the same answer each time. Whatever it says about administering goes to
+// the shell, which draws the rail's section by it.
 let me = null;
 
+async function whoami() {
+  if (!me) {
+    me = await api("GET", "/api/auth/me");
+    setAdmin(me.is_admin);
+  }
+  return me;
+}
+
 async function requireAdmin() {
-  if (!me) me = await api("GET", "/api/auth/me");
-  if (!me.is_admin) {
+  const who = await whoami();
+  if (!who.is_admin) {
     toast("Administration is for administrators");
     replace("#/me");
     await renderRoute();
     return null;
   }
-  return me;
+  return who;
 }
 
 /** Whether to draw the way in. Me asks this; it never guesses. */
 export const isAdmin = (who) => Boolean(who && who.is_admin);
 
-/** The row that leads here, for Me to put under the rest. */
+/** The row that leads here, for Me to put under the rest — on a phone. A
+    computer has the rail's section, and the stylesheet keeps the row off it. */
 export function adminRow() {
-  return `<div class="group"><a class="row admin-link" href="#/admin">
+  return `<div class="group admin-group"><a class="row admin-link" href="#/admin">
     <span class="main"><span class="title">Administration</span>
     <span class="meta"><span class="preview">The accounts, their circles, the Quills, and the server itself</span></span></span>
     ${icons.chevronRight}</a></div>`;
 }
 
-// -- the panel ------------------------------------------------------------------------
-async function renderAdmin() {
+// -- the sides ------------------------------------------------------------------------
+async function renderAdmin(arg) {
   if (!(await requireAdmin())) return;
-  const side = store.get("admin.side");
-  // "features" was a side once; whoever last stood there is sent to the Quills.
-  const which = ["circles", "quills", "server"].includes(side) ? side : side === "features" ? "quills" : "users";
+  // The side is in the address, so the rail can light it. A bare #/admin —
+  // the row in Me — opens whichever was last open; "features" was a side
+  // once, and whoever last stood there is sent to the Quills.
+  const last = store.get("admin.side");
+  const which = SIDE_LABELS[arg] ? arg : SIDE_LABELS[last] ? last : last === "features" ? "quills" : "users";
+  if (arg !== which) replace(sideHash(which));
+  store.set("admin.side", which);
   // The + beside the heading makes whatever this side lists.
   const making = { users: ["#/adminuser", "New account"], circles: ["#/admincircle", "New circle"] }[which];
-  mount(nav({ back: "#/me", backLabel: "Me", title: "Administration" }) + `
-    <main>
-      ${heading("Administration", making
+  // A top-level screen, like a Quill's: the rail says where you are, and Me
+  // is in the corner. The switch is for the phone, which has no rail.
+  mount(nav({ title: SIDE_LABELS[which] }) + `
+    <main class="admin">
+      ${heading(SIDE_LABELS[which], making
         ? `<button class="compose" aria-label="${making[1]}">${icons.compose}</button>`
         : "")}
-      <div class="seg">
-        <button data-side="users"${which === "users" ? ' class="active"' : ""}>Users</button>
-        <button data-side="circles"${which === "circles" ? ' class="active"' : ""}>Circles</button>
-        <button data-side="quills"${which === "quills" ? ' class="active"' : ""}>Quills</button>
-        <button data-side="server"${which === "server" ? ' class="active"' : ""}>Server</button>
+      <div class="seg">${SIDES.map(([key, label]) =>
+        `<a data-side="${key}" href="${sideHash(key)}"${key === which ? ' class="active"' : ""}>${label}</a>`).join("")}
       </div>
       <div class="panel"><p class="empty"><b>…</b></p></div>
-    </main>`);
+    </main>` + tabs("admin." + which));
   wireShell();
 
-  for (const button of app.querySelectorAll(".seg button")) {
-    button.addEventListener("click", () => {
-      store.set("admin.side", button.dataset.side);
-      renderAdmin();
-    });
-  }
   const compose = app.querySelector(".heading .compose");
   if (compose) compose.addEventListener("click", () => { location.hash = making[0]; });
 
@@ -305,7 +331,7 @@ async function renderUser(username) {
     user = users.find((u) => u.username === username);
     if (!user) {
       toast("No such account");
-      replace("#/admin");
+      replace(sideHash("users"));
       return renderRoute();
     }
   }
@@ -324,10 +350,10 @@ async function renderUser(username) {
   }
 
   mount(nav({
-    back: "#/admin",
+    back: sideHash("users"),
     // Short on purpose: the bar's left column is narrow and the wordmark
     // sits in the middle of it, so a long label runs into the mark.
-    backLabel: "Admin",
+    backLabel: "Users",
     title: making ? "New account" : user.username,
   }) + `
     <main>
@@ -411,7 +437,7 @@ async function renderUser(username) {
         }
       }
       toast(making ? "Account made" : "Saved");
-      replace("#/admin");
+      replace(sideHash("users"));
       await renderRoute();
     } catch (err) {
       button.disabled = false;
@@ -430,7 +456,7 @@ async function renderUser(username) {
       try {
         await api("DELETE", userUrl(user.username));
         toast(`Deleted ${user.username}`);
-        replace("#/admin");
+        replace(sideHash("users"));
         await renderRoute();
       } catch (err) {
         say(err.message);
@@ -441,6 +467,18 @@ async function renderUser(username) {
 
 registerScreen("admin", renderAdmin);
 registerScreen("adminuser", renderUser);
+for (const [key, label, icon] of SIDES) {
+  registerTab({ name: "admin." + key, label, icon, href: () => sideHash(key), admin: true });
+}
+// Once per load, on whichever screen comes first: whether the rail gets its
+// section is the server's to say, and an account made an administrator —
+// or no longer one — since the last load is told so here.
+let asked = false;
+onShell(() => {
+  if (!session.token || asked) return;
+  asked = true;
+  whoami().catch(() => {});
+});
 // Signing out as one person and in as another must not leave the first
 // person's answer behind.
-onSignOut(() => { me = null; });
+onSignOut(() => { me = null; asked = false; });

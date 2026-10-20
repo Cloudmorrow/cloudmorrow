@@ -202,7 +202,7 @@ def test_the_record_calls_it_makes_exist(client, auth, tasks_quill):
 # -- the administrator's Quills --------------------------------------------------
 def test_the_quills_section_is_in_administration():
     admin = (WEB / "admin.js").read_text(encoding="utf-8")
-    assert 'data-side="quills"' in admin
+    assert '["quills", "Quills"' in admin
     assert "drawQuills(panel)" in admin
     assert 'registerScreen("adminquill", renderQuill);' in ADMIN_JS
 

@@ -72,7 +72,50 @@ def test_there_is_no_features_side_any_more():
     stood on it lands on the Quills."""
     assert 'data-side="features"' not in ADMIN_JS
     assert "drawFeatures" not in ADMIN_JS
-    assert 'side === "features" ? "quills"' in ADMIN_JS
+    assert '=== "features" ? "quills"' in ADMIN_JS
+
+
+# -- where it is -------------------------------------------------------------------
+def test_each_side_is_a_tab_of_the_rail_for_an_administrator():
+    """On a computer the sides are under Administration in the rail, as the
+    terminal app's sidebar lists them; each has an address of its own so the
+    rail can light it, and the shell draws them only when the server has said
+    this account administers."""
+    sides = ADMIN_JS.split("const SIDES = [", 1)[1].split("\n];", 1)[0]
+    assert re.findall(r'^\s*\["([a-z]+)", "([A-Za-z]+)"', sides, re.MULTILINE) == [
+        ("users", "Users"),
+        ("circles", "Circles"),
+        ("quills", "Quills"),
+        ("server", "Server"),
+    ]
+    assert 'registerTab({ name: "admin." + key, label, icon, href: () => sideHash(key), admin: true })' in ADMIN_JS
+    assert 'export const sideHash = (side) => "#/admin/" + side;' in ADMIN_JS
+    assert 'tabs("admin." + which)' in ADMIN_JS
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    assert "(!t.admin || session.admin)" in core
+    assert '<div class="rail-section">Administration</div>' in core
+    # The answer is the server's: on signing in, and again once per load.
+    assert "setAdmin(data.user.is_admin)" in core
+    assert "setAdmin(me.is_admin)" in ADMIN_JS
+    # The pages inside a side come back to that side, not to a bare #/admin.
+    for js, side in (("circlesadmin.js", "circles"), ("quillsadmin.js", "quills")):
+        assert f'replace("#/admin/{side}")' in (WEB / js).read_text(encoding="utf-8"), js
+        assert 'replace("#/admin")' not in (WEB / js).read_text(encoding="utf-8"), js
+
+
+def test_the_phone_keeps_the_row_in_me_and_the_switch_and_the_computer_the_rail():
+    """A phone's bar has no room for a section, so its way in is still the
+    row in Me and its way between the sides the switch above the page; a
+    computer has the rail, and the same stylesheet hides what it does not need."""
+    desktop = (WEB / "desktop.css").read_text(encoding="utf-8")
+    assert ".tabs .tab.admin { display: none; }" in desktop
+    assert ".tabs .rail-section { display: none; }" in desktop
+    inside = desktop.split("@media (min-width: 900px)", 1)[1]
+    assert ".tabs .tab.admin { display: flex; }" in inside
+    assert "main.admin .seg { display: none; }" in inside
+    assert ".admin-group { display: none; }" in inside
+    assert 'class="group admin-group"' in ADMIN_JS
+    assert 'data-side="${key}"' in ADMIN_JS and 'href="${sideHash(key)}"' in ADMIN_JS
     quills = (WEB / "quillsadmin.js").read_text(encoding="utf-8")
     assert '"/api/server/features/"' in quills and "On for everybody" in quills
 
@@ -92,7 +135,7 @@ def test_the_circles_section_is_wired_in():
     assert 'import "./circlesadmin.js";' in (WEB / "app.js").read_text(encoding="utf-8")
     assert '@import "./circlesadmin.css";' in (WEB / "app.css").read_text(encoding="utf-8")
     assert 'registerScreen("admincircle"' in CIRCLES_JS
-    assert 'data-side="circles"' in ADMIN_JS and "drawCircles(panel)" in ADMIN_JS
+    assert '["circles", "Circles"' in ADMIN_JS and "drawCircles(panel)" in ADMIN_JS
 
 
 def test_the_access_it_offers_is_the_access_the_server_takes():
@@ -151,8 +194,7 @@ def test_the_server_section_updates_through_the_api_the_command_uses(client, aut
     """`Update server` on the phone is `cloudmorrow update server` without the
     computer: the same POST, the same words for what it did, and the same
     witness — /api/health's commit — for whether the restart landed."""
-    assert 'data-side="server"' in ADMIN_JS
-    assert '"server"' in ADMIN_JS.split("const which = ", 1)[1].split("\n", 1)[0]
+    assert '["server", "Server"' in ADMIN_JS.split("const SIDES = [", 1)[1].split("\n];", 1)[0]
     assert 'api("POST", "/api/server/update", {})' in ADMIN_JS
     assert 'api("GET", "/api/health?t=" + Date.now())' in ADMIN_JS
     # A restart puts everybody offline for a moment: it is asked about first.

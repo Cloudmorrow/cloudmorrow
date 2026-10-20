@@ -2,7 +2,7 @@
 
 import {
   VERSION, api, app, esc, homeHash, mount, nav, previousHash, registerScreen, seconds, session,
-  signOut, store, wireShell,
+  setAdmin, signOut, store, wireShell,
 } from "./core.js";
 import { featuresCard, loadFeatures, wireFeaturesCard } from "./features.js";
 import { installCard } from "./install.js";
@@ -17,6 +17,7 @@ async function renderMe() {
   const [me] = await Promise.all([api("GET", "/api/auth/me"), loadFeatures()]);
   session.user = me.username;
   store.set("user", session.user);
+  setAdmin(me.is_admin);
   const name = me.display_name || me.username;
   const since = seconds(me.created_at);
   const facts = [

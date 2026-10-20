@@ -65,7 +65,7 @@ let lastLog = [];
 
 /** Back to the Quills side of Administration, from a sheet opened as a screen. */
 async function backToQuills() {
-  replace("#/admin");
+  replace("#/admin/quills");
   await renderRoute();
 }
 
@@ -450,7 +450,7 @@ async function renderQuill(id) {
   }
   const sheet = await buildSheet(id, me);
   if (!sheet) return backToQuills();
-  mount(nav({ back: "#/admin", backLabel: "Admin", title: sheet.name }) + `
+  mount(nav({ back: "#/admin/quills", backLabel: "Quills", title: sheet.name }) + `
     <main class="quill-sheet">${sheet.html}</main>`);
   wireShell();
   sheet.wire(app.querySelector("main"), backToQuills);
