@@ -1,16 +1,30 @@
-/* Quills, for an administrator: the catalog, and the install sheet.
+/* Quills, for an administrator: what the server runs, what people added
+   for themselves, and the catalog to add more from — with a sheet for each.
 
-   The third section of Administration, beside who may sign in and what the
-   server offers. The catalog is shelved by category, with what is already
-   here marked by its version. Choosing one opens its install sheet — every
-   datamodel it uses, extends or introduces, the records it comes with, the
-   screens it adds and where they appear, what it runs and what it asks
-   for — because nothing is added to a server without a yes, and a yes is
-   worth nothing unless it was to something written down.
+   The third section of Administration, beside who may sign in and their
+   circles, under three tabs:
+
+     Server Quills   every one installed here, with whether it is on and
+                     whether its code is running; tick some, or all, and
+                     update them from the catalog in one go
+     User Quills     what the server allows people to add for themselves,
+                     what they have asked for, and whose is whose
+     Catalog         shelved by category, with what is already here marked
+
+   Choosing a Quill opens its sheet: on a computer beside the list, on a
+   phone as a screen of its own. The sheet is every datamodel it uses,
+   extends or introduces, the records it comes with, the screens it adds
+   and where they appear, what it runs and what it asks for — because
+   nothing is added to a server without a yes, and a yes is worth nothing
+   unless it was to something written down. An installed Quill's sheet is
+   where it is switched on or off for everybody (there is no separate list
+   of features: what this server offers is its Quills), updated, installed
+   again, or removed.
 
    Installing puts its tabs in every account's bar; this window's too, at
-   once. Removing takes the tabs and the jobs and never a record: the data
-   was always the people's, not the Quill's.
+   once. Updating and reinstalling are the same install again, which keeps
+   who it is for. Removing takes the tabs and the jobs and never a record:
+   the data was always the people's, not the Quill's.
 
    A Quill with code of its own says so on the sheet in plain words — the
    commands it runs on this server, as whom, and what it may reach — and,
@@ -21,19 +35,36 @@
    may write it. A circle with `* = write` has it already, and says so. */
 
 import {
-  api, app, esc, mount, nav, registerScreen, renderRoute, replace, store, toast, wireShell,
+  api, app, esc, formatDate, icons, mount, nav, registerScreen, renderRoute, replace, seconds, store, toast,
+  wireShell,
 } from "./core.js";
+import { loadFeatures } from "./features.js";
 import { refreshQuills } from "./quills.js";
-import { drawRunning, drawRunningList } from "./quillservices.js";
+import { drawRunning } from "./quillservices.js";
 
 const quillUrl = (id) => "/api/quills/" + encodeURIComponent(id);
-// The shelf for what is on no shelf: not an id a catalog category can have.
-const SOURCE = "(source)";
+const featureUrl = (id) => "/api/server/features/" + encodeURIComponent(id);
+// A computer has the room for the sheet beside the list; the same query
+// desktop.css stands the tabs up with.
+const wide = () => matchMedia("(min-width: 900px) and (min-height: 600px)").matches;
 
-/** Back to the catalog, on the Quills side of Administration, whichever
-    side it was opened from — a link straight to a sheet included. */
-async function backToCatalog() {
-  store.set("admin.side", "quills");
+const TABS = [
+  ["server", "Server Quills"],
+  ["own", "User Quills"],
+  ["catalog", "Catalog"],
+];
+
+// Which sheet is open beside the list, and which rows are ticked for an
+// update: kept while the page is, so a redraw after an install does not
+// close the one you were reading or untick the rest.
+let shown = "";
+const picked = new Set();
+// What the last update in one go said, line by line, drawn again under the
+// buttons until the next one.
+let lastLog = [];
+
+/** Back to the Quills side of Administration, from a sheet opened as a screen. */
+async function backToQuills() {
   replace("#/admin");
   await renderRoute();
 }
@@ -47,52 +78,236 @@ const HOW = {
 };
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-// -- the catalog, in the panel -------------------------------------------------------
-/** The catalog, into Administration's panel. */
+// -- the Quills side, in the panel ----------------------------------------------------
+/** The three tabs and, on a computer, the sheet beside them, into Administration's panel. */
 export async function drawQuills(panel) {
-  let catalog;
-  let installed = [];
+  const which = TABS.some(([key]) => key === store.get("admin.quills")) ? store.get("admin.quills") : "server";
+  let catalog = null;
+  let catalogProblem = "";
+  let all;
+  let running = [];
   try {
-    // Every server Quill, on this administrator's own shelf or not.
-    [catalog, installed] = await Promise.all([
-      api("GET", "/api/quills/catalog"), api("GET", "/api/quills/all").then((all) => all.server),
+    [catalog, all, running] = await Promise.all([
+      api("GET", "/api/quills/catalog").catch((err) => { catalogProblem = err.message; return null; }),
+      api("GET", "/api/quills/all"),
+      api("GET", "/api/quillservices").catch(() => []),
     ]);
   } catch (err) {
-    panel.innerHTML = `<p class="note">The catalog could not be read: ${esc(err.message)}</p>`;
+    panel.innerHTML = `<p class="note">The Quills could not be read: ${esc(err.message)}</p>`;
     return;
   }
-  const shelves = [...catalog.categories];
-  const known = new Set(shelves.map((c) => c.id));
-  if (catalog.quills.some((q) => !known.has(q.category))) {
-    shelves.push({ id: "", label: "Other", description: "" });
-  }
-  // A Quill installed from a folder or a repository of its own — one
-  // being written, with `cm quill dev` — is on no shelf, and still has to
-  // be somewhere it can be looked at and taken away again.
-  const listed = new Set(catalog.quills.map((q) => q.id));
-  const loose = installed.filter((q) => !listed.has(q.id))
-    .map((q) => ({ ...q, installed_version: q.version, category: SOURCE }));
-  if (loose.length) {
-    shelves.push({ id: SOURCE, label: "Installed from a source", description: "Not in the catalog: added from a folder or a repository." });
-    known.add(SOURCE);
-    catalog.quills.push(...loose);
-  }
+  const split = wide();
+  panel.classList.toggle("quills-split", split);
   panel.innerHTML = `
-    <p class="note">Quills for your cloud, from the Quill Catalog. Each one
-      says what it adds before it is added, and its tabs appear for everybody
-      here once it is.</p>` +
-    shelves.map((shelf) => {
-      const here = catalog.quills.filter((q) => (known.has(q.category) ? q.category : "") === shelf.id);
-      if (!here.length) return "";
-      return `<p class="group-label">${esc(shelf.label)}</p>` +
-        (shelf.description ? `<p class="shelf-note">${esc(shelf.description)}</p>` : "") +
-        `<div class="group">${here.map(catalogRow).join("")}</div>`;
-    }).join("");
-  await drawRunningList(panel);
-  await drawShelves(panel);
+    <div class="side">
+      <div class="quill-tabs" role="tablist">${TABS.map(([key, label]) =>
+        `<button type="button" role="tab" data-tab="${key}" aria-selected="${key === which}"${
+          key === which ? ' class="active"' : ""}>${label}</button>`).join("")}</div>
+      <div class="quill-list"></div>
+    </div>
+    ${split ? `<div class="page"><p class="empty"><b>Nothing open</b>Choose a Quill on the left.</p></div>` : ""}`;
+  for (const button of panel.querySelectorAll(".quill-tabs button")) {
+    button.addEventListener("click", () => {
+      store.set("admin.quills", button.dataset.tab);
+      lastLog = [];
+      drawQuills(panel);
+    });
+  }
+  const ctx = { panel, catalog, catalogProblem, all, running, list: panel.querySelector(".quill-list") };
+  if (which === "server") await drawServer(ctx);
+  else if (which === "own") await drawOwn(ctx);
+  else drawCatalog(ctx);
+  // The sheet that was open stays open, drawn afresh: it may have changed.
+  if (split && shown) await openSheet(ctx, shown);
 }
 
-// -- Quills of people's own: what the server allows, what was asked for, whose is whose ----
+/** Open a Quill's sheet: beside the list on a computer, as its own screen on a phone. */
+async function openSheet(ctx, id) {
+  if (!wide()) { location.hash = "#/adminquill/" + encodeURIComponent(id); return; }
+  shown = id;
+  for (const row of ctx.panel.querySelectorAll(".quill-row[data-id]")) {
+    row.classList.toggle("current", row.dataset.id === id);
+  }
+  const page = ctx.panel.querySelector(".page");
+  if (!page) return;
+  const sheet = await buildSheet(id);
+  if (!sheet) {
+    shown = "";
+    page.innerHTML = `<p class="empty"><b>Nothing open</b>Choose a Quill on the left.</p>`;
+    return;
+  }
+  page.innerHTML = `<div class="quill-sheet">${sheet.html}</div>`;
+  sheet.wire(page.firstElementChild, async ({ removed } = {}) => {
+    if (removed) shown = "";
+    await drawQuills(ctx.panel);
+  });
+}
+
+/** A row that opens a sheet: a click, or Enter on it, that is not on a control in it. */
+function wireRow(ctx, row) {
+  row.addEventListener("click", (event) => {
+    if (event.target.closest("input, button, a")) return;
+    openSheet(ctx, row.dataset.id);
+  });
+  row.addEventListener("keydown", (event) => {
+    if (event.target !== row || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    openSheet(ctx, row.dataset.id);
+  });
+}
+
+// -- Server Quills: everything installed, and updating it -------------------------------
+// What a Quill is doing, in one word for the chip: off, or on and — when
+// it has code of its own — running, restarting or stopped.
+function stateOf(quill, running) {
+  if (quill.enabled === false) return ["off", ""];
+  const code = running.find((r) => r.id === quill.id);
+  const live = code ? (code.services || []).filter((s) => !s.scheduled) : [];
+  if (!live.length) return ["on", "good"];
+  if (live.some((s) => s.state === "stopped")) return ["stopped", "warn"];
+  if (live.some((s) => s.state === "restarting")) return ["restarting", "warn"];
+  return ["running", "good"];
+}
+const stateChip = ([state, tone]) => `<span class="quill-chip run-state ${tone}">${esc(state)}</span>`;
+
+// Where an installed Quill stands against the catalog (routes/quills.py):
+// a newer release there, up to date, or no telling — the entry names no
+// release, or the Quill came from a source of its own.
+function standing(quill, catalog) {
+  const entry = catalog && catalog.quills.find((q) => q.id === quill.id);
+  if (!entry) return { entry: null, newer: false, said: fromWhere(quill) };
+  if (entry.update_available === true) return { entry, newer: true, said: `newer in the catalog: ${entry.ref}` };
+  if (entry.update_available === false) return { entry, newer: false, said: "up to date" };
+  return { entry, newer: null, said: fromWhere(quill) };
+}
+function fromWhere(quill) {
+  const origin = quill.origin || {};
+  if (origin.dev) return "from a folder, with cm quill dev";
+  if (!origin.catalog && origin.repo) return `from ${origin.repo}`;
+  return "from the catalog";
+}
+
+async function drawServer(ctx) {
+  const { catalog, all, running, list } = ctx;
+  const server = all.server || [];
+  const stood = new Map(server.map((q) => [q.id, standing(q, catalog)]));
+  // What "update all" would do: every Quill the catalog has a newer release
+  // of, and every one there is no telling about, which is updated by
+  // installing it again.
+  const updatable = server.filter((q) => stood.get(q.id).entry && stood.get(q.id).newer !== false).map((q) => q.id);
+  const newer = server.filter((q) => stood.get(q.id).newer === true).length;
+  for (const id of [...picked]) if (!stood.get(id) || !stood.get(id).entry) picked.delete(id);
+  const broken = Object.entries(all.broken || {});
+
+  list.innerHTML = `
+    <p class="note">Every Quill on this server. Its tabs are in everybody's bar while it is on;
+      one with code of its own says whether that is running. Tick some and update them, or
+      update all: each is installed again from the catalog, for the same people.</p>
+    ${ctx.catalogProblem ? `<p class="shelf-note warn">The catalog could not be read: ${esc(ctx.catalogProblem)}</p>` : ""}
+    <div class="quill-actions">
+      <button type="button" class="chip-button update-picked" disabled>Update selected</button>
+      <button type="button" class="chip-button update-all"${updatable.length ? "" : " disabled"}>${
+        !updatable.length ? "Everything is up to date"
+          : newer ? `Update all · ${newer} newer` : "Update all"}</button>
+    </div>
+    <div class="update-log"${lastLog.length ? "" : " hidden"}>${lastLog.map(([text, tone]) =>
+      `<p class="${tone}">${esc(text)}</p>`).join("")}</div>
+    ${server.length ? `<div class="group">${server.map((q) => serverRow(q, stood.get(q.id), running)).join("")}</div>`
+      : `<p class="empty"><b>No Quills yet</b>Add some from the catalog.</p>`}
+    ${broken.length ? `<p class="group-label">Could not load</p>
+    <div class="group">${broken.map(([key, why]) => `<div class="row quill-row"><span class="main">
+      <span class="title">${esc(key)}</span><span class="meta"><span class="preview">${esc(why)}</span></span></span>
+      <span class="quill-chip run-state warn">broken</span></div>`).join("")}</div>` : ""}`;
+
+  const pickedButton = list.querySelector(".update-picked");
+  const sayPicked = () => {
+    pickedButton.disabled = !picked.size;
+    pickedButton.textContent = picked.size ? `Update selected · ${picked.size}` : "Update selected";
+  };
+  sayPicked();
+  for (const row of list.querySelectorAll(".quill-row[data-id]")) {
+    wireRow(ctx, row);
+    const box = row.querySelector("input.pick");
+    if (!box) continue;
+    box.addEventListener("change", () => {
+      if (box.checked) picked.add(row.dataset.id); else picked.delete(row.dataset.id);
+      sayPicked();
+    });
+  }
+  pickedButton.addEventListener("click", () => updateMany(ctx, server.filter((q) => picked.has(q.id))));
+  list.querySelector(".update-all").addEventListener("click", () =>
+    updateMany(ctx, server.filter((q) => updatable.includes(q.id))));
+}
+
+function serverRow(quill, stood, running) {
+  const pick = stood.entry
+    ? `<input type="checkbox" class="pick" aria-label="Select ${esc(quill.name)}"${picked.has(quill.id) ? " checked" : ""}>`
+    : `<input type="checkbox" class="pick" disabled aria-label="${esc(quill.name)} is not in the catalog">`;
+  return `<div class="row quill-row pick-row${quill.id === shown ? " current" : ""}" data-id="${esc(quill.id)}" role="button" tabindex="0">
+    ${pick}
+    <span class="main"><span class="title">${esc(quill.name || quill.id)}</span>
+    <span class="meta"><span class="preview">v${esc(quill.version)} · ${esc(stood.said)}</span></span></span>
+    ${stateChip(stateOf(quill, running))}${icons.chevronRight}</div>`;
+}
+
+/** Install each of *quills* again from the catalog, one after the other, saying
+    how each went; who each is for goes with it. */
+async function updateMany(ctx, quills) {
+  if (!quills.length) return;
+  const names = quills.map((q) => q.name || q.id);
+  const sure = confirm(`Update ${listed(names)}?\n\nEach is installed again from the catalog. `
+    + "Its tabs stay for the same people; nothing anybody wrote is touched.");
+  if (!sure) return;
+  for (const button of ctx.list.querySelectorAll(".quill-actions button")) button.disabled = true;
+  const log = ctx.list.querySelector(".update-log");
+  log.hidden = false;
+  log.innerHTML = "";
+  lastLog = [];
+  // A line on the page and in what is kept of it, so the redraw after says
+  // how each went rather than that each was being updated.
+  const line = (text, tone = "") => {
+    const kept = [text, tone];
+    lastLog.push(kept);
+    const p = document.createElement("p");
+    const say = (said, how) => {
+      kept[0] = said;
+      kept[1] = how;
+      p.className = how;
+      p.textContent = said;
+    };
+    say(text, tone);
+    log.append(p);
+    return say;
+  };
+  for (const quill of quills) {
+    const name = quill.name || quill.id;
+    const say = line(`Updating ${name}…`, "muted");
+    try {
+      const plan = await installAgain(quill);
+      say(plan.version === quill.version
+        ? `${name} v${quill.version} installed again`
+        : `${name} v${quill.version} → v${plan.version}`, "good");
+    } catch (err) {
+      say(`${name}: ${err.message}`, "bad");
+    }
+  }
+  picked.clear();
+  await refreshQuills();
+  await drawQuills(ctx.panel);
+}
+
+/** The same install again: from the catalog by id, or from the source it came
+    from, for the people it is for. */
+function installAgain(quill) {
+  const origin = quill.origin || {};
+  const audience = quill.audience || { circles: [], people: [] };
+  const body = origin.catalog || !origin.repo
+    ? { id: quill.id, audience }
+    : { source: origin.repo, ref: origin.ref || "", audience };
+  return api("POST", "/api/quills", body);
+}
+
+// -- User Quills: what the server allows, what was asked for, whose is whose ----------------
 const POLICY = [
   ["personal_quills", "Quills of people's own", {
     on: "Anybody may add one for themselves",
@@ -103,17 +318,12 @@ const POLICY = [
   ["personal_quill_sharing", "May be shared", { on: "With people who say yes", off: "Yours alone" }],
 ];
 
-async function drawShelves(panel) {
-  let all;
-  try { all = await api("GET", "/api/quills/all"); } catch (err) {
-    panel.insertAdjacentHTML("beforeend", `<p class="note">People's own Quills could not be read: ${esc(err.message)}</p>`);
-    return;
-  }
+async function drawOwn(ctx) {
+  const { panel, all, list } = ctx;
   const requests = all.requests || [];
   const personal = all.personal || [];
-  panel.insertAdjacentHTML("beforeend", `
-    <p class="group-label">Quills of people's own</p>
-    <p class="shelf-note">What this server allows (docs/SHARING.md). A Quill somebody adds for themselves is on
+  list.innerHTML = `
+    <p class="note">What this server allows (docs/SHARING.md). A Quill somebody adds for themselves is on
       their shelf alone, over their own data, run as them; it changes nothing other people see.</p>
     <div class="group policy">${POLICY.map(([key, label, words]) => `<label class="row">
       <span class="main"><span class="title">${esc(label)}</span>
@@ -130,8 +340,8 @@ async function drawShelves(panel) {
         <button type="button" class="quill-chip on everyone">For everyone</button>
         ${r.kind === "promote" ? "" : `<button type="button" class="quill-chip asker">For ${esc(r.username)}</button>`}
         <button type="button" class="quill-chip decline">Decline</button></span></div>`).join("")}</div>` : ""}
-    ${personal.length ? `<p class="group-label">Whose</p>
-    <div class="group">${personal.map((q) => {
+    <p class="group-label">Whose</p>
+    ${personal.length ? `<div class="group">${personal.map((q) => {
       const yes = (q.shared_with || []).filter((x) => x.state === "accepted").map((x) => x.username);
       const gone = q.owner_active === false ? " · its owner's account is gone: promote it, or remove it" : "";
       return `<div class="row own-row" data-owner="${esc(q.owner)}" data-quill="${esc(q.id)}" data-name="${esc(q.name)}">
@@ -145,9 +355,10 @@ async function drawShelves(panel) {
     }).join("")}</div>
     <p class="shelf-note">Promoting makes it the server's, for everyone: every record of its own datamodels —
       the owner's and the people's it was shared with — moves with it. Switching one off takes it from
-      everybody who has it until it is switched on again.</p>` : ""}`);
+      everybody who has it until it is switched on again.</p>`
+      : `<p class="shelf-note">Nobody has added a Quill of their own yet.</p>`}`;
 
-  for (const select of panel.querySelectorAll(".policy select")) {
+  for (const select of list.querySelectorAll(".policy select")) {
     select.addEventListener("change", async () => {
       try {
         await api("PUT", "/api/quills/policy", { [select.dataset.key]: select.value });
@@ -159,7 +370,7 @@ async function drawShelves(panel) {
   const redo = async (fn, done) => {
     try { await fn(); if (done) toast(done); await refreshQuills(); await drawQuills(panel); } catch (err) { toast(err.message); }
   };
-  for (const row of panel.querySelectorAll(".request-row")) {
+  for (const row of list.querySelectorAll(".request-row")) {
     const { id, who } = row.dataset;
     const url = `/api/quills/requests/${id}`;
     row.querySelector(".everyone").addEventListener("click", () => redo(() => api("POST", url + "/approve", {}), "Installed for everyone"));
@@ -171,7 +382,7 @@ async function drawShelves(panel) {
       redo(() => api("POST", url + "/decline", { note }), "Declined");
     });
   }
-  for (const row of panel.querySelectorAll(".own-row")) {
+  for (const row of list.querySelectorAll(".own-row")) {
     const { owner, quill, name } = row.dataset;
     row.querySelector(".promote").addEventListener("click", () => {
       if (!confirm(`Promote ${owner}'s ${name}, for everyone? Every record of its datamodels moves to the server's.`)) return;
@@ -179,24 +390,52 @@ async function drawShelves(panel) {
     });
     const key = `~${owner}.${quill}`;
     row.querySelector(".switch-off")?.addEventListener("click", () => redo(
-      () => api("PATCH", "/api/server/features/" + encodeURIComponent(key), { enabled: false })));
+      () => api("PATCH", featureUrl(key), { enabled: false })));
     row.querySelector(".switch-on")?.addEventListener("click", () => redo(
-      () => api("PATCH", "/api/server/features/" + encodeURIComponent(key), { enabled: true })));
+      () => api("PATCH", featureUrl(key), { enabled: true })));
   }
 }
 
-function catalogRow(q) {
-  const state = q.installed_version
-    ? `<span class="quill-chip on">v${esc(q.installed_version)}</span>`
-    : `<span class="quill-chip">Add</span>`;
-  const by = q.publisher ? ` · ${q.publisher}` : "";
-  return `<a class="row quill-row" href="#/adminquill/${encodeURIComponent(q.id)}">
-    <span class="main"><span class="title">${esc(q.name || q.id)}</span>
-    <span class="meta"><span class="preview">${esc((q.summary || "") + by)}</span></span></span>
-    ${state}</a>`;
+// -- the catalog ----------------------------------------------------------------------
+function drawCatalog(ctx) {
+  const { catalog, list } = ctx;
+  if (!catalog) {
+    list.innerHTML = `<p class="note">The catalog could not be read: ${esc(ctx.catalogProblem)}</p>`;
+    return;
+  }
+  const shelves = [...catalog.categories];
+  const known = new Set(shelves.map((c) => c.id));
+  if (catalog.quills.some((q) => !known.has(q.category))) {
+    shelves.push({ id: "", label: "Other", description: "" });
+  }
+  list.innerHTML = `
+    <p class="note">Quills for your cloud, from the Quill Catalog. Each one
+      says what it adds before it is added, and its tabs appear for everybody
+      here once it is.</p>` +
+    shelves.map((shelf) => {
+      const here = catalog.quills.filter((q) => (known.has(q.category) ? q.category : "") === shelf.id);
+      if (!here.length) return "";
+      return `<p class="group-label">${esc(shelf.label)}</p>` +
+        (shelf.description ? `<p class="shelf-note">${esc(shelf.description)}</p>` : "") +
+        `<div class="group">${here.map(catalogRow).join("")}</div>`;
+    }).join("");
+  for (const row of list.querySelectorAll(".quill-row[data-id]")) wireRow(ctx, row);
 }
 
-// -- the install sheet -----------------------------------------------------------------
+function catalogRow(q) {
+  const state = q.update_available
+    ? `<span class="quill-chip new">update</span>`
+    : q.installed_version ? `<span class="quill-chip on">v${esc(q.installed_version)}</span>`
+    : `<span class="quill-chip">Add</span>`;
+  const by = q.publisher ? ` · ${q.publisher}` : "";
+  return `<div class="row quill-row${q.id === shown ? " current" : ""}" data-id="${esc(q.id)}" role="button" tabindex="0">
+    <span class="main"><span class="title">${esc(q.name || q.id)}</span>
+    <span class="meta"><span class="preview">${esc((q.summary || "") + by)}</span></span></span>
+    ${state}${icons.chevronRight}</div>`;
+}
+
+// -- the sheet ------------------------------------------------------------------------
+/** A Quill's sheet, as a screen of its own: the phone's way, and a link's. */
 async function renderQuill(id) {
   const me = await api("GET", "/api/auth/me");
   if (!me.is_admin) {
@@ -204,133 +443,224 @@ async function renderQuill(id) {
     replace("#/me");
     return renderRoute();
   }
+  // A computer has the sheet beside the list; a link to one lands there.
+  if (wide()) {
+    shown = id;
+    return backToQuills();
+  }
+  const sheet = await buildSheet(id, me);
+  if (!sheet) return backToQuills();
+  mount(nav({ back: "#/admin", backLabel: "Admin", title: sheet.name }) + `
+    <main class="quill-sheet">${sheet.html}</main>`);
+  wireShell();
+  sheet.wire(app.querySelector("main"), backToQuills);
+}
+
+/** The sheet for one Quill — its name, the HTML, and what wires it into a holder
+    — or null, with a word said, when there is no such Quill. *after(what)* is
+    called once an install, update or removal has gone through. */
+async function buildSheet(id, me = null) {
+  if (!me) me = await api("GET", "/api/auth/me");
   // A Quill in the catalog is described fresh from it — what installing
   // would add now. One installed from a source has only what it added.
   let plan;
+  let entry = null;
+  let here = null;
+  let feature = null;
   try {
     const catalog = await api("GET", "/api/quills/catalog");
-    plan = catalog.quills.some((q) => q.id === id)
-      ? await api("POST", "/api/quills/plan", { id })
-      : { ...(await api("GET", quillUrl(id))), from_source: true };
+    entry = catalog.quills.find((q) => q.id === id) || null;
+    plan = entry ? await api("POST", "/api/quills/plan", { id }) : { ...(await api("GET", quillUrl(id))), from_source: true };
     if (plan.from_source) plan.installed_version = plan.version;
-    // Who an installed Quill is for is on the Quill itself, not in the catalog.
-    if (plan.installed_version && !plan.from_source) {
-      try { plan.audience = (await api("GET", quillUrl(id))).audience; } catch { /* everyone, then */ }
+    if (plan.installed_version) {
+      // Who it is for, where it came from, and whether it is on: on the
+      // Quill itself and the server's switch, not in the catalog.
+      [here, feature] = await Promise.all([
+        api("GET", quillUrl(id)).catch(() => null),
+        api("GET", "/api/server/features").then((rows) => rows.find((f) => f.key === id) || null).catch(() => null),
+      ]);
+      if (here) plan.audience = here.audience;
     }
   } catch (err) {
     toast(err.message);
-    replace("#/admin");
-    return renderRoute();
+    return null;
   }
   const installed = plan.installed_version;
   const name = plan.name || plan.id;
   // The data it brings that no circle names yet, and the circles to give it to.
   const fresh = installed ? [] : (plan.data || []).filter((d) => d.new);
   let circles = [];
-  if (fresh.length) {
-    try { circles = await api("GET", "/api/circles"); } catch { circles = []; }
-  }
-  const verb = !installed ? `Install ${name}`
-    : installed !== plan.version ? `Update to v${plan.version}` : "";
-  // Who the Quill is for: everyone, or the circles ticked (docs/SHARING.md).
-  let allCircles = circles;
-  if (!allCircles.length) {
-    try { allCircles = await api("GET", "/api/circles"); } catch { allCircles = []; }
-  }
+  try { circles = await api("GET", "/api/circles"); } catch { circles = []; }
   const audience = plan.audience || { circles: [], people: [] };
+  // A newer release: the catalog's copy says a version the installed one is
+  // not, or the catalog names a release it was not installed from.
+  const newer = Boolean(installed && entry && (plan.version !== installed || entry.update_available === true));
+  const origin = (here && here.origin) || {};
+  // Installing again is from the catalog, or from the source it came from;
+  // a folder sent with `cm quill dev` has to be sent again from there.
+  const again = installed && (entry || (!origin.dev && origin.repo));
 
-  mount(nav({ back: "#/admin", backLabel: "Admin", title: name }) + `
-    <main class="quill-sheet">
+  const html = `
       <h1 class="large">${esc(name)}</h1>
       <p class="quill-lede">${esc(plan.summary || "")}</p>
       <p class="quill-facts">${[
         `v${esc(plan.version)}`, esc(plan.publisher || ""), esc(plan.license || ""),
         installed ? `<span class="quill-chip on">v${esc(installed)} installed</span>` : "",
+        newer ? `<span class="quill-chip new">v${esc(plan.version)} in the catalog</span>` : "",
       ].filter(Boolean).join(" · ")}</p>
+      ${installed ? switchRow(name, feature) : ""}
+      ${installed ? `<div class="group sheet-actions">
+        ${newer ? `<button class="row primary update-quill" type="button">Update to v${esc(plan.version)}</button>`
+          : entry ? `<button class="row" type="button" disabled>Up to date</button>` : ""}
+        ${again ? `<button class="row reinstall-quill" type="button">Reinstall v${esc(installed)}</button>` : ""}
+        <button class="row bad remove-quill" type="button">Remove ${esc(name)}</button>
+      </div>
+      ${again ? "" : `<p class="shelf-note">Installed from a folder with <code>cm quill dev</code>: to install it again, send it from there.</p>`}
+      <div class="quill-running"></div>` : ""}
       ${sections(plan, me)}
       ${whoGetsIt(fresh, circles)}
-      ${whoItIsFor(allCircles, audience, installed)}
+      ${whoItIsFor(circles, audience, installed)}
       ${adoptSheet(plan.adopt || [])}
-      ${installed ? `<div class="quill-running"></div>` : ""}
-      ${verb ? `<div class="group"><button class="row primary add-quill" type="button">${esc(verb)}</button></div>` : ""}
-      ${installed ? `<div class="group"><button class="row bad remove-quill" type="button">Remove ${esc(name)}</button></div>` : ""}
-    </main>`);
-  wireShell();
-  const running = app.querySelector(".quill-running");
-  if (running) drawRunning(running, id);
-  const change = app.querySelector(".change-audience");
-  if (change) change.addEventListener("click", async () => {
-    const forCircles = [...app.querySelectorAll(".who-it-is-for input:checked")].map((b) => b.value);
-    try {
-      await api("PUT", quillUrl(id) + "/audience", { circles: forCircles, people: audience.people || [] });
-      await refreshQuills();
-      toast(forCircles.length ? `${name} is for ${forCircles.length} circle${forCircles.length === 1 ? "" : "s"}` : `${name} is for everyone`);
-    } catch (err) { toast(err.message); }
-  });
+      ${installed ? "" : `<div class="group"><button class="row primary add-quill" type="button">Install ${esc(name)}</button></div>`}`;
 
-  const install = app.querySelector(".add-quill");
-  if (install) install.addEventListener("click", async () => {
-    install.disabled = true;
-    install.textContent = "Installing…";
-    try {
-      const forCircles = [...app.querySelectorAll(".who-it-is-for input:checked")].map((b) => b.value);
-      const adopt = [...app.querySelectorAll(".adopt-sheet input:checked")].map((b) => b.value);
-      await api("POST", "/api/quills", { id, audience: { circles: forCircles, people: [] }, adopt });
-      const ticked = [...app.querySelectorAll(".who-gets-it input:checked:not(:disabled)")];
-      for (const box of ticked) {
-        for (const d of fresh) {
-          await api("PUT", `/api/circles/${encodeURIComponent(box.value)}/rules/${encodeURIComponent(d.id)}`,
-            { access: "write" });
-        }
+  const wire = (holder, after) => {
+    const running = holder.querySelector(".quill-running");
+    if (running) drawRunning(running, id);
+    const done = async (message, what) => {
+      await refreshQuills();
+      toast(message);
+      await after(what);
+    };
+    const change = holder.querySelector(".change-audience");
+    if (change) change.addEventListener("click", async () => {
+      const forCircles = [...holder.querySelectorAll(".who-it-is-for input:checked")].map((b) => b.value);
+      try {
+        await api("PUT", quillUrl(id) + "/audience", { circles: forCircles, people: audience.people || [] });
+        await refreshQuills();
+        toast(forCircles.length ? `${name} is for ${forCircles.length} circle${forCircles.length === 1 ? "" : "s"}` : `${name} is for everyone`);
+      } catch (err) { toast(err.message); }
+    });
+
+    const box = holder.querySelector(".server-switch input");
+    if (box) box.addEventListener("change", async () => {
+      box.disabled = true;
+      try {
+        const turned = await api("PATCH", featureUrl(id), { enabled: box.checked });
+        // "Everywhere" includes this window: the bar is drawn from what
+        // this account has, and that has just changed.
+        await loadFeatures();
+        await done(turned.enabled ? `${name} is on.` : `${name} is off — its tabs are gone everywhere.`);
+      } catch (err) {
+        box.checked = !box.checked;
+        box.disabled = false;
+        toast(err.message);
       }
-      // The tabs are in every account's bar from now; this one's at once.
-      await refreshQuills();
-      toast(`${name} is installed`);
-      await backToCatalog();
-    } catch (err) {
-      install.disabled = false;
-      install.textContent = verb;
-      toast(err.message);
-    }
-  });
+    });
 
-  const remove = app.querySelector(".remove-quill");
-  if (remove) remove.addEventListener("click", async () => {
-    let brought = [];
-    try { brought = await api("GET", quillUrl(id) + "/brought"); } catch (err) { toast(err.message); return; }
-    if (!brought.length) {
-      const sure = confirm(
-        `Remove ${name}?\n\nIts tabs and jobs go, for everybody. Nothing anybody `
-        + "wrote is deleted: the records stay, and are there again if it comes back.",
-      );
-      if (!sure) return;
-      return removeQuill(id, name, []);
-    }
-    // What it brought, each ticked to keep; the administrator unticks what goes.
-    remove.closest(".group").insertAdjacentHTML("afterend", removeSheet(name, brought));
-    remove.closest(".group").hidden = true;
-    const sheet = app.querySelector(".remove-sheet");
-    sheet.querySelector(".cancel").addEventListener("click", () => {
-      sheet.remove();
-      remove.closest(".group").hidden = false;
+    const install = holder.querySelector(".add-quill");
+    if (install) install.addEventListener("click", async () => {
+      install.disabled = true;
+      install.textContent = "Installing…";
+      try {
+        const forCircles = [...holder.querySelectorAll(".who-it-is-for input:checked")].map((b) => b.value);
+        const adopt = [...holder.querySelectorAll(".adopt-sheet input:checked")].map((b) => b.value);
+        await api("POST", "/api/quills", { id, audience: { circles: forCircles, people: [] }, adopt });
+        const ticked = [...holder.querySelectorAll(".who-gets-it input:checked:not(:disabled)")];
+        for (const tick of ticked) {
+          for (const d of fresh) {
+            await api("PUT", `/api/circles/${encodeURIComponent(tick.value)}/rules/${encodeURIComponent(d.id)}`,
+              { access: "write" });
+          }
+        }
+        // The tabs are in every account's bar from now; this one's at once.
+        await done(`${name} is installed`);
+      } catch (err) {
+        install.disabled = false;
+        install.textContent = `Install ${name}`;
+        toast(err.message);
+      }
     });
-    sheet.querySelector(".confirm").addEventListener("click", async () => {
-      const drop = [...sheet.querySelectorAll("input[type=checkbox]:not(:checked)")].map((b) => b.value);
-      await removeQuill(id, name, drop);
+
+    // Updating and installing again are one and the same install, for the
+    // same people: only the words, and the version that comes of it, differ.
+    const installOnceMore = async (button, verb) => {
+      const was = button.textContent;
+      // Every button that was live goes quiet until it is over; "Up to
+      // date" was not live, and stays so.
+      const live = [...holder.querySelectorAll(".sheet-actions button:not(:disabled)")];
+      for (const b of live) b.disabled = true;
+      button.textContent = `${verb}…`;
+      try {
+        const result = await installAgain({ id, origin, audience });
+        await done(result.version === installed ? `${name} v${installed} is installed again`
+          : `${name} is updated to v${result.version}`);
+      } catch (err) {
+        for (const b of live) b.disabled = false;
+        button.textContent = was;
+        toast(err.message);
+      }
+    };
+    const update = holder.querySelector(".update-quill");
+    if (update) update.addEventListener("click", () => installOnceMore(update, "Updating"));
+    const reinstall = holder.querySelector(".reinstall-quill");
+    if (reinstall) reinstall.addEventListener("click", () => {
+      if (!confirm(`Install ${name} v${installed} again?\n\nIts tabs stay for the same people; nothing anybody wrote is touched.`)) return;
+      installOnceMore(reinstall, "Installing");
     });
-  });
+
+    const remove = holder.querySelector(".remove-quill");
+    if (remove) remove.addEventListener("click", async () => {
+      let brought = [];
+      try { brought = await api("GET", quillUrl(id) + "/brought"); } catch (err) { toast(err.message); return; }
+      const gone = async (drop) => removeQuill(id, name, drop, (message) => done(message, { removed: true }));
+      if (!brought.length) {
+        const sure = confirm(
+          `Remove ${name}?\n\nIts tabs and jobs go, for everybody. Nothing anybody `
+          + "wrote is deleted: the records stay, and are there again if it comes back.",
+        );
+        if (!sure) return;
+        return gone([]);
+      }
+      // What it brought, each ticked to keep; the administrator unticks what goes.
+      remove.closest(".group").insertAdjacentHTML("afterend", removeSheet(name, brought));
+      remove.closest(".group").hidden = true;
+      const sheet = holder.querySelector(".remove-sheet");
+      sheet.querySelector(".cancel").addEventListener("click", () => {
+        sheet.remove();
+        remove.closest(".group").hidden = false;
+      });
+      sheet.querySelector(".confirm").addEventListener("click", async () => {
+        const drop = [...sheet.querySelectorAll("input[type=checkbox]:not(:checked)")].map((b) => b.value);
+        await gone(drop);
+      });
+    });
+  };
+  return { name, html, wire };
 }
 
-async function removeQuill(id, name, drop) {
+/** The server's switch on an installed Quill: off takes its tabs out of every
+    client and closes its API. What Features used to list, on the sheet instead. */
+function switchRow(name, feature) {
+  const on = feature ? feature.enabled : true;
+  let turned = "";
+  if (feature && feature.changed_by) {
+    const when = seconds(feature.updated_at);
+    turned = ` Switched ${on ? "on" : "off"} by ${feature.changed_by}${when ? ` ${formatDate(when)}` : ""}.`;
+  }
+  return `<div class="group"><label class="row feature-row server-switch">
+    <span class="main"><span class="title">On for everybody</span>
+    <span class="meta"><span class="preview">${esc(`Off takes its tabs out of every client and closes its part of the API.${turned}`)}</span></span></span>
+    <input type="checkbox"${on ? " checked" : ""} aria-label="${esc(name)} is on"></label></div>`;
+}
+
+async function removeQuill(id, name, drop, done) {
   try {
     const gone = await api("DELETE", quillUrl(id) + (drop.length ? "?drop=" + encodeURIComponent(drop.join(",")) : ""));
-    await refreshQuills();
     const dropped = Object.values((gone && gone.dropped) || {}).reduce((a, b) => a + b, 0);
     const programs = (gone && gone.runtimes) || [];
     const also = programs.length ? `, and ${listed(programs)} with it` : "";
-    toast(dropped ? `${name} is removed, and ${dropped} record${dropped === 1 ? "" : "s"} with it${programs.length ? ` and ${listed(programs)}` : ""}`
+    await done(dropped ? `${name} is removed, and ${dropped} record${dropped === 1 ? "" : "s"} with it${programs.length ? ` and ${listed(programs)}` : ""}`
       : `${name} is removed; its records are kept${also}`);
-    await backToCatalog();
   } catch (err) { toast(err.message); }
 }
 

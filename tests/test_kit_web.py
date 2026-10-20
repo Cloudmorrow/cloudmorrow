@@ -207,6 +207,20 @@ def test_the_quills_section_is_in_administration():
     assert 'registerScreen("adminquill", renderQuill);' in ADMIN_JS
 
 
+def test_the_quills_side_has_its_three_tabs_and_the_update_buttons():
+    """Server Quills, User Quills and the Catalog; a tick per installed Quill, and
+    an update of the ticked ones or of all, each an install again from the catalog
+    that keeps who the Quill is for."""
+    for tab in ('["server", "Server Quills"]', '["own", "User Quills"]', '["catalog", "Catalog"]'):
+        assert tab in ADMIN_JS, tab
+    assert 'class="chip-button update-picked"' in ADMIN_JS
+    assert 'class="chip-button update-all"' in ADMIN_JS
+    assert "update_available" in ADMIN_JS
+    assert "{ id: quill.id, audience }" in ADMIN_JS
+    for button in ('class="row primary update-quill"', 'class="row reinstall-quill"', 'class="row bad remove-quill"'):
+        assert button in ADMIN_JS, button
+
+
 def test_the_install_sheet_calls_the_endpoints_that_exist(client, auth):
     for call in ('"/api/quills/catalog"', '"/api/quills/plan"', 'api("POST", "/api/quills"'):
         assert call in ADMIN_JS, call

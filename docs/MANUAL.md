@@ -75,10 +75,11 @@ mentions them only as examples.
   the terminal app, left of Settings: Administration, which puts the whole workspace
   aside for the server's own panel — and the same panel is in the web app,
   behind a row in **Me** that only administrators are shown. **Users** is
-  every account, added and edited there. **Features** is every Quill and
-  every area of the app with a tick box each: switch one off and its tab is
-  gone from every client and its API answers 403, because off ought to mean
-  off rather than hidden.
+  every account, added and edited there. **Quills** is what this server
+  offers: every Quill installed, whether it is on and whether its code is
+  running, the ones people added for themselves, and the catalog. Each
+  Quill's sheet has its switch: off, and its tab is gone from every client
+  and its API answers 403, because off ought to mean off rather than hidden.
 - **And a switch of your own.** The same list is in your own settings, in
   the terminal app and in **Me** on the phone, with your answer on each.
   Switching one off there takes its tab out of your clients, on every
@@ -775,10 +776,19 @@ Two sections under a switch, the same two the terminal app has:
   the title makes a new one. Your own account is missing its Delete button,
   because the server refuses that anyway and a button that always fails is
   worse than no button.
-- **Features.** Every area of the app with a tick box, what goes dark when
-  it is off, and who last switched it. This is the server's switch, for
-  everybody. Your own is further up the same screen, under **What your apps
-  show you**.
+- **Quills.** Three tabs. **Server Quills** is every Quill installed here,
+  each with a chip — on, off, or for one with code of its own, running,
+  restarting or stopped — and a tick box: tick some and **Update selected**,
+  or **Update all**, and each is installed again from the catalog for the
+  same people, with a line per Quill saying how it went. **User Quills** is
+  what the server allows people to add for themselves, what they have asked
+  for, and whose is whose. **Catalog** is every Quill there is to add,
+  shelved by category, with what is already here marked and an **update**
+  chip on one the catalog has a newer release of. Choosing a Quill opens its
+  sheet — on a computer beside the list, on a phone as a screen — with
+  everything it adds, and for an installed one its switch (**On for
+  everybody**, with who last turned it), **Update** when there is a newer
+  release, **Reinstall**, **Remove**, and what its code is doing.
 
 One thing the terminal app does not have yet: **May sign in**. The API has
 always taken it and the terminal app's table has always shown it, with no way to
@@ -976,8 +986,8 @@ with `{"enabled": false}`.
 
 #### In the web app
 
-**Me → Administration → Features**: a tick box per feature, what goes dark
-when it is off, and who last switched it.
+**Me → Administration → Quills**, then the Quill's sheet: **On for
+everybody**, with who last switched it.
 
 #### In the terminal app
 

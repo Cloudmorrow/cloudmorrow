@@ -218,11 +218,32 @@ def test_an_administrator_installs_from_the_catalog_and_the_tabs_follow(client, 
     assert set(quills[0]["models"]) == {"board", "task"}
     after = {q["id"]: q for q in client.get("/api/quills/catalog", headers=auth).json()["quills"]}
     assert after["tasks"]["installed_version"] == "1.2.0"
+    # The fixture catalog names no release, so there is no telling whether a
+    # newer one is out: installing again is the update.
+    assert after["tasks"]["installed_ref"] == "" and after["tasks"]["update_available"] is None
     # A Quill is one more feature to switch.
     mine = {row["key"] for row in client.get("/api/me/features", headers=auth).json()}
     assert "tasks" in mine
     assert client.delete("/api/quills/tasks", headers=auth).status_code == 200
     assert client.get("/api/quills", headers=auth).json() == []
+
+
+def test_the_catalog_says_when_a_newer_release_is_out():
+    """A Quill installed from the catalog at one release, with the catalog now
+    naming another, has an update; at the same release it is up to date; and
+    one from a source of its own, or an entry without a release, is neither."""
+    from types import SimpleNamespace
+
+    from cloudmorrow.server.routes.quills import _standing
+
+    entry = {"id": "tasks", "repo": "quill-tasks", "ref": "v1.3.0"}
+    at = lambda **origin: SimpleNamespace(version="1.2.0", origin=origin)  # noqa: E731
+    assert _standing(entry, None) == {"installed_version": None, "installed_ref": None, "update_available": None}
+    assert _standing(entry, at(catalog=True, ref="v1.2.0"))["update_available"] is True
+    assert _standing(entry, at(catalog=True, ref="v1.3.0"))["update_available"] is False
+    assert _standing(entry, at(catalog=False, repo="/somewhere", ref="main"))["update_available"] is None
+    assert _standing({"id": "tasks", "repo": "quill-tasks"}, at(catalog=True, ref=""))["update_available"] is None
+    assert _standing(entry, at(catalog=True, ref="v1.2.0"))["installed_ref"] == "v1.2.0"
 
 
 def test_only_an_administrator_installs(client):

@@ -61,9 +61,20 @@ def test_the_way_in_is_drawn_only_for_an_administrator():
 
 def test_it_calls_the_endpoints_that_exist(client, auth):
     """Every path the panel asks for answers an administrator."""
-    for path in ("/api/users", "/api/server/features", "/api/health"):
+    for path in ("/api/users", "/api/health"):
         assert path in ADMIN_JS, path
         assert client.get(path, headers=auth).status_code == 200, path
+
+
+def test_there_is_no_features_side_any_more():
+    """What the server offers is its Quills: the switch is on each Quill's sheet
+    (quillsadmin.js), and the side that listed them all is gone. Whoever last
+    stood on it lands on the Quills."""
+    assert 'data-side="features"' not in ADMIN_JS
+    assert "drawFeatures" not in ADMIN_JS
+    assert 'side === "features" ? "quills"' in ADMIN_JS
+    quills = (WEB / "quillsadmin.js").read_text(encoding="utf-8")
+    assert '"/api/server/features/"' in quills and "On for everybody" in quills
 
 
 def test_those_endpoints_turn_an_ordinary_account_away(client):
