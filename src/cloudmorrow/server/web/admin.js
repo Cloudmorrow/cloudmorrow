@@ -1,9 +1,8 @@
 /* Administration: the server itself, rather than anything in it.
 
    The same sections the terminal app puts behind f9 — who may sign in,
-   which data they may use, and which parts of Cloudmorrow this server
-   offers at all — and the same rules about them, because both ends talk to
-   one API that decides.
+   which data they may use, and which Quills this server runs — and the
+   same rules about them, because both ends talk to one API that decides.
 
    It is reached from Me rather than from a tab of its own. Administering a
    server is not a sixth kind of your own stuff, and most accounts never see
@@ -15,14 +14,15 @@
    Two screens. The panel, which is the sections under a switch, and one
    account's page, which is the same form whether it is a new account or one
    that already exists. The circles (circlesadmin.js) and the Quills
-   (quillsadmin.js, with its install sheet) are files of their own; the
-   server's own section — what it runs, and updating it — is below. */
+   (quillsadmin.js, with its sheet) are files of their own; the server's
+   own section — what it runs, and updating it — is below. There is no
+   Features side any more: what this server offers is its Quills, and
+   each is switched on or off on its own sheet. */
 
 import {
-  api, app, esc, formatDate, heading, icons, mount, nav, onSignOut, registerScreen, renderRoute,
-  replace, seconds, store, toast, wireShell,
+  api, app, esc, heading, icons, mount, nav, onSignOut, registerScreen, renderRoute, replace, store, toast,
+  wireShell,
 } from "./core.js";
-import { loadFeatures } from "./features.js";
 import { circlesByPerson, domainsOf, drawCircles, rulesForm, rulesFrom, rulesSaid, wireRulesForm } from "./circlesadmin.js";
 import { drawQuills } from "./quillsadmin.js";
 
@@ -69,7 +69,7 @@ export const isAdmin = (who) => Boolean(who && who.is_admin);
 export function adminRow() {
   return `<div class="group"><a class="row admin-link" href="#/admin">
     <span class="main"><span class="title">Administration</span>
-    <span class="meta"><span class="preview">The accounts, their circles, what this server offers, its Quills, and the server itself</span></span></span>
+    <span class="meta"><span class="preview">The accounts, their circles, the Quills, and the server itself</span></span></span>
     ${icons.chevronRight}</a></div>`;
 }
 
@@ -77,7 +77,8 @@ export function adminRow() {
 async function renderAdmin() {
   if (!(await requireAdmin())) return;
   const side = store.get("admin.side");
-  const which = ["circles", "features", "quills", "server"].includes(side) ? side : "users";
+  // "features" was a side once; whoever last stood there is sent to the Quills.
+  const which = ["circles", "quills", "server"].includes(side) ? side : side === "features" ? "quills" : "users";
   // The + beside the heading makes whatever this side lists.
   const making = { users: ["#/adminuser", "New account"], circles: ["#/admincircle", "New circle"] }[which];
   mount(nav({ back: "#/me", backLabel: "Me", title: "Administration" }) + `
@@ -88,7 +89,6 @@ async function renderAdmin() {
       <div class="seg">
         <button data-side="users"${which === "users" ? ' class="active"' : ""}>Users</button>
         <button data-side="circles"${which === "circles" ? ' class="active"' : ""}>Circles</button>
-        <button data-side="features"${which === "features" ? ' class="active"' : ""}>Features</button>
         <button data-side="quills"${which === "quills" ? ' class="active"' : ""}>Quills</button>
         <button data-side="server"${which === "server" ? ' class="active"' : ""}>Server</button>
       </div>
@@ -108,7 +108,6 @@ async function renderAdmin() {
   const panel = app.querySelector(".panel");
   if (which === "users") await drawUsers(panel);
   else if (which === "circles") await drawCircles(panel);
-  else if (which === "features") await drawFeatures(panel);
   else if (which === "server") await drawServer(panel);
   else await drawQuills(panel);
 }
@@ -145,55 +144,6 @@ function userRow(user, circles) {
     </span>
     <span class="role-chip role-${esc(role)}">${esc(LABELS[role] || role)}</span>
     ${icons.chevronRight}</a>`;
-}
-
-// -- what this server offers ---------------------------------------------------------------
-async function drawFeatures(panel) {
-  const features = await api("GET", "/api/server/features");
-  panel.innerHTML = `
-    <p class="note">Switching a feature off takes its tab out of every client
-      and closes its part of the API. Off here is off for everybody.</p>
-    <div class="group">${features.map(featureRow).join("")}</div>`;
-
-  for (const box of panel.querySelectorAll(".feature-row input")) {
-    box.addEventListener("change", async () => {
-      const key = box.dataset.key;
-      box.disabled = true;
-      try {
-        const feature = await api("PATCH", "/api/server/features/" + encodeURIComponent(key), {
-          enabled: box.checked,
-        });
-        toast(feature.enabled
-          ? `${feature.label} is on.`
-          : `${feature.label} is off — its tab is gone everywhere.`);
-        // "Everywhere" includes this window: the bar at the bottom is
-        // drawn from what this account has, and that has just changed.
-        await loadFeatures();
-        await drawFeatures(panel);
-      } catch (err) {
-        // Put the tick back where the server still has it.
-        box.checked = !box.checked;
-        box.disabled = false;
-        toast(err.message);
-      }
-    });
-  }
-}
-
-function featureRow(feature) {
-  let turned = "";
-  if (feature.changed_by) {
-    const when = seconds(feature.updated_at);
-    turned = ` · switched ${feature.enabled ? "on" : "off"} by ${feature.changed_by}`
-      + (when ? ` ${formatDate(when)}` : "");
-  }
-  return `<label class="row feature-row">
-    <span class="main">
-      <span class="title">${esc(feature.label)}</span>
-      <span class="meta"><span class="preview">${esc(feature.description + turned)}</span></span>
-    </span>
-    <input type="checkbox" data-key="${esc(feature.key)}"${feature.enabled ? " checked" : ""}
-      aria-label="${esc(feature.label)}"></label>`;
 }
 
 // -- the server itself -----------------------------------------------------------------------

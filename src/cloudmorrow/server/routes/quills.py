@@ -29,6 +29,7 @@ from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_admin_user, get_current_user, get_state
 from cloudmorrow.server.quills import MANIFEST, MAX_DOWNLOAD, Catalog, QuillError, fetch, load_catalog, removal
 from cloudmorrow.server.quills.code import CodeError
+from cloudmorrow.server.quills.manifest import Manifest
 from cloudmorrow.server.quills.shelf import audience_of
 
 router = APIRouter(prefix="/api/quills", tags=["quills"])
@@ -168,10 +169,31 @@ def catalog(state: AppState = Depends(get_state), _: User = Depends(get_current_
         found = load_catalog(state.config.quill_catalog)
     except QuillError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
-    installed = {q.id: q.version for q in state.quills.quills.values()}
+    installed = {q.id: q for q in state.quills.quills.values()}
     return {
         "categories": found.categories,
-        "quills": [{**entry, "installed_version": installed.get(entry["id"])} for entry in found.quills],
+        "quills": [{**entry, **_standing(entry, installed.get(entry["id"]))} for entry in found.quills],
+    }
+
+
+def _standing(entry: dict, here: Manifest | None) -> dict:
+    """Where an installed Quill stands against its catalog entry: its version, the
+    release it was installed from, and whether the catalog names a newer one.
+
+    `update_available` is True when the catalog's `ref` is not the one it was
+    installed from, False when it is, and None when there is no telling: the
+    entry names no release, or the Quill came from a source of its own, not
+    the catalog. Installing again is the update in both of those cases.
+    """
+    if here is None:
+        return {"installed_version": None, "installed_ref": None, "update_available": None}
+    ref = str(entry.get("ref", "") or "")
+    from_catalog = bool(here.origin.get("catalog"))
+    installed_ref = str(here.origin.get("ref", "") or "")
+    return {
+        "installed_version": here.version,
+        "installed_ref": installed_ref,
+        "update_available": (installed_ref != ref) if from_catalog and ref else None,
     }
 
 
