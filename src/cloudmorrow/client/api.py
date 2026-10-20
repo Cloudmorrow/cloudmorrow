@@ -551,6 +551,87 @@ class CloudmorrowClient:
     async def datamodels(self) -> list[dict]:
         return (await self._request("GET", "/api/datamodels")).json()
 
+    # -- snapshots and attestations (docs/ATTESTATIONS.md) ----------------------
+    async def take_snapshot(
+        self,
+        space_model: str,
+        space_id: str,
+        *,
+        title: str = "",
+        series: str = "",
+        models: list[str] | None = None,
+        period: dict | None = None,
+        notes: str = "",
+        scope: str | None = None,
+        members: list[str] | None = None,
+    ) -> dict:
+        """Copy a space's records into a sealed snapshot. Answers as `snapshot` does."""
+        body = {
+            "space_model": space_model,
+            "space_id": space_id,
+            "title": title,
+            "series": series,
+            "models": models or [],
+            "period": period,
+            "notes": notes,
+            "scope": scope,
+            "members": members or [],
+        }
+        return (await self._request("POST", "/api/snapshots", json=body)).json()
+
+    async def snapshot(self, snapshot_id: str) -> dict:
+        """The snapshot, its attestations, whether its bundle is intact, and its guest links."""
+        return (await self._request("GET", f"/api/snapshots/{snapshot_id}")).json()
+
+    async def snapshot_bundle(self, snapshot_id: str) -> tuple[bytes, str]:
+        """The bundle's bytes, exactly as hashed, and the digest the server has for it."""
+        response = await self._request("GET", f"/api/snapshots/{snapshot_id}/bundle")
+        return response.content, response.headers.get("X-Snapshot-Digest", "")
+
+    async def withdraw_snapshot(self, snapshot_id: str) -> dict:
+        return (await self._request("POST", f"/api/snapshots/{snapshot_id}/withdraw")).json()
+
+    async def attest_snapshot(self, snapshot_id: str, document: dict) -> dict:
+        """Bring a signed attestation back to the snapshot it is on."""
+        return (await self._request("POST", f"/api/snapshots/{snapshot_id}/attestations", json=document)).json()
+
+    async def invite_snapshot_guest(self, snapshot_id: str, *, label: str = "", days: int | None = None) -> dict:
+        body: dict = {"label": label}
+        if days is not None:
+            body["days"] = days
+        return (await self._request("POST", f"/api/snapshots/{snapshot_id}/guests", json=body)).json()
+
+    async def snapshot_guests(self, snapshot_id: str) -> list[dict]:
+        return (await self._request("GET", f"/api/snapshots/{snapshot_id}/guests")).json()
+
+    async def revoke_snapshot_guest(self, snapshot_id: str, guest_id: int) -> None:
+        await self._request("DELETE", f"/api/snapshots/{snapshot_id}/guests/{guest_id}")
+
+    async def identity(self) -> dict:
+        """This server's signing key, public half, and its fingerprint."""
+        return (await self._request("GET", "/api/identity")).json()
+
+    async def sign_attestation(
+        self,
+        *,
+        digest: str,
+        verdict: str,
+        statement: str = "",
+        snapshot: str = "",
+        series: str = "",
+        version: int = 0,
+    ) -> dict:
+        """An attestation on a digest, signed with this server's identity in your name."""
+        body = {
+            "digest": digest,
+            "verdict": verdict,
+            "statement": statement,
+            "snapshot": snapshot,
+            "series": series,
+            "version": version,
+        }
+        return (await self._request("POST", "/api/attest", json=body)).json()
+
     async def records(
         self, model: str, *, last: int | None = None, since: str | None = None, **where: object
     ) -> list[dict]:

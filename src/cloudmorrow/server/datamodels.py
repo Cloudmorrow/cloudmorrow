@@ -138,6 +138,38 @@ class Field:
 
 
 @dataclass(frozen=True, slots=True)
+class Lock:
+    """When a record of a datamodel is never changed or deleted again.
+
+    `locked = true` locks a record the moment it is made. `locked = { field =
+    "status", value = "sealed", allow = ["withdrawn"] }` locks it once that
+    field takes that value, and from then lets that one field move to one of
+    `allow` — and nothing after. Opt-in, per datamodel: nothing is locked
+    unless its datamodel says so (docs/ATTESTATIONS.md).
+    """
+
+    field: str = ""
+    value: str = ""
+    allow: tuple[str, ...] = ()
+
+    @property
+    def always(self) -> bool:
+        return not self.field
+
+    def holds(self, fields: dict) -> bool:
+        """Is a record with these fields locked?"""
+        if self.always:
+            return True
+        current = fields.get(self.field)
+        return reads_as(current, self.value) or any(reads_as(current, a) for a in self.allow)
+
+    def to_dict(self) -> dict | bool:
+        if self.always:
+            return True
+        return {"field": self.field, "value": self.value, "allow": list(self.allow)}
+
+
+@dataclass(frozen=True, slots=True)
 class Datamodel:
     id: str
     version: int
@@ -164,6 +196,12 @@ class Datamodel:
     notify: tuple[dict, ...] = ()
     # Not in the record store: served by this backend instead.
     backend: str = ""
+    # Once locked, a record of it is never changed or deleted (see Lock).
+    lock: Lock | None = None
+    # Its records are made by the server, through a route of its own, never
+    # through the generic record API: a snapshot, which carries a digest only
+    # the server can vouch for.
+    server_made: bool = False
 
     @property
     def by_name(self) -> dict[str, Field]:
@@ -213,6 +251,8 @@ class Datamodel:
             authored=self.authored,
             notify=self.notify,
             backend=self.backend,
+            lock=self.lock,
+            server_made=self.server_made,
         )
 
     def to_dict(self) -> dict:
@@ -231,8 +271,17 @@ class Datamodel:
             "authored": self.authored,
             "notify": list(self.notify),
             "backend": self.backend,
+            "locked": self.lock.to_dict() if self.lock else False,
+            "server_made": self.server_made,
             "fields": [f.to_dict() for f in self.fields],
         }
+
+
+def reads_as(value: object, target: str) -> bool:
+    """Does a field's value read as *target*? `false` is how TOML says a bool."""
+    if isinstance(value, bool):
+        return str(value).lower() == target.lower()
+    return value is not None and str(value) == target
 
 
 def _label(name: str) -> str:
@@ -419,6 +468,9 @@ def parse_datamodel(data: dict, *, source: str = "foundation", where: str = "") 
         raise DatamodelError(f"{where}: backend is one of {', '.join(sorted(BACKENDS))}")
     if backend and source != "foundation":
         raise DatamodelError(f"{where}: only a foundational datamodel has a backend")
+    lock = _lock(head.get("locked", False), by_name, where)
+    if lock is not None and backend:
+        raise DatamodelError(f"{where}: a datamodel kept by a backend is not locked")
     return Datamodel(
         id=model_id,
         version=version,
@@ -435,7 +487,31 @@ def parse_datamodel(data: dict, *, source: str = "foundation", where: str = "") 
         authored=_authored(head.get("authored", False), in_space, where),
         notify=tuple(notify),
         backend=backend,
+        lock=lock,
+        server_made=bool(head.get("server_made", False)),
     )
+
+
+def _lock(value: object, by_name: dict[str, Field], where: str) -> Lock | None:
+    """`locked`: false, true, or `{ field, value, allow }` on an enum field."""
+    if value is False or value is None:
+        return None
+    if value is True:
+        return Lock()
+    if not isinstance(value, dict) or not value.get("field"):
+        raise DatamodelError(f"{where}: locked is true, false, or {{ field, value, allow }}")
+    name = str(value["field"])
+    watched = by_name.get(name)
+    if watched is None or watched.kind != "enum":
+        raise DatamodelError(f"{where}: locked names {name!r}, which must be an enum field")
+    locks_on = str(value.get("value", ""))
+    allow = tuple(str(a) for a in value.get("allow", ()))
+    for state in (locks_on, *allow):
+        if state not in watched.values:
+            raise DatamodelError(f"{where}: locked names a value {name} never has: {state!r}")
+    if locks_on in allow:
+        raise DatamodelError(f"{where}: locked allows the value it locks on")
+    return Lock(field=name, value=locks_on, allow=allow)
 
 
 AUTHORED = (False, True, "or-manager")

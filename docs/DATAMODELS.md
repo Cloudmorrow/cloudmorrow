@@ -101,6 +101,19 @@ message's `pinned`, which the channel's manager sets on a line that is not
 theirs — while the rest of the record stays its author's (`authored`,
 below). A change that touches any other field is the author's alone.
 
+**`locked`** says a record of the datamodel is never changed or deleted
+again: `locked = true` from the moment it is made, or `locked = { field =
+"status", value = "sealed", allow = ["withdrawn"] }` once that enum field
+takes that value, after which the one change it takes is that field moving
+to one of `allow`, and then none. The record store refuses everything else
+with `423 Locked`, from every surface. Opt-in: nothing is locked unless its
+datamodel says so, and only `snapshot` and `attestation` do
+([ATTESTATIONS.md](ATTESTATIONS.md)).
+
+**`server_made = true`** says records of the datamodel come only from a
+route of the server's own, never from the generic record API — a snapshot,
+whose digest only the server can vouch for. Reading them is as any other.
+
 **Extending** a datamodel is a `[[extends]]` table in the Quill's manifest:
 
 ```toml
@@ -433,7 +446,9 @@ stands in Business.
   by the catalog, additive only.
 - **Dataset provenance with checksums and licence review.** The lists we
   need are short, are facts, and are typed into a TOML file reviewed by
-  pull request like any field.
+  pull request like any field. (A *snapshot* of a space, with a digest
+  and a signed attestation on it, is a different thing and is built:
+  [ATTESTATIONS.md](ATTESTATIONS.md).)
 - **Permissions per field, retention policies, legal holds, governance
   packs.** Access that is a spreadsheet is not delightful, and nobody on
   one box asks for it. The control that keeps data safe is three words on

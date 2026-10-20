@@ -295,6 +295,9 @@ server, so a change to the terminal app needs no deploy to try.
   API route, with the reasoning behind them.
 - [docs/ENCRYPTION.md](docs/ENCRYPTION.md): what is encrypted, how, what it
   protects against and what it does not.
+- [docs/ATTESTATIONS.md](docs/ATTESTATIONS.md): a frozen copy of a space's
+  records with a digest, and an outside party's signed word on it: the
+  books at year end, validated by the accountant.
 - [Concept.md](Concept.md): what Cloudmorrow is, in one page.
 - [docs/DATA.md](docs/DATA.md): the data concept: elements with standard
   fields, extensions apps add, scopes, storage, the change feed, export,

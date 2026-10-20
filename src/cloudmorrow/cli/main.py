@@ -25,6 +25,7 @@ from cloudmorrow import localserver
 from cloudmorrow.agent.setup import ensure_agent, stop_agent
 from cloudmorrow.cli import (
     agent,
+    attest,
     circle,
     desktop,
     dev,
@@ -33,6 +34,7 @@ from cloudmorrow.cli import (
     secret,
     settings,
     share,
+    snapshot,
     uninstall,
     update,
 )
@@ -60,6 +62,9 @@ app.add_typer(settings.app, name="config")
 app.add_typer(update.app, name="update")
 app.add_typer(quill.app, name="quill")
 app.add_typer(circle.app, name="circle")
+# A frozen copy of a space's records, and the signed word on it (docs/ATTESTATIONS.md).
+app.add_typer(snapshot.app, name="snapshot")
+app.add_typer(attest.app, name="attest")
 # Your own access: what your circles give you, per datamodel.
 app.command("access")(circle.access)
 # The way out: `cloudmorrow uninstall`, in its own file beside the way in.
