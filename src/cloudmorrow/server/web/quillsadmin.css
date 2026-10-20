@@ -48,8 +48,9 @@
 
 /* -- the sheet beside the list ----------------------------------------------- */
 @media (min-width: 900px) and (min-height: 600px) {
-  #app:has(.panel.quills-split) { --column: 1180px; }
-  .panel.quills-split {
+  /* Administration's panel, and Your Quills alike. */
+  #app:has(.quills-split) { --column: 1180px; }
+  .quills-split {
     display: grid;
     grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
     gap: 28px;

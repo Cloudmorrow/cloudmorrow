@@ -1238,10 +1238,18 @@ made for themselves, on their shelf alone, over their own data, run as them
 
 #### In the web app
 
-**Me → Your Quills**: the catalog, with **Add … for me** on a Quill's
-sheet; yours, each with who has it and **Offer it** to pick people; what
-you were offered, to accept or decline; and your requests to an
-administrator.
+**Me → Your Quills**, under three tabs, with a sheet for each Quill —
+beside the list on a computer, a screen of its own on a phone. **Server
+Quills** is what an administrator put on your shelf, each with your own
+switch (**Shown to you**: off hides its tab from your screens and nothing
+more). **Yours** is what you added for yourself, with **update** on one the
+catalog has a newer release of and **Update all** above them; a Quill's
+sheet has **Update**, **Reinstall**, **Share…**, **Export**, **Ask to
+promote** and **Remove**; below them, what people shared with you, what you
+were offered, and your requests to an administrator. **Catalog** is every
+Quill there is, marked on the server, yours, or there to add: a Quill's
+sheet says what it adds, then **Add … for me** — or, where the server says
+you may not add one yourself, or that one cannot be yours, **Ask for it**.
 
 #### In the terminal app
 
