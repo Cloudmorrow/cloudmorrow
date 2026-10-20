@@ -10,17 +10,19 @@ of it, which is three things laid together (docs/SHARING.md):
 
 One id, one Quill, per person: a server Quill wins over one shared with
 them, which wins over their own of the same id, and what lost is listed as
-shadowed rather than lost. The same shelf narrows access: a datamodel of
-somebody's own (`~alice.budget.envelope`) is reachable only by the people on
-whose shelf that Quill stands, whatever the circles say about `*`.
+shadowed rather than lost. The same shelf decides access to a Quill's own
+data: a datamodel of somebody's own (`~alice.budget.envelope`) is reachable
+only by the people the Quill stands with — its owner, and whoever accepted
+it, each as the share's rule says (write, or read) — whatever the circles
+say about `*`; to anybody else it is absent.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 
-from cloudmorrow.server.circles import NONE, Access, CircleStore
+from cloudmorrow.server.circles import NONE, WRITE, Access, CircleStore
 from cloudmorrow.server.datamodels import OWNER_PREFIX
 from cloudmorrow.server.db import UserStore
 from cloudmorrow.server.quills.manifest import Manifest
@@ -32,13 +34,17 @@ __all__ = ["Narrowed", "Shelf", "audience_of", "in_audience"]
 
 @dataclass(frozen=True, slots=True)
 class Narrowed(Access):
-    """A person's access, with everybody else's own datamodels out of reach."""
+    """A person's access: their circles for the server's datamodels, and for a
+    Quill's own (`~owner.quill.model`) what the Quill's shelf says — write for
+    its owner, the share's rule for whoever accepted it, nothing for anybody
+    else. The circles are not asked about a Quill's own data: it is the
+    Quill's, and its owner says who reaches it (docs/SHARING.md, rule 4)."""
 
-    reach: frozenset[str] = field(default_factory=frozenset)
+    reach: Mapping[str, str] = field(default_factory=dict)
 
     def level(self, model: str) -> str:
-        if model.startswith(OWNER_PREFIX) and model not in self.reach:
-            return NONE
+        if model.startswith(OWNER_PREFIX):
+            return self.reach.get(model, NONE)
         return Access.level(self, model)
 
 
@@ -115,7 +121,7 @@ class Shelf:
         for manifest in self.registry.quills.values():
             if self.for_server_quill(manifest, username, circles):
                 taken[manifest.id] = manifest
-        if self.policy is not None and not self.policy.may_have():
+        if self.policy is not None and not self.policy.may_have(username):
             return list(taken.values()), shadowed
         accepted = self.sharing.accepted_for(username) if self._sharing_on() else set()
         for owner, quill_id in sorted(accepted):
@@ -127,6 +133,10 @@ class Shelf:
             else:
                 taken[manifest.id] = manifest
         for manifest in self.registry.personal.get(username, {}).values():
+            # Their own, unless they took it off their shelf while others
+            # still have it: then it is theirs in name only.
+            if self.sharing.owner_left(username, manifest.id):
+                continue
             if manifest.id in taken:
                 shadowed.append(manifest)
             else:
@@ -141,43 +151,63 @@ class Shelf:
         return self.for_user(username).get(quill_id)
 
     def _sharing_on(self) -> bool:
+        """Does the server let Quills be shared at all? A share made while it was is
+        still a share; this gates whether any stands on a shelf."""
         return self.policy is None or self.policy.may_share()
 
     def has(self, username: str, manifest: Manifest) -> bool:
         """Does this Quill stand on *username*'s shelf (shadowed or not)?"""
         if not manifest.personal:
             return self.for_server_quill(manifest, username)
-        if self.policy is not None and not self.policy.may_have():
+        if self.policy is not None and not self.policy.may_have(username):
             return False
         if manifest.owner == username:
-            return True
+            return not self.sharing.owner_left(username, manifest.id)
         return self._sharing_on() and (manifest.owner, manifest.id) in self.sharing.accepted_for(username)
 
+    def holders(self, manifest: Manifest) -> list[str]:
+        """Everybody a personal Quill stands with, its owner first unless they left:
+        the people whose yes it still has, and who may take it off their shelf —
+        the last of them taking it off the server."""
+        if not manifest.personal:
+            return []
+        found = self.sharing.holders(manifest.owner, manifest.id)
+        if not self._sharing_on():
+            found = [p for p in found if p == manifest.owner]
+        active = {u.username for u in self.users.list() if u.is_active}
+        return [p for p in found if p in active and (self.policy is None or self.policy.may_have(p))]
+
     def people_of(self, manifest: Manifest) -> list[str]:
-        """Everybody who has this Quill: for a personal one, its owner and whoever
-        accepted it; for a server Quill, everybody in its audience."""
-        users = self.users.list()
+        """Everybody who has this Quill: for a personal one, the people it stands
+        with; for a server Quill, everybody in its audience."""
         if manifest.personal:
-            if self.policy is not None and not self.policy.may_have():
-                return []
-            shared = self.sharing.accepted_by(manifest.owner, manifest.id) if self._sharing_on() else []
-            people = [manifest.owner, *shared]
-        else:
-            people = [u.username for u in users if self.for_server_quill(manifest, u.username)]
+            return self.holders(manifest)
+        users = self.users.list()
         active = {u.username for u in users if u.is_active}
+        people = [u.username for u in users if self.for_server_quill(manifest, u.username)]
         return [p for p in dict.fromkeys(people) if p in active]
 
     # -- what follows from it ----------------------------------------------------------------
-    def reach(self, username: str) -> frozenset[str]:
-        """Every datamodel of somebody's own that *username* may use at all."""
-        found: set[str] = set()
+    def reach(self, username: str) -> dict[str, str]:
+        """Every datamodel of somebody's own that *username* may use, with what they
+        may do with it: write on their own Quills', the share's rule on one shared
+        with them (write, unless the owner narrowed it to read)."""
+        found: dict[str, str] = {}
         mine, shadowed = self._mine(username)
         for manifest in (*mine, *shadowed):
-            if manifest.personal:
-                found.update(manifest.renamed.values())
-                # ...and what such a Quill was let at of another's.
-                found.update(m for m in manifest.models if m.startswith(OWNER_PREFIX))
-        return frozenset(found)
+            if not manifest.personal:
+                continue
+            rules: dict[str, str] = {}
+            if manifest.owner != username:
+                share = self.sharing.share(manifest.owner, manifest.id, username)
+                rules = (share or {}).get("rules") or {}
+            for model in manifest.renamed.values():
+                found[model] = rules.get(model, WRITE)
+            # ...and what such a Quill was let at of another's.
+            for model in manifest.models:
+                if model.startswith(OWNER_PREFIX) and model not in found:
+                    found[model] = WRITE
+        return found
 
     def access_for(self, username: str) -> Access:
         """What *username* may do with each datamodel: their circles, narrowed to their shelf."""

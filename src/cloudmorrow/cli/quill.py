@@ -1053,13 +1053,24 @@ def fork(
 
 @app.command("policy")
 def policy(
+    username: Annotated[
+        str, typer.Argument(help="One person: what stands for them, and what to say about them in particular")
+    ] = "",
     personal: Annotated[
         str, typer.Option("--personal", help="on, ask or off: may people have Quills of their own?")
     ] = "",
     code: Annotated[str, typer.Option("--code", help="on or off: may those run code?")] = "",
     sharing: Annotated[str, typer.Option("--sharing", help="on or off: may they be shared?")] = "",
+    create: Annotated[
+        str,
+        typer.Option("--create", help="on or off: may people make their own, rather than only take from the catalog?"),
+    ] = "",
 ) -> None:
-    """What this server allows about Quills of people's own; an administrator changes it."""
+    """What this server allows about Quills of people's own; an administrator changes it.
+
+    With a USERNAME, what stands for that person: each setting may be said again for them
+    (`inherit` takes it back to the server's answer).
+    """
 
     async def _policy() -> None:
         _, api = client()
@@ -1070,12 +1081,21 @@ def policy(
                     ("personal_quills", personal),
                     ("personal_quill_code", code),
                     ("personal_quill_sharing", sharing),
+                    ("personal_quill_create", create),
                 )
                 if v
             }
+            if username:
+                found = await (
+                    api.set_quill_policy_for(username, **changes) if changes else api.quill_policy_for(username)
+                )
+                for key, value in found["effective"].items():
+                    own = found["own"].get(key)
+                    console.print(f"{key}: [b]{value}[/]" + ("" if own else "  [dim](the server's)[/]"))
+                return
             found = await (api.set_quill_policy(**changes) if changes else api.quill_policy())
-        for key in ("personal_quills", "personal_quill_code", "personal_quill_sharing"):
-            console.print(f"{key}: [b]{found[key]}[/]")
+        for key in ("personal_quills", "personal_quill_code", "personal_quill_sharing", "personal_quill_create"):
+            console.print(f"{key}: [b]{found.get(key, '')}[/]")
 
     run(_policy())
 

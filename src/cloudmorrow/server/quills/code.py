@@ -373,9 +373,15 @@ class QuillCode:
         return getattr(self.state, "shelf", None)
 
     def _runs_as(self, manifest: Manifest) -> str:
-        """Whom a Quill's jobs, webhooks and APIs act for: a personal Quill's owner,
-        else the administrator who installed it ("" when there is nobody)."""
+        """Whom a Quill's jobs, webhooks and APIs act for: a personal Quill's owner —
+        or, once the owner took it off their shelf while others still have it, the
+        first of those — else the administrator who installed it ("" when there is
+        nobody)."""
         if manifest.personal:
+            shelf = self._shelf()
+            people = shelf.holders(manifest) if shelf is not None else [manifest.owner]
+            if people:
+                return people[0]
             user = self.state.users.get(manifest.owner)
             return manifest.owner if user is not None and user.is_active else ""
         return runs_as(self.state.users, manifest.origin)
@@ -662,21 +668,18 @@ class QuillCode:
                 self._local.depth, self._local.quill = 0, ""
 
     def _hook_people(self, manifest: Manifest, changer: Principal, record: dict) -> list[str]:
+        """Whom a hook runs as, for a change to *record*: once, as whoever changed it when
+        the Quill stands with them, else as whoever its code runs as. A personal Quill's
+        data is one pool for everybody it stands with, so a change is one event, not
+        one per person who can see it."""
         if not manifest.personal:
             return [changer.username]
         shelf = self._shelf()
         people = shelf.people_of(manifest) if shelf is not None else [manifest.owner]
-        found = []
-        for who in people:
-            if who == changer.username or record.get("owner") == who:
-                found.append(who)
-                continue
-            try:
-                self.state.records.get(Principal.person(who), record["model"], record["id"])
-            except Exception:
-                continue  # not theirs to see, or gone: nothing of theirs happened
-            found.append(who)
-        return found
+        if changer.username in people:
+            return [changer.username]
+        who = self._runs_as(manifest)
+        return [who] if who else []
 
     def drain(self, timeout: float = 30.0) -> None:
         """Wait until every queued hook has run: for tests, and for a clean stop."""

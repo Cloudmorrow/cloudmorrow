@@ -314,6 +314,32 @@ async function waitForServer(expect) {
 }
 
 // -- one account -------------------------------------------------------------------------
+// The four settings about Quills of people's own, as they read on the screen.
+const QUILL_POLICY = [
+  ["personal_quills", "Quills of their own", { on: "May add them", ask: "Only through a request", off: "None" }],
+  ["personal_quill_create", "May make their own", { on: "From a folder, a source, a fork, an assistant", off: "The catalog only" }],
+  ["personal_quill_code", "May run code", { on: "In the sandbox, as them", off: "Declared Quills only" }],
+  ["personal_quill_sharing", "May share theirs", { on: "With people who say yes", off: "Theirs alone" }],
+];
+
+/** The server's answer on each, with a select to say otherwise for this person. */
+function quillPolicyForm(policy) {
+  return `<p class="group-label">Quills of their own</p>
+    <p class="shelf-note">The server's answers (Administration, Quills, User Quills), said again for this
+      account where it should differ. <i>The server's</i> follows the server as it changes.</p>
+    <div class="group policy quill-policy">${QUILL_POLICY.map(([key, label, words]) => {
+      const own = policy.own[key];
+      const server = policy.server[key];
+      return `<label class="row">
+        <span class="main"><span class="title">${esc(label)}</span>
+        <span class="meta"><span class="preview">${esc(words[policy.effective[key]] || policy.effective[key])}</span></span></span>
+        <select name="${key}" aria-label="${esc(label)}">
+          <option value="inherit"${own ? "" : " selected"}>the server's (${esc(server)})</option>
+          ${Object.keys(words).map((v) => `<option value="${v}"${own === v ? " selected" : ""}>${v}</option>`).join("")}
+        </select></label>`;
+    }).join("")}</div>`;
+}
+
 function choices(group, options, chosen) {
   return `<div class="group choices">${options.map(([key, label, note]) => `
     <label class="row"><input type="radio" name="${group}" value="${esc(key)}"${
@@ -341,12 +367,17 @@ async function renderUser(username) {
   // them — the one person who needs the budget without a circle for them.
   let access = null;
   let shelves = [];
+  // What they may do with Quills of their own: the server's answers, and
+  // what was said about them in particular (docs/SHARING.md, rule 9).
+  let quillPolicy = null;
   if (!making) {
-    const [found, models] = await Promise.all([
+    const [found, models, policy] = await Promise.all([
       api("GET", "/api/access/" + encodeURIComponent(user.username)), api("GET", "/api/datamodels"),
+      api("GET", "/api/quills/policy/" + encodeURIComponent(user.username)).catch(() => null),
     ]);
     access = found;
     shelves = domainsOf(models);
+    quillPolicy = policy;
   }
 
   mount(nav({
@@ -394,6 +425,7 @@ async function renderUser(username) {
           <p class="shelf-note reaches">${Object.keys(access.access).length
             ? "They reach: " + esc(rulesSaid(access.access, Object.fromEntries(shelves.flatMap((s) => s.models.map((m) => [m.id, m.label || m.id])))))
             : "They reach no data."}</p>` : ""}
+        ${quillPolicy ? quillPolicyForm(quillPolicy) : ""}
         <div class="group"><button class="row primary" type="submit">${
           making ? "Make the account" : "Save"}</button></div>
         ${yourself || making ? "" :
@@ -434,6 +466,11 @@ async function renderUser(username) {
         await api("PATCH", userUrl(user.username), body);
         if (access) {
           await api("PUT", "/api/access/" + encodeURIComponent(user.username), { rules: rulesFrom(form, access.own) });
+        }
+        if (quillPolicy) {
+          const said = {};
+          for (const select of form.querySelectorAll(".quill-policy select")) said[select.name] = select.value;
+          await api("PUT", "/api/quills/policy/" + encodeURIComponent(user.username), said);
         }
       }
       toast(making ? "Account made" : "Saved");

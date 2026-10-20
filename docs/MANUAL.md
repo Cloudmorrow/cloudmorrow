@@ -1250,6 +1250,14 @@ made for themselves, on their shelf alone, over their own data, run as them
 
 #### In the web app
 
+A Quill of your own keeps its data as the Quill's: one pool for everybody
+you share it with, each as you set it — **Share…** on its sheet picks the
+people and, per datamodel of the Quill's own, **write** or **read**. Taking
+it off your shelf leaves it standing for them; the last to have it takes it
+off the server and chooses what goes with it. An administrator may say, on
+an account's page under *Quills of their own*, that one person may not add,
+make or share Quills of their own while the server allows it.
+
 **Me → Your Quills**, under three tabs, with a sheet for each Quill —
 beside the list on a computer, a screen of its own on a phone. **Server
 Quills** is what an administrator put on your shelf, each with your own

@@ -500,6 +500,9 @@ def own_widgets(everything: dict) -> list:
     for index, quill in enumerate(personal):
         shared = [s["username"] for s in quill.get("shared_with", []) if s["state"] == "accepted"]
         with_ = f", shared with {', '.join(shared)}" if shared else ""
+        if quill.get("owner_left"):
+            others = [h for h in quill.get("holders", []) if h != quill["owner"]]
+            with_ = f" — off their shelf; stands with {', '.join(others) or 'nobody'}"
         code = " · runs code, as each of them" if quill.get("code") else ""
         gone = (
             f"  [{WARN}]its owner's account is gone: promote it, or remove it[/]"

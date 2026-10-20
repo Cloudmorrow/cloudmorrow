@@ -207,13 +207,22 @@ def personalise(manifest: Manifest, owner: str) -> Manifest:
     """
     names = {m.id: f"{OWNER_PREFIX}{owner}.{m.id}" for m in manifest.introduces}
     rename = lambda model: names.get(model, model)  # noqa: E731
+
+    # Its own data is the Quill's: one pool for everybody the Quill stands
+    # with, each per the share's rule, rather than each writer's alone. The
+    # files say personal; the server keeps it so. A datamodel asking for more
+    # (shared: a space) is left as written, for check_personal to refuse.
+    def pooled(model):
+        found = renamed(model, names)
+        return replace(found, scopes=("public",)) if set(found.scopes) <= {"personal", "public"} else found
+
     return replace(
         manifest,
         owner=owner,
         renamed=names,
         uses=tuple(rename(m) for m in manifest.uses),
         extends={rename(m): f for m, f in manifest.extends.items()},
-        introduces=tuple(renamed(m, names) for m in manifest.introduces),
+        introduces=tuple(pooled(m) for m in manifest.introduces),
         grants=_renamed_in(manifest.grants, names, "model"),
         screens=_renamed_in(manifest.screens, names, "model"),
         jobs=_renamed_in(manifest.jobs, names, "model"),

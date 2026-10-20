@@ -316,6 +316,7 @@ const POLICY = [
   }],
   ["personal_quill_code", "May run code", { on: "In the sandbox, as its owner", off: "Declared Quills only" }],
   ["personal_quill_sharing", "May be shared", { on: "With people who say yes", off: "Yours alone" }],
+  ["personal_quill_create", "May be made", { on: "From a folder, a source, a fork, an assistant", off: "The catalog only" }],
 ];
 
 async function drawOwn(ctx) {
@@ -323,8 +324,9 @@ async function drawOwn(ctx) {
   const requests = all.requests || [];
   const personal = all.personal || [];
   list.innerHTML = `
-    <p class="note">What this server allows (docs/SHARING.md). A Quill somebody adds for themselves is on
-      their shelf alone, over their own data, run as them; it changes nothing other people see.</p>
+    <p class="note">What this server allows (docs/SHARING.md), for everybody; an account's page says it
+      again for one person. A Quill somebody adds for themselves is on their shelf, its own data the
+      Quill's and nobody else's until they share it; it changes nothing other people see.</p>
     <div class="group policy">${POLICY.map(([key, label, words]) => `<label class="row">
       <span class="main"><span class="title">${esc(label)}</span>
       <span class="meta"><span class="preview">${esc(words[all.policy[key]] || "")}</span></span></span>
@@ -342,12 +344,14 @@ async function drawOwn(ctx) {
         <button type="button" class="quill-chip decline">Decline</button></span></div>`).join("")}</div>` : ""}
     <p class="group-label">Whose</p>
     ${personal.length ? `<div class="group">${personal.map((q) => {
-      const yes = (q.shared_with || []).filter((x) => x.state === "accepted").map((x) => x.username);
+      const holders = q.holders || [];
+      const others = holders.filter((h) => h !== q.owner);
       const gone = q.owner_active === false ? " · its owner's account is gone: promote it, or remove it" : "";
+      const left = q.owner_left ? ` · ${esc(q.owner)} took it off their shelf; it stands with ${esc(listed(others)) || "nobody"}` : "";
       return `<div class="row own-row" data-owner="${esc(q.owner)}" data-quill="${esc(q.id)}" data-name="${esc(q.name)}">
         <span class="main"><span class="title">${esc(q.name)} <span class="meta-inline">v${esc(q.version)}</span></span>
-        <span class="meta"><span class="preview">${esc(q.owner)}'s${yes.length ? `, shared with ${esc(yes.join(", "))}` : ""}${
-          q.code ? " · runs code, as each of them" : ""}${gone}</span></span></span>
+        <span class="meta"><span class="preview">${esc(q.owner)}'s${others.length && !q.owner_left ? `, shared with ${esc(others.join(", "))}` : ""}${
+          q.code ? " · runs code, as each of them" : ""}${left}${gone}</span></span></span>
         <span class="own-buttons">
           <button type="button" class="quill-chip on promote">Promote</button>
           <button type="button" class="quill-chip ${q.enabled ? "switch-off" : "switch-on"}">${q.enabled ? "Switch off" : "Switch on"}</button>
@@ -667,7 +671,7 @@ async function removeQuill(id, name, drop, done) {
 /** What a Quill brought, a tick each to keep it: the datamodels it introduced
     and the fields it added, with how many records hold each. Unticked goes
     with the Quill, records and all. */
-function removeSheet(name, brought) {
+export function removeSheet(name, brought) {
   const rows = brought.map((b) => {
     // A program it fetched that nothing else needs is offered the other way
     // round: unticked, it goes with the quill, because nothing runs on it.
