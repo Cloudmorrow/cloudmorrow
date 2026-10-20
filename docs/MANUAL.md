@@ -193,7 +193,8 @@ cm login
 | one record | tap its row: the sheet | `enter` on its row: the sheet | `cm <quill> show <id>` |
 | you, and your switches | **Me**, top right | **Settings**, `ctrl+g` | `cm whoami`, `cm config` |
 | what the machines did | not yet | the bell, `f8` | `cm agent list`, `cm agent jobs <id>` |
-| administration | **Administration** in the rail on a computer; **Me → Administration** on a phone | **Administration**, `f9` | `cm circle`, `cm quill`; accounts with `cloudmorrow-server user` on the box |
+| administration | **Administration** in the rail on a computer; **Me → Administration** on a phone | **Administration**, `f9` | `cm circle`, `cm role`, `cm quill`; accounts with `cloudmorrow-server user` on the box |
+| what waits for your yes, and your flows | **Me → Waiting for you**, **Me → Flows** | not yet | `cm approvals`, `cm approve`, `cm flow list` |
 
 ## Layout
 
@@ -756,8 +757,8 @@ window's edge, every row and tile says when the pointer is over it, and the
 sheet that slides up from under a thumb is a dialog in the middle. The rail
 stays put in an editor and in a thread, which on a phone drop the tab bar to
 give the keyboard the room. For an administrator it has one more section at
-the foot, **Administration**, with Users, Circles, Quills and Server under
-it — the terminal app's sidebar, in the browser.
+the foot, **Administration**, with Users, Circles, Roles, Quills and Server
+under it — the terminal app's sidebar, in the browser.
 
 The keys are the ones already on the screen: `Esc` is the back button (or the
 field you are in), `/` is the search box, `n` is the pen beside the title,
@@ -781,10 +782,12 @@ Typing `#/admin` as anybody else lands you back on Me with a word about it,
 which is a courtesy rather than the guard: every call under it is admin-only
 at the server, and the screen would be empty without that.
 
-Four sides, each at its own address (`#/admin/users`, `#/admin/circles`,
-`#/admin/quills`, `#/admin/server`). **Circles** is described under
-[circles](#circles-who-may-use-which-data) and **Server** is what this server runs and
-**Update server**; the two with the most in them:
+Five sides, each at its own address (`#/admin/users`, `#/admin/circles`,
+`#/admin/roles`, `#/admin/quills`, `#/admin/server`). **Circles** is
+described under [circles](#circles-who-may-use-which-data), **Roles** under
+[roles, approvals and flows](#roles-approvals-and-flows-how-a-procedure-is-said),
+and **Server** is what this server runs and **Update server**; the two with
+the most in them:
 
 - **Users.** Every account, with its type and, where it is worth pointing
   at, its role on a chip — an ordinary User has no chip, because that is the
@@ -1076,6 +1079,69 @@ A screen over data you may not reach is not there, and a Quill with nothing
 left is not on your phone. An assistant working as you, a Quill's service
 and a mounted share reach no more than you do. The whole of it, and why, is
 [CIRCLES.md](CIRCLES.md).
+
+## Roles, approvals and flows: how a procedure is said
+
+A company has operating procedures: time off is asked for and the team
+lead says yes; an expense over a limit goes past whoever is responsible for
+expenses. A household has them too, smaller. Three things say them, each
+small, each useful alone:
+
+- A **role** names who is responsible — *Team lead*, *Expense
+  Responsible*, *Product owner* — without naming the person. It gives no
+  access to any data; circles do that. A role is held everywhere, or
+  within one circle, so Sales and Warehouse each have a Team lead of their
+  own. A Quill that expects a role says so when it is installed, and the
+  role appears, empty, for an administrator to fill.
+- An **approval** is a yes or a no asked of whoever holds a role, about a
+  record. Every one on the server, whichever Quill or flow asked it, is in
+  one place, **Waiting for you**, and is answered once, with a word. The
+  asker sees it under **Asked by you** until then and may withdraw it; the
+  bell tells both sides.
+- A **flow** is a procedure you build yourself: one trigger — a record
+  made or changed, a Quill's action pressed, a schedule, or by hand — and a
+  list of steps: press a Quill's action, ask a role, change or make a
+  record, tell somebody, wait, stop. A step may run only on one answer or
+  the other, which is how a straight list branches. A flow runs as you,
+  over what you may reach, and each run says how far it got and why it
+  stopped.
+
+#### In the web app
+
+**Me → Administration → Roles**: the roles, who holds each, and the Quill
+that asked for one. Open a role to give it to somebody — everywhere, or in
+one circle — and take it off again. **Me → Waiting for you** is every
+question asked of a role you hold, with **Approve** and **Decline**, and
+what you asked that is still open. **Me → Flows**: **New flow**, a name, the
+trigger, then **Add a step** for each step, dragged or moved into order;
+**Run it now** starts it by hand, and its runs are listed under it.
+
+#### In the terminal app
+
+Not yet: the terminal app has the records (a flow is a `flow` record) and
+nothing drawn for them.
+
+#### On the command line
+
+```sh
+cm role list
+cm role add "Team lead"
+cm role give team_lead alice --circle Sales
+cm approvals                        # what waits for you, and what you asked
+cm approve r_… --note "Enjoy"
+cm decline r_…
+cm flow list
+cm flow run <flow> --on leave <id>
+cm flow runs <flow>
+```
+
+---
+
+Anything you type into a step may hold `{{trigger.record.fields.what}}`,
+`{{approval.status}}` or `{{steps.<id>.<key>}}` — what the run has
+gathered so far — and an action a Quill declares may hand something back
+to the flow that pressed it. The whole of it, for people who build Quills
+and for the curious, is [FLOWS.md](FLOWS.md).
 
 ## Quills
 
