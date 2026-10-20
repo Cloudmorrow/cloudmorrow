@@ -10,6 +10,8 @@ bound by the Quill's manifest exactly as on the server:
 * `GET  /api/agent/quills` — the installed Quills that have machine handlers,
   and what each needs; the agent runs only the ones switched on locally.
 * `GET  /api/agent/quills/{id}/code` — the installed copy, as a tarball.
+* `GET  /api/agent/quills/runtimes` — the catalog's runtimes, for a handler
+  that needs a program the machine fetches for itself (cloudmorrow.runtimes).
 * `POST /api/agent/quills/{id}/host` — one request from the code: `{op, args}`.
 """
 
@@ -25,7 +27,7 @@ from pydantic import BaseModel
 from cloudmorrow.quill import context as sdk
 from cloudmorrow.server.agents import Agent
 from cloudmorrow.server.deps import AppState, get_current_agent, get_state
-from cloudmorrow.server.quills import ORIGIN, Manifest
+from cloudmorrow.server.quills import ORIGIN, Manifest, QuillError, load_catalog
 from cloudmorrow.server.quills.code import HostCalls
 
 router = APIRouter(prefix="/api/agent/quills", tags=["agents"])
@@ -91,6 +93,27 @@ def machine_quills(state: AppState = Depends(get_state), agent: Agent = Depends(
             }
         )
     return rows
+
+
+@router.get("/runtimes")
+def machine_runtimes(state: AppState = Depends(get_state), _: Agent = Depends(get_current_agent)) -> dict:
+    """The catalog's runtimes, by id: where a build is for each OS and architecture, and its checksum."""
+    try:
+        catalog = load_catalog(state.config.quill_catalog)
+    except QuillError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+    # A local catalog (how one is developed) names its builds relative to its
+    # own folder; the agent has no such folder, so they are made absolute.
+    runtimes = {}
+    for runtime_id, spec in catalog.runtimes.items():
+        builds = []
+        for build in spec.get("builds", ()):
+            url = str(build.get("url", ""))
+            if catalog.base is not None and not url.startswith(("https://", "http://")) and not url.startswith("/"):
+                build = {**build, "url": str(catalog.base / url)}
+            builds.append(build)
+        runtimes[runtime_id] = {**spec, "builds": builds}
+    return runtimes
 
 
 @router.get("/{quill_id}/code")

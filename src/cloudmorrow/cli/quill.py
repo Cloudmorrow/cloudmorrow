@@ -279,6 +279,16 @@ def print_plan(plan: dict) -> None:
         if runtime.get("problem"):
             facts.append(runtime["problem"])
         table.add_row("runtime", escape(name), escape(", ".join(f for f in facts if f)))
+    for runtime in plan.get("machine_runtimes", []):
+        name = f"{runtime.get('label') or runtime['id']} {runtime.get('version', '')}".strip()
+        size = f"up to {megabytes(int(runtime['size']))}" if runtime.get("size") else ""
+        facts = [
+            size,
+            runtime.get("license", ""),
+            "fetched by a machine that runs its handler",
+            runtime.get("problem", ""),
+        ]
+        table.add_row("runtime", escape(name), escape(", ".join(f for f in facts if f)))
     for hook in plan["webhooks"]:
         what = (
             f"→ {hook['model']}"
@@ -1113,6 +1123,8 @@ def machine_list() -> None:
             every = f" every {spec['every']}" if spec.get("every") else ""
             console.print(f"{escape(quill['id'])} {escape(spec['id'])}{every}  {state}")
             console.print(f"  [dim]{escape(spec['why'])}[/]")
+            if spec.get("runtimes"):
+                console.print(f"  [dim]brings {escape(', '.join(spec['runtimes']))} to the machine that runs it[/]")
 
 
 @machine_app.command("enable")
@@ -1158,9 +1170,46 @@ def machine_enable(
             f"  may start {escape(program)}"
             + ("" if allowed else "  [dim](not allowed here until it is in quill_programs)[/]")
         )
+    # A program it needs that this machine fetches for it: said with its
+    # size before the yes, and fetched after it; nothing is installed on the
+    # system itself.
+    from cloudmorrow.agent.client import AgentClient
+    from cloudmorrow.agent.quills import MachineQuills
+    from cloudmorrow.runtimes import RuntimeProblem, build_for, platform_of, said_size
+
+    machines = MachineQuills(config, None)  # type: ignore[arg-type]
+    catalog_runtimes: dict = {}
+    if spec.get("runtimes"):
+        with AgentClient(config) as agent:
+            catalog_runtimes = agent.runtimes()
+        os_name, arch = platform_of()
+        for name in spec["runtimes"]:
+            runtime = catalog_runtimes.get(name)
+            if runtime is None:
+                fail(f"it needs {name}, which the catalog does not have; nothing was switched on")
+            build = build_for(runtime, os_name, arch)
+            if build is None:
+                fail(
+                    f"it needs {runtime.get('label', name)}, and there is no build for this machine ({os_name} {arch})"
+                )
+            here = machines.runtimes.info(name)
+            label = f"{runtime.get('label', name)} {runtime.get('version', '')}".strip()
+            if here and here.get("sha256") == str(build["sha256"]).lower():
+                console.print(f"  uses {escape(label)}  [dim](on this machine already)[/]")
+            else:
+                console.print(
+                    f"  adds {escape(label)} to this machine  [dim]({said_size(int(build.get('size', 0)))},"
+                    f" {escape(str(runtime.get('license', '')))}; downloaded and checked, kept by the agent)[/]"
+                )
     console.print("  [dim]In a sandbox: nothing else on this machine is within its reach.[/]")
     if not yes and not typer.confirm("Switch it on here?"):
         raise typer.Exit(1)
+    if spec.get("runtimes"):
+        try:
+            for name in machines.runtimes.ensure(spec["runtimes"], catalog_runtimes):
+                console.print(f"[green]Fetched[/] {escape(name)}")
+        except RuntimeProblem as exc:
+            fail(f"{exc}; nothing was switched on")
     config.quills.setdefault(quill_id, {})[handler] = {"folders": given}
     config.save()
     console.print(
@@ -1172,17 +1221,35 @@ def machine_enable(
 def machine_disable(
     quill_id: Annotated[str, typer.Argument(help="The Quill.")],
     handler: Annotated[str, typer.Argument(help="Its machine handler's id.")],
+    yes: Annotated[bool, typer.Option("--yes", help="Do not ask; a program only it needed goes too.")] = False,
 ) -> None:
-    """Stop a Quill's handler running on this machine."""
+    """Stop a Quill's handler running on this machine; a program only it needed may go too."""
+    from cloudmorrow.agent.quills import MachineQuills
+    from cloudmorrow.runtimes import said_size
+
     config = _agent_config()
     handlers = config.quills.get(quill_id) or {}
     if handler not in handlers:
         fail(f"{quill_id} {handler} is not on here")
+    machines = MachineQuills(config, None)  # type: ignore[arg-type]
+    unused = []
+    try:
+        unused = machines.unused_runtimes(quill_id, handler, {q["id"]: q for q in _offers()})
+    except Exception:  # noqa: BLE001 - the server unreachable: switch off anyway, keep what is here
+        unused = []
     del handlers[handler]
     if not handlers:
         config.quills.pop(quill_id, None)
     config.save()
     console.print("[green]Off[/] on this machine")
+    for info in unused:
+        label = f"{info.get('label') or info['id']} {info.get('version', '')}".strip()
+        what = f"{label} ({said_size(int(info.get('size') or 0))}) is on this machine for it, and nothing else needs it"
+        if yes or typer.confirm(f"{what}. Remove it too?", default=True):
+            machines.runtimes.remove(info["id"])
+            console.print(f"[green]Removed[/] {escape(label)}")
+        else:
+            console.print(f"[dim]Kept {escape(label)}; `cm quill machine enable` finds it again[/]")
 
 
 @machine_app.command("run")

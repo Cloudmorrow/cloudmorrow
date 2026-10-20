@@ -128,6 +128,7 @@ def sheet_text(plan: dict) -> str:
             lines.append(f"  [b]{dataset['id']}[/] [{MUTED}]{what}[/]")
 
     lines += runtime_lines(plan)
+    lines += machine_runtime_lines(plan)
     lines += code_lines(plan)
     return "\n".join(lines)
 
@@ -156,6 +157,29 @@ def runtime_lines(plan: dict) -> list[str]:
         lines.append(f"  [b]{name}[/]")
         lines.append(f"    [{MUTED}]{' · '.join(f for f in facts if f)}[/]")
     lines.append(f"  [{MUTED}]Kept by the server for its Quills; nothing is installed on the system itself.[/]")
+    return lines
+
+
+def machine_runtime_lines(plan: dict) -> list[str]:
+    """What its machine handlers bring to a computer they are switched on on."""
+    runtimes = plan.get("machine_runtimes") or []
+    if not runtimes:
+        return []
+    lines = ["", f"[b {ACCENT}]Adds to a machine that runs it[/]"]
+    for runtime in runtimes:
+        name = escape(str(runtime.get("label") or runtime.get("id", "?")))
+        if runtime.get("version"):
+            name += f" {escape(str(runtime['version']))}"
+        facts = [
+            escape(str(runtime.get("summary") or "")),
+            f"up to {megabytes(int(runtime['size']))}" if runtime.get("size") else "",
+            escape(str(runtime.get("license") or "")),
+        ]
+        if runtime.get("problem"):
+            facts.append(f"[{WARN}]{escape(str(runtime['problem']))}[/]")
+        lines.append(f"  [b]{name}[/]")
+        lines.append(f"    [{MUTED}]{' · '.join(f for f in facts if f)}[/]")
+    lines.append(f"  [{MUTED}]Fetched by the agent on a computer where somebody switches the handler on; not here.[/]")
     return lines
 
 

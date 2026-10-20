@@ -466,6 +466,17 @@ export function sections(plan, me) {
     checks it against the catalog's checksum, and keeps it for its quills; nothing is installed on the
     system itself. When the last quill that needs it is removed, you are asked whether it goes too.</p>` : ""));
 
+  // And what its machine handlers bring to a computer they are switched on on:
+  // fetched there, by the agent, after the person says yes there.
+  const onMachines = plan.machine_runtimes || [];
+  out.push(group("Adds to a machine that runs it", onMachines.map((r) => {
+    const facts = [r.summary, r.size ? `up to ${megabytes(r.size)}` : "", r.license].filter(Boolean).map(esc);
+    if (r.problem) facts.push(`<span class="warn">${esc(r.problem)}</span>`);
+    return row(`${esc(r.label || r.id)}${r.version ? ` ${esc(r.version)}` : ""}`, facts.join(" · "));
+  }), onMachines.length ? `<p class="shelf-note">Part of this quill runs on a person's own computer, once
+    they switch it on there, and needs this program: the agent on that computer fetches it then, checks it,
+    and keeps it; the server does not.</p>` : ""));
+
   const code = [
     ...(plan.services || []).map((s) => row(`Service ${esc(s.id)}`, esc((s.command || []).join(" ")))),
     ...(plan.webhooks || []).map((w) => row(`Webhook ${esc(w.id)}`, `POST /hooks/${esc(plan.id)}/${esc(w.path || w.id)}`)),

@@ -373,6 +373,15 @@ missing from disk (a restore without it) waits, and its state says what for,
 rather than failing in a loop. A Quill of somebody's own runs no services,
 so it has no runtimes.
 
+The same for a person's machine: a `[[machine]]` handler names what it
+needs in `[machine.needs] runtimes = ["ffmpeg"]`, and the agent on a
+computer where somebody switches it on fetches the build for *that*
+machine, says so before the yes (*adds ffmpeg 7.1.5 to this machine,
+119 MB*), keeps it under its own data folder, and offers to remove it with
+the last handler that needs it. The server fetches nothing for a machine
+handler; its install sheet says *Adds to a machine that runs it*. The
+store is one module, `cloudmorrow/runtimes.py`, used by both.
+
 **APIs** (`/api/q/<quill>/<path>`) are for anybody signed in. The request goes
 to the service's `PORT` at `/<path>` without the caller's `Authorization` or
 cookies, with `X-Cloudmorrow-User: <username>` added (or

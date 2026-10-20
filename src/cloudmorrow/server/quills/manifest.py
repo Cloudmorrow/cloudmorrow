@@ -107,6 +107,11 @@ class Manifest:
         return bool(self.owner)
 
     @property
+    def machine_runtimes(self) -> tuple[str, ...]:
+        """Runtimes its machine handlers need, fetched on the machines that run them, never here."""
+        return tuple(dict.fromkeys(r for m in self.machine for r in m.get("runtimes", [])))
+
+    @property
     def key(self) -> str:
         """What this installation is called where one name must do for every
         Quill on the server: the id for a server Quill, `~owner.id` for a

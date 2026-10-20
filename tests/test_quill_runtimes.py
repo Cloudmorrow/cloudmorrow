@@ -202,7 +202,7 @@ def test_no_catalog_no_build_and_no_such_runtime_are_each_said(tmp_path, catalog
     rows = elsewhere.describe(["ffmpeg"], catalog.runtimes)
     assert rows[0]["available"] is False and "no build" in rows[0]["problem"]
     offline = store.describe(["ffmpeg"], None)
-    assert offline[0]["id"] == "ffmpeg" and "not looked up in the catalog" in offline[0]["problem"]
+    assert offline[0]["id"] == "ffmpeg" and "catalog could not be read" in offline[0]["problem"]
 
 
 # -- the registry: the sheet, the install, the removal ------------------------------------
@@ -231,6 +231,19 @@ def test_a_runtime_the_catalog_lacks_is_refused_before_anything_is_installed(reg
     with pytest.raises(QuillError, match="catalog does not have"):
         registry.install(folder, QUILL_CATALOG / "datamodels")
     assert registry.quills == {}
+
+
+def test_without_a_catalog_the_quill_installs_and_its_service_waits_for_the_runtime(tmp_path):
+    # A test harness, an offline check, a server whose catalog is unreachable:
+    # nothing is fetched, nothing is refused, and the service says what it waits for.
+    registry = QuillRegistry(tmp_path / "quills", tmp_path / "datamodels", str(tmp_path / "no-catalog"))
+    folder = write_quill(tmp_path / "src", CLIPS)
+    plan = registry.plan(folder, QUILL_CATALOG / "datamodels")
+    assert "catalog could not be read" in plan["runtimes"][0]["problem"]
+    done = registry.install(folder, QUILL_CATALOG / "datamodels")
+    assert done["runtimes_fetched"] == [] and done["runtimes_skipped"] == ["ffmpeg"]
+    assert "clips" in registry.quills and registry.runtimes.installed() == {}
+    assert registry.runtimes.missing(registry.quills["clips"].runtimes) == ["ffmpeg"]
 
 
 def test_the_remove_sheet_offers_a_runtime_only_when_nothing_else_needs_it(registry, tmp_path):
@@ -313,3 +326,118 @@ def test_a_service_finds_its_runtime_first_on_the_path_and_waits_without_it(clie
     removed = client.delete("/api/quills/clips?drop=runtime:ffmpeg", headers=auth)
     assert removed.status_code == 200 and removed.json() == {"dropped": {}, "runtimes": ["ffmpeg"]}
     assert not bin_dir.exists()
+
+
+# -- on a person's machine ----------------------------------------------------------------
+CONVERT = """
+[quill]
+id = "convert"
+name = "Convert"
+version = "1.0.0"
+summary = "Converts the videos in a folder of yours."
+category = "personal"
+publisher = "Cloudmorrow"
+license = "AGPL-3.0-or-later"
+code = "quill.py"
+
+[uses]
+datamodels = ["file"]
+
+[[machine]]
+id = "convert"
+why = "to convert the videos in a folder you pick"
+[machine.needs]
+folders = [{ name = "videos", access = "read" }]
+runtimes = ["ffmpeg"]
+"""
+
+CONVERT_CODE = """
+from cloudmorrow.quill import machine
+
+
+@machine
+def convert(ctx):
+    done = ctx.run(["ffmpeg", "-version"])
+    return {"out": done["out"].strip(), "code": done["code"]}
+"""
+
+
+def write_convert(folder: Path, manifest: str = CONVERT) -> Path:
+    write_quill(folder, manifest)
+    (folder / "quill.py").write_text(CONVERT_CODE, encoding="utf-8")
+    return folder
+
+
+def test_a_machine_handler_names_the_runtimes_it_needs(registry, tmp_path):
+    manifest = parse_manifest(__import__("tomllib").loads(CONVERT), write_convert(tmp_path / "src"))
+    assert manifest.machine[0]["runtimes"] == ["ffmpeg"] and manifest.machine_runtimes == ("ffmpeg",)
+    assert manifest.runtimes == ()  # the server fetches nothing for a machine handler
+    with pytest.raises(QuillError, match="needs.runtimes"):
+        parse_manifest(__import__("tomllib").loads(CONVERT.replace('["ffmpeg"]', '["FF mpeg"]')), tmp_path / "src")
+    # The install sheet says what a machine would fetch, and refuses a runtime the catalog lacks.
+    plan = registry.plan(tmp_path / "src", QUILL_CATALOG / "datamodels")
+    assert plan["runtimes"] == []
+    [row] = plan["machine_runtimes"]
+    assert row["label"] == "ffmpeg" and row["version"] == "7.1.5" and row["size"] > 0 and row["platforms"]
+    registry.install(tmp_path / "src", QUILL_CATALOG / "datamodels")
+    assert registry.runtimes.installed() == {}
+    with pytest.raises(QuillError, match="catalog does not have"):
+        registry.plan(
+            write_convert(tmp_path / "gimp", CONVERT.replace('["ffmpeg"]', '["gimp"]')), QUILL_CATALOG / "datamodels"
+        )
+
+
+def _machine(client, tmp_path, catalog_dir):
+    """An agent for the admin, with Convert switched on, against the test client."""
+    from cloudmorrow.agent.client import AgentClient
+    from cloudmorrow.agent.config import AgentConfig
+    from cloudmorrow.agent.quills import MachineQuills
+    from cloudmorrow.sandbox import InProcessGuest
+
+    state = client.app.state.cloudmorrow
+    object.__setattr__(state.config, "quill_catalog", str(catalog_dir))
+    state.quills.catalog_location = str(catalog_dir)
+    state.quills.install(
+        write_convert(tmp_path / "src"), QUILL_CATALOG / "datamodels", origin={"installed_by": ADMIN[0]}
+    )
+    _, token = state.agents.enroll_for_user(ADMIN[0], name="laptop")
+    videos = tmp_path / "Videos"
+    videos.mkdir(exist_ok=True)
+    config = AgentConfig(server_url="http://testserver", agent_token=token, allow_insecure_http=True)
+    config.path = tmp_path / "agent.toml"
+    config.quills = {"convert": {"convert": {"folders": {"videos": str(videos)}}}}
+    config.save()
+    agent = AgentClient(config)
+    agent._client = client
+    agent._client.headers["User-Agent"] = "cloudmorrow-agent/test"
+    return MachineQuills(config, agent, base=tmp_path / "agent" / "quills", guest=InProcessGuest), state
+
+
+def test_a_machine_fetches_the_runtime_its_handler_needs_and_runs_its_program(client, tmp_path):
+    catalog_dir = write_catalog(tmp_path / "catalog", fake_build(tmp_path / "catalog" / "builds"))
+    machine, state = _machine(client, tmp_path, catalog_dir)
+    # The server tells the agent what the catalog knows, and fetches nothing itself.
+    assert "ffmpeg" in machine.client.runtimes()
+    assert state.quills.runtimes.installed() == {}
+    assert machine.runtimes.installed() == {}
+    # Switching on fetches it (the CLI does this after the yes); a run would too.
+    assert machine.ensure_runtimes({"runtimes": ["ffmpeg"]}) == ["ffmpeg"]
+    assert machine.runtimes.info("ffmpeg")["version"] == "7.1.5"
+    assert machine.ensure_runtimes({"runtimes": ["ffmpeg"]}) == []
+    # ffmpeg is not in quill_programs, and needs no needs.run: it is the handler's own.
+    assert machine.config.quill_programs == []
+    assert machine.run("convert", "convert") == {"out": "ffmpeg 7.1.5", "code": 0}
+    # Anything else still needs the manifest and the machine to agree.
+    with pytest.raises(sdk_refused()):
+        machine._program({"runtimes": ["ffmpeg"], "run": []}, {"command": ["ls"]})
+    # The runtime goes with the last handler that needs it, when the person says so.
+    assert [r["id"] for r in machine.unused_runtimes("convert", "convert")] == ["ffmpeg"]
+    # The data folder wiped (a new machine, restored config): a run fetches it again.
+    machine.runtimes.remove("ffmpeg")
+    assert machine.run("convert", "convert")["out"] == "ffmpeg 7.1.5"
+
+
+def sdk_refused():
+    from cloudmorrow.quill import context as sdk
+
+    return sdk.Refused

@@ -12,7 +12,12 @@ manifest asked for write and the person gave it. What it asks for besides —
 records, the time, a fetch, a secret — goes to the server with this agent's
 token and is answered there as the machine's owner, through the gate. The
 one thing answered here is `ctx.run`: a program, started only when it is in
-the handler's manifest *and* in this machine's `quill_programs`.
+the handler's manifest *and* in this machine's `quill_programs` — or one of
+a *runtime* the handler needs (`needs.runtimes`), which this agent fetched
+for the machine from the catalog when the handler was switched on, checked
+against its checksum, and keeps under its data folder (cloudmorrow.runtimes).
+A runtime is removed with the last handler that needs it, when the person
+says so.
 
 A handler with `every` runs on that clock; any handler also runs when asked
 (an agent job of type `quill`, or `cm quill machine run`).
@@ -22,6 +27,7 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 import shutil
 import subprocess
 import tarfile
@@ -32,6 +38,7 @@ from cloudmorrow import locations
 from cloudmorrow.agent.client import AgentApiError, AgentClient
 from cloudmorrow.agent.config import AgentConfig
 from cloudmorrow.quill import context as sdk
+from cloudmorrow.runtimes import RUNTIMES_DIR, RuntimeProblem, RuntimeStore
 
 log = logging.getLogger("cloudmorrow.agent")
 
@@ -43,6 +50,10 @@ def quills_dir() -> Path:
     return locations.data_dir() / "quills"
 
 
+def runtimes_dir() -> Path:
+    return locations.data_dir() / RUNTIMES_DIR
+
+
 def parse_every(text: str) -> float:
     from cloudmorrow.server.datamodels import parse_duration  # a pure function; no server needed
 
@@ -52,10 +63,20 @@ def parse_every(text: str) -> float:
 class MachineQuills:
     """The handlers switched on here, fetched, kept, run on time or when asked."""
 
-    def __init__(self, config: AgentConfig, client: AgentClient, *, base: Path | None = None, guest=None) -> None:
+    def __init__(
+        self,
+        config: AgentConfig,
+        client: AgentClient,
+        *,
+        base: Path | None = None,
+        guest=None,
+        runtimes: RuntimeStore | None = None,
+    ) -> None:
         self.config = config
         self.client = client
         self.base = base or quills_dir()
+        # The programs handlers need that this machine fetched for them.
+        self.runtimes = runtimes or RuntimeStore(runtimes_dir() if base is None else base.parent / RUNTIMES_DIR)
         # The sandbox; the test harness runs the same calls in-process instead.
         self.guest = guest
         self._last: dict[tuple[str, str], float] = {}
@@ -71,6 +92,52 @@ class MachineQuills:
     def offered(self) -> dict[str, dict]:
         self._offered = {q["id"]: q for q in self.client.machine_quills()}
         return self._offered
+
+    # -- runtimes: programs fetched for this machine ----------------------------------------
+    def ensure_runtimes(self, spec: dict) -> list[str]:
+        """Every runtime *spec* (a machine handler) needs, on this machine at the catalog's
+        version; asks the server for the catalog's runtimes only when one is missing.
+        Returns what was fetched."""
+        names = list(spec.get("runtimes") or [])
+        if not names:
+            return []
+        try:
+            missing = self.runtimes.missing(names)
+            if not missing:
+                return []
+            return self.runtimes.ensure(names, self.client.runtimes())
+        except RuntimeProblem as exc:
+            raise sdk.NotFound(str(exc)) from exc
+
+    def runtimes_needed(
+        self, offered: dict[str, dict] | None = None, *, without: tuple[str, str] | None = None
+    ) -> set[str]:
+        """The runtimes every switched-on handler needs, leaving out the handler *without*."""
+        offered = offered if offered is not None else (self._offered or self.offered())
+        needed: set[str] = set()
+        for quill_id, handlers in self.switched_on().items():
+            quill = offered.get(quill_id)
+            if quill is None:
+                continue
+            for spec in quill["machine"]:
+                if spec["id"] in handlers and (quill_id, spec["id"]) != without:
+                    needed.update(spec.get("runtimes") or [])
+        return needed
+
+    def unused_runtimes(self, quill_id: str, handler_id: str, offered: dict[str, dict] | None = None) -> list[dict]:
+        """Runtimes on this machine that only *quill_id*/*handler_id* needs: what switching it
+        off may take away. Rows of the store's `runtime.json`."""
+        offered = offered if offered is not None else (self._offered or self.offered())
+        quill = offered.get(quill_id) or {}
+        spec = next((m for m in quill.get("machine", []) if m["id"] == handler_id), None)
+        if spec is None:
+            return []
+        others = self.runtimes_needed(offered, without=(quill_id, handler_id))
+        return [
+            info
+            for name in spec.get("runtimes") or []
+            if name not in others and (info := self.runtimes.info(name)) is not None
+        ]
 
     # -- the clock ---------------------------------------------------------------------------
     def tick(self) -> list[str]:
@@ -145,6 +212,8 @@ class MachineQuills:
                 raise sdk.NotFound(f"{path} is not a folder here")
             folders[need["name"]] = (path, need["access"] == "write")
 
+        self.ensure_runtimes(spec)
+
         def host(op: str, args: dict) -> object:
             if op == "run":
                 return self._program(spec, args)
@@ -173,10 +242,26 @@ class MachineQuills:
         if not command:
             raise sdk.Invalid("ctx.run needs a command")
         program = command[0]
-        if program not in spec.get("run", []):
+        # A program of a runtime the handler needs is its own, fetched and
+        # checked for this machine: started from where it was unpacked, with
+        # the handler's runtimes first on the PATH for what it starts itself.
+        fetched: dict[str, Path] = {}
+        bins: list[str] = []
+        for name in spec.get("runtimes") or []:
+            info = self.runtimes.info(name)
+            if info is None:
+                continue
+            bins.append(str(self.runtimes.bin_dir(name)))
+            for found in info.get("programs", {}):
+                fetched.setdefault(found, self.runtimes.bin_dir(name) / found)
+        if program in fetched:
+            command[0] = str(fetched[program])
+        elif program not in spec.get("run", []):
             raise sdk.Refused(f"{program} is not in this handler's needs.run")
-        if program not in self.config.quill_programs:
+        elif program not in self.config.quill_programs:
             raise sdk.Refused(f"this machine has not allowed {program}: add it to quill_programs")
+        env = dict(os.environ)
+        env["PATH"] = os.pathsep.join([*bins, env.get("PATH", os.defpath)])
         try:
             done = subprocess.run(  # noqa: S603 - a program the manifest and the machine both named
                 command,
@@ -185,6 +270,7 @@ class MachineQuills:
                 text=True,
                 timeout=min(float(args.get("timeout") or 60), MACHINE_TIMEOUT),
                 check=False,
+                env=env,
             )
         except FileNotFoundError as exc:
             raise sdk.NotFound(f"{program} is not installed here") from exc

@@ -239,7 +239,10 @@ class QuillRegistry:
             installed=installed,
         )
         # The programs it needs on this server, and whether they are here.
-        plan["runtimes"] = self.runtimes.describe(manifest.runtimes, self._runtimes_of(catalog, manifest))
+        catalog_runtimes = self._runtimes_of(catalog, manifest)
+        plan["runtimes"] = self.runtimes.describe(manifest.runtimes, catalog_runtimes)
+        # What its machine handlers would add to a machine they are switched on on.
+        plan["machine_runtimes"] = self.runtimes.describe_for_machines(manifest.machine_runtimes, catalog_runtimes)
         # The datamodels as they would be after installing, for a preview.
         touched = set(manifest.models)
         touched |= {f.to for m in touched if m in models for f in models[m].fields if f.kind == "link"}
@@ -257,7 +260,9 @@ class QuillRegistry:
 
     def _catalog(self, catalog: Catalog | None, manifest: Manifest) -> Catalog | None:
         """*catalog*, or this server's, read only when *manifest* needs one; None when it cannot be."""
-        if catalog is not None or not manifest.runtimes or not self.catalog_location:
+        if catalog is not None or not self.catalog_location:
+            return catalog
+        if not manifest.runtimes and not manifest.machine_runtimes:
             return catalog
         try:
             return load_catalog(self.catalog_location)
@@ -330,12 +335,17 @@ class QuillRegistry:
             plan = self.plan(folder, datamodels_source, owner=owner, catalog=catalog)
             manifest_id = plan["id"]
             wanted = list(plan.get("requires", {}).get("runtimes", []))
-            if wanted:
-                fetched = self.runtimes.ensure(
-                    wanted, None if catalog is None else catalog.runtimes, base=catalog.base if catalog else None
-                )
-                plan["runtimes"] = self.runtimes.describe(wanted, catalog.runtimes if catalog else None)
+            if wanted and catalog is not None:
+                fetched = self.runtimes.ensure(wanted, catalog.runtimes, base=catalog.base)
+                plan["runtimes"] = self.runtimes.describe(wanted, catalog.runtimes)
                 plan["runtimes_fetched"] = fetched
+            elif wanted:
+                # No catalog to fetch from: a test harness, an offline check, a
+                # server whose catalog is unreachable. The Quill is installed
+                # all the same; its services wait and say what for, and an
+                # install with the catalog reachable fetches it (services.py).
+                plan["runtimes_fetched"] = []
+                plan["runtimes_skipped"] = wanted
             self.datamodels_dir.mkdir(parents=True, exist_ok=True)
             for model_id, path in self._pending_paths.items():
                 shutil.copyfile(path, self.datamodels_dir / f"{model_id}.toml")
