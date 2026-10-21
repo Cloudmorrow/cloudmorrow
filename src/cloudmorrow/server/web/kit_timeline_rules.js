@@ -32,6 +32,25 @@ export function framesPath(quill, screen) {
   return `/api/q/${quill.id}/${prefix}`.replace(/\/+$/, "");
 }
 
+// The sizes a new project can start at; "" leaves it to the first clip added,
+// which gives it its own size and frame rate.
+export const SIZES = [
+  ["", "From the first clip"],
+  ["1920x1080", "1080p · 1920 × 1080"],
+  ["1280x720", "720p · 1280 × 720"],
+  ["3840x2160", "4K · 3840 × 2160"],
+  ["1080x1920", "Vertical · 1080 × 1920"],
+  ["1080x1080", "Square · 1080 × 1080"],
+];
+
+/** "1920x1080" (or "1920 × 1080") as {width, height}: even, 16 to 7680 pixels; null when it is not a size. */
+export function sizeFrom(text) {
+  const m = String(text || "").trim().match(/^(\d+)\s*[x×*]\s*(\d+)$/i);
+  if (!m) return null;
+  const even = (n) => clamp(Math.ceil(Number(n) / 2) * 2, 16, 7680);
+  return { width: even(m[1]), height: even(m[2]) };
+}
+
 // -- numbers -----------------------------------------------------------------------
 export const clamp = (n, low, high) => Math.min(high, Math.max(low, n));
 /** A time kept to the millisecond: what is written, so 0.1 + 0.2 is 0.3. */

@@ -15,12 +15,19 @@ from pathlib import Path
 import httpx
 import pytest
 from PIL import Image
-from textual.widgets import DataTable, Input, Static
+from textual.widgets import DataTable, Input, RadioButton, RadioSet, Static
 
 from cloudmorrow.quill import timeline as tl
 from cloudmorrow.quill.screens import TRACKS
 from cloudmorrow.server.quills import QuillRegistry
-from cloudmorrow.tui.panes.kit_timeline import LABEL, TimelinePane, TrackRows, track_lines, viewer_words
+from cloudmorrow.tui.panes.kit_timeline import (
+    LABEL,
+    NewProjectModal,
+    TimelinePane,
+    TrackRows,
+    track_lines,
+    viewer_words,
+)
 from cloudmorrow.tui.screens.modals import PromptModal
 from cloudmorrow.tui.widgets.picture import TerminalImage
 from tests.conftest import QUILL_CATALOG
@@ -216,6 +223,44 @@ async def test_new_makes_a_project_and_opens_it(app):
         await pilot.press("escape")
         await settle(app, pilot)
         assert not pane.editing and pane.query_one("#tl-projects", DataTable).row_count == 3
+
+
+async def test_new_asks_for_a_size_or_leaves_it_to_the_first_clip(app):
+    with_cutter(app)
+    async with app.run_test(size=(140, 40)) as pilot:
+        pane = await open_cutter(app, pilot)
+        pane.act_new_record()
+        await modal_up(pilot)
+        modal = app.screen
+        assert isinstance(modal, NewProjectModal)
+        assert not modal.query_one("#tl-new-other", Input).display
+        modal.query_one("#tl-new-name", Input).value = "Phone clip"
+        # Another size: its own box comes up, and takes width x height.
+        modal.query_one(RadioSet).query(RadioButton).last().value = True
+        await pilot.pause()
+        other = modal.query_one("#tl-new-other", Input)
+        assert other.display
+        other.value = "1001x9"
+        await pilot.click("#save")
+        await settle(app, pilot)
+        fields = pane.project["fields"]
+        assert fields["name"] == "Phone clip" and (fields["width"], fields["height"]) == (1002, 16)
+
+
+async def test_a_size_that_is_not_one_is_said_in_the_box(app):
+    with_cutter(app)
+    async with app.run_test(size=(140, 40)) as pilot:
+        pane = await open_cutter(app, pilot)
+        pane.act_new_record()
+        await modal_up(pilot)
+        modal = app.screen
+        modal.query_one("#tl-new-name", Input).value = "Odd"
+        modal.query_one(RadioSet).query(RadioButton).last().value = True
+        await pilot.pause()
+        modal.query_one("#tl-new-other", Input).value = "big"
+        modal.action_save()
+        await pilot.pause()
+        assert app.screen is modal and "1920x1080" in str(modal.query_one("#tl-new-complaint").render())
 
 
 # -- the editor ------------------------------------------------------------------------------

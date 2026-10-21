@@ -36,10 +36,11 @@ import {
 } from "./core.js";
 import { aOr, mayWrite, plural, sheetHash } from "./kit.js";
 import { press, said } from "./actions.js";
+import { openSheet } from "./dialog.js";
 import {
   boxAt, clamp, clockOf, cropOf, dropKeyframe, effectOn, fitBox, framesPath, keyframesOf, lengthOf,
-  lengthOfCut, mediaKind, ms, partsOf, pictureAt, setKeyframe, shiftKeyframes, snapMove, snapTo,
-  soundsAt, splitKeyframes, splitPiece, trackFor, tracksOf, trimEnd, trimStart, wholeFrame,
+  lengthOfCut, mediaKind, ms, partsOf, pictureAt, setKeyframe, shiftKeyframes, sizeFrom, SIZES, snapMove,
+  snapTo, soundsAt, splitKeyframes, splitPiece, trackFor, tracksOf, trimEnd, trimStart, wholeFrame,
 } from "./kit_timeline_rules.js";
 
 const glyphs = {
@@ -52,7 +53,8 @@ const glyphs = {
   crop: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 1.5V15h13.5M1.5 5H15v13.5"/></svg>',
   material: '<svg width="20" height="20" viewBox="0 0 22 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="3" width="13" height="14" rx="2"/><path d="m14.5 8 6-3v10l-6-3z"/></svg>',
   plus: '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 3.5v11M3.5 9h11"/></svg>',
-  minus: '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3.5 9h11"/></svg>',
+  zoomIn: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m12.6 12.6 4.4 4.4M6 8.5h5M8.5 6v5"/></svg>',
+  zoomOut: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m12.6 12.6 4.4 4.4M6 8.5h5"/></svg>',
   split: '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1.5v15"/><rect x="1.5" y="5" width="5" height="8" rx="1.2"/><rect x="11.5" y="5" width="5" height="8" rx="1.2"/></svg>',
   mute: '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7h3l4-3.5v11l-4-3.5h-3z"/><path d="m12.5 7 4 4M16.5 7l-4 4"/></svg>',
   sound: '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7h3l4-3.5v11l-4-3.5h-3z"/><path d="M12.5 6.5a3.5 3.5 0 0 1 0 5M14.5 4.5a6.5 6.5 0 0 1 0 9"/></svg>',
@@ -164,26 +166,73 @@ async function renderProjects(at, b) {
   mount(nav({ title: screen.label }) + `
     <main class="kit-timeline-list">
       ${heading(screen.label, writes ? `<button class="compose" aria-label="New ${esc(label)}">${icons.compose}</button>` : "")}
-      ${writes ? `<form class="add kit-add"><input placeholder="New ${esc(label)} — its name" autocapitalize="sentences" enterkeyhint="go"></form>` : ""}
       <div class="listing">${records.length
         ? `<div class="group">${records.map(row).join("")}</div>`
-        : `<p class="empty"><b>No ${esc(plural(label))} yet</b>${writes ? `Name ${aOr(b.model.label)} above to start cutting.` : ""}</p>`}</div>
+        : `<p class="empty"><b>No ${esc(plural(label))} yet</b>${writes ? `Start ${aOr(b.model.label)} with the button at the top.` : ""}</p>`}</div>
     </main>` + tabs(at.tab));
   wireShell();
-  const form = app.querySelector("form.kit-add");
-  if (!form) return;
-  const input = form.querySelector("input");
-  app.querySelector(".heading .compose").addEventListener("click", () => input.focus());
+  const compose = app.querySelector(".heading .compose");
+  if (compose) compose.addEventListener("click", () => newProject(at, b));
+}
+
+/* A new project, in the app's own form sheet: its name, and the size of its
+   picture — one of the usual ones, another typed, or the first clip's. */
+function newProject(at, b) {
+  const noun = b.model.label.toLowerCase();
+  const sized = b.has.has("width") && b.has.has("height");
+  const options = [...SIZES, ["other", "Another size…"]];
+  const { sheet, close } = openSheet(
+    `<form class="act-form record tl-new" novalidate>` +
+    `<p class="act-sheet-title">New ${esc(noun)}</p>` +
+    `<div class="group fields"><label class="row field kind-string"><span class="main">Name</span>` +
+    `<input type="text" data-field="name" aria-label="Name" placeholder="${esc(`${b.model.label} ${new Date().toLocaleDateString()}`)}"` +
+    ` autocapitalize="sentences" enterkeyhint="go"></label></div>` +
+    (sized ? `<p class="group-label">Video size</p>` +
+      `<div class="group tl-sizes" role="radiogroup" aria-label="Video size">${options.map(([value, text], i) =>
+        `<label class="row"><input type="radio" name="size" value="${esc(value)}"${i === 0 ? " checked" : ""}>` +
+        `<span class="main">${esc(text)}</span></label>`).join("")}</div>` +
+      `<div class="group fields tl-other" hidden>` +
+      `<label class="row field kind-int"><span class="main">Width</span><input type="number" inputmode="numeric" data-field="width" aria-label="Width" placeholder="1920" min="16" max="7680" step="2"></label>` +
+      `<label class="row field kind-int"><span class="main">Height</span><input type="number" inputmode="numeric" data-field="height" aria-label="Height" placeholder="1080" min="16" max="7680" step="2"></label></div>` +
+      `<p class="act-description tl-size-note">The first clip you add gives the ${esc(noun)} its size and frame rate.</p>` : "") +
+    `<p class="act-error" role="alert" hidden></p>` +
+    `<div class="act-buttons"><button type="button" class="act-button" data-cancel>Cancel</button>` +
+    `<button type="submit" class="act-button primary">Make it</button></div></form>`, "act-form-sheet");
+  const form = sheet.querySelector("form");
+  const errorEl = form.querySelector(".act-error");
+  const showError = (text) => { errorEl.textContent = text; errorEl.hidden = !text; };
+  const chosen = () => (form.querySelector('input[name="size"]:checked') || {}).value || "";
+  const other = form.querySelector(".tl-other");
+  const note = form.querySelector(".tl-size-note");
+  form.addEventListener("change", () => {
+    if (!other) return;
+    other.hidden = chosen() !== "other";
+    note.hidden = chosen() !== "";
+  });
+  form.querySelector("[data-cancel]").addEventListener("click", close);
+  form.querySelector('[data-field="name"]').focus();
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const name = input.value.trim() || `${b.model.label} ${new Date().toLocaleDateString()}`;
-    input.disabled = true;
+    const typed = form.querySelector('[data-field="name"]');
+    const fields = { [b.title]: typed.value.trim() || typed.placeholder };
+    if (sized && chosen()) {
+      const pick = chosen() === "other"
+        ? `${form.querySelector('[data-field="width"]').value}x${form.querySelector('[data-field="height"]').value}`
+        : chosen();
+      const size = sizeFrom(pick);
+      if (!size) { showError("Say the width and the height, in pixels"); return; }
+      Object.assign(fields, size);
+    }
+    const submit = form.querySelector("[type=submit]");
+    submit.disabled = true;
+    showError("");
     try {
-      const made = await api("POST", recordsUrl(b.model.id), { fields: { [b.title]: name } });
+      const made = await api("POST", recordsUrl(b.model.id), { fields });
+      close();
       go(`${at.base}/${encodeURIComponent(made.id)}`);
     } catch (err) {
-      input.disabled = false;
-      toast(said(err));
+      submit.disabled = false;
+      showError(said(err));
     }
   });
 }
@@ -263,11 +312,12 @@ async function renderEditorFor(at, b, id) {
       </div>
       <section class="tl-tracks" aria-label="Tracks">
         <div class="tl-tools">
-          <button type="button" data-zoom="-1" aria-label="Zoom out">${glyphs.minus}</button>
-          <button type="button" data-zoom="1" aria-label="Zoom in">${glyphs.plus}</button>
-          <span class="tl-tools-gap"></span>
+          ${ed.writes ? `<button type="button" class="tl-add-clip">${glyphs.plus}<span>Add clip</span></button>` : ""}
           <button type="button" class="tl-split" disabled>${glyphs.split}<span>Split</span></button>
           <button type="button" class="tl-delete" disabled>${icons.trash}<span>Delete</span></button>
+          <span class="tl-tools-gap"></span>
+          <button type="button" data-zoom="-1" aria-label="Zoom out" title="Zoom out">${glyphs.zoomOut}</button>
+          <button type="button" data-zoom="1" aria-label="Zoom in" title="Zoom in">${glyphs.zoomIn}</button>
         </div>
         <div class="tl-body">
           <div class="tl-heads"></div>
@@ -319,11 +369,9 @@ async function fillBlanks(ed) {
     await write(ed, async () => {
       await patch(ed.b.pieces.id, piece.id, { length });
       piece.length = length;
-      const f = ed.project.fields;
-      if (info.width && info.height && !(Number(f.width) > 0 && Number(f.height) > 0)) {
-        const size = { width: info.width, height: info.height };
-        if (!(Number(f.fps) > 0)) size.fps = info.fps || 30;
-        Object.assign(f, size);
+      const size = blanksFrom(ed, info);
+      if (size) {
+        Object.assign(ed.project.fields, size);
         await patch(ed.b.model.id, ed.id, size);
       }
     });
@@ -334,6 +382,18 @@ async function fillBlanks(ed) {
   drawSide(ed);
   showTime(ed, ed.t);
   ed.dirty = true;
+}
+
+/** What a source gives a project that has not got it yet: its size, unless one
+    was chosen when it was made, and its frame rate. Null when nothing. */
+function blanksFrom(ed, info) {
+  const f = ed.project.fields;
+  const out = {};
+  if (info.width && info.height && !(Number(f.width) > 0 && Number(f.height) > 0)) {
+    Object.assign(out, { width: info.width, height: info.height });
+  }
+  if ((info.width || info.height) && !(Number(f.fps) > 0)) out.fps = info.fps || 30;
+  return Object.keys(out).length ? out : null;
 }
 
 function stopEditor(ed) {
@@ -896,6 +956,8 @@ function wireTransport(ed) {
   }
   ed.root.querySelector(".tl-crop-toggle").addEventListener("click", () => setCropping(ed, !ed.cropping));
   ed.root.querySelector(".tl-material-open").addEventListener("click", () => openMaterialSheet(ed));
+  const addClip = ed.root.querySelector(".tl-add-clip");
+  if (addClip) addClip.addEventListener("click", () => openMaterialSheet(ed, "Add a clip at the playhead"));
   ed.root.querySelector(".tl-split").addEventListener("click", () => split(ed));
   ed.root.querySelector(".tl-delete").addEventListener("click", () => remove(ed));
   for (const button of ed.root.querySelectorAll("[data-zoom]")) {
@@ -1105,12 +1167,13 @@ function drawMaterial(ed) {
 }
 
 // A phone has no room beside the viewer: the material comes up as a sheet.
-function openMaterialSheet(ed) {
+// Add clip on the tracks brings up the same sheet, on any screen.
+function openMaterialSheet(ed, title = "Material") {
   closeMaterialSheet();
   const backdrop = document.createElement("div");
   backdrop.className = "sheet-backdrop tl-sheet-backdrop";
   backdrop.innerHTML = `<div class="sheet tl-material-sheet" role="dialog" aria-modal="true" aria-label="Material">
-    <p class="act-sheet-title">Material</p><div class="tl-sheet-list">${materialList(ed)}</div>
+    <p class="act-sheet-title">${esc(title)}</p><div class="tl-sheet-list">${materialList(ed)}</div>
     <button type="button" class="sheet-row cancel">Close</button></div>`;
   document.body.append(backdrop);
   wireMaterial(ed, backdrop, closeMaterialSheet);
@@ -1205,11 +1268,9 @@ async function addMaterial(ed, file) {
     if (grew) fitZoom(ed);
     ed.selected = piece.id;
     ed.effect = "";
-    const f = ed.project.fields;
-    if (file.kind === "video" && info.width && info.height && !(Number(f.width) > 0 && Number(f.height) > 0)) {
-      const size = { width: info.width, height: info.height };
-      if (!(Number(f.fps) > 0)) size.fps = info.fps || 30;
-      Object.assign(f, size);
+    const size = file.kind === "video" ? blanksFrom(ed, info) : null;
+    if (size) {
+      Object.assign(ed.project.fields, size);
       fitStage(ed);
       await patch(ed.b.model.id, ed.id, size);
     }
