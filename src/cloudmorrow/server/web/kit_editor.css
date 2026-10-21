@@ -85,6 +85,32 @@
   }
   main.split .side-back svg { width: 9px; height: 14px; }
   main.split .page > .empty { margin-top: 18vh; }
+  /* The handle that folds the list away sits on the line between them. */
+  main.split .page { position: relative; }
+  main.split .fold {
+    position: absolute;
+    top: 6px;
+    left: -15px;
+    z-index: 1;
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--bg);
+    color: var(--muted);
+  }
+  main.split .fold:hover { color: var(--accent); border-color: var(--accent); }
+  main.split .fold svg { width: 8px; height: 12px; transition: transform .15s; }
+  /* Folded, the page has the whole width, and its lines a reading measure. */
+  main.split.folded { grid-template-columns: minmax(0, 1fr); }
+  main.split.folded .side { display: none; }
+  main.split.folded .page { padding-left: 0; border-left: 0; }
+  main.split.folded .fold { left: 0; }
+  main.split.folded .fold svg { transform: rotate(180deg); }
+  main.split.folded .page .editor { max-width: 780px; margin: 0 auto; }
   /* The page that is open is the one lit in the list: Sky, as current is. */
   main.split .row.current { background: color-mix(in srgb, var(--accent) 15%, transparent); }
   main.split .row.current .title { color: var(--accent); }

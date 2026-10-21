@@ -212,7 +212,10 @@ other link the two datamodels share.
 Every screen gets a record sheet for free: opening a card or a row shows the
 record's fields with the widget for each kind, editable, with delete. An
 editor opens its own page instead, and takes pictures when its datamodel has
-`attachments`.
+`attachments`. The page is live Markdown on every surface: the line you are
+on shows its marks (`## `, `**`, `- [ ] `), every other line is drawn as it
+reads, and a task's box ticks with a click. On a computer the list beside
+the page folds away with the handle on the line between them.
 
 A screen whose things are in spaces (`space` on a `calendar`) also gets the
 spaces: a list of them — yours, shared, everybody's — the way to make one
@@ -607,7 +610,7 @@ manifest written, checked and installed in one conversation.
 | jobs, and the boot work (foundation Quills, built-ins that became Quills, old tables into records: `move_legacy_tasks`, `move_legacy_calendar`, `move_legacy_chat`) | `server/quills/jobs.py` |
 | spaces: who is told what, the badge, the people there are | `server/spacenotify.py`, `server/routes/push.py` (`badge_for`), `GET /api/people` in `server/routes/records.py` |
 | backends: notes (their folders and pictures), shares and files, secrets | `server/backends/`; a share's files in `server/fileops.py` |
-| the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; the grid in `kit_grid.js`, `kit_grid.css` (with `registerGridHook`, which the desktop app's mount lines come in by); the editor in `kit_editor.js`, `kit_editor.css` and `pictures.js`; the calendar in `kit_calendar.js`, `kit_calendar.css`; the thread in `kit_thread.js`, `kit_thread.css`; spaces (their list, making one, writing to somebody, their people) in `kit_space.js`, `kit_space.css`, shared by calendar and thread; a grouped list and hidden fields in `kit_grouped.js`, `kit_grouped.css`; the catalog and install sheet in `quillsadmin.js` |
+| the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; the grid in `kit_grid.js`, `kit_grid.css` (with `registerGridHook`, which the desktop app's mount lines come in by); the editor in `kit_editor.js`, `kit_editor.css` and `pictures.js`, its live Markdown in `markdown.js`, `markdown_rules.js` and `markdown.css`; the calendar in `kit_calendar.js`, `kit_calendar.css`; the thread in `kit_thread.js`, `kit_thread.css`; spaces (their list, making one, writing to somebody, their people) in `kit_space.js`, `kit_space.css`, shared by calendar and thread; a grouped list and hidden fields in `kit_grouped.js`, `kit_grouped.css`; the catalog and install sheet in `quillsadmin.js` |
 | the kit in the terminal | `tui/panes/kit.py` (list), `tui/panes/kit_grouped.py` + `kit_grouped.tcss` (a grouped list, hidden fields) with `tui/widgets/group_list.py`, `tui/panes/kit_board.py`, `tui/panes/kit_editor.py` + `kit_editor.tcss` (with `widgets/editor.py`, `note_tree.py`, `picture.py`), `tui/panes/kit_grid.py` (with `register_group_extension`; the mount column and buttons for shares are `tui/sharemounts.py`), `tui/panes/kit_calendar.py` + `kit_calendar.tcss`, `tui/panes/kit_thread.py`, `tui/widgets/kit_space.py` + `kit_space.tcss` (spaces: `NewSpaceModal`, `SpaceModal`, `PickPersonModal`), `tui/widgets/kit.py` (lanes and cards), `tui/kitdata.py` and `tui/dates.py` (reading datamodels, links and moments, without Textual), `tui/screens/record_sheet.py` with `tui/widgets/fields.py` (a widget per kind); a Quill's own view in `tui/panes/kit_view.py` + `tui/widgets/view_nodes.py` + `kit_view.tcss`, and its actions (the sheet's buttons, their forms, the ctrl+e palette, and every effect) in `tui/quill_actions.py`; the catalog in `tui/panes/admin_quills.py` |
 | the kit on the command line | `cli/quillrun/` (`cm <quill> …`), a module per kind of screen |
 | the timeline (a video editor) | `quill/timeline.py` (the rules), web `kit_timeline.js`, `kit_timeline_rules.js`, `kit_timeline.css`, terminal `tui/panes/kit_timeline.py`, `client/timeline.py`, `cli/quillrun/timeline.py`; see [TIMELINE.md](TIMELINE.md) |

@@ -13,7 +13,9 @@
    a Markdown file in the Notes folder of a drive.
 
    On a phone it is the tree, then a list, then the page, one screen at a
-   time. On a computer the list and the page are side by side.
+   time. On a computer the list and the page are side by side, and the list
+   folds away to give the page the whole width (it stays folded, in this
+   browser, until it is opened again).
 
    Pages of a datamodel you may only read (docs/CIRCLES.md) open read-only:
    the same page, its words there to read and not to type into, and no pen,
@@ -30,7 +32,7 @@
 import {
   SAVE_DELAY, SEARCH_DELAY, api, app, back, baseName, encodePath, esc, fileStem, folderOf,
   formatDate, heading, icons, joinPath, mount, nav, occupy, previousHash, recordsUrl, renderRoute,
-  replace, seconds, sectionOf, setStatus, tabs, toast, vacate, wireShell,
+  replace, seconds, sectionOf, setStatus, store, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
 import { mayWrite } from "./kit.js";
@@ -46,6 +48,10 @@ const own = {
 
 // A computer, by the same measure desktop.css draws its rail by.
 const wide = () => matchMedia("(min-width: 900px) and (min-height: 600px)").matches;
+
+// The list beside a page, folded away or not: one choice for every editor.
+const FOLDED = "editor.folded";
+const folded = () => store.get(FOLDED) === "1";
 
 const FOLDERS = "~folders";
 const TOP = "~top";
@@ -318,6 +324,22 @@ export async function renderEditor(at, arg) {
 const sideBack = (view) => (view.backTo
   ? `<a class="side-back" href="${view.backTo}">${icons.chevronLeft}${esc(view.backLabel)}</a>` : "");
 
+// The handle on the line between the list and the page.
+const foldButton = () => `<button class="fold" type="button" aria-label="${folded() ? "Show the list" : "Hide the list"}"` +
+  ` title="${folded() ? "Show the list" : "Hide the list"}">${icons.chevronLeft}</button>`;
+
+function wireFold() {
+  const split = app.querySelector("main.split");
+  const button = split.querySelector(".fold");
+  button.addEventListener("click", () => {
+    const now = !split.classList.contains("folded");
+    split.classList.toggle("folded", now);
+    store.set(FOLDED, now ? "1" : null);
+    button.setAttribute("aria-label", now ? "Show the list" : "Hide the list");
+    button.title = button.getAttribute("aria-label");
+  });
+}
+
 const aOr = (label) => (/^[aeiou]/i.test(label) ? "an " : "a ") + label;
 
 /** One page: the editor's own, in place of the record sheet. */
@@ -393,16 +415,16 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
   if (wide()) {
     view = listView(b, await load(b), listKey, ed.id);
     mount(nav({ title: ed.stem || "New", right: actions }) + `
-      <main class="split">
+      <main class="split${folded() ? " folded" : ""}">
         <section class="side">${sideBack(view)}${view.html}</section>
-        <section class="page">${page}</section>
+        <section class="page">${foldButton()}${page}</section>
       </main>` + tabs(b.at.tab));
   } else {
     mount(nav({ back: parent, backLabel: parentLabel, title: ed.stem, right: actions }) +
       `<main>${page}</main>`);
   }
   wireShell();
-  if (view) view.wire(app.querySelector(".side"));
+  if (view) { view.wire(app.querySelector(".side")); wireFold(); }
   app.querySelector(".nav").classList.add("lined");
 
   const box = app.querySelector(".editor");
@@ -425,7 +447,7 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
     // Read-only: the words and the pictures, and nothing that changes them.
     // pictures.js hears a paste, a drop and a backspace on the page; here
     // they stop on the way down, before they reach it.
-    for (const area of box.querySelectorAll("textarea")) { area.readOnly = true; area.placeholder = ""; }
+    for (const area of box.querySelectorAll(".blocks .md")) { area.readOnly = true; area.placeholder = ""; }
     for (const button of box.querySelectorAll(".picture .remove")) button.remove();
     for (const kind of ["paste", "drop", "dragover", "keydown"]) {
       box.addEventListener(kind, (event) => event.stopPropagation(), true);

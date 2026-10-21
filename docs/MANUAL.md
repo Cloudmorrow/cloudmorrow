@@ -35,8 +35,9 @@ mentions them only as examples.
   card per Quill — Notes, Tasks, Files, Calendar, Channels, Secrets — because
   those are the kinds of thing there are. A vault is a row in a list, the
   same shape as a note, and its keys are beside it. Every row and button is a
-  click target with a key beside it. The markdown editor is live: the line the
-  cursor is on stays raw source, and every other line renders as you leave it.
+  click target with a key beside it. The markdown editor is live — here and
+  in the web app: the line the cursor is on stays raw source, and every other
+  line renders as you leave it.
 - **Encrypted at rest.** Everything you write into the database — chat,
   events, tasks, secrets, synced dotfiles — is ciphertext on the server's
   disk, under one key the server holds. You never handle a key; you sign in

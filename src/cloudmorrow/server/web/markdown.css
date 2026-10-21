@@ -1,0 +1,82 @@
+/* Markdown drawn as it reads (markdown.js). The marks are spans in the
+   line; every line but the one being edited (`.md-on`) hides them. A mark that
+   stands for something — a bullet, a task's box — keeps its place and
+   draws that instead. */
+
+.editor .body.md {
+  --md-size: 17px;
+  min-height: 1.5em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  cursor: text;
+}
+.editor .blocks .body.md:last-child { min-height: 6em; }
+.md .md-ln { position: relative; min-height: 1.6em; }
+.md .md-ln[data-placeholder]::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* The marks: shown on the line you are on, muted; hidden on the others. */
+.md .md-mk { color: var(--muted); }
+.md .md-ln:not(.md-on) .md-mk { display: none; }
+.md .md-ln:not(.md-on) .md-mk.md-glyph { display: inline-block; font-size: 0; vertical-align: baseline; }
+.md .md-ln:not(.md-on) .md-mk.md-glyph::before { font-size: var(--md-size); }
+.md .md-ln:not(.md-on) .md-mk.md-dot::before {
+  content: "";
+  display: inline-block;
+  width: .36em;
+  height: .36em;
+  margin: 0 .62em 0 .3em;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: .22em;
+}
+.md .md-ln:not(.md-on) .md-mk.md-box::before {
+  content: "";
+  display: inline-block;
+  width: .9em;
+  height: .9em;
+  margin: 0 .45em -.1em .1em;
+  border: 1.6px solid var(--accent);
+  border-radius: 4px;
+  font-size: var(--md-size);
+  cursor: pointer;
+}
+.md .md-ln:not(.md-on) .md-mk.md-box.md-ticked::before {
+  background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='m2.5 6.2 2.4 2.4 4.6-5' fill='none' stroke='%2314171f' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 80% no-repeat;
+}
+.md .md-ln.md-task.md-done:not(.md-on) { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--muted); }
+.md .md-num { color: var(--accent); font-weight: 600; }
+
+/* Headings: the size is the line's, so the marks are that size too. */
+.md .md-ln.md-h1, .md .md-ln.md-h2, .md .md-ln.md-h3, .md .md-ln.md-h4, .md .md-ln.md-h5, .md .md-ln.md-h6 {
+  font-family: var(--display);
+  font-weight: 700;
+  line-height: 1.3;
+}
+.md .md-ln.md-h1 { font-size: 1.75em; margin: .4em 0 .15em; }
+.md .md-ln.md-h2 { font-size: 1.45em; margin: .35em 0 .1em; }
+.md .md-ln.md-h3 { font-size: 1.22em; margin: .3em 0 .05em; }
+.md .md-ln.md-h4 { font-size: 1.08em; }
+.md .md-ln.md-h5, .md .md-ln.md-h6 { font-size: 1em; color: var(--muted); }
+
+.md strong { font-weight: 700; }
+.md s { color: var(--muted); }
+.md code, .md .md-ln.md-code, .md .md-ln.md-fence, .md .md-ln.md-table {
+  font-family: var(--mono);
+  font-size: .88em;
+}
+.md code { padding: .1em .3em; border-radius: 5px; background: var(--card-2); }
+.md .md-ln.md-code, .md .md-ln.md-fence { background: var(--card); padding: 0 .8em; }
+.md .md-ln.md-fence { color: var(--muted); }
+.md .md-link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.md .md-link[data-href] { cursor: pointer; }
+.md .md-tag { color: var(--action); }
+.md .md-pipe { color: var(--line-bright); }
+.md .md-ln.md-quote { border-left: 3px solid var(--line-bright); padding-left: .8em; color: var(--muted); font-style: italic; }
+.md .md-ln.md-rule:not(.md-on) {
+  background: linear-gradient(var(--line), var(--line)) center / 100% 1px no-repeat;
+}
