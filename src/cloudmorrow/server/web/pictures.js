@@ -16,7 +16,7 @@
    a picture and never see the line that stands for it. Saving joins the
    boxes and the lines back into the one body. */
 
-import { ApiError, apiRaw, esc, fileStem, setStatus, toast } from "./core.js";
+import { ApiError, apiRaw, esc, fileStem, fitArea, setStatus, toast } from "./core.js";
 
 const photoIcon = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-8 8"/></svg>';
 const closeIcon = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m2 2 8 8M10 2l-8 8"/></svg>';
@@ -142,10 +142,7 @@ export function focusBody(ed, { end = false } = {}) {
   area.setSelectionRange(at, at);
 }
 
-function grow(area) {
-  area.style.height = "auto";
-  area.style.height = area.scrollHeight + "px";
-}
+const grow = fitArea;
 
 // The first box invites writing; an empty box under a picture says, more
 // quietly, that it is there to be written in — without it the space would
