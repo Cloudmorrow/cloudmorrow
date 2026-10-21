@@ -41,7 +41,11 @@ these kinds, or `cm quill check` says which is missing.
 | `message` | string, optional | said beside the status |
 | `output` | string, optional | the id of the last export's file record: the header offers to open it |
 
-A higher video track covers a lower one where both have a piece. Every
+A piece's picture is fitted into the project's frame (`width` × `height`)
+whole and centred, with black bars where the shapes differ; a higher video
+track covers a lower one where both have a piece, bars included, and where
+no piece is there the frame is black. Effect boxes and the crop are in
+percent of that frame. Every
 piece's sound plays, mixed, unless it is muted.
 
 ### A piece (`pieces`)
@@ -69,7 +73,7 @@ an audio track only plays its sound (a video file there gives its sound).
 | `kind` | enum | the kit draws `blur`; other values are kept and listed by label |
 | `label` | string | what it hides: a face, a number plate |
 | `strength` | int, optional | 1 to 100, 20 when blank |
-| `keyframes` | json | `[{"t": 0.0, "x": 35, "y": 25, "w": 30, "h": 40}, …]`: `t` in seconds from the piece's start, the box in percent of the frame (before the crop), sorted by `t` |
+| `keyframes` | json | `[{"t": 0.0, "x": 35, "y": 25, "w": 30, "h": 40}, …]`: `t` in seconds from the piece's start, the box in percent of the project's frame (before the crop), sorted by `t` |
 
 Between two keyframes the box moves and resizes in a straight line; before
 the first and after the last it stays where that one says. An effect is on
@@ -113,7 +117,9 @@ only for records the asker can read, and only for the bytes.
 ## What each surface does
 
 **Projects.** The screen opens on the projects, newest first, with New. A
-project opens the editor; Back returns to the list.
+project opens the editor; Back returns to the list. Opened with a `project`
+parameter (`go("editor", project=<id>)` from an action or a view), it opens
+that project's editor straight away.
 
 **The editor.**
 - *Material*: the videos and sounds under `media`, by folder, with their
