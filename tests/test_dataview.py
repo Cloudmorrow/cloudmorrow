@@ -42,7 +42,7 @@ def test_data_is_on_every_shelf_last_with_every_datamodel_marked_read(tasks_quil
     data = data_of(tasks_quill)
     assert data["name"] == "Data" and data["composed"] is True and data["available"] and data["enabled"]
     assert data["screens"] == [{"id": "data", "kit": "data", "label": "Data"}]
-    assert set(data["models"]) == {"board", "task", "snapshot", "attestation"}
+    assert set(data["models"]) == {"board", "task", "snapshot", "attestation", "approval", "flow", "flow_run"}
     assert {m["access"] for m in data["models"].values()} == {"read"}
     assert data["uses"] == sorted(data["models"])
     # The same shape as any Quill: what every client reads of one is there.
@@ -147,6 +147,21 @@ def test_the_web_kit_draws_it_and_it_is_served(client):
     assert "function dataSheet" in DATA_JS and "section:" in DATA_JS
 
 
+def test_the_web_rail_sets_data_apart_from_the_quills_under_your_cloud():
+    """A composed Quill's tab is drawn under a Your cloud label in the rail, as
+    the terminal app's sidebar has it. The phone's bar has no sections: the
+    label is hidden off the rail, and the tab runs on after the Quills."""
+    quills = (WEB / "quills.js").read_text()
+    core = (WEB / "core.js").read_text()
+    desktop = (WEB / "desktop.css").read_text()
+    assert "cloud: !!quill.composed" in quills
+    assert 'section("Your cloud", shown.filter((t) => t.cloud))' in core
+    assert 'section("Administration", shown.filter((t) => t.admin))' in core
+    assert core.index('"Your cloud"') < core.index('"Administration"')
+    assert ".tabs .rail-section { display: none; }" in desktop
+    assert ".tabs .tab.cloud" not in desktop
+
+
 def test_nothing_in_the_web_kit_is_named_for_one_quill_or_one_domain():
     code = js_code(DATA_JS)
     for word in ("ledger", "book", "deal", "contact", "task", "secret", "vault", "accounting", "crm"):
@@ -187,9 +202,12 @@ async def test_the_data_tab_lists_the_datamodels_and_the_records_of_the_one_pick
     from textual.widgets import DataTable
 
     from cloudmorrow.tui.widgets.group_list import GroupList
-    from tests.tui_harness import settle, start
+    from tests.tui_harness import feature_row, settle, start
 
     tasks = next(q for q in app.client.quill_list if q["id"] == "tasks")
+    # The tab is a feature like a Quill's (server/dataview.py), and the
+    # sidebar draws a card only for a feature the account has on.
+    app.client.feature_list.append(feature_row("data", "Data"))
     app.client.quill_list.append(
         {
             "id": "data",
@@ -202,10 +220,16 @@ async def test_the_data_tab_lists_the_datamodels_and_the_records_of_the_one_pick
             "actions": [],
             "enabled": True,
             "available": True,
+            "composed": True,
         }
     )
     async with app.run_test(size=(120, 36)) as pilot:
         screen = await start(app, pilot)
+        # Its card stands under YOUR CLOUD, apart from the Quills' cards.
+        sidebar = [w.id for w in screen.query_one("#sidebar").children if w.display]
+        assert sidebar.index("nav-section-quills") < sidebar.index("nav-tasks") < sidebar.index("nav-section-cloud")
+        assert sidebar.index("nav-section-cloud") + 1 == sidebar.index("nav-data")
+        assert "nav-section-admin" not in sidebar or sidebar.index("nav-data") < sidebar.index("nav-section-admin")
         await pilot.click("#nav-data")
         await settle(app, pilot)
         pane = screen.query_one(DataPane)

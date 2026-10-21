@@ -55,6 +55,10 @@ class QuillCards:
         self._quill_panes: dict[str, str] = {}
         self._quill_keys: dict[str, str] = {}
         self._feature_of: dict[str, str] = {}
+        # The ones the server composes for whoever asks rather than anybody
+        # installed — Data (server/dataview.py) — whose cards stand under
+        # YOUR CLOUD rather than among the Quills.
+        self._cloud_panes: set[str] = set()
 
     # -- Quill cards -------------------------------------------------------
     async def sync_quills(self) -> None:
@@ -95,12 +99,32 @@ class QuillCards:
         anchor: NavCard | SectionLabel = self.query_one("#nav-section-quills", SectionLabel)
         for key, (quill, screen, signature) in wanted.items():
             if key in self._quill_panes:
-                anchor = self.query_one(f"#nav-{key}", NavCard)
+                if key not in self._cloud_panes:
+                    anchor = self.query_one(f"#nav-{key}", NavCard)
+                continue
+            if quill.get("composed"):
+                # Under YOUR CLOUD: after whatever is there already, which is
+                # everything up to the Administration label.
+                card = await self._add_quill_pane(
+                    key, quill, screen, before=self.query_one("#nav-section-admin", SectionLabel)
+                )
+                if card is not None:
+                    self._quill_panes[key] = signature
+                    self._cloud_panes.add(key)
                 continue
             card = await self._add_quill_pane(key, quill, screen, after=anchor)
             if card is not None:
                 self._quill_panes[key] = signature
                 anchor = card
+        self.show_sections()
+
+    def show_sections(self) -> None:
+        """QUILLS and YOUR CLOUD, each shown while a card of its own is."""
+        showing = {card.nav_key for card in self._place_cards() if card.display}
+        quills = (showing & set(self._quill_panes)) - self._cloud_panes
+        self.query_one("#nav-section-quills").display = bool(quills)
+        # The rest are its: the built-in cards, and the composed ones.
+        self.query_one("#nav-section-cloud").display = bool(showing - quills)
 
     def _free_key(self, key: str) -> str:
         """This card's function key: the one it had, or the first nobody has."""
@@ -118,7 +142,7 @@ class QuillCards:
             self._quill_keys[key] = free
         return free
 
-    async def _add_quill_pane(self, key: str, quill: dict, screen: dict, *, after) -> NavCard | None:
+    async def _add_quill_pane(self, key: str, quill: dict, screen: dict, *, after=None, before=None) -> NavCard | None:
         if self.query(f"#pane-{key}") or self.query(f"#nav-{key}"):
             # Half there from a sync that was cut short by the next one.
             await self._drop_quill_pane(key)
@@ -134,7 +158,7 @@ class QuillCards:
         card = NavCard(key, pane.TAB_LABEL, tag=pane.TAB_KEY, id=f"nav-{key}")
         card.set_class(self.has_class("-narrow"), "-line")
         card.set_status("none", str(quill.get("summary") or quill.get("name") or ""))
-        await self.query_one("#sidebar", VerticalScroll).mount(card, after=after)
+        await self.query_one("#sidebar", VerticalScroll).mount(card, after=after, before=before)
         # Its card says how it is from the start, not only once visited.
         pane.reload()
         return card
@@ -151,6 +175,7 @@ class QuillCards:
         for widget in [*self.query(f"#nav-{key}"), *switcher.query(f"#pane-{key}")]:
             await widget.remove()
         self._quill_panes.pop(key, None)
+        self._cloud_panes.discard(key)
         self._feature_of.pop(key, None)
         self._quill_keys.pop(key, None)
 
