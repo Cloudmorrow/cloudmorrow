@@ -33,7 +33,7 @@ stay, in the shape every other Quill already reads.
 | **Foundational datamodel** | One of the standard datamodels in [`Cloudmorrow/datamodels`](https://github.com/Cloudmorrow/datamodels), the ones Cloudmorrow decides on. Grouped into **domains** — Tasks, Customers (CRM), Fleet, Calendars, Messaging, Notes, Secrets, Files — which you can choose at install on their own, with or without a Quill that uses them. |
 | **Extended datamodel** | What a Quill adds: fields of its own on a foundational datamodel (`fleet.odometer` on a `vehicle`), or a new datamodel under its own name (`fleet.service_visit`). Anybody's next Quill may use either. |
 | **Dataset** | Records that come with a Quill — reference data (car makes, country codes) or a starting record (your first board) — and, later, a named collection of records a person makes and shares ("Fleet 2026"). |
-| **Kit** | The fixed vocabulary of screens every surface can draw: `list`, `board`, `detail`, `form`, `calendar`, `thread`, `grid`, `editor`, and `view` — a screen a Quill's code draws from primitives. |
+| **Kit** | The fixed vocabulary of screens every surface can draw: `list`, `board`, `detail`, `form`, `calendar`, `thread`, `grid`, `editor`, `data`, `timeline`, and `view` — a screen a Quill's code draws from primitives. |
 | **Quill code** | The Python a manifest names — views, actions, hooks, jobs, webhooks, APIs, machine handlers — run in a sandbox, through the gate. See [QUILLCODE.md](QUILLCODE.md). |
 | **Shelf** | What one person has: the server's Quills that are for them (everyone's, or an **audience** of circles and people), their own, and the ones shared with them. A **personal Quill** is one somebody installed for themselves; its key is `~owner.id`. See [SHARING.md](SHARING.md). |
 
@@ -181,6 +181,7 @@ each element needs:
 | `editor` | `model`, `title`, `body` (markdown), optional `path` (a string, `folder/sub/title`: the folders) | a tree, then a list, then the page | the list and the page side by side | the tree and the live editor side by side | `cm <quill> list`, `show`, `add`, `edit`, `search` |
 | `grid` | `model` with content (`file`), `group` (a link: the places, picked first), `folder`, `kind` (an enum with `folder`), optional `size`, `modified`, `mime`, `group_subtitle`, `group_open` (a bool on the group: false and it is listed, not opened), `group_writes` (a bool on the group: false and it opens with nothing that writes) | the groups, then folders and tiles | the same, wider; drag and drop in | the groups in a table, then the folder, with the picture beside | `cm <quill> list [group] [folder]`, `get`, `put`, `add` |
 | `data` | nothing: every datamodel the Quill has, or `models` (a list of ids) | the datamodels by domain, the records of one, the sheet of each — to look at | the same, wider | the datamodels down the left, a table of the records of one | `cm <quill> list [datamodel]`, `show <datamodel> <id>` |
+| `timeline` | `model` (the projects), `pieces`, optional `effects`, `media` (a share and a folder: the material), `frames` (an api that draws frames), `export` (an action); the fields are [TIMELINE.md](TIMELINE.md)'s | the projects, then the viewer over the tracks, the material as a sheet | the material, the viewer and the tracks together, live video with sound | frames where the terminal shows pictures, the tracks as rows of text, every edit on a key | `cm <quill> list`, `add`, `show`, `cut`, `trim`, `move`, `rm`, `frame`, `export` |
 
 A board's lanes are an enum's values, fixed by the datamodel — To Do,
 Doing, Done — or, when `lane` is a link, the records it links to, in their
@@ -227,6 +228,12 @@ the sheet every record has, marked read whatever the circles give. The
 with every datamodel their circles give them (`server/dataview.py`); under a
 record's fields it shows what links to it, and a snapshot with its digest
 and attestations ([ATTESTATIONS.md](ATTESTATIONS.md)).
+
+A `timeline` is the kit's video editor: material from the drive on video
+and audio tracks, cut, trimmed and moved, blurs that follow keyframes, a
+crop, and an export by the Quill's own action. What its datamodels must
+have, the frames API its service answers, and what each surface does are
+[TIMELINE.md](TIMELINE.md).
 
 A `thread` is the kit's conversation: things written (`body`) in spaces. Its
 `made_as` says what fields a space gets for how it is made — by its scope, or
@@ -603,6 +610,7 @@ manifest written, checked and installed in one conversation.
 | the kit on the web (phone and full) | `server/web/kit.js`, `kit.css`, `quills.js`; the grid in `kit_grid.js`, `kit_grid.css` (with `registerGridHook`, which the desktop app's mount lines come in by); the editor in `kit_editor.js`, `kit_editor.css` and `pictures.js`; the calendar in `kit_calendar.js`, `kit_calendar.css`; the thread in `kit_thread.js`, `kit_thread.css`; spaces (their list, making one, writing to somebody, their people) in `kit_space.js`, `kit_space.css`, shared by calendar and thread; a grouped list and hidden fields in `kit_grouped.js`, `kit_grouped.css`; the catalog and install sheet in `quillsadmin.js` |
 | the kit in the terminal | `tui/panes/kit.py` (list), `tui/panes/kit_grouped.py` + `kit_grouped.tcss` (a grouped list, hidden fields) with `tui/widgets/group_list.py`, `tui/panes/kit_board.py`, `tui/panes/kit_editor.py` + `kit_editor.tcss` (with `widgets/editor.py`, `note_tree.py`, `picture.py`), `tui/panes/kit_grid.py` (with `register_group_extension`; the mount column and buttons for shares are `tui/sharemounts.py`), `tui/panes/kit_calendar.py` + `kit_calendar.tcss`, `tui/panes/kit_thread.py`, `tui/widgets/kit_space.py` + `kit_space.tcss` (spaces: `NewSpaceModal`, `SpaceModal`, `PickPersonModal`), `tui/widgets/kit.py` (lanes and cards), `tui/kitdata.py` and `tui/dates.py` (reading datamodels, links and moments, without Textual), `tui/screens/record_sheet.py` with `tui/widgets/fields.py` (a widget per kind); a Quill's own view in `tui/panes/kit_view.py` + `tui/widgets/view_nodes.py` + `kit_view.tcss`, and its actions (the sheet's buttons, their forms, the ctrl+e palette, and every effect) in `tui/quill_actions.py`; the catalog in `tui/panes/admin_quills.py` |
 | the kit on the command line | `cli/quillrun/` (`cm <quill> …`), a module per kind of screen |
+| the timeline (a video editor) | `quill/timeline.py` (the rules), web `kit_timeline.js`, `kit_timeline_rules.js`, `kit_timeline.css`, terminal `tui/panes/kit_timeline.py`, `client/timeline.py`, `cli/quillrun/timeline.py`; see [TIMELINE.md](TIMELINE.md) |
 | what a screen's bindings mean (done lanes, space names, a calendar's and a grid's fields), for the terminal and the command line alike | `quill/screens.py` |
 | building one | `cli/quill.py` (`cm quill new/check/dev/add`), `quill_reference.md`, `quill_template/` |
 | the kit to an assistant | `server/mcptools.py` (generic record tools) |

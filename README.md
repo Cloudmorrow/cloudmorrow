@@ -303,6 +303,19 @@ server, so a change to the terminal app needs no deploy to try.
 
 - [docs/MANUAL.md](docs/MANUAL.md): every feature, command, config key and
   API route, with the reasoning behind them.
+- [docs/QUILLS.md](docs/QUILLS.md): what a Quill is, its manifest, the
+  kit of screens, the rules it keeps, and the catalog.
+- [docs/QUILLCODE.md](docs/QUILLCODE.md): a Quill that runs code: views,
+  actions, services, runtimes, the sandbox.
+- [docs/TIMELINE.md](docs/TIMELINE.md): the timeline kit, a video editor
+  on every surface.
+- [docs/SHARING.md](docs/SHARING.md): Quills of people's own: shared,
+  promoted, exported, and the policy for them.
+- [docs/DATAMODELS.md](docs/DATAMODELS.md): the shape of the data: fields,
+  versions, extensions, records, spaces.
+- [docs/CIRCLES.md](docs/CIRCLES.md): who may use which data.
+- [docs/FLOWS.md](docs/FLOWS.md): roles, approvals, and the flows people
+  build out of Quills' actions.
 - [docs/ENCRYPTION.md](docs/ENCRYPTION.md): what is encrypted, how, what it
   protects against and what it does not.
 - [docs/ATTESTATIONS.md](docs/ATTESTATIONS.md): a frozen copy of a space's
