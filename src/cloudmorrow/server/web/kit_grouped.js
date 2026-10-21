@@ -25,6 +25,7 @@ import {
   aOr, canWrite, circle, fieldOf, linkTitles, mayWrite, sheetHash, spoken, timeLeft,
   titleField, titleOf, wireAdd,
 } from "./kit.js";
+import { askText } from "./dialog.js";
 
 export const MASK = "••••••••";
 
@@ -226,7 +227,7 @@ export async function renderGroupedList(at, arg) {
   async function newValue(i) {
     const f = levels[i];
     if (f.kind === "enum") { toast(`${f.label} is one of the chips`); return; }
-    const text = (prompt(`New ${f.label.toLowerCase()}`) || "").trim();
+    const text = (await askText(`New ${f.label.toLowerCase()}`) || "").trim();
     if (!text) return;
     let value = text.toLowerCase();
     if (f.kind === "link") {

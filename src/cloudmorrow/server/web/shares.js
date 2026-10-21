@@ -22,6 +22,7 @@ import {
   toast, wireShell,
 } from "./core.js";
 import { registerGridHook } from "./kit_grid.js";
+import { ask } from "./dialog.js";
 
 const shareUrl = (name, rest = "") => "/api/shares/" + encodeURIComponent(name) + rest;
 // What somebody may do in a share, as the menus say it.
@@ -267,7 +268,7 @@ async function renderShare(name) {
     }
     form.querySelector("[data-remove]").addEventListener("click", async () => {
       const others = (share.members || []).length ? ` Whoever it is shared with loses it too.` : "";
-      if (!confirm(`Remove ${share.name}? Its files stay on the server.${others}`)) return;
+      if (!await ask(`Remove ${share.name}? Its files stay on the server.${others}`)) return;
       try {
         await api("DELETE", shareUrl(share.name));
         toast(`Removed ${share.name}`);
@@ -278,7 +279,7 @@ async function renderShare(name) {
   const leave = app.querySelector("[data-leave]");
   if (leave) {
     leave.addEventListener("click", async () => {
-      if (!confirm(`Leave ${share.name}? ${share.owner} can share it with you again.`)) return;
+      if (!await ask(`Leave ${share.name}? ${share.owner} can share it with you again.`)) return;
       try {
         await api("DELETE", shareUrl(share.name, `/members/user/${encodeURIComponent(session.user)}`));
         toast(`Left ${share.name}`);

@@ -41,6 +41,7 @@ import {
 import { loadFeatures } from "./features.js";
 import { refreshQuills } from "./quills.js";
 import { drawRunning } from "./quillservices.js";
+import { ask, askText } from "./dialog.js";
 
 const quillUrl = (id) => "/api/quills/" + encodeURIComponent(id);
 const featureUrl = (id) => "/api/server/features/" + encodeURIComponent(id);
@@ -255,7 +256,7 @@ function serverRow(quill, stood, running) {
 async function updateMany(ctx, quills) {
   if (!quills.length) return;
   const names = quills.map((q) => q.name || q.id);
-  const sure = confirm(`Update ${listed(names)}?\n\nEach is installed again from the catalog. `
+  const sure = await ask(`Update ${listed(names)}?\n\nEach is installed again from the catalog. `
     + "Its tabs stay for the same people; nothing anybody wrote is touched.");
   if (!sure) return;
   for (const button of ctx.list.querySelectorAll(".quill-actions button")) button.disabled = true;
@@ -380,16 +381,16 @@ async function drawOwn(ctx) {
     row.querySelector(".everyone").addEventListener("click", () => redo(() => api("POST", url + "/approve", {}), "Installed for everyone"));
     row.querySelector(".asker")?.addEventListener("click", () => redo(
       () => api("POST", url + "/approve", { audience: { people: [who] } }), `Installed for ${who}`));
-    row.querySelector(".decline").addEventListener("click", () => {
-      const note = prompt(`Decline ${who}'s request? A word back, if you like:`);
+    row.querySelector(".decline").addEventListener("click", async () => {
+      const note = await askText(`Decline ${who}'s request? A word back, if you like:`);
       if (note === null) return;
       redo(() => api("POST", url + "/decline", { note }), "Declined");
     });
   }
   for (const row of list.querySelectorAll(".own-row")) {
     const { owner, quill, name } = row.dataset;
-    row.querySelector(".promote").addEventListener("click", () => {
-      if (!confirm(`Promote ${owner}'s ${name}, for everyone? Every record of its datamodels moves to the server's.`)) return;
+    row.querySelector(".promote").addEventListener("click", async () => {
+      if (!await ask(`Promote ${owner}'s ${name}, for everyone? Every record of its datamodels moves to the server's.`)) return;
       redo(() => api("POST", "/api/quills/promote", { owner, id: quill }), `${name} is the server's now`);
     });
     const key = `~${owner}.${quill}`;
@@ -607,8 +608,8 @@ async function buildSheet(id, me = null) {
     const update = holder.querySelector(".update-quill");
     if (update) update.addEventListener("click", () => installOnceMore(update, "Updating"));
     const reinstall = holder.querySelector(".reinstall-quill");
-    if (reinstall) reinstall.addEventListener("click", () => {
-      if (!confirm(`Install ${name} v${installed} again?\n\nIts tabs stay for the same people; nothing anybody wrote is touched.`)) return;
+    if (reinstall) reinstall.addEventListener("click", async () => {
+      if (!await ask(`Install ${name} v${installed} again?\n\nIts tabs stay for the same people; nothing anybody wrote is touched.`)) return;
       installOnceMore(reinstall, "Installing");
     });
 
@@ -618,7 +619,7 @@ async function buildSheet(id, me = null) {
       try { brought = await api("GET", quillUrl(id) + "/brought"); } catch (err) { toast(err.message); return; }
       const gone = async (drop) => removeQuill(id, name, drop, (message) => done(message, { removed: true }));
       if (!brought.length) {
-        const sure = confirm(
+        const sure = await ask(
           `Remove ${name}?\n\nIts tabs and jobs go, for everybody. Nothing anybody `
           + "wrote is deleted: the records stay, and are there again if it comes back.",
         );

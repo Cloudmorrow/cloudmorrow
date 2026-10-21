@@ -28,9 +28,10 @@ import {
   WEEKDAYS, addDays, addMonths, dateOf, longDay, monthOf, today, weeksOf,
 } from "./kit_calendar.js";
 import {
-  ask, choose, findAction, formFields, hideFromBar, linksFor, onRedrawHere, press, readFields, run,
+  choose, findAction, formFields, hideFromBar, linksFor, onRedrawHere, press, readFields, run,
   said, screenAt, wireFields,
 } from "./actions.js";
+import { ask } from "./dialog.js";
 
 const glyphs = {
   left: '<svg width="11" height="18" viewBox="0 0 11 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 1.5 2 9l6.5 7.5"/></svg>',

@@ -36,6 +36,7 @@ import { renderView } from "./kit_view.js";
 import { dataSheet, renderData } from "./kit_data.js";
 // And a Quill's actions, on every record's sheet.
 import { sheetSection, wireSheetSection } from "./actions.js";
+import { ask, askText } from "./dialog.js";
 
 const own = {
   // What a board is, for the button that opens its own sheet.
@@ -390,7 +391,7 @@ async function recordLanes(laneModel, groupModel, group) {
 // A group wants only a name, as a folder does in Notes. The new one opens
 // as soon as it exists, with nothing in it yet.
 async function newGroup(at, groupModel) {
-  const text = (prompt(`${groupModel.label} name`) || "").trim();
+  const text = (await askText(`${groupModel.label} name`) || "").trim();
   if (!text) return;
   try {
     const made = await api("POST", recordsUrl(groupModel.id), { fields: { [groupModel.title]: text } });
@@ -878,7 +879,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
       f.kind === "link" && f.to === model.id && f.on_delete === "cascade"));
     const warning = along.length
       ? `\n\nEvery ${along.map((m) => m.label.toLowerCase()).join(" and ")} on it goes with it.` : "";
-    if (!confirm(`Delete “${titleOf(model, ed.record, title)}”?${warning}`)) return;
+    if (!await ask(`Delete “${titleOf(model, ed.record, title)}”?${warning}`)) return;
     try {
       clearTimeout(ed.timer);
       ed.dirty = false;

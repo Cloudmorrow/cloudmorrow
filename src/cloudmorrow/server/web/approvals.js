@@ -8,6 +8,7 @@
 import {
   api, app, esc, mount, nav, registerScreen, renderRoute, toast, wireShell,
 } from "./core.js";
+import { askText } from "./dialog.js";
 
 /** The row that leads here, for Me, with how many wait. */
 export function approvalsRow(count = 0) {
@@ -52,7 +53,7 @@ async function renderApprovals() {
     const status = button.dataset.answer;
     let note = "";
     if (status !== "withdrawn") {
-      note = prompt(status === "approved" ? "A word with the yes? (optional)" : "Why not? (optional)", "");
+      note = await askText(status === "approved" ? "A word with the yes? (optional)" : "Why not? (optional)", "");
       if (note === null) return;
     }
     button.disabled = true;
