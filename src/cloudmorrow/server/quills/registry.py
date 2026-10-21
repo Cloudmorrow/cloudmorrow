@@ -38,6 +38,9 @@ from cloudmorrow.server.quills.manifest import ORIGIN, Manifest, QuillError, loa
 from cloudmorrow.server.quills.runtimes import RUNTIMES_DIR, RuntimeStore
 
 PERSONAL_DIR = "quills-personal"
+# The catalog's categories, as this server last read them, beside the Quills:
+# the labels and the order the clients shelve the installed Quills under.
+CATEGORIES = "quill-categories.json"
 
 
 def check_personal(manifest: Manifest) -> None:
@@ -96,6 +99,10 @@ class QuillRegistry:
         self.catalog_location = catalog
         # The programs Quills' services need, fetched for them (quills/runtimes.py).
         self.runtimes = runtimes or RuntimeStore(quills_dir.parent / RUNTIMES_DIR)
+        self.categories_path = quills_dir.parent / CATEGORIES
+        # The catalog's categories (id, label, description), in its order,
+        # from the last time the catalog was read: see `remember_categories`.
+        self.categories: list[dict] = _read_categories(self.categories_path)
         self._lock = threading.RLock()
         # The server's Quills, by id.
         self.quills: dict[str, Manifest] = {}
@@ -340,6 +347,8 @@ class QuillRegistry:
         """
         with self._lock:
             catalog = self._catalog(catalog, load_manifest(folder, owner=owner))
+            if catalog is not None:
+                self.remember_categories(catalog)
             plan = self.plan(folder, datamodels_source, owner=owner, catalog=catalog)
             manifest_id = plan["id"]
             wanted = list(plan.get("requires", {}).get("runtimes", []))
@@ -439,6 +448,39 @@ class QuillRegistry:
             return None
         return fetch(str(spec["repo"]), str(spec.get("ref", "")), base=catalog.base, into=into)
 
+    # -- the categories ----------------------------------------------------------------
+    def remember_categories(self, catalog: Catalog) -> None:
+        """Keep the catalog's categories, for shelving the installed Quills by.
+
+        Called whenever the catalog is read — an install, a look at the
+        catalog page — so a server tells its clients the catalog's labels
+        and order without reaching for it every time they ask, or at all
+        once the network is gone.
+        """
+        found = [
+            {"id": str(c.get("id", "")), "label": str(c.get("label", "")), "description": str(c.get("description", ""))}
+            for c in catalog.categories
+            if c.get("id")
+        ]
+        if found == self.categories:
+            return
+        with self._lock:
+            self.categories = found
+            try:
+                self.categories_path.parent.mkdir(parents=True, exist_ok=True)
+                self.categories_path.write_text(json.dumps(found, indent=1), encoding="utf-8")
+            except OSError:
+                pass  # remembered for this run; written next time
+
+    def shelf(self, category: str) -> tuple[str, int]:
+        """Where a Quill of *category* is shelved: the label to show, and the rank
+        of that shelf among the others — the catalog's order for the categories
+        it names, then the rest by their own label, Other last."""
+        for rank, found in enumerate(self.categories):
+            if found["id"] == category:
+                return found["label"] or _titled(category), rank
+        return _titled(category), len(self.categories) + (1 if not category else 0)
+
     # -- telling -----------------------------------------------------------------------
     def ordered(self, manifests: Iterable[Manifest]) -> list[Manifest]:
         """*manifests* in the order their tabs appear in.
@@ -460,6 +502,9 @@ class QuillRegistry:
         """An installed Quill as a client is told it, its runtimes as they are on this server."""
         told = describe(manifest, self.datamodels, installed=manifest)
         told["runtimes"] = self.runtimes.describe_installed(manifest.runtimes)
+        # Where its tabs stand in a client's rail: the catalog's label for
+        # its category, and the order of the shelves.
+        told["category_label"], told["category_rank"] = self.shelf(manifest.category)
         return told
 
     def installed(self) -> list[dict]:
@@ -475,6 +520,24 @@ class QuillRegistry:
             row["owner"] = owner_of(model.id)
             rows.append(row)
         return sorted(rows, key=lambda r: (not r["foundation"], r["id"]))
+
+
+def _titled(category: str) -> str:
+    """A label for a category the catalog does not name: `garden` reads Garden,
+    `home_office` Home office, and none at all is Other — as the catalog pages
+    shelve what has no category."""
+    words = category.replace("_", " ").replace("-", " ").split()
+    return " ".join(words).capitalize() if words else "Other"
+
+
+def _read_categories(path: Path) -> list[dict]:
+    try:
+        found = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(found, list):
+        return []
+    return [c for c in found if isinstance(c, dict) and c.get("id")]
 
 
 CORE_DATAMODELS = Path(__file__).resolve().parent.parent / "core_datamodels"

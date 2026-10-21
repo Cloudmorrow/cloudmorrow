@@ -391,7 +391,9 @@ export function registerScreen(name, render) { screens.set(name, render); }
 /** A tab. `feature` names the feature it belongs to; without one it is
     always there. `admin` puts it under Administration, for administrators
     only — and, since a phone's bar has no room for a section, only in the
-    rail. `icon` may be a function, for an icon the library has not read yet. */
+    rail. `icon` may be a function, for an icon the library has not read yet.
+    `section` names the shelf it stands on in the rail (a Quill's category),
+    and `rank` where that shelf comes among the others. */
 export function registerTab(tab) { tabList.push(tab); }
 /** A place in the tab order for tabs that arrive later — the Quills, which
     only the server knows. Held where it is called, so the order of app.js
@@ -737,11 +739,14 @@ export function heading(title, right = "") {
 // On a screen wide enough the same markup is a rail down the left, and
 // the wordmark moves to the head of it out of the middle of the bar. The
 // rail has what the bar does not: sections, as the terminal app's sidebar
-// has them. The Quills first; then Your cloud, for what the server itself
-// gives everybody (Data) rather than a Quill somebody installed; and for
-// an administrator, Administration at the foot, with the server's pages
-// under it. The phone's bar runs the first two together, keeps the third
-// behind a row in Me, and the stylesheet keeps the labels off it.
+// has them. Today first, on its own; then the Quills, shelved by the
+// catalog's categories (Personal, Home, Business, Developer, in the
+// catalog's order; a tab says its `section` and the shelf's `rank`); then
+// Your cloud, for what the server itself gives everybody (Data) rather
+// than a Quill somebody installed; and for an administrator,
+// Administration at the foot, with the server's pages under it. The
+// phone's bar runs all but the last together, keeps that one behind a row
+// in Me, and the stylesheet keeps the labels off it.
 // Which tab was last lit, for the screens that draw none of their own.
 let lastTab = "";
 export function tabs(active) {
@@ -753,12 +758,26 @@ export function tabs(active) {
     `<span>${t.label}</span></a>`;
   const shown = shownTabs();
   const section = (title, list) =>
-    list.length ? `<div class="rail-section">${title}</div>` + list.map(draw).join("") : "";
+    list.length ? `<div class="rail-section">${esc(title)}</div>` + list.map(draw).join("") : "";
+  const own = shown.filter((t) => !t.admin && !t.cloud);
   return `<nav class="tabs"><div class="rail-head">${wordmark()}</div>` +
-    shown.filter((t) => !t.admin && !t.cloud).map(draw).join("") +
+    own.filter((t) => !t.section).map(draw).join("") +
+    shelves(own.filter((t) => t.section)).map((s) => section(s.title, s.tabs)).join("") +
     section("Your cloud", shown.filter((t) => t.cloud)) +
     section("Administration", shown.filter((t) => t.admin)) +
     `</nav>`;
+}
+
+/** The shelves the tabs with a `section` stand on, in rank order and then
+    by name, each with its tabs in the order they came. */
+function shelves(tabs) {
+  const found = [];
+  for (const t of tabs) {
+    let shelf = found.find((s) => s.title === t.section);
+    if (!shelf) found.push(shelf = { title: t.section, rank: Number.isFinite(t.rank) ? t.rank : found.length, tabs: [] });
+    shelf.tabs.push(t);
+  }
+  return found.sort((a, b) => a.rank - b.rank || a.title.localeCompare(b.title));
 }
 
 // The bar shows its title, and a line, once the page's own title scrolls

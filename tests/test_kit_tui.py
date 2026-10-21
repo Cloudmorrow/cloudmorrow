@@ -172,8 +172,64 @@ async def test_the_quill_tabs_come_first_notes_then_tasks(app):
         # Then Tasks, Files and Chat: the catalog's order, Tasks and Files
         # with their old keys and Chat with the next one free.
         assert tab_labels(screen)[1:4] == ["Tasks  f2", "Files  f5", "Chat  f4"]
-        assert screen.query_one("#nav-section-quills").display
+        assert screen.query_one("#nav-shelf-personal").display
         assert isinstance(screen.query_one("#pane-tasks"), BoardPane)
+
+
+def shelves(screen) -> list[tuple[str, list[str]]]:
+    """The Quills' shelves in the sidebar as (LABEL, [card names]), in order, the hidden left out."""
+    from cloudmorrow.tui.widgets.sidebar import NavCard, SectionLabel
+
+    found: list[tuple[str, list[str]]] = []
+    for widget in screen.query_one("#sidebar").children:
+        if not widget.display:
+            continue
+        if isinstance(widget, SectionLabel):
+            if not str(widget.id).startswith("nav-shelf-"):
+                break  # Your cloud, Administration: not the Quills' own
+            found.append((widget.visual.plain, []))
+        elif isinstance(widget, NavCard) and found:
+            found[-1][1].append(widget.name_text)
+    return found
+
+
+async def test_the_cards_stand_on_the_shelves_of_their_categories(app):
+    # The fixtures say a category but, as a server from before did, no label
+    # or rank for it: the category's own name, in the order the Quills came.
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await start(app, pilot)
+        assert shelves(screen) == [
+            ("PERSONAL", ["Notes", "Tasks", "Files"]),
+            ("HOME", ["Chat"]),
+            ("DEVELOPER", ["Secrets"]),
+        ]
+        assert screen.query_one("#nav-shelf-personal").has_class("-first")
+        # A shelf stands while a card of its own does: Secrets off, and
+        # DEVELOPER goes with it.
+        screen.apply_features(["notes", "tasks", "files", "chat"])
+        assert [label for label, _ in shelves(screen)] == ["PERSONAL", "HOME"]
+        screen.apply_features(["notes", "tasks", "files", "chat", "secrets"])
+        assert [label for label, _ in shelves(screen)] == ["PERSONAL", "HOME", "DEVELOPER"]
+
+
+async def test_the_shelves_follow_the_catalogs_order(app):
+    labels = {"personal": ("Personal", 2), "home": ("Home", 1), "developer": ("Developer", 0)}
+    for quill in app.client.quill_list:
+        quill["category_label"], quill["category_rank"] = labels[quill["category"]]
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await start(app, pilot)
+        assert [label for label, _ in shelves(screen)] == ["DEVELOPER", "HOME", "PERSONAL"]
+        assert screen.query_one("#nav-shelf-developer").has_class("-first")
+        # The keys are still handed out in the order the Quills came, and the
+        # workspace still opens on Notes.
+        assert tab_labels(screen)[:2] == ["Secrets  f3", "Chat  f4"]
+        assert screen.query_one("#panes").current == "pane-notes"
+        # Every Quill on a shelf gone: the shelf goes with it.
+        app.client.quill_list = [q for q in app.client.quill_list if q["category"] != "home"]
+        await screen.sync_quills()
+        await settle(app, pilot)
+        assert [label for label, _ in shelves(screen)] == ["DEVELOPER", "PERSONAL"]
+        assert not screen.query("#nav-shelf-home")
 
 
 async def test_the_quill_key_brings_its_tab(app):
@@ -418,7 +474,7 @@ async def test_removing_asks_then_takes_the_tab_and_keeps_the_records(app):
         assert ("uninstall", "tasks") in app.client.quill_calls
         assert not screen.query("#nav-tasks")
         # Notes and Chat are still Quills, so the section stays.
-        assert screen.query_one("#nav-section-quills").display
+        assert screen.query_one("#nav-shelf-personal").display
         assert tab_labels(screen)[0] == "Notes  f1"
         assert not screen.query("#pane-tasks")
         assert len(app.client.record_store["task"]) == 3

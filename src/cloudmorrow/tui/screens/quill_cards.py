@@ -8,8 +8,15 @@ drawn from the kit by tui/panes/kit.py, each with a function key of its
 own, the ones that changed drawn again, and the ones whose Quill went taken
 out. A Quill's `go`, and its actions on ctrl+e, come through here too.
 
+The cards stand on shelves, one per category of the catalog's — PERSONAL,
+HOME, BUSINESS, DEVELOPER — in the catalog's order, each a section label
+(`#nav-shelf-<category>`) with its Quills' cards under it. The server says
+the label and the order (`category_label`, `category_rank`, from
+quills/registry.py); from a server that does not, the category's own name
+stands in, shelved in the order the Quills came.
+
 `QuillCards` is mixed into the WorkspaceScreen, whose sidebar (`#sidebar`,
-`#nav-section-quills`), switcher (`#panes`) and ways of showing a pane
+`#nav-section-cloud`), switcher (`#panes`) and ways of showing a pane
 (`action_show_pane`, `_mark_active`, `set_status`, `active_pane`,
 `admin_showing`, `first_builtin`) it works with.
 """
@@ -17,6 +24,7 @@ out. A Quill's `go`, and its actions on ctrl+e, come through here too.
 from __future__ import annotations
 
 import json
+import re
 
 from textual import work
 from textual.containers import VerticalScroll
@@ -44,6 +52,22 @@ FORMER_KEYS: dict[str, str] = {
 }
 
 
+def shelf_of(quill: dict) -> tuple[str, int | None]:
+    """The shelf a Quill's cards stand on, and where that shelf comes: the
+    catalog's label and rank when the server says them, else the category's
+    own name (`home` reads Home) and no rank; QUILLS for one with neither."""
+    label = str(quill.get("category_label") or "")
+    rank = quill.get("category_rank")
+    if not label:
+        words = str(quill.get("category") or "").replace("_", " ").replace("-", " ").split()
+        label = " ".join(words).capitalize() if words else "Quills"
+    return label, rank if isinstance(rank, int) and not isinstance(rank, bool) else None
+
+
+def _slug(label: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", label.casefold()).strip("-") or "other"
+
+
 class QuillCards:
     """The part of the workspace that is its Quills' cards and panes."""
 
@@ -59,6 +83,10 @@ class QuillCards:
         # installed — Data (server/dataview.py) — whose cards stand under
         # YOUR CLOUD rather than among the Quills.
         self._cloud_panes: set[str] = set()
+        # The shelves the Quills' cards stand on, by label, and which shelf
+        # each card is on.
+        self._shelves: dict[str, SectionLabel] = {}
+        self._shelf_of: dict[str, str] = {}
 
     # -- Quill cards -------------------------------------------------------
     async def sync_quills(self) -> None:
@@ -96,11 +124,9 @@ class QuillCards:
         for key, signature in list(self._quill_panes.items()):
             if key not in wanted or wanted[key][2] != signature:
                 await self._drop_quill_pane(key)
-        anchor: NavCard | SectionLabel = self.query_one("#nav-section-quills", SectionLabel)
+        cloud = self.query_one("#nav-section-cloud", SectionLabel)
         for key, (quill, screen, signature) in wanted.items():
             if key in self._quill_panes:
-                if key not in self._cloud_panes:
-                    anchor = self.query_one(f"#nav-{key}", NavCard)
                 continue
             if quill.get("composed"):
                 # Under YOUR CLOUD: after whatever is there already, which is
@@ -112,17 +138,59 @@ class QuillCards:
                     self._quill_panes[key] = signature
                     self._cloud_panes.add(key)
                 continue
-            card = await self._add_quill_pane(key, quill, screen, after=anchor)
+            # Among the Quills, anywhere for now: `shelve` puts it in place.
+            card = await self._add_quill_pane(key, quill, screen, before=cloud)
             if card is not None:
                 self._quill_panes[key] = signature
-                anchor = card
+        await self.shelve([(key, quill) for key, (quill, _, _) in wanted.items() if not quill.get("composed")])
         self.show_sections()
 
+    async def shelve(self, quills: list[tuple[str, dict]]) -> None:
+        """Stand the Quills' cards on their shelves: a section label per category,
+        in the catalog's order, and under each its cards in the order they came.
+
+        *quills* is every (card key, Quill) among the Quills, in the server's
+        order. A card is moved, never drawn again; a shelf with nothing left
+        on it goes.
+        """
+        sidebar = self.query_one("#sidebar", VerticalScroll)
+        shelves: dict[str, tuple[float, list[str]]] = {}
+        for key, quill in quills:
+            if key not in self._quill_panes:
+                continue
+            label, rank = shelf_of(quill)
+            rank = rank if rank is not None else len(shelves)
+            shelves.setdefault(label, (rank, []))[1].append(key)
+            self._shelf_of[key] = label
+        for label, heading in list(self._shelves.items()):
+            if label not in shelves:
+                await heading.remove()
+                del self._shelves[label]
+        anchor: SectionLabel | NavCard | None = None
+        for label, (_, keys) in sorted(shelves.items(), key=lambda item: (item[1][0], item[0].casefold())):
+            heading = self._shelves.get(label)
+            if heading is None:
+                heading = SectionLabel(label, id=f"nav-shelf-{_slug(label)}")
+                self._shelves[label] = heading
+                await sidebar.mount(heading, before=self.query_one("#nav-section-cloud", SectionLabel))
+            # The first shelf stands at the top of the sidebar, with no air above it.
+            heading.set_class(anchor is None, "-first")
+            if anchor is None:
+                sidebar.move_child(heading, before=0)
+            else:
+                sidebar.move_child(heading, after=anchor)
+            anchor = heading
+            for key in keys:
+                card = self.query_one(f"#nav-{key}", NavCard)
+                sidebar.move_child(card, after=anchor)
+                anchor = card
+
     def show_sections(self) -> None:
-        """QUILLS and YOUR CLOUD, each shown while a card of its own is."""
+        """The shelves and YOUR CLOUD, each shown while a card of its own is."""
         showing = {card.nav_key for card in self._place_cards() if card.display}
         quills = (showing & set(self._quill_panes)) - self._cloud_panes
-        self.query_one("#nav-section-quills").display = bool(quills)
+        for label, heading in self._shelves.items():
+            heading.display = any(self._shelf_of.get(key) == label for key in quills)
         # The rest are its: the built-in cards, and the composed ones.
         self.query_one("#nav-section-cloud").display = bool(showing - quills)
 
@@ -176,6 +244,7 @@ class QuillCards:
             await widget.remove()
         self._quill_panes.pop(key, None)
         self._cloud_panes.discard(key)
+        self._shelf_of.pop(key, None)
         self._feature_of.pop(key, None)
         self._quill_keys.pop(key, None)
 

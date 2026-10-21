@@ -5,7 +5,8 @@ a card can also say how it is — "3 to do", "2 unread", "4 vaults" — so the
 sidebar is where you see the state of your cloud at a glance, and a click or
 a key takes you in. The sections:
 
-- **QUILLS** — a card for every screen of every installed Quill.
+- **PERSONAL, HOME, BUSINESS, DEVELOPER** — the catalog's categories, a
+  shelf each, with a card for every screen of every installed Quill on it.
 - **YOUR CLOUD** — what the server gives everybody without a Quill: Data,
   which it composes for whoever asks, and any card built into the core.
 - **ADMINISTRATION** — for administrators: Users, Circles, Quills. Smaller,
@@ -52,7 +53,7 @@ def status_text(tone: str, text: str, *, active: bool = False) -> Text:
 
 
 class SectionLabel(Static):
-    """YOUR CLOUD, in bold soft capitals, and a faint note after it."""
+    """PERSONAL, YOUR CLOUD: a section, in bold soft capitals, and a faint note after it."""
 
     def __init__(self, title: str, note: str = "", **kwargs) -> None:
         text = Text(title.upper(), style=f"bold {MUTED}")

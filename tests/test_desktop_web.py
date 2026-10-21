@@ -77,3 +77,18 @@ def test_the_shell_gives_every_screen_a_rail() -> None:
     assert 'app.classList.toggle("aside-tabs"' in core
     # And the window is named after the screen, for a browser full of tabs.
     assert "document.title" in core
+
+
+def test_the_rail_shelves_the_quills_by_their_categories() -> None:
+    """A Quill's tabs stand under the catalog's label for its category, the
+    shelves in the catalog's order (the server says both, quills/registry.py);
+    Today, with no category, before them all; a phone's bar runs them together."""
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    quills = (WEB / "quills.js").read_text(encoding="utf-8")
+    assert 'section: quill.composed ? "" : quill.category_label || titled(quill.category)' in quills
+    assert "rank: quill.category_rank" in quills
+    assert 'own.filter((t) => !t.section).map(draw).join("")' in core
+    assert "shelves(own.filter((t) => t.section)).map((s) => section(s.title, s.tabs))" in core
+    assert core.index("shelves(own.filter") < core.index('section("Your cloud"')
+    # The heading is the catalog's text, escaped on the way in.
+    assert '<div class="rail-section">${esc(title)}</div>' in core

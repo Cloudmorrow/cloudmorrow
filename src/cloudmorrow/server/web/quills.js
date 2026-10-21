@@ -71,8 +71,19 @@ function place(list) {
     // installed (server/dataview.py): the rail sets its tab apart from
     // the Quills, under Your cloud, as the terminal app's sidebar does.
     cloud: !!quill.composed,
+    // The rest stand on the shelf of their category, as the catalog has
+    // them: the server says the catalog's label for it and the order of
+    // the shelves (quills/registry.py); a list cached from before it did
+    // gets the category's own name until the server answers.
+    section: quill.composed ? "" : quill.category_label || titled(quill.category),
+    rank: quill.category_rank,
   }))));
 }
+
+const titled = (category) => {
+  const words = String(category || "").replace(/[_-]+/g, " ").trim();
+  return words ? words[0].toUpperCase() + words.slice(1).toLowerCase() : "Other";
+};
 
 try { place(JSON.parse(store.get("quills") || "[]")); } catch { place([]); }
 // The tabs drawn from the cache went up before the icon library was read:
