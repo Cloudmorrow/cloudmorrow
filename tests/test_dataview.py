@@ -42,7 +42,9 @@ def test_data_is_on_every_shelf_last_with_every_datamodel_marked_read(tasks_quil
     data = data_of(tasks_quill)
     assert data["name"] == "Data" and data["composed"] is True and data["available"] and data["enabled"]
     assert data["screens"] == [{"id": "data", "kit": "data", "label": "Data"}]
-    assert set(data["models"]) == {"board", "task", "snapshot", "attestation"}
+    # The Quill's own two, and what the package itself ships: snapshots, and roles' flows.
+    core = {"snapshot", "attestation", "approval", "flow", "flow_run"}
+    assert set(data["models"]) == {"board", "task"} | core
     assert {m["access"] for m in data["models"].values()} == {"read"}
     assert data["uses"] == sorted(data["models"])
     # The same shape as any Quill: what every client reads of one is there.
