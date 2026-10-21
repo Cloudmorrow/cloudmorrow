@@ -17,7 +17,7 @@
    {quill, screen, tab, base}, where base is the screen's own hash. */
 
 import {
-  SAVE_DELAY, api, app, back, esc, formatDate, heading, icons, localMinute, mount, nav, occupy,
+  SAVE_DELAY, api, app, back, esc, fitArea, formatDate, heading, icons, localMinute, mount, nav, occupy,
   recordsUrl, renderRoute, replace, seconds, session, setStatus, store, tabs, toast, vacate,
   wireShell,
 } from "./core.js";
@@ -807,9 +807,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   ed.box = box;
 
   const areas = [...box.querySelectorAll("textarea")];
-  const grow = ed.grow = () => {
-    for (const area of areas) { area.style.height = "auto"; area.style.height = area.scrollHeight + "px"; }
-  };
+  const grow = ed.grow = () => { for (const area of areas) fitArea(area); };
   grow();
   addEventListener("resize", grow);
   wireSecretWidgets(box);

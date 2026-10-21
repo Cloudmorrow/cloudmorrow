@@ -407,6 +407,22 @@ def test_spaces_you_may_only_read_are_not_made_or_changed():
     assert "if (!form) return;" in calendar
 
 
+def test_a_text_box_is_measured_without_the_page_shrinking_under_the_window():
+    """A box fitted to its text is measured by letting it collapse for an
+    instant; left alone, the shorter page clamps the window's scroll and the
+    line being typed lands at the bottom edge on every keystroke. One helper
+    holds the box's parent at its height for the measure, and both editors
+    use it rather than measuring on their own."""
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    fit = js_code(_function(core, "fitArea"))
+    assert 'holder.style.minHeight = holder.offsetHeight + "px";' in fit
+    assert 'area.style.height = "auto";' in fit and 'area.style.height = area.scrollHeight + "px";' in fit
+    assert "holder.style.minHeight = held;" in fit
+    for name in ("pictures.js", "kit.js"):
+        source = (WEB / name).read_text(encoding="utf-8")
+        assert "fitArea" in source and 'style.height = "auto"' not in source, name
+
+
 def test_the_editor_opens_pages_you_may_only_read_read_only():
     editor = js_code((WEB / "kit_editor.js").read_text(encoding="utf-8"))
     assert "writes: mayWrite(model)," in editor

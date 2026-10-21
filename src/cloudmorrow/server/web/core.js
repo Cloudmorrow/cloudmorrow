@@ -705,6 +705,21 @@ export function nav({ back: backTo, backLabel, title, right = "" }) {
 export const meLink = () =>
   `<a class="button me-link" href="#/me" aria-label="Me">${pixelIcon("me")}</a>`;
 
+// A box that is as tall as what is written in it. Measuring means letting
+// it fall to one row for an instant, and a page that shrinks under a
+// scrolled window is clamped: the window lands wherever the shorter page
+// lets it, and the line being typed comes to rest at the bottom edge on
+// every keystroke. So what holds the box is held at its height while the
+// box is measured, and the page never shrinks at all.
+export function fitArea(area) {
+  const holder = area.parentElement;
+  const held = holder ? holder.style.minHeight : "";
+  if (holder) holder.style.minHeight = holder.offsetHeight + "px";
+  area.style.height = "auto";
+  area.style.height = area.scrollHeight + "px";
+  if (holder) holder.style.minHeight = held;
+}
+
 // A screen's title, with what the screen makes beside it: the pen on a
 // list of notes, the plus on a folder. Beside the title rather than in the
 // bar, because the bar's corner belongs to Me and the title is the thing
