@@ -44,7 +44,7 @@ SHORTEST = 0.04
 # The frames per second a project is stepped at before it has its own.
 FPS = 30.0
 # The box an effect starts with: the middle of the picture, in percent.
-MIDDLE = {"x": 35.0, "y": 35.0, "w": 30.0, "h": 30.0}
+MIDDLE = {"x": 35.0, "y": 25.0, "w": 30.0, "h": 40.0}
 # The crop that keeps all of it.
 WHOLE = {"x": 0.0, "y": 0.0, "w": 100.0, "h": 100.0}
 BOX = ("x", "y", "w", "h")
