@@ -30,9 +30,11 @@ from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_current_user, get_principal, get_state
 from cloudmorrow.server.records import SEARCH_CAP, Principal, RecordError, UnknownRecordError
 from cloudmorrow.server.routes.errors import ERRORS, http_error
+from cloudmorrow.server.security import TokenError, create_media_token, decode_media_token
 from cloudmorrow.server.seeding import seed
 
 router = APIRouter(prefix="/api/records", tags=["records"])
+media_router = APIRouter(prefix="/api/media", tags=["records"])
 models_router = APIRouter(prefix="/api/datamodels", tags=["records"])
 people_router = APIRouter(prefix="/api/people", tags=["records"])
 
@@ -408,6 +410,44 @@ def record_content(
         raise http_error(exc) from exc
     # Someone's files: nobody's cache but the browser's own, and asked about
     # again next time — a cheap 304 when nothing changed.
+    return FileResponse(path, media_type=media_type, headers=PRIVATE)
+
+
+@router.post("/{model}/{record_id}/media")
+def record_media(
+    model: str,
+    record_id: str,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """A link to the record's bytes that needs no token: for a <video> or an
+    <audio>, which cannot send one, and ask for ranges as they play. It
+    lasts six hours, and opens these bytes alone (docs/TIMELINE.md)."""
+    switched_on(state, model)
+    try:
+        state.records.content(Principal.person(user.username, admin=user.is_admin), model, record_id)
+    except ERRORS as exc:
+        raise http_error(exc) from exc
+    issued = create_media_token(user.username, model, record_id, state.config.ensure_secret_key())
+    return {"url": f"/api/media/{issued.token}", "expires": issued.expires_at.isoformat()}
+
+
+@media_router.get("/{token}")
+def media(token: str, state: AppState = Depends(get_state)) -> FileResponse:
+    """The bytes a media link opens, as the person it was made for — still only
+    while they may read them, and with ranges, so a video seeks."""
+    try:
+        username, model, record_id = decode_media_token(token, state.config.ensure_secret_key())
+    except TokenError as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
+    user = state.users.get(username)
+    if user is None or not user.is_active:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "unknown user")
+    switched_on(state, model)
+    try:
+        path, media_type = state.records.content(Principal.person(user.username, admin=user.is_admin), model, record_id)
+    except ERRORS as exc:
+        raise http_error(exc) from exc
     return FileResponse(path, media_type=media_type, headers=PRIVATE)
 
 

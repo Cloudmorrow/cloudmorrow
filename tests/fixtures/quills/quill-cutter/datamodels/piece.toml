@@ -1,0 +1,17 @@
+[datamodel]
+id = "cutter.piece"
+version = 1
+label = "Piece"
+scopes = ["personal"]
+title = "name"
+
+[fields]
+project = { kind = "link", to = "cutter.project", required = true, indexed = true, on_delete = "cascade" }
+track = { kind = "string", required = true }
+source = { kind = "string", required = true }
+name = { kind = "string", required = true }
+start = { kind = "decimal", required = true }
+offset = { kind = "decimal", default = 0 }
+length = { kind = "decimal", required = true }
+volume = { kind = "decimal" }
+muted = { kind = "bool", default = false }

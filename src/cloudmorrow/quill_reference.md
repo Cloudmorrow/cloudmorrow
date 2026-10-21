@@ -60,7 +60,7 @@ why = "to show who looks after each plant"
 
 [[screens]]                        # one tab per screen, on every surface
 id = "plants"
-kit = "list"                       # list, board, detail, form, calendar, grid, editor, thread
+kit = "list"                       # list, board, detail, form, calendar, grid, editor, thread, timeline
 label = "Plants"
 model = "plants.plant"
 title = "name"
@@ -342,6 +342,7 @@ and has every surface draw it hidden until asked for.
 | editor | model, title, body (markdown); optional path (a string like folder/sub/title: the folders) | a tree of folders and records beside a page of Markdown; pictures where the backend keeps attachments |
 | grid | a model with bytes beside its fields (the foundational `file`); group (link: the places, picked first), folder (string), kind (an enum with "folder"); optional size, modified, mime, group_subtitle, group_open and group_writes (fields of the group's model; group_open and group_writes are bools: false and the group is listed but not opened, or opened with nothing that writes) | the groups, then folders and tiles with pictures; put in, get, new folder, rename, move, delete |
 | thread | model (in a space), space (its link to the space), body; optional about (a field of the space), made_as; a team's: reply_to (a link of the model to itself: a reply, in a thread under its parent), pinned (a bool: kept at the top; `managed` in the datamodel lets the space's manager pin), reactions (a datamodel of the Quill's with a link to the model, an `emoji` string, authored: one per person per emoji per line, toggled), mentions = true (@name lights up and tells that person) | the spaces with unread counts, then a conversation: newest at the bottom, grouped by author and day, a box to write in; threads beside it, reactions under each line, pinned lines in the header |
+| timeline | model (a project: width, height, fps, tracks; optional crop, status, message, output), pieces (a datamodel with one link to the project: track, source, name, start, offset, length; optional volume, muted), media (where the material is: `{ share = "my-files", within = "Videos" }`); optional effects (a datamodel with one link to the pieces: kind, label, keyframes; optional strength), frames (an `[[apis]]` id that draws frames), export (an action on the project) | a video editor: material from the drive, video and audio tracks with pieces to move, trim and split, blurs that move by keyframes, a crop, export; live with sound on the web, real frames in the terminal (docs/TIMELINE.md) |
 
 A thread's `made_as` says what fields a space gets for how it is made — by
 scope, or `direct`: a shared space found-or-made between you and the person

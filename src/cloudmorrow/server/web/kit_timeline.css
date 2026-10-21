@@ -1,0 +1,475 @@
+/* The kit's `timeline`: the viewer, the tracks, and what is beside them.
+
+   A phone has it in one column — the picture on top, the buttons under it,
+   the tracks scrolling sideways, and the chosen piece below — with the
+   material as a sheet. A computer has the material on the left and the
+   chosen piece on the right of the picture, and the tracks the width of
+   all three under them. The one amber fill is Export; amber lines are what
+   you are moving — the chosen piece, a blur's box — and the playhead is
+   sky, like the caret it is. Nothing here is named for one Quill. */
+
+:root {
+  --tl-video: #5aa6e0;
+  --tl-audio: var(--good);
+  --tl-row-video: 56px;
+  --tl-row-audio: 40px;
+  --tl-ruler: 26px;
+}
+
+/* On a phone the page is one column in the order it is used: the picture,
+   its buttons, the tracks, and then what is chosen on them. */
+.kit-timeline { display: flex; flex-direction: column; padding-bottom: calc(24px + var(--bottom)); }
+.tl-desk { display: contents; }
+.tl-viewer { order: 1; }
+.tl-tracks { order: 2; }
+.tl-side { order: 3; margin-top: 8px; }
+.tl-quiet { margin: 4px 4px 10px; color: var(--muted); font-size: 14px; }
+
+/* -- the header: export and how it is going -------------------------------- */
+.tl-headbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin: -8px 0 12px;
+}
+.tl-status {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tone, var(--muted));
+  font-size: 14px;
+  font-weight: 600;
+}
+.tl-spin {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: tl-spin .9s linear infinite;
+}
+@keyframes tl-spin { to { transform: rotate(360deg); } }
+.tl-head-actions { display: inline-flex; align-items: center; gap: 8px; margin-right: 4px; }
+/* Export is a Quill's action, drawn as one: its button is the form's. */
+.heading .act-button { min-height: 38px; padding: 0 18px; }
+.heading .tl-open { min-height: 36px; font-family: var(--display); font-weight: 600; }
+
+/* -- the desk: material, viewer, the chosen piece ---------------------------- */
+.tl-material { display: none; }
+.tl-viewer { min-width: 0; }
+.tl-stage-box { display: flex; justify-content: center; width: 100%; }
+.tl-stage {
+  position: relative;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tl-stage canvas { display: block; width: 100%; height: 100%; }
+.tl-over { position: absolute; inset: 0; }
+.tl-media { position: fixed; left: -10px; top: 0; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+
+/* The box on the picture: a blur's in amber, the crop's in white with the
+   rest of the picture dimmed around it. */
+.tl-box {
+  position: absolute;
+  border: 2px solid var(--action);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .5);
+  cursor: move;
+  touch-action: none;
+}
+.tl-box.off { border-style: dashed; opacity: .6; }
+.tl-box.crop { border-color: #fff; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .58); }
+/* The handles sit inside the box's edges, so a box at the frame's edge —
+   the crop, at first — still has all eight to hold. */
+.tl-box i {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border: 2px solid var(--action);
+  border-radius: 3px;
+  touch-action: none;
+}
+.tl-box.crop i { border-color: rgba(0, 0, 0, .6); }
+.tl-box [data-h="nw"] { left: 0; top: 0; cursor: nwse-resize; }
+.tl-box [data-h="n"] { left: 50%; top: 0; transform: translateX(-50%); cursor: ns-resize; }
+.tl-box [data-h="ne"] { right: 0; top: 0; cursor: nesw-resize; }
+.tl-box [data-h="e"] { right: 0; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.tl-box [data-h="se"] { right: 0; bottom: 0; cursor: nwse-resize; }
+.tl-box [data-h="s"] { left: 50%; bottom: 0; transform: translateX(-50%); cursor: ns-resize; }
+.tl-box [data-h="sw"] { left: 0; bottom: 0; cursor: nesw-resize; }
+.tl-box [data-h="w"] { left: 0; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+/* A finger needs more to hold on to than a pointer does. */
+@media (pointer: coarse) {
+  .tl-box i { width: 22px; height: 22px; border-radius: 6px; }
+}
+
+.tl-transport {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin: 8px 0 0;
+}
+.tl-transport button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 40px;
+  height: 40px;
+  border-radius: var(--radius-control);
+  color: var(--accent);
+}
+.tl-transport .tl-play {
+  min-width: 48px;
+  height: 44px;
+  margin: 0 4px;
+  background: var(--fill);
+  color: var(--fill-ink);
+  box-shadow: inset 0 -2px 0 var(--fill-pressed);
+}
+.tl-transport button:active { background: var(--card-2); }
+.tl-transport .tl-play:active { background: var(--fill-pressed); }
+/* On a phone the time is a line of its own over the buttons. */
+.tl-time {
+  order: -1;
+  flex-basis: 100%;
+  text-align: center;
+  margin: 0 0 2px;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tl-time b { color: var(--ink); font-weight: 600; }
+.tl-crop-toggle span { display: none; }
+.tl-crop-toggle.on { background: var(--fill); color: var(--fill-ink); }
+
+/* -- the tracks ---------------------------------------------------------------- */
+.tl-tracks {
+  margin: 14px 0 0;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.tl-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
+}
+.tl-tools button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 36px;
+  height: 36px;
+  justify-content: center;
+  padding: 0 8px;
+  border-radius: var(--radius-control);
+  color: var(--accent);
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 600;
+}
+.tl-tools button:disabled { color: var(--muted); opacity: .45; cursor: default; }
+.tl-tools .tl-delete:not(:disabled) { color: var(--bad); }
+.tl-tools-gap { flex: 1; }
+.tl-body { display: grid; grid-template-columns: 58px 1fr; }
+.tl-heads { border-right: 1px solid var(--line); background: var(--bar); }
+.tl-head-ruler { height: var(--tl-ruler); border-bottom: 1px solid var(--line); }
+.tl-head {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.1;
+  overflow: hidden;
+}
+.tl-head.video, .tl-row.video { height: var(--tl-row-video); }
+.tl-head.audio, .tl-row.audio { height: var(--tl-row-audio); }
+.tl-lanes { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
+.tl-inner { position: relative; min-width: 100%; }
+.tl-ruler {
+  position: relative;
+  height: var(--tl-ruler);
+  border-bottom: 1px solid var(--line);
+  background: repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px var(--minor, 10px)) bottom / 100% 6px no-repeat;
+  cursor: col-resize;
+  touch-action: none;
+}
+.tl-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  padding: 2px 0 0 4px;
+  border-left: 1px solid var(--line-bright);
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.tl-row { position: relative; border-bottom: 1px solid var(--line); }
+.tl-row.audio { background: color-mix(in srgb, var(--tl-audio) 4%, transparent); }
+
+.tl-piece {
+  --c: var(--tl-video);
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  min-width: 2px;
+  border: 1px solid color-mix(in srgb, var(--c) 70%, transparent);
+  border-radius: 6px;
+  background-color: color-mix(in srgb, var(--c) 28%, var(--card));
+  background-size: auto 100%;
+  background-repeat: repeat-x;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tl-piece.audio, .tl-piece.sound { --c: var(--tl-audio); }
+.tl-piece.muted { opacity: .55; }
+.tl-piece.on { border-color: var(--action); box-shadow: 0 0 0 1px var(--action); z-index: 2; touch-action: none; }
+.tl-piece.dragging { cursor: grabbing; opacity: .85; z-index: 3; }
+.tl-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+  pointer-events: none;
+}
+.tl-name svg { flex: none; width: 13px; height: 13px; }
+.tl-badge {
+  position: absolute;
+  left: 8px;
+  bottom: 3px;
+  color: var(--action);
+  font-size: 10.5px;
+  font-weight: 600;
+  pointer-events: none;
+}
+.tl-key {
+  position: absolute;
+  bottom: 4px;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  background: var(--ink);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .5);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.tl-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.tl-edge.left { left: 0; }
+.tl-edge.right { right: 0; }
+.tl-piece.on .tl-edge { background: color-mix(in srgb, var(--action) 70%, transparent); }
+.tl-piece.on .tl-edge.left { border-radius: 5px 0 0 5px; }
+.tl-piece.on .tl-edge.right { border-radius: 0 5px 5px 0; }
+/* A finger trims only the chosen piece, by wider ends. */
+@media (pointer: coarse) {
+  .tl-piece:not(.on) .tl-edge { display: none; }
+  .tl-piece.on .tl-edge { width: 16px; }
+}
+.tl-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1px;
+  width: 2px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 4;
+}
+.tl-playhead::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -5px;
+  border: 6px solid transparent;
+  border-top: 8px solid var(--accent);
+}
+
+/* -- the chosen piece, its effects, the crop ------------------------------------ */
+.tl-side .group-label:first-child { margin-top: 4px; }
+.tl-hint { margin-top: 14px; }
+.tl-card .row { min-height: 48px; }
+.tl-volume input, .tl-field input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
+.tl-volume .main { flex: none; }
+.tl-volume output, .tl-field output {
+  flex: none;
+  min-width: 3.2em;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tl-effects { display: flex; flex-direction: column; gap: 8px; margin: 0 0 10px; }
+.tl-effect {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.tl-effect.on { border-color: color-mix(in srgb, var(--action) 60%, var(--line)); }
+.tl-effect.other { padding: 10px 14px; }
+.tl-effect-pick {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  text-align: left;
+  font-weight: 600;
+}
+.tl-effect.on .tl-effect-pick { color: var(--action); }
+.tl-effect-body { padding: 0 14px 12px; }
+.tl-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  font-size: 14px;
+}
+.tl-field > span { flex: none; min-width: 4.6em; color: var(--muted); }
+.tl-field input[type="text"], .tl-field input[type="number"] {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  outline: none;
+}
+.tl-field input:focus { border-color: var(--accent); }
+.tl-keys-label { margin: 8px 0 6px; font-size: 14px; color: var(--muted); }
+.tl-keys-label .tl-quiet { margin: 0; font-size: 12.5px; }
+.tl-keyframes { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.tl-keyframe {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card-2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.tl-keyframe.here { border-color: var(--action); }
+.tl-keyframe button { height: 30px; padding: 0 8px; color: var(--accent); }
+.tl-keyframe .tl-unkey { padding: 0 8px 0 2px; color: var(--muted); }
+.tl-drop-effect {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--bad);
+  font-size: 14px;
+}
+.tl-drop-effect svg { width: 18px; height: 18px; }
+.tl-add-blur, .tl-row-buttons .act-chip { gap: 6px; }
+.tl-crop-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.tl-field.small > span { min-width: 3.4em; }
+.tl-row-buttons { display: flex; gap: 8px; margin: 0 0 12px; }
+
+/* -- the material ------------------------------------------------------------------ */
+.tl-target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.tl-target select {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  background: var(--field);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  font: inherit;
+}
+.tl-folder { margin: 12px 4px 6px; color: var(--muted); font-size: 13px; font-weight: 600; }
+.tl-file { min-height: 50px; gap: 10px; padding: 6px 8px 6px 12px; }
+.tl-file .icon { width: 22px; }
+.tl-file .title { font-size: 15px; }
+.tl-add {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  color: var(--accent);
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 600;
+}
+.tl-add:disabled { opacity: .5; }
+.tl-material-sheet { max-height: 80dvh; display: flex; flex-direction: column; }
+.tl-sheet-list { overflow-y: auto; padding: 0 12px 8px; }
+.tl-material-sheet .group { margin-bottom: 8px; }
+
+/* A phone's bar along the bottom would take the tracks' room: the editor
+   goes without it, as an editor does, with Back to the projects. */
+@media (max-width: 899px), (max-height: 599px) {
+  #app:has(main.kit-timeline) > nav.tabs { display: none; }
+}
+
+/* -- a computer: the material and the piece beside the picture ------------------------- */
+@media (min-width: 900px) and (min-height: 600px) {
+  #app:has(.kit-timeline) { --column: 1400px; }
+  .kit-timeline { display: block; }
+  .tl-side { margin-top: 0; }
+  .tl-time { order: 0; flex-basis: auto; margin: 0 6px; }
+  .tl-transport { flex-wrap: nowrap; }
+  .tl-desk {
+    display: grid;
+    grid-template-columns: minmax(200px, 250px) minmax(0, 1fr) minmax(240px, 300px);
+    gap: 16px;
+  }
+  /* As tall as the viewer and no taller, so the tracks stay where they are
+     whatever is chosen: the two sides scroll inside themselves. */
+  .tl-material, .tl-side { height: 0; min-height: 100%; overflow-y: auto; }
+  .tl-material { display: block; }
+  .tl-material .group-label:first-child { margin-top: 4px; }
+  .tl-material-open { display: none !important; }
+  .tl-crop-toggle span { display: inline; }
+  .tl-crop-toggle { padding: 0 10px; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .tl-transport button:not(.tl-play):hover, .tl-tools button:not(:disabled):hover, .tl-add:hover,
+  .tl-keyframe button:hover, .tl-effect-pick:hover { background: var(--card-2); }
+  .tl-transport .tl-play:hover { background: var(--fill-hover); }
+  .tl-piece:hover { filter: brightness(1.12); }
+}

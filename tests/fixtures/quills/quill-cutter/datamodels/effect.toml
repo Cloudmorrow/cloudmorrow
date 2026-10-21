@@ -1,0 +1,13 @@
+[datamodel]
+id = "cutter.effect"
+version = 1
+label = "Effect"
+scopes = ["personal"]
+title = "label"
+
+[fields]
+piece = { kind = "link", to = "cutter.piece", required = true, indexed = true, on_delete = "cascade" }
+kind = { kind = "enum", values = ["blur"], default = "blur" }
+label = { kind = "string", required = true }
+strength = { kind = "int", default = 20 }
+keyframes = { kind = "json", default = [] }

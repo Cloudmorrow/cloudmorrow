@@ -1,0 +1,17 @@
+[datamodel]
+id = "cutter.project"
+version = 1
+label = "Project"
+scopes = ["personal"]
+title = "name"
+
+[fields]
+name = { kind = "string", required = true }
+width = { kind = "int" }
+height = { kind = "int" }
+fps = { kind = "decimal" }
+tracks = { kind = "json" }
+crop = { kind = "json" }
+status = { kind = "enum", values = ["editing", "queued", "rendering", "done", "failed"], default = "editing" }
+message = { kind = "string" }
+output = { kind = "string" }

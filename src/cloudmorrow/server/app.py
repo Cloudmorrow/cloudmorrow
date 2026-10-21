@@ -291,6 +291,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         ],
     )
     app.include_router(records.router)
+    app.include_router(records.media_router)
     app.include_router(snapshots.router)
     app.include_router(snapshots.guest_router)
     app.include_router(snapshots.attest_router)

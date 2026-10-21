@@ -203,6 +203,10 @@ def preview(plan: dict) -> str:
             lines.append("  opening one: the page, beside the tree")
             lines.append("")
             continue
+        elif screen["kit"] == "timeline":
+            lines.extend(_timeline_sketch(plan, screen, title))
+            lines.append("")
+            continue
         elif screen["kit"] == "thread":
             space = fields.get(screen.get("space", ""), {}).get("to", "space")
             about = f" — <{screen['about']}>" if screen.get("about") else ""
@@ -221,6 +225,37 @@ def preview(plan: dict) -> str:
         lines.append(f"  opening one: a sheet with {', '.join(editable)}")
         lines.append("")
     return "\n".join(lines)
+
+
+def _timeline_sketch(plan: dict, screen: dict, title: str) -> list[str]:
+    """A timeline as the terminal draws it: material, viewer and effects over the tracks."""
+    media = screen.get("media") or {}
+    where = " / ".join(str(media[k]) for k in ("share", "within") if media.get(k)) or "the drive"
+    frames = screen.get("frames")
+    effects = screen.get("effects")
+    export = next((a for a in plan.get("actions", []) if a.get("id") == screen.get("export")), None)
+    head = f"  <{title}>  <width>×<height> · <fps> fps"
+    if export:
+        head += f"   <status> <message>   [ {export.get('label') or export['id']} e ]"
+    viewer = "<the cut, from " + frames + ">" if frames else "<what is at the playhead>"
+    lines = [
+        f"  first the {screen['model']}s, newest first, with New; one opens the editor:",
+        head,
+        f"  {'Material':<18}│ {'Viewer':<27}│ Effects",
+        f"  ▶ <file>  0:12.00 │ {viewer[:27]:<27}│ " + ("<label>  blur" if effects else "—"),
+        f"  ♪ <file>  3:05.10 │ {'0:03.20 / 0:24.00':<27}│ " + ("  0:01.00  35 35 30 30" if effects else ""),
+        "       0:00      0:05      0:10      0:15",
+        "  V2  ·         ┃",
+        "  V1  [<name>███┃████][<name>████]",
+        "  A1  [<name>███┃███████████████]",
+        "  A2  ·         ┃",
+        f"  pieces are {screen.get('pieces')}" + (f", effects {effects}" if effects else "") + f"; material in {where}",
+    ]
+    if not frames:
+        lines.append("  no frames API: the viewer says what is at the playhead, and Add asks a length")
+    lines.append("  space plays, ←/→ a frame, [ ] trim, s split, m move, ↑/↓ track, x delete,")
+    lines.append("  b blur, k keyframe, c crop" + (", e export" if export else "") + "; tab: material, tracks, effects")
+    return lines
 
 
 def _plan_offline(folder: Path, datamodels: Path | None) -> dict:

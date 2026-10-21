@@ -818,6 +818,16 @@ class CloudmorrowClient:
         response = await self._request("GET", f"/api/records/{model}/{record_id}/content", timeout=UPLOAD_TIMEOUT)
         return response.content
 
+    async def record_media(self, model: str, record_id: str) -> dict:
+        """A link to a record's bytes that needs no token, for six hours: {url, expires}."""
+        return (await self._request("POST", f"/api/records/{model}/{record_id}/media")).json()
+
+    async def quill_api(self, path: str, params: dict | None = None) -> httpx.Response:
+        """GET one of a Quill's [[apis]], under /api/q/: a timeline's frames, as JPEG or JSON."""
+        return await self._request(
+            "GET", "/api/q/" + path.removeprefix("/api/q/").lstrip("/"), params=params, timeout=UPLOAD_TIMEOUT
+        )
+
     async def record_thumb(self, model: str, record_id: str, *, size: int = 256) -> bytes:
         """A JPEG with its long edge at *size* or so; a 415 when the server
         cannot make one of that record's bytes."""

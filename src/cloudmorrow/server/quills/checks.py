@@ -128,6 +128,8 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
                 need(model, thing, name)
         elif kit == "calendar":
             _check_calendar(screen, model, models, thing, need, where)
+        elif kit == "timeline":
+            _check_timeline(manifest, screen, model, model_of, thing, need, where)
         elif kit == "editor":
             # A page of text with a title; `path`, when bound, is a string
             # like `folder/sub/title` whose folders are the tree beside it.
@@ -341,6 +343,81 @@ def _check_calendar(screen: dict, model: Datamodel, models: dict[str, Datamodel]
         need(space, thing + " colour", screen["colour"], ("string", "enum"))
     if screen.get("subtitle"):
         need(model, thing + " subtitle", screen["subtitle"])
+
+
+# A timeline's datamodels carry the kit's own field names (docs/TIMELINE.md):
+# (field, kinds, required). The web app, the terminal and `cm` read them so.
+TIMELINE_PROJECT = (
+    ("width", ("int",), True),
+    ("height", ("int",), True),
+    ("fps", ("decimal",), True),
+    ("tracks", ("json",), True),
+    ("crop", ("json",), False),
+    ("status", ("enum",), False),
+    ("message", ("string", "text"), False),
+    ("output", ("string",), False),
+)
+TIMELINE_PIECE = (
+    ("track", ("string",), True),
+    ("source", ("string",), True),
+    ("name", ("string",), True),
+    ("start", ("decimal",), True),
+    ("offset", ("decimal",), True),
+    ("length", ("decimal",), True),
+    ("volume", ("decimal",), False),
+    ("muted", ("bool",), False),
+)
+TIMELINE_EFFECT = (
+    ("kind", ("enum",), True),
+    ("label", ("string",), True),
+    ("keyframes", ("json",), True),
+    ("strength", ("int",), False),
+)
+
+
+def timeline_link(model: Datamodel, to: str) -> str:
+    """The one field of *model* that links to *to*, or "" when there is not exactly one."""
+    links = [f.name for f in model.fields if f.kind == "link" and f.to == to]
+    return links[0] if len(links) == 1 else ""
+
+
+def _check_timeline(manifest: Manifest, screen: dict, model: Datamodel, model_of, thing: str, need, where: str) -> None:
+    """A timeline: a project, the pieces on its tracks, their effects, and where the material is."""
+
+    def fields(of: Datamodel, wanted: tuple, label: str) -> None:
+        for name, kinds, required in wanted:
+            if required or name in of.by_name:
+                need(of, f"{thing} {label}", name, kinds)
+
+    def linked(of: Datamodel, to: Datamodel, label: str) -> None:
+        if not timeline_link(of, to.id):
+            raise QuillError(f"{where}: {thing} {label} {of.id} has exactly one link to {to.id}")
+
+    fields(model, TIMELINE_PROJECT, "project")
+    if not isinstance(screen.get("pieces"), str):
+        raise QuillError(f'{where}: {thing} is a timeline, so it names its pieces: pieces = "<datamodel>"')
+    pieces = model_of(thing + " pieces", screen["pieces"])
+    fields(pieces, TIMELINE_PIECE, "pieces")
+    linked(pieces, model, "pieces")
+    if screen.get("effects"):
+        effects = model_of(thing + " effects", screen["effects"])
+        fields(effects, TIMELINE_EFFECT, "effects")
+        linked(effects, pieces, "effects")
+    media = screen.get("media", {})
+    if not isinstance(media, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in media.items()):
+        raise QuillError(
+            f'{where}: {thing} media is where the material is: media = {{ share = "my-files", within = "Videos" }}'
+        )
+    if "file" not in manifest.models:
+        raise QuillError(
+            f'{where}: {thing} lays files on its tracks, so the Quill uses them: [uses] datamodels = ["file"]'
+        )
+    if screen.get("frames") and screen["frames"] not in {api["id"] for api in manifest.apis}:
+        raise QuillError(f"{where}: {thing} frames names one of its [[apis]] by id")
+    if screen.get("export"):
+        action = next((a for a in manifest.actions if a["id"] == screen["export"]), None)
+        if action is None or action.get("on") != model.id:
+            raise QuillError(f"{where}: {thing} export names one of its actions on {model.id}")
 
 
 def runs_code(manifest: Manifest) -> list[str]:
