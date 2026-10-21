@@ -136,7 +136,9 @@ RUNNER = """
 import * as rules from "%s";
 import { readFileSync } from "node:fs";
 const calls = JSON.parse(readFileSync(0, "utf8"));
-console.log(JSON.stringify(calls.map(([name, ...args]) => rules[name](...args))));
+// A name that is not a function is a constant, sent as it is.
+const answer = ([name, ...args]) => (typeof rules[name] === "function" ? rules[name](...args) : rules[name]);
+console.log(JSON.stringify(calls.map(answer)));
 """
 
 
@@ -271,3 +273,32 @@ def test_tracks_material_and_the_crop(tmp_path):
     # Counted out from the middle, as the terminal does: Video 1, then Audio 1.
     assert first_video["id"] == "V1"
     assert crop == {"x": 50, "y": 0, "w": 50, "h": 100} and whole == {"x": 0, "y": 0, "w": 100, "h": 100}
+
+
+@node
+def test_a_new_project_takes_a_size_or_the_first_clips(tmp_path):
+    from cloudmorrow.quill import timeline as tl
+
+    sizes, hd, odd, nonsense = run(
+        tmp_path,
+        ["SIZES"],
+        ["sizeFrom", "1920x1080"],
+        ["sizeFrom", "1001 × 9"],
+        ["sizeFrom", "big"],
+    )
+    # The same choices, in the same order, as the terminal offers.
+    assert [list(s) for s in tl.SIZES] == sizes and sizes[0][0] == ""
+    assert hd == {"width": 1920, "height": 1080} == tl.size_from("1920x1080")
+    assert odd == {"width": 1002, "height": 16} == tl.size_from("1001 × 9")
+    assert nonsense is None and tl.size_from("big") is None
+
+
+def test_new_is_a_button_with_a_form_and_plus_on_the_tracks_adds_a_clip():
+    code = js_code(TIMELINE_JS)
+    # No line to type into on the list: the compose button asks, in a sheet.
+    assert "kit-add" not in code
+    assert 'compose.addEventListener("click", () => newProject(at, b))' in code
+    assert "openSheet(" in code and 'name="size"' in code
+    # On the tracks, + is Add clip; zooming is a magnifier.
+    assert '<button type="button" class="tl-add-clip">${glyphs.plus}' in code
+    assert 'aria-label="Zoom in" title="Zoom in">${glyphs.zoomIn}' in code

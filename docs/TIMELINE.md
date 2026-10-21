@@ -116,8 +116,13 @@ only for records the asker can read, and only for the bytes.
 
 ## What each surface does
 
-**Projects.** The screen opens on the projects, newest first, with New. A
-project opens the editor; Back returns to the list. Opened with a `project`
+**Projects.** The screen opens on the projects, newest first, with New.
+New asks, in a form, for the project's name and its video size: one of the
+usual ones (1080p, 720p, 4K, vertical 1080 × 1920, square 1080 × 1080),
+another typed as width × height (rounded up to even, 16 to 7680), or "From
+the first clip", which leaves `width` and `height` blank for the first
+video added to fill. A size chosen here is kept; `fps` is still the first
+video's. A project opens the editor; Back returns to the list. Opened with a `project`
 parameter (`go("editor", project=<id>)` from an action or a view), it opens
 that project's editor straight away.
 
@@ -129,7 +134,9 @@ that project's editor straight away.
   none.
 - *Viewer*: the picture at the playhead with effects and crop drawn; play and
   pause, step a frame, jump to start and end, the time and the total.
-- *Tracks*: one row per track, pieces drawn to scale, a playhead, zoom. A
+- *Tracks*: one row per track, pieces drawn to scale, a playhead, zoom
+  (magnifiers on the web, + and − in the terminal). Add clip, above them,
+  brings up the material to put one at the playhead. A
   piece is selected by choosing it; selected, it can be moved (to a time, to
   another track of the same kind), trimmed at either end, split at the
   playhead, muted, its volume set, or deleted. Moves snap to other pieces'
@@ -160,7 +167,8 @@ split, m move to the playhead, ↑/↓ another track, x delete, b add a blur,
 k set a keyframe from typed numbers, c crop, e export, tab between
 material, tracks and effects.
 
-**Command line.** `cm <quill> list` lists the projects; `show <project>`
+**Command line.** `cm <quill> list` lists the projects; `add <name>
+[size=1920x1080]` makes one; `show <project>`
 prints the tracks and pieces with times; `add <project> <file> [--track V1]
 [--at 0]`, `cut <project> <piece> <at>`, `trim <project> <piece> --start/--end <s>`,
 `move <project> <piece> --at <s> [--track]`, `rm <project> <piece>`;

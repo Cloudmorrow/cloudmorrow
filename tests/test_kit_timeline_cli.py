@@ -196,3 +196,11 @@ def test_the_other_kits_do_not_have_a_timelines_words(tasks_quill, monkeypatch):
 
     with pytest.raises(typer.Exit):
         asyncio.run(go())
+
+
+def test_a_new_project_may_say_its_size(cm, cutter):
+    cm("add", "Vertical", "size=1080x1920")
+    made = next(r for r in records(cutter, "cutter.project") if r["fields"]["name"] == "Vertical")
+    assert (made["fields"]["width"], made["fields"]["height"]) == (1080, 1920)
+    with pytest.raises(typer.Exit):
+        cm("add", "Odd", "size=big")

@@ -54,6 +54,31 @@ VIDEO_EXT = frozenset({"mp4", "m4v", "mov", "mkv", "webm", "avi", "wmv", "mpg", 
 AUDIO_EXT = frozenset({"mp3", "m4a", "aac", "flac", "wav", "ogg", "opus", "aiff", "wma"})
 
 
+# The sizes a new project can start at; "" leaves it to the first clip added,
+# which gives it its own size and frame rate.
+SIZES = (
+    ("", "From the first clip"),
+    ("1920x1080", "1080p · 1920 × 1080"),
+    ("1280x720", "720p · 1280 × 720"),
+    ("3840x2160", "4K · 3840 × 2160"),
+    ("1080x1920", "Vertical · 1080 × 1920"),
+    ("1080x1080", "Square · 1080 × 1080"),
+)
+
+
+def size_from(text: str) -> dict | None:
+    """ "1920x1080" (or "1920 × 1080") as width and height: even, 16 to 7680 pixels;
+    None when it is not a size."""
+    m = re.match(r"^(\d+)\s*[x×*]\s*(\d+)$", str(text or "").strip(), re.IGNORECASE)
+    if not m:
+        return None
+
+    def even(n: str) -> int:
+        return min(7680, max(16, (int(n) + 1) // 2 * 2))
+
+    return {"width": even(m.group(1)), "height": even(m.group(2))}
+
+
 def seconds(value: object, default: float = 0.0) -> float:
     """A stored number as seconds: a decimal arrives as a string, a blank as *default*."""
     if value is None or value == "":

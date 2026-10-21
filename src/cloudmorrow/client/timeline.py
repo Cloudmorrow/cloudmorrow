@@ -97,8 +97,18 @@ class Timeline:
         return response.content
 
     # -- writing -----------------------------------------------------------------
-    async def new_project(self, name: str) -> dict:
-        return await self.api.create_record(self.project_model, {self.title: name})
+    @property
+    def keeps_size(self) -> bool:
+        """Whether a project here keeps a size of its own (width and height)."""
+        return {"width", "height"} <= set(self.bound["fields"])
+
+    async def new_project(self, name: str, size: dict | None = None) -> dict:
+        """A project called *name*, *size* (width and height) when one is given;
+        otherwise the first clip added gives it its own."""
+        fields = {self.title: name}
+        if size and self.keeps_size:
+            fields.update(width=size["width"], height=size["height"])
+        return await self.api.create_record(self.project_model, fields)
 
     async def add(
         self,

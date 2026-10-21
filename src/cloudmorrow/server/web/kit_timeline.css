@@ -440,6 +440,14 @@
 .tl-sheet-list { overflow-y: auto; padding: 0 12px 8px; }
 .tl-material-sheet .group { margin-bottom: 8px; }
 
+/* A new project: its name, and the size of its picture, one of a list. */
+.tl-new .group-label { margin-top: 14px; }
+.tl-sizes .row { gap: 12px; cursor: pointer; }
+.tl-sizes input[type="radio"] { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+.tl-new .tl-other { margin-top: 8px; }
+.tl-new .tl-size-note { padding-top: 8px; }
+.tl-tools .tl-add-clip { padding: 0 12px; }
+
 /* A phone's bar along the bottom would take the tracks' room: the editor
    goes without it, as an editor does, with Back to the projects. */
 @media (max-width: 899px), (max-height: 599px) {

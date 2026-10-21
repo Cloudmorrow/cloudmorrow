@@ -98,9 +98,15 @@ async def _act_timeline(
             table.add_row(_short(record["id"]), escape(str(f.get(line.title) or "")), _size(f), escape(_status(f)))
         quillrun.out.print(table)
         return
-    if action == "add" and len(args) == 1:
-        # `add <name>` with nothing to put on it: a new project.
-        made = await line.new_project(args[0])
+    if action == "add" and (len(args) == 1 or (len(args) == 2 and args[1].startswith("size="))):
+        # `add <name> [size=1920x1080]` with nothing to put on it: a new
+        # project, its size the first clip's unless one is said.
+        size = None
+        if len(args) == 2:
+            size = tl.size_from(args[1].removeprefix("size="))
+            if size is None:
+                fail(f"a size is width x height: {command} add <name> size=1920x1080")
+        made = await line.new_project(args[0], size)
         quillrun.console.print(f"[green]Made[/] {escape(args[0])} [dim]{_short(made['id'])}[/]")
         return
     if not args:

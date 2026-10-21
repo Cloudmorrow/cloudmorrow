@@ -41,7 +41,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widget import Widget
-from textual.widgets import ContentSwitcher, DataTable, Static
+from textual.widgets import Button, ContentSwitcher, DataTable, Input, Label, RadioButton, RadioSet, Static
 
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.client.timeline import Timeline
@@ -50,7 +50,7 @@ from cloudmorrow.quill.screens import tracks_of
 from cloudmorrow.tui.kitdata import title_of
 from cloudmorrow.tui.panes.kit import KitPane
 from cloudmorrow.tui.quill_actions import run_action
-from cloudmorrow.tui.screens.modals import PromptModal
+from cloudmorrow.tui.screens.modals import Modal, PromptModal
 from cloudmorrow.tui.theme import ACCENT, ACTION, BAD, FAINT, GOOD, LENS, MUTED, PANEL, SKY, TEXT
 from cloudmorrow.tui.widgets.picture import TerminalImage
 from cloudmorrow.tui.widgets.toolbar import Action
@@ -286,6 +286,87 @@ class TrackRows(Widget, can_focus=True):
         rows = event.screen_y - row
         if moved or rows:
             self.pane.dragged(piece, moved, rows)
+
+
+class NewProjectModal(Modal[tuple[str, dict | None] | None]):
+    """A new project's name and the size of its picture: one of the usual ones,
+    another typed as 1920x1080, or the first clip's. Dismisses with
+    `(name, size)` — size None for the first clip's — or None."""
+
+    BINDINGS = [("escape", "cancel", "Cancel"), ("ctrl+s", "save", "Make it")]
+
+    def __init__(self, noun: str, *, sized: bool = True) -> None:
+        super().__init__()
+        self.noun = noun
+        self.sized = sized
+        self.choices = [*tl.SIZES, ("other", "Another size…")]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal modal-wide", id="tl-new"):
+            yield Label(f"New {self.noun}", classes="modal-title")
+            yield Input(placeholder="Name", id="tl-new-name")
+            if self.sized:
+                yield Static(f"[{MUTED}]video size[/]", classes="pane-title")
+                yield RadioSet(
+                    *(RadioButton(text, value=index == 0) for index, (_, text) in enumerate(self.choices)),
+                    id="tl-new-size",
+                    compact=True,
+                )
+                yield Input(placeholder="1920x1080", id="tl-new-other")
+            yield Static("", id="tl-new-complaint", classes="modal-detail")
+            with Horizontal(classes="modal-buttons"):
+                yield Button("Cancel", id="cancel")
+                yield Button(f"Make the {self.noun}", variant="primary", id="save")
+
+    def on_mount(self) -> None:
+        self.query_one("#tl-new-name", Input).focus()
+        if self.sized:
+            self.query_one("#tl-new-other", Input).display = False
+
+    def _choice(self) -> str:
+        index = self.query_one("#tl-new-size", RadioSet).pressed_index
+        return self.choices[index][0] if 0 <= index < len(self.choices) else ""
+
+    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+        event.stop()
+        other = self.query_one("#tl-new-other", Input)
+        other.display = self._choice() == "other"
+        if other.display:
+            other.focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Enter makes it, with the size chosen so far: the first clip's, unless
+        tab went down to another."""
+        event.stop()
+        self.action_save()
+
+    def action_save(self) -> None:
+        name = self.query_one("#tl-new-name", Input).value.strip()
+        if not name:
+            self._complain("It needs a name.", "#tl-new-name")
+            return
+        size = None
+        if self.sized and (choice := self._choice()):
+            typed = self.query_one("#tl-new-other", Input).value
+            size = tl.size_from(typed if choice == "other" else choice)
+            if size is None:
+                self._complain("Say the size as width x height, like 1920x1080.", "#tl-new-other")
+                return
+        self.dismiss((name, size))
+
+    def _complain(self, words: str, where: str) -> None:
+        self.query_one("#tl-new-complaint", Static).update(f"[{BAD}]{words}[/]")
+        self.query_one(where, Input).focus()
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        event.stop()
+        if event.button.id == "save":
+            self.action_save()
+        else:
+            self.dismiss(None)
 
 
 class TimelinePane(KitPane):
@@ -912,11 +993,13 @@ class TimelinePane(KitPane):
 
     @work(group="ui")
     async def new_project(self) -> None:
-        name = await self.app.push_screen_wait(PromptModal("New project", placeholder="Holiday 2026"))
-        if not name:
+        noun = str(self.line.model.get("label") or "project").lower()
+        answer = await self.app.push_screen_wait(NewProjectModal(noun, sized=self.line.keeps_size))
+        if not answer:
             return
+        name, size = answer
         try:
-            made = await self.line.new_project(name)
+            made = await self.line.new_project(name, size)
         except ApiError as exc:
             await self.went_wrong(exc)
             return
