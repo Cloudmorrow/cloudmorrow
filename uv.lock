@@ -331,6 +331,7 @@ server = [
     { name = "zeroconf" },
 ]
 tui = [
+    { name = "cryptography" },
     { name = "httpx" },
     { name = "platformdirs" },
     { name = "segno" },
@@ -346,6 +347,7 @@ requires-dist = [
     { name = "a2wsgi", marker = "extra == 'server'", specifier = ">=1.10" },
     { name = "argon2-cffi", marker = "extra == 'server'", specifier = ">=23.1" },
     { name = "cryptography", marker = "extra == 'server'", specifier = ">=42.0" },
+    { name = "cryptography", marker = "extra == 'tui'", specifier = ">=42.0" },
     { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.115" },
     { name = "httpx", marker = "extra == 'agent'", specifier = ">=0.27" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },

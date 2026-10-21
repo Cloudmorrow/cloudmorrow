@@ -23,9 +23,8 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
-from cloudmorrow.cli.common import client, console, emit, fail, out, plural, run
+from cloudmorrow.cli.common import client, console, emit, fail, from_server, out, plural, run
 from cloudmorrow.console import TITLE
-from cloudmorrow.server.snapshots import digest_of, verify_attestation, verify_bundle
 
 app = typer.Typer(help="Snapshots: a frozen copy of a space's records, with a digest.", no_args_is_help=True)
 
@@ -167,10 +166,11 @@ def bundle(
     """Write the bundle: the file to send to whoever validates it."""
 
     async def _bundle() -> None:
+        snapshots = from_server("snapshots")
         _, api = client()
         async with api:
             data, digest = await api.snapshot_bundle(snapshot_id)
-        if digest_of(data) != digest:
+        if snapshots.digest_of(data) != digest:
             fail("the bundle does not hash to the digest the server sent with it")
         if path is None:
             emit(data.decode("utf-8"))
@@ -278,12 +278,13 @@ def verify(
     The bundle hashes to a digest; each attestation is checked to be its
     signer's signature over that very digest.
     """
+    snapshots = from_server("snapshots")
     data = bundle_path.read_bytes()
     try:
-        document = verify_bundle(data)
+        document = snapshots.verify_bundle(data)
     except ValueError as exc:
         fail(str(exc))
-    digest = digest_of(data)
+    digest = snapshots.digest_of(data)
     space = document.get("space", {})
     count = sum(len(rows) for rows in document.get("records", {}).values())
     console.print(
@@ -294,7 +295,7 @@ def verify(
     bad = 0
     for path in attestations or []:
         try:
-            checked = verify_attestation(_read_json(path), digest=digest)
+            checked = snapshots.verify_attestation(_read_json(path), digest=digest)
         except ValueError as exc:
             bad += 1
             console.print(f"[red]{path.name}: {exc}[/]")
