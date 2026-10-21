@@ -303,6 +303,37 @@ async function renderEditorFor(at, b, id) {
   ed.raf = requestAnimationFrame(() => tick(ed));
   watchExport(ed);
   loadMaterial(ed);
+  fillBlanks(ed);
+}
+
+/** A piece a Quill made without a length (it could not read the source) gets
+    its source's, read the way Add reads it; and the project its size. */
+async function fillBlanks(ed) {
+  const blank = ed.pieces.filter((p) => !(p.length > 0) && p.source);
+  if (!blank.length || !ed.writes) return;
+  for (const piece of blank) {
+    const info = await lengthFor(ed, { id: piece.source, name: piece.name, kind: "video" });
+    if (!ed.alive || !info || !(info.duration > 0)) continue;
+    know(ed, piece.source, info);
+    const length = ms(Math.max(0, info.duration - piece.offset));
+    await write(ed, async () => {
+      await patch(ed.b.pieces.id, piece.id, { length });
+      piece.length = length;
+      const f = ed.project.fields;
+      if (info.width && info.height && !(Number(f.width) > 0 && Number(f.height) > 0)) {
+        const size = { width: info.width, height: info.height };
+        if (!(Number(f.fps) > 0)) size.fps = info.fps || 30;
+        Object.assign(f, size);
+        await patch(ed.b.model.id, ed.id, size);
+      }
+    });
+  }
+  fitZoom(ed);
+  fitStage(ed);
+  drawTracks(ed);
+  drawSide(ed);
+  showTime(ed, ed.t);
+  ed.dirty = true;
 }
 
 function stopEditor(ed) {
