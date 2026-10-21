@@ -1,0 +1,21 @@
+/* A question with a line to type (dialog.js): the field sits in the same
+   sheet as the question, drawn as a field of the app's, and takes the focus
+   the moment the sheet is up. */
+.act-text { display: block; }
+.act-input {
+  display: block;
+  width: calc(100% - 32px);
+  margin: 10px 16px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line-bright);
+  border-radius: var(--radius-control);
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  /* 16px or iOS zooms the page the moment it is focused. */
+  font-size: 16px;
+  line-height: 1.35;
+}
+.act-input::placeholder { color: var(--muted); }
+.act-input:focus { outline: none; border-color: var(--accent); }
+textarea.act-input.long { resize: vertical; min-height: 96px; }

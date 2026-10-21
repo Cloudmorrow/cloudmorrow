@@ -31,6 +31,7 @@ import { circlesByPerson, domainsOf, drawCircles, rulesForm, rulesFrom, rulesSai
 import { drawRoles } from "./rolesadmin.js";
 import { drawQuills } from "./quillsadmin.js";
 import { QUILL_GLYPH } from "./quills.js";
+import { ask } from "./dialog.js";
 
 // The sides, in the order of the rail and of the switch: the places the
 // terminal app's sidebar lists under ADMINISTRATION. The icons are the
@@ -242,7 +243,7 @@ async function drawServer(panel) {
   const button = panel.querySelector(".update-server");
   const log = panel.querySelector(".update-log");
   button.addEventListener("click", async () => {
-    const sure = confirm(
+    const sure = await ask(
       "Update the server?\n\nIt fetches the newest code, reinstalls and restarts. "
       + "Everybody is offline for a few seconds.",
     );
@@ -525,7 +526,7 @@ async function renderUser(username) {
   const remove = form.querySelector(".delete");
   if (remove) {
     remove.addEventListener("click", async () => {
-      const sure = confirm(
+      const sure = await ask(
         `Delete ${user.username}?\n\nSigning in stops at once. Their notes and `
         + "files stay on the disc, under their name.",
       );

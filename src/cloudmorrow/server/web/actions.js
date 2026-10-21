@@ -20,6 +20,7 @@
    buttons, forms and rows (kit_view.js). All three come through `press`. */
 
 import { ApiError, api, app, esc, go, parseHash, route, toast } from "./core.js";
+import { ask, openSheet } from "./dialog.js";
 import { linkTitles, read, segments, widget } from "./kit.js";
 
 // Every installed Quill as the server fitted it to you; quills.js keeps it.
@@ -75,43 +76,7 @@ export function hereNow() {
 }
 
 // -- asking ---------------------------------------------------------------------------------
-// The phone's sheet from the bottom, a dialog in the middle on a computer
-// (desktop.css): the same `.sheet` the grid's choices are drawn on.
-// Tapping outside it, or Escape, is no: `dismissed` hears about it.
-function openSheet(inner, className = "", dismissed = () => {}) {
-  const backdrop = document.createElement("div");
-  backdrop.className = "sheet-backdrop act-backdrop";
-  backdrop.innerHTML = `<div class="sheet act-sheet ${className}" role="dialog" aria-modal="true">${inner}</div>`;
-  document.body.appendChild(backdrop);
-  const close = () => { backdrop.remove(); removeEventListener("keydown", onKey); };
-  const dismiss = () => { close(); dismissed(); };
-  const onKey = (event) => {
-    // Only the sheet on top: a confirm over a form is answered first.
-    if (event.key === "Escape" && [...document.querySelectorAll(".act-backdrop")].pop() === backdrop) dismiss();
-  };
-  addEventListener("keydown", onKey);
-  backdrop.addEventListener("click", (event) => { if (event.target === backdrop) dismiss(); });
-  return { backdrop, sheet: backdrop.firstElementChild, close };
-}
-
-/** Yes or no, in a sheet: resolves true on yes. */
-export function ask(text, { yes = "OK", tone = "neutral" } = {}) {
-  return new Promise((resolve) => {
-    const { backdrop, sheet, close } = openSheet(
-      `<p class="act-question">${esc(text)}</p>` +
-      `<div class="act-buttons"><button type="button" class="act-button" data-answer="no">Cancel</button>` +
-      `<button type="button" class="act-button ${tone === "danger" ? "danger" : "fill"}" data-answer="yes">${esc(yes)}</button></div>`,
-      "act-ask", () => resolve(false));
-    backdrop.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-answer]");
-      if (!button) return;
-      close();
-      resolve(button.dataset.answer === "yes");
-    });
-    sheet.querySelector('[data-answer="yes"]').focus();
-  });
-}
-
+// The sheet, and yes-or-no, are dialog.js's: every screen asks the same way.
 /** A list of things to press, in a sheet: a row's actions, a view's menu. */
 export function choose(title, choices) {
   const { backdrop, close } = openSheet(

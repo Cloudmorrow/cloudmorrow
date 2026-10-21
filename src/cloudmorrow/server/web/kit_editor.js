@@ -35,6 +35,7 @@ import {
 import { installCard } from "./install.js";
 import { mayWrite } from "./kit.js";
 import { bodyMarkup, bodyText, focusBody, mountBody, photoButton, setBody } from "./pictures.js";
+import { ask, askText } from "./dialog.js";
 
 const own = {
   folder: '<svg width="22" height="18" viewBox="0 0 22 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h5l2 2.5h9a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H3a1.5 1.5 0 0 1-1.5-1.5z"/></svg>',
@@ -269,7 +270,7 @@ function listView(b, data, key, openId = "") {
 }
 
 async function newFolder(b, parent) {
-  const name = fileStem(prompt("Folder name") || "");
+  const name = fileStem(await askText("Folder name") || "");
   if (!name) return;
   try {
     await api("POST", recordsUrl(b.model.id, "", withQuery(b, "/_folders")), { path: wholeFolder(b, joinPath(parent, name)) });
@@ -449,7 +450,7 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
   done.addEventListener("click", () => document.activeElement && document.activeElement.blur());
   del.addEventListener("click", async () => {
     if (ed.isNew) { back(parent); return; }
-    if (!confirm(`Delete “${ed.stem}”?`)) return;
+    if (!await ask(`Delete “${ed.stem}”?`)) return;
     try {
       clearTimeout(ed.timer);
       ed.dirty = false;

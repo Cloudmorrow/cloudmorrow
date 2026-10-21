@@ -52,6 +52,7 @@ import {
 } from "./kit_space.js";
 import { mayWrite, plural } from "./kit.js";
 import { listenChanges } from "./changes.js";
+import { ask, askText } from "./dialog.js";
 
 // How often an open conversation asks for what it has not got while the
 // change feed is down, how seldom while it is up (a safety net, not the
@@ -781,7 +782,7 @@ function mentionSuggestions(box, form) {
 function ownChoices(s, state, line, repaint) {
   return [
     { label: "Edit", run: async () => {
-      const text = (prompt("Edit your message", line.fields[s.body] || "") || "").trim();
+      const text = (await askText("Edit your message", line.fields[s.body] || "", { long: true }) || "").trim();
       if (!text || text === line.fields[s.body]) return;
       try {
         const changed = await api("PATCH", recordsUrl(s.model.id, line.id), { fields: { [s.body]: text }, rev: line.rev });
@@ -790,7 +791,7 @@ function ownChoices(s, state, line, repaint) {
       } catch (err) { toast(err.status === 409 ? "That changed somewhere else" : err.message); }
     } },
     { label: "Delete", bad: true, run: async () => {
-      if (!confirm("Delete this message? It goes for everybody.")) return;
+      if (!await ask("Delete this message? It goes for everybody.")) return;
       try {
         await api("DELETE", recordsUrl(s.model.id, line.id));
         state.lines = state.lines.filter((l) => l.id !== line.id);

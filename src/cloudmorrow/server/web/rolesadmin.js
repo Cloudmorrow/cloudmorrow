@@ -14,6 +14,7 @@
 import {
   api, app, esc, icons, mount, nav, registerScreen, renderRoute, replace, toast, wireShell,
 } from "./core.js";
+import { ask } from "./dialog.js";
 
 const roleUrl = (id) => "/api/roles/" + encodeURIComponent(id);
 const plural = (n, word, many = word + "s") => `${n} ${n === 1 ? word : many}`;
@@ -161,7 +162,7 @@ async function renderRole(id) {
   const remove = form.querySelector(".delete");
   if (remove) {
     remove.addEventListener("click", async () => {
-      const sure = confirm(`Delete ${role.name}?\n\nNothing asked of it will be answered. A role a Quill asked for comes back, empty.`);
+      const sure = await ask(`Delete ${role.name}?\n\nNothing asked of it will be answered. A role a Quill asked for comes back, empty.`);
       if (!sure) return;
       try {
         await api("DELETE", roleUrl(role.id));

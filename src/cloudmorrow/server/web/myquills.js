@@ -30,6 +30,7 @@ import {
 import { loadFeatures } from "./features.js";
 import { refreshQuills } from "./quills.js";
 import { removeSheet, sections } from "./quillsadmin.js";
+import { ask, askText } from "./dialog.js";
 
 const mineUrl = (id) => "/api/quills/mine/" + encodeURIComponent(id);
 const quillUrl = (id) => "/api/quills/" + encodeURIComponent(id);
@@ -252,8 +253,8 @@ function drawMine(ctx) {
     const base = `/api/quills/offers/${encodeURIComponent(owner)}/${encodeURIComponent(quill)}`;
     row.querySelector(".accept")?.addEventListener("click", () => attempt(() => api("POST", base + "/accept"), `${quill} is on your shelf`));
     row.querySelector(".decline")?.addEventListener("click", () => attempt(() => api("POST", base + "/decline")));
-    row.querySelector(".leave")?.addEventListener("click", () => {
-      if (confirm(`Leave ${owner}'s ${quill}? Your records of its data stay yours.`)) attempt(() => api("DELETE", base));
+    row.querySelector(".leave")?.addEventListener("click", async () => {
+      if (await ask(`Leave ${owner}'s ${quill}? Your records of its data stay yours.`)) attempt(() => api("DELETE", base));
     });
   }
   for (const button of ctx.list.querySelectorAll(".request-row .withdraw")) {
@@ -266,7 +267,7 @@ function drawMine(ctx) {
 async function updateMany(ctx, quills) {
   if (!quills.length) return;
   const names = quills.map((q) => q.name || q.id);
-  if (!confirm(`Update ${listed(names)}?\n\nEach is installed again, for you. Nothing you wrote is touched.`)) return;
+  if (!await ask(`Update ${listed(names)}?\n\nEach is installed again, for you. Nothing you wrote is touched.`)) return;
   const log = ctx.list.querySelector(".update-log");
   const button = ctx.list.querySelector(".update-all");
   button.disabled = true;
@@ -494,7 +495,7 @@ async function buildSheet(id, data) {
       } catch (err) { undo(); toast(err.message); }
     });
     on(".ask-mine", async () => {
-      const note = prompt(`Ask an administrator for ${name}? Say why, if you like:`);
+      const note = await askText(`Ask an administrator for ${name}? Say why, if you like:`);
       if (note === null) return;
       try { await api("POST", "/api/quills/requests", { id, note }); await done("Asked"); } catch (err) { toast(err.message); }
     });
@@ -506,14 +507,14 @@ async function buildSheet(id, data) {
       } catch (err) { undo(); toast(err.message); }
     };
     on(".update-mine", (event) => again(event.currentTarget, "Updating"));
-    on(".reinstall-mine", (event) => {
-      if (!confirm(`Install ${name} v${plan.version} again?\n\nNothing you wrote is touched.`)) return;
+    on(".reinstall-mine", async (event) => {
+      if (!await ask(`Install ${name} v${plan.version} again?\n\nNothing you wrote is touched.`)) return;
       again(event.currentTarget, "Installing");
     });
     on(".share-mine", () => shareSheet(holder.querySelector(".share-slot"), id, name, plan, after));
     on(".export-mine", () => exportIt(id));
     on(".promote-mine", async () => {
-      const note = prompt(`Ask an administrator to make ${name} the server's, for everyone? Say why, if you like:`);
+      const note = await askText(`Ask an administrator to make ${name} the server's, for everyone? Say why, if you like:`);
       if (note === null) return;
       try { await api("POST", "/api/quills/requests", { kind: "promote", id, note }); await done("Asked"); } catch (err) { toast(err.message); }
     });
@@ -522,7 +523,7 @@ async function buildSheet(id, data) {
     const offShelf = async (button, url, broughtUrl, whose) => {
       const others = holders.filter((h) => h !== me.username);
       if (others.length) {
-        if (!confirm(`Take ${name} off your shelf?\n\nIt stays for ${listed(others)}, its data and all; what you wrote stays the Quill's.`)) return;
+        if (!await ask(`Take ${name} off your shelf?\n\nIt stays for ${listed(others)}, its data and all; what you wrote stays the Quill's.`)) return;
         try {
           await api("DELETE", url);
           await done(`${name} is off your shelf; it stays with ${listed(others)}`, { gone: true });
@@ -532,7 +533,7 @@ async function buildSheet(id, data) {
       let brought = [];
       try { brought = await api("GET", broughtUrl); } catch (err) { toast(err.message); return; }
       if (!brought.length) {
-        if (!confirm(`Remove ${whose}${name}?\n\nYou are the last to have it, so it goes from the server. Nothing it kept is deleted.`)) return;
+        if (!await ask(`Remove ${whose}${name}?\n\nYou are the last to have it, so it goes from the server. Nothing it kept is deleted.`)) return;
         try { await api("DELETE", url); await done(`${name} is removed`, { gone: true }); } catch (err) { toast(err.message); }
         return;
       }
