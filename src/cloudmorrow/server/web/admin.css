@@ -105,12 +105,13 @@
 .feature-row .preview, .choices .preview { white-space: normal; overflow: visible; }
 .feature-row .meta, .choices .meta { white-space: normal; overflow: visible; }
 
-/* -- the account form ----------------------------------------------------- */
-.account .row { align-items: center; }
+/* -- the account form, and the server's settings ---------------------------- */
+.account .row, .server-settings .row { align-items: center; }
 .account .choices .row { align-items: flex-start; }
 .account input[type="text"],
 .account input[type="password"],
-.account input:not([type]) {
+.account input:not([type]),
+.server-settings input {
   flex: 1;
   min-width: 0;
   border: 0;
@@ -122,7 +123,7 @@
   font-size: 16px;
   text-align: right;
 }
-.account input::placeholder { color: var(--muted); }
+.account input::placeholder, .server-settings input::placeholder { color: var(--muted); }
 .account .value { min-width: 0; }
 
 /* The one amber on the screen: what the form is for. */

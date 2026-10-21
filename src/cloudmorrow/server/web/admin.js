@@ -188,8 +188,23 @@ function userRow(user, circles) {
 const HEALTH_WAIT = 60 * 1000;
 
 async function drawServer(panel) {
-  const health = await api("GET", "/api/health");
+  const [health, settings] = await Promise.all([api("GET", "/api/health"), api("GET", "/api/server/settings")]);
   panel.innerHTML = `
+    <p class="group-label">Settings</p>
+    <form class="server-settings">
+      <div class="group">
+        <label class="row"><span class="main">Name</span>
+          <input name="name" value="${esc(settings.name || "")}" maxlength="64" required
+            placeholder="Cloudmorrow" autocapitalize="words" autocorrect="off"></label>
+        <label class="row"><span class="main">Weather for</span>
+          <input name="weather_place" value="${esc(settings.weather_place || "")}" maxlength="120"
+            placeholder="a town, or latitude,longitude" autocapitalize="words" autocorrect="off"></label>
+      </div>
+      <p class="note">The name is on every screen and the home-screen icon. The weather on Today is
+        for the place: a town (<i>Copenhagen</i>, <i>Aarhus, Denmark</i>) or <i>55.68,12.57</i> when a
+        name is ambiguous; blank and Today says nothing about the weather.</p>
+      <div class="group"><button class="row primary" type="submit">Save</button></div>
+    </form>
     <p class="group-label">Running</p>
     <div class="group">
       <div class="row"><span class="main">Version</span><span class="value">${esc(health.version || "?")}</span></div>
@@ -203,6 +218,26 @@ async function drawServer(panel) {
       The same as <code>cloudmorrow update server</code> from a computer.</p>
     <div class="group"><button class="row primary update-server" type="button">Update server</button></div>
     <div class="update-log" hidden></div>`;
+
+  const form = panel.querySelector("form.server-settings");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const save = form.querySelector("button[type=submit]");
+    save.disabled = true;
+    try {
+      const saved = await api("PATCH", "/api/server/settings", {
+        name: form.elements.name.value.trim(),
+        weather_place: form.elements.weather_place.value.trim(),
+      });
+      form.elements.name.value = saved.name;
+      form.elements.weather_place.value = saved.weather_place;
+      toast("Saved");
+    } catch (err) {
+      toast(err.message);
+    } finally {
+      save.disabled = false;
+    }
+  });
 
   const button = panel.querySelector(".update-server");
   const log = panel.querySelector(".update-log");

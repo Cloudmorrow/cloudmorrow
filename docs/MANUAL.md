@@ -717,9 +717,9 @@ and what the calendar has for the day, so the front page is a glance rather
 than a tab. The clock is the phone's own. The quote is the day's — the same
 one for everybody on the server, a different one tomorrow, from a list in
 `server/today.py` that is there to be added to. The weather is Open-Meteo's,
-which needs no key, for the place named by `weather_place` in the server
-config (`"Copenhagen"`, or `"55.68,12.57"` when a name is ambiguous); leave
-it out and the card says so instead of guessing. The events are the
+which needs no key, for the place an administrator names under
+**Administration, Server** (`Copenhagen`, or `55.68,12.57` when a name is
+ambiguous); with none named the card says so instead of guessing. The events are the
 calendar's — any installed Quill with a `calendar` screen, asked through the
 record API for what overlaps today — in its own rows, and the section is
 gone when there is none or it is switched off.
@@ -799,8 +799,11 @@ Five sides, each at its own address (`#/admin/users`, `#/admin/circles`,
 `#/admin/roles`, `#/admin/quills`, `#/admin/server`). **Circles** is
 described under [circles](#circles-who-may-use-which-data), **Roles** under
 [roles, approvals and flows](#roles-approvals-and-flows-how-a-procedure-is-said),
-and **Server** is what this server runs and **Update server**; the two with
-the most in them:
+and **Server** is the server's own settings — its **Name**, on every screen
+and the home-screen icon, and **Weather for**, the place Today's weather is
+for — then what this server runs, and **Update server**. Nothing an
+administrator sets is in a config file; the file is for the person who
+installed the server. The two sides with the most in them:
 
 - **Users.** Every account, with its type and, where it is worth pointing
   at, its role on a chip — an ordinary User has no chip, because that is the

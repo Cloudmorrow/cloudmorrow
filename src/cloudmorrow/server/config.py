@@ -98,8 +98,10 @@ class ServerConfig:
     # The unit the API update stops so systemd starts it again on new code.
     service_name: str = "cloudmorrow"
     # Where the weather on the app's front page is for: a place name
-    # ("Copenhagen", "Aarhus, Denmark") or "latitude,longitude". Empty and
-    # the page says nothing about the weather; nothing else minds.
+    # ("Copenhagen", "Aarhus, Denmark") or "latitude,longitude". Only what a
+    # server starts with: an administrator sets it in the app (Administration,
+    # Server), and that wins from then on. Empty and the page says nothing
+    # about the weather; nothing else minds.
     weather_place: str = ""
     # Where the Quill Catalog is read from: a URL to its catalog.toml, or a
     # local path to one (or to a checkout of the catalog repository).

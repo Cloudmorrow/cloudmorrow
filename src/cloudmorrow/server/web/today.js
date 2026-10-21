@@ -156,7 +156,7 @@ function weatherCard(today) {
   if (!w) {
     const why = today.weather_error
       ? esc(today.weather_error)
-      : "Put <code>weather_place</code> in the server config and it is here.";
+      : "An administrator says where, under Administration, Server.";
     return `<div class="card weather off"><b>${today.weather_error ? "No weather right now" : "No place set"}</b><span>${why}</span></div>`;
   }
   const facts = [

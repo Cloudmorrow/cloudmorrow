@@ -164,7 +164,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         ),
         shares=share_store,
         mcp=MCPStore(db),
-        weather=Weather(config.weather_place),
+        weather=Weather(settings_store.weather_place(config.weather_place)),
         credential_check=credential_check,
         sealer=sealer,
         settings=settings_store,

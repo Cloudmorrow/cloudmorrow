@@ -30,6 +30,11 @@ CREATE TABLE IF NOT EXISTS settings (
 """
 
 NAME = "name"
+# Where the front page's weather is for: a place name, or "latitude,longitude".
+# Set under Administration, Server; the server config's weather_place is only
+# what it starts as, on a server nobody has told yet.
+WEATHER_PLACE = "weather_place"
+WEATHER_PLACE_MAX_LENGTH = 120
 # Long enough for "The Larsens' cloud", short enough for a home-screen label
 # and a page title. A name is text, never markup: it is escaped where shown.
 NAME_MAX_LENGTH = 64
@@ -84,4 +89,21 @@ class SettingsStore:
     def set_name(self, name: str, *, changed_by: str = "") -> str:
         cleaned = validate_name(name)
         self.set(NAME, cleaned, changed_by=changed_by)
+        return cleaned
+
+    def weather_place(self, default: str) -> str:
+        """Where the weather is for: what an administrator set, else *default* from the config.
+
+        Set to nothing in the app and it is nothing, whatever the config says:
+        a row with an empty value is an answer, a missing row is not.
+        """
+        with self._connect() as conn:
+            row = conn.execute("SELECT value FROM settings WHERE key = ?", (WEATHER_PLACE,)).fetchone()
+        return default.strip() if row is None else str(row["value"])
+
+    def set_weather_place(self, place: str, *, changed_by: str = "") -> str:
+        cleaned = " ".join(place.split())
+        if len(cleaned) > WEATHER_PLACE_MAX_LENGTH:
+            raise InvalidNameError(f"a place is at most {WEATHER_PLACE_MAX_LENGTH} characters")
+        self.set(WEATHER_PLACE, cleaned, changed_by=changed_by)
         return cleaned

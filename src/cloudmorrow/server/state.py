@@ -98,6 +98,10 @@ class AppState:
         """What this cloud is called: set from the app, else from the config."""
         return self.settings.name(self.config.name)
 
+    def weather_place(self) -> str:
+        """Where the front page's weather is for: set from the app, else from the config."""
+        return self.settings.weather_place(self.config.weather_place)
+
     def ensure_drive(self, username: str) -> None:
         """The person's own drive, with its Notes folder, exists the moment they do."""
         self.config.notes_root(username).mkdir(parents=True, exist_ok=True)
