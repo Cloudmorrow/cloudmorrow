@@ -134,9 +134,16 @@ def test_a_service_starts_and_writes_with_its_own_token(live):
     # Written as the Quill, into the records of the admin who installed it.
     assert ping["written_by"] == "relay" and ping["owner"] == ADMIN[0]
     assert ping["fields"]["text"] == "hello from the service"
-    log = live.http.get("/api/quillservices/relay/logs", params={"service": "web"}, headers=live.admin).json()["web"]
+
+    # The service says "wrote" only once the server has answered it, and a
+    # thread copies the line into the log after that: a beat behind the ping.
+    def logged():
+        answer = live.http.get("/api/quillservices/relay/logs", params={"service": "web"}, headers=live.admin)
+        lines = answer.json()["web"]
+        return lines if any(line.startswith("wrote ") for line in lines) else None
+
+    log = wait_for(logged, what="the service's log line")
     assert any("started python services/web.py" in line for line in log)
-    assert any(line.startswith("wrote ") for line in log)
     log_file = live.config.data_dir / "logs" / "quills" / "relay" / "web.log"
     assert log_file.is_file()
 
