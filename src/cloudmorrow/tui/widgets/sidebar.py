@@ -5,8 +5,9 @@ a card can also say how it is — "3 to do", "2 unread", "4 vaults" — so the
 sidebar is where you see the state of your cloud at a glance, and a click or
 a key takes you in. The sections:
 
-- **YOUR CLOUD** — what is built into the core: nothing now, so not drawn.
 - **QUILLS** — a card for every screen of every installed Quill.
+- **YOUR CLOUD** — what the server gives everybody without a Quill: Data,
+  which it composes for whoever asks, and any card built into the core.
 - **ADMINISTRATION** — for administrators: Users, Circles, Quills. Smaller,
   one line each, because it is the server rather than your things.
 

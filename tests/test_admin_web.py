@@ -94,7 +94,7 @@ def test_each_side_is_a_tab_of_the_rail_for_an_administrator():
     assert 'tabs("admin." + which)' in ADMIN_JS
     core = (WEB / "core.js").read_text(encoding="utf-8")
     assert "(!t.admin || session.admin)" in core
-    assert '<div class="rail-section">Administration</div>' in core
+    assert 'section("Administration", shown.filter((t) => t.admin))' in core
     # The answer is the server's: on signing in, and again once per load.
     assert "setAdmin(data.user.is_admin)" in core
     assert "setAdmin(me.is_admin)" in ADMIN_JS

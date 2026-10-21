@@ -721,24 +721,28 @@ export function heading(title, right = "") {
 //
 // On a screen wide enough the same markup is a rail down the left, and
 // the wordmark moves to the head of it out of the middle of the bar. The
-// rail has one more thing the bar does not: for an administrator, a
-// section of its own at the foot — Administration, and the server's pages
-// under it — as the terminal app's sidebar has. The phone keeps those
-// behind a row in Me, and the stylesheet keeps the section off it.
+// rail has what the bar does not: sections, as the terminal app's sidebar
+// has them. The Quills first; then Your cloud, for what the server itself
+// gives everybody (Data) rather than a Quill somebody installed; and for
+// an administrator, Administration at the foot, with the server's pages
+// under it. The phone's bar runs the first two together, keeps the third
+// behind a row in Me, and the stylesheet keeps the labels off it.
 // Which tab was last lit, for the screens that draw none of their own.
 let lastTab = "";
 export function tabs(active) {
   if (active) lastTab = active;
   const draw = (t) =>
-    `<a class="tab${t.admin ? " admin" : ""}${t.name === active ? " active" : ""}" data-tab="${t.name}"` +
-    ` href="${t.href(t.name === active)}"` +
+    `<a class="tab${t.admin ? " admin" : ""}${t.cloud ? " cloud" : ""}${t.name === active ? " active" : ""}"` +
+    ` data-tab="${t.name}" href="${t.href(t.name === active)}"` +
     `${t.name === active ? ' aria-current="page"' : ""}>${typeof t.icon === "function" ? t.icon() : t.icon}` +
     `<span>${t.label}</span></a>`;
   const shown = shownTabs();
-  const admin = shown.filter((t) => t.admin).map(draw).join("");
+  const section = (title, list) =>
+    list.length ? `<div class="rail-section">${title}</div>` + list.map(draw).join("") : "";
   return `<nav class="tabs"><div class="rail-head">${wordmark()}</div>` +
-    shown.filter((t) => !t.admin).map(draw).join("") +
-    (admin ? `<div class="rail-section">Administration</div>` + admin : "") +
+    shown.filter((t) => !t.admin && !t.cloud).map(draw).join("") +
+    section("Your cloud", shown.filter((t) => t.cloud)) +
+    section("Administration", shown.filter((t) => t.admin)) +
     `</nav>`;
 }
 
