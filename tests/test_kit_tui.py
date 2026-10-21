@@ -185,7 +185,8 @@ async def test_the_quill_key_brings_its_tab(app):
 
 
 async def test_a_kit_the_terminal_does_not_draw_yet_has_no_tab(app):
-    # Every kit is drawn now; one from a server newer than this client is not.
+    # Every kit is drawn now, the timeline too (test_kit_timeline_tui.py);
+    # one from a server newer than this client is not.
     quill = dict(READING_QUILL, id="diary", name="Diary", installed_version="0.2.0")
     quill["screens"] = [dict(READING_QUILL["screens"][0], kit="spreadsheet")]
     app.client.quill_list.append(quill)
