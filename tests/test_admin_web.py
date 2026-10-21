@@ -199,7 +199,7 @@ def test_the_server_section_updates_through_the_api_the_command_uses(client, aut
     assert 'api("POST", "/api/server/update", {})' in ADMIN_JS
     assert 'api("GET", "/api/health?t=" + Date.now())' in ADMIN_JS
     # A restart puts everybody offline for a moment: it is asked about first.
-    assert "confirm(" in ADMIN_JS.split("async function drawServer", 1)[1].split("const shortCommit", 1)[0]
+    assert "await ask(" in ADMIN_JS.split("async function drawServer", 1)[1].split("const shortCommit", 1)[0]
     # The page is the old app once the server is back: it reloads onto the new one.
     assert "location.reload()" in ADMIN_JS
     # The same route, which only an administrator may call (test_server_update_api.py).

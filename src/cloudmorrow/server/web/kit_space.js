@@ -38,6 +38,7 @@ import {
   tabs, toast, wireShell,
 } from "./core.js";
 import { mayWrite, sheetHash } from "./kit.js";
+import { ask } from "./dialog.js";
 
 // -- reading a space ---------------------------------------------------------------------
 /** How the screen says spaces are made: scope (or `direct`) → the fields it sets. */
@@ -309,7 +310,7 @@ export function wireSpace(root, model, record, { left, again = renderRoute } = {
   }
   for (const button of root.querySelectorAll(".take-out")) {
     button.addEventListener("click", async () => {
-      if (!confirm(`Take ${button.dataset.who} out of ${name}?`)) return;
+      if (!await ask(`Take ${button.dataset.who} out of ${name}?`)) return;
       try {
         await api("DELETE", `${url}/${encodeURIComponent(button.dataset.who)}`);
         again();
@@ -319,7 +320,7 @@ export function wireSpace(root, model, record, { left, again = renderRoute } = {
   const leave = root.querySelector(".leave");
   if (leave) {
     leave.addEventListener("click", async () => {
-      if (!confirm(`Leave ${name}? You will stop seeing what is in it. Somebody in it can add you back.`)) return;
+      if (!await ask(`Leave ${name}? You will stop seeing what is in it. Somebody in it can add you back.`)) return;
       try {
         await api("DELETE", `${url}/${encodeURIComponent(session.user)}`);
         replace(left);
@@ -364,7 +365,7 @@ export async function renderSpaceAbout(at, model, id, { back, backLabel, gone })
   const del = app.querySelector(".delete");
   if (del) {
     del.addEventListener("click", async () => {
-      if (!confirm(`Delete ${name}? Everything in it goes too.`)) return;
+      if (!await ask(`Delete ${name}? Everything in it goes too.`)) return;
       try {
         await api("DELETE", recordsUrl(model.id, id));
         leftTo();

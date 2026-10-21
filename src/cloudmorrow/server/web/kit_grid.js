@@ -38,6 +38,7 @@ import {
   tabs, toast, wireShell,
 } from "./core.js";
 import { mayWrite, plural } from "./kit.js";
+import { ask, askText } from "./dialog.js";
 
 const own = {
   place: '<svg width="22" height="20" viewBox="0 0 22 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="2" width="19" height="6" rx="1.5"/><rect x="1.5" y="12" width="19" height="6" rx="1.5"/><path d="M5 5h.01M5 15h.01" stroke-linecap="round" stroke-width="2.4"/></svg>',
@@ -502,7 +503,7 @@ async function uploadAll(place, items) {
 }
 
 async function newFolder({ b, group, folder }, reload) {
-  const name = (prompt("Folder name") || "").trim();
+  const name = (await askText("Folder name") || "").trim();
   if (!name) return;
   try {
     await api("POST", recordsUrl(b.model.id), {
@@ -519,12 +520,12 @@ async function change(b, entry, what) {
   const noun = entry.is_dir ? "folder" : b.model.label.toLowerCase();
   try {
     if (what === "rename") {
-      const name = (prompt(`Rename the ${noun}`, entry.name) || "").trim();
+      const name = (await askText(`Rename the ${noun}`, entry.name) || "").trim();
       if (!name || name === entry.name) return null;
       return await api("PATCH", recordsUrl(b.model.id, entry.id), { fields: { [b.title]: name }, rev: entry.rev });
     }
     if (what === "move") {
-      const to = prompt(`Move “${entry.name}” to which folder? Empty is the top.`, entry.folder);
+      const to = await askText(`Move “${entry.name}” to which folder? Empty is the top.`, entry.folder);
       if (to === null) return null;
       const target = to.trim().replace(/^\/+|\/+$/g, "");
       if (target === entry.folder) return null;
@@ -532,7 +533,7 @@ async function change(b, entry, what) {
     }
     if (what === "delete") {
       const warning = entry.is_dir ? "\n\nEverything in it goes with it." : "";
-      if (!confirm(`Delete “${entry.name}”?${warning}`)) return null;
+      if (!await ask(`Delete “${entry.name}”?${warning}`)) return null;
       await api("DELETE", recordsUrl(b.model.id, entry.id));
       return { deleted: true };
     }

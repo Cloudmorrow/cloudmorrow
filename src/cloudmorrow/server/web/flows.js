@@ -14,6 +14,7 @@
 import {
   api, app, esc, mount, nav, recordsUrl, registerScreen, renderRoute, replace, toast, wireShell,
 } from "./core.js";
+import { ask } from "./dialog.js";
 
 /** The row that leads here, for Me. */
 export function flowsRow() {
@@ -378,7 +379,7 @@ async function renderFlow(id) {
     const remove = form.querySelector(".delete");
     if (remove) {
       remove.addEventListener("click", async () => {
-        if (!confirm(`Delete ${flow.name}?\n\nIts runs go with it.`)) return;
+        if (!await ask(`Delete ${flow.name}?\n\nIts runs go with it.`)) return;
         try {
           await api("DELETE", recordsUrl("flow", record.id));
           toast(`Deleted ${flow.name}`);

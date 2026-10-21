@@ -20,6 +20,7 @@
 import {
   api, app, esc, mount, nav, registerScreen, renderRoute, replace, store, toast, wireShell,
 } from "./core.js";
+import { ask } from "./dialog.js";
 
 export const EVERY = "*";
 // What a circle gives on a datamodel, as the menus say it.
@@ -275,7 +276,7 @@ async function renderCircle(id) {
   const remove = form.querySelector(".delete");
   if (remove) {
     remove.addEventListener("click", async () => {
-      const sure = confirm(
+      const sure = await ask(
         `Delete ${circle.name}?\n\nIts people keep their other circles. Anybody `
         + "in no other circle reaches no data until they are put in one.",
       );

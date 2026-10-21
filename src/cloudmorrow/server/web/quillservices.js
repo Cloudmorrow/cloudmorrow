@@ -10,6 +10,7 @@
    reads the same status for the chip on each row. */
 
 import { api, esc, toast } from "./core.js";
+import { ask } from "./dialog.js";
 
 const url = (id) => "/api/quillservices/" + encodeURIComponent(id);
 const STATES = { running: "good", restarting: "warn", stopped: "" };
@@ -75,17 +76,17 @@ export async function drawRunning(holder, id) {
   };
   holder.querySelector(".restart-quill").addEventListener("click", () =>
     act(() => api("POST", url(id) + "/restart"), "Restarting"));
-  holder.querySelector(".rotate-token").addEventListener("click", () => {
-    if (!confirm("Give it a new token?\n\nThe one it has stops working now, and its services restart with the new one.")) return;
+  holder.querySelector(".rotate-token").addEventListener("click", async () => {
+    if (!await ask("Give it a new token?\n\nThe one it has stops working now, and its services restart with the new one.")) return;
     act(() => api("POST", url(id) + "/token"), "New token; its services are restarting");
   });
   holder.querySelectorAll(".copy-hook").forEach((button) => button.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(button.dataset.address); toast("Copied"); }
     catch (err) { toast(err.message || "Could not copy"); }
   }));
-  holder.querySelectorAll(".rotate-hook").forEach((button) => button.addEventListener("click", () => {
+  holder.querySelectorAll(".rotate-hook").forEach((button) => button.addEventListener("click", async () => {
     const hook = button.closest("[data-hook]").dataset.hook;
-    if (!confirm(`A new secret for ${hook}?\n\nWhatever sends it needs the new address from now.`)) return;
+    if (!await ask(`A new secret for ${hook}?\n\nWhatever sends it needs the new address from now.`)) return;
     act(() => api("POST", `${url(id)}/webhooks/${encodeURIComponent(hook)}/secret`), "New secret");
   }));
 }
