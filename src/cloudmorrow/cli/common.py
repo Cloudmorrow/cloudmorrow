@@ -8,6 +8,7 @@ piped; everything else goes to stderr so it does not end up in the pipe.
 from __future__ import annotations
 
 import asyncio
+import importlib
 import os
 import subprocess
 import sys
@@ -61,6 +62,21 @@ EnvOption = Annotated[
 def fail(message: str) -> NoReturn:
     console.print(f"[red]{message}[/]")
     raise typer.Exit(code=1)
+
+
+def from_server(name: str):
+    """A module of the server's, imported on first use: `from_server("snapshots")`.
+
+    A bundle is hashed and an attestation signed by the same code on both
+    sides, and that code wants the cryptography package. The client has it
+    from v0.33; a client installed before then must still start, and only
+    these commands tell it to update.
+    """
+    try:
+        return importlib.import_module(f"cloudmorrow.server.{name}")
+    except ModuleNotFoundError as exc:
+        package = (exc.name or name).partition(".")[0]
+        fail(f"this needs the {package} package, which is not installed here: `cm update` brings it")
 
 
 def run(coro: Awaitable[T]) -> T:

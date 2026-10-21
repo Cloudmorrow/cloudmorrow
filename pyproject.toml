@@ -27,6 +27,9 @@ tui = [
     "zeroconf>=0.131",
     # QR codes on a terminal: a link code, a login server (qrtext.py). Pure Python.
     "segno>=1.6",
+    # `cm attest` signs a snapshot's digest with a key of this machine's own,
+    # and `cm snapshot verify` checks such signatures (server/snapshots.py).
+    "cryptography>=42.0",
 ]
 agent = [
     "httpx>=0.27",

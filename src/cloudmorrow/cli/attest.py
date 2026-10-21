@@ -25,10 +25,8 @@ from typing import Annotated
 import httpx
 import typer
 
-from cloudmorrow.cli.common import client, console, emit, fail, run
+from cloudmorrow.cli.common import client, console, emit, fail, from_server, run
 from cloudmorrow.client.config import config_path
-from cloudmorrow.server import crypto
-from cloudmorrow.server.snapshots import VERDICTS, digest_of, sign_attestation, verify_attestation, verify_bundle
 
 app = typer.Typer(help="Sign your word on a snapshot: validated, qualified or rejected.", no_args_is_help=True)
 
@@ -39,19 +37,20 @@ def key_path() -> Path:
 
 def _bundle_from(what: str) -> tuple[bytes, dict, str]:
     """The bundle's bytes and document, and where to put the attestation: a path, or a link to post to."""
+    snapshots = from_server("snapshots")
     if what.startswith(("http://", "https://")):
         try:
             response = httpx.get(_bundle_url(what), timeout=60, follow_redirects=True)
             response.raise_for_status()
         except httpx.HTTPError as exc:
             fail(f"cannot fetch the snapshot through that link: {exc}")
-        return response.content, verify_bundle(response.content), what
+        return response.content, snapshots.verify_bundle(response.content), what
     path = Path(what)
     try:
         data = path.read_bytes()
     except OSError as exc:
         fail(f"{path}: {exc}")
-    return data, verify_bundle(data), ""
+    return data, snapshots.verify_bundle(data), ""
 
 
 def _bundle_url(link: str) -> str:
@@ -79,11 +78,12 @@ def sign(
     out_path: Annotated[Path | None, typer.Option("--out", help="Where to write the attestation, with a file.")] = None,
 ) -> None:
     """Sign a verdict over a snapshot's digest, and write it beside the bundle or send it through the link."""
+    snapshots = from_server("snapshots")
     verdict = verdict.strip().lower()
-    if verdict not in VERDICTS:
-        fail(f"--verdict is one of {', '.join(VERDICTS)}")
+    if verdict not in snapshots.VERDICTS:
+        fail(f"--verdict is one of {', '.join(snapshots.VERDICTS)}")
     data, bundle, link = _bundle_from(what)
-    digest = digest_of(data)
+    digest = snapshots.digest_of(data)
     snapshot_id = str(bundle.get("snapshot_id") or _snapshot_in(link))
     series = ""
     version = 0
@@ -99,11 +99,11 @@ def sign(
             digest=digest, snapshot=snapshot_id, series=series, version=version, verdict=verdict, statement=statement
         )
     else:
-        key = crypto.load_or_create_signing_key(key_path())
+        key = from_server("crypto").load_or_create_signing_key(key_path())
         who = name.strip() or _remembered_name() or _login_name()
         if not who:
             fail("say who signs: --name 'Jane Doe'")
-        document = sign_attestation(
+        document = snapshots.sign_attestation(
             key,
             digest=digest,
             snapshot=snapshot_id,
@@ -115,7 +115,7 @@ def sign(
             signer_organisation=organisation,
         )
         _remember_name(who)
-    verify_attestation(document, digest=digest)
+    snapshots.verify_attestation(document, digest=digest)
     text = json.dumps(document, indent=2, ensure_ascii=False) + "\n"
     if link:
         try:
@@ -183,6 +183,7 @@ def _remember_name(name: str) -> None:
 @app.command("key")
 def key() -> None:
     """Your public key and its fingerprint: give them to whoever will check your stamps."""
+    crypto = from_server("crypto")
     signing = crypto.load_or_create_signing_key(key_path())
     public = crypto.public_key_text(signing)
     console.print(f"[dim]fingerprint[/] {crypto.key_fingerprint(public)}  [dim]at {key_path()}[/]")
@@ -195,11 +196,12 @@ def verify(
     attestation_path: Annotated[Path, typer.Argument(help="The attestation file.")],
 ) -> None:
     """Check that an attestation is its signer's word over this very bundle."""
+    snapshots = from_server("snapshots")
     data = bundle_path.read_bytes()
-    verify_bundle(data)
-    digest = digest_of(data)
+    snapshots.verify_bundle(data)
+    digest = snapshots.digest_of(data)
     try:
-        checked = verify_attestation(json.loads(attestation_path.read_text(encoding="utf-8")), digest=digest)
+        checked = snapshots.verify_attestation(json.loads(attestation_path.read_text(encoding="utf-8")), digest=digest)
     except (OSError, ValueError) as exc:
         fail(f"{attestation_path.name}: {exc}")
     signer = checked["signer"]
