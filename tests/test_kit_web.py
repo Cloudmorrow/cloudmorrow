@@ -284,9 +284,12 @@ def test_the_calendar_asks_the_record_api_for_a_window_of_days():
         code = re.sub(r"/\*.*?\*/|//[^\n]*", "", calendar, flags=re.DOTALL)
         assert field not in code, field
     # Drawn by the kit, and its sheet changed by it, from its own file.
-    own = "const OWN = { calendar: renderCalendar, thread: renderThread, view: renderView, data: renderData };"
+    own = (
+        "const OWN = { calendar: renderCalendar, thread: renderThread, timeline: renderTimeline,"
+        " view: renderView, data: renderData };"
+    )
     assert own in KIT_JS
-    assert "const SHEETS = { calendar: calendarSheet, data: dataSheet };" in KIT_JS
+    assert "const SHEETS = { calendar: calendarSheet, timeline: timelineSheet, data: dataSheet };" in KIT_JS
 
 
 def test_a_space_has_its_people_on_its_sheet():
