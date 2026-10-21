@@ -400,6 +400,17 @@ class Weather:
     def configured(self) -> bool:
         return bool(self.place_name)
 
+    def set_place(self, place: str) -> None:
+        """Another place, from now on: the lookup and the forecast kept are the old one's."""
+        place = place.strip()
+        with self._lock:
+            if place == self.place_name:
+                return
+            self.place_name = place
+            self._place = None
+            self._forecast = None
+            self._fetched = 0.0
+
     def current(self) -> dict | None:
         """The forecast, or None with no place set. Raises WeatherError otherwise."""
         if not self.configured:

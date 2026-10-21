@@ -216,3 +216,13 @@ def test_the_server_section_says_what_a_deploy_did_in_the_commands_words():
         assert phrase in cli, phrase
         assert phrase in web, phrase
     assert "the old code is still serving" in cli and "the old code is still serving" in web
+
+
+def test_the_server_side_has_the_settings_form_before_the_update_button():
+    """The name and the weather place are set here, not in a config file."""
+    server = ADMIN_JS.split("async function drawServer", 1)[1].split("const shortCommit", 1)[0]
+    assert server.index('class="server-settings"') < server.index("update-server")
+    assert 'name="weather_place"' in server and 'name="name"' in server
+    assert 'api("PATCH", "/api/server/settings"' in server
+    today = (WEB / "today.js").read_text(encoding="utf-8")
+    assert "weather_place" not in today and "Administration" in today

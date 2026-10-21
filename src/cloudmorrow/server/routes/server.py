@@ -37,9 +37,13 @@ from cloudmorrow.server.update import (
 router = APIRouter(prefix="/api/server", tags=["server"])
 
 
+def _settings(state: AppState) -> ServerSettingsOut:
+    return ServerSettingsOut(name=state.cloud_name(), weather_place=state.weather_place())
+
+
 @router.get("/settings", response_model=ServerSettingsOut)
 def read_settings(state: AppState = Depends(get_state), _: User = Depends(get_current_user)) -> ServerSettingsOut:
-    return ServerSettingsOut(name=state.cloud_name())
+    return _settings(state)
 
 
 @router.patch("/settings", response_model=ServerSettingsOut)
@@ -48,12 +52,20 @@ def change_settings(
     state: AppState = Depends(get_state),
     admin: User = Depends(get_admin_user),
 ) -> ServerSettingsOut:
-    """Rename the cloud. It is on every screen the moment it is reloaded."""
+    """Rename the cloud, or say where the weather is for. Each is in effect at once.
+
+    The name is on every screen the moment it is reloaded; the weather is the
+    new place's on the front page's next ask.
+    """
     try:
-        state.settings.set_name(payload.name, changed_by=admin.username)
+        if payload.name is not None:
+            state.settings.set_name(payload.name, changed_by=admin.username)
+        if payload.weather_place is not None:
+            place = state.settings.set_weather_place(payload.weather_place, changed_by=admin.username)
+            state.weather.set_place(place)
     except InvalidNameError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return ServerSettingsOut(name=state.cloud_name())
+    return _settings(state)
 
 
 @router.post("/update", response_model=ServerUpdateOut)

@@ -89,7 +89,7 @@ def test_the_name_in_the_page_is_text_not_markup(config):
 
 
 def test_an_administrator_can_rename_the_cloud_later(client, auth):
-    assert client.get("/api/server/settings", headers=auth).json() == {"name": "Cloudmorrow"}
+    assert client.get("/api/server/settings", headers=auth).json()["name"] == "Cloudmorrow"
     renamed = client.patch("/api/server/settings", json={"name": "Number 12"}, headers=auth)
     assert renamed.status_code == 200, renamed.text
     assert renamed.json()["name"] == "Number 12"

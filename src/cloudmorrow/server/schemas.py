@@ -305,10 +305,15 @@ class ServerSettingsOut(BaseModel):
     """What the server has been told about itself."""
 
     name: str
+    # Where the front page's weather is for; empty for no weather.
+    weather_place: str = ""
 
 
 class ServerSettingsUpdate(BaseModel):
-    name: str = Field(min_length=1, max_length=64)
+    """What to change; a field left out is left alone."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    weather_place: str | None = Field(default=None, max_length=120)
 
 
 class ServerUpdateRequest(BaseModel):

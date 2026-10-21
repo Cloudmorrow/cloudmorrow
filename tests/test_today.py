@@ -181,3 +181,71 @@ def test_weather_place_is_read_from_toml_and_the_environment(tmp_path, monkeypat
     assert load_config(path).weather_place == "Aarhus"
     monkeypatch.setenv("CLOUDMORROW_WEATHER_PLACE", "55.68,12.57")
     assert load_config(path).weather_place == "55.68,12.57"
+
+
+# -- the place is the administrator's to set, in the app ---------------------------------
+def test_an_administrator_sets_the_place_in_the_app(client, auth, calls):
+    """No config line: the place is set under Administration, Server, and the weather follows at once."""
+    assert client.get("/api/server/settings", headers=auth).json()["weather_place"] == ""
+    assert client.get("/api/today", headers=auth).json()["weather"] is None
+
+    told = client.patch("/api/server/settings", json={"weather_place": "  Copenhagen "}, headers=auth)
+    assert told.status_code == 200, told.text
+    assert told.json() == {"name": "Cloudmorrow", "weather_place": "Copenhagen"}
+    assert client.get("/api/today", headers=auth).json()["weather"]["place"] == "Copenhagen, Denmark"
+    assert len(calls) == 2  # one lookup, one forecast
+
+    # Another place is looked up afresh, and the forecast is not the old one's.
+    client.patch("/api/server/settings", json={"weather_place": "55.68,12.57"}, headers=auth)
+    assert client.get("/api/today", headers=auth).json()["weather"]["place"] == "55.68,12.57"
+    assert len(calls) == 3  # coordinates need no lookup; the forecast was fetched again
+
+    # Blank means no weather, whatever the config said.
+    client.patch("/api/server/settings", json={"weather_place": ""}, headers=auth)
+    assert client.get("/api/today", headers=auth).json()["weather"] is None
+    # And the name was left alone throughout.
+    assert client.get("/api/server/settings", headers=auth).json()["name"] == "Cloudmorrow"
+
+
+def test_the_place_set_in_the_app_outlives_a_restart_and_beats_the_config(tmp_path, users, calls):
+    config = ServerConfig(
+        notes_dir=tmp_path / "notes",
+        data_dir=tmp_path / "data",
+        secret_key="test-signing-key-that-is-long-enough-for-hs256",
+        weather_place="Copenhagen",
+    )
+    client = TestClient(create_app(config))
+    auth = {"Authorization": f"Bearer {token_for(client, *ADMIN)}"}
+    # The config's place is what the server starts with.
+    assert client.get("/api/server/settings", headers=auth).json()["weather_place"] == "Copenhagen"
+    client.patch("/api/server/settings", json={"weather_place": ""}, headers=auth)
+
+    again = TestClient(create_app(config))
+    auth = {"Authorization": f"Bearer {token_for(again, *ADMIN)}"}
+    assert again.get("/api/server/settings", headers=auth).json()["weather_place"] == ""
+    assert again.get("/api/today", headers=auth).json()["weather"] is None
+
+
+def test_only_an_administrator_sets_the_place_and_not_a_novel(client):
+    from tests.conftest import GUEST
+
+    guest = {"Authorization": f"Bearer {token_for(client, *GUEST)}"}
+    assert client.patch("/api/server/settings", json={"weather_place": "Oslo"}, headers=guest).status_code == 403
+    admin = {"Authorization": f"Bearer {token_for(client, *ADMIN)}"}
+    assert client.patch("/api/server/settings", json={"weather_place": "x" * 121}, headers=admin).status_code in (
+        400,
+        422,
+    )
+
+
+def test_a_new_place_drops_what_was_kept_of_the_old(calls):
+    weather = Weather("Copenhagen")
+    weather.current()
+    weather.set_place("Copenhagen")  # the same place: nothing forgotten
+    weather.current()
+    assert len(calls) == 2
+    weather.set_place("55.68, 12.57")
+    assert weather.current()["place"] == "55.68, 12.57"
+    assert len(calls) == 3
+    weather.set_place("")
+    assert weather.current() is None
