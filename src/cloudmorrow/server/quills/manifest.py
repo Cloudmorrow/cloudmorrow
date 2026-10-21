@@ -30,10 +30,12 @@ MANIFEST = "quill.toml"
 ORIGIN = ".origin.json"
 
 # The screens every surface draws. A Quill has these and nothing else.
-KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor", "view", "data")
+KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor", "timeline", "view", "data")
 # The ones every surface draws *today*. A screen of another kind is refused at
 # install, so a Quill never lands with a tab that draws nothing somewhere.
-KIT_READY = frozenset({"list", "board", "detail", "form", "calendar", "grid", "editor", "thread", "view", "data"})
+KIT_READY = frozenset(
+    {"list", "board", "detail", "form", "calendar", "grid", "editor", "thread", "timeline", "view", "data"}
+)
 
 # How a thread screen may make a space: in one of the scopes, or `direct`,
 # found-or-made between the people picked.
@@ -228,7 +230,7 @@ def personalise(manifest: Manifest, owner: str) -> Manifest:
         extends={rename(m): f for m, f in manifest.extends.items()},
         introduces=tuple(pooled(m) for m in manifest.introduces),
         grants=_renamed_in(manifest.grants, names, "model"),
-        screens=_renamed_in(manifest.screens, names, "model"),
+        screens=_renamed_in(manifest.screens, names, "model", "pieces", "effects"),
         jobs=_renamed_in(manifest.jobs, names, "model"),
         datasets=_renamed_in(manifest.datasets, names, "model"),
         webhooks=_renamed_in(manifest.webhooks, names, "model"),

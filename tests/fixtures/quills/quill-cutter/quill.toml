@@ -1,0 +1,33 @@
+# A small timeline, for the kit's tests: projects, pieces on tracks, blurs.
+[quill]
+id = "cutter"
+name = "Cutter"
+version = "1.0.0"
+summary = "Cut videos from your drive on a timeline."
+category = "personal"
+publisher = "Cloudmorrow"
+license = "MIT"
+code = "quill.py"
+
+[uses]
+datamodels = ["file"]
+
+[[screens]]
+id = "editor"
+kit = "timeline"
+label = "Editor"
+model = "cutter.project"
+title = "name"
+pieces = "cutter.piece"
+effects = "cutter.effect"
+media = { share = "my-files", within = "Videos" }
+export = "export"
+
+[[actions]]
+id = "export"
+label = "Export"
+on = "cutter.project"
+tone = "primary"
+description = "Renders the cut to a new video beside the originals."
+[actions.fields]
+format = { kind = "enum", values = ["mp4", "webm"], default = "mp4" }

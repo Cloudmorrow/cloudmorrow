@@ -125,6 +125,58 @@ def grid_fields(screen: dict, model: dict) -> dict[str, str]:
     }
 
 
+# -- timelines ----------------------------------------------------------------
+# The field names are the kit's own (docs/TIMELINE.md); what a screen binds is
+# its datamodels, where the material is, and the Quill's frames API and export.
+TRACKS = [
+    {"id": "V2", "kind": "video", "name": "Video 2"},
+    {"id": "V1", "kind": "video", "name": "Video 1"},
+    {"id": "A1", "kind": "audio", "name": "Audio 1"},
+    {"id": "A2", "kind": "audio", "name": "Audio 2"},
+]
+
+
+def _link_to(model: dict, to: str) -> str:
+    links = [f["name"] for f in model.get("fields", []) if f.get("kind") == "link" and f.get("to") == to]
+    return links[0] if len(links) == 1 else ""
+
+
+def timeline_fields(screen: dict, model: dict, models: dict[str, dict]) -> dict:
+    """What a timeline draws from: its three datamodels, the links between
+    them, the media filters, and the paths of the frames API and export."""
+    pieces = models.get(screen.get("pieces") or "", {})
+    effects = models.get(screen.get("effects") or "", {})
+    return {
+        "title": screen.get("title") or model.get("title") or "name",
+        "project": model.get("id", screen.get("model", "")),
+        "pieces": pieces.get("id", ""),
+        "effects": effects.get("id", ""),
+        "piece_project": _link_to(pieces, model.get("id", "")) if pieces else "",
+        "effect_piece": _link_to(effects, pieces.get("id", "")) if effects else "",
+        "media": {str(k): str(v) for k, v in (screen.get("media") or {}).items()},
+        "frames": screen.get("frames") or "",
+        "export": screen.get("export") or "",
+        "fields": {f.get("name") for f in model.get("fields", [])},
+    }
+
+
+def frames_path(quill: dict, screen: dict) -> str | None:
+    """Where the frames API answers: `/api/q/<quill>/<prefix>`, or None without one."""
+    api = next((a for a in quill.get("apis", []) if a.get("id") == screen.get("frames")), None)
+    if api is None:
+        return None
+    prefix = str(api.get("prefix") or "").strip("/")
+    return f"/api/q/{quill['id']}/{prefix}".rstrip("/")
+
+
+def tracks_of(project: dict) -> list[dict]:
+    """The project's tracks, top to bottom; the kit's four when it says none."""
+    tracks = project.get("tracks")
+    if isinstance(tracks, list) and all(isinstance(t, dict) and t.get("id") for t in tracks):
+        return [{"kind": "video", "name": t["id"], **t} for t in tracks]
+    return [dict(t) for t in TRACKS]
+
+
 # -- editors -------------------------------------------------------------------
 # A screen binds a title, a body and, when the pages sit in folders, a path.
 # `where` is the filters every listing, search and folder call is made with

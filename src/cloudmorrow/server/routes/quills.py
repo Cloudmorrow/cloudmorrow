@@ -94,6 +94,8 @@ def _screen_needs(screen: dict, models: dict[str, dict]) -> set[str]:
     if model is None:
         return {screen["model"]}
     needs = {screen["model"]}
+    # A timeline is drawn with its pieces and their effects as well.
+    needs.update(screen[key] for key in ("pieces", "effects") if isinstance(screen.get(key), str))
     by_name = {f["name"]: f for f in model["fields"]}
     for name in (*(screen.get(key) for key in WITHIN), model.get("in_space")):
         found = by_name.get(name) if isinstance(name, str) else None
