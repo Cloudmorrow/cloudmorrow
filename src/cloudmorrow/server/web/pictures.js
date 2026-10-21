@@ -14,9 +14,11 @@
    TUI reads. On the page it is the picture itself: the body is a run of
    text boxes with the pictures between them, so you write above and below
    a picture and never see the line that stands for it. Saving joins the
-   boxes and the lines back into the one body. */
+   boxes and the lines back into the one body. Each box is Markdown drawn
+   as it reads (markdown.js). */
 
-import { ApiError, apiRaw, esc, fileStem, fitArea, setStatus, toast } from "./core.js";
+import { ApiError, apiRaw, esc, fileStem, setStatus, toast } from "./core.js";
+import { markdownArea } from "./markdown.js";
 
 const photoIcon = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-8 8"/></svg>';
 const closeIcon = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m2 2 8 8M10 2l-8 8"/></svg>';
@@ -88,13 +90,14 @@ export function composeBlocks(blocks) {
 
 // -- the editor's body ------------------------------------------------------------
 // The editor supplies `changed`, called on every edit. In return it gets
-// `bodyText(ed)`, `setBody(ed, text)`, `focusBody(ed)` and `ed.grow()`.
+// `bodyText(ed)`, `setBody(ed, text)`, `focusBody(ed)` and `ed.grow()`,
+// which has nothing to do: a box grows with its lines by itself.
 export const photoButton = `<button class="photo" aria-label="Add a photo">${photoIcon}</button>`;
 export const bodyMarkup = `<div class="blocks"></div><input class="photo-input" type="file" accept="image/*" multiple hidden>`;
 
 export function mountBody(ed, box, text) {
   ed.blocksEl = box.querySelector(".blocks");
-  ed.grow = () => { for (const area of ed.blocksEl.querySelectorAll("textarea")) grow(area); };
+  ed.grow = () => {};
   setBody(ed, text);
   wirePictures(ed, box);
   wireGaps(ed);
@@ -107,8 +110,8 @@ export function mountBody(ed, box, text) {
 function wireGaps(ed) {
   ed.blocksEl.addEventListener("click", (event) => {
     const target = event.target;
-    if (target.tagName === "TEXTAREA" || target.tagName === "IMG" || target.closest("button")) return;
-    const areas = [...ed.blocksEl.querySelectorAll("textarea")];
+    if (target.closest(".md") || target.tagName === "IMG" || target.closest("button")) return;
+    const areas = [...ed.blocksEl.querySelectorAll(".md")];
     if (!areas.length) return;
     const below = areas.find((area) => area.getBoundingClientRect().top >= event.clientY);
     const area = below || areas[areas.length - 1];
@@ -120,7 +123,7 @@ function wireGaps(ed) {
 
 export function setBody(ed, text) {
   ed.blocksEl.replaceChildren(...parseBlocks(text).map((block) =>
-    block.kind === "image" ? figureFor(ed, block.name, block.alt) : textareaFor(ed, block.text)));
+    block.kind === "image" ? figureFor(ed, block.name, block.alt) : boxFor(ed, block.text)));
   placeholders(ed);
   ed.grow();
 }
@@ -134,7 +137,7 @@ export function bodyText(ed) {
 
 // The caret into the first box, or at the very end of the last.
 export function focusBody(ed, { end = false } = {}) {
-  const areas = ed.blocksEl.querySelectorAll("textarea");
+  const areas = ed.blocksEl.querySelectorAll(".md");
   const area = end ? areas[areas.length - 1] : areas[0];
   if (!area) return;
   area.focus();
@@ -142,22 +145,16 @@ export function focusBody(ed, { end = false } = {}) {
   area.setSelectionRange(at, at);
 }
 
-const grow = fitArea;
-
 // The first box invites writing; an empty box under a picture says, more
 // quietly, that it is there to be written in — without it the space would
 // look like nothing, and there would be nothing to tap.
 function placeholders(ed) {
-  const areas = ed.blocksEl.querySelectorAll("textarea");
+  const areas = ed.blocksEl.querySelectorAll(".md");
   areas.forEach((area, index) => { area.placeholder = index === 0 ? "Write something…" : "Write here…"; });
 }
 
-function textareaFor(ed, text) {
-  const area = document.createElement("textarea");
-  area.className = "body";
-  area.rows = 1;
-  area.value = text;
-  area.addEventListener("input", () => { grow(area); ed.changed(); });
+function boxFor(ed, text) {
+  const area = markdownArea(text, () => ed.changed());
   area.addEventListener("keydown", (event) => {
     // Backspace at the top of the box under a picture takes the picture.
     if (event.key === "Backspace" && area.selectionStart === 0 && area.selectionEnd === 0) {
@@ -186,14 +183,14 @@ function figureFor(ed, name, alt) {
 // A picture goes where the caret is: the box splits around it. With no box
 // focused, it goes at the end.
 function insertPicture(ed, name, alt) {
-  const areas = [...ed.blocksEl.querySelectorAll("textarea")];
+  const areas = [...ed.blocksEl.querySelectorAll(".md")];
   let area = areas.find((a) => a === document.activeElement) || areas[areas.length - 1];
   let at = area === document.activeElement ? area.selectionStart : area.value.length;
   const before = area.value.slice(0, at);
   const after = area.value.slice(at);
   area.value = before;
   const figure = figureFor(ed, name, alt);
-  const next = textareaFor(ed, after);
+  const next = boxFor(ed, after);
   area.after(figure, next);
   placeholders(ed);
   ed.grow();
