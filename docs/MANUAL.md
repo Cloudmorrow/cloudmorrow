@@ -743,8 +743,10 @@ you, by domain, and the records in each — the same records the Quills draw,
 to look at rather than change, each on the sheet every record has, with its
 history, what links to it and, for a snapshot, its digest and the
 attestations on it ([ATTESTATIONS.md](ATTESTATIONS.md)). It is there for
-everybody without any Quill, and shows nothing a Quill would not. In the
-terminal it is a card under the Quills with the datamodels down the left; on
+everybody without any Quill, and shows nothing a Quill would not, so it
+stands apart from them: under **Your cloud** in the rail on a computer and
+in the terminal app's sidebar, where it is a card with the datamodels down
+the left; on
 the command line it is `cm data list`, `cm data list <datamodel>` and
 `cm data show <datamodel> <id>`.
 
@@ -766,9 +768,10 @@ buttons come in to meet the column they act on rather than sitting out at the
 window's edge, every row and tile says when the pointer is over it, and the
 sheet that slides up from under a thumb is a dialog in the middle. The rail
 stays put in an editor and in a thread, which on a phone drop the tab bar to
-give the keyboard the room. For an administrator it has one more section at
-the foot, **Administration**, with Users, Circles, Roles, Quills and Server
-under it — the terminal app's sidebar, in the browser.
+give the keyboard the room. It has the sections the terminal app's sidebar
+has: the Quills, then **Your cloud** with Data under it, and for an
+administrator **Administration** at the foot, with Users, Circles, Roles,
+Quills and Server under it.
 
 The keys are the ones already on the screen: `Esc` is the back button (or the
 field you are in), `/` is the search box, `n` is the pen beside the title,

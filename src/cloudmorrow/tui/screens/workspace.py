@@ -146,6 +146,8 @@ class WorkspaceScreen(QuillCards, Screen):
                 quills = SectionLabel("Quills", id="nav-section-quills")
                 quills.display = False
                 yield quills
+                # Then what the server gives everybody without a Quill: the
+                # built-in cards, and Data, which sync_quills puts here.
                 cloud = SectionLabel("Your cloud", id="nav-section-cloud")
                 cloud.display = bool(PANES)
                 yield cloud
@@ -287,7 +289,7 @@ class WorkspaceScreen(QuillCards, Screen):
             if on:
                 showing.append(key)
         self._showing = showing
-        self.query_one("#nav-section-quills").display = any(key in showing for key in self._quill_panes)
+        self.show_sections()
         # Switch the last one off in Settings and there is no card to stand
         # on: say so, rather than leaving a pane up that nothing points at.
         self.query_one("#panes", ContentSwitcher).display = bool(showing)

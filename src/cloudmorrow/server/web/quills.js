@@ -67,6 +67,10 @@ function place(list) {
     // Quill of somebody's own is switched by its key, `~alice.budget`.
     feature: quill.key || quill.id,
     href: () => screenHash(quill, screen),
+    // Data is composed by the server for whoever asks rather than
+    // installed (server/dataview.py): the rail sets its tab apart from
+    // the Quills, under Your cloud, as the terminal app's sidebar does.
+    cloud: !!quill.composed,
   }))));
 }
 
