@@ -109,3 +109,42 @@ def test_the_servers_own_503_keeps_its_words():
     with pytest.raises(ApiError) as caught:
         asyncio.run(api.me())
     assert str(caught.value) == "no supervisor on this server"
+
+
+# -- the client, when the server took the call and is slow to answer ----------------------
+def _client_raising(exc: Exception, seen: list | None = None) -> CloudmorrowClient:
+    api = CloudmorrowClient(ClientConfig(api_url=SERVER))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if seen is not None:
+            seen.append(request.extensions["timeout"])
+        raise exc
+
+    api._client = httpx.AsyncClient(base_url=SERVER, transport=httpx.MockTransport(handler))
+    return api
+
+
+def test_a_slow_answer_is_not_called_unreachable():
+    api = _client_raising(httpx.ReadTimeout("timed out"))
+    with pytest.raises(ApiError) as caught:
+        asyncio.run(api.me())
+    assert "did not answer in time" in str(caught.value)
+    assert "cannot reach" not in str(caught.value)
+
+
+def test_a_server_that_never_picks_up_is_unreachable():
+    api = _client_raising(httpx.ConnectTimeout("timed out"))
+    with pytest.raises(ApiError) as caught:
+        asyncio.run(api.me())
+    assert str(caught.value).startswith(f"cannot reach {SERVER}")
+
+
+def test_an_install_waits_for_the_runtime_it_fetches():
+    # Installing Vidmorrow fetches ffmpeg, over 100 MB: the ten seconds of an
+    # ordinary call gave up while the server went on and installed it.
+    seen: list = []
+    api = _client_raising(httpx.ReadTimeout("timed out"), seen)
+    for call in (api.install_quill(id="vidmorrow"), api.install_my_quill(id="vidmorrow"), api.upload_quill(b"")):
+        with pytest.raises(ApiError):
+            asyncio.run(call)
+    assert [t["read"] for t in seen] == [600.0] * 3
