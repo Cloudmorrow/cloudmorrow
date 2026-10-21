@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 
 from cloudmorrow.server.app import create_app
 from cloudmorrow.server.datamodels import ID_RE
-from cloudmorrow.server.quills import QuillError, load_manifest
+from cloudmorrow.server.quills import QuillError, load_manifest, sharing
 from cloudmorrow.server.quills.manifest import personalise
 from cloudmorrow.server.quills.registry import check_personal
 from cloudmorrow.server.security import hash_password
@@ -235,7 +235,7 @@ def test_sharing_is_an_offer_bob_says_yes_to_and_then_the_quills_data_is_his_too
     assert state_of(client).records.count_all("~alice.budget.envelope") == 2
 
 
-def test_the_owner_says_what_each_person_may_do_with_the_quills_data(budget):
+def test_the_owner_says_what_each_person_may_do_with_the_quills_data(budget, monkeypatch):
     """A share's rules: read on a datamodel is a datamodel looked at. Offered again, only the rules change."""
     client, who = budget
     food = add_envelope(client, who["alice"], "Food")
@@ -275,6 +275,16 @@ def test_the_owner_says_what_each_person_may_do_with_the_quills_data(budget):
     assert unknown.status_code == 400
     # Nobody else reaches it, whatever `*` says: not listed, 404.
     assert client.get("/api/records/~alice.budget.envelope", headers=who[ADMIN[0]]).status_code == 404
+    # The offer bob said yes to keeps its date, however many times the rules
+    # change after; a no asked again is a new offer, and takes today's.
+    store = client.app.state.cloudmorrow.sharing
+    first = store.share("alice", "budget", "bob")
+    monkeypatch.setattr(sharing, "_now", lambda: "2030-01-01T00:00:00+00:00")
+    again = store.offer("alice", "budget", "bob", by="alice", rules={"~alice.budget.entry": "read"})
+    assert (again["offered_at"], again["offered_by"]) == (first["offered_at"], first["offered_by"])
+    assert again["rules"] == {"~alice.budget.entry": "read"}
+    client.post("/api/quills/offers/alice/budget/decline", headers=who["bob"])
+    assert store.offer("alice", "budget", "bob")["offered_at"] == "2030-01-01T00:00:00+00:00"
 
 
 def test_the_owner_taking_it_off_their_shelf_leaves_it_standing_for_the_others(budget):

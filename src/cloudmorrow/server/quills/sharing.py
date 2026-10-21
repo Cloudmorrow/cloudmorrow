@@ -186,7 +186,10 @@ class SharingStore:
     # -- shares ------------------------------------------------------------------------
     def offer(self, owner: str, quill: str, username: str, *, by: str = "", rules: dict | None = None) -> dict:
         """Offer *owner*'s *quill* to *username*, with what they may do with each of its
-        datamodels (*rules*: nothing named is write); an earlier no is asked again."""
+        datamodels (*rules*: nothing named is write); an earlier no is asked again.
+
+        Offered to somebody who has it already, only the rules change: the offer
+        they said yes to keeps who made it and when."""
         if username == owner:
             raise SharingError("it is yours already")
         with self._connect() as conn:
@@ -195,7 +198,11 @@ class SharingStore:
                 " VALUES (?, ?, ?, ?, ?, ?, ?)"
                 " ON CONFLICT(owner, quill, username) DO UPDATE SET"
                 " state = CASE WHEN quill_shares.state = 'accepted' THEN 'accepted' ELSE 'offered' END,"
-                " offered_by = excluded.offered_by, offered_at = excluded.offered_at, rules = excluded.rules",
+                " offered_by = CASE WHEN quill_shares.state = 'accepted'"
+                " THEN quill_shares.offered_by ELSE excluded.offered_by END,"
+                " offered_at = CASE WHEN quill_shares.state = 'accepted'"
+                " THEN quill_shares.offered_at ELSE excluded.offered_at END,"
+                " rules = excluded.rules",
                 (owner, quill, username, OFFERED, by or owner, _now(), _rules_text(rules)),
             )
             conn.commit()
