@@ -1,10 +1,10 @@
 """A Quill's screens in the terminal: one pane per screen, drawn from the kit.
 
 A Quill never ships UI (docs/QUILLS.md). It declares screens — `board`,
-`list`, `detail`, `form`, `calendar` — bound to the fields of its datamodels, and every
-surface draws them. This is where the terminal does: `pane_for` takes one
-screen of one installed Quill and returns the pane for its kit, and the
-workspace gives it a tab after Notes.
+`list`, `detail`, `form`, `calendar`, `timeline` — bound to the fields of its
+datamodels, and every surface draws them. This is where the terminal does:
+`pane_for` takes one screen of one installed Quill and returns the pane for
+its kit, and the workspace gives it a tab after Notes.
 
 Nothing here knows what any Quill is about. The pane reads its screen's
 bindings and the datamodels the server sent beside them, and that is all a
@@ -27,6 +27,8 @@ task board has to go on as much as a list of car services does.
   you are on to the right, and a line to write in.
 - `view` is not the kit's: the Quill's own code draws it, as a tree of
   primitives, and kit_view.py turns the tree into widgets (widgets/view_nodes.py).
+- `timeline` is in kit_timeline.py: the projects, then one cut on its
+  tracks, with the frames the Quill's service draws in the viewer.
 - `data` is in kit_data.py: the Quill's datamodels down the left, the
   records of one beside them, each opened in the sheet to look at.
 
@@ -461,6 +463,7 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     from cloudmorrow.tui.panes.kit_grid import GridPane
     from cloudmorrow.tui.panes.kit_grouped import GroupedListPane, draws_here
     from cloudmorrow.tui.panes.kit_thread import ThreadPane
+    from cloudmorrow.tui.panes.kit_timeline import TimelinePane
     from cloudmorrow.tui.panes.kit_view import ViewPane
 
     kit = screen.get("kit")
@@ -486,4 +489,6 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
         return ListPane(quill, screen, **kwargs)
     if kit == "thread":
         return ThreadPane(quill, screen, **kwargs)
+    if kit == "timeline":
+        return TimelinePane(quill, screen, **kwargs)
     return None

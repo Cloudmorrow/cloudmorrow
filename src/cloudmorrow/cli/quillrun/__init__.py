@@ -53,6 +53,20 @@ A `thread` screen is spaces and what is said in them:
     cm chat show general               # the conversation, newest at the bottom
     cm chat say general "on my way"    # a channel by name, id, or the person
 
+A `timeline` is projects of pieces on tracks; a piece is named by the start
+of its id or its name, a time is seconds or m:ss:
+
+    cm cutter list                     # the projects, newest first
+    cm cutter add "Holiday"            # a new project
+    cm cutter show Holiday             # its tracks, and the pieces with their times
+    cm cutter add Holiday beach.mp4 --track V1 --at 0   # --length without a frames API
+    cm cutter cut Holiday 8f2c 4.5     # split at 4.5 s; its blurs go with each half
+    cm cutter trim Holiday 8f2c --start 1 | --end 0:12
+    cm cutter move Holiday 8f2c --at 20 [--track V2]
+    cm cutter rm Holiday 8f2c
+    cm cutter frame Holiday --at 3 -o frame.jpg   # the cut at 3 s, from the frames API
+    cm cutter export Holiday format=webm          # the screen's export action
+
 A Quill with code has actions of its own, each a command, and views, which
 print as text:
 
@@ -66,7 +80,7 @@ print as text:
 `cm tasks` works without the CLI knowing, when it starts, what is installed.
 
 Each kind of screen is a module of its own, as the TUI's are panes/kit_*:
-board, grouped (a list), calendar, editor, grid and thread, with records
+board, grouped (a list), calendar, editor, grid, thread and timeline, with records
 for what a board, a list and a calendar share, screen for what they all do,
 and actions for a Quill's own code.
 """
@@ -96,8 +110,11 @@ from cloudmorrow.cli.quillrun.screen import (  # noqa: F401
     _screen_spec,
 )
 from cloudmorrow.cli.quillrun.thread import _thread, space_name  # noqa: F401
+from cloudmorrow.cli.quillrun.timeline import _act_timeline
 from cloudmorrow.client.api import CloudmorrowClient
 
+# A timeline's words that no other screen has.
+TIMELINE_ONLY = ("cut", "trim", "rm", "frame", "export")
 ACTIONS = (
     "list",
     "add",
@@ -114,6 +131,7 @@ ACTIONS = (
     "search",
     "say",
     "history",
+    *TIMELINE_ONLY,
 )
 
 
@@ -135,6 +153,12 @@ def main(
     reveal: Annotated[bool, typer.Option("--reveal", help="show: include a hidden field's value.")] = False,
     first: Annotated[str, typer.Option("--from", help="A calendar: the first day, as 2026-10-01 (today).")] = "",
     last: Annotated[str, typer.Option("--to", help="A calendar: the last day (a week after --from).")] = "",
+    track: Annotated[str, typer.Option("--track", help="A timeline: the track, as V1.")] = "",
+    at: Annotated[str | None, typer.Option("--at", help="A timeline: when, in seconds or m:ss.")] = None,
+    length: Annotated[str | None, typer.Option("--length", help="A timeline: how long the file is.")] = None,
+    start: Annotated[str | None, typer.Option("--start", help="A timeline's trim: the new start.")] = None,
+    end: Annotated[str | None, typer.Option("--end", help="A timeline's trim: the new end.")] = None,
+    out_file: Annotated[str, typer.Option("--out", "-o", help="A timeline's frame: where to save it.")] = "",
 ) -> None:
     """Run ACTION on an installed Quill: one of the kit's, or one the Quill declares."""
     args = list(args or [])
@@ -153,6 +177,7 @@ def main(
                 plain=plain,
                 days=(first, last),
                 reveal=reveal,
+                timing={"track": track, "at": at, "length": length, "start": start, "end": end, "out": out_file},
             )
 
     run(_run())
@@ -170,11 +195,15 @@ async def dispatch(
     plain: bool = False,
     days: tuple[str, str] = ("", ""),
     reveal: bool = False,
+    timing: dict | None = None,
 ) -> None:
     """One `cm <quill> …`: a Quill's own action, its view, or the kit's words for its screen."""
     found = _quill(await api.quills(), quill)
     declared = {a["id"]: a for a in found.get("actions", [])}
-    if action in declared:
+    shown = next((s for s in found.get("screens") or [] if s["id"] == screen_id or not screen_id), {})
+    # A timeline's `export` is its screen's, whatever the action is called.
+    exports = shown.get("kit") == "timeline" and action == "export"
+    if action in declared and not exports:
         await _press(api, found, declared[action], args, plain)
         return
     if action == "actions":
@@ -194,7 +223,7 @@ async def dispatch(
         await _view(api, found, spec, args, plain)
         return
     screen = Screen(found, spec)
-    await _act(api, screen, action, args, group, index, plain, days, reveal)
+    await _act(api, screen, action, args, group, index, plain, days, reveal, timing)
 
 
 async def _act(
@@ -207,6 +236,7 @@ async def _act(
     plain: bool,
     days: tuple[str, str] = ("", ""),
     reveal: bool = False,
+    timing: dict | None = None,
 ) -> None:
     if action == "history":
         await _history(api, screen, args, plain)
@@ -220,4 +250,9 @@ async def _act(
     if screen.kit == "thread":
         await _thread(api, screen, action, args, plain)
         return
+    if screen.kit == "timeline":
+        await _act_timeline(api, screen, action, args, plain, timing or {})
+        return
+    if action in TIMELINE_ONLY:
+        fail(f"{action} is a timeline's; {screen.quill['id']} is a {screen.kit}")
     await _act_records(api, screen, action, args, group, index, plain, days, reveal)
