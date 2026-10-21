@@ -15,6 +15,9 @@ TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 # A deploy is a git fetch, a pip install and a wheel build. It is the one call
 # that is allowed to take minutes.
 DEPLOY_TIMEOUT = httpx.Timeout(600.0, connect=5.0)
+# An install fetches the Quill and whatever runtime it needs — ffmpeg is over
+# 100 MB — before it answers.
+INSTALL_TIMEOUT = httpx.Timeout(600.0, connect=5.0)
 # A picture over a slow link.
 UPLOAD_TIMEOUT = httpx.Timeout(120.0, connect=5.0)
 
@@ -438,7 +441,7 @@ class CloudmorrowClient:
         body: dict = {"id": id, "source": source, "ref": ref}
         if audience is not None:
             body["audience"] = audience
-        return (await self._request("POST", "/api/quills", json=body)).json()
+        return (await self._request("POST", "/api/quills", json=body, timeout=INSTALL_TIMEOUT)).json()
 
     async def upload_quill(self, data: bytes, *, plan_only: bool = False) -> dict:
         """Install a Quill from a .tar.gz of its folder — or, with plan_only, only say what it adds."""
@@ -448,6 +451,7 @@ class CloudmorrowClient:
             params={"plan_only": str(plan_only).lower()},
             content=data,
             headers_extra={"Content-Type": "application/gzip"},
+            timeout=INSTALL_TIMEOUT,
         )
         return response.json()
 
@@ -492,7 +496,7 @@ class CloudmorrowClient:
 
     async def install_my_quill(self, *, id: str = "", source: str = "", ref: str = "") -> dict:
         body = {"id": id, "source": source, "ref": ref}
-        return (await self._request("POST", "/api/quills/mine", json=body)).json()
+        return (await self._request("POST", "/api/quills/mine", json=body, timeout=INSTALL_TIMEOUT)).json()
 
     async def upload_my_quill(self, data: bytes, *, plan_only: bool = False) -> dict:
         response = await self._request(
@@ -501,6 +505,7 @@ class CloudmorrowClient:
             params={"plan_only": str(plan_only).lower()},
             content=data,
             headers_extra={"Content-Type": "application/gzip"},
+            timeout=INSTALL_TIMEOUT,
         )
         return response.json()
 

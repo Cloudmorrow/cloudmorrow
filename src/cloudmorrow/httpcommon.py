@@ -29,6 +29,10 @@ class ServerError(RuntimeError):
 
     @classmethod
     def unreachable(cls, url: str, exc: Exception) -> Self:
+        # A server that took the call and has not answered yet is still at
+        # work: saying it cannot be reached sends people looking at the network.
+        if isinstance(exc, httpx.TimeoutException) and not isinstance(exc, httpx.ConnectTimeout):
+            return cls(f"{url} did not answer in time; what was asked may still be under way there")
         return cls(f"cannot reach {url}: {exc}")
 
     @classmethod
