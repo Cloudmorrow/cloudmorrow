@@ -175,6 +175,7 @@ def catalog(state: AppState = Depends(get_state), _: User = Depends(get_current_
         found = load_catalog(state.config.quill_catalog)
     except QuillError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+    state.quills.remember_categories(found)
     installed = {q.id: q for q in state.quills.quills.values()}
     return {
         "categories": found.categories,

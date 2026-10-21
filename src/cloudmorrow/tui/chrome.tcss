@@ -130,7 +130,8 @@
     margin: 1 0 0 1;
 }
 
-#nav-section-quills {
+/* The first shelf stands at the top, with no air above it. */
+.nav-section.-first {
     margin-top: 0;
 }
 
@@ -191,7 +192,7 @@ WorkspaceScreen.-narrow .nav-section {
     margin: 1 0 0 0;
 }
 
-WorkspaceScreen.-narrow #nav-section-quills {
+WorkspaceScreen.-narrow .nav-section.-first {
     margin-top: 0;
 }
 

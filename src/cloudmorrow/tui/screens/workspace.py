@@ -3,15 +3,17 @@
     ▄▀▀▀▄ █     ▄▀▀▀▄ …        BRAM'S CLOUD · cloudmorrow
     (the pixel wordmark)       bram@cm.example.org   ⚙ Settings ^g
                                server ● connected    🔔 1  f8
-    QUILLS            ╭──────────────────────────────────────────╮
+    PERSONAL          ╭──────────────────────────────────────────╮
     ╭ Notes ───────╮  │ Notes  Markdown notes in folders  read 12:03 │
     │ ● 12 notes   │  │ [New note ^n]  New folder  Search          │
     ╰───────── f1 ╯  │ …                                          │
     ╭ Tasks ───────╮  ╰──────────────────────────────────────────╯
     │ ● 3 to do    │  ╭ LOG ─────────────────────────────────────╮
     ╰───────── f2 ╯  │ 12:03:04 sam asks for crm                  │
-    YOUR CLOUD        ╰──────────────────────────────────────────╯
-      Calendar  f7 …   ^r Refresh   ^c Quit
+    BUSINESS          ╰──────────────────────────────────────────╯
+    ╭ Channels ────╮    ^r Refresh   ^c Quit
+    YOUR CLOUD
+      Data  f7
     ADMINISTRATION
       Users  f9
 
@@ -20,16 +22,18 @@ plainness: a place per card down the left, each saying how it is; one rounded
 panel for the place you are on; a strip of what happened along the bottom;
 the keys on the last line.
 
-Down the left: QUILLS, a card for every screen of every Quill this server
-has installed, in the catalog's order (Notes, Tasks, Files, Calendar, Chat,
-Secrets), drawn from the kit by tui/panes/kit.py. YOUR CLOUD, what was
-still built in, has nothing left in it and is not drawn. The Quills are asked for after sign-in
-rather than built in, so installing one in Administration puts its card here
-without a restart, and the workspace opens on the first card there is:
-Notes, where it is installed. An administrator has a
-third section, ADMINISTRATION, whose entries put the server's own panel —
-accounts, circles, Quills — in place of the workspace. A Quill switched off
-there loses its card here, for everybody.
+Down the left: a card for every screen of every Quill this server has
+installed, drawn from the kit by tui/panes/kit.py, on the shelves of the
+catalog's categories — PERSONAL (Notes, Tasks, Files, Calendar), HOME,
+BUSINESS (Channels, CRM), DEVELOPER (Secrets) — in the catalog's order, the
+Quills on each in the catalog's order too (tui/screens/quill_cards.py).
+YOUR CLOUD, what was still built in, has only Data left in it. The Quills
+are asked for after sign-in rather than built in, so installing one in
+Administration puts its card here without a restart, and the workspace
+opens on the first card there is: Notes, where it is installed. An
+administrator has a last section, ADMINISTRATION, whose entries put the
+server's own panel — accounts, circles, Quills — in place of the workspace.
+A Quill switched off there loses its card here, for everybody.
 
 A Quill's actions that are not on a record (docs/QUILLCODE.md) are in the
 actions palette, ctrl+e, from anywhere here: type to find one, enter to run
@@ -141,13 +145,12 @@ class WorkspaceScreen(QuillCards, Screen):
         )
         with Horizontal(id="body"):
             with VerticalScroll(id="sidebar"):
-                # The Quills first: Notes is one, and Notes has always been
-                # the first card and the one the workspace opens on.
-                quills = SectionLabel("Quills", id="nav-section-quills")
-                quills.display = False
-                yield quills
-                # Then what the server gives everybody without a Quill: the
-                # built-in cards, and Data, which sync_quills puts here.
+                # The Quills come first, on the shelves of their categories,
+                # which sync_quills puts here once the server has said: Notes
+                # is one, and Notes has always been the first card and the
+                # one the workspace opens on. Then what the server gives
+                # everybody without a Quill: the built-in cards, and Data,
+                # which sync_quills puts here too.
                 cloud = SectionLabel("Your cloud", id="nav-section-cloud")
                 cloud.display = bool(PANES)
                 yield cloud

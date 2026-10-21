@@ -227,7 +227,7 @@ async def test_the_data_tab_lists_the_datamodels_and_the_records_of_the_one_pick
         screen = await start(app, pilot)
         # Its card stands under YOUR CLOUD, apart from the Quills' cards.
         sidebar = [w.id for w in screen.query_one("#sidebar").children if w.display]
-        assert sidebar.index("nav-section-quills") < sidebar.index("nav-tasks") < sidebar.index("nav-section-cloud")
+        assert sidebar.index("nav-shelf-personal") < sidebar.index("nav-tasks") < sidebar.index("nav-section-cloud")
         assert sidebar.index("nav-section-cloud") + 1 == sidebar.index("nav-data")
         assert "nav-section-admin" not in sidebar or sidebar.index("nav-data") < sidebar.index("nav-section-admin")
         await pilot.click("#nav-data")

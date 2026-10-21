@@ -769,9 +769,11 @@ window's edge, every row and tile says when the pointer is over it, and the
 sheet that slides up from under a thumb is a dialog in the middle. The rail
 stays put in an editor and in a thread, which on a phone drop the tab bar to
 give the keyboard the room. It has the sections the terminal app's sidebar
-has: the Quills, then **Your cloud** with Data under it, and for an
-administrator **Administration** at the foot, with Users, Circles, Roles,
-Quills and Server under it.
+has: Today, then the Quills on the shelves of their catalog categories —
+**Personal**, **Home**, **Business**, **Developer**, in the catalog's order —
+then **Your cloud** with Data under it, and for an administrator
+**Administration** at the foot, with Users, Circles, Roles, Quills and Server
+under it. The phone's bar runs the tabs together without the headings.
 
 The keys are the ones already on the screen: `Esc` is the back button (or the
 field you are in), `/` is the search box, `n` is the pen beside the title,
@@ -835,9 +837,10 @@ its files and turns away the password.
 ## The terminal app
 
 `cm` with no command opens the workspace on the first card — **Notes**, on
-a fresh server. There is a card per installed Quill, and fewer when one of
-them is switched off, by the server for everybody or by you in Settings,
-since a tab follows its feature.
+a fresh server. There is a card per installed Quill, on the shelf of its
+catalog category — **PERSONAL**, **HOME**, **BUSINESS**, **DEVELOPER**, in the
+catalog's order — and fewer when one of them is switched off, by the server
+for everybody or by you in Settings, since a tab follows its feature.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
