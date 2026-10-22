@@ -5,7 +5,7 @@ folder — and the `shares` backend serves them through the record API, with
 their bytes and a small copy of each picture beside the record. These hold
 that the Quill does everything the built-in Files did: list a share and a
 folder, open a file, a thumbnail of a picture, put a file in, and — new —
-make a folder, rename, move and delete; that a share is made by anybody
+make a folder, rename, move and delete — to the Trash, and back; that a share is made by anybody
 and seen by the people it is shared with, read-only when that is all they
 were given; that an account sees only what it has; and that a server which
 had Files built in gets the Quill at boot.
@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import io
 import os
+from pathlib import Path
 
 import pytest
 
@@ -269,6 +270,140 @@ def test_folders_are_made_renamed_moved_and_deleted(files, config):
     # Deleting a folder takes what is in it.
     call(files, "DELETE", f"/api/records/file/{tax['id']}", expect=204)
     assert not (root / "Tax").exists()
+
+
+def test_deleting_moves_to_the_trash_and_moving_back_restores(files, config):
+    """A deleted file sits in the share's Trash, its record saying when and
+    where from; moved back out it is restored, folders made on the way."""
+    root = drive(config)
+    (root / "Docs" / "Tax").mkdir(parents=True)
+    (root / "Docs" / "Tax" / "2025.pdf").write_bytes(b"%PDF")
+    pdf = call(files, "GET", "/api/records/file?share=my-files&folder=Docs/Tax")[0]
+    assert pdf["fields"]["deleted"] is None and pdf["fields"]["deleted_from"] == ""
+    call(files, "DELETE", f"/api/records/file/{pdf['id']}", expect=204)
+    assert not (root / "Docs" / "Tax" / "2025.pdf").exists()
+    assert (root / "Trash" / "2025.pdf").read_bytes() == b"%PDF"
+    # Listed at the top as a folder like any other, and in it the file says
+    # when it went and where it was.
+    top = call(files, "GET", "/api/records/file?share=my-files")
+    assert "Trash" in [f["fields"]["name"] for f in top]
+    trashed = call(files, "GET", "/api/records/file?share=my-files&folder=Trash")
+    assert [f["fields"]["name"] for f in trashed] == ["2025.pdf"]
+    assert trashed[0]["fields"]["deleted"] and trashed[0]["fields"]["deleted_from"] == "Docs/Tax/2025.pdf"
+    # The folder it was in is gone since; restoring makes it again.
+    (root / "Docs" / "Tax").rmdir()
+    back = call(
+        files,
+        "PATCH",
+        f"/api/records/file/{trashed[0]['id']}",
+        {"fields": {"folder": "Docs/Tax", "name": "2025.pdf"}, "rev": trashed[0]["rev"]},
+    )
+    assert back["fields"]["path"] == "Docs/Tax/2025.pdf" and back["fields"]["deleted"] is None
+    assert (root / "Docs" / "Tax" / "2025.pdf").read_bytes() == b"%PDF"
+    assert call(files, "GET", "/api/records/file?share=my-files&folder=Trash") == []
+    # Two of a name in the Trash: the second is numbered, and each knows its own way back.
+    (root / "2025.pdf").write_bytes(b"%PDF-top")
+    for folder in ("Docs/Tax", ""):
+        found = call(files, "GET", f"/api/records/file?share=my-files&folder={folder}")
+        call(files, "DELETE", f"/api/records/file/{found[0]['id']}", expect=204)
+    trashed = call(files, "GET", "/api/records/file?share=my-files&folder=Trash")
+    assert {f["fields"]["name"]: f["fields"]["deleted_from"] for f in trashed} == {
+        "2025.pdf": "Docs/Tax/2025.pdf",
+        "2025 2.pdf": "2025.pdf",
+    }
+    # Restored to a name taken since: numbered, not written over.
+    (root / "2025.pdf").write_bytes(b"new")
+    numbered = next(f for f in trashed if f["fields"]["name"] == "2025 2.pdf")
+    back = call(files, "PATCH", f"/api/records/file/{numbered['id']}", {"fields": {"folder": "", "name": "2025.pdf"}})
+    assert back["fields"]["name"] == "2025 2.pdf" and (root / "2025.pdf").read_bytes() == b"new"
+
+
+def test_a_deleted_folder_goes_whole_and_what_is_in_it_knows_its_old_place(files, config):
+    root = drive(config)
+    (root / "Tax" / "2024").mkdir(parents=True)
+    (root / "Tax" / "2024" / "a.pdf").write_bytes(b"a")
+    tax = next(f for f in call(files, "GET", "/api/records/file?share=my-files") if f["fields"]["name"] == "Tax")
+    call(files, "DELETE", f"/api/records/file/{tax['id']}", expect=204)
+    inside = call(files, "GET", "/api/records/file?share=my-files&folder=Trash/Tax/2024")
+    assert inside[0]["fields"]["deleted_from"] == "Tax/2024/a.pdf" and inside[0]["fields"]["deleted"]
+    # One file out of a deleted folder, back to its old place; the rest stays.
+    call(files, "PATCH", f"/api/records/file/{inside[0]['id']}", {"fields": {"folder": "Tax/2024", "name": "a.pdf"}})
+    assert (root / "Tax" / "2024" / "a.pdf").read_bytes() == b"a"
+    assert (root / "Trash" / "Tax" / "2024").is_dir()
+
+
+def test_in_the_trash_delete_is_for_good_and_the_trash_stays_put(files, config):
+    root = drive(config)
+    (root / "a.txt").write_text("a")
+    (root / "b.txt").write_text("b")
+    for name in ("a.txt", "b.txt"):
+        found = call(files, "GET", "/api/records/file?share=my-files")
+        one = next(f["id"] for f in found if f["fields"]["name"] == name)
+        call(files, "DELETE", f"/api/records/file/{one}", expect=204)
+    trashed = call(files, "GET", "/api/records/file?share=my-files&folder=Trash")
+    a = next(f for f in trashed if f["fields"]["name"] == "a.txt")
+    call(files, "DELETE", f"/api/records/file/{a['id']}", expect=204)
+    assert not (root / "Trash" / "a.txt").exists() and not (root / "Trash" / ".info" / "a.txt.json").exists()
+    # The Trash is not renamed or moved; deleting it empties it.
+    trash = next(f for f in call(files, "GET", "/api/records/file?share=my-files") if f["fields"]["name"] == "Trash")
+    assert trash["fields"]["deleted"] is None
+    call(files, "PATCH", f"/api/records/file/{trash['id']}", {"fields": {"name": "Bin"}}, expect=400)
+    call(files, "DELETE", f"/api/records/file/{trash['id']}", expect=204)
+    assert not (root / "Trash").exists() and (root / "b.txt").exists() is False
+
+
+def test_a_file_moved_into_the_trash_by_hand_is_adopted(files, config):
+    """Over a mount, or with a move: it has no line saying where from, so it
+    is dated when first seen, and restored to the top of the share."""
+    root = drive(config)
+    (root / "Trash").mkdir()
+    (root / "Trash" / "old.txt").write_text("old")
+    (root / "Photos").mkdir()
+    (root / "Photos" / "cat.jpg").write_bytes(b"cat")
+    found = call(files, "GET", "/api/records/file?share=my-files&folder=Trash")
+    assert found[0]["fields"]["deleted"] and found[0]["fields"]["deleted_from"] == "old.txt"
+    cat = call(files, "GET", "/api/records/file?share=my-files&folder=Photos")[0]
+    moved = call(files, "PATCH", f"/api/records/file/{cat['id']}", {"fields": {"folder": "Trash"}})
+    assert moved["fields"]["deleted"] and moved["fields"]["deleted_from"] == "Photos/cat.jpg"
+
+
+def test_the_sweep_removes_what_has_been_in_the_trash_thirty_days(files, config):
+    import datetime as dt
+    import json
+
+    from cloudmorrow.server.fileops import TRASH_KEEP
+    from cloudmorrow.server.quills.jobs import sweep_all
+
+    root = drive(config)
+    (root / "old.txt").write_text("old")
+    (root / "new.txt").write_text("new")
+    for name in ("old.txt", "new.txt"):
+        found = call(files, "GET", "/api/records/file?share=my-files")
+        one = next(f["id"] for f in found if f["fields"]["name"] == name)
+        call(files, "DELETE", f"/api/records/file/{one}", expect=204)
+    line = root / "Trash" / ".info" / "old.txt.json"
+    info = json.loads(line.read_text())
+    info["at"] = (dt.datetime.now(tz=dt.UTC) - TRASH_KEEP - dt.timedelta(minutes=1)).isoformat(timespec="seconds")
+    line.write_text(json.dumps(info))
+    (root / "Trash" / ".info" / "orphan.json").write_text("{}")
+    state = files.app.state.cloudmorrow
+    assert sweep_all(state.quills, state.records) == 1
+    assert not (root / "Trash" / "old.txt").exists() and not line.exists()
+    assert (root / "Trash" / "new.txt").exists() and not (root / "Trash" / ".info" / "orphan.json").exists()
+    # The same for a share, not only a drive.
+    share = call(files, "POST", "/api/records/share", {"fields": {"name": "team"}}, expect=201)
+    team = call(files, "GET", "/api/records/share/team")
+    folder = Path(team["fields"]["path"])
+    (folder / "x.txt").write_text("x")
+    x = call(files, "GET", "/api/records/file?share=team")[0]
+    call(files, "DELETE", f"/api/records/file/{x['id']}", expect=204)
+    line = folder / "Trash" / ".info" / "x.txt.json"
+    info = json.loads(line.read_text())
+    info["at"] = "2020-01-01T00:00:00+00:00"
+    line.write_text(json.dumps(info))
+    assert sweep_all(state.quills, state.records) == 1
+    assert not (folder / "Trash" / "x.txt").exists()
+    assert share["fields"]["name"] == "team"
 
 
 def test_files_are_their_owners_alone(files, config):

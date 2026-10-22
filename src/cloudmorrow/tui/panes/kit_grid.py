@@ -19,7 +19,9 @@ cursor is on is shown beside, the way a note's picture is.
 In a folder: put a file in from this machine, get one onto it, make a
 folder, rename, move and delete — or, where the records may only be read
 (docs/CIRCLES.md), open, look and get, and nothing that changes what is
-there. Something else in the terminal app may add
+there. Deleting moves a record to the server's Trash folder; in there, the
+screen's `deleted` field set, `u` restores it to where it was
+(`deleted_from`) and `del` deletes it for good. Something else in the terminal app may add
 to the groups — a column, and actions on the group the cursor is on — with
 `register_group_extension`, without this file knowing what it adds.
 
@@ -341,6 +343,7 @@ IN_FOLDER = frozenset(
         "new_record",
         "rename",
         "delete_record",
+        "restore",
         "toggle_view",
         "sort",
         "refresh",
@@ -362,9 +365,10 @@ class GridPane(KitPane):
         ("g", "fire('get')", "Get a file"),
         ("e", "fire('rename')", "Rename"),
         ("M", "fire('move')", "Move"),
+        ("u", "fire('restore')", "Restore"),
     ]
     # Getting a file is reading it; everything else in a folder is writing.
-    WRITING = KitPane.WRITING | {"put", "rename", "move"}
+    WRITING = KitPane.WRITING | {"put", "rename", "move", "restore"}
 
     DEFAULT_CSS = """
     GridPane {
@@ -432,7 +436,12 @@ class GridPane(KitPane):
         self.size_field: str = bound["size"]
         self.modified_field: str = bound["modified"]
         self.mime_field: str = bound["mime"]
+        self.deleted_field: str = bound["deleted"]
+        self.deleted_from_field: str = bound["deleted_from"]
         self.extensions = [ext for ext in EXTENSIONS if ext.applies(self.group_model)]
+        if not self.deleted_field:
+            # A screen with no Trash to restore from: delete is for good.
+            self.refused.add("restore")
         if not can_write(self.group_model):
             # What an extension's other actions do is its own business; a
             # new group is the group datamodel's to allow.
@@ -459,6 +468,7 @@ class GridPane(KitPane):
                 Action("up", "Up", "bksp", hint=f"The folder above; the {group_noun}s at the top"),
                 Action("rename", "Rename", "e", hint="Rename it; M moves it to another folder"),
                 Action("delete_record", "Delete", "del", variant="error"),
+                Action("restore", "Restore", "u", hint="Put what is in the Trash back where it was"),
                 Action("toggle_view", "Thumbnails", "v", hint="Show the folder as pictures, or as a list"),
                 Action("sort", "Sort: Name", "s", hint="Name, date, size or type; shift-s turns it around"),
                 Action("refresh", "Refresh", "r"),
@@ -549,6 +559,9 @@ class GridPane(KitPane):
             "size": int(f.get(self.size_field) or 0) if self.size_field else 0,
             "modified": _seconds(f.get(self.modified_field)) if self.modified_field else 0.0,
             "mime": str(f.get(self.mime_field) or "") if self.mime_field else "",
+            # In the Trash: when it went there, and the path it had.
+            "deleted": _seconds(f.get(self.deleted_field)) if self.deleted_field else 0.0,
+            "deleted_from": str(f.get(self.deleted_from_field) or "") if self.deleted_from_field else "",
         }
 
     @work(exclusive=True, group="grid")
@@ -1008,21 +1021,54 @@ class GridPane(KitPane):
 
     @work(group="ui")
     async def delete_entry(self, entry: dict) -> None:
-        confirmed = await self.app.push_screen_wait(
-            ConfirmModal(
-                f"Delete {entry['name']}?",
-                detail="[dim]Everything in it goes with it. It is not recoverable.[/]"
-                if entry["is_dir"]
-                else "[dim]It is not recoverable.[/]",
+        contents = "Everything in it goes with it. " if entry["is_dir"] else ""
+        if entry["deleted"] or not self.deleted_field:
+            # For good: in the Trash already, or on a screen without one.
+            modal = ConfirmModal(
+                f"Delete {entry['name']} for good?",
+                detail=f"[dim]{contents}It is not recoverable.[/]",
                 confirm_label="Delete",
             )
-        )
-        if not confirmed:
+        else:
+            modal = ConfirmModal(
+                f"Move {entry['name']} to the Trash?",
+                detail=f"[dim]{contents}It can be restored from there.[/]",
+                confirm_label="Move",
+            )
+        if not await self.app.push_screen_wait(modal):
             return
         try:
             await self.api.delete_record(self.model_id, entry["id"])
         except ApiError as exc:
             self.status(str(exc), error=True)
             return
-        self.status(f"Deleted {entry['name']}")
+        if entry["deleted"] or not self.deleted_field:
+            self.status(f"Deleted {entry['name']} for good")
+        else:
+            self.status(f"Moved {entry['name']} to the Trash")
+        self.reload()
+
+    def act_restore(self) -> None:
+        entry = self.highlighted
+        if self.at_top or entry is None:
+            return
+        if not entry["deleted"]:
+            self.status(f"{entry['name']} is not in the Trash", error=True)
+            return
+        self.restore_entry(entry)
+
+    @work(group="ui")
+    async def restore_entry(self, entry: dict) -> None:
+        """Back where it was before it was deleted; the server makes the
+        folders on the way if they are gone, and numbers a name taken since."""
+        was = entry["deleted_from"] or entry["name"]
+        folder, _, name = was.rpartition("/")
+        fields = {self.folder_field: folder, self.title_field: name}
+        try:
+            await self.api.update_record(self.model_id, entry["id"], fields, rev=entry["rev"] or None)
+        except ApiError as exc:
+            if await self.went_wrong(exc, stale=True) != "auth":
+                self.reload()
+            return
+        self.status(f"Restored {entry['name']} to {folder or 'the top'}")
         self.reload()

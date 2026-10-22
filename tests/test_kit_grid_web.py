@@ -15,6 +15,7 @@ import json
 import re
 
 import pytest
+import typer
 
 from cloudmorrow.cli.quillrun import Screen, _act_grid
 from cloudmorrow.server.routes.web import WEB, asset_version
@@ -154,6 +155,22 @@ class FakeApi:
                     },
                 },
             ],
+            ("my-files", "Trash"): [
+                {
+                    "id": "f_9",
+                    "rev": "1",
+                    "fields": {
+                        "share": "my-files",
+                        "folder": "Trash",
+                        "name": "old.txt",
+                        "kind": "file",
+                        "size": 2,
+                        "modified": "",
+                        "deleted": "2026-10-01T10:00:00+00:00",
+                        "deleted_from": "Letters/old.txt",
+                    },
+                },
+            ],
         }
 
     async def records(self, model, **where):
@@ -173,6 +190,10 @@ class FakeApi:
     async def create_record(self, model, fields, index=None):
         self.calls.append(("create", fields))
         return {"id": "f_4", "fields": dict(fields)}
+
+    async def update_record(self, model, record_id, fields, *, rev=None):
+        self.calls.append(("change", record_id, dict(fields)))
+        return {"id": record_id, "fields": dict(fields)}
 
     async def delete_record(self, model, record_id):
         self.calls.append(("delete", record_id))
@@ -212,6 +233,43 @@ def test_cm_files_lists_gets_and_puts(screen, tmp_path, capsys):
     )
     asyncio.run(_act_grid(api, screen, "list", [], True))
     assert json.loads(capsys.readouterr().out)[0]["id"] == "my-files"
+
+
+def test_cm_files_delete_goes_to_the_trash_and_restore_comes_back(screen, capsys):
+    api = FakeApi()
+    asyncio.run(_act_grid(api, screen, "delete", ["my-files", "cv.txt"], False))
+    assert api.calls[-1] == ("delete", "f_2")
+    assert "Moved cv.txt to the Trash" in capsys.readouterr().err
+    asyncio.run(_act_grid(api, screen, "restore", ["my-files", "Trash/old.txt"], False))
+    assert api.calls[-1] == ("change", "f_9", {"folder": "Letters", "name": "old.txt"})
+    assert "Restored old.txt to Letters" in capsys.readouterr().err
+    asyncio.run(_act_grid(api, screen, "delete", ["my-files", "Trash/old.txt"], False))
+    assert api.calls[-1] == ("delete", "f_9")
+    assert "Deleted Trash/old.txt for good" in capsys.readouterr().err
+    with pytest.raises(typer.Exit):
+        asyncio.run(_act_grid(api, screen, "restore", ["my-files", "cv.txt"], False))
+
+
+# -- the Trash, in the browser ----------------------------------------------------------
+def test_a_deleted_file_has_restore_and_a_delete_for_good():
+    """A record whose `deleted` field is set is in the Trash: its page has
+    Restore in place of Rename and Move, and Delete is for good; a folder's
+    “…” offers the same two. Restore is the generic move, back to
+    `deleted_from`."""
+    code = code_of(GRID_JS)
+    assert 'deleted: screen.deleted || ""' in code and 'deletedFrom: screen.deleted_from || ""' in code
+    assert "deleted: (b.deleted && seconds(f[b.deleted])) || 0," in code
+    item = code[code.index("export async function renderGridItem(") :]
+    assert "const actions = entry.deleted ? `" in item
+    assert 'data-do="restore"' in item and "Delete for good" in item
+    assert '["Deleted", formatDate(entry.deleted, { long: true })]' in item
+    change = code[code.index("async function change(") : code.index("const saidDone")]
+    assert "const to = entry.deletedFrom || entry.name;" in change
+    assert "{ [b.folder]: folderOf(to), [b.title]: baseName(to) }" in change
+    assert "Move “${entry.name}” to the Trash?" in change
+    assert "Delete “${entry.name}” for good?" in change
+    folder = code[code.index("async function renderFolder(") : code.index("function photoName(")]
+    assert 'label: "Restore folder"' in folder and 'label: "Delete folder for good"' in folder
 
 
 # -- read is drawn as read (docs/CIRCLES.md) -----------------------------------------

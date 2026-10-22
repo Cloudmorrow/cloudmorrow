@@ -1,6 +1,6 @@
 [datamodel]
 id = "file"
-version = 2
+version = 3
 label = "File"
 description = "A file or a folder in a share or in My Files: a real file on disk, reached over WebDAV and the desktop app's mounts as well."
 domain = "files"
@@ -20,3 +20,5 @@ size = { kind = "int", indexed = true, description = "In bytes; 0 for a folder" 
 modified = { kind = "datetime", indexed = true }
 mime = { kind = "string", indexed = true, label = "Type", description = "A guess from the name; empty when there is none" }
 text = { kind = "text", label = "Text", description = "A text file's words — Markdown, plain text — read a file at a time and written back the same way; left out of a listing, and nothing for a file that is not text" }
+deleted = { kind = "datetime", indexed = true, label = "Deleted", description = "When it was deleted — moved to the share's Trash folder, where it stays thirty days unless restored or deleted again; empty for anything not in the Trash" }
+deleted_from = { kind = "string", label = "Deleted from", description = "Where it was before it was deleted, folders and all, so it can be put back; empty for anything not in the Trash" }

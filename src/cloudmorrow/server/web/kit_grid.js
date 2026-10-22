@@ -20,6 +20,12 @@
    drag files in, or paste one. A record is renamed, moved and deleted from
    its own page, a folder from the “…” beside its name.
 
+   Deleting does not lose anything: the server moves what is deleted to a
+   Trash folder, and a record in there — the screen's `deleted` field says
+   when it went, `deleted_from` where it was — has Restore in place of
+   Rename and Move, and a Delete that is for good. The server sweeps the
+   Trash of what has sat there a month; the kit only draws what it says.
+
    A group whose `group_open` field is false is listed and not opened — it
    is somewhere this server cannot show — with its `group_subtitle` saying
    why. One whose `group_writes` field is false is opened as if its records
@@ -61,6 +67,7 @@ const own = {
   camera: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>',
   rename: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>',
   move: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 13.5h6M12.5 11l2.5 2.5-2.5 2.5"/></svg>',
+  restore: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10a8 8 0 1 1 2.3 5.7"/><path d="M4 4v6h6"/></svg>',
   more: '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
   list: '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 4h9M6 9h9M6 14h9M3 4h.01M3 9h.01M3 14h.01"/></svg>',
   grid: '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="2" y="2" width="5.5" height="5.5" rx="1"/><rect x="10.5" y="2" width="5.5" height="5.5" rx="1"/><rect x="2" y="10.5" width="5.5" height="5.5" rx="1"/><rect x="10.5" y="10.5" width="5.5" height="5.5" rx="1"/></svg>',
@@ -90,6 +97,8 @@ function bind(at) {
     size: screen.size || "",
     modified: screen.modified || "",
     mime: screen.mime || "",
+    deleted: screen.deleted || "",
+    deletedFrom: screen.deleted_from || "",
     groupTitle: groupModel.title,
     groupSubtitle: screen.group_subtitle || "",
     groupOpen: screen.group_open || "",
@@ -117,6 +126,9 @@ function entryOf(b, record) {
     size: Number(b.size ? f[b.size] : 0) || 0,
     modified: (b.modified && seconds(f[b.modified])) || 0,
     mime: String((b.mime && f[b.mime]) || ""),
+    // In the Trash: when it went there, and the path it had.
+    deleted: (b.deleted && seconds(f[b.deleted])) || 0,
+    deletedFrom: String((b.deletedFrom && f[b.deletedFrom]) || ""),
   };
 }
 
@@ -394,11 +406,20 @@ async function renderFolder(at, b, group, folder) {
   ]));
   const more = app.querySelector(".heading .more");
   if (more) {
-    more.addEventListener("click", () => openSheet([
-      { icon: own.rename, label: "Rename folder", run: () => folderAction(at, place, "rename") },
-      { icon: own.move, label: "Move folder", run: () => folderAction(at, place, "move") },
-      { icon: icons.trash, label: "Delete folder", bad: true, run: () => folderAction(at, place, "delete") },
-    ]));
+    // Which choices depends on where the folder is: one in the Trash is
+    // restored or deleted for good, not renamed or moved about in there.
+    more.addEventListener("click", async () => {
+      const here = await folderEntry(b, group, folder);
+      if (!here) return;
+      openSheet(here.deleted ? [
+        { icon: own.restore, label: "Restore folder", run: () => folderAction(at, place, "restore", here) },
+        { icon: icons.trash, label: "Delete folder for good", bad: true, run: () => folderAction(at, place, "delete", here) },
+      ] : [
+        { icon: own.rename, label: "Rename folder", run: () => folderAction(at, place, "rename", here) },
+        { icon: own.move, label: "Move folder", run: () => folderAction(at, place, "move", here) },
+        { icon: icons.trash, label: "Delete folder", bad: true, run: () => folderAction(at, place, "delete", here) },
+      ]);
+    });
   }
   pickInput.addEventListener("change", async () => {
     const picked = [...pickInput.files];
@@ -514,8 +535,10 @@ async function newFolder({ b, group, folder }, reload) {
   } catch (err) { toast(err.message); }
 }
 
-// -- renaming, moving, deleting ----------------------------------------------------------
-/** Rename, move or delete one record; true when it changed. `after(record)` follows a change. */
+// -- renaming, moving, deleting, restoring ---------------------------------------------------
+/** What was done to a record: the record as it is now, `{ deleted: true }`
+    when it went to the Trash, `{ gone: true }` when it went for good, or null
+    when nothing happened. */
 async function change(b, entry, what) {
   const noun = entry.is_dir ? "folder" : b.model.label.toLowerCase();
   try {
@@ -531,9 +554,23 @@ async function change(b, entry, what) {
       if (target === entry.folder) return null;
       return await api("PATCH", recordsUrl(b.model.id, entry.id), { fields: { [b.folder]: target }, rev: entry.rev });
     }
+    if (what === "restore") {
+      // Back where it was: the server makes the folders on the way if they
+      // are gone, and numbers the name if it is taken since.
+      const to = entry.deletedFrom || entry.name;
+      const fields = { [b.folder]: folderOf(to), [b.title]: baseName(to) };
+      return await api("PATCH", recordsUrl(b.model.id, entry.id), { fields, rev: entry.rev });
+    }
     if (what === "delete") {
-      const warning = entry.is_dir ? "\n\nEverything in it goes with it." : "";
-      if (!await ask(`Delete “${entry.name}”?${warning}`)) return null;
+      const contents = entry.is_dir ? " Everything in it goes with it." : "";
+      if (entry.deleted || !b.deleted) {
+        // For good: in the Trash already, or on a screen without one.
+        const warning = entry.deleted ? ` It cannot be restored after this.${contents}` : contents;
+        if (!await ask(`Delete “${entry.name}” for good?${warning ? "\n\n" + warning.trim() : ""}`)) return null;
+        await api("DELETE", recordsUrl(b.model.id, entry.id));
+        return { gone: true };
+      }
+      if (!await ask(`Move “${entry.name}” to the Trash?${contents ? "\n\n" + contents.trim() : ""}`, { yes: "Move" })) return null;
       await api("DELETE", recordsUrl(b.model.id, entry.id));
       return { deleted: true };
     }
@@ -543,21 +580,32 @@ async function change(b, entry, what) {
   return null;
 }
 
-async function folderAction(at, { b, group, folder }, what) {
-  // The folder's own record is in the listing of the folder it is in.
+/** What was done, said in a few words. */
+const saidDone = (done, name) =>
+  done.gone ? `Deleted ${name} for good` : done.deleted ? `Moved ${name} to the Trash` : done.restored ? `Restored ${name}` : "";
+
+/** The folder's own record, which is in the listing of the folder it is in. */
+async function folderEntry(b, group, folder) {
   let entry;
   try {
     entry = (await listFolder(b, group, folderOf(folder))).find((e) => e.is_dir && e.name === baseName(folder));
-  } catch (err) { toast(err.message); return; }
-  if (!entry) { toast("That folder is gone"); return; }
+  } catch (err) { toast(err.message); return null; }
+  if (!entry) toast("That folder is gone");
+  return entry || null;
+}
+
+async function folderAction(at, { b, group, folder }, what, entry = null) {
+  entry = entry || await folderEntry(b, group, folder);
+  if (!entry) return;
   const done = await change(b, entry, what);
   if (!done) return;
-  if (done.deleted) {
-    toast("Deleted " + entry.name);
+  if (done.deleted || done.gone) {
+    toast(saidDone(done, entry.name));
     back(folderHash(at, group, folderOf(folder)));
     return;
   }
   const moved = entryOf(b, done);
+  if (what === "restore") toast(saidDone({ restored: true }, entry.name));
   replace(folderHash(at, group, joinPath(moved.folder, moved.name)));
   renderRoute();
 }
@@ -714,7 +762,16 @@ export async function renderGridItem(at, id) {
     ...(b.size ? [["Size", formatSize(entry.size)]] : []),
     ...(entry.modified ? [["Modified", formatDate(entry.modified, { long: true })]] : []),
     ["Where", groupName + (entry.folder ? "/" + entry.folder : "")],
+    // In the Trash: when it went there, and where Restore puts it back.
+    ...(entry.deleted ? [["Deleted", formatDate(entry.deleted, { long: true })]] : []),
+    ...(entry.deleted ? [["Was in", groupName + (folderOf(entry.deletedFrom) ? "/" + folderOf(entry.deletedFrom) : "")]] : []),
   ];
+  const actions = entry.deleted ? `
+        <button class="row has-icon" data-do="restore"><span class="icon">${own.restore}</span><span class="main"><span class="title">Restore</span></span></button>
+        <button class="row has-icon danger" data-do="delete"><span class="icon">${icons.trash}</span><span class="main"><span class="title">Delete for good</span></span></button>` : `
+        <button class="row has-icon" data-do="rename"><span class="icon">${own.rename}</span><span class="main"><span class="title">Rename</span></span></button>
+        <button class="row has-icon" data-do="move"><span class="icon">${own.move}</span><span class="main"><span class="title">Move to another folder</span></span></button>
+        <button class="row has-icon danger" data-do="delete"><span class="icon">${icons.trash}</span><span class="main"><span class="title">Delete</span></span></button>`;
   const sending = canSendFiles();
   mount(nav({
     back: parent, backLabel: entry.folder ? baseName(entry.folder) : groupName, title: entry.name,
@@ -727,10 +784,7 @@ export async function renderGridItem(at, id) {
       <h1 class="large file-name">${esc(entry.name)}</h1>
       <div class="group facts">${facts.map(([label, value]) =>
         `<div class="row"><span class="main">${esc(label)}</span><span class="value">${esc(value)}</span></div>`).join("")}</div>
-      ${b.writes ? `<div class="group item-actions">
-        <button class="row has-icon" data-do="rename"><span class="icon">${own.rename}</span><span class="main"><span class="title">Rename</span></span></button>
-        <button class="row has-icon" data-do="move"><span class="icon">${own.move}</span><span class="main"><span class="title">Move to another folder</span></span></button>
-        <button class="row has-icon danger" data-do="delete"><span class="icon">${icons.trash}</span><span class="main"><span class="title">Delete</span></span></button>
+      ${b.writes ? `<div class="group item-actions">${actions}
       </div>` : ""}
     </main>`);
   wireShell();
@@ -758,10 +812,16 @@ export async function renderGridItem(at, id) {
     button.addEventListener("click", async () => {
       const done = await change(b, entry, button.dataset.do);
       if (!done) return;
-      if (done.deleted) {
-        toast("Deleted " + entry.name);
+      if (done.deleted || done.gone) {
+        toast(saidDone(done, entry.name));
         back(parent);
         return;
+      }
+      if (button.dataset.do === "restore") {
+        // Back in its folder, which the page it came from is not any more.
+        toast(saidDone({ restored: true }, entry.name));
+        replace(folderHash(at, group, entryOf(b, done).folder));
+        return renderRoute();
       }
       replace(itemHash(at, b, done.id));
       route();

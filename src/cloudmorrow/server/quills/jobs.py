@@ -32,7 +32,8 @@ can stop the server starting. What fails is logged and tried again at the
 next boot.
 
 On the clock: every `expire` job, swept every few minutes. Reads sweep too,
-so this is only for a server nobody is looking at. And every half minute,
+so this is only for a server nobody is looking at. The shares' Trash is
+swept with them, of what has been there thirty days. And every half minute,
 the `run` jobs whose `every` has come round, which the supervisor starts
 (`quills.services.Supervisor.run_due`) — never one still running from before.
 """
@@ -487,6 +488,15 @@ def sweep_all(registry: QuillRegistry, records: RecordStore) -> int:
             gone += records.sweep(model_id)
         except UnknownModelError:
             continue
+    # A backend with a sweep of its own: the shares' Trash, emptied of what
+    # has been there thirty days (backends/shares.py).
+    for backend in records.backends.values():
+        sweep = getattr(backend, "sweep", None)
+        if callable(sweep):
+            try:
+                gone += sweep()
+            except Exception:
+                log.exception("a backend's sweep failed")
     # The change feed's old lines go with the expired records: what it is
     # kept for (an open screen catching up, an audit) looks back weeks, not years.
     records.prune_changes()

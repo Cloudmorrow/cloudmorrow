@@ -38,3 +38,5 @@ kind = "kind"
 size = "size"
 modified = "modified"
 mime = "mime"
+deleted = "deleted"             # in the Trash: when it went there, and Restore instead of Delete
+deleted_from = "deleted_from"   # …and where it was, which Restore puts it back to
