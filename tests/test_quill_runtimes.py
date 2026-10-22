@@ -123,9 +123,9 @@ def registry(tmp_path, catalog_dir) -> QuillRegistry:
 def test_requires_is_read_and_held_to_its_shape(tmp_path):
     manifest = parse_manifest(__import__("tomllib").loads(CLIPS))
     assert manifest.runtimes == ("ffmpeg",)
-    assert manifest.to_dict()["requires"] == {"runtimes": ["ffmpeg"]}
-    with pytest.raises(QuillError, match="no \\[\\[services\\]\\]"):
-        parse_manifest(__import__("tomllib").loads(CLIPS.split("[[services]]")[0]))
+    assert manifest.to_dict()["requires"] == {"runtimes": ["ffmpeg"], "quills": []}
+    # Without services too: the server itself draws a picture of each video with ffmpeg.
+    assert parse_manifest(__import__("tomllib").loads(CLIPS.split("[[services]]")[0])).runtimes == ("ffmpeg",)
     with pytest.raises(QuillError, match="runtime ids"):
         parse_manifest(__import__("tomllib").loads(CLIPS.replace('["ffmpeg"]', '["FFmpeg 7"]')))
     with pytest.raises(QuillError, match="knows runtimes"):
@@ -209,7 +209,7 @@ def test_no_catalog_no_build_and_no_such_runtime_are_each_said(tmp_path, catalog
 def test_the_install_sheet_says_what_is_added_and_the_install_fetches_it(registry, tmp_path):
     folder = write_quill(tmp_path / "src", CLIPS)
     plan = registry.plan(folder, QUILL_CATALOG / "datamodels")
-    assert plan["requires"] == {"runtimes": ["ffmpeg"]}
+    assert plan["requires"] == {"runtimes": ["ffmpeg"], "quills": []}
     [row] = plan["runtimes"]
     assert row["label"] == "ffmpeg" and row["version"] == "7.1.5" and row["available"] is True
     assert row["installed"] == "" and row["size"] > 0 and row["license"] == "GPL-3.0-or-later"

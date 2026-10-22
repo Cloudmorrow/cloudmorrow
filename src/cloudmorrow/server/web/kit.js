@@ -677,6 +677,37 @@ async function drawHistory(slot, model, id) {
     `<span class="meta"><span class="date">${esc(formatDate(seconds(l.at) || Date.now() / 1000, { long: true }))}</span></span></span></div>`).join("")}</div>`;
 }
 
+// A record that is a photo or a video (a file, opened from a gallery or a
+// list) shows it above its fields: the picture, or the video playing, by a
+// link that needs no token, since a <video> cannot send one. Nothing is
+// shown when the server will not serve its bytes.
+const previewable = (record) => /^(image|video)\//.test(String(record.fields.mime || ""));
+
+async function showPreview(slot, model, record) {
+  let made;
+  try { made = await api("POST", recordsUrl(model.id, record.id, "/media")); }
+  catch { slot.remove(); return; }
+  if (!slot.isConnected) return;
+  const name = String(record.fields.name || "");
+  const video = String(record.fields.mime).startsWith("video/");
+  slot.innerHTML = video
+    ? `<video controls playsinline preload="metadata" src="${esc(made.url)}"></video>`
+    : `<img alt="${esc(name)}" src="${esc(made.url)}">`;
+  slot.removeAttribute("aria-busy");
+  const media = slot.firstElementChild;
+  media.addEventListener("error", () => slot.remove());
+  if (!video) {
+    // Tap the picture and it fills the screen; tap again and it is back.
+    media.addEventListener("click", () => {
+      const box = document.createElement("div");
+      box.className = "lightbox";
+      box.innerHTML = `<img src="${esc(made.url)}" alt="${esc(name)}">`;
+      box.addEventListener("click", () => box.remove());
+      document.body.appendChild(box);
+    });
+  }
+}
+
 export async function renderRecordSheet(at, modelId, id, arg) {
   const { quill, screen } = at;
   // An editor's own records open on its page, not on the sheet.
@@ -769,6 +800,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
       (deletable ? `<button class="delete" aria-label="Delete ${esc(model.label.toLowerCase())}">${icons.trash}</button>` : ""),
   }) + `
     <main>
+      ${previewable(record) ? `<figure class="sheet-preview" aria-busy="true"></figure>` : ""}
       <div class="editor record${looked ? " read-only" : ""}">
         <input class="title" data-field="${esc(title)}" placeholder="${esc(fieldOf(model, title).label)}" value="${esc(record.fields[title] ?? "")}" autocapitalize="sentences" enterkeyhint="next"${looked ? " readonly" : ""}>
         <p class="stamp"><span class="when">${esc(formatDate(seconds(record.updated_at) || Date.now() / 1000, { long: true }))}</span>${
@@ -790,6 +822,8 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   wireShell();
   app.querySelector(".nav").classList.add("lined");
   drawHistory(app.querySelector(".history-slot"), model, id);
+  const preview = app.querySelector(".sheet-preview");
+  if (preview) showPreview(preview, model, record);
   // What the kit adds under the fields, when it does: what links here, a
   // snapshot's attestations. Filled as it arrives; a failure leaves it empty.
   if (own && own.section) own.section(app.querySelector(".own-slot"), record).catch(() => {});

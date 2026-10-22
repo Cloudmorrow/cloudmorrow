@@ -39,7 +39,7 @@ from textual.widgets import (
     TabPane,
 )
 
-from cloudmorrow.quill.text import value_text
+from cloudmorrow.quill.text import stars_text, value_text
 from cloudmorrow.quill.ui import GAPS, TONES, children
 from cloudmorrow.tui.dates import month_start, shift_month, span, weeks_of
 from cloudmorrow.tui.kitdata import (
@@ -87,6 +87,7 @@ RENDERERS: dict[str, str] = {
     "menu": "draw_menu",
     "table": "draw_table",
     "cards": "draw_cards",
+    "gallery": "draw_gallery",
     "lanes": "draw_lanes",
     "month": "draw_month",
 }
@@ -467,6 +468,145 @@ class TableNode(Vertical):
             self.post_message(ViewAct({"ui": "button", "action": action["id"], "record": record}))
 
 
+class GalleryNode(Horizontal):
+    """`gallery`: a row per record with its stars, and the picture of the row
+    you are on beside it — the terminal's tiles. 0 to 5 rate the row."""
+
+    BINDINGS = [Binding(str(n), f"rate({n})", f"{n} stars", show=False) for n in range(6)]
+
+    def __init__(self, node: dict, models: dict, actions: list[dict], **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.node = node
+        self.records: list[dict] = list(node.get("records") or [])
+        self.models = models
+        self.actions = actions
+        self.cursor = 0
+        # Thumbnails fetched while the view is open, by (id, rev).
+        self._pictures: dict[tuple[str, str], bytes | None] = {}
+        self.add_class("view-gallery")
+
+    @property
+    def table(self) -> DataTable:
+        return self.query_one(DataTable)
+
+    def compose(self) -> ComposeResult:
+        if not self.records:
+            yield Static(_text(self.node.get("empty") or "Nothing here."), classes="view-muted")
+            return
+        with Vertical(classes="view-gallery-list"):
+            yield DataTable(id=f"{self.id}-rows", cursor_type="row", zebra_stripes=True)
+            hint = "enter opens" + (" · 0–5 rate it" if self.node.get("rate") else "")
+            yield Static(Text(hint, style=MUTED), classes="view-gallery-hint")
+            if self.actions:
+                with Horizontal(classes="view-row-actions"):
+                    for action in self.actions:
+                        button = Button(
+                            str(action.get("label") or action["id"]),
+                            variant=variant_for(action.get("tone")),
+                            compact=True,
+                            id=f"{self.id}-act-{safe_id(action['id'])}",
+                            classes="view-button",
+                        )
+                        button.tooltip = "On the row you are on"
+                        yield button
+        yield Vertical(id=f"{self.id}-picture", classes="view-gallery-picture")
+
+    def on_mount(self) -> None:
+        if not self.records:
+            return
+        table = self.table
+        names = [
+            n
+            for n in (self.node.get("stars"), self.node["title"], self.node.get("badge"), self.node.get("subtitle"))
+            if n
+        ]
+        for name in names:
+            label = "" if name == self.node.get("stars") else name
+            if label:
+                model = self.models.get(self.records[0].get("model", "")) or {}
+                field = field_of(model, name)
+                label = field_label(field) if field else name.replace("_", " ").capitalize()
+            table.add_column(str(label).upper())
+        for record in self.records:
+            model = self.models.get(record.get("model", ""))
+            fields = record.get("fields") or {}
+            cells = []
+            for name in names:
+                if name == self.node.get("stars"):
+                    cells.append(Text(stars_text(fields.get(name)), style=ACCENT))
+                else:
+                    cells.append(_text(_cell(model, name, fields)))
+            table.add_row(*cells)
+        table.move_cursor(row=min(self.cursor, len(self.records) - 1))
+        table.call_after_refresh(settle_widths, table)
+        self.show_picture()
+
+    @property
+    def selected(self) -> dict | None:
+        if not self.records:
+            return None
+        row = self.table.cursor_row
+        return self.records[row] if 0 <= row < len(self.records) else None
+
+    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        event.stop()
+        self.show_picture()
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        event.stop()
+        record = self.selected
+        if record is not None and self.node.get("open", True):
+            self.post_message(ViewOpen(record))
+
+    def action_rate(self, stars: int) -> None:
+        record = self.selected
+        if record is None or not self.node.get("rate"):
+            return
+        self.post_message(
+            ViewAct({"ui": "button", "action": self.node["rate"], "record": record, "args": {"stars": stars}})
+        )
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        event.stop()
+        record = self.selected
+        prefix = f"{self.id}-act-"
+        button_id = event.button.id or ""
+        action = next((a for a in self.actions if button_id == f"{prefix}{safe_id(a['id'])}"), None)
+        if record is not None and action is not None:
+            self.post_message(ViewAct({"ui": "button", "action": action["id"], "record": record}))
+
+    @work(exclusive=True, group="gallery-picture")
+    async def show_picture(self) -> None:
+        from cloudmorrow.tui.widgets.picture import TerminalImage
+
+        record = self.selected
+        api = getattr(self.app, "client", None)
+        frame = self.query_one(f"#{self.id}-picture", Vertical)
+        if record is None or api is None or TerminalImage is None:
+            return
+        key = (str(record.get("id")), str(record.get("rev", "")))
+        if key not in self._pictures:
+            try:
+                self._pictures[key] = await api.record_thumb(str(record["model"]), str(record["id"]), size=512)
+            except Exception:  # no picture of it: a sound, a document, a video without ffmpeg
+                self._pictures[key] = None
+        if self.selected is not record:
+            return
+        await frame.remove_children()
+        data = self._pictures[key]
+        if data is None:
+            await frame.mount(Static(Text("No picture", style=MUTED), classes="view-image-caption"))
+            return
+        try:
+            from PIL import Image as PILImage
+
+            opened = PILImage.open(BytesIO(data))
+            opened.load()
+        except Exception:
+            return
+        await frame.mount(TerminalImage(opened, classes="view-picture"))
+
+
 class ViewCard(Static, can_focus=True):
     """One of `cards`: its title, subtitle, body and badge. Enter or a click opens it."""
 
@@ -813,6 +953,14 @@ class Drawer:
             id=path,
             classes="view-cards",
         )
+
+    def draw_gallery(self, node: dict, path: str) -> Widget:
+        actions = [
+            a for a in (find_action(self.pane.quill, str(i)) for i in node.get("actions") or []) if a is not None
+        ]
+        gallery = GalleryNode(node, self.models, actions, id=path)
+        gallery.cursor = int(self.pane.kept.get(path) or 0)
+        return gallery
 
     def draw_lanes(self, node: dict, path: str) -> Widget:
         records = node.get("records") or []

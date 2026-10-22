@@ -94,6 +94,10 @@ class Manifest:
     # Programs its services need on the server, fetched for it from the
     # catalog's runtimes at install (quills/runtimes.py): `[requires]`.
     runtimes: tuple[str, ...] = ()
+    # Other Quills it works with and installs with it (`[requires] quills`):
+    # installing it installs them first, from the catalog, and none of them
+    # can be removed while it is here.
+    quills: tuple[str, ...] = ()
     # The roles it expects somebody to hold — `[[roles]]`, each with why —
     # made on the server, empty, when it is installed (roles.py, docs/FLOWS.md).
     roles: tuple[dict, ...] = ()
@@ -177,7 +181,7 @@ class Manifest:
             "fetch": list(self.fetch),
             "secrets": list(self.secrets),
             "machine": list(self.machine),
-            "requires": {"runtimes": list(self.runtimes)},
+            "requires": {"runtimes": list(self.runtimes), "quills": list(self.quills)},
             "roles": list(self.roles),
             "origin": dict(self.origin),
             "owner": self.owner,
@@ -396,7 +400,7 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
             raise QuillError(f"{where}: service {service['id']!r} always is true or false")
     _ids_unique(webhooks, "webhook", where)
     _ids_unique(apis, "api", where)
-    runtimes = _requires(data, where, bool(services))
+    runtimes, required = _requires(data, where, quill_id)
     service_ids = {s["id"] for s in services}
     for job in jobs:
         if job["action"] == "run":
@@ -450,6 +454,7 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
         secrets=code.secrets,
         machine=code.machine,
         runtimes=runtimes,
+        quills=required,
         roles=roles,
         readme=readme,
         folder=folder,
@@ -510,24 +515,28 @@ def _check_webhook(hook: dict, service_ids: set[str], paths: set[str], where: st
         raise QuillError(f"{where}: {thing} signature is the name of a header")
 
 
-def _requires(data: dict, where: str, has_services: bool) -> tuple[str, ...]:
-    """`[requires] runtimes`: programs the server fetches for the Quill's services."""
+def _requires(data: dict, where: str, quill_id: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """`[requires]`: programs the server fetches for it (`runtimes`), and the
+    other Quills it installs with it (`quills`)."""
     table = data.get("requires", {})
     if not isinstance(table, dict):
         raise QuillError(f"{where}: [requires] is a table")
-    unknown = sorted(set(table) - {"runtimes"})
+    unknown = sorted(set(table) - {"runtimes", "quills"})
     if unknown:
-        raise QuillError(f"{where}: [requires] knows runtimes, not {', '.join(unknown)}")
+        raise QuillError(f"{where}: [requires] knows runtimes and quills, not {', '.join(unknown)}")
     runtimes = table.get("runtimes", [])
     if not isinstance(runtimes, list) or not all(isinstance(r, str) and RUNTIME_RE.match(r) for r in runtimes):
         raise QuillError(f'{where}: requires.runtimes is a list of runtime ids, like ["ffmpeg"]')
     if len(set(runtimes)) != len(runtimes):
         raise QuillError(f"{where}: requires.runtimes names a runtime twice")
-    if runtimes and not has_services:
-        raise QuillError(
-            f"{where}: requires runtimes, but has no [[services]] to run them; a runtime is on a service's PATH"
-        )
-    return tuple(runtimes)
+    quills = table.get("quills", [])
+    if not isinstance(quills, list) or not all(isinstance(q, str) and ID_RE.match(q) for q in quills):
+        raise QuillError(f'{where}: requires.quills is a list of Quill ids, like ["media"]')
+    if len(set(quills)) != len(quills):
+        raise QuillError(f"{where}: requires.quills names a Quill twice")
+    if quill_id in quills:
+        raise QuillError(f"{where}: requires.quills names the Quill itself")
+    return tuple(runtimes), tuple(quills)
 
 
 def _features(head: dict, where: str) -> tuple[str, ...]:

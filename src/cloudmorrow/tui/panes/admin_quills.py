@@ -145,9 +145,33 @@ def sections_text(plan: dict) -> list[str]:
             what = f"{amount} of {dataset.get('model')}{per}"
             lines.append(f"  [b]{dataset['id']}[/] [{MUTED}]{what}[/]")
 
+    lines += quill_lines(plan)
     lines += runtime_lines(plan)
     lines += machine_runtime_lines(plan)
     lines += code_lines(plan)
+    return lines
+
+
+def quill_lines(plan: dict) -> list[str]:
+    """The other Quills it works with, installed first from the catalog."""
+    quills = plan.get("quills") or []
+    if not quills:
+        return []
+    lines = ["", f"[b {ACCENT}]Installs with it[/]"]
+    for quill in quills:
+        name = escape(str(quill.get("name") or quill.get("id", "?")))
+        if quill.get("version"):
+            name += f" {escape(str(quill['version']))}"
+        facts = [escape(str(quill.get("summary") or ""))]
+        if quill.get("installed"):
+            facts.append(f"[{GOOD}]here already[/]")
+        elif quill.get("problem"):
+            facts.append(f"[{WARN}]{escape(str(quill['problem']))}[/]")
+        else:
+            facts.append("installed first, from the catalog")
+        lines.append(f"  [b]{name}[/]")
+        lines.append(f"    [{MUTED}]{' · '.join(f for f in facts if f)}[/]")
+    lines.append(f"  [{MUTED}]Kept while this Quill is here.[/]")
     return lines
 
 

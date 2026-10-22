@@ -85,7 +85,7 @@ def data_quill(state: AppState, username: str, access: Access | None) -> dict:
         "fetch": [],
         "secrets": [],
         "machine": [],
-        "requires": {"runtimes": []},
+        "requires": {"runtimes": [], "quills": []},
         "origin": {},
         "owner": "",
         "personal": False,

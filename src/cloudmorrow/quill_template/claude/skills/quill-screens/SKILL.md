@@ -78,6 +78,7 @@ Keep it quick: list what you need, filter on indexed fields
 | `image(record=…)` or `image("https://…")` | a picture: a file record, or an https address |
 | `table(records, columns=[…], actions=[…], open=True)` | records, a row each; `actions` are action ids pressed per row |
 | `cards(records, title=, subtitle=, body=, badge=)` | records, a card each (field names) |
+| `gallery(records, title=, subtitle=, badge=, stars=, rate=, actions=[…])` | files as picture tiles (a video's picture is a frame of it); `stars` names a 0–5 field drawn as stars, and pressing one runs the `rate` action with `stars=` |
 | `lanes(records, field=, title=)` | cards in columns by an enum field; dragging moves them |
 | `month(records, date=, title=)` | records on a month |
 | `field(record, name, edit=True)` | one field of one record, editable in place |

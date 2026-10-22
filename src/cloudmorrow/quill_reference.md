@@ -181,6 +181,8 @@ Primitives (`ui.`): `stack`, `row`, `columns`, `tabs`, `text(style=)`,
 `markdown`, `image`, `badge`, `stat`, `empty`, `divider`, `field(record,
 name, edit=)`, `form(action)`, `button(label, action= | open= | go=)`,
 `menu`, `table(records, columns=, actions=)`, `cards(records, title=, …)`,
+`gallery(records, title=, subtitle=, badge=, stars=, rate=, actions=)` (files
+as picture tiles with five stars; a star runs `rate` with `stars=`),
 `lanes(records, field=, title=)`, `month(records, date=, title=)`. Every
 button runs a declared action, opens a record, or goes to a declared screen.
 
@@ -229,10 +231,13 @@ service = "sync"
 [requires]                         # a program a service needs that the server may not have
 runtimes = ["ffmpeg"]              # an id from the catalog's [runtimes]; the install fetches
                                    # a checked static build and puts it first on the services' PATH
+quills = ["media"]                 # other Quills it works with: installed first, from the catalog,
+                                   # and kept while this one is here
 ```
 
-A runtime is for a service only (a Quill without `[[services]]` is refused
-one), is named on the install sheet with its size before the yes, and is
+A runtime is for the services (and ffmpeg also gives every video file a
+thumbnail, so a Quill that only shows videos may require it without a
+service); it is named on the install sheet with its size before the yes, and is
 offered for removal with the last Quill that needs it. Never tell anybody to
 `apt install` something: name it in `[requires]` instead, and if the catalog
 has no entry for it yet, that is a pull request to Cloudmorrow/quill-catalog

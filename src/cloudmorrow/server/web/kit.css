@@ -251,3 +251,9 @@
 .history-slot .group-label { margin-top: 18px; }
 .history .row { padding-top: 9px; padding-bottom: 9px; }
 .history .row .title { font-size: 15px; }
+
+/* A photo or a video on its own sheet, above its fields. */
+.sheet-preview { margin: 0 0 14px; border-radius: var(--radius); overflow: hidden; background: var(--card); }
+.sheet-preview[aria-busy="true"] { aspect-ratio: 16 / 9; }
+.sheet-preview img, .sheet-preview video { display: block; width: 100%; max-height: 70dvh; object-fit: contain; background: var(--bg); }
+.sheet-preview img { cursor: zoom-in; }

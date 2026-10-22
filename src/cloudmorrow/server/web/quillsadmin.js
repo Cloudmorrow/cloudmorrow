@@ -787,6 +787,19 @@ export function sections(plan, me) {
 
   out.push(group("Runs on a schedule", (plan.jobs || []).map((j) => row(esc(j.id), esc(jobSaid(j, label, plan.models || {}))))));
 
+  // The other quills it works with: installed first, from the catalog, and
+  // kept while it is here.
+  const needs = plan.quills || [];
+  out.push(group("Installs with it", needs.map((q) => {
+    const facts = [q.summary || ""].filter(Boolean).map(esc);
+    if (q.problem) facts.push(`<span class="warn">${esc(q.problem)}</span>`);
+    const chip = q.installed ? `<span class="quill-chip on">here already</span>`
+      : q.problem ? "" : `<span class="quill-chip new">will install</span>`;
+    return row(`${esc(q.name || q.id)}${q.version ? ` ${esc(q.version)}` : ""}`, facts.join(" · "), chip);
+  }), needs.length ? `<p class="shelf-note">This quill works with ${needs.length === 1 ? "this one" : "these"}:
+    ${needs.length === 1 ? "it is" : "they are"} installed first, from the catalog, and cannot be removed while
+    this quill is here.</p>` : ""));
+
   // Programs its services need: the server fetches them from where the
   // catalog says and keeps them for its Quills. Said with the size before
   // the yes, because a hundred megabytes is a thing to know.

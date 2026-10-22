@@ -400,6 +400,34 @@ missing from disk (a restore without it) waits, and its state says what for,
 rather than failing in a loop. A Quill of somebody's own runs no services,
 so it has no runtimes.
 
+The server uses one runtime itself: with ffmpeg here, a video in somebody's
+files has a thumbnail, a frame from a second in, the way a photo has one.
+So a Quill with no services may require `ffmpeg` too, for the pictures of
+videos it shows (Media does).
+
+**Other Quills** (`[requires] quills`). A Quill that works with another —
+a video editor whose material is a media library's, say — names it, and the
+install brings that one first:
+
+```toml
+[requires]
+quills = ["media"]         # ids from the catalog
+```
+
+The install sheet says what comes with it (*Installs with it: Media 1.0.0*)
+before the yes. Installing it installs each one not here yet from the
+catalog, at the catalog's release, before it, and each of those brings what
+it requires in turn; two that name each other are each installed once. A
+Quill the catalog does not have is refused before anything is installed.
+Without a catalog to ask (a test harness, `cm quill dev --local` offline)
+it is installed alone and the plan says so (`quills_skipped`). A required
+Quill cannot be removed while one that needs it is here: the remove sheet
+says *CutMorrow needs media; remove it first*, before anything is dropped.
+Somebody's own Quill is satisfied by the server's Quill of that id, or else
+gets its own. It is one way: Media names nothing, and works alone. A
+requirement is about working together on screen, not about datamodels:
+a Quill that uses another's datamodel says so in `[uses]` as before.
+
 The same for a person's machine: a `[[machine]]` handler names what it
 needs in `[machine.needs] runtimes = ["ffmpeg"]`, and the agent on a
 computer where somebody switches it on fetches the build for *that*

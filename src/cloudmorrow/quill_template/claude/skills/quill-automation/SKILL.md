@@ -96,7 +96,23 @@ the yes; removing the last Quill that needs it asks whether it goes too. A
 runtime the catalog does not list is a pull request to Cloudmorrow/quill-catalog
 with a build per OS and architecture and its SHA-256. In the service, call
 the program by name (`shutil.which("ffmpeg")` finds it) and still say
-something sensible on a clip when it is missing.
+something sensible on a clip when it is missing. With ffmpeg on the server,
+a video file has a thumbnail too (`ui.image(record=…)`, `ui.gallery`), so a
+Quill that only shows videos may require it without a service.
+
+## Another Quill it works with
+
+A Quill built on top of another one — an editor for what a library holds —
+names it, and installing it installs that one first, from the catalog:
+
+```toml
+[requires]
+quills = ["media"]          # Quill ids; installed with it, kept while it is here
+```
+
+The install sheet says *Installs with it: Media*. The other one cannot be
+removed while this one is here; it does not know about this one, and works
+alone. Each Quill still declares the datamodels it uses in `[uses]`.
 
 ## Webhooks: something outside tells you something
 
