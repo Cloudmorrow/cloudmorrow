@@ -131,6 +131,10 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
             _check_calendar(screen, model, models, thing, need, where)
         elif kit == "timeline":
             _check_timeline(manifest, screen, model, model_of, thing, need, where)
+        elif kit == "sheet":
+            # A spreadsheet: a title, and `cells`, a json field holding what
+            # is typed in each cell by name (docs/CELLS.md).
+            need(model, thing + " cells", screen.get("cells") or "cells", ("json",))
         elif kit == "editor":
             # A page of text with a title; `path`, when bound, is a string
             # like `folder/sub/title` whose folders are the tree beside it.

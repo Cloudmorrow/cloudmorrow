@@ -28,6 +28,8 @@ import { calendarSheet, renderCalendar } from "./kit_calendar.js";
 import { spaceSection, wireSpace } from "./kit_space.js";
 // Each element beyond the first four is a file of its own, drawn from here.
 import { renderEditor, renderEditorPage } from "./kit_editor.js";
+// A sheet is a spreadsheet over a text file: the editor's lists, a grid for a page.
+import { renderCells, renderCellsPage } from "./kit_cells.js";
 import { renderGrid, renderGridItem } from "./kit_grid.js";
 import { renderThread } from "./kit_thread.js";
 // A timeline is a video editor: the viewer, the tracks, the effects.
@@ -141,7 +143,7 @@ export const canDrag = () => matchMedia("(hover: hover) and (pointer: fine)").ma
 // The kit elements this file draws. The server refuses to install a screen
 // of any other kind until every surface draws it, and a test holds this
 // list to the server's; the check below is for a server newer than the page.
-export const DRAWS = ["list", "board", "detail", "form", "calendar", "grid", "editor", "thread", "timeline", "view", "data"];
+export const DRAWS = ["list", "board", "detail", "form", "calendar", "grid", "editor", "sheet", "thread", "timeline", "view", "data"];
 
 // Each element that is more than rows is a file of its own: kit_<kit>.js.
 const OWN = { calendar: renderCalendar, thread: renderThread, timeline: renderTimeline, view: renderView, data: renderData };
@@ -153,6 +155,7 @@ export async function renderKitScreen(at, arg) {
   if (kit === "board") return renderBoard(at, arg);
   if (OWN[kit]) return OWN[kit](at, arg);
   if (kit === "editor") return renderEditor(at, arg);
+  if (kit === "sheet") return renderCells(at, arg);
   // A list picked through by group, or with a field kept hidden: kit_grouped.js.
   if (kit === "list" && drawsHere(at.quill.models[at.screen.model], at.screen)) return renderGroupedList(at, arg);
   if (kit === "grid") return renderGrid(at, arg);
@@ -749,6 +752,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   const { quill, screen } = at;
   // An editor's own records open on its page, not on the sheet.
   if (screen.kit === "editor" && modelId === screen.model) return renderEditorPage(at, id, arg);
+  if (screen.kit === "sheet" && modelId === screen.model) return renderCellsPage(at, id, arg);
   // A grid's own records are files: shown, sent and saved on a page of the
   // grid's rather than as a sheet of fields.
   if (screen.kit === "grid" && modelId === screen.model) return renderGridItem(at, id);

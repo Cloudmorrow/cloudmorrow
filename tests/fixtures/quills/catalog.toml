@@ -94,3 +94,11 @@ summary = "Customers for a company: organisations, people, a pipeline of deals, 
 repo = "quill-crm"
 category = "business"
 publisher = "Cloudmorrow"
+
+[[quills]]
+id = "cells"
+name = "Cells"
+summary = "Sheets of cells and formulas: plain .cell files in the Cells folder of your drive."
+repo = "quill-cells"
+category = "business"
+publisher = "Cloudmorrow"

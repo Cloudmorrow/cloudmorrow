@@ -23,6 +23,7 @@ surface. Reach for a **view** only when no kit element says it.
 | a conversation | `kit = "thread"` |
 | a team's conversation: threads, @mentions, reactions, pinned lines | `kit = "thread"` with `reply_to`, `mentions`, `reactions`, `pinned` |
 | pages of Markdown in folders | `kit = "editor"` |
+| a small spreadsheet: cells, numbers, formulas | `kit = "sheet"` over the foundational `sheet` (docs/CELLS.md in the Cloudmorrow repository) |
 | files | `kit = "grid"` |
 | editing video: clips on video and audio tracks, cut, moved, blurred, exported | `kit = "timeline"` (docs/TIMELINE.md in the Cloudmorrow repository) |
 | a summary, a dashboard, numbers, a mix of the above, a record's own page | a **view** |

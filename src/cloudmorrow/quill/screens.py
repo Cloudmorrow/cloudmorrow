@@ -267,6 +267,19 @@ def page_fields(bound: dict, path: str) -> dict:
     return fields
 
 
+# -- sheets --------------------------------------------------------------------
+# A screen binds a title and `cells`, a json field: what is typed in each
+# cell, by name (docs/CELLS.md). The web app does the same in kit_cells.js.
+
+
+def sheet_fields(screen: dict, model: dict) -> dict[str, str]:
+    """What a sheet draws from: its title, and the field its cells are in."""
+    return {
+        "title": screen.get("title") or model.get("title") or "name",
+        "cells": screen.get("cells") or "cells",
+    }
+
+
 # -- a record's history --------------------------------------------------------
 
 

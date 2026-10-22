@@ -1,0 +1,52 @@
+/* The kit's sheet in the terminal: the sheets down the left, and on the
+   right the bar over the grid — the cell's name and what is typed in it —
+   and the grid. */
+
+#cells-body {
+    height: 1fr;
+}
+
+#cells-list {
+    width: 30;
+    background: transparent;
+    border-right: solid $line;
+    scrollbar-size-vertical: 1;
+}
+
+#cells-list:focus {
+    border-right: solid $primary;
+}
+
+#cells-pane {
+    width: 1fr;
+}
+
+#cells-name {
+    height: 1;
+    padding: 0 2;
+    background: transparent;
+    color: $secondary;
+    text-style: bold;
+}
+
+#cells-bar {
+    height: 3;
+    padding: 0 1;
+}
+
+#cells-where {
+    width: 8;
+    height: 3;
+    content-align: center middle;
+    text-style: bold;
+}
+
+#cells-formula {
+    width: 1fr;
+}
+
+#cells-grid {
+    height: 1fr;
+    background: $background;
+    scrollbar-size: 1 1;
+}

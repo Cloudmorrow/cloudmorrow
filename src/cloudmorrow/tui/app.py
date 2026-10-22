@@ -40,6 +40,7 @@ class CloudmorrowApp(App):
         "chrome.tcss",
         "kit.tcss",
         "kit_editor.tcss",
+        "kit_cells.tcss",
         "kit_calendar.tcss",
         "kit_space.tcss",
         "kit_grouped.tcss",

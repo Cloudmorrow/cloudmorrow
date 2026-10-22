@@ -15,6 +15,7 @@ task board has to go on as much as a list of car services does.
   a space's people are widgets/kit_space.py.
 - `editor` is in kit_editor.py: a tree of folders and pages beside the live
   Markdown editor.
+- `sheet` is in kit_cells.py: the sheets beside a grid of cells.
 - `grid` is in kit_grid.py: groups to pick from, then folders and files, as
   a table or as tiles, with the picture beside.
 - `list` is a table of records by `title` (and `subtitle`), with a circle for
@@ -459,6 +460,7 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     """
     from cloudmorrow.tui.panes.kit_board import BoardPane
     from cloudmorrow.tui.panes.kit_calendar import CalendarPane
+    from cloudmorrow.tui.panes.kit_cells import CellsPane
     from cloudmorrow.tui.panes.kit_data import DataPane
     from cloudmorrow.tui.panes.kit_editor import EditorPane
     from cloudmorrow.tui.panes.kit_grid import GridPane
@@ -483,6 +485,8 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
         return CalendarPane(quill, screen, **kwargs)
     if kit == "editor":
         return EditorPane(quill, screen, **kwargs)
+    if kit == "sheet":
+        return CellsPane(quill, screen, **kwargs)
     if kit == "list" and draws_here(quill["models"][screen["model"]], screen):
         return GroupedListPane(quill, screen, **kwargs)
     if kit == "list" and screen.get("vault"):

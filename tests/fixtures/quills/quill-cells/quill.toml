@@ -1,0 +1,28 @@
+# A local copy of Cloudmorrow/quill-cells for the kit's tests: a sheet
+# screen over the foundational `sheet` datamodel.
+[quill]
+id = "cells"
+name = "Cells"
+version = "1.0.0"
+summary = "Small spreadsheets: cells, numbers and formulas, worked out on every surface."
+category = "business"
+icon = "grid"
+publisher = "Cloudmorrow"
+license = "AGPL-3.0-or-later"
+
+[uses]
+datamodels = ["sheet"]
+
+[[screens]]
+id = "sheets"
+kit = "sheet"
+label = "Cells"
+model = "sheet"
+title = "name"
+cells = "cells"
+
+[[datasets]]
+id = "welcome"
+model = "sheet"
+seed = "per-owner"
+file = "datasets/welcome.toml"
