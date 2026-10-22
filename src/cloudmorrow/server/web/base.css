@@ -231,7 +231,9 @@ svg { display: block; }
   to { opacity: 1; background-position: 160% 0; }
 }
 .nav .left { justify-self: start; }
-.nav .right { justify-self: end; }
+/* A row, so a button shorter than the rest — Done — sits in the middle of
+   the bar rather than on the line its taller neighbours' text is on. */
+.nav .right { justify-self: end; display: flex; align-items: center; gap: 4px; }
 .nav .center { display: flex; align-items: center; }
 .wordmark { display: block; height: auto; color: var(--accent); }
 .nav .wordmark { color: var(--bar-accent); }
