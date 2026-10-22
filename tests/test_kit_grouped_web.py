@@ -54,7 +54,8 @@ def test_a_hidden_field_is_dots_until_one_record_is_asked_for():
 
 
 def test_a_new_record_lands_in_both_levels_and_opens():
-    assert "levels.forEach((f, i) => { if (chosen[i] !== null) fields[f.name] = chosen[i]; });" in GROUPED_JS
+    assert "levels.forEach((f, i) => { if (chosen[i] !== null) given[f.name] = chosen[i]; });" in GROUPED_JS
+    assert '{ given, where: where.join(" · ") }' in GROUPED_JS
     assert "go(sheetHash(at, model.id, made.id));" in GROUPED_JS
 
 

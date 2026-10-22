@@ -29,9 +29,10 @@
 
 import {
   api, app, esc, heading, icons, localDay, localMinute, mount, nav, pad2, recordsUrl, renderRoute,
-  replace, store, tabs, toast, wireShell,
+  replace, store, tabs, wireShell,
 } from "./core.js";
-import { aOr, mayWrite, sheetHash } from "./kit.js";
+import { mayWrite, sheetHash } from "./kit.js";
+import { openSheet } from "./dialog.js";
 import { renderNewSpace, renderSpaceList } from "./kit_space.js";
 
 // The colours a space can be, by name: the record says "violet", and the
@@ -275,22 +276,12 @@ export async function renderCalendar(at, arg) {
   const adds = mayWrite(b.model);
   const actions = `<a class="button" href="${at.base}/spaces" aria-label="${esc(b.spaceModel.label)}s">${glyphs.people}</a>` +
     (adds ? `<button class="compose" aria-label="New ${esc(b.model.label.toLowerCase())}">${icons.compose}</button>` : "");
-  // What to type, and that a time in front of it is when: on a phone the
-  // day is the one lit below, and the room is for the typing.
-  const hint = wide()
-    ? `Add ${aOr(b.model.label)} on ${shortDay(picked)} — “10:00 Dentist”, or a whole day`
-    : `Add ${aOr(b.model.label)} — “10:00 Dentist”`;
-  const addLine = !adds ? "" : `<form class="add kit-add">
-      <input placeholder="${esc(hint)}" autocapitalize="sentences" enterkeyhint="done">
-      ${spaceList.length > 1 ? `<select class="kit-in" aria-label="In which ${esc(b.spaceModel.label.toLowerCase())}">${spaceList.map((s) =>
-        `<option value="${esc(s.id)}"${s === target ? " selected" : ""}>${esc(String(s.fields[b.spaceModel.title] || ""))}</option>`).join("")}</select>` : ""}
-    </form>`;
   const onThatDay = inOrder(filed.get(picked) || []);
   const dayList = `<p class="group-label day-label">${esc(longDay(picked))}
       ${picked === today() ? "" : `<button class="today-link" type="button">Today</button>`}</p>
     <div class="listing">${onThatDay.length
       ? `<div class="group">${onThatDay.map((e) => eventRow(href(e), e)).join("")}</div>`
-      : `<p class="empty"><b>Nothing on</b>${adds ? "Add something above, and it will show up here." : ""}</p>`}</div>`;
+      : `<p class="empty"><b>Nothing on</b>${adds ? "Add something with the pen at the top." : ""}</p>`}</div>`;
 
   mount(nav({ title: screen.label }) + `
     <main class="kit-calendar view-${view}">
@@ -301,7 +292,6 @@ export async function renderCalendar(at, arg) {
         <button class="step" data-step="1" aria-label="On">${glyphs.right}</button>
         ${switcher}
       </div>
-      ${addLine}
       ${view === "week" ? weekGrid(days, filed, picked, href) + dayList
         : monthGrid(picked, filed) + dayList}
     </main>` + tabs(at.tab));
@@ -332,26 +322,47 @@ export async function renderCalendar(at, arg) {
   const todayLink = app.querySelector(".today-link");
   if (todayLink) todayLink.addEventListener("click", () => go(today()));
 
-  const form = app.querySelector("form.kit-add");
-  if (!form) return;
-  const input = form.querySelector("input");
-  const pick = form.querySelector(".kit-in");
-  if (pick) pick.addEventListener("change", () => { target = spaces.get(pick.value); store.set(remembered + ".in", pick.value); });
-  app.querySelector(".heading .compose").addEventListener("click", () => input.focus());
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const text = input.value.trim();
-    if (!text) return;
-    if (!target) { toast(`No ${b.spaceModel.label.toLowerCase()} to put it in`); return; }
-    input.value = "";
-    try {
-      await api("POST", recordsUrl(b.model.id), { fields: { ...newFields(b, picked, text), [b.spaceField]: target.id } });
-      store.set(remembered + ".in", target.id);
-      renderRoute();
-    } catch (err) {
-      input.value = text;
-      toast(err.message);
-    }
+  const pen = app.querySelector(".heading .compose");
+  if (!pen) return;
+  // The pen opens a sheet for the day that is lit: what it is, a time in
+  // front of it if it has one, and — with more than one — which it is in.
+  pen.addEventListener("click", () => {
+    const noun = b.model.label.toLowerCase();
+    const where = b.spaceModel.label.toLowerCase();
+    const { sheet, close } = openSheet(
+      `<form class="act-form record kit-new" novalidate>` +
+      `<p class="act-sheet-title">New ${esc(noun)}</p>` +
+      `<p class="act-description">On ${esc(longDay(picked))}. A time in front is when it starts — “10:00 Dentist” — and without one it is the whole day.</p>` +
+      `<div class="group fields"><label class="row field kind-string"><span class="main">What</span>` +
+      `<input type="text" data-field="what" aria-label="What" placeholder="10:00 Dentist" autocapitalize="sentences" enterkeyhint="done"></label>` +
+      (spaceList.length > 1 ? `<label class="row field kind-link"><span class="main">In</span><select class="kit-in" data-field="in" aria-label="In which ${esc(where)}">${
+        spaceList.map((s) => `<option value="${esc(s.id)}"${s === target ? " selected" : ""}>${
+          esc(String(s.fields[b.spaceModel.title] || ""))}</option>`).join("")}</select></label>` : "") +
+      `</div><p class="act-error" role="alert" hidden></p>` +
+      `<div class="act-buttons"><button type="button" class="act-button" data-cancel>Cancel</button>` +
+      `<button type="submit" class="act-button primary">Create</button></div></form>`, "act-form-sheet");
+    const form = sheet.querySelector("form");
+    const input = form.querySelector("[data-field=what]");
+    const pick = form.querySelector(".kit-in");
+    const errorEl = form.querySelector(".act-error");
+    const showError = (text) => { errorEl.textContent = text; errorEl.hidden = !text; };
+    form.querySelector("[data-cancel]").addEventListener("click", close);
+    input.focus();
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const text = input.value.trim();
+      if (!text) { showError("What is it?"); return; }
+      const into = pick ? spaces.get(pick.value) : target;
+      if (!into) { showError(`No ${where} to put it in`); return; }
+      try {
+        await api("POST", recordsUrl(b.model.id), { fields: { ...newFields(b, picked, text), [b.spaceField]: into.id } });
+        store.set(remembered + ".in", into.id);
+        close();
+        renderRoute();
+      } catch (err) {
+        showError(err.message);
+      }
+    });
   });
 }
 

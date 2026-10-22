@@ -24,8 +24,15 @@ export function openSheet(inner, className = "", dismissed = () => {}) {
   backdrop.className = "sheet-backdrop act-backdrop";
   backdrop.innerHTML = `<div class="sheet act-sheet ${className}" role="dialog" aria-modal="true">${inner}</div>`;
   document.body.appendChild(backdrop);
-  const close = () => { backdrop.remove(); removeEventListener("keydown", onKey); };
+  const close = () => {
+    backdrop.remove();
+    removeEventListener("keydown", onKey);
+    removeEventListener("hashchange", onLeave);
+  };
   const dismiss = () => { close(); dismissed(); };
+  // Leaving the screen leaves its sheet: a form for a list that is gone is no.
+  const onLeave = () => { if (backdrop.isConnected) dismiss(); };
+  addEventListener("hashchange", onLeave);
   const onKey = (event) => {
     // Only the sheet on top: a question over a form is answered first.
     if (event.key === "Escape" && [...document.querySelectorAll(".act-backdrop")].pop() === backdrop) dismiss();

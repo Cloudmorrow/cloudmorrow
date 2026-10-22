@@ -22,8 +22,8 @@ import {
 } from "./core.js";
 import { installCard } from "./install.js";
 import {
-  aOr, canWrite, circle, fieldOf, linkTitles, mayWrite, sheetHash, spoken, timeLeft,
-  titleField, titleOf, wireAdd,
+  canWrite, circle, fieldOf, linkTitles, mayWrite, sheetHash, spoken, timeLeft,
+  penSays, titleField, titleOf, wirePen,
 } from "./kit.js";
 import { askText } from "./dialog.js";
 
@@ -129,8 +129,6 @@ export async function renderGroupedList(at, arg) {
     <main>
       ${heading(screen.label, writes ? `<button class="compose" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</button>` : "")}
       ${levels.map(chipRow).join("")}
-      ${writes ? `<form class="add">${tick ? circle("") : ""}<input placeholder="Add ${esc(aOr(model.label))}${
-        where.length ? ` to ${esc(where.join(" · "))}` : ""}" autocapitalize="off" autocomplete="off" spellcheck="false" enterkeyhint="done"></form>` : ""}
       <div class="install-slot">${installCard()}</div>
       <div class="listing"></div>
     </main>` + tabs(at.tab));
@@ -169,7 +167,7 @@ export async function renderGroupedList(at, arg) {
     if (!rows.length) {
       const place = where.length ? ` in ${esc(where.join(" · "))}` : "";
       listing.innerHTML = writes
-        ? `<p class="empty mascot"><b>Nothing${place} yet</b>Add ${esc(aOr(model.label))} above, and it will show up here.</p>`
+        ? `<p class="empty mascot"><b>Nothing${place} yet</b>${esc(penSays(model))}</p>`
         : `<p class="empty mascot"><b>Nothing${place} yet</b>When there is, it will show up here.</p>`;
       return;
     }
@@ -213,13 +211,13 @@ export async function renderGroupedList(at, arg) {
   show();
 
   // A new record goes into the group and subgroup on screen, and opens, so
-  // what the add row has no room for — a value, a date — is typed next.
-  wireAdd(async (text) => {
-    const fields = { [title]: text };
-    levels.forEach((f, i) => { if (chosen[i] !== null) fields[f.name] = chosen[i]; });
+  // what the sheet did not ask for — a value, a date — is typed next.
+  const given = {};
+  levels.forEach((f, i) => { if (chosen[i] !== null) given[f.name] = chosen[i]; });
+  wirePen(quill, model, title, async (fields) => {
     const made = await api("POST", recordsUrl(model.id), { fields });
     go(sheetHash(at, model.id, made.id));
-  });
+  }, { given, where: where.join(" · ") });
 
   for (const button of app.querySelectorAll(".new-group")) {
     button.addEventListener("click", () => newValue(Number(button.dataset.level)));

@@ -35,8 +35,8 @@ import { renderTimeline, timelineSheet } from "./kit_timeline.js";
 import { renderView } from "./kit_view.js";
 import { dataSheet, renderData } from "./kit_data.js";
 // And a Quill's actions, on every record's sheet.
-import { sheetSection, wireSheetSection } from "./actions.js";
-import { ask, askText } from "./dialog.js";
+import { formFields, linksFor, readFields, sheetSection, wireFields, wireSheetSection } from "./actions.js";
+import { ask, askText, openSheet } from "./dialog.js";
 
 const own = {
   // What a board is, for the button that opens its own sheet.
@@ -232,7 +232,6 @@ async function renderBoard(at, arg) {
     <main>
       ${heading(name, !groupModel || group ? actions : "")}
       ${chips}
-      ${canAdd ? `<form class="add">${circle("")}<input placeholder="Add ${esc(aOr(model.label))}" autocapitalize="sentences" enterkeyhint="done"></form>` : ""}
       <div class="install-slot">${installCard()}</div>
       <div class="listing"></div>
     </main>` + tabs(at.tab));
@@ -369,12 +368,14 @@ async function renderBoard(at, arg) {
   show();
 
   // New records go in the first lane of the group on screen.
-  wireAdd(async (text) => {
-    const fields = { [title]: text, [laneField.name]: first };
-    if (group) fields[groupField.name] = group.id;
-    records.push(await api("POST", recordsUrl(model.id), { fields }));
-    show();
-  });
+  if (canAdd) {
+    const given = { [laneField.name]: first };
+    if (group) given[groupField.name] = group.id;
+    wirePen(quill, model, title, async (fields) => {
+      records.push(await api("POST", recordsUrl(model.id), { fields }));
+      show();
+    }, { given, where: group ? titleOf(groupModel, group) : "" });
+  }
   const more = app.querySelector(".new-group");
   if (more) more.addEventListener("click", () => newGroup(at, groupModel));
 }
@@ -400,31 +401,67 @@ async function newGroup(at, groupModel) {
   } catch (err) { toast(err.message); }
 }
 
-/** What an empty listing says: where the add row is, or — for somebody who
-    may only look — that there is nothing to look at yet. */
+/** What an empty listing says: that the pen at the top makes the first, or —
+    for somebody who may only look — that there is nothing to look at yet. */
 export const emptyList = (model, writes) => (writes
-  ? `<p class="empty mascot"><b>Nothing here yet</b>Add ${esc(aOr(model.label))} above, and it will show up here.</p>`
+  ? `<p class="empty mascot"><b>Nothing here yet</b>${esc(penSays(model))}</p>`
   : `<p class="empty mascot"><b>Nothing here yet</b>When there is, it will show up here.</p>`);
 
-/** The add row under the title, and the pen beside it that leads there. */
-export function wireAdd(create) {
-  const form = app.querySelector("form.add");
-  if (!form) return;
-  const input = form.querySelector("input");
+/** The words an empty screen says about the pen. */
+export const penSays = (model) => `Make the first ${model.label.toLowerCase()} with the pen at the top.`;
+
+/** The pen at the top of a screen: it opens the sheet that makes one. There
+    is no line to type into on the page itself — making one is the pen's.
+    *given* is what the screen already says (the lane, the group it is in),
+    and *create(fields)* makes the record from what the sheet adds to it. */
+export function wirePen(quill, model, title, create, { given = {}, where = "" } = {}) {
+  const pen = app.querySelector(".heading .compose");
+  if (pen) pen.addEventListener("click", () => createSheet(quill, model, title, create, { given, where }));
+}
+
+/** The sheet that makes one: its title first, then each field it cannot be
+    made without, drawn with the record sheet's widgets as an action's form
+    is. What goes wrong is said under the fields, and what was typed stays. */
+export async function createSheet(quill, model, title, create, { given = {}, where = "" } = {}) {
+  const named = fieldOf(model, title);
+  const head = { ...(named || { name: title, kind: "string" }), label: named ? named.label : "Name", required: true };
+  const needed = model.fields.filter((f) =>
+    f.required && f.name !== title && !(f.name in given) && f.default === undefined);
+  const fields = [head, ...needed];
+  const links = await linksFor(quill, fields);
+  const noun = model.label.toLowerCase();
+  const { sheet, close } = openSheet(
+    `<form class="act-form record kit-new" novalidate>` +
+    `<p class="act-sheet-title">New ${esc(noun)}</p>` +
+    (where ? `<p class="act-description">In ${esc(where)}</p>` : "") +
+    formFields(fields, {}, links) +
+    `<p class="act-error" role="alert" hidden></p>` +
+    `<div class="act-buttons"><button type="button" class="act-button" data-cancel>Cancel</button>` +
+    `<button type="submit" class="act-button primary">Create</button></div>` +
+    `</form>`, "act-form-sheet");
+  const form = sheet.querySelector("form");
+  const errorEl = form.querySelector(".act-error");
+  const showError = (text) => { errorEl.textContent = text; errorEl.hidden = !text; };
+  wireFields(form);
+  form.querySelector("[data-cancel]").addEventListener("click", close);
+  const first = form.querySelector("input:not([type=checkbox]), textarea, select");
+  if (first) first.focus();
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const text = input.value.trim();
-    if (!text) return;
-    input.value = "";
+    const read = readFields(form, fields);
+    if (read.problem) { showError(read.problem); return; }
+    const submit = form.querySelector("[type=submit]");
+    submit.disabled = true;
+    showError("");
     try {
-      await create(text);
+      await create({ ...given, ...read.fields });
+      close();
     } catch (err) {
-      input.value = text;
-      toast(err.message);
+      showError(err.message);
+    } finally {
+      submit.disabled = false;
     }
   });
-  const compose = app.querySelector(".heading .compose");
-  if (compose) compose.addEventListener("click", () => input.focus());
 }
 
 // -- the list, and the detail -------------------------------------------------------
@@ -447,7 +484,6 @@ async function renderList(at) {
   mount(nav({ title: screen.label }) + `
     <main>
       ${heading(screen.label, writes ? `<button class="compose" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</button>` : "")}
-      ${writes ? `<form class="add">${tick ? circle("") : ""}<input placeholder="Add ${esc(aOr(model.label))}" autocapitalize="sentences" enterkeyhint="done"></form>` : ""}
       <div class="install-slot">${installCard()}</div>
       <div class="listing"></div>
     </main>` + tabs(at.tab));
@@ -491,8 +527,8 @@ async function renderList(at) {
     show();
   };
   show();
-  wireAdd(async (text) => {
-    records.push(await api("POST", recordsUrl(model.id), { fields: { [title]: text } }));
+  wirePen(quill, model, title, async (fields) => {
+    records.push(await api("POST", recordsUrl(model.id), { fields }));
     show();
   });
 }

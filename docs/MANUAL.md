@@ -777,7 +777,9 @@ then **Your cloud** with Data under it, and for an administrator
 under it. The phone's bar runs the tabs together without the headings.
 
 The keys are the ones already on the screen: `Esc` is the back button (or the
-field you are in), `/` is the search box, `n` is the pen beside the title,
+field you are in), `/` is the search box, `n` is the pen beside the title
+(which opens the sheet that makes a new one: there is no line on the page to
+type a new one into),
 `j` and `k` — and the arrows, once the list has the keyboard — walk the rows,
 and `Enter` opens the one you are on.
 

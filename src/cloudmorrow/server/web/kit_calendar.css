@@ -62,20 +62,6 @@
 .month-bar .step:active { background: var(--card); }
 .month-bar .views { flex: none; margin: 0 0 0 12px; }
 
-/* The add row, and the space a new one goes in beside it. */
-.kit-add { gap: 8px; }
-.kit-add .kit-in {
-  flex: none;
-  max-width: 34%;
-  padding: 4px 8px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-control);
-  background: var(--field);
-  color: var(--ink);
-  font: inherit;
-  font-size: 14px;
-}
-
 /* -- the month ---------------------------------------------------------------- */
 .weekdays {
   display: grid;

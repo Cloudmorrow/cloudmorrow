@@ -374,14 +374,14 @@ def test_a_board_you_may_only_read_is_one_you_look_at():
     assert 'class="tick still" role="img"' in KIT_JS
 
 
-def test_a_list_you_may_only_read_has_no_add_row_and_no_ticking():
+def test_a_list_you_may_only_read_has_no_pen_and_no_ticking():
     listing = js_code(_function(KIT_JS, "renderList"))
     assert "const writes = mayWrite(model);" in listing
-    assert '${writes ? `<form class="add">' in listing
+    assert '${heading(screen.label, writes ? `<button class="compose"' in listing
     assert '${writes ? `<button class="tick"' in listing
     assert 'querySelectorAll("button.tick")' in listing
     grouped = js_code((WEB / "kit_grouped.js").read_text(encoding="utf-8"))
-    assert '${writes ? `<form class="add">' in grouped
+    assert '${heading(screen.label, writes ? `<button class="compose"' in grouped
     assert 'tick && writes ? `<button class="tick"' in grouped
     assert 'namesGroups(f) ? `<button class="chip new-group"' in grouped
 
@@ -419,8 +419,32 @@ def test_spaces_you_may_only_read_are_not_made_or_changed():
     assert section.count("writes &&") >= 3  # adding, taking out, leaving
     calendar = js_code((WEB / "kit_calendar.js").read_text(encoding="utf-8"))
     assert "const adds = mayWrite(b.model);" in calendar
-    assert 'const addLine = !adds ? "" :' in calendar
-    assert "if (!form) return;" in calendar
+    assert '(adds ? `<button class="compose"' in calendar
+    assert "if (!pen) return;" in calendar
+
+
+def test_nothing_is_made_from_a_line_typed_into_the_page():
+    """No add row under a title, on any screen: the pen at the top opens a sheet that makes one."""
+    for path in sorted(WEB.glob("*.js")):
+        code = js_code(path.read_text(encoding="utf-8"))
+        assert '<form class="add' not in code, path.name
+        assert "wireAdd" not in code, path.name
+    kit = js_code((WEB / "kit.js").read_text(encoding="utf-8"))
+    sheet = js_code(_function(kit, "createSheet"))
+    assert "openSheet(" in sheet and "formFields(fields, {}, links)" in sheet and "readFields(form, fields)" in sheet
+    assert "f.required && f.name !== title" in sheet
+    assert 'pen.addEventListener("click", () => createSheet(' in js_code(_function(kit, "wirePen"))
+    for name in ("kit.js", "kit_grouped.js"):
+        assert "wirePen(quill, model, title," in js_code((WEB / name).read_text(encoding="utf-8")), name
+    for words in ("Add ${esc(aOr(model.label))} above", "Add something above"):
+        for name in ("kit.js", "kit_grouped.js", "kit_calendar.js"):
+            assert words not in (WEB / name).read_text(encoding="utf-8"), (name, words)
+
+
+def test_a_sheet_goes_when_its_screen_does():
+    dialog = js_code((WEB / "dialog.js").read_text(encoding="utf-8"))
+    assert 'addEventListener("hashchange", onLeave);' in dialog
+    assert 'removeEventListener("hashchange", onLeave);' in dialog
 
 
 def test_a_text_box_is_measured_without_the_page_shrinking_under_the_window():
