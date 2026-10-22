@@ -351,6 +351,37 @@ def test_taking_it_back_and_removing_it_leave_everybodys_records(budget):
     assert state_of(client).records.count_all("~alice.budget.envelope") == 0
 
 
+def test_an_administrator_removes_somebodys_own_quill_off_every_shelf(budget):
+    """User Quills' Remove: off the server at once, for the owner and everybody it was shared
+    with; the records kept unless dropped, and everybody who had it told."""
+    client, who = budget
+    admin = who[ADMIN[0]]
+    share_with_bob(client, who)
+    add_envelope(client, who["bob"], "Beer")
+    url = "/api/quills/personal/alice/budget"
+    assert client.delete(url, headers=who["bob"]).status_code == 403
+    assert client.get(url + "/brought", headers=who["bob"]).status_code == 403
+    assert client.delete("/api/quills/personal/alice/nothing", headers=admin).status_code == 404
+    brought = client.get(url + "/brought", headers=admin).json()
+    assert {b["id"] for b in brought} == {"~alice.budget.envelope", "~alice.budget.entry"}
+    # The server's own removal says whose it is, and how to remove it.
+    wrong = client.delete("/api/quills/budget", headers=admin)
+    assert wrong.status_code == 400 and "alice's own" in wrong.json()["detail"]
+    assert "--owner alice" in wrong.json()["detail"]
+    gone = client.delete(url, headers=admin)
+    assert gone.status_code == 200 and gone.json()["removed"] == "~alice.budget"
+    for person in ("alice", "bob"):
+        assert "budget" not in {q["id"] for q in client.get("/api/quills", headers=who[person]).json()}
+        told = client.get("/api/notifications", headers=who[person]).json()
+        assert any(n["kind"] == "quill.removed" for n in told), person
+    assert state_of(client).records.count_all("~alice.budget.envelope") == 1
+    assert client.get("/api/quills/all", headers=admin).json()["personal"] == []
+    # Dropping takes them; uploaded again, it starts from nothing shared.
+    client.post("/api/quills/mine/upload", content=_tarball(BUDGET), headers=who["alice"])
+    client.delete(url + "?drop=~alice.budget.envelope", headers=admin)
+    assert state_of(client).records.count_all("~alice.budget.envelope") == 0
+
+
 # -- the policy ----------------------------------------------------------------------------------------
 def test_an_administrator_switches_quills_of_peoples_own_off_on_or_to_asking(budget):
     client, who = budget

@@ -396,6 +396,15 @@ def uninstall(
     try:
         return removal.remove(state.quills, state.records, quill_id, [d for d in drop.split(",") if d])
     except QuillError as exc:
+        owners = sorted(o for o, theirs in state.quills.personal.items() if quill_id in theirs)
+        if quill_id not in state.quills.quills and owners:
+            # Not the server's: somebody's own. Say whose, and the way that removes it.
+            raise _bad(
+                QuillError(
+                    f"{quill_id} is not a server Quill; it is {', '.join(owners)}'s own. Remove it under "
+                    f"User Quills, or with: cm quill remove {quill_id} --owner {owners[0]}"
+                )
+            ) from exc
         raise _bad(exc) from exc
 
 

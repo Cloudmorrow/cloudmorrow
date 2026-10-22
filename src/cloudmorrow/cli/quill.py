@@ -724,10 +724,14 @@ def add(
 def remove(
     quill_id: Annotated[str, typer.Argument(help="The Quill's id.")],
     mine: Annotated[bool, typer.Option("--mine", help="A Quill of your own.")] = False,
+    owner: Annotated[str, typer.Option("--owner", help="Somebody's own Quill, off every shelf it is on (admin).")] = "",
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Do not ask.")] = False,
 ) -> None:
     """Remove a Quill. Its screens and jobs go; the records stay, because they are yours."""
-    if not yes and not typer.confirm(f"Remove {quill_id}? Its records are kept.", default=False):
+    if mine and owner:
+        fail("--mine is your own; --owner is somebody else's")
+    whose = f"{owner}'s " if owner else ""
+    if not yes and not typer.confirm(f"Remove {whose}{quill_id}? Its records are kept.", default=False):
         return
 
     async def _remove() -> None:
@@ -735,6 +739,8 @@ def remove(
         async with api:
             if mine:
                 await api.remove_my_quill(quill_id)
+            elif owner:
+                await api.remove_their_quill(owner, quill_id)
             else:
                 await api.uninstall_quill(quill_id)
         console.print(f"[green]Removed[/] {quill_id}")

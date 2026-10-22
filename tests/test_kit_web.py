@@ -241,6 +241,22 @@ def test_the_quills_side_has_its_three_tabs_and_the_update_buttons():
         assert button in ADMIN_JS, button
 
 
+def test_user_quills_have_a_remove_beside_promote_and_switch():
+    """Somebody's own Quill comes off the server from its row, with the same choice of what goes."""
+    assert '<button type="button" class="quill-chip remove-own">Remove</button>' in ADMIN_JS
+    assert "`/api/quills/personal/${encodeURIComponent(owner)}/${encodeURIComponent(quill)}`" in ADMIN_JS
+    assert "removeSheet(`${owner}'s ${name}`, brought)" in ADMIN_JS
+
+
+def test_a_quill_the_catalog_dropped_offers_no_reinstall_and_no_update():
+    """Installing it again would ask the catalog for an id it no longer has."""
+    assert "(entry || (!origin.dev && !origin.catalog && origin.repo))" in ADMIN_JS
+    assert 'said: "no longer in the catalog"' in ADMIN_JS
+    mine = (WEB / "myquills.js").read_text(encoding="utf-8")
+    assert "if (!entry && catalog && origin.catalog) return { entry: null, newer: false," in mine
+    assert "stood.entry || (!(own.origin || {}).catalog && (own.origin || {}).repo)" in mine
+
+
 def test_the_install_sheet_calls_the_endpoints_that_exist(client, auth):
     for call in ('"/api/quills/catalog"', '"/api/quills/plan"', 'api("POST", "/api/quills"'):
         assert call in ADMIN_JS, call
