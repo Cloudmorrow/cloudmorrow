@@ -27,29 +27,6 @@
 /* The way to another group looks like a group, but is drawn rather than filled. */
 .chip.new-group { border: 1px dashed var(--line-bright); }
 
-.add {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 52px;
-  padding: 0 16px;
-  margin: 0 0 12px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-}
-.add:focus-within { border-color: var(--accent); }
-.add input {
-  flex: 1;
-  min-width: 0;
-  min-height: 52px;
-  border: 0;
-  background: none;
-  outline: none;
-}
-.add input::placeholder { color: var(--muted); }
-.add .check { opacity: .5; }
-
 /* -- the circle ------------------------------------------------------------ */
 /* Empty at the start, a dot along the way, full at the end. */
 .check {
