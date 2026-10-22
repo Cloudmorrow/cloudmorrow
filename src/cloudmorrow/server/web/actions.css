@@ -16,31 +16,26 @@
   min-height: 40px;
   padding: 0 16px;
   border: 1px solid var(--line-bright);
-  border-radius: var(--radius-control);
   color: var(--ink);
   font-family: var(--display);
   font-size: 16px;
   font-weight: 600;
   text-align: center;
 }
-.act-button:active { background: var(--card-2); }
 .act-button:disabled { opacity: .5; cursor: default; }
-/* The one action a view or a form is for. */
+/* The one action a view or a form is for. Its states — the edge, the lit
+   side under the pointer, the press — are every button's (base.css). */
 .act-button.primary {
   border-color: transparent;
   background: var(--action);
   color: var(--action-ink);
-  box-shadow: inset 0 -3px 0 var(--action-edge);
 }
-.act-button.primary:active { background: var(--action); filter: brightness(.94); }
 /* Primary, but not the first: the platform's fill. */
 .act-button.fill {
   border-color: transparent;
   background: var(--fill);
   color: var(--fill-ink);
-  box-shadow: inset 0 -3px 0 var(--fill-pressed);
 }
-.act-button.fill:active { background: var(--fill-pressed); }
 .act-button.danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); }
 
 /* A smaller one, for the bar and a table's row. */
@@ -51,7 +46,6 @@
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-control);
   background: var(--card);
   color: var(--accent);
   font-family: var(--display);
@@ -59,7 +53,6 @@
   font-weight: 600;
   white-space: nowrap;
 }
-.act-chip:active { background: var(--card-2); }
 .act-chip.danger, .act-chip.bad { color: var(--bad); }
 
 /* -- the bar under a Quill's title ------------------------------------------ */
@@ -116,9 +109,4 @@
   .act-form-sheet { max-width: 480px; }
 }
 
-/* What the pointer is over says so, as everywhere else. */
-@media (hover: hover) and (pointer: fine) and (min-width: 900px) and (min-height: 600px) {
-  .act-button:hover, .act-chip:hover { background: var(--card-2); }
-  .act-button.primary:hover { background: var(--action); filter: brightness(1.08); }
-  .act-button.fill:hover { background: var(--fill-hover); }
-}
+/* What the pointer is over, and a press, are every button's: base.css. */

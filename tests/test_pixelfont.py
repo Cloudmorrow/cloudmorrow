@@ -22,12 +22,30 @@ def test_every_glyph_is_five_across_and_seven_down():
 
 
 def test_the_font_matches_the_one_the_web_app_draws_with():
-    """Two copies, one drawing. The mark has to be the same in both places."""
-    theirs = _js_font((WEB / "brand.js").read_text(encoding="utf-8"), "const FONT = {")
-    assert theirs, "brand.js no longer declares FONT"
-    assert set(theirs) == set(pixelfont.GLYPHS)
-    for char, rows in theirs.items():
-        assert list(pixelfont.GLYPHS[char]) == rows, f"{char} drifted"
+    """Three copies, one drawing. The mark has to be the same in every place:
+    the brand page's, and the app's own, which spells the cloud's name."""
+    for name, marker in (("brand.js", "const FONT = {"), ("core.js", "const GLYPHS = {")):
+        theirs = _js_font((WEB / name).read_text(encoding="utf-8"), marker)
+        assert theirs, f"{name} no longer declares the font"
+        assert set(theirs) == set(pixelfont.GLYPHS), name
+        for char, rows in theirs.items():
+            assert list(pixelfont.GLYPHS[char]) == rows, f"{char} drifted in {name}"
+
+
+def test_the_font_spells_a_danish_name():
+    assert {"Æ", "Ø", "Å"} <= set(pixelfont.GLYPHS)
+    assert pixelfont.rows("SØREN") != pixelfont.rows("SREN")
+
+
+def test_the_app_puts_the_clouds_name_at_the_head_of_the_rail():
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    assert '<div class="rail-head">${wordmark(CLOUD_NAME)}</div>' in core
+    assert '<div class="center">${wordmark(CLOUD_NAME)}' in core
+    # Any name: upper-cased, an accent dropped to its letter, a space narrower
+    # than a letter, and a mark the font cannot spell left out, not left blank.
+    assert "text.toUpperCase()" in core
+    assert 'GLYPHS[char.normalize("NFD")[0]]' in core
+    assert "const SPACE = 3;" in core
 
 
 def test_half_blocks_pack_two_rows_of_dots_into_one_cell():

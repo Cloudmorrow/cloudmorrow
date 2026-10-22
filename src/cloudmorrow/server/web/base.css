@@ -15,7 +15,10 @@
    three, and warn is orange so it is never mistaken for amber.
 
    A button that is filled has a bottom edge one shade darker, like the
-   shadow side of a pixel. Everything else is a ghost: a line and no fill.
+   shadow side of a pixel; under the pointer its top edge lights, the lit
+   side, and pressed it goes down onto its shadow. Everything else is a
+   ghost: a line and no fill, Sky under the pointer. The rules for all of
+   them are in one place below, "a button is a pixel".
 
    The type is the rule from the guide: pixels for the marks, real type for
    the words. The wordmark in the bar is drawn dot by dot; titles, labels
@@ -63,6 +66,8 @@
   --brand-mark: linear-gradient(100deg, #1c70b1, #3685bd, #5aa6e0);
   --radius: 14px;
   --radius-control: 10px;
+  /* A button: squarer than a control, the corners of a thing made of dots. */
+  --radius-button: 6px;
   --system: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Inter,
             system-ui, sans-serif;
   --sans: "Barlow", var(--system);
@@ -120,6 +125,61 @@ input, textarea { caret-color: var(--accent); }
 ::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button { background: none; border: 0; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+/* -- a button is a pixel --------------------------------------------------- */
+/* Every button in the app — the amber one a screen is for, the Cloud-blue
+   fills, the ghosts — has the same three states, kept here so no screen
+   invents its own. A filled one is one big pixel: a face, and under it an
+   edge one shade darker, its shadow side (--edge, each fill's own; --edge-h
+   its depth). The pointer over it lights a line along its top, the lit
+   side, and brightens the face a touch — no more; pressing it pushes it two
+   dots down onto its shadow, which shrinks to a line, and lets it back up.
+   A ghost is a line and no fill: under the pointer its line and its words
+   turn Sky, and pressed it sinks one dot onto a darker floor. Nothing here
+   turns grey. Hover is behind `hover`, so a finger never leaves the last
+   thing it touched lit up; the press is for every pointer there is. */
+.act-button, .act-chip, .row.primary, .nav button.strong, .login .submit, .push-card button,
+.install .actions button, .desk-button, .add-button, .chip-button, button.quill-chip {
+  border-radius: var(--radius-button);
+  transition: transform .06s ease-out, box-shadow .06s ease-out, border-color .12s, color .12s, filter .12s;
+}
+.act-button.primary, .row.primary, .nav button.strong, .login .submit, .composer button { --edge: var(--action-edge); }
+.act-button.fill, .push-card button, .install .actions button.strong, .desk-button.cloud { --edge: var(--fill-pressed); }
+.nav button.strong, .push-card button, .install .actions button.strong, .desk-button.cloud, .composer button { --edge-h: 2px; }
+.act-button.primary, .act-button.fill, .row.primary, .nav button.strong, .login .submit, .push-card button,
+.install .actions button.strong, .desk-button.cloud, .composer button {
+  box-shadow: inset 0 calc(0px - var(--edge-h, 3px)) 0 var(--edge);
+}
+@media (hover: hover) and (pointer: fine) {
+  .act-button.primary:enabled:hover, .act-button.fill:enabled:hover, .row.primary:enabled:hover,
+  .nav button.strong:enabled:hover, .login .submit:enabled:hover, .push-card button:enabled:hover,
+  .install .actions button.strong:enabled:hover, .desk-button.cloud:enabled:hover, .composer button:enabled:hover {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24), inset 0 calc(0px - var(--edge-h, 3px)) 0 var(--edge);
+    filter: brightness(1.05);
+  }
+  .act-button:not(.primary):not(.fill):enabled:hover, .act-chip:enabled:hover, .install .actions button:not(.strong):enabled:hover,
+  .desk-button.ghost:enabled:hover, .add-button:enabled:hover, .chip-button:enabled:hover, button.quill-chip:enabled:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .act-button.danger:enabled:hover, .act-chip.danger:enabled:hover, .act-chip.bad:enabled:hover { border-color: var(--bad); color: var(--bad); }
+}
+.act-button.primary:enabled:active, .act-button.fill:enabled:active, .row.primary:enabled:active,
+.nav button.strong:enabled:active, .login .submit:enabled:active, .push-card button:enabled:active,
+.install .actions button.strong:enabled:active, .desk-button.cloud:enabled:active, .composer button:enabled:active {
+  transform: translateY(2px);
+  box-shadow: inset 0 -1px 0 var(--edge);
+  filter: none;
+}
+.act-button:not(.primary):not(.fill):enabled:active, .act-chip:enabled:active, .install .actions button:not(.strong):enabled:active,
+.desk-button.ghost:enabled:active, .add-button:enabled:active, .chip-button:enabled:active, button.quill-chip:enabled:active {
+  transform: translateY(1px);
+  background: var(--card-2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .act-button, .act-chip, .row.primary, .nav button.strong, .login .submit, .push-card button,
+  .install .actions button, .desk-button, .add-button, .chip-button, button.quill-chip { transition: none; }
+}
 a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
 svg { display: block; }
@@ -175,7 +235,9 @@ svg { display: block; }
 .nav .center { display: flex; align-items: center; }
 .wordmark { display: block; height: auto; color: var(--accent); }
 .nav .wordmark { color: var(--bar-accent); }
-.nav .center .wordmark { width: 145px; }
+/* The cloud's name, in the mark's dots. Its height is the wordmark's; a
+   long name draws narrower dots rather than a wider bar. */
+.nav .center .wordmark { height: 15.6px; width: auto; max-width: 145px; }
 /* The title is on the page for what reads it, not for the eye: the bar is
    the wordmark, and the wordmark does not move. */
 .nav .center .text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -194,10 +256,8 @@ svg { display: block; }
   align-self: center;
   min-height: 32px;
   padding: 0 14px;
-  border-radius: 999px;
   background: var(--action);
   color: var(--action-ink);
-  box-shadow: inset 0 -2px 0 var(--action-edge);
   font-family: var(--display);
   font-weight: 600;
 }
@@ -468,15 +528,12 @@ h1.large {
   display: block;
   width: 100%;
   height: 50px;
-  border-radius: var(--radius);
   background: var(--action);
   color: var(--action-ink);
-  box-shadow: inset 0 -3px 0 var(--action-edge);
   font-family: var(--display);
   font-size: 17px;
   font-weight: 600;
 }
-.login .submit:active { filter: brightness(.94); }
 .login .submit:disabled { opacity: .6; }
 .login .error { color: var(--muted); font-size: 15px; margin: 0 0 12px; min-height: 1.3em; }
 .login .error.bad { color: var(--bad); }

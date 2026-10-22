@@ -188,30 +188,80 @@ export function toast(message, ms = 2200) {
 
 // The wordmark, in the dots the home-screen icon is drawn in: five wide,
 // seven tall, each dot a rounded square with a gap around it. Drawn inline
-// as SVG, so it is there the moment the page is and never shifts.
+// as SVG, so it is there the moment the page is and never shifts. The
+// font is the one cloudmorrow/pixelfont.py and brand.js hold — a test
+// keeps the three the same — and it spells more than CLOUDMORROW: the
+// cloud's own name stands at the head of the rail in the same dots.
 const GLYPHS = {
-  B: ["XXXX.", "X...X", "X...X", "XXXX.", "X...X", "X...X", "XXXX."],
-  R: ["XXXX.", "X...X", "X...X", "XXXX.", "X.X..", "X..X.", "X...X"],
   A: [".XXX.", "X...X", "X...X", "XXXXX", "X...X", "X...X", "X...X"],
-  M: ["X...X", "XX.XX", "X.X.X", "X.X.X", "X...X", "X...X", "X...X"],
+  B: ["XXXX.", "X...X", "X...X", "XXXX.", "X...X", "X...X", "XXXX."],
   C: [".XXX.", "X...X", "X....", "X....", "X....", "X...X", ".XXX."],
-  L: ["X....", "X....", "X....", "X....", "X....", "X....", "XXXXX"],
-  O: [".XXX.", "X...X", "X...X", "X...X", "X...X", "X...X", ".XXX."],
-  U: ["X...X", "X...X", "X...X", "X...X", "X...X", "X...X", ".XXX."],
   D: ["XXX..", "X..X.", "X...X", "X...X", "X...X", "X..X.", "XXX.."],
+  E: ["XXXXX", "X....", "X....", "XXXX.", "X....", "X....", "XXXXX"],
+  F: ["XXXXX", "X....", "X....", "XXXX.", "X....", "X....", "X...."],
+  G: [".XXX.", "X...X", "X....", "X.XXX", "X...X", "X...X", ".XXX."],
+  H: ["X...X", "X...X", "X...X", "XXXXX", "X...X", "X...X", "X...X"],
+  I: ["XXXXX", "..X..", "..X..", "..X..", "..X..", "..X..", "XXXXX"],
+  J: ["..XXX", "...X.", "...X.", "...X.", "...X.", "X..X.", ".XX.."],
+  K: ["X...X", "X..X.", "X.X..", "XX...", "X.X..", "X..X.", "X...X"],
+  L: ["X....", "X....", "X....", "X....", "X....", "X....", "XXXXX"],
+  M: ["X...X", "XX.XX", "X.X.X", "X.X.X", "X...X", "X...X", "X...X"],
+  N: ["X...X", "XX..X", "X.X.X", "X..XX", "X...X", "X...X", "X...X"],
+  O: [".XXX.", "X...X", "X...X", "X...X", "X...X", "X...X", ".XXX."],
+  P: ["XXXX.", "X...X", "X...X", "XXXX.", "X....", "X....", "X...."],
+  Q: [".XXX.", "X...X", "X...X", "X...X", "X.X.X", "X..X.", ".XX.X"],
+  R: ["XXXX.", "X...X", "X...X", "XXXX.", "X.X..", "X..X.", "X...X"],
+  S: [".XXXX", "X....", "X....", ".XXX.", "....X", "....X", "XXXX."],
+  T: ["XXXXX", "..X..", "..X..", "..X..", "..X..", "..X..", "..X.."],
+  U: ["X...X", "X...X", "X...X", "X...X", "X...X", "X...X", ".XXX."],
+  V: ["X...X", "X...X", "X...X", "X...X", "X...X", ".X.X.", "..X.."],
   W: ["X...X", "X...X", "X...X", "X.X.X", "X.X.X", "XX.XX", "X...X"],
+  X: ["X...X", "X...X", ".X.X.", "..X..", ".X.X.", "X...X", "X...X"],
+  Y: ["X...X", "X...X", ".X.X.", "..X..", "..X..", "..X..", "..X.."],
+  Z: ["XXXXX", "....X", "...X.", "..X..", ".X...", "X....", "XXXXX"],
+  "0": [".XXX.", "X..XX", "X.X.X", "X.X.X", "X.X.X", "XX..X", ".XXX."],
+  "1": ["..X..", ".XX..", "..X..", "..X..", "..X..", "..X..", ".XXX."],
+  "2": [".XXX.", "X...X", "....X", "...X.", "..X..", ".X...", "XXXXX"],
+  "3": ["XXXXX", "...X.", "..XX.", "....X", "....X", "X...X", ".XXX."],
+  "4": ["...X.", "..XX.", ".X.X.", "X..X.", "XXXXX", "...X.", "...X."],
+  "5": ["XXXXX", "X....", "XXXX.", "....X", "....X", "X...X", ".XXX."],
+  "6": ["..XX.", ".X...", "X....", "XXXX.", "X...X", "X...X", ".XXX."],
+  "7": ["XXXXX", "....X", "...X.", "..X..", ".X...", ".X...", ".X..."],
+  "8": [".XXX.", "X...X", "X...X", ".XXX.", "X...X", "X...X", ".XXX."],
+  "9": [".XXX.", "X...X", "X...X", ".XXXX", "....X", "...X.", ".XX.."],
+  ".": [".....", ".....", ".....", ".....", ".....", "..XX.", "..XX."],
+  "-": [".....", ".....", ".....", ".XXX.", ".....", ".....", "....."],
+  "/": ["....X", "....X", "...X.", "..X..", ".X...", "X....", "X...."],
+  "'": ["..X..", "..X..", ".....", ".....", ".....", ".....", "....."],
+  "!": ["..X..", "..X..", "..X..", "..X..", "..X..", ".....", "..X.."],
+  "?": [".XXX.", "X...X", "....X", "...X.", "..X..", ".....", "..X.."],
+  "Æ": [".XXXX", "X.X..", "X.X..", "X.XXX", "XXX..", "X.X..", "X.XXX"],
+  "Ø": [".XXX.", "X..XX", "X.X.X", "X.X.X", "X.X.X", "XX..X", ".XXX."],
+  "Å": ["..X..", ".....", ".XXX.", "X...X", "XXXXX", "X...X", "X...X"],
 };
+const SPACE = 3;   // dots a space is worth: narrower than a letter
+// A letter the font has, or the plain one under an accent (É reads E; Æ, Ø
+// and Å are letters of their own and are in the font); nothing, for a mark
+// it cannot spell, which is left out rather than left blank.
+const glyphOf = (char) => GLYPHS[char] || GLYPHS[char.normalize("NFD")[0]] || null;
 export function wordmark(text = "CLOUDMORROW") {
-  const letters = [...text].filter((c) => GLYPHS[c]);
+  const shown = text.toUpperCase();
   let dots = "";
-  letters.forEach((letter, i) => {
-    GLYPHS[letter].forEach((row, y) => {
+  let x0 = 0;
+  for (const char of shown) {
+    if (char === " ") { if (x0) x0 += SPACE; continue; }
+    const glyph = glyphOf(char);
+    if (!glyph) continue;
+    glyph.forEach((row, y) => {
       [...row].forEach((cell, x) => {
-        if (cell === "X") dots += `<rect x="${i * 6 + x + 0.08}" y="${y + 0.08}" width="0.84" height="0.84" rx="0.14"/>`;
+        if (cell === "X") dots += `<rect x="${x0 + x + 0.08}" y="${y + 0.08}" width="0.84" height="0.84" rx="0.14"/>`;
       });
     });
-  });
-  return `<svg class="wordmark" viewBox="0 0 ${letters.length * 6 - 1} 7" fill="currentColor" role="img" aria-label="${text}">${dots}</svg>`;
+    x0 += 6;
+  }
+  const width = Math.max(x0 - 1, 1);
+  return `<svg class="wordmark" viewBox="0 0 ${width} 7" preserveAspectRatio="xMinYMid meet" fill="currentColor"` +
+    ` role="img" aria-label="${esc(text)}">${dots}</svg>`;
 }
 
 // The icons every tab is drawn with: eight dots across, because a glyph
@@ -699,7 +749,7 @@ export function nav({ back: backTo, backLabel, title, right = "" }) {
   // that sets it, for anything reading the page aloud, and — on a screen
   // wide enough that the wordmark has moved into the rail — for the eye.
   return `<header class="nav"><div class="left">${left}</div>` +
-    `<div class="center">${wordmark()}` +
+    `<div class="center">${wordmark(CLOUD_NAME)}` +
     `<span class="text">${esc(title)}</span></div><div class="right">${right}</div></header>`;
 }
 
@@ -737,7 +787,9 @@ export function heading(title, right = "") {
 // you to the top of it, as on a phone.
 //
 // On a screen wide enough the same markup is a rail down the left, and
-// the wordmark moves to the head of it out of the middle of the bar. The
+// the mark moves to the head of it out of the middle of the bar: the
+// cloud's own name, in the wordmark's dots, so a cloud called The Larsens
+// says so where a program on a computer puts its name. The
 // rail has what the bar does not: sections, as the terminal app's sidebar
 // has them. Today first, on its own; then the Quills, shelved by the
 // catalog's categories (Personal, Home, Business, Developer, in the
@@ -760,7 +812,7 @@ export function tabs(active) {
   const section = (title, list) =>
     list.length ? `<div class="rail-section">${esc(title)}</div>` + list.map(draw).join("") : "";
   const own = shown.filter((t) => !t.admin && !t.cloud);
-  return `<nav class="tabs"><div class="rail-head">${wordmark()}</div>` +
+  return `<nav class="tabs"><div class="rail-head">${wordmark(CLOUD_NAME)}</div>` +
     own.filter((t) => !t.section).map(draw).join("") +
     shelves(own.filter((t) => t.section)).map((s) => section(s.title, s.tabs)).join("") +
     section("Your cloud", shown.filter((t) => t.cloud)) +

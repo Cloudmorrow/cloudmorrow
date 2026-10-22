@@ -64,8 +64,8 @@
     overflow-x: hidden;
     overflow-y: auto;
   }
-  /* The wordmark sits at the head of the rail, where a program on a
-     computer puts its name. */
+  /* The cloud's name, in the wordmark's dots, sits at the head of the
+     rail, where a program on a computer puts its name. */
   .tabs .rail-head {
     display: flex;
     align-items: center;
@@ -74,7 +74,7 @@
     margin-bottom: 8px;
     color: var(--bar-accent);
   }
-  .tabs .rail-head .wordmark { width: 157px; }
+  .tabs .rail-head .wordmark { height: 17px; width: auto; max-width: 100%; }
 
   .tab {
     flex: none;
@@ -202,20 +202,18 @@
    mouse never sees that, and a row that does nothing until it is clicked
    is most of what makes an app feel like a page. */
 @media (hover: hover) and (pointer: fine) and (min-width: 900px) and (min-height: 600px) {
-  .row:hover { background: var(--card-2); }
+  /* A row that is a button — the amber Save — is a button (base.css), not a row. */
+  .row:not(.primary):hover { background: var(--card-2); }
   /* The rows that are a filled colour already brighten instead. */
-  .row.primary:hover, .row.bad:hover, .sheet-row:hover { filter: brightness(1.12); }
+  .row.bad:hover, .sheet-row:hover { filter: brightness(1.12); }
   .tab:hover { background: var(--card); color: var(--bar-ink); }
   .tab.active:hover { color: var(--bar-accent); }
-  .nav button:hover, .nav a.button:hover, .nav .nav-link:hover,
+  .nav button:not(.strong):hover, .nav a.button:hover, .nav .nav-link:hover,
   .heading button:hover, .heading a.button:hover { opacity: .72; }
   .tile:hover .thumb { border-color: var(--line-bright); background: var(--card-2); }
   .chip:hover, .sort button:hover, .sides button:hover, .segments button:hover { color: var(--ink); }
   .chip.active:hover, .sort button.active:hover,
   .sides button.active:hover, .segments button.active:hover { color: var(--fill-ink); }
-  .composer button:hover, .nav button.strong:hover, .login .submit:hover { filter: brightness(1.08); }
-  /* A Cloud fill that is a button is lit to Puff, as the cloud is. */
-  .push-card button:hover, .install .actions button.strong:hover { background: var(--fill-hover); }
 }
 
 /* -- the screens that want more than a column ------------------------------ */

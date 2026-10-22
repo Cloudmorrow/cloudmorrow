@@ -44,7 +44,6 @@
 /* Update selected, update all: chips, not the screen's one amber fill. */
 .quill-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 4px 12px; }
 .quill-actions .chip-button:disabled { opacity: .5; cursor: default; }
-.quill-actions .chip-button:disabled:hover { border-color: var(--line-bright); color: var(--ink); }
 
 /* -- the sheet beside the list ----------------------------------------------- */
 @media (min-width: 900px) and (min-height: 600px) {
@@ -154,6 +153,5 @@
 .own-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: auto; }
 .own-buttons .quill-chip { margin-left: 0; }
 button.quill-chip { cursor: pointer; background: transparent; font: inherit; font-size: 11.5px; font-weight: 600; }
-button.quill-chip:hover { border-color: var(--accent); color: var(--accent); }
 .meta-inline { color: var(--muted); font-weight: 400; font-size: 13px; }
 .row.request-row, .row.own-row { align-items: center; }
