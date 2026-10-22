@@ -290,7 +290,9 @@ main {
 main.entering { animation: screen-in .16s ease-out; }
 main.ghost {
   z-index: 1;
-  overflow: hidden;
+  /* Clipped, not hidden: hidden would make the copy the thing a sticky
+     list column sticks to, and put the column lower than on the page. */
+  overflow: clip;
   pointer-events: none;
   animation: screen-out .16s ease-out forwards;
 }
