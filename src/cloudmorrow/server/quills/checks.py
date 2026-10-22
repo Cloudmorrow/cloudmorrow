@@ -158,7 +158,14 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
             need(model, thing + " kind", screen.get("kind"), ("enum",))
             if "folder" not in model.by_name[screen["kind"]].values:
                 raise QuillError(f"{where}: {thing} kind {screen['kind']!r} has no value 'folder'")
-            for binding, kinds in (("size", ("int",)), ("modified", ("datetime", "date")), ("mime", ("string",))):
+            for binding, kinds in (
+                ("size", ("int",)),
+                ("modified", ("datetime", "date")),
+                ("mime", ("string",)),
+                # The Trash: when a record was deleted, and where from, for Restore.
+                ("deleted", ("datetime", "date")),
+                ("deleted_from", ("string",)),
+            ):
                 if screen.get(binding):
                     need(model, f"{thing} {binding}", screen[binding], kinds)
             group_model = models.get(model.by_name[screen["group"]].to)

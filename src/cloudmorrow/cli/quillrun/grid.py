@@ -47,6 +47,8 @@ class _Grid:
         self.name = screen.title
         self.size = bound["size"]
         self.modified = bound["modified"]
+        self.deleted = bound["deleted"]
+        self.deleted_from = bound["deleted_from"]
         self.subtitle = bound["subtitle"]
 
     def where(self, group: str, folder: str) -> dict:
@@ -148,10 +150,11 @@ async def _act_grid(api: CloudmorrowClient, screen: Screen, action: str, args: l
         folder, _, name = rest[0].strip("/").rpartition("/")
         await api.create_record(screen.model, {**grid.where(group, folder), grid.name: name, grid.kind: "folder"})
         quillrun.console.print(f"[green]Made[/] {escape(rest[0].strip('/'))}/")
-    elif action in ("show", "delete", "set"):
+    elif action in ("show", "delete", "set", "restore"):
         if not rest:
             fail(f"which one? {command} {action} {group} <path>")
         record = await _entry(api, grid, group, rest[0])
+        in_trash = bool(grid.deleted and record["fields"].get(grid.deleted))
         if action == "show":
             if plain:
                 quillrun.emit(json.dumps(record, indent=2) + "\n")
@@ -160,8 +163,23 @@ async def _act_grid(api: CloudmorrowClient, screen: Screen, action: str, args: l
         elif action == "set":
             changed = await api.update_record(screen.model, record["id"], _pairs(rest[1:], screen), rev=record["rev"])
             quillrun.console.print(f"[green]Saved[/] {escape(str(changed['fields'].get(grid.name, '')))}")
+        elif action == "restore":
+            # Back where it was before it was deleted; the server makes the
+            # folders on the way if they are gone, and numbers a taken name.
+            if not in_trash:
+                fail(f"{rest[0]} is not in the Trash")
+            was = str(record["fields"].get(grid.deleted_from) or record["fields"].get(grid.name))
+            folder, _, name = was.rpartition("/")
+            changed = await api.update_record(
+                screen.model, record["id"], {grid.folder: folder, grid.name: name}, rev=record["rev"]
+            )
+            restored = escape(str(changed["fields"].get(grid.name, "")))
+            quillrun.console.print(f"[green]Restored[/] {restored} to {escape(folder or 'the top')}")
+        elif in_trash or not grid.deleted:
+            await api.delete_record(screen.model, record["id"])
+            quillrun.console.print(f"[green]Deleted[/] {escape(rest[0])} for good")
         else:
             await api.delete_record(screen.model, record["id"])
-            quillrun.console.print(f"[green]Deleted[/] {escape(rest[0])}")
+            quillrun.console.print(f"[green]Moved[/] {escape(rest[0])} to the Trash")
     else:
-        fail(f"a {screen.kit} has list, get, put, add, show, set and delete, not {action}")
+        fail(f"a {screen.kit} has list, get, put, add, show, set, delete and restore, not {action}")

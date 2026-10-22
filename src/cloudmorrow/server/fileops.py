@@ -8,6 +8,9 @@ keep the same rules: nothing hidden is listed, no symlink is followed out
 of the share, a path is checked against the share's folder before anything
 is opened or written, and nothing is overwritten by a file put there.
 
+What is deleted goes to the share's Trash, and comes back from it, until a
+sweep removes it for good (the Trash section, at the end).
+
 A share on the server, and the caller's own drive: which of them a caller
 has, and whether they may change what is in one, is the caller's business
 (routes/sharefiles.py, backends/shares.py), not this module's.
@@ -15,7 +18,9 @@ has, and whether they may change what is in one, is the caller's business
 
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
+import json
 import mimetypes
 import os
 import re
@@ -32,16 +37,27 @@ __all__ = [
     "NOT_SCALABLE",
     "THUMB_SIZES",
     "THUMB_TYPES",
+    "TRASH",
+    "TRASH_KEEP",
     "Entry",
     "FileOpError",
+    "empty_trash",
     "entries",
     "entry",
     "file_name",
+    "forget_trashed",
     "free_name",
+    "in_trash",
     "inside",
     "mime_of",
+    "moved",
     "place",
+    "remove",
+    "sweep_trash",
     "thumbnail",
+    "trash",
+    "trash_top",
+    "trashed",
 ]
 
 # What a file put in a share is made readable as: whatever the server's
@@ -266,3 +282,197 @@ def thumbnail(data_dir: Path, share: Share, target: Path, size: int) -> Path:
         except Exception as exc:  # a picture Pillow cannot read, or one too big to try
             raise FileOpError(415, NOT_SCALABLE) from exc
     return out
+
+
+# -- the Trash ----------------------------------------------------------------
+# What is deleted from a share is not gone: it goes to a Trash folder at the
+# top of the share, the way a desktop's does, and is put back from there —
+# where it was, or wherever it is moved to — until a sweep removes what has
+# been there TRASH_KEEP. Deleting something that is in the Trash already
+# removes it for good, and so does deleting the Trash itself.
+#
+# Beside each thing in the Trash a line says where it came from and when,
+# in a hidden folder nothing lists, keyed by the thing's name in the Trash.
+# Something put in the Trash another way — over a mount, with no line — is
+# adopted the first time the server sees it: dated then, from the top of
+# the share, so it too is restored and swept.
+TRASH = "Trash"
+TRASH_KEEP = dt.timedelta(days=30)
+_TRASH_INFO = ".info"
+
+
+def _now() -> str:
+    return dt.datetime.now(tz=dt.UTC).isoformat(timespec="seconds")
+
+
+def in_trash(path: str) -> bool:
+    """Whether *path* (relative to the share) is the Trash or something in it."""
+    path = path.strip("/")
+    return path == TRASH or path.startswith(TRASH + "/")
+
+
+def trash_top(path: str) -> str | None:
+    """The name of the thing directly in the Trash that *path* is, or is
+    under: "Trash/Tax/2025.pdf" is under "Tax". None outside the Trash, and
+    for the Trash itself."""
+    parts = path.strip("/").split("/")
+    if len(parts) < 2 or parts[0] != TRASH:
+        return None
+    return parts[1]
+
+
+def _trash_dir(share: Share) -> Path:
+    return share.path.resolve() / TRASH
+
+
+def _info_path(share: Share, name: str) -> Path:
+    return _trash_dir(share) / _TRASH_INFO / f"{name}.json"
+
+
+def _read_info(share: Share, name: str) -> dict | None:
+    try:
+        data = json.loads(_info_path(share, name).read_text("utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("at"), str) or not data["at"]:
+        return None
+    return {"from": str(data.get("from") or "").strip("/"), "at": data["at"]}
+
+
+def _write_info(share: Share, name: str, origin: str, at: str) -> None:
+    path = _info_path(share, name)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    part = path.with_name(f".{path.name}.tmp")
+    part.write_text(json.dumps({"from": origin.strip("/"), "at": at}), "utf-8")
+    os.replace(part, path)
+
+
+def forget_trashed(share: Share, name: str) -> None:
+    """The line beside *name* in the Trash, gone with it."""
+    _info_path(share, name).unlink(missing_ok=True)
+
+
+def _adopt(share: Share, name: str) -> dict:
+    info = _read_info(share, name)
+    if info is None:
+        info = {"from": "", "at": _now()}
+        try:
+            _write_info(share, name, "", info["at"])
+        except OSError:
+            pass
+    return info
+
+
+def trashed(share: Share, path: str) -> tuple[str, str] | None:
+    """For something in the Trash: when it was put there, and where it came
+    from — the path it had, folders and all; for something inside a folder
+    that was deleted, its path inside that folder's old place. None for
+    anything not in the Trash, and for the Trash itself."""
+    top = trash_top(path)
+    if top is None:
+        return None
+    info = _adopt(share, top)
+    rest = path.strip("/").split("/", 2)[2:]
+    origin = info["from"] or top
+    return info["at"], "/".join([origin, *rest])
+
+
+def remove(target: Path) -> None:
+    """*target* gone for good, whatever it is."""
+    if target.is_dir() and not target.is_symlink():
+        shutil.rmtree(target)
+    else:
+        target.unlink()
+
+
+def trash(share: Share, path: str, target: Path) -> Path:
+    """Move *target*, at *path* in the share, into the Trash. Returns where it
+    is now: its own name, or "name 2" when that is taken."""
+    folder = _trash_dir(share)
+    try:
+        folder.mkdir(exist_ok=True)
+    except OSError as exc:
+        raise FileOpError(403, "the server cannot make the Trash") from exc
+    dest = free_name(folder, target.name)
+    try:
+        os.rename(target, dest)
+    except OSError as exc:
+        raise FileOpError(403, f"the server cannot move {path} to the Trash: {exc.strerror or exc}") from exc
+    try:
+        _write_info(share, dest.name, path, _now())
+    except OSError:
+        pass  # adopted at the next look: dated then, from the top
+    return dest
+
+
+def empty_trash(share: Share) -> None:
+    """The Trash and everything in it, gone for good."""
+    folder = _trash_dir(share)
+    if folder.is_dir() and not folder.is_symlink():
+        shutil.rmtree(folder)
+
+
+def _direct(path: str) -> str | None:
+    """The name of *path* when it is directly in the Trash, else None."""
+    top = trash_top(path)
+    return top if top is not None and path.strip("/") == f"{TRASH}/{top}" else None
+
+
+def moved(share: Share, old_path: str, new_path: str) -> None:
+    """Keep the Trash's lines true after a rename or move from *old_path*
+    to *new_path*: renamed in the Trash, the line follows; moved out, it is
+    restored and the line goes; moved in by hand, it is deleted, from where
+    it was."""
+    old, new = _direct(old_path), _direct(new_path)
+    try:
+        if old is not None and new is not None:
+            info = _read_info(share, old)
+            forget_trashed(share, old)
+            if info is not None:
+                _write_info(share, new, info["from"], info["at"])
+        elif old is not None:
+            forget_trashed(share, old)
+        elif new is not None and not in_trash(old_path):
+            _write_info(share, new, old_path, _now())
+    except OSError:
+        pass
+
+
+def sweep_trash(share: Share, now: dt.datetime | None = None) -> int:
+    """Remove what has been in the share's Trash for TRASH_KEEP, and the
+    lines of things no longer there. Returns how many went."""
+    folder = _trash_dir(share)
+    if not folder.is_dir() or folder.is_symlink():
+        return 0
+    now = now or dt.datetime.now(tz=dt.UTC)
+    gone = 0
+    names: set[str] = set()
+    for child in list(folder.iterdir()):
+        if child.name.startswith("."):
+            continue
+        names.add(child.name)
+        info = _adopt(share, child.name)
+        try:
+            at = dt.datetime.fromisoformat(info["at"])
+        except ValueError:
+            # A line nothing can read: the thing is as good as just arrived.
+            try:
+                _write_info(share, child.name, info["from"], _now())
+            except OSError:
+                pass
+            continue
+        if at.tzinfo is None:
+            at = at.replace(tzinfo=dt.UTC)
+        if now - at >= TRASH_KEEP:
+            try:
+                remove(child)
+            except OSError:
+                continue
+            forget_trashed(share, child.name)
+            gone += 1
+    lines = folder / _TRASH_INFO
+    if lines.is_dir():
+        for line in list(lines.iterdir()):
+            if line.suffix == ".json" and line.stem not in names:
+                line.unlink(missing_ok=True)
+    return gone

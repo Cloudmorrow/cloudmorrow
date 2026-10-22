@@ -11,8 +11,8 @@ nothing more (`server/pages.py`).
 
 from __future__ import annotations
 
+import logging
 import os
-import shutil
 from collections.abc import Callable
 from pathlib import Path
 
@@ -40,6 +40,8 @@ from cloudmorrow.server.shares import (
     ShareStore,
     UnknownShareError,
 )
+
+log = logging.getLogger("cloudmorrow.files")
 
 
 def _matches(fields: dict, where: dict) -> bool:
@@ -80,6 +82,13 @@ class SharesBackend:
     share; changing a text file's `text` writes it, with `rev` to refuse
     writing over somebody else's.
 
+    Deleting one moves it to the share's `Trash` folder, where its record
+    says when it was `deleted` and where it was `deleted_from`; moving it
+    out of the Trash — back to that path, or anywhere — restores it, making
+    the folders on the way if they are gone. Deleting something in the
+    Trash, or the Trash itself, removes it for good, and so does the sweep
+    on the clock, once it has been there thirty days (`fileops.TRASH_KEEP`).
+
     The folders and attachments the editor kit asks for are answered within
     a root the query names (`share`, `within`): the folders under it, and
     the pictures in its `img` folder, which no listing shows.
@@ -97,11 +106,15 @@ class SharesBackend:
         *,
         data_dir: Path,
         base_url: Callable[[], str] = lambda: "",
+        drives: Callable[[], list[Share]] = lambda: [],
     ) -> None:
         self._shares = shares
         self._drive_of = drive_of
         self._data_dir = data_dir
         self._base_url = base_url
+        # Every drive there is, for the sweep: the backend knows only the
+        # drive of whoever is asking.
+        self._drives = drives
 
     # -- which datamodel -------------------------------------------------------------
     @staticmethod
@@ -152,13 +165,31 @@ class SharesBackend:
         share, path = self._locate(principal, record_id, write=True)
         target = self._existing(share, path, record_id)
         try:
-            if target.is_dir() and not target.is_symlink():
-                shutil.rmtree(target)
+            if fileops.in_trash(path):
+                # In the Trash already, or the Trash itself: gone for good.
+                fileops.remove(target)
+                name = fileops.trash_top(path)
+                if name is not None and path == f"{fileops.TRASH}/{name}":
+                    fileops.forget_trashed(share, name)
             else:
-                target.unlink()
+                fileops.trash(share, path, target)
+        except fileops.FileOpError as exc:
+            raise RecordError(str(exc)) from None
         except OSError as exc:
             raise RecordError(f"the server cannot delete {path}: {exc.strerror or exc}") from None
         return 1
+
+    def sweep(self) -> int:
+        """Every share's Trash, and every drive's, swept of what has been
+        there `fileops.TRASH_KEEP`. On the clock (quills/jobs.py). Returns
+        how many things went."""
+        gone = 0
+        for share in [*self._shares.all(), *self._drives()]:
+            try:
+                gone += fileops.sweep_trash(share)
+            except OSError:
+                log.warning("could not sweep the Trash of %s", share.name, exc_info=True)
+        return gone
 
     # -- shares ----------------------------------------------------------------------
     def _all_shares(self, principal: Principal) -> list[Share]:
@@ -349,6 +380,8 @@ class SharesBackend:
         entry = fileops.entry(target)
         folder, _, name = path.rpartition("/")
         stamp = iso_stamp(entry.modified)
+        # In the Trash: when it went there, and where it was before.
+        deleted, deleted_from = fileops.trashed(share, path) or (None, "")
         return Record(
             id=encode_id(self.FILE_PREFIX, f"{share.name}/{path}"),
             model=model.id,
@@ -366,6 +399,8 @@ class SharesBackend:
                 "modified": stamp,
                 "mime": entry.mime,
                 "text": text,
+                "deleted": deleted,
+                "deleted_from": deleted_from,
             },
             written_by="files",
             created_at=stamp,
@@ -548,6 +583,8 @@ class SharesBackend:
             new_path = _join(folder, str(fields.get("name", current.fields["name"]) or ""))
         if new_path == path:
             return self.get(principal, model, record_id) if "text" in fields else current
+        if path == fileops.TRASH:
+            raise RecordError("the Trash stays where it is; what is in it is moved, or restored")
         new_folder, _, new_name = new_path.rpartition("/")
         try:
             new_name = fileops.file_name(new_name)
@@ -558,13 +595,28 @@ class SharesBackend:
         if (new_path + "/").startswith(path + "/"):
             raise RecordError("a folder cannot go inside itself")
         source = self._existing(share, path, record_id)
-        target = self._folder_in(share, new_folder) / new_name
-        if target.exists() and target.resolve() != source.resolve():
-            raise RecordError(f"there is already something called {new_name} there")
+        if fileops.in_trash(path) and not fileops.in_trash(new_path):
+            # Restored: to where it was, as a rule, whose folders may be gone
+            # by now, and whose name may be taken since — it is put back all
+            # the same, the folders made and the name numbered.
+            try:
+                parent = fileops.inside(share, new_folder)
+                parent.mkdir(parents=True, exist_ok=True)
+                target = fileops.free_name(parent, new_name)
+            except fileops.FileOpError as exc:
+                raise RecordError(str(exc)) from None
+            except OSError as exc:
+                raise RecordError(f"the server cannot make {new_folder}: {exc.strerror or exc}") from None
+            new_name = target.name
+        else:
+            target = self._folder_in(share, new_folder) / new_name
+            if target.exists() and target.resolve() != source.resolve():
+                raise RecordError(f"there is already something called {new_name} there")
         try:
             os.rename(source, target)
         except OSError as exc:
             raise RecordError(f"the server cannot move {path}: {exc.strerror or exc}") from None
+        fileops.moved(share, path, _join(new_folder, new_name))
         return self._file_record(model, share, _join(new_folder, new_name), target, text=self._text_of(target))
 
     # -- folders and pictures, within a root ------------------------------------------
@@ -637,6 +689,7 @@ class SharesBackend:
             os.rename(source, target)
         except OSError as exc:
             raise RecordError(f"the server cannot move {source_rel}: {exc.strerror or exc}") from None
+        fileops.moved(share, source_rel, target_rel)
         return {"path": target_rel, "name": target.name}
 
     def delete_folder(self, principal: Principal, model: Datamodel, path: str, where: dict | None = None) -> None:
@@ -645,7 +698,15 @@ class SharesBackend:
         if not target.is_dir() or target.is_symlink():
             raise RecordError(f"there is no folder called {rel}")
         try:
-            shutil.rmtree(target)
+            if fileops.in_trash(rel):
+                fileops.remove(target)
+                name = fileops.trash_top(rel)
+                if name is not None and rel == f"{fileops.TRASH}/{name}":
+                    fileops.forget_trashed(share, name)
+            else:
+                fileops.trash(share, rel, target)
+        except fileops.FileOpError as exc:
+            raise RecordError(str(exc)) from None
         except OSError as exc:
             raise RecordError(f"the server cannot delete {rel}: {exc.strerror or exc}") from None
 

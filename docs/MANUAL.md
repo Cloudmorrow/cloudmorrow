@@ -2042,6 +2042,18 @@ may only read opens with none of that: no plus, nothing dropped or pasted
 in, and no rename, move or delete — the Files Quill's `group_writes` reads
 the share's `writable` field.
 
+**The Trash.** Deleting loses nothing yet: the file or folder moves to a
+`Trash` folder at the top of the share (My Files has one of its own), where
+its page says when it was deleted and where it was, and has **Restore** in
+place of Rename and Move — back to where it was, the folders made again if
+they are gone, the name numbered if it is taken since — and **Delete for
+good**. The “…” on a folder in the Trash offers the same two. Thirty days
+after something went to the Trash the server removes it for good; deleting
+the Trash folder itself empties it. Something put in the Trash another way
+— over a mount — counts from when the server first sees it there, and is
+restored to the top of the share. A note deleted in Notes goes to My
+Files' Trash the same way.
+
 #### In the terminal app
 
 The **Files** card: the shares, then `enter` on one for its folders and
@@ -2050,7 +2062,8 @@ thumbnails, and the picture the cursor is on drawn beside the listing — the
 real picture in Kitty or a Sixel terminal, coloured half-cells anywhere
 else. In a folder, `p` puts a file from this machine there, `g` gets the
 one the cursor is on, `ctrl+n` makes a folder, `e` renames, `M` moves and
-`del` deletes. A share you may only read hides the same keys.
+`del` deletes — to the Trash; in the Trash, `u` restores and `del` is for
+good. A share you may only read hides the same keys.
 
 #### On the command line
 
@@ -2062,7 +2075,9 @@ cm files list my-files Photos                  # a folder
 cm files get my-files Photos/cat.jpg ~/Desktop
 cm files put my-files Photos ./dog.jpg
 cm files add my-files Photos/2026              # a new folder
-cm files delete my-files Photos/old.jpg
+cm files delete my-files Photos/old.jpg        # to the Trash
+cm files restore my-files Trash/old.jpg        # back to Photos
+cm files delete my-files Trash/old.jpg         # for good
 ```
 
 ---

@@ -354,6 +354,19 @@ def test_boards_and_tasks_from_before_move_into_records(config, users, registry)
     assert len(store.list(bram, "task")) == 2
 
 
+def test_a_grids_deleted_names_a_datetime_and_deleted_from_a_string(registry, tmp_path):
+    """The Files Quill's Trash bindings: checked like size and mime."""
+    files = (QUILL_CATALOG / "quill-files" / "quill.toml").read_text(encoding="utf-8")
+    assert 'deleted = "deleted"' in files and 'deleted_from = "deleted_from"' in files
+    registry.plan(QUILL_CATALOG / "quill-files", QUILL_CATALOG / "datamodels")
+    bad = write_quill(tmp_path / "bad", files.replace('deleted = "deleted"', 'deleted = "size"'))
+    with pytest.raises(QuillError, match="deleted"):
+        registry.plan(bad, QUILL_CATALOG / "datamodels")
+    bad = write_quill(tmp_path / "bad2", files.replace('deleted_from = "deleted_from"', 'deleted_from = "size"'))
+    with pytest.raises(QuillError, match="deleted_from"):
+        registry.plan(bad, QUILL_CATALOG / "datamodels")
+
+
 def test_a_grids_group_writes_names_a_bool_on_the_group(registry, tmp_path):
     """The Files Quill's `group_writes`: checked like `group_open`, against the share datamodel."""
     files = (QUILL_CATALOG / "quill-files" / "quill.toml").read_text(encoding="utf-8")

@@ -5,7 +5,7 @@ fetched, renamed, moved and deleted."""
 
 from __future__ import annotations
 
-from textual.widgets import DataTable, Static
+from textual.widgets import DataTable, Label, Static
 
 from cloudmorrow.tui.panes.kit_grid import (
     GridPane,
@@ -339,6 +339,66 @@ async def test_e_renames_shift_m_moves_and_delete_deletes(app):
         await settle(app, pilot)
         assert app.client.file_calls[-1] == ("delete", "f_media:Holiday/sand.jpg")
         assert names(screen) == ["where.txt"]
+
+
+async def test_delete_moves_to_the_trash_and_u_restores(app):
+    """Deleting is a move to the Trash; in there, `u` puts a file back where
+    it was and `del` deletes it for good."""
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await into_holiday(app, pilot)
+        pane = screen.active_pane
+        assert pane.deleted_field == "deleted"
+        # Not in the Trash: u says so and does nothing.
+        await pilot.press("u")
+        await settle(app, pilot)
+        assert "beach.jpg is not in the Trash" in status(screen)
+        await pilot.press("delete")
+        await pilot.pause()
+        await pilot.pause()
+        assert "Move beach.jpg to the Trash?" in app.screen.query_one(".modal-title", Label).visual.plain
+        await pilot.press("y")
+        await settle(app, pilot)
+        assert app.client.file_calls[-1] == ("delete", "f_media:Holiday/beach.jpg")
+        assert "Moved beach.jpg to the Trash" in status(screen)
+        assert names(screen) == ["dunes.png", "where.txt"]
+        # Into the Trash: the file is there, and u restores it to Holiday.
+        pane.go_to("media", "Trash")
+        pane.reload()
+        await settle(app, pilot)
+        assert names(screen) == ["beach.jpg"]
+        await pilot.press("u")
+        await settle(app, pilot)
+        assert app.client.file_calls[-1] == (
+            "change",
+            "f_media:Trash/beach.jpg",
+            {"folder": "Holiday", "name": "beach.jpg"},
+        )
+        assert "Restored beach.jpg to Holiday" in status(screen)
+        assert names(screen) == []
+        assert [e["name"] for e in app.client.share_tree["media"]["Holiday"]] == ["dunes.png", "where.txt", "beach.jpg"]
+        # Deleted again, and deleted in the Trash: for good.
+        pane.go_to("media", "Holiday")
+        pane.reload()
+        await settle(app, pilot)
+        assert names(screen) == ["beach.jpg", "dunes.png", "where.txt"]
+        await pilot.press("delete")
+        await pilot.pause()
+        await pilot.pause()
+        await pilot.press("y")
+        await settle(app, pilot)
+        pane.go_to("media", "Trash")
+        pane.reload()
+        await settle(app, pilot)
+        assert names(screen) == ["beach.jpg"]
+        await pilot.press("delete")
+        await pilot.pause()
+        await pilot.pause()
+        assert "Delete beach.jpg for good?" in app.screen.query_one(".modal-title", Label).visual.plain
+        await pilot.press("y")
+        await settle(app, pilot)
+        assert app.client.file_calls[-1] == ("delete", "f_media:Trash/beach.jpg")
+        assert "Deleted beach.jpg for good" in status(screen)
+        assert names(screen) == []
 
 
 async def test_among_the_shares_only_what_works_there_is_offered(app):

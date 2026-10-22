@@ -173,7 +173,8 @@ def preview(plan: dict) -> str:
             lines.append(f"  first the {target}s: <{target}>{about}")
             lines.append(f"  then its folders (<{screen.get('folder')}>), and the rest as a list or tiles:")
             lines.append(f"  ▰ <{title}>/   ▣ <{title}>   ▣ <{title}>")
-            lines.append("  put in, get, new folder, rename, move, delete; a picture shown")
+            restore = ", restore from the Trash" if screen.get("deleted") else ""
+            lines.append(f"  put in, get, new folder, rename, move, delete{restore}; a picture shown")
             lines.append("")
             continue
         elif screen["kit"] == "list":

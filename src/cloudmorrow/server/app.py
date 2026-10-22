@@ -190,6 +190,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         lambda username: user_drive(config, username),
         data_dir=config.data_dir,
         base_url=lambda: config.public_url or "",
+        drives=lambda: [user_drive(config, user.username) for user in user_store.list()],
     )
     # Secrets stay in their own store, sealed under the key itself; the
     # Secrets Quill draws them from here, and no assistant is ever let in.

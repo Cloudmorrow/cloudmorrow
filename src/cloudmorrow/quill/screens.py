@@ -121,6 +121,10 @@ def grid_fields(screen: dict, model: dict) -> dict[str, str]:
         "size": screen.get("size") or "",
         "modified": screen.get("modified") or "",
         "mime": screen.get("mime") or "",
+        # The Trash: when a record was deleted, and where it was before, for
+        # Restore; a screen without them has delete and no Trash to show.
+        "deleted": screen.get("deleted") or "",
+        "deleted_from": screen.get("deleted_from") or "",
         "subtitle": screen.get("group_subtitle") or "",
     }
 

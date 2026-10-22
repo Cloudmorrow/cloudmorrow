@@ -118,6 +118,8 @@ FILES_QUILL = {
             "size": "size",
             "modified": "modified",
             "mime": "mime",
+            "deleted": "deleted",
+            "deleted_from": "deleted_from",
         },
     ],
     "jobs": [],
@@ -209,6 +211,8 @@ class FakeFiles:
                 "size": entry.get("size", 0),
                 "modified": stamp,
                 "mime": entry.get("mime", ""),
+                "deleted": _stamp(entry["deleted"]) if entry.get("deleted") else None,
+                "deleted_from": entry.get("deleted_from", ""),
             },
         }
 
@@ -280,15 +284,24 @@ class FakeFiles:
             self.share_tree[share][folder].remove(entry)
             entry = dict(entry, name=fields.get("name", name))
             target = fields.get("folder", folder)
+            if folder.split("/")[0] == "Trash" and target.split("/")[0] != "Trash":
+                # Restored: out of the Trash, and no longer deleted.
+                entry.pop("deleted", None)
+                entry.pop("deleted_from", None)
             self.share_tree[share].setdefault(target, []).append(entry)
             return self._file_record(share, target, entry)
         return await super().update_record(model, record_id, fields, rev=rev)
 
     async def delete_record(self, model: str, record_id: str) -> None:
         if model == "file":
-            share, folder, _name, entry = self._locate(record_id)
+            share, folder, name, entry = self._locate(record_id)
             self.file_calls.append(("delete", record_id))
             self.share_tree[share][folder].remove(entry)
+            if folder.split("/")[0] != "Trash":
+                # To the Trash, as the server does, remembering where from.
+                path = f"{folder}/{name}" if folder else name
+                trashed = dict(entry, deleted=1_756_950_000.0, deleted_from=path)
+                self.share_tree[share].setdefault("Trash", []).append(trashed)
             return None
         return await super().delete_record(model, record_id)
 
