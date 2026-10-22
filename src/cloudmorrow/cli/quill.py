@@ -204,6 +204,18 @@ def preview(plan: dict) -> str:
             lines.append("  opening one: the page, beside the tree")
             lines.append("")
             continue
+        elif screen["kit"] == "sheet":
+            sheet = f"· <{title}>"
+            lines.append(f"  {sheet:<26}│ B4  [ =SUM(B1:B3)          ]")
+            lines.append(f"  {sheet:<26}│      A          B          C")
+            lines.append(f"  {'':<26}│ 1    Rent          1200")
+            lines.append(f"  {'':<26}│ 4    Total         3000")
+            lines.append(
+                f"  the cells are {screen.get('cells') or 'cells'}, as typed, formulas and all (docs/CELLS.md)"
+            )
+            lines.append("  opening one: the grid, beside the list")
+            lines.append("")
+            continue
         elif screen["kit"] == "timeline":
             lines.extend(_timeline_sketch(plan, screen, title))
             lines.append("")

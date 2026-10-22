@@ -30,11 +30,11 @@ MANIFEST = "quill.toml"
 ORIGIN = ".origin.json"
 
 # The screens every surface draws. A Quill has these and nothing else.
-KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor", "timeline", "view", "data")
+KIT = ("list", "board", "detail", "form", "calendar", "thread", "grid", "editor", "sheet", "timeline", "view", "data")
 # The ones every surface draws *today*. A screen of another kind is refused at
 # install, so a Quill never lands with a tab that draws nothing somewhere.
 KIT_READY = frozenset(
-    {"list", "board", "detail", "form", "calendar", "grid", "editor", "thread", "timeline", "view", "data"}
+    {"list", "board", "detail", "form", "calendar", "grid", "editor", "sheet", "thread", "timeline", "view", "data"}
 )
 
 # How a thread screen may make a space: in one of the scopes, or `direct`,

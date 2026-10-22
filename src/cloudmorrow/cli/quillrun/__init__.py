@@ -35,6 +35,13 @@ An `editor` screen is pages of Markdown, found by their path:
     cm notes add ideas/garden          # from stdin, or $EDITOR
     cm notes edit ideas/garden         # $EDITOR, or the new text from stdin
     cm notes search tomatoes           # names and every line
+
+A `sheet` screen is sheets of cells, worked out here (docs/CELLS.md):
+
+    cm cells add "Budget"              # a new, empty sheet
+    cm cells show Budget               # the sheet as a table; --raw for the formulas
+    cm cells get Budget B4             # one cell, worked out
+    cm cells set Budget B4 "=SUM(B1:B3)"
 A `grid` (files) takes its group and folder as words instead:
 
     cm files list                      # the groups: My Files, the shares
@@ -90,7 +97,7 @@ print as text:
 `cm tasks` works without the CLI knowing, when it starts, what is installed.
 
 Each kind of screen is a module of its own, as the TUI's are panes/kit_*:
-board, grouped (a list), calendar, editor, grid, thread and timeline, with records
+board, grouped (a list), calendar, editor, cells (a sheet), grid, thread and timeline, with records
 for what a board, a list and a calendar share, screen for what they all do,
 and actions for a Quill's own code.
 """
@@ -107,6 +114,7 @@ import typer
 from cloudmorrow.cli.common import client, console, emit, fail, out, run  # noqa: F401
 from cloudmorrow.cli.quillrun.actions import _list_actions, _press, _view
 from cloudmorrow.cli.quillrun.board import _lane_named, _lanes  # noqa: F401
+from cloudmorrow.cli.quillrun.cells import _act_cells
 from cloudmorrow.cli.quillrun.data import _act_data
 from cloudmorrow.cli.quillrun.editor import _act_editor
 from cloudmorrow.cli.quillrun.grid import _act_grid
@@ -164,6 +172,7 @@ def main(
     index: Annotated[int | None, typer.Option("--index", help="Where in the lane, 0 for the top.")] = None,
     plain: Annotated[bool, typer.Option("--plain", help="JSON, for scripts.")] = False,
     reveal: Annotated[bool, typer.Option("--reveal", help="show: include a hidden field's value.")] = False,
+    raw: Annotated[bool, typer.Option("--raw", help="A sheet: the cells as typed, formulas and all.")] = False,
     first: Annotated[str, typer.Option("--from", help="A calendar: the first day, as 2026-10-01 (today).")] = "",
     last: Annotated[str, typer.Option("--to", help="A calendar: the last day (a week after --from).")] = "",
     track: Annotated[str, typer.Option("--track", help="A timeline: the track, as V1.")] = "",
@@ -194,6 +203,7 @@ def main(
                 plain=plain,
                 days=(first, last),
                 reveal=reveal,
+                raw=raw,
                 timing={"track": track, "at": at, "length": length, "start": start, "end": end, "out": out_file},
                 local={"path": path, "env": env, "file": file, "force": force, "plain": plain},
             )
@@ -213,6 +223,7 @@ async def dispatch(
     plain: bool = False,
     days: tuple[str, str] = ("", ""),
     reveal: bool = False,
+    raw: bool = False,
     timing: dict | None = None,
     local: dict | None = None,
 ) -> None:
@@ -245,7 +256,7 @@ async def dispatch(
     if action in PROJECT_WORDS:
         await _act_projects(api, screen, action, args, local or {})
         return
-    await _act(api, screen, action, args, group, index, plain, days, reveal, timing)
+    await _act(api, screen, action, args, group, index, plain, days, reveal, timing, raw=raw)
 
 
 async def _act(
@@ -259,12 +270,16 @@ async def _act(
     days: tuple[str, str] = ("", ""),
     reveal: bool = False,
     timing: dict | None = None,
+    raw: bool = False,
 ) -> None:
     if action == "history":
         await _history(api, screen, args, plain)
         return
     if screen.kit == "editor":
         await _act_editor(api, screen, action, args, plain)
+        return
+    if screen.kit == "sheet":
+        await _act_cells(api, screen, action, args, plain, raw)
         return
     if screen.kit == "grid":
         await _act_grid(api, screen, action, args, plain)

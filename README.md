@@ -308,6 +308,7 @@ server, so a change to the terminal app needs no deploy to try.
 - [docs/QUILLCODE.md](docs/QUILLCODE.md): a Quill that runs code: views,
   actions, services, runtimes, the sandbox.
 - [docs/TIMELINE.md](docs/TIMELINE.md): the timeline kit, a video editor
+- [docs/CELLS.md](docs/CELLS.md): the sheet kit, a spreadsheet of cells and formulas
   on every surface.
 - [docs/SHARING.md](docs/SHARING.md): Quills of people's own: shared,
   promoted, exported, and the policy for them.

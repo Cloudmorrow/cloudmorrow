@@ -47,11 +47,11 @@ const own = {
 };
 
 // A computer, by the same measure desktop.css draws its rail by.
-const wide = () => matchMedia("(min-width: 900px) and (min-height: 600px)").matches;
+export const wide = () => matchMedia("(min-width: 900px) and (min-height: 600px)").matches;
 
 // The list beside a page, folded away or not: one choice for every editor.
 const FOLDED = "editor.folded";
-const folded = () => store.get(FOLDED) === "1";
+export const folded = () => store.get(FOLDED) === "1";
 
 const FOLDERS = "~folders";
 const TOP = "~top";
@@ -326,10 +326,10 @@ const sideBack = (view) => (view.backTo
   ? `<a class="side-back" href="${view.backTo}">${icons.chevronLeft}${esc(view.backLabel)}</a>` : "");
 
 // The handle on the line between the list and the page.
-const foldButton = () => `<button class="fold" type="button" aria-label="${folded() ? "Show the list" : "Hide the list"}"` +
+export const foldButton = () => `<button class="fold" type="button" aria-label="${folded() ? "Show the list" : "Hide the list"}"` +
   ` title="${folded() ? "Show the list" : "Hide the list"}">${icons.chevronLeft}</button>`;
 
-function wireFold() {
+export function wireFold() {
   const split = app.querySelector("main.split");
   const button = split.querySelector(".fold");
   button.addEventListener("click", () => {
