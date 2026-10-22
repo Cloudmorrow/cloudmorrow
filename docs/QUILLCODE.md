@@ -247,6 +247,7 @@ one:
 | `form(action, values=, record=)` | an action's form, drawn in place |
 | `button(label, action= \| open= \| go=)`, `menu` | run an action, open a record, go to a screen |
 | `table(records, columns=, actions=)`, `cards(records, title=, …)` | records, a row or a card each; opening one shows its sheet |
+| `gallery(records, title=, subtitle=, badge=, stars=, rate=, actions=)` | records as tiles with their own picture (a file's thumbnail; a video's is a frame of it) and five stars; pressing a star runs `rate` with `stars=` |
 | `lanes(records, field=, title=)` | records in columns by an enum; dragging moves the record, as a board does |
 | `month(records, date=, title=)` | records on a month |
 

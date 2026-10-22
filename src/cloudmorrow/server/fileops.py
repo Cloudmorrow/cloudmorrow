@@ -25,10 +25,12 @@ import mimetypes
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from cloudmorrow.runtimes import RUNTIMES_DIR
 from cloudmorrow.server.paths import UnsafePathError, resolve_within
 from cloudmorrow.server.shares import Share
 
@@ -217,6 +219,12 @@ THUMB_TYPES = frozenset(
     }
 )
 NOT_SCALABLE = "not a picture the server can scale"
+# A video's thumbnail is a frame from a second in, drawn with ffmpeg: the
+# runtime a Quill brought (`[requires] runtimes = ["ffmpeg"]`), or one on
+# the system. Without either, a video has no picture and the client shows
+# its icon.
+NO_FFMPEG = "no ffmpeg on the server to draw a video's picture with"
+FRAME_TIMEOUT = 30
 
 
 def _thumb_size(size: int) -> int:
@@ -266,17 +274,68 @@ def _make_thumb(source: Path, out: Path, edge: int) -> None:
             raise
 
 
+def ffmpeg_for(data_dir: Path) -> str | None:
+    """The ffmpeg to draw a video's frame with: the server's runtime, or the system's."""
+    own = data_dir / RUNTIMES_DIR / "ffmpeg" / "bin" / "ffmpeg"
+    return str(own) if own.exists() else shutil.which("ffmpeg")
+
+
+def _video_thumb(data_dir: Path, source: Path, out: Path, edge: int) -> None:
+    """A frame of the video at *source*, a second in (the first, for one
+    shorter), scaled as a picture's thumbnail is."""
+    ffmpeg = ffmpeg_for(data_dir)
+    if ffmpeg is None:
+        raise FileOpError(415, NO_FFMPEG)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=out.parent, prefix=".frame-") as tmp:
+        frame = Path(tmp) / "frame.png"
+        for at in ("1", "0"):
+            try:
+                subprocess.run(
+                    [
+                        ffmpeg,
+                        "-nostdin",
+                        "-v",
+                        "error",
+                        "-ss",
+                        at,
+                        "-i",
+                        str(source),
+                        "-frames:v",
+                        "1",
+                        "-y",
+                        str(frame),
+                    ],
+                    capture_output=True,
+                    timeout=FRAME_TIMEOUT,
+                    check=False,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                break
+            if frame.is_file() and frame.stat().st_size:
+                _make_thumb(frame, out, edge)
+                return
+    raise FileOpError(415, NOT_SCALABLE)
+
+
 def thumbnail(data_dir: Path, share: Share, target: Path, size: int) -> Path:
     """A small copy of the picture at *target*, made if it is not made yet."""
     if not target.is_file() or os.path.islink(target):
         raise FileOpError(404, "no such file")
-    if mime_of(target) not in THUMB_TYPES:
+    mime = mime_of(target) or ""
+    video = mime.startswith("video/")
+    if mime not in THUMB_TYPES and not video:
         raise FileOpError(415, NOT_SCALABLE)
     edge = _thumb_size(size)
     out = _thumb_path(data_dir, share, target, edge)
     if not out.is_file():
         try:
-            _make_thumb(target, out, edge)
+            if video:
+                _video_thumb(data_dir, target, out, edge)
+            else:
+                _make_thumb(target, out, edge)
+        except FileOpError:
+            raise
         except ImportError as exc:
             raise FileOpError(501, "Pillow is not installed on the server") from exc
         except Exception as exc:  # a picture Pillow cannot read, or one too big to try

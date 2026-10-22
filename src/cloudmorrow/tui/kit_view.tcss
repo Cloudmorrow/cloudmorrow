@@ -15,7 +15,7 @@
 
 /* -- layout ----------------------------------------------------------------- */
 .view-stack, .view-column, .view-empty, .view-form, .view-table, .view-image,
-.view-cards, .view-month, .view-tabs {
+.view-cards, .view-month, .view-tabs, .view-gallery, .view-gallery-list {
     height: auto;
 }
 
@@ -250,4 +250,23 @@ Button.view-button.-error {
     height: auto;
     max-height: 12;
     margin-top: 1;
+}
+
+.view-gallery-list {
+    width: 1fr;
+}
+
+.view-gallery-list DataTable {
+    height: auto;
+    max-height: 24;
+}
+
+.view-gallery-hint {
+    height: auto;
+}
+
+.view-gallery-picture {
+    width: 42;
+    height: auto;
+    padding: 0 1;
 }

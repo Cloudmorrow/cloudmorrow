@@ -22,6 +22,8 @@ way the web app and the phone draw the same tree their own way:
     table                     a row per record: enter opens it, and the row's
                               actions are buttons under it, on the row you are on
     cards                     a card per record: enter or a click opens it
+    gallery                   a row per record with its stars, and the picture
+                              of the row you are on beside it: 0–5 rate it
     lanes                     the board's lanes and cards: `[` `]` or a drag
                               moves one, through the record API
     month                     a month of the records by a date field, and the
@@ -69,6 +71,7 @@ from cloudmorrow.tui.widgets.view_nodes import (
     Drawer,
     FieldNode,
     FormNode,
+    GalleryNode,
     LanesNode,
     MonthNode,
     TableNode,
@@ -178,7 +181,7 @@ class ViewPane(KitPane):
                 self.kept[str(tabs.id)] = tabs.query_one(TabbedContent).active
             except Exception:
                 pass
-        for table in self.query(TableNode):
+        for table in (*self.query(TableNode), *self.query(GalleryNode)):
             if table.records:
                 self.kept[str(table.id)] = table.table.cursor_row
 

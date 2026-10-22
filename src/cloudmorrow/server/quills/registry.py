@@ -48,7 +48,7 @@ def check_personal(manifest: Manifest) -> None:
 
     It changes nothing other people see and runs nothing outside the sandbox:
     no fields on datamodels everybody shares, no datamodel that is a space or
-    sits in one, no scope but personal, no service. Everything else a Quill
+    sits in one, no scope but personal, no service, no runtime. Everything else a Quill
     may do, it may (docs/SHARING.md, *The rules*).
     """
     where = manifest.id
@@ -62,6 +62,11 @@ def check_personal(manifest: Manifest) -> None:
         raise QuillError(
             f"{where}: a Quill of your own runs no [[services]]: a service runs outside the sandbox, as the"
             " server itself. Its Python runs in the sandbox, as you"
+        )
+    if manifest.runtimes:
+        raise QuillError(
+            f"{where}: a Quill of your own brings no runtimes: a program is fetched onto the server for everybody,"
+            " which is an administrator's to say yes to"
         )
     for model in manifest.introduces:
         plain = manifest.plain(model.id)
@@ -113,6 +118,8 @@ class QuillRegistry:
         self.broken: dict[str, str] = {}
         # What the last plan found to copy in: foundational datamodel -> file.
         self._pending_paths: dict[str, Path] = {}
+        # The Quills being installed right now, so two that require each other end.
+        self._installing: set[str] = set()
         # Told after every reload: what runs a Quill's code starts and stops
         # its services by what is installed now, whoever installed it.
         self.listeners: list = []
@@ -256,6 +263,8 @@ class QuillRegistry:
         # The programs it needs on this server, and whether they are here.
         catalog_runtimes = self._runtimes_of(catalog, manifest)
         plan["runtimes"] = self.runtimes.describe(manifest.runtimes, catalog_runtimes)
+        # The other Quills it installs with it, and whether they are here.
+        plan["quills"] = self._required(manifest, owner, self._catalog(catalog, manifest))
         # What its machine handlers would add to a machine they are switched on on.
         plan["machine_runtimes"] = self.runtimes.describe_for_machines(manifest.machine_runtimes, catalog_runtimes)
         # The datamodels as they would be after installing, for a preview.
@@ -277,12 +286,45 @@ class QuillRegistry:
         """*catalog*, or this server's, read only when *manifest* needs one; None when it cannot be."""
         if catalog is not None or not self.catalog_location:
             return catalog
-        if not manifest.runtimes and not manifest.machine_runtimes:
+        if not manifest.runtimes and not manifest.machine_runtimes and not self._missing_quills(manifest):
             return catalog
         try:
             return load_catalog(self.catalog_location)
         except QuillError:
             return None
+
+    def _here(self, quill_id: str, owner: str = "") -> Manifest | None:
+        """The Quill of that id somebody sees: the server's, or else their own."""
+        return self.quills.get(quill_id) or (self.personal.get(owner, {}).get(quill_id) if owner else None)
+
+    def _missing_quills(self, manifest: Manifest) -> list[str]:
+        return [q for q in manifest.quills if self._here(q, manifest.owner) is None]
+
+    def _required(self, manifest: Manifest, owner: str, catalog: Catalog | None) -> list[dict]:
+        """The Quills *manifest* requires, for the install sheet: here already,
+        or to be installed with it from the catalog. One the catalog lacks
+        is refused; without a catalog to ask, each is said and left out."""
+        rows = []
+        for quill_id in manifest.quills:
+            here = self._here(quill_id, owner)
+            if here is not None:
+                rows.append({"id": quill_id, "name": here.name, "version": here.version, "installed": True})
+                continue
+            row = {"id": quill_id, "name": quill_id, "version": "", "installed": False}
+            if catalog is None:
+                row["problem"] = "the catalog could not be read, so it is not installed with it"
+            else:
+                try:
+                    entry = catalog.entry(quill_id)
+                except QuillError:
+                    raise QuillError(
+                        f"{manifest.id} requires the {quill_id} Quill, which is neither installed nor in the catalog"
+                    ) from None
+                row["name"] = str(entry.get("name") or quill_id)
+                row["version"] = str(entry.get("ref", "")).removeprefix("v")
+                row["summary"] = str(entry.get("summary", ""))
+            rows.append(row)
+        return rows
 
     def _runtimes_of(self, catalog: Catalog | None, manifest: Manifest) -> dict | None:
         found = self._catalog(catalog, manifest)
@@ -343,13 +385,35 @@ class QuillRegistry:
 
         With *owner*, as that person's own Quill, under `quills-personal/<owner>/`.
         The runtimes it requires are fetched first, from where *catalog* (or
-        this server's) says: a download that fails installs nothing.
+        this server's) says: a download that fails installs nothing. The
+        Quills it requires that are not here are installed before it, from
+        the same catalog; without one it is installed all the same.
         """
         with self._lock:
             catalog = self._catalog(catalog, load_manifest(folder, owner=owner))
             if catalog is not None:
                 self.remember_categories(catalog)
             plan = self.plan(folder, datamodels_source, owner=owner, catalog=catalog)
+            # Checked, it is good to go: first the Quills it works with.
+            brought, skipped = [], []
+            for row in plan["quills"]:
+                if row["installed"]:
+                    continue
+                if catalog is None or row["id"] in self._installing:
+                    skipped.append(row["id"])
+                    continue
+                self._installing.add(plan["id"])
+                try:
+                    self.install_from_catalog(row["id"], catalog, owner=owner)
+                finally:
+                    self._installing.discard(plan["id"])
+                brought.append(row["id"])
+            if brought:
+                # Planned again: they may have brought datamodels it finds here now.
+                plan = self.plan(folder, datamodels_source, owner=owner, catalog=catalog)
+            plan["quills_installed"] = brought
+            if skipped:
+                plan["quills_skipped"] = skipped
             manifest_id = plan["id"]
             wanted = list(plan.get("requires", {}).get("runtimes", []))
             if wanted and catalog is not None:
@@ -405,10 +469,36 @@ class QuillRegistry:
             dependants = [q.key for q in self.all() if q.key != key and any(m.startswith(prefix) for m in q.models)]
             if dependants:
                 raise QuillError(f"{', '.join(dependants)} use what {quill_id} introduced; remove those first")
+            self.check_unneeded(quill_id, owner)
             shutil.rmtree(target)
             if owner and target.parent.is_dir() and not any(target.parent.iterdir()):
                 target.parent.rmdir()
             self.reload()
+
+    def needed_by(self, quill_id: str, owner: str = "") -> list[Manifest]:
+        """The installed Quills that require *quill_id* and would be left without
+        it: for the server's, every one not holding its own; for somebody's own,
+        theirs, when the server has none."""
+        if owner:
+            if quill_id in self.quills:
+                return []
+            return [q for q in self.personal.get(owner, {}).values() if quill_id in q.quills]
+        return [
+            q
+            for q in self.all()
+            if quill_id in q.quills
+            and q.id != quill_id
+            and (not q.owner or quill_id not in self.personal.get(q.owner, {}))
+        ]
+
+    def check_unneeded(self, quill_id: str, owner: str = "") -> None:
+        """Refuse to take away a Quill another installed one requires."""
+        needing = sorted({q.name for q in self.needed_by(quill_id, owner)})
+        if needing:
+            one = len(needing) == 1
+            raise QuillError(
+                f"{', '.join(needing)} {'needs' if one else 'need'} {quill_id}; remove {'it' if one else 'them'} first"
+            )
 
     def set_origin(self, manifest: Manifest, **changes) -> Manifest:
         """Change what an installed Quill's `.origin.json` says — its audience, who maintains it."""

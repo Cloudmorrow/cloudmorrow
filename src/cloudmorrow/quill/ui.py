@@ -37,6 +37,7 @@ __all__ = [
     "empty",
     "field",
     "form",
+    "gallery",
     "image",
     "lanes",
     "markdown",
@@ -248,6 +249,39 @@ def cards(
     )
 
 
+def gallery(
+    records,
+    *,
+    title: str,
+    subtitle: str | None = None,
+    badge: str | None = None,
+    stars: str | None = None,
+    rate: str | None = None,
+    open: bool = True,  # noqa: A002
+    actions=(),
+    empty: str = "",
+) -> dict:
+    """Records as tiles, each with its own picture (a file's thumbnail; a video's
+    is a frame of it) and *title*, *subtitle* and *badge* (field names) under it.
+
+    *stars* is a field holding 0 to 5, drawn as five stars. With *rate*,
+    pressing a star runs that action on the record with `stars=` the number
+    pressed — the one already lit, 0. *actions* are ids, per tile.
+    """
+    return _node(
+        "gallery",
+        records=_records(records),
+        title=title,
+        subtitle=subtitle,
+        badge=badge,
+        stars=stars,
+        rate=rate,
+        open=open,
+        actions=list(actions),
+        empty=empty,
+    )
+
+
 def lanes(records, *, field: str, title: str, body: str | None = None, lanes=None, model: str | None = None) -> dict:  # noqa: A002
     """Records in columns by an enum *field*; dragging a card moves it to another lane.
 
@@ -313,6 +347,17 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
         "body": (str, False),
         "badge": (str, False),
         "open": (bool, False),
+        "empty": (str, False),
+    },
+    "gallery": {
+        "records": (list, True),
+        "title": (str, True),
+        "subtitle": (str, False),
+        "badge": (str, False),
+        "stars": (str, False),
+        "rate": (str, False),
+        "open": (bool, False),
+        "actions": (list, False),
         "empty": (str, False),
     },
     "lanes": {
@@ -391,7 +436,9 @@ def check(tree, *, actions=None, screens=None) -> dict:
             raise TreeError(f"{where}: text style is one of {', '.join(TEXT_STYLES)}")
         if kind == "image" and node.get("src") and not node["src"].startswith("https://"):
             raise TreeError(f"{where}: an image's src is an https:// address")
-        for key in ("action",):
+        if kind == "gallery" and node.get("rate") and not node.get("stars"):
+            raise TreeError(f"{where}: a gallery that rates says which field holds the stars: stars=")
+        for key in ("action", "rate"):
             if node.get(key) and actions is not None and node[key] not in actions:
                 raise TreeError(f"{where}: {kind} runs {node[key]!r}, which the manifest does not declare")
         for key in ("actions",):

@@ -102,6 +102,19 @@ def _lines(node: dict, actions: dict) -> list[str]:
             if node.get("body") and value_text(record, node["body"]):
                 out += ["  " + line for line in value_text(record, node["body"]).splitlines()[:3]]
         return out
+    if kind == "gallery":
+        if not node["records"]:
+            return [f"({node.get('empty') or 'nothing yet'})"]
+        out = []
+        for record in node["records"]:
+            head = stars_text(record.get("fields", {}).get(node["stars"])) + "  " if node.get("stars") else ""
+            head += value_text(record, node["title"])
+            if node.get("badge") and value_text(record, node["badge"]):
+                head += f" [{value_text(record, node['badge'])}]"
+            if node.get("subtitle") and value_text(record, node["subtitle"]):
+                head += f" — {value_text(record, node['subtitle'])}"
+            out.append(f"▣ {head}")
+        return out
     if kind == "lanes":
         order = [lane["value"] for lane in node.get("lanes") or []]
         names = {lane["value"]: lane["label"] for lane in node.get("lanes") or []}
@@ -121,6 +134,15 @@ def _lines(node: dict, actions: dict) -> list[str]:
             "(nothing this month)"
         ]
     return [f"[{kind}]"]
+
+
+def stars_text(value) -> str:
+    """A rating of 0 to 5 as five stars, the lit ones first: ★★★☆☆."""
+    try:
+        lit = max(0, min(5, int(value or 0)))
+    except (TypeError, ValueError):
+        lit = 0
+    return "★" * lit + "☆" * (5 - lit)
 
 
 def render(tree: dict, *, actions: dict[str, str] | None = None) -> str:

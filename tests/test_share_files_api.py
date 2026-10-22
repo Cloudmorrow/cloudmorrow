@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+import shutil
 import stat
+import subprocess
 
 import pytest
 
@@ -254,3 +256,46 @@ def test_a_thumbnail_of_nothing_is_a_404_and_nothing_escapes(client, auth, share
     assert thumb(client, auth, "Holiday").status_code == 404
     assert thumb(client, auth, "../secret.jpg").status_code == 400
     assert client.get("/api/shares/nosuch/thumb?path=x.jpg", headers=auth).status_code == 404
+
+
+# -- a video's thumbnail: a frame from it, with ffmpeg --------------------------
+needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="no ffmpeg on this machine")
+
+
+@needs_ffmpeg
+def test_a_video_s_thumbnail_is_a_frame_from_it(client, auth, share):
+    clip = share / "Holiday" / "waves.mp4"
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=blue:s=320x240:d=2", "-pix_fmt", "yuv420p", str(clip)],
+        check=True,
+    )
+    response = thumb(client, auth, "Holiday/waves.mp4")
+    assert response.status_code == 200, response.text
+    assert size_of(response) == ("JPEG", (256, 192))
+    # Half a second long: there is no frame a second in, so the first one.
+    short = share / "Holiday" / "blink.mp4"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=red:s=160x160:d=0.5",
+            "-pix_fmt",
+            "yuv420p",
+            str(short),
+        ],
+        check=True,
+    )
+    assert size_of(thumb(client, auth, "Holiday/blink.mp4")) == ("JPEG", (160, 160))
+
+
+def test_without_ffmpeg_a_video_has_no_thumbnail(client, auth, share, monkeypatch):
+    from cloudmorrow.server import fileops
+
+    monkeypatch.setattr(fileops, "ffmpeg_for", lambda data_dir: None)
+    (share / "Holiday" / "clip.mp4").write_bytes(b"not really")
+    response = thumb(client, auth, "Holiday/clip.mp4")
+    assert response.status_code == 415 and "ffmpeg" in response.text

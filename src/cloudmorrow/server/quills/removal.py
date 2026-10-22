@@ -98,6 +98,8 @@ def remove(
     sealed body can be opened and rewritten; then the Quill is removed, and
     last a runtime it alone needed, once nothing runs on it.
     """
+    # Refused before anything is dropped: another Quill requires it.
+    registry.check_unneeded(quill_id, owner)
     wanted = {str(name).strip() for name in drop if str(name).strip()}
     offered = {row["id"]: row for row in brought(registry, records, quill_id, owner)}
     unknown = sorted(wanted - set(offered))

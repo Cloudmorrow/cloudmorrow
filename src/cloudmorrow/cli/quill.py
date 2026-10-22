@@ -305,6 +305,14 @@ def print_plan(plan: dict) -> None:
     for service in plan["services"]:
         always = ", kept running" if service.get("always") else ""
         table.add_row("service", escape(service["id"]), escape(" ".join(service["command"]) + always))
+    for quill in plan.get("quills", []):
+        name = f"{quill.get('name') or quill['id']} {quill.get('version', '')}".strip()
+        said = (
+            "installed already"
+            if quill.get("installed")
+            else quill.get("problem") or "installed with it, from the catalog"
+        )
+        table.add_row("quill", escape(name), escape(said))
     for runtime in plan.get("runtimes", []):
         name = f"{runtime.get('label') or runtime['id']} {runtime.get('version', '')}".strip()
         facts = [megabytes(int(runtime["size"])) if runtime.get("size") else "", runtime.get("license", "")]

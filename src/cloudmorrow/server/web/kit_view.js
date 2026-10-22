@@ -254,6 +254,7 @@ const DRAW = {
   },
   table: drawTable,
   cards: drawCards,
+  gallery: drawGallery,
   lanes: drawLanes,
   month: drawMonth,
 };
@@ -482,6 +483,61 @@ function drawCards(v, n) {
   }).join("") + `</div>`;
 }
 
+// Tiles, each the record's own picture with its title under it: a photo
+// library's grid. The picture is the record's thumbnail, fetched when the
+// tile comes into sight; a video's is a frame of it. The stars run the
+// view's rating action at once, no form — the star already lit takes it
+// back to none — and are lit at once, before the view is drawn again.
+function drawGallery(v, n) {
+  if (!n.records.length) return none(n.empty);
+  const rate = n.rate && findAction(v.at.quill.id, n.rate);
+  const actions = (n.actions || []).map((id) => findAction(v.at.quill.id, id)).filter(Boolean);
+  return `<div class="v-gallery">` + n.records.map((r) => {
+    const hash = n.open !== false ? sheetOf(v, r) : "";
+    const title = titled(v, r, n.title);
+    const badge = n.badge ? say(v, r, n.badge) : "";
+    const pic = `<span class="v-thumb v-tile-thumb" role="img" aria-label="${esc(title)}" data-thumb-size="256"` +
+      ` data-thumb-model="${esc(r.model)}" data-thumb-id="${esc(r.id)}"></span>` +
+      (badge ? `<span class="v-tile-badge">${esc(badge)}</span>` : "");
+    const lit = n.stars ? Math.max(0, Math.min(5, Number(r.fields[n.stars]) || 0)) : 0;
+    let stars = "";
+    if (n.stars) {
+      const star = (i) => {
+        const on = i <= lit ? " on" : "";
+        const label = `${i} star${i === 1 ? "" : "s"}`;
+        if (!rate) return `<span class="v-star${on}" aria-hidden="true">★</span>`;
+        return `<button type="button" class="v-star${on}" aria-label="${label}" aria-pressed="${i === lit}"` +
+          ` ${doing(v, (el) => rateTile(v, rate, r, i === lit ? 0 : i, el))}>★</button>`;
+      };
+      stars = `<span class="v-stars" role="group" aria-label="${rate ? "Rate it" : `${lit} of 5 stars`}">` +
+        [1, 2, 3, 4, 5].map(star).join("") + `</span>`;
+    }
+    const runOn = (action) => () => press(v.at.quill, action, { record: r.id, here: v.at, after: v.draw });
+    const more = !actions.length ? "" : actions.length === 1
+      ? `<button type="button" class="act-chip" ${doing(v, runOn(actions[0]))}>${esc(actions[0].label)}</button>`
+      : `<button type="button" class="v-more" aria-label="More" ${doing(v, () => choose(title,
+        actions.map((a) => ({ label: a.label, tone: a.tone, run: runOn(a) }))))}>${glyphs.more}</button>`;
+    const sub = n.subtitle ? say(v, r, n.subtitle) : "";
+    return `<div class="v-tile">` +
+      (hash ? `<a class="v-tile-pic" href="${esc(hash)}">${pic}</a>` : `<span class="v-tile-pic">${pic}</span>`) +
+      `<span class="v-tile-text"><span class="title">${esc(title)}</span>` +
+      (sub ? `<span class="v-tile-sub">${esc(sub)}</span>` : "") + `</span>` +
+      (stars || more ? `<span class="v-tile-foot">${stars}${more}</span>` : "") +
+      `</div>`;
+  }).join("") + `</div>`;
+}
+
+async function rateTile(v, action, record, stars, el) {
+  const group = el.closest(".v-stars");
+  if (group) {
+    group.querySelectorAll(".v-star").forEach((star, i) => {
+      star.classList.toggle("on", i < stars);
+      star.setAttribute("aria-pressed", String(i + 1 === stars));
+    });
+  }
+  await run(v.at.quill, action, { record: record.id, fields: { stars }, here: v.at, after: v.draw });
+}
+
 // The board's lanes, from the tree: the enum's own values and labels unless
 // the view names them. A card dragged to another lane is moved with the
 // same call the board makes, at once, and the view drawn again after.
@@ -614,27 +670,55 @@ function drawMonth(v, n, p) {
 
 // -- pictures --------------------------------------------------------------------------------
 // A record's picture comes through fetch with the token, which an <img src>
-// cannot carry, and is kept for as long as the view is open.
-async function loadThumbs(v) {
-  const size = (window.devicePixelRatio || 1) > 1.5 ? 1024 : 512;
-  for (const el of v.root.querySelectorAll("[data-thumb-id]")) {
-    const key = `${el.dataset.thumbModel}/${el.dataset.thumbId}`;
-    try {
-      if (!v.thumbs.has(key)) {
-        const path = recordsUrl(el.dataset.thumbModel, el.dataset.thumbId, "/thumb?size=" + size);
-        v.thumbs.set(key, apiRaw("GET", path, { fail: "no picture" })
-          .then(async (res) => URL.createObjectURL(await res.blob())));
-      }
-      const url = await v.thumbs.get(key);
-      const img = document.createElement("img");
-      img.alt = el.getAttribute("aria-label") || "";
-      img.src = url;
-      el.replaceChildren(img);
-      el.classList.add("has-img");
-    } catch {
-      el.textContent = el.getAttribute("aria-label") || "No picture";
-      el.classList.add("no-img");
+// cannot carry, and is kept for as long as the view is open. Each is asked
+// for once it comes near the screen, a few at a time, so a gallery of
+// hundreds asks for the ones being looked at.
+const THUMBS_AT_ONCE = 6;
+
+function loadThumbs(v) {
+  if (v.thumbWatch) v.thumbWatch.disconnect();
+  const waiting = [];
+  let busy = 0;
+  const next = () => {
+    while (busy < THUMBS_AT_ONCE && waiting.length) {
+      busy += 1;
+      fillThumb(v, waiting.shift()).finally(() => { busy -= 1; next(); });
     }
+  };
+  const want = (el) => { waiting.push(el); next(); };
+  const els = [...v.root.querySelectorAll("[data-thumb-id]")];
+  if (!("IntersectionObserver" in window)) { els.forEach(want); return; }
+  v.thumbWatch = new IntersectionObserver((seen) => {
+    for (const entry of seen) {
+      if (!entry.isIntersecting) continue;
+      v.thumbWatch.unobserve(entry.target);
+      want(entry.target);
+    }
+  }, { rootMargin: "400px 0px" });
+  els.forEach((el) => v.thumbWatch.observe(el));
+}
+
+async function fillThumb(v, el) {
+  if (!el.isConnected) return;
+  const big = (window.devicePixelRatio || 1) > 1.5;
+  const asked = Number(el.dataset.thumbSize) || 512;
+  const size = big ? asked * 2 : asked;
+  const key = `${el.dataset.thumbModel}/${el.dataset.thumbId}/${size}`;
+  try {
+    if (!v.thumbs.has(key)) {
+      const path = recordsUrl(el.dataset.thumbModel, el.dataset.thumbId, "/thumb?size=" + size);
+      v.thumbs.set(key, apiRaw("GET", path, { fail: "no picture" })
+        .then(async (res) => URL.createObjectURL(await res.blob())));
+    }
+    const url = await v.thumbs.get(key);
+    const img = document.createElement("img");
+    img.alt = el.getAttribute("aria-label") || "";
+    img.src = url;
+    el.replaceChildren(img);
+    el.classList.add("has-img");
+  } catch {
+    el.textContent = el.classList.contains("v-tile-thumb") ? "" : el.getAttribute("aria-label") || "No picture";
+    el.classList.add("no-img");
   }
 }
 
