@@ -28,7 +28,11 @@ class SplashScreen(Screen):
         self._fit_logo()
 
     def _fit_logo(self) -> None:
-        self.query_one("#logo", Static).update(mark_for_width(self.size.width))
+        # A resize can land before the screen's children are mounted; the
+        # logo is fitted again on mount, so one that is not there yet is
+        # left alone rather than asked for.
+        for logo in self.query("#logo"):
+            logo.update(mark_for_width(self.size.width))
 
     def status(self, message: str) -> None:
         self.query_one("#splash-status", Static).update(f"[{MUTED}]{message}[/]")
