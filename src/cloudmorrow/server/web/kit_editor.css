@@ -39,8 +39,24 @@
 .row.indent-2 { padding-left: 64px; }
 .row.indent-3 { padding-left: 88px; }
 
-/* In the list of every page, which folder a page is in. */
-.row .meta .where { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+/* In the list of every page, which folder a page is in: greyed, at the
+   end of the title's line, the title cut short to leave it the room. A
+   folder too long for half the line — a folder in a folder in a folder —
+   wraps under the title instead, where it starts at the left as the
+   title does, and is itself cut if even the whole line is too short. */
+.row .title-line { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; }
+.row .title-line .title { flex: 1 1 0; min-width: 50%; }
+.row .title-line .where {
+  flex: none;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.row .title-line .where svg { flex: none; }
+.row .title-line .where span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 /* -- side by side ------------------------------------------------------------ */
 /* Only a computer draws the split; a phone never gets `main.split`. The
@@ -104,10 +120,13 @@
   }
   main.split .fold:hover { color: var(--accent); border-color: var(--accent); }
   main.split .fold svg { width: 8px; height: 12px; transition: transform .15s; }
-  /* Folded, the page has the whole width, and its lines a reading measure. */
+  /* Folded, the page has the whole width, and its lines a reading measure.
+     It keeps a margin either side, and the handle lives in the left one:
+     in a window too narrow for the measure to leave room, the page would
+     otherwise run under it and the handle sit on the title. */
   main.split.folded { grid-template-columns: minmax(0, 1fr); }
   main.split.folded .side { display: none; }
-  main.split.folded .page { padding-left: 0; border-left: 0; }
+  main.split.folded .page { padding: 0 48px; border-left: 0; }
   main.split.folded .fold { left: 0; }
   main.split.folded .fold svg { transform: rotate(180deg); }
   main.split.folded .page .editor { max-width: 780px; margin: 0 auto; }

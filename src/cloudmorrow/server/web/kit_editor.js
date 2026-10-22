@@ -198,10 +198,11 @@ function listView(b, data, key, openId = "") {
   const subfolders = all ? [] : data.folders.filter((f) => f.path && folderOf(f.path) === folder);
 
   const row = (p) => `<a class="row${p.id === openId ? " current" : ""}" href="${pageHash(b, p.id)}">
-      <span class="main"><span class="title">${esc(p.title)}</span>
+      <span class="main"><span class="title-line"><span class="title">${esc(p.title)}</span>` +
+      (all && p.folder ? `<span class="where">${own.folderSmall}<span>${esc(p.folder)}</span></span>` : "") +
+      `</span>
       <span class="meta"><span class="date">${esc(formatDate(p.modified))}</span>` +
       `<span class="preview">${esc(p.preview || "No additional text")}</span>` +
-      (all && p.folder ? `<span class="where">${own.folderSmall}${esc(p.folder)}</span>` : "") +
       `</span></span></a>`;
 
   const show = (listing, items, subs, { searching = false } = {}) => {
