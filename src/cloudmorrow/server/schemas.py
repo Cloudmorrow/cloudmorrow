@@ -301,6 +301,30 @@ class SetupOut(BaseModel):
     note: str = ""
 
 
+class ServerReleaseOut(BaseModel):
+    """One release the server could move onto, as the Server page lists it."""
+
+    tag: str
+    version: str
+    date: str = ""
+    notes: str = ""
+    changes: list[str] = []
+
+
+class ServerUpdatesOut(BaseModel):
+    """Whether a newer release is out than the one this server runs, and which."""
+
+    running_version: str = ""
+    running_commit: str = ""
+    latest_version: str = ""
+    available: bool = False
+    # Newest first: everything from after the running release to the latest.
+    releases: list[ServerReleaseOut] = []
+    checked_at: str = ""
+    # Why the server could not look — no checkout, no network — else "".
+    error: str = ""
+
+
 class ServerSettingsOut(BaseModel):
     """What the server has been told about itself."""
 

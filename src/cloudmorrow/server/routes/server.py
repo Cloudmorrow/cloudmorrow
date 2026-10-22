@@ -13,21 +13,27 @@ It cannot run code that was not pushed there first.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+import datetime as dt
+import time
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_admin_user, get_current_user, get_state
 from cloudmorrow.server.schemas import (
+    ServerReleaseOut,
     ServerSettingsOut,
     ServerSettingsUpdate,
     ServerUpdateOut,
     ServerUpdateRequest,
+    ServerUpdatesOut,
 )
 from cloudmorrow.server.settings import InvalidNameError
 from cloudmorrow.server.update import (
     UpdateError,
     build_wheel,
     describe,
+    releases_ahead,
     self_restart,
     self_restart_blocker,
     update,
@@ -68,6 +74,47 @@ def change_settings(
     return _settings(state)
 
 
+# How long a look at the remote stands before the next one: a page opened
+# twice in a row asks git once.
+CHECK_TTL = 15 * 60
+
+
+@router.get("/updates", response_model=ServerUpdatesOut)
+def newer_releases(
+    refresh: bool = Query(False),
+    state: AppState = Depends(get_state),
+    _: User = Depends(get_admin_user),
+) -> ServerUpdatesOut:
+    """Whether a newer release is out, and the notes from the running one to it.
+
+    The look fetches the remote, so it is kept for a quarter of an hour;
+    `?refresh=1` looks again now. A server that is not a checkout, or cannot
+    reach its remote, says so in `error` rather than failing: the page still
+    has a Server to show.
+    """
+    kept = state.update_check
+    if kept is not None and not refresh and time.monotonic() - kept[0] < CHECK_TTL:
+        return kept[1]
+    checked_at = dt.datetime.now(tz=dt.UTC).isoformat(timespec="seconds")
+    try:
+        found = releases_ahead()
+        out = ServerUpdatesOut(
+            running_version=found.running_version,
+            running_commit=found.running_commit,
+            latest_version=found.latest_version,
+            available=found.available,
+            releases=[
+                ServerReleaseOut(tag=r.tag, version=r.version, date=r.date, notes=r.notes, changes=list(r.changes))
+                for r in found.releases
+            ],
+            checked_at=checked_at,
+        )
+    except UpdateError as exc:
+        out = ServerUpdatesOut(checked_at=checked_at, error=str(exc))
+    state.update_check = (time.monotonic(), out)
+    return out
+
+
 @router.post("/update", response_model=ServerUpdateOut)
 def update_server(
     payload: ServerUpdateRequest,
@@ -102,6 +149,8 @@ def update_server(
     except UpdateError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
+    # Whatever the page knew about newer releases, it has just moved onto them.
+    state.update_check = None
     published = ""
     if result.changed or payload.force:
         try:

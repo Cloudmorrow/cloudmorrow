@@ -11,6 +11,7 @@ from cloudmorrow.server.update import (
     UpdateError,
     current_commit,
     find_source_dir,
+    releases_ahead,
     update,
     working_tree_is_dirty,
 )
@@ -126,6 +127,61 @@ def test_a_deploy_fetches_the_tags_it_reads_versions_from(deployment):
     result = update(source=checkout, restart=False, reinstall=False)
 
     assert result.new_version == "0.4.0"
+
+
+# -- what is out there, before deploying it ------------------------------------
+def test_the_releases_past_the_running_one_are_listed_newest_first(deployment):
+    """The Server page's box: every release from the running one to the latest,
+    each with the note on its tag and the commits that went into it."""
+    origin, checkout = deployment
+    tag(origin, "v0.1.0")
+    git("fetch", "--quiet", "--tags", "origin", cwd=checkout)
+    push_commit(origin, "Notes fold")
+    git("tag", "-a", "v0.2.0", "-m", "v0.2.0: Notes fold", cwd=origin)
+    (origin / "version.txt").write_text("3\n")
+    git("commit", "--quiet", "-am", "Tasks swim", cwd=origin)
+    (origin / "version.txt").write_text("4\n")
+    git("commit", "--quiet", "-am", "Tasks fly", cwd=origin)
+    git("tag", "-a", "v0.3.0", "-m", "v0.3.0: Tasks fly\n\nAnd swim.", cwd=origin)
+
+    found = releases_ahead(source=checkout)
+
+    assert found.available
+    assert (found.running_version, found.latest_version, found.latest_tag) == ("0.1.0", "0.3.0", "v0.3.0")
+    assert [r.version for r in found.releases] == ["0.3.0", "0.2.0"]
+    newest, older = found.releases
+    # The tag's own words, without the version it opens with; then the other
+    # commits since the release before — the note's own is not said twice.
+    assert newest.notes == "Tasks fly\n\nAnd swim."
+    assert newest.changes == ("Tasks swim",)
+    assert older.notes == "Notes fold" and older.changes == ()
+    assert newest.date == older.date  # today, both
+    # Nothing moved: the look is a look.
+    assert current_commit(checkout) != git("rev-parse", "v0.3.0", cwd=origin)
+
+
+def test_on_the_latest_release_nothing_is_ahead(deployment):
+    origin, checkout = deployment
+    tag(origin, "v0.1.0")
+    git("fetch", "--quiet", "--tags", "origin", cwd=checkout)
+
+    found = releases_ahead(source=checkout)
+
+    assert not found.available and found.releases == ()
+    assert (found.running_version, found.latest_version) == ("0.1.0", "0.1.0")
+
+
+def test_an_untagged_checkout_still_sees_the_releases_ahead(deployment):
+    origin, checkout = deployment
+    push_commit(origin, "Notes fold")
+    tag(origin, "v0.1.0")
+
+    found = releases_ahead(source=checkout)
+
+    assert found.running_version == "" and found.available
+    assert [r.version for r in found.releases] == ["0.1.0"]
+    # The tag says only its name, so the commit is what there is to tell.
+    assert found.releases[0].notes == "" and found.releases[0].changes == ("Notes fold",)
 
 
 def test_a_commit_past_a_release_says_how_far_past(deployment):
