@@ -15,7 +15,6 @@
   min-height: 0;
   align-self: center;
 }
-.myquills button.quill-chip:hover { border-color: var(--accent); color: var(--accent); }
 .myquills .row.offer-row, .myquills .row.request-row { align-items: center; }
 .myquills .quills-stack .quill-tabs { margin-top: 4px; }
 .myquills .share-sheet { margin: 0 0 14px; }

@@ -67,6 +67,9 @@ const FONT = {
   "'": ["..X..", "..X..", ".....", ".....", ".....", ".....", "....."],
   "!": ["..X..", "..X..", "..X..", "..X..", "..X..", ".....", "..X.."],
   "?": [".XXX.", "X...X", "....X", "...X.", "..X..", ".....", "..X.."],
+  "Æ": [".XXXX", "X.X..", "X.X..", "X.XXX", "XXX..", "X.X..", "X.XXX"],
+  "Ø": [".XXX.", "X..XX", "X.X.X", "X.X.X", "X.X.X", "XX..X", ".XXX."],
+  "Å": ["..X..", ".....", ".XXX.", "X...X", "XXXXX", "X...X", "X...X"],
 };
 
 // A word in dots. `fill` is a paint — a colour or a url(#id) at a gradient —
@@ -444,7 +447,7 @@ function cssFor(t) {
     `  --brand: linear-gradient(100deg, ${t.gradient.join(", ")});\n` +
     `  --brand-mark: linear-gradient(100deg, ${markStops(t).join(", ")});\n` +
     `  --brand-bar: linear-gradient(100deg, ${t.barGradient.join(", ")});\n` +
-    `  --radius: ${t.radius};\n  --radius-control: ${t.radiusControl || t.radius};\n` +
+    `  --radius: ${t.radius};\n  --radius-control: ${t.radiusControl || t.radius};\n  --radius-button: 6px;\n` +
     `  color-scheme: ${t.scheme};\n}\n`;
 }
 

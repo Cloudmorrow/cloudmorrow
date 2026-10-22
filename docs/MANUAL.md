@@ -763,8 +763,8 @@ administrator, **Administration**.
 ### The same app on a computer
 
 Past 900 points wide — and 600 tall, because a phone held sideways is still a
-phone — the tabs stand up into a **rail down the left**, with the wordmark at
-the head of it and the name of the screen in the bar instead. The bar's
+phone — the tabs stand up into a **rail down the left**, with your cloud's
+name at the head of it, in the dots the wordmark is drawn in, and the name of the screen in the bar instead. The bar's
 buttons come in to meet the column they act on rather than sitting out at the
 window's edge, every row and tile says when the pointer is over it, and the
 sheet that slides up from under a thumb is a dialog in the middle. The rail

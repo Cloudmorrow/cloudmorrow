@@ -131,12 +131,12 @@
   justify-content: center;
   background: var(--action);
   color: var(--action-ink);
-  box-shadow: inset 0 -3px 0 var(--action-edge);
   font-family: var(--display);
   font-size: 17px;
   font-weight: 600;
 }
-.row.primary:active { background: var(--action); filter: brightness(.94); }
+/* A row goes grey when pressed; this one is a button, and keeps its amber. */
+.row.primary:active { background: var(--action); }
 .row.primary:disabled { opacity: .5; }
 .row.bad { justify-content: center; color: var(--bad); font-weight: 600; }
 

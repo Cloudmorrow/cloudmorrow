@@ -2,9 +2,10 @@
 
 Five dots across and seven down per letter, which is the smallest grid that
 still gives a G a crossbar. The same glyphs the web app draws its mark with —
-`server/web/brand.js` holds the other copy, and a test fails if the two ever
-disagree — because the mark on the phone and the mark above a prompt should
-be the same drawing, not two drawings of the same idea.
+`server/web/brand.js` and `server/web/core.js` hold the other copies, and a
+test fails if they ever disagree — because the mark on the phone, the cloud's
+name at the head of the rail and the mark above a prompt should be the same
+drawing, not three drawings of the same idea.
 
 In a terminal each cell is about twice as tall as it is wide, so a dot per
 cell would give letters stretched to twice their height. Half blocks fix it:
@@ -405,6 +406,34 @@ GLYPHS: dict[str, tuple[str, ...]] = {
         "..X..",
         ".....",
         "..X..",
+    ),
+    # The three the Danish alphabet adds, for a cloud named in it.
+    "Æ": (
+        ".XXXX",
+        "X.X..",
+        "X.X..",
+        "X.XXX",
+        "XXX..",
+        "X.X..",
+        "X.XXX",
+    ),
+    "Ø": (
+        ".XXX.",
+        "X..XX",
+        "X.X.X",
+        "X.X.X",
+        "X.X.X",
+        "XX..X",
+        ".XXX.",
+    ),
+    "Å": (
+        "..X..",
+        ".....",
+        ".XXX.",
+        "X...X",
+        "XXXXX",
+        "X...X",
+        "X...X",
     ),
 }
 
