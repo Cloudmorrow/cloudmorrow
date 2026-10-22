@@ -1,0 +1,35 @@
+# A list of projects for the tests (test_kit_projects_cli.py): `vault`,
+# `repo` and `env_files` bound, and the secrets as a list beside them.
+[quill]
+id = "devlist"
+name = "Devlist"
+version = "1.0.0"
+summary = "Projects, their repositories and their .env files."
+category = "developer"
+icon = "code"
+publisher = "Cloudmorrow"
+license = "AGPL-3.0-or-later"
+
+[uses]
+datamodels = ["secret"]
+
+[[screens]]
+id = "projects"
+kit = "list"
+label = "Projects"
+model = "devlist.project"
+title = "name"
+subtitle = "repo"
+vault = "vault"
+repo = "repo"
+env_files = "env_files"
+
+[[screens]]
+id = "secrets"
+kit = "list"
+label = "Secrets"
+model = "secret"
+title = "key"
+subtitle = "value"
+group = "vault"
+subgroup = "environment"

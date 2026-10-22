@@ -26,6 +26,7 @@ import {
   penSays, titleField, titleOf, wirePen,
 } from "./kit.js";
 import { askText } from "./dialog.js";
+import { secretsBar, wireSecretsBar } from "./kit_projects.js";
 
 export const MASK = "••••••••";
 
@@ -129,6 +130,7 @@ export async function renderGroupedList(at, arg) {
     <main>
       ${heading(screen.label, writes ? `<button class="compose" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</button>` : "")}
       ${levels.map(chipRow).join("")}
+      ${secretsBar(model, writes)}
       <div class="install-slot">${installCard()}</div>
       <div class="listing"></div>
     </main>` + tabs(at.tab));
@@ -209,6 +211,8 @@ export async function renderGroupedList(at, arg) {
     show();
   };
   show();
+  // A list of secrets: the place on screen, in from a .env file and out to one (kit_projects.js).
+  wireSecretsBar(app, levels, chosen, async () => { all = await api("GET", recordsUrl(model.id)); show(); });
 
   // A new record goes into the group and subgroup on screen, and opens, so
   // what the sheet did not ask for — a value, a date — is typed next.

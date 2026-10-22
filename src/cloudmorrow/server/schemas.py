@@ -165,7 +165,9 @@ class SecretWrite(BaseModel):
 
 
 class SecretImport(BaseModel):
-    entries: dict[str, str]
+    entries: dict[str, str] = Field(default_factory=dict)
+    # A .env file as it is, read here instead: what the web app sends up.
+    text: str | None = None
     environment: str = DEFAULT_ENVIRONMENT
     # Delete keys the import does not mention, so the environment matches it exactly.
     prune: bool = False

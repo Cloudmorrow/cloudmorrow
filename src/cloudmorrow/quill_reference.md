@@ -340,7 +340,7 @@ and has every surface draw it hidden until asked for.
 
 | kit | needs | draws |
 | --- | --- | --- |
-| list | model, title; optional subtitle, tick (bool), fields (the sheet's), group and subgroup (link, enum or indexed string) | rows, a circle per row if tick; chips (phone, web) or a list and buttons (terminal) to pick the group and subgroup |
+| list | model, title; optional subtitle, tick (bool), fields (the sheet's), group and subgroup (link, enum or indexed string); projects: vault (a string: the vault its secrets are in), repo (url) and env_files (json: which .env file each environment came from) | rows, a circle per row if tick; chips (phone, web) or a list and buttons (terminal) to pick the group and subgroup; a list of `secret` has Import .env and Export .env; a list of projects has their environments on the sheet, and init, update, clone in the terminal and on the command line |
 | board | model, lane (in ordered_within: an enum, or a link to the records that are the lanes — in their order, and on a board with a group only those linking to it), title; optional group (link: chips), subtitle (a field, or a list of them, under a card's title), body (markdown), done (a lane value; for record lanes what the lane has: `{ outcome = "won" }`) | lanes; cards dragged between them |
 | detail / form | model; optional fields = [...] | one record's fields, editable |
 | calendar | model, starts, ends (indexed datetime/date), space (a link to a space datamodel); optional all_day (bool), colour (a field of the space), subtitle | every space's things at once: a month, a week, the day's list; the spaces and their people |
@@ -359,6 +359,13 @@ public = { kind = "public" }
 shared = { kind = "private" }
 direct = { kind = "direct" }
 ```
+
+A list that binds `vault` is projects on your machines: `cm <quill> init
+[--path DIR]` makes a folder one and reads every `.env*` file into its
+vault (`.env.prod` is `prod`, `.env` is `local`; examples and files git
+tracks are left alone), `update [project]` pulls it and writes the files
+back from the vault, `clone <project> [DIR]` puts it on a new machine, and
+`secrets [import|export] [project] [-e ENV] [-f FILE]` moves one file or all.
 
 On the command line a thread is `cm <quill> list` (the spaces, with unread),
 `show <space>` and `say <space> "text"`; with the team's bindings also

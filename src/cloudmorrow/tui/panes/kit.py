@@ -19,7 +19,8 @@ task board has to go on as much as a list of car services does.
   a table or as tiles, with the picture beside.
 - `list` is a table of records by `title` (and `subtitle`), with a circle for
   the `tick` field that space fills in. With a `group` (and `subgroup`), or a
-  `secret` field to keep hidden, it is kit_grouped.py's instead.
+  `secret` field to keep hidden, it is kit_grouped.py's instead; one that
+  binds `vault` is projects, kit_projects.py's.
 - `detail` and `form` are the same table without the circle: the record
   sheet is the point of them, and enter or a click opens it, showing the
   screen's `fields` when it names them.
@@ -462,6 +463,7 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     from cloudmorrow.tui.panes.kit_editor import EditorPane
     from cloudmorrow.tui.panes.kit_grid import GridPane
     from cloudmorrow.tui.panes.kit_grouped import GroupedListPane, draws_here
+    from cloudmorrow.tui.panes.kit_projects import ProjectsPane
     from cloudmorrow.tui.panes.kit_thread import ThreadPane
     from cloudmorrow.tui.panes.kit_timeline import TimelinePane
     from cloudmorrow.tui.panes.kit_view import ViewPane
@@ -483,6 +485,9 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
         return EditorPane(quill, screen, **kwargs)
     if kit == "list" and draws_here(quill["models"][screen["model"]], screen):
         return GroupedListPane(quill, screen, **kwargs)
+    if kit == "list" and screen.get("vault"):
+        # Projects, with their folders here and their .env files (kit_projects.py).
+        return ProjectsPane(quill, screen, **kwargs)
     if kit == "grid":
         return GridPane(quill, screen, **kwargs)
     if kit in ("list", "detail", "form"):

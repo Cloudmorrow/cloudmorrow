@@ -376,3 +376,20 @@ def test_a_grids_group_writes_names_a_bool_on_the_group(registry, tmp_path):
     bad = write_quill(tmp_path / "bad", files.replace('group_writes = "writable"', 'group_writes = "owner"'))
     with pytest.raises(QuillError, match="group_writes"):
         registry.plan(bad, models_source())
+
+
+def test_a_list_of_projects_names_a_string_vault_and_needs_one_for_its_repo(registry, tmp_path):
+    """`vault`, `repo` and `env_files` on a list (checkout.py): checked against the datamodel."""
+    devlist = QUILL_CATALOG / "quill-devlist"
+    manifest = (devlist / "quill.toml").read_text(encoding="utf-8")
+    project = (devlist / "datamodels" / "project.toml").read_text(encoding="utf-8")
+    assert registry.plan(devlist, QUILL_CATALOG / "datamodels")
+    for change, says in (
+        (('vault = "vault"', 'vault = "env_files"'), "vault"),
+        (('repo = "repo"', 'repo = "env_files"'), "repo"),
+        (('env_files = "env_files"', 'env_files = "name"'), "env_files"),
+        (('vault = "vault"\n', ""), "needs the vault"),
+    ):
+        bad = write_quill(tmp_path / says.replace(" ", "-"), manifest.replace(*change), project=project)
+        with pytest.raises(QuillError, match=says):
+            registry.plan(bad, QUILL_CATALOG / "datamodels")

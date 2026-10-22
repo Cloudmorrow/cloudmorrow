@@ -23,6 +23,7 @@ import {
 } from "./core.js";
 import { installCard } from "./install.js";
 import { drawsHere, renderGroupedList, secretWidget, wireSecretWidgets } from "./kit_grouped.js";
+import { projectsSheet } from "./kit_projects.js";
 import { calendarSheet, renderCalendar } from "./kit_calendar.js";
 import { spaceSection, wireSpace } from "./kit_space.js";
 // Each element beyond the first four is a file of its own, drawn from here.
@@ -145,7 +146,7 @@ export const DRAWS = ["list", "board", "detail", "form", "calendar", "grid", "ed
 // Each element that is more than rows is a file of its own: kit_<kit>.js.
 const OWN = { calendar: renderCalendar, thread: renderThread, timeline: renderTimeline, view: renderView, data: renderData };
 // And what it changes on the record sheet, if anything: kit_<kit>.js again.
-const SHEETS = { calendar: calendarSheet, timeline: timelineSheet, data: dataSheet };
+const SHEETS = { calendar: calendarSheet, timeline: timelineSheet, data: dataSheet, list: projectsSheet };
 
 export async function renderKitScreen(at, arg) {
   const { kit } = at.screen;

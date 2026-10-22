@@ -245,3 +245,15 @@ def test_without_the_quill_the_vaults_are_closed(config, users):
     refused = bare.get("/api/secrets", headers=headers)
     assert refused.status_code == 403
     assert "Administration, Quills" in refused.json()["detail"]
+
+
+def test_a_env_file_goes_up_as_it_is(client, auth):
+    """What the web app sends: the file's text, read on the server."""
+    text = '# a comment\nexport API_KEY="sk live"\nDEBUG=false\n'
+    imported = client.post("/api/secrets/import", json={"environment": "prod", "text": text}, headers=auth)
+    assert imported.status_code == 200
+    assert imported.json()["added"] == ["API_KEY", "DEBUG"]
+    out = client.get("/api/secrets/export", params={"env": "prod", "format": "json"}, headers=auth).json()
+    assert out == {"API_KEY": "sk live", "DEBUG": "false"}
+    broken = client.post("/api/secrets/import", json={"environment": "prod", "text": "NOT A LINE"}, headers=auth)
+    assert broken.status_code == 400
