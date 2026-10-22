@@ -1201,7 +1201,13 @@ cm quill catalog          # what there is, by category
 cm quill add tasks        # what it adds — datamodels, screens, jobs — then a yes
 cm quill list
 cm quill remove tasks     # its tabs and jobs go; your records stay
+cm quill remove budget --mine            # a Quill of your own
+cm quill remove budget --owner alice     # somebody's own, off every shelf (admin)
 ```
+
+A Quill the catalog no longer has (renamed, or taken out) says so in
+Administration → Quills, and offers no Reinstall or Update: remove it, and
+install what replaced it.
 
 ---
 

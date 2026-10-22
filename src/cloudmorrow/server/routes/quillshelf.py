@@ -803,6 +803,58 @@ def promote(payload: PromoteIn, state: AppState = Depends(get_state), admin: Use
     return plan
 
 
+def _theirs(state: AppState, owner: str, quill_id: str) -> Manifest:
+    manifest = state.quills.personal.get(owner, {}).get(quill_id)
+    if manifest is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"{owner} has no Quill of their own called {quill_id}")
+    return manifest
+
+
+@router.get("/personal/{owner}/{quill_id}/brought")
+def brought_theirs(
+    owner: str, quill_id: str, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)
+) -> list[dict]:
+    """What somebody's own Quill brought, and how many records hold each: for an administrator
+    choosing what goes with it."""
+    _shelf(state)
+    _theirs(state, owner, quill_id)
+    try:
+        return removal.brought(state.quills, state.records, quill_id, owner)
+    except QuillError as exc:
+        raise _bad(exc) from exc
+
+
+@router.delete("/personal/{owner}/{quill_id}")
+def remove_theirs(
+    owner: str,
+    quill_id: str,
+    drop: str = "",
+    state: AppState = Depends(get_state),
+    admin: User = Depends(get_admin_user),
+) -> dict:
+    """Somebody's own Quill, taken off the server by an administrator: off every shelf it is on
+    at once, as when its last holder removes it — its records kept unless `?drop=` names what
+    it brought to go with it. Everybody who had it is told."""
+    _shelf(state)
+    manifest = _theirs(state, owner, quill_id)
+    holders = state.shelf.holders(manifest)
+    try:
+        done = removal.remove(
+            state.quills, state.records, manifest.id, [d for d in drop.split(",") if d], owner=manifest.owner
+        )
+    except QuillError as exc:
+        raise _bad(exc) from exc
+    state.sharing.forget(manifest.owner, manifest.id)
+    for person in {owner, *holders} - {admin.username}:
+        state.notifications.add(
+            person,
+            kind="quill.removed",
+            title=f"{manifest.name} is gone",
+            body=f"{admin.username} took {owner}'s {manifest.name} off this server.",
+        )
+    return {**done, "removed": manifest.key}
+
+
 @router.post("/adopt/{owner}/{quill_id}")
 def adopt(
     owner: str, quill_id: str, state: AppState = Depends(get_state), admin: User = Depends(get_admin_user)

@@ -394,6 +394,9 @@ def standing_of(quill: dict, entry: dict | None) -> tuple[bool | None, str]:
     if entry is None:
         if origin.get("dev"):
             return None, "from a folder, with cm quill dev"
+        if origin.get("catalog"):
+            # Installed from the catalog, which has dropped it: nothing to install again.
+            return False, "no longer in the catalog"
         return None, f"from {origin['repo']}" if origin.get("repo") else "not in the catalog"
     if entry.get("update_available") is True:
         return True, f"newer in the catalog: {entry.get('ref', '')}"
@@ -522,6 +525,7 @@ def own_widgets(everything: dict) -> list:
             Horizontal(
                 Button("Promote for everyone", id=f"promote-{index}"),
                 Button("Switch off" if on else "Switch on", id=f"pswitch-{index}"),
+                Button("Remove", variant="error", id=f"premove-{index}"),
                 classes="own-buttons",
             )
         )
@@ -907,11 +911,14 @@ class QuillsView(Pane):
             return
         if quill["id"] not in self._entries:
             installed = self._installed(quill["id"])
+            name = quill.get("name") or quill["id"]
             said = standing_of(installed or quill, None)[1]
-            self.status(
-                f"{quill.get('name') or quill['id']} is not in the catalog ({said}); install it again from there.",
-                error=True,
-            )
+            if said == "no longer in the catalog":
+                self.status(
+                    f"{name} is no longer in the catalog: remove it (d), and install what replaced it.", error=True
+                )
+                return
+            self.status(f"{name} is not in the catalog ({said}); install it again from there.", error=True)
             return
         self.install(self._entries[quill["id"]], audience=(self._installed(quill["id"]) or {}).get("audience"))
 
@@ -990,9 +997,16 @@ class QuillsView(Pane):
 
     @work(group="ui")
     async def remove(self, quill: dict) -> None:
+        await self._remove(quill)
+
+    async def _remove(self, quill: dict, owner: str = "") -> None:
+        """Remove a server Quill, or — with *owner* — somebody's own, off every shelf it is on."""
         name = quill.get("name") or quill["id"]
         try:
-            brought = await self.api.quill_brought(quill["id"])
+            if owner:
+                brought = await self.api.their_quill_brought(owner, quill["id"])
+            else:
+                brought = await self.api.quill_brought(quill["id"])
         except ApiError:
             brought = []
         drop: list[str] = []
@@ -1002,11 +1016,12 @@ class QuillsView(Pane):
                 return
             drop = answer
         else:
+            who = f"{owner}'s " if owner else ""
             confirmed = await self.app.push_screen_wait(
                 ConfirmModal(
-                    f"Remove {name}?",
+                    f"Remove {who}{name}?",
                     detail=(
-                        "[dim]Its tabs and its jobs go, for everybody on this server. Its "
+                        "[dim]Its tabs and its jobs go, for everybody who has it. Its "
                         "records stay: install it again and they are all there.[/]"
                     ),
                     confirm_label="Remove",
@@ -1015,7 +1030,10 @@ class QuillsView(Pane):
             if not confirmed:
                 return
         try:
-            gone = await self.api.uninstall_quill(quill["id"], drop=drop)
+            if owner:
+                gone = await self.api.remove_their_quill(owner, quill["id"], drop=drop)
+            else:
+                gone = await self.api.uninstall_quill(quill["id"], drop=drop)
         except ApiError as exc:
             self.status(str(exc), error=True)
             return
@@ -1031,7 +1049,7 @@ class QuillsView(Pane):
     # -- people's own Quills, and what they asked for ----------------------------
     def on_button_pressed(self, event: Button.Pressed) -> None:
         kind, _, rest = (event.button.id or "").partition("-")
-        if kind not in ("approve", "asker", "decline", "promote", "pswitch"):
+        if kind not in ("approve", "asker", "decline", "promote", "pswitch", "premove"):
             return
         event.stop()
         self.answer(kind, rest)
@@ -1055,6 +1073,10 @@ class QuillsView(Pane):
                 enabled = not quill.get("enabled", True)
                 await self.api.set_feature(f"~{quill['owner']}.{quill['id']}", enabled)
                 self.status(f"{quill['name']} is " + ("on again." if enabled else "off, for everybody who has it."))
+            elif kind == "premove":
+                quill = (everything.get("personal") or [])[int(rest)]
+                await self._remove(quill, owner=quill["owner"])
+                return
             elif kind == "promote":
                 quill = (everything.get("personal") or [])[int(rest)]
                 owner, quill_id = quill["owner"], quill["id"]

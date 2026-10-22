@@ -191,6 +191,15 @@ install sheet offers to bring their records in, and `"adopt": ["alice"]` on
 the install does it. That is how Alice's Budget, published and installed from
 the catalog, finds her records waiting.
 
+**Removal by an administrator.** An administrator takes somebody's own Quill
+off the server at once, off every shelf it stands on (`DELETE
+/api/quills/personal/{owner}/{id}`, Administration → Quills → User Quills →
+Remove, `cm quill remove budget --owner alice`), with the same choice of
+what it brought as the last holder has (`…/brought`, `?drop=`): its records
+stay unless dropped. The owner and everybody who had it are told. Removing a
+server Quill by an id that is only somebody's own says whose it is, and this
+way to remove it.
+
 ### Catalog
 
 `GET /api/quills/mine/{id}/export`, Your Quills → Export, or `cm quill export
@@ -241,12 +250,14 @@ TRACKER_KEY from your vault.*
 | `POST /api/quills/requests/{n}/approve`, `…/decline`, `DELETE …` | `{audience, give_to, note}`; a word back; withdraw |
 | `GET /api/quills/all` (admin) | everything: server Quills with audiences, personal Quills with shares, requests, the policy, what is broken |
 | `POST /api/quills/promote`, `POST /api/quills/adopt/{owner}/{id}` (admin) | `{owner, id, audience, give_to}`; fold one in |
+| `GET /api/quills/personal/{owner}/{id}/brought`, `DELETE /api/quills/personal/{owner}/{id}?drop=` (admin) | what it brought; off the server, off every shelf |
 | `PUT /api/quills/{id}/audience` (admin) | `{circles, people}` |
 | `/hooks/~alice.budget/<path>`, `/api/q/~alice.budget/…` | a personal Quill's webhooks and APIs, by its key |
 
 On the command line it is all under `cm quill`: `add --mine`, `add --for`,
 `audience`, `mine`, `share`, `accept`, `decline`, `leave`, `request`,
-`requests`, `approve`, `decline-request`, `promote`, `adopt`, `export`,
+`requests`, `approve`, `decline-request`, `promote`, `adopt`, `remove --mine`,
+`remove --owner`, `export`,
 `fork`, `policy`. To an assistant: `quill_check` and `quill_dev_install`
 (theirs for anybody but an administrator), `quill_mine`, `quill_share`,
 `quill_request`.

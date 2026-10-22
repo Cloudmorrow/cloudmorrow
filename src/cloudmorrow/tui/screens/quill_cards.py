@@ -219,7 +219,8 @@ class QuillCards:
             # A kit this terminal does not draw yet: no card, and no key held.
             self._quill_keys.pop(key, None)
             return None
-        self._feature_of[key] = str(quill["id"])
+        # A Quill of somebody's own is switched by its key, `~alice.budget`.
+        self._feature_of[key] = str(quill.get("key") or quill["id"])
         # Mounted hidden: the switcher only hides what it had at the start.
         pane.display = False
         await self.query_one("#panes", ContentSwitcher).mount(pane)

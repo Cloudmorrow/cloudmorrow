@@ -82,6 +82,8 @@ async function load() {
 function standing(own, catalog) {
   const entry = catalog && catalog.quills.find((q) => q.id === own.id);
   const origin = own.origin || {};
+  // Dropped from the catalog: there is nothing to install again, from it or from anywhere.
+  if (!entry && catalog && origin.catalog) return { entry: null, newer: false, said: "no longer in the catalog" };
   if (!entry || !origin.catalog) {
     if (origin.dev) return { entry: null, newer: false, said: "from a folder, with cm quill dev" };
     if (origin.repo) return { entry: null, newer: null, said: `from ${origin.repo}` };
@@ -429,7 +431,7 @@ async function buildSheet(id, data) {
       ${stood.newer === false ? `<button class="row" type="button" disabled>${esc(stood.said === "up to date" ? "Up to date" : stood.said)}</button>`
         : `<button class="row primary update-mine" type="button">${stood.newer ? `Update to ${esc(stood.entry.ref)}`
           : stood.entry ? "Update from the catalog" : "Update from its source"}</button>`}
-      ${stood.entry || (own.origin || {}).repo ? `<button class="row reinstall-mine" type="button">Reinstall v${esc(plan.version)}</button>` : ""}
+      ${stood.entry || (!(own.origin || {}).catalog && (own.origin || {}).repo) ? `<button class="row reinstall-mine" type="button">Reinstall v${esc(plan.version)}</button>` : ""}
       ${may.share ? `<button class="row share-mine" type="button">Share…</button>` : ""}
       <button class="row export-mine" type="button">Export</button>
       <button class="row promote-mine" type="button">Ask to promote</button>

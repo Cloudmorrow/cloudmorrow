@@ -142,3 +142,32 @@ def test_mine_lists_what_the_server_says(monkeypatch):
     assert "https://x/hooks/~alice.budget/bank?token=s3" in shown.output
     assert "cm quill accept dan/plants" in shown.output
     assert "request 4: install tasks" in shown.output
+
+
+def test_remove_takes_a_server_quill_your_own_or_somebody_elses(monkeypatch):
+    """`cm quill remove x`, `--mine` and, for an administrator, `--owner alice`: each its own call."""
+    calls = []
+
+    class FakeApi:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return None
+
+        async def uninstall_quill(self, quill_id):
+            calls.append(("server", quill_id))
+
+        async def remove_my_quill(self, quill_id):
+            calls.append(("mine", quill_id))
+
+        async def remove_their_quill(self, owner, quill_id):
+            calls.append((owner, quill_id))
+
+    monkeypatch.setattr(quill_cli, "client", lambda: (None, FakeApi()))
+    for args in (["vidmorrow"], ["vidmorrow", "--mine"], ["vidmorrow", "--owner", "alice"]):
+        done = runner.invoke(quill_cli.app, ["remove", *args, "--yes"])
+        assert done.exit_code == 0, done.output
+    assert calls == [("server", "vidmorrow"), ("mine", "vidmorrow"), ("alice", "vidmorrow")]
+    both = runner.invoke(quill_cli.app, ["remove", "vidmorrow", "--mine", "--owner", "alice", "--yes"])
+    assert both.exit_code != 0 and len(calls) == 3

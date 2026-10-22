@@ -176,6 +176,7 @@ const stateChip = ([state, tone]) => `<span class="quill-chip run-state ${tone}"
 // release, or the Quill came from a source of its own.
 function standing(quill, catalog) {
   const entry = catalog && catalog.quills.find((q) => q.id === quill.id);
+  if (!entry && catalog && (quill.origin || {}).catalog) return { entry: null, newer: false, said: "no longer in the catalog" };
   if (!entry) return { entry: null, newer: false, said: fromWhere(quill) };
   if (entry.update_available === true) return { entry, newer: true, said: `newer in the catalog: ${entry.ref}` };
   if (entry.update_available === false) return { entry, newer: false, said: "up to date" };
@@ -356,11 +357,13 @@ async function drawOwn(ctx) {
         <span class="own-buttons">
           <button type="button" class="quill-chip on promote">Promote</button>
           <button type="button" class="quill-chip ${q.enabled ? "switch-off" : "switch-on"}">${q.enabled ? "Switch off" : "Switch on"}</button>
+          <button type="button" class="quill-chip remove-own">Remove</button>
         </span></div>`;
     }).join("")}</div>
     <p class="shelf-note">Promoting makes it the server's, for everyone: every record of its own datamodels —
       the owner's and the people's it was shared with — moves with it. Switching one off takes it from
-      everybody who has it until it is switched on again.</p>`
+      everybody who has it until it is switched on again. Removing it takes it off the server, off
+      every shelf it is on; its records stay unless you untick them.</p>`
       : `<p class="shelf-note">Nobody has added a Quill of their own yet.</p>`}`;
 
   for (const select of list.querySelectorAll(".policy select")) {
@@ -398,7 +401,31 @@ async function drawOwn(ctx) {
       () => api("PATCH", featureUrl(key), { enabled: false })));
     row.querySelector(".switch-on")?.addEventListener("click", () => redo(
       () => api("PATCH", featureUrl(key), { enabled: true })));
+    row.querySelector(".remove-own").addEventListener("click", () => removeTheirs(row, redo));
   }
+}
+
+// Somebody's own Quill, off the server and every shelf it is on: what it
+// brought is offered the way a server Quill's is, ticked to keep.
+async function removeTheirs(row, redo) {
+  const { owner, quill, name } = row.dataset;
+  const url = `/api/quills/personal/${encodeURIComponent(owner)}/${encodeURIComponent(quill)}`;
+  const gone = (drop) => redo(() => api("DELETE", url + (drop.length ? "?drop=" + encodeURIComponent(drop.join(",")) : "")),
+    `${owner}'s ${name} is removed`);
+  let brought = [];
+  try { brought = await api("GET", url + "/brought"); } catch (err) { toast(err.message); return; }
+  if (!brought.length) {
+    if (!await ask(`Remove ${owner}'s ${name}?\n\nIts tabs and jobs go, for everybody who has it. `
+      + "Nothing anybody wrote is deleted: the records stay, and are there again if it comes back.")) return;
+    return gone([]);
+  }
+  const group = row.closest(".group");
+  group.insertAdjacentHTML("afterend", removeSheet(`${owner}'s ${name}`, brought));
+  group.hidden = true;
+  const sheet = group.nextElementSibling;
+  sheet.querySelector(".cancel").addEventListener("click", () => { sheet.remove(); group.hidden = false; });
+  sheet.querySelector(".confirm").addEventListener("click", () =>
+    gone([...sheet.querySelectorAll("input[type=checkbox]:not(:checked)")].map((b) => b.value)));
 }
 
 // -- the catalog ----------------------------------------------------------------------
@@ -472,9 +499,12 @@ async function buildSheet(id, me = null) {
   let entry = null;
   let here = null;
   let feature = null;
+  // A catalog that cannot be read leaves an installed Quill its sheet — and
+  // its Remove — described from what it added.
+  let catalog = null;
+  try { catalog = await api("GET", "/api/quills/catalog"); } catch { catalog = null; }
   try {
-    const catalog = await api("GET", "/api/quills/catalog");
-    entry = catalog.quills.find((q) => q.id === id) || null;
+    entry = (catalog && catalog.quills.find((q) => q.id === id)) || null;
     plan = entry ? await api("POST", "/api/quills/plan", { id }) : { ...(await api("GET", quillUrl(id))), from_source: true };
     if (plan.from_source) plan.installed_version = plan.version;
     if (plan.installed_version) {
@@ -502,8 +532,10 @@ async function buildSheet(id, me = null) {
   const newer = Boolean(installed && entry && (plan.version !== installed || entry.update_available === true));
   const origin = (here && here.origin) || {};
   // Installing again is from the catalog, or from the source it came from;
-  // a folder sent with `cm quill dev` has to be sent again from there.
-  const again = installed && (entry || (!origin.dev && origin.repo));
+  // a folder sent with `cm quill dev` has to be sent again from there, and
+  // one the catalog has dropped cannot be had again at all.
+  const again = installed && (entry || (!origin.dev && !origin.catalog && origin.repo));
+  const dropped = Boolean(installed && catalog && !entry && origin.catalog);
 
   const html = `
       <h1 class="large">${esc(name)}</h1>
@@ -520,7 +552,9 @@ async function buildSheet(id, me = null) {
         ${again ? `<button class="row reinstall-quill" type="button">Reinstall v${esc(installed)}</button>` : ""}
         <button class="row bad remove-quill" type="button">Remove ${esc(name)}</button>
       </div>
-      ${again ? "" : `<p class="shelf-note">Installed from a folder with <code>cm quill dev</code>: to install it again, send it from there.</p>`}
+      ${again ? "" : dropped
+        ? `<p class="shelf-note">The catalog no longer has ${esc(name)}, so it cannot be installed again or updated: remove it, and install what replaced it from the catalog.</p>`
+        : `<p class="shelf-note">Installed from a folder with <code>cm quill dev</code>: to install it again, send it from there.</p>`}
       <div class="quill-running"></div>` : ""}
       ${sections(plan, me)}
       ${whoGetsIt(fresh, circles)}

@@ -608,6 +608,14 @@ class FakeQuills:
     async def quill_brought(self, quill_id: str) -> list[dict]:
         return list(self.__dict__.setdefault("brought", {}).get(quill_id, []))
 
+    async def their_quill_brought(self, owner: str, quill_id: str) -> list[dict]:
+        return list(self.__dict__.setdefault("brought", {}).get(f"~{owner}.{quill_id}", []))
+
+    async def remove_their_quill(self, owner: str, quill_id: str, drop: list[str] | None = None) -> dict:
+        self.quill_calls.append(("remove", f"~{owner}.{quill_id}", list(drop or [])))
+        self.personal = [q for q in self.__dict__.get("personal", []) if (q["owner"], q["id"]) != (owner, quill_id)]
+        return {"removed": f"~{owner}.{quill_id}", "dropped": {}}
+
     async def uninstall_quill(self, quill_id: str, drop: list[str] | None = None) -> dict:
         self.quill_calls.append(("uninstall", quill_id) if not drop else ("uninstall", quill_id, list(drop)))
         self.quill_list = [q for q in self.quill_list if q["id"] != quill_id]

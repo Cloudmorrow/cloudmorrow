@@ -583,6 +583,15 @@ class CloudmorrowClient:
         """Every Quill there is, whose it is, who has it (admin)."""
         return (await self._request("GET", "/api/quills/all")).json()
 
+    async def their_quill_brought(self, owner: str, quill_id: str) -> list[dict]:
+        """What somebody's own Quill brought, and how many records hold each (admin)."""
+        return (await self._request("GET", f"/api/quills/personal/{owner}/{quill_id}/brought")).json()
+
+    async def remove_their_quill(self, owner: str, quill_id: str, drop: list[str] | None = None) -> dict:
+        """Somebody's own Quill off the server, off every shelf it is on (admin)."""
+        params = {"drop": ",".join(drop)} if drop else {}
+        return (await self._request("DELETE", f"/api/quills/personal/{owner}/{quill_id}", params=params)).json()
+
     async def promote_quill(
         self, owner: str, quill_id: str, *, circles: list[str] = (), people: list[str] = (), give_to: list[str] = ()
     ) -> dict:

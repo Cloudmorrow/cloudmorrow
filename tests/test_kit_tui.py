@@ -358,8 +358,8 @@ async def test_server_quills_is_the_tab_it_opens_on_with_how_each_is(app):
         assert names == ["Notes", "Tasks", "Files", "Chat", "Secrets"]
         at = names.index("Tasks")
         assert listed[at][3] == "off" and listed[at][4] == "from the catalog"
-        # Notes is on no shelf of the catalog: it says so, and cannot be ticked.
-        assert listed[0][3] == "on" and listed[0][4] == "not in the catalog"
+        # Notes came from the catalog, which no longer has it: it says so, and cannot be ticked.
+        assert listed[0][3] == "on" and listed[0][4] == "no longer in the catalog"
         table = view.query_one("#admin-server-table")
         table.focus()
         table.move_cursor(row=at)
@@ -456,6 +456,49 @@ async def test_installing_shows_the_sheet_then_adds_the_tab(app):
         # The workspace behind the panel grew the tab, with the next free key.
         assert "Reading  f10" in tab_labels(screen)
         assert "0.2.0" in str(table.get_row_at(3)[1])
+
+
+async def test_a_quill_of_your_own_has_its_card_switched_by_its_own_key(app):
+    """Somebody's own Quill is the feature `~owner.id`, not its bare id: on, its card shows."""
+    import copy
+
+    from tests.tui_harness import feature_row
+    from tests.tui_quills import READING_QUILL
+
+    own = {**copy.deepcopy(READING_QUILL), "key": "~bram.reading", "mine": True}
+    app.client.quill_list.append(own)
+    app.client.feature_list.append(feature_row("~bram.reading", "Reading"))
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await start(app, pilot)
+        assert any(label.startswith("Reading") for label in tab_labels(screen))
+
+
+async def test_somebodys_own_quill_is_removed_from_user_quills(app):
+    """User Quills: Remove beside Promote and Switch, asked first, off the server for everybody."""
+    from cloudmorrow.tui.panes.admin_quills import QuillsView
+
+    app.client.personal = [
+        {
+            "id": "vidmorrow",
+            "key": "~alice.vidmorrow",
+            "name": "Vidmorrow",
+            "version": "2.0.0",
+            "owner": "alice",
+            "holders": ["alice"],
+            "shared_with": [],
+            "enabled": True,
+        }
+    ]
+    async with app.run_test(size=(120, 40)) as pilot:
+        screen, view = await open_quills(app, pilot)
+        view.show_tab("own")
+        await settle(app, pilot)
+        await pilot.click("#premove-0")
+        await breathe(pilot)
+        await pilot.press("y")
+        await settle(app, pilot)
+        assert ("remove", "~alice.vidmorrow", []) in app.client.quill_calls
+        assert not screen.query_one(QuillsView).query("#premove-0")
 
 
 async def test_removing_asks_then_takes_the_tab_and_keeps_the_records(app):
