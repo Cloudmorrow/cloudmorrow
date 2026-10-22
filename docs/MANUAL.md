@@ -804,9 +804,14 @@ described under [circles](#circles-who-may-use-which-data), **Roles** under
 [roles, approvals and flows](#roles-approvals-and-flows-how-a-procedure-is-said),
 and **Server** is the server's own settings — its **Name**, on every screen
 and the home-screen icon, and **Weather for**, the place Today's weather is
-for — then what this server runs, and **Update server**. Nothing an
-administrator sets is in a config file; the file is for the person who
-installed the server. The two sides with the most in them:
+for — then what this server runs, and **Update server**. When a newer
+release is out, a box above the button says so, with its version and
+**Release notes**: every release from the one this server runs to the latest,
+newest first, each with the note on its tag and what went into it. The server
+looks at its git remote for them when the side is opened, at most once a
+quarter of an hour. Nothing an administrator sets is in a config file; the
+file is for the person who installed the server. The two sides with the most
+in them:
 
 - **Users.** Every account, with its type and, where it is worth pointing
   at, its role on a chip — an ordinary User has no chip, because that is the

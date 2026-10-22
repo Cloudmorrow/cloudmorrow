@@ -38,6 +38,27 @@
 .panel .note code { font-family: var(--mono); font-size: 13px; }
 
 /* -- the server itself ----------------------------------------------------- */
+/* A newer version: the box above the Update button, and the sheet its
+   Release notes open. The box is a group with the accent's line round it,
+   so it reads as news rather than as one more setting. */
+.update-notice .note { margin-top: 0; }
+.update-notice .note.muted { color: var(--muted); }
+.new-version { border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.new-version .row { align-items: center; }
+.new-version .row .main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.new-version .title { font-family: var(--display); font-size: 17px; font-weight: 600; }
+.new-version .meta { white-space: normal; overflow: visible; }
+.new-version .act-chip { flex: none; }
+.release-notes-sheet .releases { padding: 4px 16px 0; max-height: 60dvh; overflow-y: auto; }
+.release-notes-sheet .release + .release { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.release-notes-sheet .release h3 { margin: 0 0 4px; font-family: var(--display); font-size: 17px; font-weight: 600; }
+.release-notes-sheet .release .date { margin-left: 6px; color: var(--muted); font-size: 14px; font-weight: 500; }
+.release-notes-sheet .release p { margin: 0 0 6px; }
+.release-notes-sheet .release ul { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; line-height: 1.4; }
+.release-notes-sheet .running { margin: 14px 0 4px; color: var(--muted); font-size: 14px; }
+@media (min-width: 900px) and (min-height: 600px) {
+  .release-notes-sheet { max-width: 560px; }
+}
 .update-log { margin: 4px 4px 14px; font-size: 14px; line-height: 1.45; }
 .update-log p { margin: 0 0 4px; overflow-wrap: anywhere; }
 .update-log .good { color: var(--accent); }

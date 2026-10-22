@@ -31,7 +31,7 @@ import { circlesByPerson, domainsOf, drawCircles, rulesForm, rulesFrom, rulesSai
 import { drawRoles } from "./rolesadmin.js";
 import { drawQuills } from "./quillsadmin.js";
 import { QUILL_GLYPH } from "./quills.js";
-import { ask } from "./dialog.js";
+import { ask, openSheet } from "./dialog.js";
 
 // The sides, in the order of the rail and of the switch: the places the
 // terminal app's sidebar lists under ADMINISTRATION. The icons are the
@@ -217,8 +217,12 @@ async function drawServer(panel) {
       republishes the app the computers install, and restarts onto it. Everybody is
       offline for a few seconds, and this app comes back on the new version by itself.
       The same as <code>cloudmorrow update server</code> from a computer.</p>
+    <div class="update-notice" aria-live="polite"><p class="note muted">Looking for a newer version…</p></div>
     <div class="group"><button class="row primary update-server" type="button">Update server</button></div>
     <div class="update-log" hidden></div>`;
+  // Whether a newer release is out, found after the page is up: the look
+  // fetches the server's git remote, which is a moment the page need not wait.
+  lookForUpdates(panel.querySelector(".update-notice"));
 
   const form = panel.querySelector("form.server-settings");
   form.addEventListener("submit", async (event) => {
@@ -296,6 +300,65 @@ async function drawServer(panel) {
 }
 
 const shortCommit = (commit) => (commit || "").slice(0, 8);
+
+// -- a newer version ---------------------------------------------------------------
+// Above the Update button: a box saying a newer release is out, with its
+// version, and Release notes — a sheet listing every release from the one
+// this server runs to the latest, newest first, each with the note on its
+// tag and what went into it. Nothing when the server is on the latest, and
+// a quiet line when it cannot look (no checkout, no network).
+async function lookForUpdates(box) {
+  let found;
+  try {
+    found = await api("GET", "/api/server/updates");
+  } catch (err) {
+    box.innerHTML = `<p class="note muted">${esc(err.status === 404
+      ? "This server is from before it could look for a newer version."
+      : "Could not look for a newer version: " + err.message)}</p>`;
+    return;
+  }
+  if (found.error) {
+    box.innerHTML = `<p class="note muted">Could not look for a newer version: ${esc(found.error)}</p>`;
+    return;
+  }
+  if (!found.available) {
+    box.innerHTML = `<p class="note muted">This server runs the latest version${found.running_version
+      ? `, ${esc(found.running_version)}` : ""}.</p>`;
+    return;
+  }
+  const count = found.releases.length;
+  const latest = found.releases[0];
+  box.innerHTML = `<div class="group new-version">
+    <div class="row">
+      <span class="main">
+        <span class="title">Version ${esc(latest.version)} is out</span>
+        <span class="meta">${esc(found.running_version ? `This server runs ${found.running_version}` : "This server runs an untagged commit")}
+          · ${count === 1 ? "one release" : `${count} releases`} since · ${esc(latest.date)}</span>
+      </span>
+      <button class="act-chip release-notes" type="button">Release notes</button>
+    </div>
+  </div>`;
+  box.querySelector(".release-notes").addEventListener("click", () => showReleaseNotes(found));
+}
+
+function showReleaseNotes(found) {
+  const latest = found.releases[0];
+  const release = (r) => `<section class="release">
+    <h3>${esc(r.version)} <span class="date">${esc(r.date)}</span></h3>
+    ${r.notes ? `<p>${esc(r.notes)}</p>` : ""}
+    ${r.changes.length ? `<ul>${r.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
+  </section>`;
+  const { sheet, close } = openSheet(
+    `<h2 class="act-sheet-title">Release notes</h2>
+    <p class="act-description">From ${esc(found.running_version || "what this server runs")} to ${esc(latest.version)}, newest first.</p>
+    <div class="releases">${found.releases.map(release).join("")}
+      <p class="running">${esc(found.running_version || shortCommit(found.running_commit))} — what this server runs now.</p>
+    </div>
+    <div class="act-buttons"><button class="act-button" type="button">Close</button></div>`,
+    "release-notes-sheet",
+  );
+  sheet.querySelector(".act-buttons button").addEventListener("click", close);
+}
 
 // What to call one end of a deploy: its release, or its commit. A tagged
 // commit is a release and says so; anything else is named by its commit,

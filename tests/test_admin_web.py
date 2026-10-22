@@ -226,3 +226,20 @@ def test_the_server_side_has_the_settings_form_before_the_update_button():
     assert 'api("PATCH", "/api/server/settings"' in server
     today = (WEB / "today.js").read_text(encoding="utf-8")
     assert "weather_place" not in today and "Administration" in today
+
+
+def test_the_server_side_says_when_a_newer_version_is_out():
+    """A box above the Update button, with the version, and Release notes in a
+    sheet of its own (never a browser window): every release from the running
+    one to the latest."""
+    server = ADMIN_JS.split("async function drawServer", 1)[1].split("const shortCommit", 1)[0]
+    assert server.index('class="update-notice"') < server.index("update-server")
+    assert "lookForUpdates(" in server
+    look = ADMIN_JS.split("async function lookForUpdates", 1)[1]
+    assert 'api("GET", "/api/server/updates")' in look
+    assert "is out" in look and 'class="act-chip release-notes"' in look
+    assert "openSheet(" in look and "Release notes" in look
+    assert "newest first" in look
+    # Quiet when there is nothing new, or nothing to look at.
+    assert "runs the latest version" in look
+    assert "Could not look for a newer version" in look

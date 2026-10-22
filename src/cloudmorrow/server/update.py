@@ -235,6 +235,86 @@ def deployed_commit() -> str:
     return _COMMIT
 
 
+@dataclass(frozen=True)
+class Release:
+    """One release the remote branch has and this checkout does not."""
+
+    tag: str
+    version: str
+    date: str  # the release commit's date, YYYY-MM-DD
+    notes: str  # the tag's message, without the "vX.Y.Z: " it opens with
+    changes: tuple[str, ...]  # the other commits since the release before, newest first
+
+
+@dataclass(frozen=True)
+class ReleasesAhead:
+    """What the remote branch has released past what this checkout runs."""
+
+    running_version: str
+    running_commit: str
+    latest_version: str
+    latest_tag: str
+    releases: tuple[Release, ...]  # newest first
+
+    @property
+    def available(self) -> bool:
+        return bool(self.releases)
+
+
+def releases_ahead(source: Path | None = None, branch: str | None = None, *, fetch: bool = True) -> ReleasesAhead:
+    """The releases on the remote branch that this checkout does not run yet.
+
+    Fetches the branch and its tags (unless *fetch* is off), then reads off the
+    tags: every `v*` tag reachable from `origin/<branch>` and not from HEAD is
+    a release the server could move onto, newest first, each with the note
+    its tag carries and the commits that went into it. The Server page shows
+    them over the Update button; nothing here changes the checkout.
+    """
+    checkout = find_source_dir(source)
+    on_branch = branch or current_branch(checkout)
+    if on_branch == "HEAD":
+        raise UpdateError("the checkout is on a detached HEAD; check out a branch first")
+    if fetch:
+        _run(["git", "fetch", "--quiet", "--tags", "origin", on_branch], cwd=checkout)
+    head = current_commit(checkout)
+    remote = _run(["git", "rev-parse", f"origin/{on_branch}"], cwd=checkout)
+    running = _run(["git", "tag", "-l", "v*", "--merged", head, "--sort=-v:refname"], cwd=checkout).splitlines()
+    on_remote = _run(["git", "tag", "-l", "v*", "--merged", remote, "--sort=-v:refname"], cwd=checkout).splitlines()
+    ahead = [tag for tag in on_remote if tag not in set(running)]
+    releases = []
+    for i, tag in enumerate(ahead):
+        # The commits in it: since the release before it on the remote, or,
+        # for the first one past what runs here, since the running commit.
+        since = ahead[i + 1] if i + 1 < len(ahead) else head
+        notes = _run(["git", "tag", "-l", "--format=%(contents)", tag], cwd=checkout).strip()
+        # A tag that only says its own name says nothing.
+        if notes == tag:
+            notes = ""
+        elif notes.startswith(f"{tag}:"):
+            notes = notes[len(tag) + 1 :].strip()
+        changes = _run(["git", "log", "--no-merges", "--pretty=%s", f"{since}..{tag}"], cwd=checkout).splitlines()
+        # The note is the release commit's subject (scripts/release.py), which
+        # the log has too: said once, as the note.
+        headline = notes.splitlines()[0] if notes else ""
+        changes = [c for c in changes if c != headline]
+        releases.append(
+            Release(
+                tag=tag,
+                version=tag.removeprefix("v"),
+                date=_run(["git", "log", "-1", "--format=%cs", tag], cwd=checkout),
+                notes=notes,
+                changes=tuple(changes),
+            )
+        )
+    return ReleasesAhead(
+        running_version=version_at(checkout, head),
+        running_commit=head,
+        latest_version=releases[0].version if releases else (running[0].removeprefix("v") if running else ""),
+        latest_tag=releases[0].tag if releases else (running[0] if running else ""),
+        releases=tuple(releases),
+    )
+
+
 def validate_branch(branch: str) -> str:
     """A branch name, or an UpdateError. Never something git reads as a flag."""
     name = branch.strip()
