@@ -181,6 +181,12 @@ def test_a_tap_on_a_tab_answers_at_once_and_the_screen_fades_in():
     assert 'el.classList.add("entering")' in core
     assert "prefers-reduced-motion: reduce" in core
     assert "main.entering { animation: screen-in" in css
+    # The ghost is the page as it was: its own classes kept, so its
+    # stylesheet still reaches it; its width pinned rather than measured
+    # again outside the shell; and nothing in it sticking to the ghost.
+    assert 'ghost.classList.add("ghost");' in core and 'ghost.className = "ghost"' not in core
+    assert "max-width:none" in core
+    assert "overflow: clip;" in css.split("main.ghost {", 1)[1].split("}", 1)[0]
 
 
 def test_each_tab_keeps_its_place_and_a_second_tap_goes_to_the_top():

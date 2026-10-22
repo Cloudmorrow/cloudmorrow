@@ -656,7 +656,7 @@ export function mount(html) {
     if (fading && el.matches("main")) el.classList.add("entering");
     app.insertBefore(el, bar);
   }
-  for (const ghost of ghosts) document.body.append(ghost);
+  for (const ghost of ghosts) ghost.settle();
 
   // The tabs: the highlight moves; the bar stays.
   ownTabs = !!newTabs;
@@ -673,17 +673,33 @@ export function mount(html) {
 // screen does not move it. It takes no taps and is read by nothing; the
 // stylesheet fades it, and it leaves when the fade ends — or on a timer,
 // should the fade never run.
+//
+// The copy keeps the page's own classes — `today`, `split`, `thread` —
+// because every screen's stylesheet hangs off them: a copy without them
+// is the same words with no cards round them and no columns, which for
+// the length of the fade is the page falling apart. It stands on the
+// body, not in the shell, so the measure the shell gives the page is
+// pinned on it in pixels rather than asked for again; and a list that
+// scrolls on its own inside the page is scrolled the same in the copy,
+// once the copy is on the page and can be. `settle` puts it there.
 function ghostOf(main) {
   const rect = main.getBoundingClientRect();
   const ghost = main.cloneNode(true);
-  ghost.className = "ghost";
+  ghost.classList.remove("entering");
+  ghost.classList.add("ghost");
   ghost.setAttribute("aria-hidden", "true");
   ghost.setAttribute("inert", "");
   for (const el of ghost.querySelectorAll("[id]")) el.removeAttribute("id");
   ghost.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;` +
-    `width:${rect.width}px;height:${rect.height}px;margin:0;`;
+    `width:${rect.width}px;max-width:none;height:${rect.height}px;min-height:0;margin:0;`;
+  const scrolled = [...main.querySelectorAll("*")].map((el, i) => [i, el.scrollTop]).filter(([, top]) => top > 0);
   ghost.addEventListener("animationend", () => ghost.remove(), { once: true });
   setTimeout(() => ghost.remove(), 600);
+  ghost.settle = () => {
+    document.body.append(ghost);
+    const parts = ghost.querySelectorAll("*");
+    for (const [i, top] of scrolled) parts[i].scrollTop = top;
+  };
   return ghost;
 }
 
