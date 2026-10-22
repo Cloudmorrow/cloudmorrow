@@ -34,8 +34,10 @@ def test_the_sheet_is_its_own_file_drawn_from_the_kit(client):
 def test_nothing_in_the_sheet_is_named_for_one_quill():
     for source, name in ((CELLS_JS, "kit_cells.js"), (RULES_JS, "rules"), (CELLS_CSS, "css")):
         code = js_code(source)
-        for word in ("budget", "Budget", "Cells"):
-            assert word not in code.replace("renderCells", ""), f"{name} names {word!r}"
+        for word in ("budget", "Budget"):
+            assert word not in code, f"{name} names {word!r}"
+        # The Quill is Cells; the kit's own names (parseCells, renderCells) are about cells.
+        assert not re.search(r"(?<![a-z])Cells", code), f"{name} names the Cells Quill"
 
 
 def test_it_reads_the_bindings_and_writes_only_where_it_may():
