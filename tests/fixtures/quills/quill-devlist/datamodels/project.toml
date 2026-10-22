@@ -1,0 +1,13 @@
+[datamodel]
+id = "devlist.project"
+version = 1
+label = "Project"
+description = "A piece of software, where its code is, and its secrets' vault."
+scopes = ["personal"]
+title = "name"
+
+[fields]
+name = { kind = "string", required = true }
+repo = { kind = "url" }
+vault = { kind = "string", indexed = true }
+env_files = { kind = "json" }

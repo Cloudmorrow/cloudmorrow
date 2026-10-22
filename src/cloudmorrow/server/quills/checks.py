@@ -121,6 +121,7 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
             if screen.get("subtitle"):
                 need(model, thing + " subtitle", screen["subtitle"])
             _check_list_groups(where, thing, model, screen, need)
+            _check_projects(where, thing, model, screen, need)
             for name in screen.get("fields", []):
                 need(model, thing, name)
         elif kit in ("detail", "form"):
@@ -256,6 +257,24 @@ def _check_list_groups(where: str, thing: str, model: Datamodel, screen: dict, n
         raise QuillError(f"{where}: {thing} has a subgroup, so it needs a group above it")
     if screen.get("subgroup") and screen.get("subgroup") == screen.get("group"):
         raise QuillError(f"{where}: {thing} group and subgroup are two different fields")
+
+
+def _check_projects(where: str, thing: str, model: Datamodel, screen: dict, need) -> None:
+    """A list of projects: `vault` names each one's secrets, `repo` and `env_files` its checkout.
+
+    `vault` is a string field holding the vault its secrets are kept in;
+    `repo` a url (or string) field, the git repository; `env_files` a json
+    field, which file each environment was read from. The last two need the
+    first: without a vault there is nothing to write into the files.
+    """
+    if screen.get("vault"):
+        need(model, thing + " vault", screen["vault"], ("string",))
+    if screen.get("repo"):
+        need(model, thing + " repo", screen["repo"], ("url", "string"))
+    if screen.get("env_files"):
+        need(model, thing + " env_files", screen["env_files"], ("json",))
+    if (screen.get("repo") or screen.get("env_files")) and not screen.get("vault"):
+        raise QuillError(f"{where}: {thing} has a repo or env_files, so it needs the vault they belong to")
 
 
 def _surfaces(manifest: Manifest) -> list[str]:

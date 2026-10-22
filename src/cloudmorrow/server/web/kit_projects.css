@@ -1,0 +1,9 @@
+/* Secrets as .env files (kit_projects.js): the two buttons over a list of
+   secrets, and the environments on a project's sheet. */
+
+.secrets-bar { display: flex; gap: 8px; margin: 0 4px 12px; flex-wrap: wrap; }
+.row.project-env { padding-right: 12px; }
+.row.project-env .title { color: var(--ink); text-decoration: none; }
+.row.project-env a.title:hover { color: var(--accent); }
+.row.project-env .chip { flex: none; }
+.own-slot code { font-size: 14px; }

@@ -36,6 +36,7 @@ from textual.widgets import Button, DataTable, Static
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.kitdata import can_write, field_label, field_of, link_rows, shown, title_of
 from cloudmorrow.tui.panes.kit import KitPane, ListPane
+from cloudmorrow.tui.panes.kit_projects import SecretFiles
 from cloudmorrow.tui.screens.modals import PromptModal
 from cloudmorrow.tui.theme import MUTED
 from cloudmorrow.tui.widgets.group_list import GroupList
@@ -91,7 +92,7 @@ class SubgroupBar(Horizontal):
         await self.mount(add)
 
 
-class GroupedListPane(ListPane):
+class GroupedListPane(SecretFiles, ListPane):
     """`list` with a group (and a subgroup), or with a secret field, opened in the sheet."""
 
     BINDINGS = [
@@ -100,6 +101,8 @@ class GroupedListPane(ListPane):
         ("c", "fire('copy')", "Copy"),
         ("e", "fire('new_subgroup')", "New subgroup"),
         ("r", "fire('refresh')", "Refresh"),
+        ("m", "fire('import_env')", "Import .env"),
+        ("x", "fire('export_env')", "Export .env"),
     ]
 
     def __init__(self, quill: dict, screen: dict, **kwargs) -> None:
@@ -125,6 +128,8 @@ class GroupedListPane(ListPane):
             actions.append(Action("copy", "Copy", "c", hint=f"Copy the {label} without showing it"))
         if self.tick:
             actions.append(Action("tick", field_label(self.tick), "space"))
+        # A list of secrets: its environment in from a .env file and out to one (kit_projects.py).
+        actions.extend(self.file_actions())
         actions.append(Action("delete_record", "Delete", "del", variant="error"))
         self.ACTIONS = self.offer(actions)
 

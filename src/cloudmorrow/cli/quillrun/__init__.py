@@ -67,6 +67,16 @@ of its id or its name, a time is seconds or m:ss:
     cm cutter frame Holiday --at 3 -o frame.jpg   # the cut at 3 s, from the frames API
     cm cutter export Holiday format=webm          # the screen's export action
 
+A `list` that binds `vault` is projects: folders on your machines, each
+with a git repository and .env files kept in its vault (checkout.py):
+
+    cm devproject init [name] [--path DIR]     # here: a project, and every .env* into its vault
+    cm devproject update [project]             # git pull, then the .env files from the vault
+    cm devproject clone myapp [DIR]            # another machine: the repository, then its .env files
+    cm devproject secrets [project]            # its environments, and the file each is
+    cm devproject secrets import [project] [-e local] [-f .env]
+    cm devproject secrets export [project] [-e prod] [-f .env.prod] [--force]
+
 A Quill with code has actions of its own, each a command, and views, which
 print as text:
 
@@ -101,6 +111,8 @@ from cloudmorrow.cli.quillrun.data import _act_data
 from cloudmorrow.cli.quillrun.editor import _act_editor
 from cloudmorrow.cli.quillrun.grid import _act_grid
 from cloudmorrow.cli.quillrun.history import _history
+from cloudmorrow.cli.quillrun.projects import WORDS as PROJECT_WORDS
+from cloudmorrow.cli.quillrun.projects import _act_projects
 from cloudmorrow.cli.quillrun.records import _act_records
 from cloudmorrow.cli.quillrun.screen import (  # noqa: F401
     MASK,
@@ -132,6 +144,7 @@ ACTIONS = (
     "say",
     "history",
     *TIMELINE_ONLY,
+    *PROJECT_WORDS,
 )
 
 
@@ -159,6 +172,10 @@ def main(
     start: Annotated[str | None, typer.Option("--start", help="A timeline's trim: the new start.")] = None,
     end: Annotated[str | None, typer.Option("--end", help="A timeline's trim: the new end.")] = None,
     out_file: Annotated[str, typer.Option("--out", "-o", help="A timeline's frame: where to save it.")] = "",
+    path: Annotated[str, typer.Option("--path", help="Projects: the folder, instead of this one.")] = "",
+    env: Annotated[str, typer.Option("--env", "-e", help="Projects' secrets: the environment, as local or prod.")] = "",
+    file: Annotated[str, typer.Option("--file", "-f", help="Projects' secrets: the .env file.")] = "",
+    force: Annotated[bool, typer.Option("--force", help="Projects: write over keys only a .env file has.")] = False,
 ) -> None:
     """Run ACTION on an installed Quill: one of the kit's, or one the Quill declares."""
     args = list(args or [])
@@ -178,6 +195,7 @@ def main(
                 days=(first, last),
                 reveal=reveal,
                 timing={"track": track, "at": at, "length": length, "start": start, "end": end, "out": out_file},
+                local={"path": path, "env": env, "file": file, "force": force, "plain": plain},
             )
 
     run(_run())
@@ -196,6 +214,7 @@ async def dispatch(
     days: tuple[str, str] = ("", ""),
     reveal: bool = False,
     timing: dict | None = None,
+    local: dict | None = None,
 ) -> None:
     """One `cm <quill> …`: a Quill's own action, its view, or the kit's words for its screen."""
     found = _quill(await api.quills(), quill)
@@ -223,6 +242,9 @@ async def dispatch(
         await _view(api, found, spec, args, plain)
         return
     screen = Screen(found, spec)
+    if action in PROJECT_WORDS:
+        await _act_projects(api, screen, action, args, local or {})
+        return
     await _act(api, screen, action, args, group, index, plain, days, reveal, timing)
 
 

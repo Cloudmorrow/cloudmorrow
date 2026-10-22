@@ -96,12 +96,18 @@ def import_secrets(
     scope: Scope = Depends(get_scope),
 ) -> SecretImportOut:
     """Set many secrets at once — what a `.env` file turns into."""
+    entries = dict(payload.entries)
+    if payload.text is not None:
+        try:
+            entries.update(dotenv.parse(payload.text))
+        except dotenv.DotenvError as exc:
+            raise _bad_request(exc) from exc
     try:
         result = state.secrets.set_many(
             scope.owner,
             scope.vault,
             payload.environment,
-            payload.entries,
+            entries,
             prune=payload.prune,
             overwrite=payload.overwrite,
             dry_run=payload.dry_run,

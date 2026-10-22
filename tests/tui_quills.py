@@ -641,6 +641,33 @@ class FakeQuills:
     def _rows(self, model_id: str) -> list[dict]:
         return self.record_store.setdefault(model_id, [])
 
+    # -- secrets as .env files (kit_projects.py), over the same records ------
+    def _secrets_in(self, vault: str | None, environment: str) -> list[dict]:
+        return [
+            row
+            for row in self._rows("secret")
+            if row["fields"]["vault"] == (vault or "default") and row["fields"]["environment"] == environment
+        ]
+
+    async def import_secrets(self, entries: dict, environment: str, *, vault: str | None = None, **_: object) -> dict:
+        self.__dict__.setdefault("secret_imports", []).append((vault, environment, dict(entries)))
+        result: dict[str, list[str]] = {"added": [], "updated": [], "unchanged": [], "skipped": [], "removed": []}
+        have = {row["fields"]["key"]: row for row in self._secrets_in(vault, environment)}
+        for key, value in entries.items():
+            if key not in have:
+                fields = {"vault": vault or "default", "environment": environment, "key": key, "value": value}
+                await self.create_record("secret", fields)
+                result["added"].append(key)
+            elif have[key]["fields"]["value"] != value:
+                have[key]["fields"]["value"] = value
+                result["updated"].append(key)
+            else:
+                result["unchanged"].append(key)
+        return result
+
+    async def export_secrets(self, environment: str, *, vault: str | None = None) -> dict[str, str]:
+        return {row["fields"]["key"]: row["fields"]["value"] or "" for row in self._secrets_in(vault, environment)}
+
     def _find(self, model_id: str, record_id: str) -> dict:
         for row in self._rows(model_id):
             if row["id"] == record_id:
