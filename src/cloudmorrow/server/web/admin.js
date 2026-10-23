@@ -15,12 +15,12 @@
    call under here is admin-only at the server, and the screen would be
    empty without it.
 
-   Five sides, each at its own address — #/admin/users and so on, so the
+   Six sides, each at its own address — #/admin/users and so on, so the
    rail can light one — and one account's page, which is the same form
    whether it is a new account or one that already exists. The circles
-   (circlesadmin.js) and the Quills (quillsadmin.js, with its sheet) are
-   files of their own; the server's own side — what it runs, and updating
-   it — is below. There is no Features side any more: what this server
+   (circlesadmin.js), the Quills (quillsadmin.js, with its sheet) and the
+   backups (backupsadmin.js) are files of their own; the server's own side
+   — what it runs, and updating it — is below. There is no Features side any more: what this server
    offers is its Quills, and each is switched on or off on its own sheet. */
 
 import {
@@ -30,6 +30,7 @@ import {
 import { circlesByPerson, domainsOf, drawCircles, rulesForm, rulesFrom, rulesSaid, wireRulesForm } from "./circlesadmin.js";
 import { drawRoles } from "./rolesadmin.js";
 import { drawQuills } from "./quillsadmin.js";
+import { drawBackups } from "./backupsadmin.js";
 import { QUILL_GLYPH } from "./quills.js";
 import { ask, openSheet } from "./dialog.js";
 
@@ -43,6 +44,7 @@ const SIDES = [
   ["roles", "Roles", () => pixelIcon("badge") || pixelIcon("me")],
   ["quills", "Quills", () => pixelIcon("feather") || pixelArt(QUILL_GLYPH)],
   ["server", "Server", () => pixelIcon("server") || pixelIcon("settings")],
+  ["backups", "Backups", () => pixelIcon("cloud-upload") || pixelIcon("upload") || pixelIcon("server")],
 ];
 const SIDE_LABELS = Object.fromEntries(SIDES.map(([key, label]) => [key, label]));
 /** The address of one side. */
@@ -141,6 +143,7 @@ async function renderAdmin(arg) {
   else if (which === "circles") await drawCircles(panel);
   else if (which === "roles") await drawRoles(panel);
   else if (which === "server") await drawServer(panel);
+  else if (which === "backups") await drawBackups(panel);
   else await drawQuills(panel);
 }
 

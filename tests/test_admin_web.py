@@ -88,6 +88,7 @@ def test_each_side_is_a_tab_of_the_rail_for_an_administrator():
         ("roles", "Roles"),
         ("quills", "Quills"),
         ("server", "Server"),
+        ("backups", "Backups"),
     ]
     assert 'registerTab({ name: "admin." + key, label, icon, href: () => sideHash(key), admin: true })' in ADMIN_JS
     assert 'export const sideHash = (side) => "#/admin/" + side;' in ADMIN_JS
@@ -243,3 +244,38 @@ def test_the_server_side_says_when_a_newer_version_is_out():
     # Quiet when there is nothing new, or nothing to look at.
     assert "runs the latest version" in look
     assert "Could not look for a newer version" in look
+
+
+# -- the Backups side ---------------------------------------------------------------
+def test_backups_is_a_side_of_administration():
+    """The sixth side, with its own file, imported by the app and drawn by the switch."""
+    assert '["backups", "Backups"' in ADMIN_JS
+    assert 'import { drawBackups } from "./backupsadmin.js";' in ADMIN_JS
+    assert 'which === "backups") await drawBackups(panel)' in ADMIN_JS
+    assert 'import "./backupsadmin.js";' in (WEB / "app.js").read_text(encoding="utf-8")
+
+
+def test_the_parts_it_offers_are_the_parts_the_server_backs_up():
+    from cloudmorrow.server.backups import PARTS
+
+    source = (WEB / "backupsadmin.js").read_text(encoding="utf-8")
+    listed = source.split("const PARTS = [", 1)[1].split("\n];", 1)[0]
+    assert re.findall(r'^\s*\["([a-z_]+)"', listed, re.MULTILINE) == list(PARTS)
+
+
+def test_the_backups_page_asks_on_the_page_and_calls_the_backup_api():
+    """Every question is a sheet (dialog.js), never the browser's; and the
+    calls are the ones routes/backups.py answers."""
+    source = (WEB / "backupsadmin.js").read_text(encoding="utf-8")
+    assert "window.confirm" not in source and "confirm(" not in source.replace("ask(", "")
+    assert 'import { ask, openSheet } from "./dialog.js";' in source
+    for call in (
+        '"GET", "/api/server/backup"',
+        '"PATCH", "/api/server/backup"',
+        '"POST", "/api/server/backup/test"',
+        '"POST", "/api/server/backup/run"',
+        '"GET", "/api/server/backups"',
+        '"DELETE", "/api/server/backups/"',
+        "/restore`",
+    ):
+        assert call in source, call

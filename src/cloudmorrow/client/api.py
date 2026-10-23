@@ -164,6 +164,32 @@ class CloudmorrowClient:
             )
         ).json()
 
+    # -- backups (admin) -----------------------------------------------------
+    async def backup_status(self) -> dict:
+        """Where backups go, what is running, and what last happened."""
+        return (await self._request("GET", "/api/server/backup")).json()
+
+    async def set_backup_settings(self, **changes: object) -> dict:
+        return (await self._request("PATCH", "/api/server/backup", json=changes)).json()
+
+    async def test_backup_destination(self) -> dict:
+        return (await self._request("POST", "/api/server/backup/test", timeout=120.0)).json()
+
+    async def run_backup(self, parts: list[str] | None = None) -> dict:
+        return (await self._request("POST", "/api/server/backup/run", json={"parts": parts})).json()
+
+    async def backups(self) -> list[dict]:
+        return (await self._request("GET", "/api/server/backups", timeout=120.0)).json()
+
+    async def backup(self, stamp: str) -> dict:
+        return (await self._request("GET", f"/api/server/backups/{stamp}", timeout=120.0)).json()
+
+    async def delete_backup(self, stamp: str) -> None:
+        await self._request("DELETE", f"/api/server/backups/{stamp}", timeout=120.0)
+
+    async def restore_backup(self, stamp: str, **choice: object) -> dict:
+        return (await self._request("POST", f"/api/server/backups/{stamp}/restore", json=choice)).json()
+
     # -- administration ----------------------------------------------------
     async def users(self) -> list[dict]:
         """Every account on the server. Admin only."""

@@ -161,5 +161,31 @@
 .row.primary:disabled { opacity: .5; }
 .row.bad { justify-content: center; color: var(--bad); font-weight: 600; }
 
+/* -- backups ------------------------------------------------------------- */
+/* The settings form shares the server's; what is its own is a number with
+   its unit after it, the good/bad word on a run, and the sheet a backup
+   opens with its parts to tick. */
+.backup-settings .with-unit { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: flex-end; }
+.backup-settings .with-unit input { flex: 0 1 72px; }
+.backup-settings .with-unit .unit { color: var(--muted); font-size: 15px; }
+.backup-settings .feature-row input[type="checkbox"] { margin-top: 15px; }
+.backup-settings .row.try-bucket { justify-content: center; color: var(--accent); font-weight: 600; }
+.backup-status .good { color: var(--accent); font-weight: 600; }
+.backup-status .bad { color: var(--bad); font-weight: 600; }
+.backup-status .value.muted { color: var(--muted); }
+.backup-status .meta, .backup-list .meta { white-space: normal; overflow: visible; }
+.backup-row { width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.backup-row .role-chip.other-key { display: inline-flex; border-color: var(--bad); color: var(--bad); }
+.panel .note.warn, .restore-sheet .note.warn { color: var(--bad); }
+.restore-sheet .restore-parts { padding: 0 16px; max-height: 55dvh; overflow-y: auto; }
+.restore-sheet .restore-parts .group-label { display: flex; align-items: center; justify-content: space-between; }
+.restore-sheet .all-of { font: inherit; text-transform: none; letter-spacing: 0; color: var(--accent); background: none; border: 0; padding: 0 4px; cursor: pointer; }
+.restore-sheet .feature-row { align-items: center; }
+.restore-sheet .feature-row input[type="checkbox"] { margin: 0; width: 20px; height: 20px; accent-color: var(--accent); }
+.restore-sheet .note { margin: 0 16px 10px; font-size: 14px; line-height: 1.45; }
+@media (min-width: 900px) and (min-height: 600px) {
+  .restore-sheet { max-width: 520px; }
+}
+
 /* The switch and the chips are labels: the guide's semi-condensed face. */
 .seg a, .role-chip { font-family: var(--display); }

@@ -556,3 +556,89 @@ class NotificationsRead(BaseModel):
 class NotificationsReadOut(BaseModel):
     marked: int
     unread: int
+
+
+# -- backups (backups.py) ----------------------------------------------------------
+class BackupSettingsOut(BaseModel):
+    """Where backups go and when. The secret key is never sent back; `has_secret` says one is kept."""
+
+    endpoint: str = ""
+    bucket: str = ""
+    region: str = ""
+    prefix: str = ""
+    access_key: str = ""
+    has_secret: bool = False
+    time: str = "03:00"
+    keep_days: int = 30
+    parts: list[str] = []
+    seal_key: bool = False
+    enabled: bool = False
+    configured: bool = False
+
+
+class BackupSettingsUpdate(BaseModel):
+    """What to change; a field left out is left alone. A blank secret keeps the old one."""
+
+    endpoint: str | None = Field(default=None, max_length=300)
+    bucket: str | None = Field(default=None, max_length=63)
+    region: str | None = Field(default=None, max_length=40)
+    prefix: str | None = Field(default=None, max_length=200)
+    access_key: str | None = Field(default=None, max_length=200)
+    secret_key: str | None = Field(default=None, max_length=400)
+    time: str | None = Field(default=None, max_length=5)
+    keep_days: int | None = Field(default=None, ge=1, le=3650)
+    parts: list[str] | None = None
+    seal_key: bool | None = None
+    enabled: bool | None = None
+
+
+class BackupStatusOut(BaseModel):
+    """What is going on, and what last happened."""
+
+    settings: BackupSettingsOut
+    # "backup", "restore", or null when nothing runs.
+    running: str | None = None
+    started_at: str = ""
+    by: str = ""
+    step: str = ""
+    lines: list[str] = []
+    last: dict | None = None
+    last_restore: dict | None = None
+
+
+class BackupRunRequest(BaseModel):
+    """Back up now: these parts, or the ones the settings name."""
+
+    parts: list[str] | None = None
+
+
+class BackupSummaryOut(BaseModel):
+    stamp: str
+    made_at: str = ""
+    cloud: str = ""
+    version: str = ""
+    parts: list[str] = []
+    size: int = 0
+    took: float = 0
+    drives: int = 0
+    shares: int = 0
+    key_matches: bool = False
+    by: str = ""
+
+
+class BackupRestoreRequest(BaseModel):
+    """What to put back from one backup."""
+
+    database: bool = False
+    drives: list[str] = []
+    shares: list[str] = []
+    quills: bool = False
+    keys: bool = False
+    restart: bool = True
+    force: bool = False
+
+
+class BackupTestOut(BaseModel):
+    ok: bool = True
+    backups: int = 0
+    where: str = ""

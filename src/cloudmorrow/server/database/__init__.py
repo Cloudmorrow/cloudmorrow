@@ -400,6 +400,13 @@ class Database:
         """The engine's housekeeping on the clock (quills/jobs.py)."""
         return self.engine.checkpoint()
 
+    def recheck(self) -> None:
+        """The database underneath was replaced (a restore, backups.py): the
+        next connection brings its schema up and looks at its tables afresh."""
+        with self._ready_lock:
+            self._ready = False
+            self._tables = set()
+
     def close(self) -> None:
         self.engine.close()
 
