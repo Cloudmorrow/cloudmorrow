@@ -111,7 +111,12 @@ name and what is typed in it — and the grid, as many rows and columns as
 are used with room beyond, scrolling both ways with the headings held. A
 tap or click selects a cell; typing, Enter or a double tap edits it; Enter
 commits and moves down, Tab across, Escape leaves it as it was, Delete
-clears it; the arrows move. Numbers stand to the right, errors are red.
+clears it; the arrows move. While a formula wants a reference — after
+`=`, an operator, `(`, a comma or a colon — the arrows point one out
+instead, as in Excel: the cell's name is written where the caret is and
+follows as they move, Shift and an arrow make it a range, a click on a
+cell points the same way, and Enter keeps the name and typing goes on.
+Numbers stand to the right, errors are red.
 The sheet saves as you type, and one changed elsewhere since it was opened
 is not written over. On a computer the list and the sheet are side by
 side, and the list folds away. Read-only, the grid shows and nothing types
@@ -120,7 +125,8 @@ into it.
 **Terminal** (`tui/panes/kit_cells.py`): the sheets down the left, the
 grid on the right with the cell's name and what is typed in it over it.
 Arrows move, Enter or typing edits on the line above the grid, Enter
-commits and moves down, Tab across, Escape leaves it, Delete clears,
+commits and moves down, Tab across, Escape leaves it, Delete clears; a
+formula wanting a reference is pointed out with the arrows as on the web,
 `ctrl+s` saves (it saves on its own too); `ctrl+n` a new sheet, `f2`
 rename, `del` delete.
 

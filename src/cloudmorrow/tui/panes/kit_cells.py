@@ -7,7 +7,10 @@ quill/cells.py, with the cell's name and what is typed in it over it.
 
 Arrows move; Enter, or typing, edits the cell on the line above the grid;
 Enter there keeps it and moves down, Tab across, Escape leaves the cell as
-it was; Delete clears it. It saves on its own, and `ctrl+s` saves now. A
+it was; Delete clears it. While a formula wants a reference — after `=`,
+an operator, `(`, a comma or a colon — the arrows point one out instead:
+the cell's name is written on the line and follows as they move, Shift
+and an arrow make it a range, Enter keeps it and typing goes on. It saves on its own, and `ctrl+s` saves now. A
 sheet changed somewhere else since it was opened is not written over: you
 are asked. A sheet you may only read shows, and nothing types into it.
 """
@@ -35,6 +38,7 @@ from cloudmorrow.tui.widgets.toolbar import Action
 from cloudmorrow.tui.words import plural
 
 COLUMN_WIDTH = 12
+ARROWS = {"up": (-1, 0), "down": (1, 0), "left": (0, -1), "right": (0, 1)}
 
 
 class SheetGrid(DataTable):
@@ -105,6 +109,9 @@ class CellsPane(KitPane):
         self.current_id: str | None = None
         self.current_rev: object = None
         self.dirty = False
+        # A reference being pointed out on the line: where it is written in
+        # the text (start, end), and the cells it names (anchor, at).
+        self.point: dict | None = None
         self._autosave_timer: Timer | None = None
         # How many rows and columns the grid draws; it grows as the sheet does.
         self.rows = 0
@@ -213,6 +220,7 @@ class CellsPane(KitPane):
         self.current_id = str(record["id"])
         self.current_rev = record.get("rev")
         self.dirty = False
+        self.point = None
         self.sheet = cells.Sheet.from_field((record.get("fields") or {}).get(self.cells_field))
         self.draw_grid(keep=(0, 0))
         self.query_one("#cells-name", Static).update(f"[{SECOND}]{self.title_of(record)}[/]")
@@ -222,6 +230,7 @@ class CellsPane(KitPane):
         self.current_id = None
         self.current_rev = None
         self.dirty = False
+        self.point = None
         self.sheet = cells.Sheet()
         self.draw_grid(keep=(0, 0))
         self.query_one("#cells-name", Static).update(f"no {self.noun} open")
@@ -299,10 +308,14 @@ class CellsPane(KitPane):
         value = self.sheet.value(name)
         shown = self.sheet.shown(name)
         if isinstance(value, cells.Error):
-            return Text(shown, style="bold red", justify="center")
-        if isinstance(value, (int, float)) and not isinstance(value, bool):
-            return Text(shown, justify="right")
-        return Text(shown)
+            text = Text(shown, style="bold red", justify="center")
+        elif isinstance(value, (int, float)) and not isinstance(value, bool):
+            text = Text(shown, justify="right")
+        else:
+            text = Text(shown)
+        if self.point is not None and self._pointed(name):
+            text.stylize("reverse")
+        return text
 
     def draw_grid(self, *, keep: tuple[int, int] | None = None) -> None:
         """The whole grid again: as many rows and columns as the sheet uses,
@@ -355,6 +368,7 @@ class CellsPane(KitPane):
         event.stop()
         if self.current_id is None or not self.writes:
             return
+        self._end_point()
         line = self.line
         line.focus()
         line.value = self.sheet.raw(self.at_name) if event.initial is None else event.initial
@@ -387,6 +401,7 @@ class CellsPane(KitPane):
         if event.input.id != "cells-formula":
             return
         event.stop()
+        self._end_point()
         if self.current_id is None or not self.writes:
             return
         self.put(self.at_name, event.value)
@@ -397,6 +412,8 @@ class CellsPane(KitPane):
     def on_key(self, event: Key) -> None:
         line = self.line
         if not line.has_focus:
+            return
+        if self._point_key(event):
             return
         if event.key == "escape":
             event.stop()
@@ -410,6 +427,63 @@ class CellsPane(KitPane):
             row, col = self.at
             self.grid.move_cursor(row=row, column=max(0, col + (1 if event.key == "tab" else -1)))
             self.grid.focus()
+
+    # -- pointing -----------------------------------------------------------------------
+    # Excel's way of writing a reference. While the formula wants one, the
+    # arrows pick a cell and its name is written where the cursor is,
+    # following as they move; Shift and an arrow make it a range. Enter
+    # keeps the name and typing goes on, as does any other key.
+    def _pointing(self) -> bool:
+        if self.point is not None:
+            return True
+        line = self.line
+        return self.current_id is not None and self.writes and cells.wants_ref(line.value[: line.cursor_position])
+
+    def _point_key(self, event: Key) -> bool:
+        """A key on the line: True when it was pointing's."""
+        arrow = ARROWS.get(event.key.removeprefix("shift+"))
+        if arrow is not None and self._pointing():
+            event.stop()
+            event.prevent_default()
+            frm = self.point["at"] if self.point is not None else self.at
+            self._point_to((frm[0] + arrow[0], frm[1] + arrow[1]), extend=event.key.startswith("shift+"))
+            return True
+        if self.point is None:
+            return False
+        if event.key == "enter":
+            event.stop()
+            event.prevent_default()
+            self._end_point()
+            return True
+        self._end_point()
+        return False
+
+    def _point_to(self, target: tuple[int, int], *, extend: bool) -> None:
+        line = self.line
+        at = (min(max(0, target[0]), self.rows - 1), min(max(0, target[1]), self.cols - 1))
+        point = self.point or {"start": line.cursor_position, "end": line.cursor_position, "anchor": at}
+        point["at"] = at
+        if not extend:
+            point["anchor"] = at
+        name = cells.range_name(point["anchor"], at)
+        line.value = line.value[: point["start"]] + name + line.value[point["end"] :]
+        point["end"] = point["start"] + len(name)
+        line.cursor_position = point["end"]
+        self.point = point
+        self.refresh_cells()
+
+    def _pointed(self, name: str) -> bool:
+        place = cells.parse_ref(name)
+        if place is None or self.point is None:
+            return False
+        (r0, c0), (r1, c1) = self.point["anchor"], self.point["at"]
+        return min(r0, r1) <= place[0] <= max(r0, r1) and min(c0, c1) <= place[1] <= max(c0, c1)
+
+    def _end_point(self) -> None:
+        if self.point is None:
+            return
+        self.point = None
+        self.refresh_cells()
 
     # -- new, rename, delete ------------------------------------------------------------
     def act_new_record(self) -> None:

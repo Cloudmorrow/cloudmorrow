@@ -180,6 +180,26 @@ def is_formula(raw: str) -> bool:
     return str(raw or "").startswith("=")
 
 
+# What a formula may end in and still want a reference: `=`, an operator,
+# `(`, a comma, a colon. There the arrows point one out (the surfaces'
+# point mode, docs/CELLS.md).
+WANTS_REF = frozenset("=+-*/^&<>(,;:")
+
+
+def wants_ref(text: str) -> bool:
+    """Whether a cell's name may go where this (typed so far) ends."""
+    text = text.rstrip()
+    return is_formula(text) and text[-1] in WANTS_REF
+
+
+def range_name(one: tuple[int, int], other: tuple[int, int]) -> str:
+    """`B1` for one cell; `B1:C3` for two corners, whichever way round."""
+    top, bottom = sorted((one[0], other[0]))
+    left, right = sorted((one[1], other[1]))
+    first = ref_name(top, left)
+    return first if (top, left) == (bottom, right) else f"{first}:{ref_name(bottom, right)}"
+
+
 def display(value: Any) -> str:
     """A value as a cell shows it: numbers short, booleans TRUE/FALSE, blank empty."""
     if value is None:

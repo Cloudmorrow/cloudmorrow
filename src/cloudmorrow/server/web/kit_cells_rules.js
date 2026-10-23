@@ -130,6 +130,24 @@ export function literal(raw) {
 
 export const isFormula = (raw) => String(raw || "").startsWith("=");
 
+// What a formula may end in and still want a reference: `=`, an operator,
+// `(`, a comma, a colon. There the arrows point one out (point mode).
+const WANTS_REF = new Set("=+-*/^&<>(,;:");
+
+// Whether a cell's name may go where this (typed so far) ends.
+export function wantsRef(text) {
+  const typed = String(text || "").replace(/\s+$/, "");
+  return isFormula(typed) && WANTS_REF.has(typed[typed.length - 1]);
+}
+
+// `B1` for one cell; `B1:C3` for two corners, whichever way round.
+export function rangeName(one, other) {
+  const [top, bottom] = [Math.min(one[0], other[0]), Math.max(one[0], other[0])];
+  const [left, right] = [Math.min(one[1], other[1]), Math.max(one[1], other[1])];
+  const first = refName(top, left);
+  return top === bottom && left === right ? first : `${first}:${refName(bottom, right)}`;
+}
+
 /** A number to ten significant figures, without a trailing `.0`. */
 export function numberText(x) {
   if (!Number.isFinite(x)) return "#NUM!";
