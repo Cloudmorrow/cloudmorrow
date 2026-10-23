@@ -28,7 +28,7 @@ import {
 import { installCard } from "./install.js";
 import { mayWrite, sheetHash } from "./kit.js";
 import { foldButton, folded, wide, wireFold } from "./kit_editor.js";
-import { CellError, Sheet, colName, extent, isFormula, refName } from "./kit_cells_rules.js";
+import { CellError, Sheet, colName, extent, isFormula, rangeName, refName, wantsRef } from "./kit_cells_rules.js";
 import { ask } from "./dialog.js";
 
 const NEW = "~new";
@@ -159,7 +159,7 @@ async function renderSheet(b, { record = null, isNew = false, arg }) {
     ? { isNew: true, created: false, id: "", stem: "", rev: null, sheet: new Sheet(), modified: Date.now() / 1000 }
     : { isNew: false, created: false, ...sheetState(b, record) };
   Object.assign(ed, { b, arg, dirty: false, saving: false, pending: false, timer: null,
-                      at: [0, 0], editing: null, rows: 0, cols: 0 });
+                      at: [0, 0], editing: null, point: null, rows: 0, cols: 0 });
   open = ed;
   // The screen is this sheet's until it is left: a new one while the hash
   // says new, a saved one while the hash is its own.
@@ -311,8 +311,9 @@ function edit(ed, { initial = null } = {}) {
   ed.editing = { name, input, td };
   input.focus();
   input.setSelectionRange(input.value.length, input.value.length);
-  input.addEventListener("input", () => { ed.formulaEl.value = input.value; });
+  input.addEventListener("input", () => { endPoint(ed); ed.formulaEl.value = input.value; });
   input.addEventListener("keydown", (event) => {
+    if (pointKeys(ed, input, event)) return;
     if (event.key === "Enter") { event.preventDefault(); commit(ed); move(ed, event.shiftKey ? -1 : 1, 0); ed.wrap.focus(); }
     else if (event.key === "Tab") { event.preventDefault(); commit(ed); move(ed, 0, event.shiftKey ? -1 : 1); ed.wrap.focus(); }
     else if (event.key === "Escape") { event.preventDefault(); cancel(ed); ed.wrap.focus(); }
@@ -329,6 +330,7 @@ function put(ed, name, raw) {
 
 function commit(ed) {
   if (!ed.editing) return;
+  endPoint(ed);
   const { name, input } = ed.editing;
   ed.editing = null;
   const changed = put(ed, name, input.value);
@@ -339,6 +341,7 @@ function commit(ed) {
 
 function cancel(ed) {
   if (!ed.editing) return;
+  endPoint(ed);
   ed.editing = null;
   refresh(ed);
   select(ed, ...ed.at, { scroll: false });
@@ -346,12 +349,79 @@ function cancel(ed) {
 
 const move = (ed, dr, dc) => select(ed, ed.at[0] + dr, ed.at[1] + dc);
 
+// -- pointing ----------------------------------------------------------------------------
+// Excel's way of writing a reference. While the formula wants one — after
+// `=`, an operator, `(`, a comma or a colon — the arrows pick a cell and
+// its name is written where the caret is, following as they move; Shift
+// and an arrow make it a range; a click on a cell points the same way.
+// Enter keeps the name and typing goes on, as does any other key.
+const ARROWS = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+const MODIFIERS = new Set(["Shift", "Control", "Alt", "Meta"]);
+
+// The input that edits the cell at `ed.at` right now, if any.
+const editingInput = (ed) =>
+  ed.editing ? ed.editing.input : document.activeElement === ed.formulaEl ? ed.formulaEl : null;
+
+function pointing(ed, input) {
+  if (ed.point) return true;
+  const { value, selectionStart, selectionEnd } = input;
+  return selectionStart === selectionEnd && wantsRef(value.slice(0, selectionStart));
+}
+
+function pointTo(ed, input, target, extend) {
+  const r = Math.min(Math.max(0, target[0]), ed.rows - 1);
+  const c = Math.min(Math.max(0, target[1]), ed.cols - 1);
+  const point = ed.point || { start: input.selectionStart, end: input.selectionStart, anchor: [r, c], at: [r, c] };
+  point.at = [r, c];
+  if (!extend) point.anchor = [r, c];
+  const name = rangeName(point.anchor, point.at);
+  input.value = input.value.slice(0, point.start) + name + input.value.slice(point.end);
+  point.end = point.start + name.length;
+  input.setSelectionRange(point.end, point.end);
+  if (input !== ed.formulaEl) ed.formulaEl.value = input.value;
+  ed.point = point;
+  showPoint(ed);
+}
+
+function showPoint(ed) {
+  for (const td of ed.table.querySelectorAll("td.pointed")) td.classList.remove("pointed");
+  if (!ed.point) return;
+  const [[r0, c0], [r1, c1]] = [ed.point.anchor, ed.point.at];
+  for (let r = Math.min(r0, r1); r <= Math.max(r0, r1); r++) {
+    for (let c = Math.min(c0, c1); c <= Math.max(c0, c1); c++) cellAt(ed, r, c).classList.add("pointed");
+  }
+  cellAt(ed, ...ed.point.at).scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+function endPoint(ed) {
+  if (!ed.point) return;
+  ed.point = null;
+  showPoint(ed);
+}
+
+// A key in an input editing the cell at `ed.at`: true when it was pointing's.
+function pointKeys(ed, input, event) {
+  const arrow = ARROWS[event.key];
+  if (arrow && !event.ctrlKey && !event.metaKey && !event.altKey && pointing(ed, input)) {
+    event.preventDefault();
+    const from = ed.point ? ed.point.at : ed.at;
+    pointTo(ed, input, [from[0] + arrow[0], from[1] + arrow[1]], event.shiftKey);
+    return true;
+  }
+  if (!ed.point) return false;
+  if (event.key === "Enter") { event.preventDefault(); endPoint(ed); return true; }
+  if (!MODIFIERS.has(event.key)) endPoint(ed);
+  return false;
+}
+
 function wireGrid(ed) {
   const { wrap, table, formulaEl } = ed;
   table.addEventListener("mousedown", (event) => {
     const td = event.target.closest("td");
     if (!td || event.target.tagName === "INPUT") return;
     event.preventDefault();
+    const input = editingInput(ed);
+    if (input && pointing(ed, input)) { pointTo(ed, input, [+td.dataset.r, +td.dataset.c], event.shiftKey); return; }
     if (ed.editing) commit(ed);
     select(ed, +td.dataset.r, +td.dataset.c, { scroll: false });
     wrap.focus();
@@ -390,7 +460,9 @@ function wireGrid(ed) {
     event.preventDefault();
   });
   // The formula bar: typing there is typing into the cell.
+  formulaEl.addEventListener("input", () => endPoint(ed));
   formulaEl.addEventListener("keydown", (event) => {
+    if (pointKeys(ed, formulaEl, event)) return;
     if (event.key === "Enter") {
       event.preventDefault();
       if (ed.editing) cancel(ed);
@@ -399,6 +471,7 @@ function wireGrid(ed) {
       wrap.focus();
     } else if (event.key === "Escape") {
       event.preventDefault();
+      endPoint(ed);
       formulaEl.value = ed.sheet.raw(refName(...ed.at));
       wrap.focus();
     } else if (event.key === "Tab") {

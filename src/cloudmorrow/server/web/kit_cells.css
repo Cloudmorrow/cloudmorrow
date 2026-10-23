@@ -101,6 +101,11 @@
   outline-offset: -2px;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
+.cells .grid td.pointed {
+  outline: 2px dashed var(--second);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--second) 14%, transparent);
+}
 .cells .grid td .cell-input {
   position: absolute;
   inset: 0;

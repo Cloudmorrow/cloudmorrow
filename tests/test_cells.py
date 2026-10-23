@@ -226,6 +226,50 @@ def test_javascript_writes_the_same_cells(tmp_path):
     )
 
 
+# Where a cell's name may go in what is typed so far, and a range's name
+# from two corners: the point mode of the web and the terminal.
+WANTS = {
+    "=": True,
+    "=33*": True,
+    "=SUM(": True,
+    "=A1,": True,
+    "=A1:": True,
+    "=1<": True,
+    '="a"&': True,
+    "=33* ": True,
+    "=A1": False,
+    "=33": False,
+    "33*": False,
+    "": False,
+    "=SUM(A1)": False,
+    "'=": False,
+}
+RANGES = {"0,0 0,0": "A1", "0,0 2,1": "A1:B3", "2,1 0,0": "A1:B3", "0,2 1,0": "A1:C2"}
+
+
+def test_where_a_name_may_go():
+    assert {text: cells.wants_ref(text) for text in WANTS} == WANTS
+    corners = {k: tuple(tuple(map(int, p.split(","))) for p in k.split()) for k in RANGES}
+    assert {k: cells.range_name(*corners[k]) for k in RANGES} == RANGES
+
+
+@node
+def test_javascript_agrees_where_a_name_may_go(tmp_path):
+    rules = (WEB / "kit_cells_rules.js").resolve().as_posix()
+    script = tmp_path / "wants.mjs"
+    script.write_text(
+        f'import {{ wantsRef, rangeName }} from "{rules}";\n'
+        "const wants = Object.fromEntries(" + json.dumps(list(WANTS)) + ".map((t) => [t, wantsRef(t)]));\n"
+        "const ranges = Object.fromEntries(" + json.dumps(list(RANGES)) + ".map((k) => "
+        "[k, rangeName(...k.split(' ').map((p) => p.split(',').map(Number)))]));\n"
+        "console.log(JSON.stringify({ wants, ranges }));\n",
+        encoding="utf-8",
+    )
+    done = subprocess.run(["node", str(script)], capture_output=True, text=True, check=False)
+    assert done.returncode == 0, done.stderr
+    assert json.loads(done.stdout) == {"wants": WANTS, "ranges": RANGES}
+
+
 def test_names_and_places():
     assert [cells.col_name(i) for i in (0, 25, 26, 51, 52, 701, 702)] == ["A", "Z", "AA", "AZ", "BA", "ZZ", "AAA"]
     assert all(cells.col_index(cells.col_name(i)) == i for i in range(800))

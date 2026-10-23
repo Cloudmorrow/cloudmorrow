@@ -134,6 +134,38 @@ async def test_typing_into_a_cell_saves_with_the_rev_it_read(app):
         assert "B3" not in app.client.record_store["sheet"][0]["fields"]["cells"]
 
 
+async def test_a_formula_wanting_a_reference_takes_it_from_the_arrows(app):
+    with_cells(app)
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await open_cells(app, pilot)
+        pane = screen.query_one(CellsPane)
+        pane.open_sheet("r_budget")
+        await settle(app, pilot)
+        grid = pane.query_one(SheetGrid)
+        grid.move_cursor(row=4, column=1)
+        grid.focus()
+        await pilot.pause()
+        line = pane.query_one("#cells-formula", Input)
+        # `=2*`, then up: B4 is written and shown pointed; up again moves it.
+        await pilot.press("=", "2", "*", "up")
+        assert line.value == "=2*B4" and pane.point is not None
+        assert any(span.style == "reverse" for span in grid.get_cell("3", "B").spans), "B4 is drawn pointed"
+        await pilot.press("up")
+        assert line.value == "=2*B3"
+        # Shift and an arrow make it a range; Enter keeps it and typing goes on.
+        await pilot.press("shift+down", "enter")
+        assert line.value == "=2*B3:B4" and pane.point is None and line.has_focus
+        assert line.cursor_position == len(line.value)
+        await pilot.press("+", "1", "enter")
+        await settle(app, pilot)
+        assert pane.sheet.raw("B5") == "=2*B3:B4+1", "the formula is kept as written, right or not"
+        assert pane.at == (5, 1), "and the second Enter commits and moves down"
+        # No reference wanted: the arrows move the caret as ever.
+        await pilot.press("4", "2", "left", "left", "enter")
+        await settle(app, pilot)
+        assert pane.sheet.raw("B6") == "42"
+
+
 async def test_a_sheet_changed_elsewhere_asks_before_writing_over_it(app):
     with_cells(app)
     async with app.run_test(size=(120, 34)) as pilot:
