@@ -17,6 +17,7 @@ import "./rolesadmin.js";
 import "./approvals.js";
 import "./flows.js";
 import "./quillsadmin.js";
+import "./backupsadmin.js";
 import "./myquills.js";
 import "./adddevice.js";
 import "./push.js";

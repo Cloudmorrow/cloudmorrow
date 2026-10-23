@@ -116,6 +116,18 @@ directory carries yesterday's database; for a copy at one moment, run the
 dump yourself. With a server of your own, its backups are yours. A dump
 is sealed rows like the file is: ciphertext without the key.
 
+**A backup into a bucket is the same ciphertext.** Administration,
+Backups puts a copy of everything into an S3 bucket every day
+(MANUAL.md, *Backups*): the database as the file at one moment, or the
+dump, sealed rows and all; the drives and shares as archives, plain, as
+they are on disk. The sealing key is not in it unless the administrator
+ticks **The sealing key too**, so a bucket on its own holds a database
+that opens with nothing in it — and a bucket with the key holds
+everything. The manifest carries a fingerprint of the key, and a restore
+of a database sealed under another key is refused unless that key comes
+back with it. The secret the store is reached with is itself sealed in
+the settings table, like any other value.
+
 **Every command sees the same key.** `cloudmorrow-server` reads the
 config and registers the key for the database before it opens it, so
 `user create` and the rest seal and open under the service's key. A
@@ -191,6 +203,7 @@ unencrypted, and they are gone.
 | --- | --- |
 | The database file or a backup of it is copied | yes: ciphertext without the key |
 | The files directory or a backup of it is copied | no: notes, pictures, My Files and shares are plain files |
+| The backup bucket is read | the database, yes, unless the sealing key was sent with it; the files, no |
 | The server's disk is lost, stolen or decommissioned | yes, if the key was not on it or was on a different volume; on a single-disk box, put the key in `/etc` and back the data up separately |
 | Someone reads traffic on the network | yes, on every hop, when the server is reached over https |
 | Someone with root on the running server | no: they have the key, and the server itself must be able to read everything |

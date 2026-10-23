@@ -17,6 +17,7 @@ from cloudmorrow.server.access_lan import announcer
 from cloudmorrow.server.agents import AgentStore, JobStore
 from cloudmorrow.server.approvals import Approvals
 from cloudmorrow.server.backends import SharesBackend, VaultsBackend
+from cloudmorrow.server.backups import Backups
 from cloudmorrow.server.circles import CircleStore
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.dataview import DATA_FEATURE
@@ -41,6 +42,7 @@ from cloudmorrow.server.routes import (
     agents,
     approvals,
     auth,
+    backups,
     circles,
     features,
     flows,
@@ -211,6 +213,8 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     role_store.declare(quill_registry.all())
     state.approvals = Approvals(state)
     state.flows = FlowRunner(state)
+    # Everything into a bucket every day, and back (backups.py); the clock asks.
+    state.backups = Backups(state)
     app.router.on_startup.append(state.flows.start)
     app.router.on_shutdown.append(state.flows.stop)
     state.quill_tokens = QuillTokenStore(db)
@@ -225,6 +229,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         state.services.run_due()
         state.code.run_due()
         state.flows.run_due()
+        state.backups.tick()
 
     clock = Clock(db, quill_registry, record_store, on_tick=tick)
     app.router.on_startup.append(clock.start)
@@ -322,6 +327,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.include_router(install.router)
     app.include_router(web.router)
     app.include_router(server_routes.router)
+    app.include_router(backups.router)
 
     # The fileshares, spoken WebDAV. A WSGI app, because that is what WsgiDAV
     # is; a2wsgi streams bodies through rather than buffering a whole upload.

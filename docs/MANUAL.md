@@ -264,6 +264,7 @@ cloudmorrow agent   list | run | jobs | enroll-token
 cloudmorrow share   list | show | add | with | unshare | leave | move | remove | mount | unmount
 cloudmorrow config  show | set
 cloudmorrow update  [server | all]
+cloudmorrow backup  status | now | list | show | restore | delete
 cloudmorrow snapshot take | list | show | bundle | attest | guest | guests | revoke | withdraw | verify
 cloudmorrow attest  sign | verify | key
 ```
@@ -800,10 +801,12 @@ Typing `#/admin` as anybody else lands you back on Me with a word about it,
 which is a courtesy rather than the guard: every call under it is admin-only
 at the server, and the screen would be empty without that.
 
-Five sides, each at its own address (`#/admin/users`, `#/admin/circles`,
-`#/admin/roles`, `#/admin/quills`, `#/admin/server`). **Circles** is
-described under [circles](#circles-who-may-use-which-data), **Roles** under
+Six sides, each at its own address (`#/admin/users`, `#/admin/circles`,
+`#/admin/roles`, `#/admin/quills`, `#/admin/server`, `#/admin/backups`).
+**Circles** is described under [circles](#circles-who-may-use-which-data),
+**Roles** under
 [roles, approvals and flows](#roles-approvals-and-flows-how-a-procedure-is-said),
+**Backups** under [backups](#backups-everything-into-a-bucket-and-back),
 and **Server** is the server's own settings — its **Name**, on every screen
 and the home-screen icon, and **Weather for**, the place Today's weather is
 for — then what this server runs, and **Update server**. When a newer
@@ -1893,6 +1896,113 @@ your machines, over plain HTTP on the LAN — and they are gone, so nothing
 Cloudmorrow sends crosses a wire unencrypted unless you chose plain HTTP
 for the whole server.
 
+## Backups: everything into a bucket, and back
+
+A home server is one disk, and one disk is one bad day away from nothing.
+**Administration, Backups** names a bucket, says what goes and when, and
+from then on the server puts a copy of everything there every day and
+throws away the copies older than you told it to keep. The same page
+reads one back: all of it, or the parts you tick.
+
+**Where they go** is any store that speaks S3: Amazon's, Hetzner's,
+Backblaze's, Cloudflare R2, Wasabi, Scaleway, a MinIO on a box of your
+own. The **Endpoint** is the store's URL (`https://s3.eu-north-1.amazonaws.com`,
+`https://fsn1.your-objectstorage.com`, `http://minio.local:9000`), the
+**Bucket** is one you made there, the **Folder** is a path in it for this
+cloud's backups (blank for the top), and the **Region** is what the store
+wants in the signature — blank reads Amazon's from its host and is
+`us-east-1` for everybody else, which most stores take. The **Access key**
+and **Secret key** are a pair the store gave you with the right to read,
+write and delete in that bucket; the secret is sealed on the server the
+moment you save it and never shown again. **Try the bucket** writes a
+tiny probe and takes it away, so a wrong key or region is said now rather
+than at three in the morning.
+
+**When**: **Every day** at the time you give, on the server's own clock,
+kept for as many days as you say. A daily backup older than that is taken
+out of the bucket after the next one lands, and so is a folder left by a
+backup that never finished. Off, nothing runs on its own and **Back up
+now** is the only way; it is also the way to take one before something
+you are about to do.
+
+**What** is five parts, each ticked on its own, so a server with its
+files on a disk of their own can send only its database:
+
+| part | what it is | in the bucket |
+| --- | --- | --- |
+| **Database** | accounts, circles, roles, every record of every Quill, the settings, the secrets, which Quills are installed | `database.sqlite.gz`, a copy at one moment with the write-ahead log folded in; or `database.pgdump` from `pg_dump` |
+| **Everybody's files** | each person's drive — My Files, their notes in it — and the drives of accounts since deleted, whose files stay | `drives/<name>.tar.gz`, one per drive |
+| **Shares** | every share, wherever its folder is | `shares/<name>.tar.gz`, one per share |
+| **Quills** | the installed Quills, people's own, the datamodels, the runtimes fetched for them | `quills.tar.gz` |
+| **Keys** | the token signing key, the identity key, the push key | `keys.tar.gz` |
+
+And `manifest.json`, which lists them with their sizes and digests, the
+Cloudmorrow version, and a fingerprint of the key the database was sealed
+with. A backup is one folder in the bucket named by its moment,
+`20261023T030000Z`, and anything that reads S3 reads it.
+
+**The sealing key** is off by default and stays off unless you tick **The
+sealing key too**. The database goes up as it is on disk — sealed — so a
+bucket holding the backups and not the key holds a database that opens
+with nothing in it, which is the point of keeping the key apart
+([encryption at rest](#encryption-at-rest)). Tick it and a bucket is a
+complete copy, which is what you want for a server you could lose
+altogether, and also what whoever holds the bucket then holds. Files go
+up as they are, plain, as they are on the disk: give the bucket to nobody
+you would not give the disk. Either way, keep a copy of the key file
+somewhere that is not the server.
+
+**Restore** opens from the list under **In the bucket**: each backup a
+row with its date, size and parts, and on tapping one a sheet of what it
+holds — the database, each person's files, each share, the Quills, the
+keys — with a box beside each and **all** on the groups. Tick what you
+want and **Restore**: what the backup has goes over what is on the server
+now, and what it does not have is left alone, so a file made since a
+backup stays and a file deleted since comes back. Before the database is
+put back, a copy of today's is kept in `<data_dir>/before-restore/` (the
+last three), so a restore is never the end of the road. A restore that
+brings the database, the Quills or the keys back ends with the server
+restarting itself, as an update does, so nothing in memory remembers the
+old rows; the page waits for it and comes back on the restored data.
+Only files, nothing restarts.
+
+Two refusals worth knowing. A backup whose database was sealed with
+another key than this server's is marked **another key** in the list, and
+restoring its database is refused unless the backup carries the sealing
+key and you tick **Keys** with it — a database that would open with
+nothing in it is no restore. And the sealing key itself goes back only
+together with the database, or where there is none: written over a key in
+use on its own, it would lock every row the server has.
+
+**A new server from a backup**: install Cloudmorrow, make the first
+account, open Administration, Backups, type the same bucket and keys,
+open the newest backup and tick everything. If the backup carries the
+sealing key, that is all; if it does not, put your copy of the key file
+in place as `key_file` in `server.toml` first, then restore. The server
+comes back as the old one, accounts and all — sign in as you did there.
+
+From a computer, as an administrator, the same without the browser:
+
+```bash
+cm backup status                                      # where, when, how the last went
+cm backup now                                         # the parts the settings name
+cm backup now --part database                         # one part
+cm backup list
+cm backup show 20261023T030000Z
+cm backup restore 20261023T030000Z --all
+cm backup restore 20261023T030000Z --drive bram --share photos
+cm backup restore 20261023T030000Z --database --no-restart   # and restart when it suits you
+cm backup delete 20261023T030000Z
+```
+
+The bucket and its keys are set in the browser, where the secret is typed
+once; `cm backup` watches, runs and restores. On PostgreSQL the server
+runs `pg_dump` and `pg_restore`, so the client tools must be installed
+beside it (`apt install postgresql-client`); with the container the
+installer runs, the daily dump into `<data_dir>/postgres/` is still there
+too. The agent's own `backup` task (below) is a different thing: a
+tarball of some paths on a machine, into a folder on that machine.
+
 ## Fileshares
 
 A share is a folder on the server with a name. The name is the last
@@ -2417,7 +2527,8 @@ CLOUDMORROW_NOTES_DIR=/tmp/notes CLOUDMORROW_DATA_DIR=/tmp/cloudmorrow-data \
   reboot, and it stops working when the token it signed in with expires (30
   days by default), at which point `share mount` again. Nothing remounts it
   for you yet — that is a job for the agent, along with the Local backups
-  tab, which is a placeholder.
+  tab, which is a placeholder. The server's own backups, into a bucket, are
+  [a thing of their own](#backups-everything-into-a-bucket-and-back).
 - A picture put in a page by the kit's editor and taken out again is not
   taken out of `img/`: nothing prunes the folder yet. The terminal app shows
   one picture at a time, beside the text rather than in it, and a terminal

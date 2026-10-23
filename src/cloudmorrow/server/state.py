@@ -36,6 +36,7 @@ from cloudmorrow.server.webpush import PushStore
 if TYPE_CHECKING:
     from cloudmorrow.server.access_lan import LanAnnouncer
     from cloudmorrow.server.approvals import Approvals
+    from cloudmorrow.server.backups import Backups
     from cloudmorrow.server.changefeed import ChangeFeed
     from cloudmorrow.server.flows import FlowRunner
     from cloudmorrow.server.roles import RoleStore
@@ -93,6 +94,8 @@ class AppState:
     roles: RoleStore | None = None
     approvals: Approvals | None = None
     flows: FlowRunner | None = None
+    # Copies of everything into a bucket, daily, and back (backups.py).
+    backups: Backups | None = None
     # The last look at the remote for newer releases, and when (routes/server.py).
     update_check: tuple[float, object] | None = None
 

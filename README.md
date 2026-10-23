@@ -86,6 +86,11 @@ It is free software under the [GNU AGPL v3](LICENSE).
 - **Encrypted at rest.** Notes, messages, events, tasks, secrets and pictures
   are ciphertext on disk, under one key the server holds. You sign in with a
   password and never handle a key. See [docs/ENCRYPTION.md](docs/ENCRYPTION.md).
+- **Backed up to a bucket.** An administrator names an S3 bucket — Amazon's
+  or anybody's — and every day the server puts a copy of everything there:
+  the database, everybody's files, the shares, the Quills, the keys; kept as
+  long as you say. Any backup is restored from the same page, all of it or
+  one person's files. See [the manual](docs/MANUAL.md#backups-everything-into-a-bucket-and-back).
 - **Switches, not settings.** An administrator can turn any whole area off
   for the server. Each person can hide any area from their own screens. That,
   and the list of accounts, is the whole administration panel.

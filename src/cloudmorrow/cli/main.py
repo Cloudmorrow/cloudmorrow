@@ -26,6 +26,7 @@ from cloudmorrow.agent.setup import ensure_agent, stop_agent
 from cloudmorrow.cli import (
     agent,
     attest,
+    backup,
     circle,
     desktop,
     dev,
@@ -61,6 +62,8 @@ app.add_typer(agent.app, name="agent")
 app.add_typer(share.app, name="share")
 app.add_typer(settings.app, name="config")
 app.add_typer(update.app, name="update")
+# The server's backups into a bucket, and restoring from one (docs/MANUAL.md, *Backups*).
+app.add_typer(backup.app, name="backup")
 app.add_typer(quill.app, name="quill")
 app.add_typer(circle.app, name="circle")
 # A frozen copy of a space's records, and the signed word on it (docs/ATTESTATIONS.md).
