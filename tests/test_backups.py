@@ -317,8 +317,8 @@ def test_the_clock_runs_todays_backup_once_its_time_has_come(client, auth, store
     assert backups.status()["last"]["ok"]
     assert backups.status()["last"]["by"] == "the clock"
     # Not again today; again tomorrow.
-    assert backups.tick(dt.datetime(2026, 10, 23, 9, 0, tzinfo=tz)) is False
-    assert backups.tick(dt.datetime(2026, 10, 24, 3, 0, tzinfo=tz)) is True
+    assert backups.tick(dt.datetime(2026, 10, 23, 9, 0).astimezone()) is False
+    assert backups.tick(dt.datetime(2026, 10, 24, 3, 0).astimezone()) is True
     wait_done(client)
     stamps = {key.split("/")[1] for key in store.keys("home/")}
     assert len(stamps) == 2, "two backups, each in a folder of its own"
