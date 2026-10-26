@@ -8,7 +8,15 @@ kept is what was typed, as typed; everything else — that `1200` is a
 number, that `=SUM(B1:B3)` is a formula and what it comes to — is worked
 out on reading, here, and in kit_cells_rules.js for the web app, by the
 same rules (docs/CELLS.md). The terminal app and the command line both ask
-here, so no two surfaces can disagree about what a cell says.
+here, so no two surfaces can disagree about what a cell says. Beside the
+cells the file may hold a `format`: per cell, how it looks — for now its
+borders, `{"B5": {"border": "top bottom"}}` — and whatever else sits beside
+those is kept as it was found.
+
+A row or a column can be put in or taken out (Sheet.insert_rows and the
+rest): the cells move, and every formula's references follow, as in Excel
+— a reference to a cell that is taken out becomes `#REF!`, a range that
+loses a row shrinks, one that gains a row grows.
 
 A cell's text means:
 
@@ -117,10 +125,166 @@ def ordered_cells(cells: dict[str, str]) -> dict[str, str]:
     return {name: cells[name] for name in sorted(cells, key=sort_key) if str(cells[name]).strip()}
 
 
-def file_text(cells: dict[str, str]) -> str:
+# -- the format --------------------------------------------------------------------------
+# Beside the cells, how a cell looks: for now its borders. Written only for
+# the cells that have any, {"B5": {"border": "top bottom"}}, the sides in
+# SIDES' order; a key that is not known is kept as it is, for whoever wrote it.
+
+SIDES = ("top", "right", "bottom", "left")
+
+
+def parse_sides(value: Any) -> list[str]:
+    """`"bottom top"` → ["top", "bottom"], in SIDES' order; `all` is the
+    four; a word that is no side is passed over."""
+    words = str(value or "").replace(",", " ").lower().split()
+    if "all" in words:
+        return list(SIDES)
+    return [side for side in SIDES if side in words]
+
+
+def parse_format(value: Any) -> dict[str, dict]:
+    """The `format` object of a `.cell` file: per cell, how it looks. Names
+    are made proper; a cell with nothing to say is left out."""
+    if not isinstance(value, dict):
+        return {}
+    found: dict[str, dict] = {}
+    for key, entry in value.items():
+        at = parse_ref(key)
+        if at is None or not isinstance(entry, dict):
+            continue
+        kept = {k: v for k, v in entry.items() if k != "border"}
+        sides = parse_sides(entry.get("border"))
+        if sides:
+            kept = {"border": " ".join(sides), **kept}
+        if kept:
+            found[ref_name(*at)] = kept
+    return found
+
+
+def ordered_format(format: dict[str, dict]) -> dict[str, dict]:
+    return {name: format[name] for name in sorted(format, key=sort_key) if format[name]}
+
+
+def parse_file(value: Any) -> tuple[dict[str, str], dict[str, dict], dict[str, Any]]:
+    """A `.cell` file's text, or the object it holds, taken apart: the cells,
+    the format, and whatever else sits beside them, kept for writing back."""
+    data = value
+    if isinstance(value, str):
+        try:
+            data = json.loads(value) if value.strip() else {}
+        except ValueError:
+            return {}, {}, {}
+    if not isinstance(data, dict):
+        return {}, {}, {}
+    if not isinstance(data.get("cells"), dict):
+        # The cells alone, with nothing around them, are a sheet too.
+        return parse_cells(data), {}, {}
+    extra = {k: v for k, v in data.items() if k not in ("cells", "format")}
+    return parse_cells(data["cells"]), parse_format(data.get("format")), extra
+
+
+def file_text(cells: dict[str, str], format: dict[str, dict] | None = None, extra: dict[str, Any] | None = None) -> str:
     """A `.cell` file's text: one JSON object with the cells in it, a cell
-    a line, by row then column — the same bytes kit_cells_rules.js writes."""
-    return json.dumps({"cells": ordered_cells(cells)}, indent=2, ensure_ascii=False) + "\n"
+    a line, by row then column, then the format of the cells that have
+    one, then whatever else was found beside them — the same bytes
+    kit_cells_rules.js writes."""
+    data: dict[str, Any] = {"cells": ordered_cells(cells)}
+    kept = ordered_format(format or {})
+    if kept:
+        data["format"] = kept
+    for key, value in (extra or {}).items():
+        if key not in data:
+            data[key] = value
+    return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+
+
+# -- rows and columns ------------------------------------------------------------------
+# Putting rows (or columns) in, or taking them out, moves what is past them,
+# and every formula's references follow, as Excel's do.
+
+
+def shift_index(index: int, at: int, count: int) -> int | None:
+    """Where row (or column) `index` goes when `count` are put in at `at`
+    (count > 0), or that many taken out there (count < 0): None for one
+    that is taken out."""
+    if count > 0:
+        return index + count if index >= at else index
+    if index >= at - count:
+        return index + count
+    return None if index >= at else index
+
+
+def shift_place(place: tuple[int, int] | None, axis: int, at: int, count: int) -> tuple[int, int] | None:
+    if place is None:
+        return None
+    moved = shift_index(place[axis], at, count)
+    if moved is None:
+        return None
+    return (moved, place[1]) if axis == 0 else (place[0], moved)
+
+
+# A reference in a formula, or a range of two, outside a string: not a
+# function's name (`LOG10(`), not part of a longer word.
+REF_IN_FORMULA = re.compile(
+    r'(?P<string>"(?:[^"]|"")*")'
+    r"|(?<![A-Za-z0-9_.$])(?P<a>\$?[A-Za-z]{1,3}\$?[0-9]+)"
+    r"(?:(?P<colon>\s*:\s*)(?P<b>\$?[A-Za-z]{1,3}\$?[0-9]+))?(?![A-Za-z0-9_.(])"
+)
+
+
+def _ref_text(like: str, place: tuple[int, int]) -> str:
+    """`place` named the way `like` was: its `$`s kept, its letters proper."""
+    col_dollar = "$" if like.startswith("$") else ""
+    row_dollar = "$" if "$" in like[1:] else ""
+    return f"{col_dollar}{col_name(place[1])}{row_dollar}{place[0] + 1}"
+
+
+def shift_formula(raw: str, axis: int, at: int, count: int) -> str:
+    """A formula with its references moved along: `count` rows (axis 0) or
+    columns (axis 1) put in at `at`, or taken out there when count < 0. A
+    reference to a cell taken out becomes `#REF!`; a range that loses rows
+    shrinks, one with rows put in grows, one wholly taken out is `#REF!`.
+    What is not a formula is as it was."""
+    if not is_formula(raw) or count == 0:
+        return raw
+
+    def with_axis(place: tuple[int, int], index: int) -> tuple[int, int]:
+        return (index, place[1]) if axis == 0 else (place[0], index)
+
+    def fix(match: re.Match) -> str:
+        whole = match.group(0)
+        if match.group("string"):
+            return whole
+        a, b = match.group("a"), match.group("b")
+        pa = parse_ref(a)
+        if pa is None:
+            return whole
+        if b is None:
+            moved = shift_index(pa[axis], at, count)
+            if moved is None:
+                return "#REF!"
+            return whole if moved == pa[axis] else _ref_text(a, with_axis(pa, moved))
+        pb = parse_ref(b)
+        if pb is None:
+            return whole
+        lo, hi = sorted((pa[axis], pb[axis]))
+        if count > 0:
+            lo2 = lo + count if lo >= at else lo
+            hi2 = hi + count if hi >= at else hi
+        else:
+            n = -count
+            lo2 = lo if lo < at else (lo - n if lo >= at + n else at)
+            hi2 = hi if hi < at else (hi - n if hi >= at + n else at - 1)
+            if lo2 > hi2:
+                return "#REF!"
+        if (lo2, hi2) == (lo, hi):
+            return whole
+        a_is_lo = pa[axis] <= pb[axis]
+        pa2 = with_axis(pa, lo2 if a_is_lo else hi2)
+        pb2 = with_axis(pb, hi2 if a_is_lo else lo2)
+        return _ref_text(a, pa2) + match.group("colon") + _ref_text(b, pb2)
+
+    return "=" + REF_IN_FORMULA.sub(fix, raw[1:])
 
 
 def extent(cells: dict[str, str]) -> tuple[int, int]:
@@ -286,6 +450,7 @@ TOKEN = re.compile(
     r"\s*(?:"
     r"(?P<number>(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)"
     r"|(?P<string>\"(?:[^\"]|\"\")*\")"
+    r"|(?P<error>#(?:REF!|DIV/0!|NAME\?|VALUE!|NUM!|CIRC!|N/A))"
     r"|(?P<name>\$?[A-Za-z_][A-Za-z0-9_.]*\$?[0-9]*)"
     r"|(?P<op><>|<=|>=|[-+*/^&=<>%(),:])"
     r")"
@@ -408,6 +573,10 @@ class Parser:
         if kind == "string":
             self.take()
             return ("str", text[1:-1].replace('""', '"'))
+        if kind == "error":
+            # `#REF!` written in a formula — left by a row taken out — is that error.
+            self.take()
+            return ("err", text)
         if kind == "op" and text == "(":
             self.take()
             node = self.comparison()
@@ -803,19 +972,84 @@ FUNCTIONS = {
 class Sheet:
     """The cells of one `.cell` file, and what each comes to."""
 
-    def __init__(self, cells: dict[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        cells: dict[str, str] | None = None,
+        format: dict[str, dict] | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
         self.cells: dict[str, str] = dict(cells or {})
+        # How a cell looks, by name, for the cells that say: {"B5": {"border": "top"}}.
+        self.format: dict[str, dict] = {name: dict(entry) for name, entry in (format or {}).items()}
+        # Whatever else the file held beside the cells and the format, kept as found.
+        self.extra: dict[str, Any] = dict(extra or {})
         self._values: dict[str, Any] = {}
         self._busy: set[str] = set()
 
     @classmethod
     def from_text(cls, value: Any) -> Sheet:
         """From a `.cell` file's text (a file record's `text` field)."""
-        return cls(parse_cells(value))
+        return cls(*parse_file(value))
 
     def to_text(self) -> str:
         """The `.cell` file's text, for writing back."""
-        return file_text(self.cells)
+        return file_text(self.cells, self.format, self.extra)
+
+    # -- how a cell looks
+
+    def border(self, name: str) -> list[str]:
+        """The sides of a cell that have a border, in SIDES' order."""
+        at = parse_ref(name)
+        if at is None:
+            return []
+        return parse_sides((self.format.get(ref_name(*at)) or {}).get("border"))
+
+    def set_border(self, name: str, sides: Any) -> None:
+        """Which sides of a cell have a border; none clears them."""
+        at = parse_ref(name)
+        if at is None:
+            raise ValueError(f"{name!r} is no cell")
+        key = ref_name(*at)
+        words = parse_sides(" ".join(sides))
+        entry = {k: v for k, v in (self.format.get(key) or {}).items() if k != "border"}
+        if words:
+            entry = {"border": " ".join(words), **entry}
+        if entry:
+            self.format[key] = entry
+        else:
+            self.format.pop(key, None)
+
+    # -- rows and columns
+
+    def insert_rows(self, at: int, count: int = 1) -> None:
+        """`count` empty rows put in before row `at` (counted from zero)."""
+        self._shift(0, at, count)
+
+    def delete_rows(self, at: int, count: int = 1) -> None:
+        """Rows `at` to `at + count - 1` taken out."""
+        self._shift(0, at, -count)
+
+    def insert_cols(self, at: int, count: int = 1) -> None:
+        self._shift(1, at, count)
+
+    def delete_cols(self, at: int, count: int = 1) -> None:
+        self._shift(1, at, -count)
+
+    def _shift(self, axis: int, at: int, count: int) -> None:
+        if at < 0 or count == 0:
+            return
+        cells: dict[str, str] = {}
+        for name, raw in self.cells.items():
+            place = shift_place(parse_ref(name), axis, at, count)
+            if place is not None:
+                cells[ref_name(*place)] = shift_formula(raw, axis, at, count)
+        format: dict[str, dict] = {}
+        for name, entry in self.format.items():
+            place = shift_place(parse_ref(name), axis, at, count)
+            if place is not None:
+                format[ref_name(*place)] = entry
+        self.cells, self.format = cells, format
+        self._values.clear()
 
     def raw(self, name: str) -> str:
         return self.cells.get(name, "")
@@ -874,6 +1108,8 @@ class Sheet:
             return node[1]
         if kind == "bool":
             return node[1]
+        if kind == "err":
+            return Error(node[1])
         if kind == "ref":
             return self.value(ref_name(node[1], node[2]))
         if kind == "range":

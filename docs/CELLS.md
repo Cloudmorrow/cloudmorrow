@@ -54,16 +54,57 @@ what was typed, as typed:
 }
 ```
 
-Nothing else is kept: not what a formula came to, not that `1200` is a
-number. All of that is worked out on reading, by the same rules on every
-surface — `quill/cells.py` in Python, `kit_cells_rules.js` in the browser,
-held together by one test (`tests/test_cells.py`). The file is written a
-cell a line, by row then column, so two versions of a sheet diff well; a
-key that is no cell, or an empty value, is dropped on writing; names are
-made proper (`a1` → `A1`). Reading, a file holding the cells alone, with
-no `cells` around them, is the same sheet; a file that is not JSON, or
-not an object, is an empty sheet. Whatever else the object comes to hold
-one day — a column's width — sits beside `cells` and is kept.
+Nothing else is kept of a cell's value: not what a formula came to, not
+that `1200` is a number. All of that is worked out on reading, by the
+same rules on every surface — `quill/cells.py` in Python,
+`kit_cells_rules.js` in the browser, held together by one test
+(`tests/test_cells.py`). The file is written a cell a line, by row then
+column, so two versions of a sheet diff well; a key that is no cell, or an
+empty value, is dropped on writing; names are made proper (`a1` → `A1`).
+Reading, a file holding the cells alone, with no `cells` around them, is
+the same sheet; a file that is not JSON, or not an object, is an empty
+sheet.
+
+Beside `cells`, a `format` says how a cell looks — for now, which of its
+sides have a border — for the cells that have anything to say:
+
+```json
+{
+  "cells": { "A1": "Rent", "B1": "1200" },
+  "format": {
+    "A1": { "border": "bottom" },
+    "B1": { "border": "top right bottom left" }
+  }
+}
+```
+
+`border` is the sides with a line, as words, written in the order top,
+right, bottom, left and read in any order (`all` reads as the four). A
+key beside `border` that this version does not know is kept as it was
+found, as is whatever else the file holds beside `cells` and `format` —
+a column's width, one day.
+
+## Rows and columns
+
+A row or a column can be put in or taken out, and the sheet moves with
+it: the cells past it shift, their borders with them, and every
+formula's references follow, as Excel's do.
+
+| before | after | |
+| --- | --- | --- |
+| `=A1+A3` | `=A1+A4` | a row put in at 2 |
+| `=SUM(A1:A3)` | `=SUM(A1:A4)` | a row put in inside the range |
+| `=SUM(A1:A3)` | `=SUM(A1:A3)` | a row put in just after it |
+| `=SUM(A1:A3)` | `=SUM(A1:A2)` | row 2 taken out |
+| `=A2*2` | `=#REF!*2` | row 2 taken out |
+| `=SUM(A1:A3)` | `=SUM(#REF!)` | rows 1 to 3 taken out |
+| `=$A$3` | `=$A$2` | row 1 taken out: the `$`s stay |
+
+`#REF!` written in a formula is that error, so a cell whose row is gone
+says so. Text in quotes is never touched, nor a function's name
+(`LOG10(`). Python: `Sheet.insert_rows(at, count)`, `delete_rows`,
+`insert_cols`, `delete_cols`, `at` counted from zero; the browser the
+same in camel case.
 
 ## What a cell says
 
@@ -124,9 +165,20 @@ reads it:
 search box and the pen; a sheet is its title — the file's name — the
 formula bar (the cell's name and what is typed in it) and the grid, as
 many rows and columns as are used with room beyond, scrolling both ways
-with the headings held. A tap or click selects a cell; typing, Enter or a
-double tap edits it; Enter commits and moves down, Tab across, Escape
-leaves it as it was, Delete clears it; the arrows move. While a formula
+with the headings held. A tap or click selects a cell, a drag or Shift
+with a click or an arrow a block of them, a row's or a column's heading
+the whole row or column (dragging down the headings, more); typing,
+Enter or a double tap edits the cell; Enter commits and moves down, Tab
+across, Escape leaves it as it was — or, with a block selected, selects
+the one cell again; Delete or Backspace clears everything selected; the
+arrows move. Over the formula bar, the border buttons: a side of the
+selection, all four around it, every side of every cell, or none — a
+border that is there already comes off again. On a row's or a column's
+heading the right button (on a phone, a second tap) opens a menu to put
+rows or columns in before or after the selection, as many as are
+selected, or take them out; the right button on a cell offers both, and
+Clear. Taking out rows or columns that hold something asks first, there
+being no undo. While a formula
 wants a reference — after `=`, an operator, `(`, a comma or a colon — the
 arrows point one out instead, as in Excel: the cell's name is written
 where the caret is and follows as they move, Shift and an arrow make it a

@@ -9,6 +9,12 @@
    kit_cells_rules.js, the same rules the terminal and the command line
    follow in quill/cells.py. Nothing here knows what a budget is.
 
+   A click selects a cell, a drag or Shift a range, a heading its row or
+   column; Delete clears what is selected. Over the formula bar, buttons
+   for the borders of the selected cells; on a row's or a column's heading
+   (or the right button anywhere) a menu to put rows and columns in or take
+   them out, the formulas following (kit_cells_rules.js).
+
    The sheet saves as you type, like a page in the editor; one changed
    elsewhere since it was opened is not written over. Sheets of a
    datamodel you may only read (docs/CIRCLES.md) open read-only: the grid
@@ -33,8 +39,9 @@ import {
   fixedFields, foldButton, folded, trimSlashes, underRoot, wholePath, wide, wireFold, withQuery,
   withSuffix, withoutSuffix,
 } from "./kit_editor.js";
-import { CellError, Sheet, colName, extent, isFormula, rangeName, refName, wantsRef } from "./kit_cells_rules.js";
+import { CellError, SIDES, Sheet, colName, extent, isFormula, parseRef, rangeName, refName, wantsRef } from "./kit_cells_rules.js";
 import { ask } from "./dialog.js";
+import { choose } from "./actions.js";
 
 const NEW = "~new";
 
@@ -173,8 +180,11 @@ async function renderSheet(b, { record = null, isNew = false, arg }) {
   const ed = isNew
     ? { isNew: true, created: false, id: "", stem: "", rev: null, sheet: new Sheet(), modified: Date.now() / 1000 }
     : { isNew: false, created: false, ...sheetState(b, record) };
+  // `at` is the cell that is selected — the one the formula bar edits —
+  // and `anchor` the far corner of the selection, the same cell when it is
+  // one cell; Infinity for a whole row or column, however wide the grid.
   Object.assign(ed, { b, arg, dirty: false, saving: false, pending: false, timer: null,
-                      at: [0, 0], editing: null, point: null, rows: 0, cols: 0 });
+                      at: [0, 0], anchor: [0, 0], editing: null, point: null, rows: 0, cols: 0 });
   open = ed;
   // The screen is this sheet's until it is left: a new one while the hash
   // says new, a saved one while the hash is its own.
@@ -192,6 +202,7 @@ async function renderSheet(b, { record = null, isNew = false, arg }) {
       <div class="editor cells${b.writes ? "" : " read-only"}">
         <input class="title" placeholder="Title" value="${esc(ed.isNew ? "" : ed.stem)}" autocapitalize="sentences" enterkeyhint="next"${b.writes ? "" : " readonly"}>
         <p class="stamp"><span class="when">${esc(formatDate(ed.modified, { long: true }))}</span><span class="status"></span></p>
+        ${b.writes ? formatBar() : ""}
         <div class="formula-bar"><span class="where">A1</span><input class="formula" spellcheck="false" autocapitalize="none" autocorrect="off" placeholder="Type a value, or =SUM(B1:B3)"${b.writes ? "" : " readonly"}></div>
         <div class="grid-wrap" tabindex="0"><table class="grid"></table></div>
       </div>`;
@@ -215,6 +226,7 @@ async function renderSheet(b, { record = null, isNew = false, arg }) {
   ed.titleEl = box.querySelector(".title");
   ed.statusEl = box.querySelector(".stamp .status");
   ed.whereEl = box.querySelector(".formula-bar .where");
+  ed.formatEl = box.querySelector(".format-bar");
   ed.formulaEl = box.querySelector(".formula");
   ed.wrap = box.querySelector(".grid-wrap");
   ed.table = box.querySelector(".grid");
@@ -245,6 +257,15 @@ async function renderSheet(b, { record = null, isNew = false, arg }) {
     if (ed.dirty) { clearTimeout(ed.timer); saveSheet(ed); }
   });
   done.addEventListener("click", () => { commit(ed); if (document.activeElement) document.activeElement.blur(); });
+  // The border buttons: the grid keeps the focus, so the keys go on working.
+  ed.formatEl.addEventListener("mousedown", (event) => { if (event.target.closest("button")) event.preventDefault(); });
+  ed.formatEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-border]");
+    if (!button) return;
+    if (ed.editing) commit(ed);
+    setBorders(ed, button.dataset.border);
+    ed.wrap.focus();
+  });
   del.addEventListener("click", async () => {
     if (ed.isNew) { back(parent); return; }
     if (!await ask(`Delete “${ed.stem}”?`)) return;
@@ -265,8 +286,9 @@ async function renderSheet(b, { record = null, isNew = false, arg }) {
 // fewer than the selection needs: moving past the edge makes more.
 function drawGrid(ed) {
   const [rows, cols] = extent(ed.sheet.cells);
-  ed.rows = Math.max(rows, ed.at[0] + 2);
-  ed.cols = Math.max(cols, ed.at[1] + 2);
+  const [farRow, farCol] = ed.anchor.map((n) => (Number.isFinite(n) ? n + 2 : 0));
+  ed.rows = Math.max(rows, ed.at[0] + 2, farRow);
+  ed.cols = Math.max(cols, ed.at[1] + 2, farCol);
   const head = `<thead><tr><th class="corner"></th>${
     Array.from({ length: ed.cols }, (_, c) => `<th class="col" data-c="${c}">${colName(c)}</th>`).join("")}</tr></thead>`;
   const body = `<tbody>${Array.from({ length: ed.rows }, (_, r) =>
@@ -285,27 +307,92 @@ function refresh(ed) {
     td.classList.toggle("num", typeof value === "number");
     td.classList.toggle("bad", value instanceof CellError);
     td.classList.toggle("has-formula", isFormula(ed.sheet.raw(name)));
+    const sides = ed.sheet.border(name);
+    for (const side of SIDES) td.classList.toggle(`b-${side}`, sides.includes(side));
   }
 }
 
 const cellAt = (ed, r, c) => ed.table.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
 
-function select(ed, r, c, { scroll = true } = {}) {
+// -- the selection ----------------------------------------------------------------------
+// One cell, or the block between `at` and `anchor`: a drag, Shift and a
+// click or an arrow move the far corner and the cell stays, as in Excel;
+// a heading takes a whole row or column.
+const corner = (ed) => [Math.min(ed.anchor[0], ed.rows - 1), Math.min(ed.anchor[1], ed.cols - 1)];
+const rect = (ed) => {
+  const far = corner(ed);
+  return [Math.min(far[0], ed.at[0]), Math.min(far[1], ed.at[1]), Math.max(far[0], ed.at[0]), Math.max(far[1], ed.at[1])];
+};
+const isRange = (ed) => ed.anchor[0] !== ed.at[0] || ed.anchor[1] !== ed.at[1];
+// Whether the selection is whole rows, or whole columns.
+const wholeRows = (ed) => { const [, c0, , c1] = rect(ed); return c0 === 0 && c1 === ed.cols - 1; };
+const wholeCols = (ed) => { const [r0, , r1] = rect(ed); return r0 === 0 && r1 === ed.rows - 1; };
+
+function select(ed, r, c, { scroll = true, extend = false } = {}) {
   r = Math.max(0, r);
   c = Math.max(0, c);
-  const was = cellAt(ed, ...ed.at);
-  if (was) was.classList.remove("selected");
-  ed.at = [r, c];
-  if (r >= ed.rows || c >= ed.cols) drawGrid(ed);
-  const td = cellAt(ed, r, c);
-  td.classList.add("selected");
-  for (const th of ed.table.querySelectorAll("th.current")) th.classList.remove("current");
-  ed.table.querySelector(`th.row[data-r="${r}"]`).classList.add("current");
-  ed.table.querySelector(`th.col[data-c="${c}"]`).classList.add("current");
-  const name = refName(r, c);
+  if (!extend) ed.at = [r, c];
+  ed.anchor = [r, c];
+  settle(ed, scroll ? [r, c] : null);
+}
+
+// Rows `from` to `to`, whole; the cell the formula bar edits is the first of `from`.
+function selectRows(ed, from, to) {
+  ed.at = [from, 0];
+  ed.anchor = [to, Infinity];
+  settle(ed, null);
+}
+
+function selectCols(ed, from, to) {
+  ed.at = [0, from];
+  ed.anchor = [Infinity, to];
+  settle(ed, null);
+}
+
+// The selection as it now is, shown: the grid grown to hold it, the
+// formula bar on its cell, and `into` scrolled into view.
+function settle(ed, into) {
+  const far = ed.anchor.map((n) => (Number.isFinite(n) ? n : 0));
+  if (Math.max(ed.at[0], far[0]) >= ed.rows || Math.max(ed.at[1], far[1]) >= ed.cols) drawGrid(ed);
+  showSelection(ed);
+  const name = refName(...ed.at);
   ed.whereEl.textContent = name;
   if (document.activeElement !== ed.formulaEl) ed.formulaEl.value = ed.sheet.raw(name);
-  if (scroll) td.scrollIntoView({ block: "nearest", inline: "nearest" });
+  if (into) cellAt(ed, ...into).scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+function showSelection(ed) {
+  for (const el of ed.table.querySelectorAll(".selected, .active, th.current")) el.classList.remove("selected", "active", "current");
+  const [r0, c0, r1, c1] = rect(ed);
+  for (let r = r0; r <= r1; r += 1) {
+    ed.table.querySelector(`th.row[data-r="${r}"]`).classList.add("current");
+    for (let c = c0; c <= c1; c += 1) cellAt(ed, r, c).classList.add("selected");
+  }
+  for (let c = c0; c <= c1; c += 1) ed.table.querySelector(`th.col[data-c="${c}"]`).classList.add("current");
+  cellAt(ed, ...ed.at).classList.add("active");
+  showFormat(ed);
+}
+
+// Every cell of the selection, by name.
+function selectedNames(ed) {
+  const [r0, c0, r1, c1] = rect(ed);
+  const names = [];
+  for (let r = r0; r <= r1; r += 1) for (let c = c0; c <= c1; c += 1) names.push(refName(r, c));
+  return names;
+}
+
+// Delete, with a selection: every cell in it is cleared, and it stays selected.
+function clearSelection(ed) {
+  if (!ed.b.writes) return;
+  if (ed.editing) commit(ed);
+  let changed = false;
+  for (const name of selectedNames(ed)) {
+    if (!ed.sheet.raw(name)) continue;
+    ed.sheet.set(name, "");
+    changed = true;
+  }
+  if (changed) { ed.changed(); refresh(ed); }
+  settle(ed, null);
 }
 
 // -- editing a cell ----------------------------------------------------------------------------
@@ -362,7 +449,220 @@ function cancel(ed) {
   select(ed, ...ed.at, { scroll: false });
 }
 
-const move = (ed, dr, dc) => select(ed, ed.at[0] + dr, ed.at[1] + dc);
+// A step: the cell moves, or with Shift the far corner of the selection.
+function move(ed, dr, dc, extend = false) {
+  const from = extend ? corner(ed) : ed.at;
+  select(ed, from[0] + dr, from[1] + dc, { extend });
+}
+
+// -- borders ---------------------------------------------------------------------------------
+// The buttons over the formula bar: a side of the selection — its top
+// row's top, its last column's right — all four around it, every side of
+// every cell, or none. One that is there already comes off again.
+const BORDER_BUTTONS = [
+  ["all", "All borders"], ["outer", "Outside borders"], ["top", "Top border"], ["bottom", "Bottom border"],
+  ["left", "Left border"], ["right", "Right border"], ["none", "No borders"],
+];
+const GLYPH_LINES = { top: "M2 2h12", right: "M14 2v12", bottom: "M2 14h12", left: "M2 2v12", across: "M2 8h12", down: "M8 2v12" };
+const GLYPH_SOLID = {
+  all: ["top", "right", "bottom", "left", "across", "down"], outer: ["top", "right", "bottom", "left"],
+  top: ["top"], bottom: ["bottom"], left: ["left"], right: ["right"], none: [],
+};
+
+function borderGlyph(kind) {
+  const solid = GLYPH_SOLID[kind];
+  const lines = Object.entries(GLYPH_LINES).map(([side, d]) => solid.includes(side)
+    ? `<path d="${d}" stroke="currentColor" stroke-width="2"/>`
+    : `<path d="${d}" stroke="currentColor" stroke-width="1" stroke-dasharray="1 2" opacity=".45"/>`).join("");
+  return `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" shape-rendering="crispEdges" aria-hidden="true">${lines}</svg>`;
+}
+
+function formatBar() {
+  return `<div class="format-bar" role="toolbar" aria-label="Borders">${BORDER_BUTTONS.map(([kind, label]) =>
+    `<button type="button" class="fmt-button" data-border="${kind}" title="${label}" aria-label="${label}">${borderGlyph(kind)}</button>`).join("")}</div>`;
+}
+
+// Which sides of which cells a button is about, for the selection as it is.
+function borderTargets(ed, kind) {
+  const [r0, c0, r1, c1] = rect(ed);
+  const targets = [];
+  for (let r = r0; r <= r1; r += 1) {
+    for (let c = c0; c <= c1; c += 1) {
+      const name = refName(r, c);
+      const sides = [];
+      if (kind === "all") sides.push(...SIDES);
+      if ((kind === "top" || kind === "outer") && r === r0) sides.push("top");
+      if ((kind === "bottom" || kind === "outer") && r === r1) sides.push("bottom");
+      if ((kind === "left" || kind === "outer") && c === c0) sides.push("left");
+      if ((kind === "right" || kind === "outer") && c === c1) sides.push("right");
+      for (const side of sides) targets.push([name, side]);
+    }
+  }
+  return targets;
+}
+
+function setBorders(ed, kind) {
+  if (!ed.b.writes) return;
+  let changed = false;
+  if (kind === "none") {
+    for (const name of selectedNames(ed)) {
+      if (!ed.sheet.border(name).length) continue;
+      ed.sheet.setBorder(name, []);
+      changed = true;
+    }
+  } else {
+    const targets = borderTargets(ed, kind);
+    const missing = targets.some(([name, side]) => !ed.sheet.border(name).includes(side));
+    for (const [name, side] of targets) {
+      const had = ed.sheet.border(name);
+      ed.sheet.setBorder(name, missing ? [...had, side] : had.filter((s) => s !== side));
+    }
+    changed = targets.length > 0;
+  }
+  if (!changed) return;
+  ed.changed();
+  refresh(ed);
+  showFormat(ed);
+}
+
+// The buttons say which borders the selection has.
+function showFormat(ed) {
+  if (!ed.formatEl) return;
+  for (const button of ed.formatEl.querySelectorAll("button[data-border]")) {
+    const kind = button.dataset.border;
+    if (kind === "none") continue;
+    const targets = borderTargets(ed, kind);
+    const on = targets.length > 0 && targets.every(([name, side]) => ed.sheet.border(name).includes(side));
+    button.classList.toggle("on", on);
+    button.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+}
+
+// -- rows and columns ---------------------------------------------------------------------
+// The menu on a heading, or the right button anywhere: rows or columns put
+// in before or after the selection, as many as are selected, or taken out.
+// The sheet moves and the formulas follow (kit_cells_rules.js). Taking out
+// rows that hold something asks first: there is no undo.
+function menuChoices(ed, kind) {
+  const [r0, c0, r1, c1] = rect(ed);
+  const nr = r1 - r0 + 1;
+  const nc = c1 - c0 + 1;
+  const rowsSaid = nr === 1 ? `row ${r0 + 1}` : `rows ${r0 + 1}–${r1 + 1}`;
+  const colsSaid = nc === 1 ? `column ${colName(c0)}` : `columns ${colName(c0)}–${colName(c1)}`;
+  const rows = [
+    { label: nr === 1 ? "Insert row above" : `Insert ${nr} rows above`, run: () => insertRows(ed, r0, nr) },
+    { label: nr === 1 ? "Insert row below" : `Insert ${nr} rows below`, run: () => insertRows(ed, r1 + 1, nr) },
+    { label: `Delete ${rowsSaid}`, tone: "danger", run: () => deleteRows(ed, r0, nr, rowsSaid) },
+  ];
+  const cols = [
+    { label: nc === 1 ? "Insert column left" : `Insert ${nc} columns left`, run: () => insertCols(ed, c0, nc) },
+    { label: nc === 1 ? "Insert column right" : `Insert ${nc} columns right`, run: () => insertCols(ed, c1 + 1, nc) },
+    { label: `Delete ${colsSaid}`, tone: "danger", run: () => deleteCols(ed, c0, nc, colsSaid) },
+  ];
+  const clear = selectedNames(ed).some((name) => ed.sheet.raw(name)) ? [{ label: "Clear", run: () => clearSelection(ed) }, { sep: true }] : [];
+  if (kind === "rows") return [...clear, ...rows];
+  if (kind === "cols") return [...clear, ...cols];
+  return [...clear, ...rows, { sep: true }, ...cols];
+}
+
+let menuOpen = null;
+function closeMenu() { if (menuOpen) menuOpen(); }
+
+/** The menu for the selection: at the pointer on a computer, a sheet from the bottom on a phone. */
+function openMenu(ed, kind, { x = null, y = null } = {}) {
+  closeMenu();
+  const choices = menuChoices(ed, kind);
+  if (matchMedia("(pointer: coarse)").matches || x === null) {
+    choose("", choices.filter((c) => !c.sep));
+    return;
+  }
+  const menu = document.createElement("div");
+  menu.className = "cell-menu";
+  menu.setAttribute("role", "menu");
+  menu.innerHTML = choices.map((c, i) => (c.sep ? "<hr>" :
+    `<button type="button" role="menuitem"${c.tone === "danger" ? ' class="danger"' : ""} data-choice="${i}">${esc(c.label)}</button>`)).join("");
+  document.body.appendChild(menu);
+  menu.style.left = `${Math.max(8, Math.min(x, innerWidth - menu.offsetWidth - 8))}px`;
+  menu.style.top = `${Math.max(8, Math.min(y, innerHeight - menu.offsetHeight - 8))}px`;
+  const items = [...menu.querySelectorAll("button")];
+  const gone = new AbortController();
+  const close = () => { menu.remove(); gone.abort(); menuOpen = null; };
+  menuOpen = close;
+  menu.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-choice]");
+    if (!button) return;
+    close();
+    ed.wrap.focus();
+    choices[+button.dataset.choice].run();
+  });
+  menu.addEventListener("keydown", (event) => {
+    const i = items.indexOf(document.activeElement);
+    if (event.key === "ArrowDown") items[(i + 1) % items.length].focus();
+    else if (event.key === "ArrowUp") items[(i - 1 + items.length) % items.length].focus();
+    else if (event.key === "Escape" || event.key === "Tab") { close(); ed.wrap.focus(); }
+    else return;
+    event.preventDefault();
+  });
+  const { signal } = gone;
+  document.addEventListener("mousedown", (event) => { if (!menu.contains(event.target)) close(); }, { capture: true, signal });
+  document.addEventListener("scroll", close, { capture: true, signal });
+  addEventListener("resize", close, { signal });
+  addEventListener("hashchange", close, { signal });
+  items[0].focus();
+}
+
+// How many cells rows (or columns) `from` to `to` hold.
+function heldBy(ed, axis, from, to) {
+  return Object.keys(ed.sheet.cells).filter((name) => {
+    const at = parseRef(name);
+    return at && at[axis] >= from && at[axis] <= to;
+  }).length;
+}
+
+async function mayTakeOut(ed, axis, from, to, said) {
+  const held = heldBy(ed, axis, from, to);
+  if (!held) return true;
+  const what = held === 1 ? "One cell has something in it" : `${held} cells have something in them`;
+  return await ask(`Delete ${said}?\n\n${what}, and there is no undo.`);
+}
+
+function insertRows(ed, at, n) {
+  if (ed.editing) commit(ed);
+  ed.sheet.insertRows(at, n);
+  ed.changed();
+  ed.at = ed.anchor = [at, 0];
+  drawGrid(ed);
+  selectRows(ed, at, at + n - 1);
+}
+
+async function deleteRows(ed, at, n, said) {
+  if (ed.editing) commit(ed);
+  if (!await mayTakeOut(ed, 0, at, at + n - 1, said)) return;
+  ed.sheet.deleteRows(at, n);
+  ed.changed();
+  ed.at = ed.anchor = [at, 0];
+  drawGrid(ed);
+  selectRows(ed, at, at);
+}
+
+function insertCols(ed, at, n) {
+  if (ed.editing) commit(ed);
+  ed.sheet.insertCols(at, n);
+  ed.changed();
+  ed.at = ed.anchor = [0, at];
+  drawGrid(ed);
+  selectCols(ed, at, at + n - 1);
+}
+
+async function deleteCols(ed, at, n, said) {
+  if (ed.editing) commit(ed);
+  if (!await mayTakeOut(ed, 1, at, at + n - 1, said)) return;
+  ed.sheet.deleteCols(at, n);
+  ed.changed();
+  ed.at = ed.anchor = [0, at];
+  drawGrid(ed);
+  selectCols(ed, at, at);
+}
 
 // -- pointing ----------------------------------------------------------------------------
 // Excel's way of writing a reference. While the formula wants one — after
@@ -429,17 +729,62 @@ function pointKeys(ed, input, event) {
   return false;
 }
 
+// What the mouse button went down on, until it comes up: a drag across
+// cells, down the row headings or along the column headings widens the
+// selection; while a formula wants a reference, it points out a range.
+let drag = null;
+let dragWired = false;
+const placeOf = (el) => (el && el.dataset.r !== undefined ? +el.dataset.r : null);
+const colOf = (el) => (el && el.dataset.c !== undefined ? +el.dataset.c : null);
+const coarse = () => matchMedia("(pointer: coarse)").matches;
+
 function wireGrid(ed) {
   const { wrap, table, formulaEl } = ed;
+  if (!dragWired) { document.addEventListener("mouseup", () => { drag = null; }); dragWired = true; }
   table.addEventListener("mousedown", (event) => {
+    if (event.button !== 0 || event.target.tagName === "INPUT") return;
     const td = event.target.closest("td");
-    if (!td || event.target.tagName === "INPUT") return;
+    const th = event.target.closest("th");
+    if (!td && !th) return;
     event.preventDefault();
     const input = editingInput(ed);
-    if (input && pointing(ed, input)) { pointTo(ed, input, [+td.dataset.r, +td.dataset.c], event.shiftKey); return; }
-    if (ed.editing) commit(ed);
-    select(ed, +td.dataset.r, +td.dataset.c, { scroll: false });
+    if (td && input && pointing(ed, input)) {
+      pointTo(ed, input, [+td.dataset.r, +td.dataset.c], event.shiftKey);
+      drag = { kind: "point", input };
+      return;
+    }
+    // The focus first: the formula bar, or the cell's input, keeps what
+    // was typed in the cell it was for.
     wrap.focus();
+    if (ed.editing) commit(ed);
+    if (td) {
+      select(ed, +td.dataset.r, +td.dataset.c, { scroll: false, extend: event.shiftKey });
+      drag = { kind: "cells" };
+    } else if (th.classList.contains("row")) {
+      const from = event.shiftKey ? ed.at[0] : +th.dataset.r;
+      selectRows(ed, from, +th.dataset.r);
+      drag = { kind: "rows", from };
+    } else if (th.classList.contains("col")) {
+      const from = event.shiftKey ? ed.at[1] : +th.dataset.c;
+      selectCols(ed, from, +th.dataset.c);
+      drag = { kind: "cols", from };
+    } else {
+      // The corner: everything.
+      ed.at = [0, 0];
+      ed.anchor = [Infinity, Infinity];
+      settle(ed, null);
+    }
+  });
+  table.addEventListener("mouseover", (event) => {
+    if (!drag) return;
+    const td = event.target.closest("td");
+    const el = td || event.target.closest("th");
+    const r = placeOf(el);
+    const c = colOf(el);
+    if (drag.kind === "cells" && td) select(ed, r, c, { extend: true, scroll: false });
+    else if (drag.kind === "rows" && r !== null) selectRows(ed, drag.from, r);
+    else if (drag.kind === "cols" && c !== null) selectCols(ed, drag.from, c);
+    else if (drag.kind === "point" && td) pointTo(ed, drag.input, [r, c], true);
   });
   table.addEventListener("dblclick", (event) => {
     const td = event.target.closest("td");
@@ -447,29 +792,68 @@ function wireGrid(ed) {
     select(ed, +td.dataset.r, +td.dataset.c, { scroll: false });
     edit(ed);
   });
-  // A finger has no double tap worth waiting for: the second tap on the
-  // selected cell opens it.
+  // A finger has no double tap worth waiting for, and no right button: the
+  // second tap on the selected cell opens it, on a selected heading its menu.
   table.addEventListener("click", (event) => {
+    if (event.target.tagName === "INPUT" || !coarse()) return;
     const td = event.target.closest("td");
-    if (!td || event.target.tagName === "INPUT" || !matchMedia("(pointer: coarse)").matches) return;
-    if (+td.dataset.r === ed.at[0] && +td.dataset.c === ed.at[1] && !ed.editing) edit(ed);
+    const th = event.target.closest("th");
+    if (td) {
+      if (+td.dataset.r === ed.at[0] && +td.dataset.c === ed.at[1] && !ed.editing && !isRange(ed)) edit(ed);
+      return;
+    }
+    if (!th || !ed.b.writes) return;
+    const [r0, c0, r1, c1] = rect(ed);
+    const r = placeOf(th);
+    const c = colOf(th);
+    if (r !== null && wholeRows(ed) && r >= r0 && r <= r1 && !event.shiftKey) openMenu(ed, "rows");
+    else if (c !== null && wholeCols(ed) && c >= c0 && c <= c1 && !event.shiftKey) openMenu(ed, "cols");
+  });
+  table.addEventListener("contextmenu", (event) => {
+    if (!ed.b.writes || event.target.tagName === "INPUT") return;
+    const td = event.target.closest("td");
+    const th = event.target.closest("th");
+    if (!td && !th) return;
+    event.preventDefault();
+    wrap.focus();
+    if (ed.editing) commit(ed);
+    const [r0, c0, r1, c1] = rect(ed);
+    let kind;
+    if (td) {
+      const [r, c] = [+td.dataset.r, +td.dataset.c];
+      if (r < r0 || r > r1 || c < c0 || c > c1) select(ed, r, c, { scroll: false });
+      kind = "cell";
+    } else if (th.classList.contains("row")) {
+      const r = +th.dataset.r;
+      if (!(wholeRows(ed) && r >= r0 && r <= r1)) selectRows(ed, r, r);
+      kind = "rows";
+    } else if (th.classList.contains("col")) {
+      const c = +th.dataset.c;
+      if (!(wholeCols(ed) && c >= c0 && c <= c1)) selectCols(ed, c, c);
+      kind = "cols";
+    } else return;
+    openMenu(ed, kind, { x: event.clientX, y: event.clientY });
   });
   wrap.addEventListener("keydown", (event) => {
     if (ed.editing || event.target !== wrap) return;
-    const { key } = event;
-    if (key === "ArrowDown") move(ed, 1, 0);
-    else if (key === "ArrowUp") move(ed, -1, 0);
-    else if (key === "ArrowRight") move(ed, 0, 1);
-    else if (key === "ArrowLeft") move(ed, 0, -1);
-    else if (key === "Tab") move(ed, 0, event.shiftKey ? -1 : 1);
+    const { key, shiftKey } = event;
+    if (key === "ArrowDown") move(ed, 1, 0, shiftKey);
+    else if (key === "ArrowUp") move(ed, -1, 0, shiftKey);
+    else if (key === "ArrowRight") move(ed, 0, 1, shiftKey);
+    else if (key === "ArrowLeft") move(ed, 0, -1, shiftKey);
+    else if (key === "Tab") move(ed, 0, shiftKey ? -1 : 1);
     else if (key === "Enter" || key === "F2") edit(ed);
-    else if (key === "Delete" || key === "Backspace") {
+    else if (key === "Delete" || key === "Backspace") clearSelection(ed);
+    else if (key === "Escape") { if (!isRange(ed)) return; select(ed, ...ed.at, { scroll: false }); }
+    else if (key === " " && shiftKey) { const [r0, , r1] = rect(ed); selectRows(ed, r0, r1); }
+    else if (key === " " && (event.ctrlKey || event.metaKey)) { const [, c0, , c1] = rect(ed); selectCols(ed, c0, c1); }
+    else if (key === "ContextMenu" || (key === "F10" && shiftKey)) {
       if (!ed.b.writes) return;
-      if (put(ed, refName(...ed.at), "")) refresh(ed);
-      select(ed, ...ed.at, { scroll: false });
-    } else if (key === "Home") select(ed, ed.at[0], 0);
-    else if (key === "PageDown") move(ed, 10, 0);
-    else if (key === "PageUp") move(ed, -10, 0);
+      const box = cellAt(ed, ...ed.at).getBoundingClientRect();
+      openMenu(ed, wholeRows(ed) ? "rows" : wholeCols(ed) ? "cols" : "cell", { x: box.left + 12, y: box.bottom });
+    } else if (key === "Home") select(ed, ed.at[0], 0, { extend: shiftKey });
+    else if (key === "PageDown") move(ed, 10, 0, shiftKey);
+    else if (key === "PageUp") move(ed, -10, 0, shiftKey);
     else if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) edit(ed, { initial: key });
     else return;
     event.preventDefault();

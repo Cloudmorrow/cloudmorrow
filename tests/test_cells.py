@@ -91,6 +91,9 @@ SHEET = {
     "C58": "=1/3*3",
     "C59": "=B4:B4",
     "C60": "=2.50",
+    "C61": "=#REF!+1",
+    "C62": '=IFERROR(#REF!, "gone")',
+    "C63": "=SUM(B1:B2, #DIV/0!)",
 }
 
 SHOWN = {
@@ -165,6 +168,9 @@ SHOWN = {
     "C58": "1",
     "C59": "#VALUE!",
     "C60": "2.5",
+    "C61": "#REF!",
+    "C62": "gone",
+    "C63": "#DIV/0!",
 }
 
 
@@ -229,6 +235,122 @@ def test_javascript_writes_the_same_file(tmp_path):
     # And an empty sheet the same.
     done = subprocess.run(["node", str(script)], input="", capture_output=True, text=True, check=False)
     assert done.stdout == cells.file_text({})
+
+
+# -- the format, and what else sits beside the cells ----------------------------------
+STYLED_TEXT = (
+    '{\n  "cells": {\n    "A1": "1",\n    "A2": "=A1*2"\n  },\n'
+    '  "format": {\n    "A1": {\n      "border": "top bottom"\n    },\n'
+    '    "B2": {\n      "border": "top right bottom left",\n      "bold": true\n    }\n  },\n'
+    '  "columns": {\n    "A": 20\n  }\n}\n'
+)
+STYLED_TYPED = (
+    '{"columns": {"A": 20}, "format": {"b2": {"bold": true, "border": "all"}, "a1": {"border": "bottom, top, inside"},'
+    ' "C3": {"border": ""}, "nope": {"border": "top"}, "D4": "top"}, "cells": {"A2": "=A1*2", "A1": "1"}}'
+)
+
+
+def test_the_format_is_written_beside_the_cells_and_the_rest_kept():
+    sheet = cells.Sheet.from_text(STYLED_TYPED)
+    assert sheet.to_text() == STYLED_TEXT
+    assert sheet.border("a1") == ["top", "bottom"] and sheet.border("B2") == list(cells.SIDES) == ["top", "right", "bottom", "left"]
+    assert sheet.border("C3") == [] and sheet.border("nope") == []
+    sheet.set_border("A1", ["left", "top"])
+    assert sheet.border("A1") == ["top", "left"], "in the sides' order, however they were said"
+    sheet.set_border("B2", [])
+    assert sheet.format == {"A1": {"border": "top left"}, "B2": {"bold": True}}, "what else a cell says stays"
+    sheet.set_border("A1", "")
+    assert "A1" not in sheet.format
+    with pytest.raises(ValueError):
+        sheet.set_border("nope", ["top"])
+    assert cells.parse_file('{"a1": "1"}') == ({"A1": "1"}, {}, {})
+    assert cells.parse_file("[1]") == ({}, {}, {}) and cells.parse_file('{"cells": 1, "format": {"A1": {"border": "top"}}}') == ({}, {}, {})
+
+
+# -- rows and columns -------------------------------------------------------------------
+# A formula, which rows (0) or columns (1) move where — `count` put in at
+# `at`, or taken out there when count < 0 — and what it says after.
+SHIFTS = [
+    ["=A1+A3", 0, 1, 1, "=A1+A4"],
+    ["=A1+A3", 0, 1, -1, "=A1+A2"],
+    ["=A2*2", 0, 1, -1, "=#REF!*2"],
+    ["=A2*2", 0, 0, -2, "=#REF!*2"],
+    ["=SUM(A1:A3)", 0, 1, 1, "=SUM(A1:A4)"],
+    ["=SUM(A1:A3)", 0, 0, 2, "=SUM(A3:A5)"],
+    ["=SUM(A1:A3)", 0, 3, 1, "=SUM(A1:A3)"],
+    ["=SUM(A1:A3)", 0, 1, -1, "=SUM(A1:A2)"],
+    ["=SUM(A1:A3)", 0, 2, -5, "=SUM(A1:A2)"],
+    ["=SUM(A1:A3)", 0, 0, -3, "=SUM(#REF!)"],
+    ["=SUM(A1 : A3)", 0, 2, -1, "=SUM(A1 : A2)"],
+    ["=C3:A1", 0, 0, -1, "=C2:A1"],
+    ["=$A$3+A$3+$A3", 0, 0, -1, "=$A$2+A$2+$A2"],
+    ["=a3+1", 0, 1, 2, "=A5+1"],
+    ['="A3"&A3', 0, 0, -1, '="A3"&A2'],
+    ["=LOG10(A3)", 0, 0, 1, "=LOG10(A4)"],
+    ["=B1+C1", 1, 1, -1, "=#REF!+B1"],
+    ["=SUM(A1:C1)", 1, 1, 1, "=SUM(A1:D1)"],
+    ["=SUM(A1:C1)+Z9", 1, 0, -3, "=SUM(#REF!)+W9"],
+    ["=A1", 0, 5, 0, "=A1"],
+    ["A3", 0, 0, 1, "A3"],
+    ["=1 +", 0, 0, 1, "=1 +"],
+]
+MOVED_TYPED = (
+    '{"cells": {"A1": "1", "A2": "2", "A3": "=SUM(A1:A2)", "B1": "=A2*2", "C5": "x"},'
+    ' "format": {"A3": {"border": "top"}, "A2": {"border": "left"}}, "columns": {"A": 20}}'
+)
+MOVED_TEXT = (
+    '{\n  "cells": {\n    "C1": "1",\n    "D1": "=#REF!*2",\n    "C2": "=SUM(C1:C1)",\n    "E4": "x",\n'
+    '    "A7": "new"\n  },\n  "format": {\n    "C2": {\n      "border": "top"\n    }\n  },\n'
+    '  "columns": {\n    "A": 20\n  }\n}\n'
+)
+
+
+def test_a_formula_follows_the_rows_and_columns():
+    for raw, axis, at, count, after in SHIFTS:
+        assert cells.shift_formula(raw, axis, at, count) == after, raw
+
+
+def test_the_sheet_moves_with_its_rows_and_columns():
+    sheet = cells.Sheet.from_text(MOVED_TYPED)
+    sheet.delete_rows(1)
+    sheet.insert_cols(0, 2)
+    sheet.set("A7", "new")
+    assert sheet.to_text() == MOVED_TEXT
+    assert sheet.shown("C2") == "1" and sheet.shown("D1") == "#REF!"
+    sheet.insert_rows(0, 3)
+    assert sheet.raw("C5") == "=SUM(C4:C4)" and sheet.border("C5") == ["top"] and sheet.shown("C5") == "1"
+    sheet.delete_cols(2, 2)
+    assert sheet.cells == {"A10": "new", "C7": "x"} and sheet.format == {}
+    sheet.insert_rows(-1, 2)
+    sheet.delete_rows(0, 0)
+    assert sheet.cells == {"A10": "new", "C7": "x"}, "nowhere, or nothing, is nothing"
+
+
+@node
+def test_javascript_moves_the_same(tmp_path):
+    rules = (WEB / "kit_cells_rules.js").resolve().as_posix()
+    script = tmp_path / "moves.mjs"
+    script.write_text(
+        f'import {{ Sheet, shiftFormula }} from "{rules}";\n'
+        "const shifts = " + json.dumps(SHIFTS) + ".map(([raw, axis, at, count]) => shiftFormula(raw, axis, at, count));\n"
+        "const sheet = Sheet.fromText(" + json.dumps(MOVED_TYPED) + ");\n"
+        "sheet.deleteRows(1); sheet.insertCols(0, 2); sheet.set('A7', 'new');\n"
+        "const styled = Sheet.fromText(" + json.dumps(STYLED_TYPED) + ");\n"
+        "const borders = [styled.border('a1'), styled.border('B2'), styled.border('C3')];\n"
+        "styled.setBorder('A1', ['left', 'top']); styled.setBorder('B2', []);\n"
+        "console.log(JSON.stringify({ shifts, moved: sheet.toText(), shown: [sheet.shown('C2'), sheet.shown('D1')],"
+        " styled: Sheet.fromText(" + json.dumps(STYLED_TYPED) + ").toText(), borders, format: styled.format }));\n",
+        encoding="utf-8",
+    )
+    done = subprocess.run(["node", str(script)], capture_output=True, text=True, check=False)
+    assert done.returncode == 0, done.stderr
+    got = json.loads(done.stdout)
+    assert got["shifts"] == [after for *_, after in SHIFTS]
+    assert got["moved"] == MOVED_TEXT, "byte for byte"
+    assert got["shown"] == ["1", "#REF!"]
+    assert got["styled"] == STYLED_TEXT, "byte for byte"
+    assert got["borders"] == [["top", "bottom"], list(cells.SIDES), []]
+    assert got["format"] == {"A1": {"border": "top left"}, "B2": {"bold": True}}
 
 
 # Where a cell's name may go in what is typed so far, and a range's name
