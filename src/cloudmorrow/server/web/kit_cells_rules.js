@@ -7,7 +7,14 @@
    it, one entry per cell that has something in it, keyed by the cell's
    name: {"cells": {"A1": "Rent", "B1": "1200", "B4": "=SUM(B1:B3)"}}. What
    is kept is what was typed; what it is — a number, a formula, text — is
-   worked out on reading.
+   worked out on reading. Beside the cells the file may hold a `format`:
+   per cell, how it looks — for now its borders, {"B5": {"border": "top
+   bottom"}} — and whatever else sits beside those is kept as found.
+
+   A row or a column can be put in or taken out (Sheet.insertRows and the
+   rest): the cells move, and every formula's references follow, as in
+   Excel — a reference to a cell taken out becomes #REF!, a range that
+   loses a row shrinks, one that gains a row grows.
 
    A value is a number, a string, a boolean, null (blank) or an Error. */
 
@@ -89,9 +96,139 @@ export function orderedCells(cells) {
   return ordered;
 }
 
+// -- the format --------------------------------------------------------------------------
+// Beside the cells, how a cell looks: for now its borders. Written only for
+// the cells that have any, {"B5": {"border": "top bottom"}}, the sides in
+// SIDES' order; a key that is not known is kept as it is, for whoever wrote it.
+export const SIDES = ["top", "right", "bottom", "left"];
+
+/** `"bottom top"` → ["top", "bottom"], in SIDES' order; `all` is the four;
+    a word that is no side is passed over. */
+export function parseSides(value) {
+  const words = String(value || "").replace(/,/g, " ").toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.includes("all")) return [...SIDES];
+  return SIDES.filter((side) => words.includes(side));
+}
+
+/** The `format` object of a `.cell` file: per cell, how it looks. Names
+    are made proper; a cell with nothing to say is left out. */
+export function parseFormat(value) {
+  if (!isObject(value)) return {};
+  const found = {};
+  for (const [key, entry] of Object.entries(value)) {
+    const at = parseRef(key);
+    if (!at || !isObject(entry)) continue;
+    const rest = Object.fromEntries(Object.entries(entry).filter(([k]) => k !== "border"));
+    const sides = parseSides(entry.border);
+    const kept = sides.length ? { border: sides.join(" "), ...rest } : rest;
+    if (Object.keys(kept).length) found[refName(...at)] = kept;
+  }
+  return found;
+}
+
+function orderedFormat(format) {
+  const ordered = {};
+  for (const name of Object.keys(format).sort(byPlace)) {
+    if (format[name] && Object.keys(format[name]).length) ordered[name] = format[name];
+  }
+  return ordered;
+}
+
+/** A `.cell` file's text, or the object it holds, taken apart: the cells,
+    the format, and whatever else sits beside them, kept for writing back. */
+export function parseFile(value) {
+  let data = value;
+  if (typeof value === "string") {
+    try { data = value.trim() ? JSON.parse(value) : {}; }
+    catch { return [{}, {}, {}]; }
+  }
+  if (!isObject(data)) return [{}, {}, {}];
+  // The cells alone, with nothing around them, are a sheet too.
+  if (!isObject(data.cells)) return [parseCells(data), {}, {}];
+  const extra = Object.fromEntries(Object.entries(data).filter(([k]) => k !== "cells" && k !== "format"));
+  return [parseCells(data.cells), parseFormat(data.format), extra];
+}
+
 /** A `.cell` file's text: one JSON object with the cells in it, a cell a
-    line, by row then column — the same bytes quill/cells.py writes. */
-export const fileText = (cells) => JSON.stringify({ cells: orderedCells(cells) }, null, 2) + "\n";
+    line, by row then column, then the format of the cells that have one,
+    then whatever else was found beside them — the same bytes
+    quill/cells.py writes. */
+export function fileText(cells, format = {}, extra = {}) {
+  const data = { cells: orderedCells(cells) };
+  const kept = orderedFormat(format);
+  if (Object.keys(kept).length) data.format = kept;
+  for (const [key, value] of Object.entries(extra)) if (!(key in data)) data[key] = value;
+  return JSON.stringify(data, null, 2) + "\n";
+}
+
+// -- rows and columns ------------------------------------------------------------------
+// Putting rows (or columns) in, or taking them out, moves what is past them,
+// and every formula's references follow, as Excel's do.
+
+/** Where row (or column) `index` goes when `count` are put in at `at`
+    (count > 0), or that many taken out there (count < 0): null for one
+    that is taken out. */
+export function shiftIndex(index, at, count) {
+  if (count > 0) return index >= at ? index + count : index;
+  if (index >= at - count) return index + count;
+  return index >= at ? null : index;
+}
+
+function shiftPlace(place, axis, at, count) {
+  if (!place) return null;
+  const moved = shiftIndex(place[axis], at, count);
+  if (moved === null) return null;
+  return axis === 0 ? [moved, place[1]] : [place[0], moved];
+}
+
+// A reference in a formula, or a range of two, outside a string: not a
+// function's name (`LOG10(`), not part of a longer word.
+const REF_IN_FORMULA = /("(?:[^"]|"")*")|(?<![A-Za-z0-9_.$])(\$?[A-Za-z]{1,3}\$?[0-9]+)(?:(\s*:\s*)(\$?[A-Za-z]{1,3}\$?[0-9]+))?(?![A-Za-z0-9_.(])/g;
+
+// `place` named the way `like` was: its `$`s kept, its letters proper.
+function refText(like, place) {
+  const colDollar = like.startsWith("$") ? "$" : "";
+  const rowDollar = like.slice(1).includes("$") ? "$" : "";
+  return `${colDollar}${colName(place[1])}${rowDollar}${place[0] + 1}`;
+}
+
+/** A formula with its references moved along: `count` rows (axis 0) or
+    columns (axis 1) put in at `at`, or taken out there when count < 0. A
+    reference to a cell taken out becomes #REF!; a range that loses rows
+    shrinks, one with rows put in grows, one wholly taken out is #REF!.
+    What is not a formula is as it was. */
+export function shiftFormula(raw, axis, at, count) {
+  if (!isFormula(raw) || count === 0) return raw;
+  const withAxis = (place, index) => (axis === 0 ? [index, place[1]] : [place[0], index]);
+  const fixed = String(raw).slice(1).replace(REF_IN_FORMULA, (whole, string, a, colon, b) => {
+    if (string) return whole;
+    const pa = parseRef(a);
+    if (!pa) return whole;
+    if (b === undefined) {
+      const moved = shiftIndex(pa[axis], at, count);
+      if (moved === null) return "#REF!";
+      return moved === pa[axis] ? whole : refText(a, withAxis(pa, moved));
+    }
+    const pb = parseRef(b);
+    if (!pb) return whole;
+    const [lo, hi] = [Math.min(pa[axis], pb[axis]), Math.max(pa[axis], pb[axis])];
+    let lo2;
+    let hi2;
+    if (count > 0) {
+      lo2 = lo >= at ? lo + count : lo;
+      hi2 = hi >= at ? hi + count : hi;
+    } else {
+      const n = -count;
+      lo2 = lo < at ? lo : lo >= at + n ? lo - n : at;
+      hi2 = hi < at ? hi : hi >= at + n ? hi - n : at - 1;
+      if (lo2 > hi2) return "#REF!";
+    }
+    if (lo2 === lo && hi2 === hi) return whole;
+    const aIsLo = pa[axis] <= pb[axis];
+    return refText(a, withAxis(pa, aIsLo ? lo2 : hi2)) + colon + refText(b, withAxis(pb, aIsLo ? hi2 : lo2));
+  });
+  return "=" + fixed;
+}
 
 /** [rows, cols] the sheet is drawn with: what is used, with room beyond it. */
 export function extent(cells) {
@@ -200,7 +337,7 @@ function truth(value) {
 }
 
 // -- the tokens -------------------------------------------------------------------------
-const TOKEN = /\s*(?:(?<number>(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)|(?<string>"(?:[^"]|"")*")|(?<name>\$?[A-Za-z_][A-Za-z0-9_.]*\$?[0-9]*)|(?<op><>|<=|>=|[-+*/^&=<>%(),:]))/y;
+const TOKEN = /\s*(?:(?<number>(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)|(?<string>"(?:[^"]|"")*")|(?<error>#(?:REF!|DIV\/0!|NAME\?|VALUE!|NUM!|CIRC!|N\/A))|(?<name>\$?[A-Za-z_][A-Za-z0-9_.]*\$?[0-9]*)|(?<op><>|<=|>=|[-+*/^&=<>%(),:]))/y;
 
 class FormulaError extends Error {
   constructor(error) { super(error.code); this.error = error; }
@@ -286,6 +423,8 @@ class Parser {
     const [kind, text] = token;
     if (kind === "number") { this.take(); return ["num", Number(text)]; }
     if (kind === "string") { this.take(); return ["str", text.slice(1, -1).replace(/""/g, '"')]; }
+    // `#REF!` written in a formula — left by a row taken out — is that error.
+    if (kind === "error") { this.take(); return ["err", text]; }
     if (kind === "op" && text === "(") {
       this.take();
       const node = this.comparison();
@@ -523,15 +662,57 @@ export function compare(symbol, left, right) {
 
 // -- the sheet ------------------------------------------------------------------------
 export class Sheet {
-  constructor(cells = {}) {
+  constructor(cells = {}, format = {}, extra = {}) {
     this.cells = { ...cells };
+    // How a cell looks, by name, for the cells that say: {"B5": {"border": "top"}}.
+    this.format = Object.fromEntries(Object.entries(format).map(([name, entry]) => [name, { ...entry }]));
+    // Whatever else the file held beside the cells and the format, kept as found.
+    this.extra = { ...extra };
     this.cache = new Map();
     this.busy = new Set();
   }
   /** From a `.cell` file's text (a file record's `text` field). */
-  static fromText(value) { return new Sheet(parseCells(value)); }
+  static fromText(value) { return new Sheet(...parseFile(value)); }
   /** The `.cell` file's text, for writing back. */
-  toText() { return fileText(this.cells); }
+  toText() { return fileText(this.cells, this.format, this.extra); }
+  /** The sides of a cell that have a border, in SIDES' order. */
+  border(name) {
+    const at = parseRef(name);
+    return at ? parseSides((this.format[refName(...at)] || {}).border) : [];
+  }
+  /** Which sides of a cell have a border; none clears them. */
+  setBorder(name, sides) {
+    const at = parseRef(name);
+    if (!at) throw new Error(`${name} is no cell`);
+    const key = refName(...at);
+    const words = parseSides([...sides].join(" "));
+    const rest = Object.fromEntries(Object.entries(this.format[key] || {}).filter(([k]) => k !== "border"));
+    const entry = words.length ? { border: words.join(" "), ...rest } : rest;
+    if (Object.keys(entry).length) this.format[key] = entry;
+    else delete this.format[key];
+  }
+  /** `count` empty rows put in before row `at` (counted from zero). */
+  insertRows(at, count = 1) { this.shift(0, at, count); }
+  /** Rows `at` to `at + count - 1` taken out. */
+  deleteRows(at, count = 1) { this.shift(0, at, -count); }
+  insertCols(at, count = 1) { this.shift(1, at, count); }
+  deleteCols(at, count = 1) { this.shift(1, at, -count); }
+  shift(axis, at, count) {
+    if (at < 0 || count === 0) return;
+    const cells = {};
+    for (const [name, raw] of Object.entries(this.cells)) {
+      const place = shiftPlace(parseRef(name), axis, at, count);
+      if (place) cells[refName(...place)] = shiftFormula(raw, axis, at, count);
+    }
+    const format = {};
+    for (const [name, entry] of Object.entries(this.format)) {
+      const place = shiftPlace(parseRef(name), axis, at, count);
+      if (place) format[refName(...place)] = entry;
+    }
+    this.cells = cells;
+    this.format = format;
+    this.cache.clear();
+  }
   raw(name) { return this.cells[name] || ""; }
   /** What is typed into a cell; nothing clears it. */
   set(name, raw) {
@@ -570,6 +751,7 @@ export class Sheet {
   evaluate(node) {
     const kind = node[0];
     if (kind === "num" || kind === "str" || kind === "bool") return node[1];
+    if (kind === "err") return new CellError(node[1]);
     if (kind === "ref") return this.value(refName(node[1], node[2]));
     if (kind === "range") {
       const out = [];
