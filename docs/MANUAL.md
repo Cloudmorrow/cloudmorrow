@@ -814,7 +814,8 @@ release is out, a box above the button says so, with its version and
 **Release notes**: every release from the one this server runs to the latest,
 newest first, each with the note on its tag and what went into it. The server
 looks at its git remote for them when the side is opened, at most once a
-quarter of an hour. Nothing an administrator sets is in a config file; the
+quarter of an hour, and the button is asleep until the look finds one: on
+the latest release there is nothing to update to. Nothing an administrator sets is in a config file; the
 file is for the person who installed the server. The two sides with the most
 in them:
 
