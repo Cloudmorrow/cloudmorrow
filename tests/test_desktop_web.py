@@ -15,7 +15,7 @@ from cloudmorrow.server.routes.web import WEB
 
 # The only selectors allowed to reach the phone: all are for elements that
 # did not exist before this file, and all only hide them.
-PHONE_SAFE = {".tabs .rail-head", ".aside-tabs .tabs", ".tabs .rail-section", ".tabs .tab.admin"}
+PHONE_SAFE = {".tabs .rail-head", ".aside-tabs .tabs, .aside-tabs .subtabs", ".tabs .rail-section", ".tabs .tab.admin"}
 
 
 def strip_comments(css: str) -> str:
@@ -92,3 +92,34 @@ def test_the_rail_shelves_the_quills_by_their_categories() -> None:
     assert core.index("shelves(own.filter") < core.index('section("Your cloud"')
     # The heading is the catalog's text, escaped on the way in.
     assert '<div class="rail-section">${esc(title)}</div>' in core
+
+
+def test_a_quill_is_one_tab_with_its_screens_under_it() -> None:
+    """A Quill with several screens is one tab, the Quill's own, with the
+    screens as the items under it: drawn only while one of them is on show,
+    nested under the tab in the rail and in a strip above the phone's bar.
+    A Quill with one screen is that screen's tab, as it always was."""
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    quills = (WEB / "quills.js").read_text(encoding="utf-8")
+    base = (WEB / "base.css").read_text(encoding="utf-8")
+    desktop = (WEB / "desktop.css").read_text(encoding="utf-8")
+    # quills.js: the tab is the Quill, its screens under it, each with its own icon.
+    assert "name: one ? screens[0].name : quill.id," in quills
+    assert "label: one ? screens[0].label : quill.name," in quills
+    assert "screens: one ? [] : screens," in quills
+    assert "icon: pixelIcon(screen.icon)," in quills
+    assert "href: () => screenHash(quill, quill.screens[0])," in quills
+    # core.js: the items only under an open tab, and the strip only for one.
+    assert '(open ? t.screens.map(drawItem).join("") : "")' in core
+    assert '<a class="tab sub${s.name === active ? " active" : ""}"' in core
+    assert '<nav class="subtabs" aria-label="${esc(opened.label)}">' in core
+    assert 'data-screens="${t.screens.map((s) => s.name).join(" ")}"' in core
+    # Tapping an item lights it and the tab it is under before the screen comes.
+    assert '(t.dataset.screens || "").split(" ").includes(name)' in core
+    assert 'event.target.closest("nav.tabs > .tab, nav.subtabs > .tab")' in core
+    # The items are not in the phone's bar; the strip is not in the rail.
+    assert ".tabs .tab.sub { display: none; }" in base
+    assert ".subtabs {\n  position: fixed;" in base
+    assert "#app:has(> nav.subtabs) main { padding-bottom:" in base
+    assert ".subtabs { display: none; }" in desktop
+    assert ".tabs .tab.sub {\n    display: flex;" in desktop

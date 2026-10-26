@@ -344,6 +344,8 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
     except CodeSpecError as exc:
         raise QuillError(str(exc)) from exc
     for screen in screens:
+        if "icon" in screen and not isinstance(screen["icon"], str):
+            raise QuillError(f"{where}: screen {screen['id']!r} icon is a name from the icon library")
         kit = screen.get("kit")
         if kit not in KIT:
             raise QuillError(f"{where}: screen {screen['id']!r} kit is one of {', '.join(KIT)}")

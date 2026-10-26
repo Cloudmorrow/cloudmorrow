@@ -6,7 +6,9 @@ sidebar is where you see the state of your cloud at a glance, and a click or
 a key takes you in. The sections:
 
 - **PERSONAL, HOME, BUSINESS, DEVELOPER** — the catalog's categories, a
-  shelf each, with a card for every screen of every installed Quill on it.
+  shelf each, with a card for every installed Quill on it. A Quill with
+  several screens is still one card, the Quill's; its screens are the
+  items under it, one line each, there only while you are in the Quill.
 - **YOUR CLOUD** — what the server gives everybody without a Quill: Data,
   which it composes for whoever asks, and any card built into the core.
 - **ADMINISTRATION** — for administrators: Users, Circles, Quills. Smaller,
@@ -74,7 +76,9 @@ class NavCard(Static, can_focus=False):
             self.card = card
             super().__init__()
 
-    def __init__(self, key: str, title: str, *, tag: str = "", compact: bool = False, **kwargs) -> None:
+    def __init__(
+        self, key: str, title: str, *, tag: str = "", compact: bool = False, sub: bool = False, **kwargs
+    ) -> None:
         super().__init__("", **kwargs)
         self.nav_key = key
         self.name_text = title
@@ -84,6 +88,10 @@ class NavCard(Static, can_focus=False):
         self.add_class("nav-card")
         if compact:
             self.add_class("-small")
+        # An item under a Quill's card — one of its screens: one line, in
+        # from the card's edge, with no key and no line about how it is.
+        if sub:
+            self.add_class("-sub")
         self.border_title = title
 
     def on_mount(self) -> None:
@@ -104,9 +112,12 @@ class NavCard(Static, can_focus=False):
         self.redraw()
 
     def redraw(self) -> None:
-        if self.has_class("-small") or self.has_class("-line"):
-            # One line: the name, and the key after it, faint.
+        if self.has_class("-small") or self.has_class("-line") or self.has_class("-sub"):
+            # One line: the name, and the key after it, faint. An item
+            # under a card stands in from it.
             line = Text(no_wrap=True, overflow="ellipsis")
+            if self.has_class("-sub"):
+                line.append("  ")
             line.append("› " if self.active else "  ", style=SKY)
             line.append(self.name_text, style=f"bold {SKY}" if self.active else MUTED)
             if self.tag:

@@ -408,6 +408,20 @@ def check(
             f"[yellow]![/] icon {icon!r} is not in the icon library; the tab shows the quill mark"
             " — see cloudmorrow.com/resources/icons"
         )
+    # The items under the tab — the screens — each name a mark of their own.
+    try:
+        import tomllib
+
+        screens = tomllib.loads((folder / "quill.toml").read_text(encoding="utf-8")).get("screens") or []
+    except Exception:  # noqa: BLE001 — the plan above already said what is wrong with the file
+        screens = []
+    for screen in screens:
+        name = str(screen.get("icon") or "")
+        if name and name not in APP_ICONS and icons_get(name) is None:
+            console.print(
+                f"[yellow]![/] screen {screen.get('id')!r} icon {name!r} is not in the icon library;"
+                " the item under the tab shows no mark"
+            )
     if plan.get("code"):
         # Handlers in the code that nothing names: harmless, and usually a typo.
         try:

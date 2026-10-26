@@ -440,8 +440,54 @@ h1.large {
   letter-spacing: .02em;
 }
 .tab .pixel-icon { width: 22px; height: 22px; }
-.tab.active { color: var(--bar-accent); font-weight: 600; }
+/* The tab you are on, and the tab whose item you are on: the bar has no
+   room under a tab, so on the phone the two look the same. */
+.tab.active, .tab.open { color: var(--bar-accent); font-weight: 600; }
 .tab:active { opacity: .6; }
+/* The items under a tab — a Quill's screens — are not in the bar: the
+   rail stands them under it (desktop.css), and the phone has the strip. */
+.tabs .tab.sub { display: none; }
+
+/* -- the items under the tab you are on, above the bar ------------------ */
+/* A Quill with several screens: a row of them, each a pill, scrolling
+   sideways when the phone is not wide enough for all. Only there while
+   you are in such a Quill; the page keeps the room for it below. */
+.subtabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(50px + var(--bottom));
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 12px;
+  background: var(--bar);
+  border-top: 1px solid var(--line);
+  justify-content: safe center;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.subtabs::-webkit-scrollbar { display: none; }
+.subtabs .tab {
+  flex: 0 0 auto;
+  flex-direction: row;
+  gap: 6px;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+.subtabs .tab .pixel-icon { width: 14px; height: 14px; }
+.subtabs .tab.active { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+#app:has(> nav.subtabs) main { padding-bottom: calc(116px + var(--bottom)); }
+#app:has(> nav.subtabs) #toast { bottom: calc(108px + var(--bottom)); }
 
 /* -- the editor ---------------------------------------------------------- */
 .editor { padding-top: 4px; min-height: 70vh; cursor: text; }

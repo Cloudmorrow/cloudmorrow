@@ -2,8 +2,16 @@
 
    A Quill ships no screens of its own — it names a kit element and binds
    it to fields, and kit.js draws it. So this file is only the part in
-   between: ask the server which Quills are installed, give each of their
-   screens a tab, and hand the address bar's `#/q/…` and `#/r/…` to the kit.
+   between: ask the server which Quills are installed, give each one a tab
+   with its screens under it, and hand the address bar's `#/q/…` and
+   `#/r/…` to the kit.
+
+   One Quill is one tab, named after the Quill and drawn with its icon: a
+   CRM is CRM in the bar, not Sales, Pipeline, Organisations, People and
+   Activities side by side with everything else. Its screens are the items
+   under that tab, and core.js draws them only while you are in the Quill —
+   nested under it in the rail, in a strip above the phone's bar. A Quill
+   with one screen has nothing under its tab, and the tab is that screen's.
 
      #/q/<quill>/<screen>              a screen: the board, the list
      #/q/<quill>/<screen>/<group>      a board, on one of its groups
@@ -58,26 +66,41 @@ function place(list) {
   quills = list.filter(yours);
   // Their actions go on every record's sheet, whichever Quill it is in.
   knowQuills(quills);
-  fillTabs(quills.flatMap((quill) => quill.screens.map((screen) => ({
-    name: tabName(quill, screen),
-    label: screen.label || quill.name,
-    icon: pixelIcon(quill.icon) || pixelArt(QUILL_GLYPH),
-    // The Quill is the feature: the administrator's switch and your own
-    // take its tabs away together, as they did when Tasks was built in. A
-    // Quill of somebody's own is switched by its key, `~alice.budget`.
-    feature: quill.key || quill.id,
-    href: () => screenHash(quill, screen),
-    // Data is composed by the server for whoever asks rather than
-    // installed (server/dataview.py): the rail sets its tab apart from
-    // the Quills, under Your cloud, as the terminal app's sidebar does.
-    cloud: !!quill.composed,
-    // The rest stand on the shelf of their category, as the catalog has
-    // them: the server says the catalog's label for it and the order of
-    // the shelves (quills/registry.py); a list cached from before it did
-    // gets the category's own name until the server answers.
-    section: quill.composed ? "" : quill.category_label || titled(quill.category),
-    rank: quill.category_rank,
-  }))));
+  fillTabs(quills.filter((quill) => quill.screens.length).map((quill) => {
+    // The items under the tab: the Quill's screens, each with the icon it
+    // names, so no two look alike. A Quill with one screen has no items:
+    // its tab is that screen, by the screen's name, so a thread's pip
+    // and the kit's memory of the tab (`kit.<tab>`) find it as before.
+    const screens = quill.screens.map((screen) => ({
+      name: tabName(quill, screen),
+      label: screen.label || quill.name,
+      icon: pixelIcon(screen.icon),
+      href: () => screenHash(quill, screen),
+    }));
+    const one = screens.length === 1;
+    return {
+      name: one ? screens[0].name : quill.id,
+      label: one ? screens[0].label : quill.name,
+      icon: pixelIcon(quill.icon) || pixelArt(QUILL_GLYPH),
+      screens: one ? [] : screens,
+      // The Quill is the feature: the administrator's switch and your own
+      // take its tab away together, as they did when Tasks was built in. A
+      // Quill of somebody's own is switched by its key, `~alice.budget`.
+      feature: quill.key || quill.id,
+      // The tab opens the Quill on its first screen.
+      href: () => screenHash(quill, quill.screens[0]),
+      // Data is composed by the server for whoever asks rather than
+      // installed (server/dataview.py): the rail sets its tab apart from
+      // the Quills, under Your cloud, as the terminal app's sidebar does.
+      cloud: !!quill.composed,
+      // The rest stand on the shelf of their category, as the catalog has
+      // them: the server says the catalog's label for it and the order of
+      // the shelves (quills/registry.py); a list cached from before it did
+      // gets the category's own name until the server answers.
+      section: quill.composed ? "" : quill.category_label || titled(quill.category),
+      rank: quill.category_rank,
+    };
+  }));
 }
 
 const titled = (category) => {

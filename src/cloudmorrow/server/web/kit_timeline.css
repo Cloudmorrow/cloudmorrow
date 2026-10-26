@@ -451,7 +451,7 @@
 /* A phone's bar along the bottom would take the tracks' room: the editor
    goes without it, as an editor does, with Back to the projects. */
 @media (max-width: 899px), (max-height: 599px) {
-  #app:has(main.kit-timeline) > nav.tabs { display: none; }
+  #app:has(main.kit-timeline) > nav.tabs, #app:has(main.kit-timeline) > nav.subtabs { display: none; }
 }
 
 /* -- a computer: the material and the piece beside the picture ------------------------- */

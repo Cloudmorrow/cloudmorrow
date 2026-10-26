@@ -292,6 +292,9 @@ class WorkspaceScreen(QuillCards, Screen):
             if on:
                 showing.append(key)
         self._showing = showing
+        # The items under a Quill's card are only there while you are in it.
+        current = self.query_one("#panes", ContentSwitcher).current or ""
+        self.reveal_screens(current[len("pane-") :])
         self.show_sections()
         # Switch the last one off in Settings and there is no card to stand
         # on: say so, rather than leaving a pane up that nothing points at.
@@ -310,6 +313,9 @@ class WorkspaceScreen(QuillCards, Screen):
     def _mark_active(self, key: str) -> None:
         for card in self.query(NavCard):
             card.set_active(card.nav_key == key)
+        # A Quill's card is lit while you are on any of its screens, and
+        # its screens are listed under it only then (quill_cards.py).
+        self.reveal_screens(key)
 
     def on_nav_card_chosen(self, event: NavCard.Chosen) -> None:
         event.stop()
@@ -317,7 +323,8 @@ class WorkspaceScreen(QuillCards, Screen):
         if key.startswith("admin-"):
             self.open_admin(key[len("admin-") :])
         else:
-            self.action_show_pane(key)
+            # A Quill's own card opens it on its first screen.
+            self.action_show_pane(self.pane_key(key))
 
     def refresh_cards(self) -> None:
         """Each card's line: what its pane knows, or its summary until then."""

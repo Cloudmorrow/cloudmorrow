@@ -183,6 +183,33 @@
     background: $cloud 25%;
 }
 
+/* The items under a Quill's card — its screens, while you are in it: one
+   line each, in from the card, no air between them and the card above. */
+.nav-card.-sub {
+    height: 1;
+    border: none;
+    padding: 0 0 0 1;
+    margin-bottom: 0;
+}
+
+.nav-card.-sub:hover {
+    border: none;
+    background: $surface;
+}
+
+.nav-card.-sub.-active {
+    border: none;
+    background: $cloud 25%;
+}
+
+.nav-card.-parent.-active {
+    margin-bottom: 0;
+}
+
+.nav-card.-sub.-last {
+    margin-bottom: 1;
+}
+
 /* Narrow: the sidebar is a list of names. */
 WorkspaceScreen.-narrow #sidebar {
     width: 18;
@@ -190,6 +217,10 @@ WorkspaceScreen.-narrow #sidebar {
 
 WorkspaceScreen.-narrow .nav-section {
     margin: 1 0 0 0;
+}
+
+WorkspaceScreen.-narrow .nav-card.-sub.-last {
+    margin-bottom: 0;
 }
 
 WorkspaceScreen.-narrow .nav-section.-first {

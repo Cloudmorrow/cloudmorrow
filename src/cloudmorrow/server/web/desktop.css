@@ -18,7 +18,7 @@
    screen that draws none of its own. Both are in the page on a phone as
    well; neither is for it. */
 .tabs .rail-head { display: none; }
-.aside-tabs .tabs { display: none; }
+.aside-tabs .tabs, .aside-tabs .subtabs { display: none; }
 /* The rail's sections (the Quills' categories, Your cloud, Administration)
    and the administration pages under the last. A phone's bar has no room
    for a section: it runs the Quills and Data on after Today, and keeps
@@ -91,6 +91,24 @@
   }
   .tab .pixel-icon { width: 18px; height: 18px; }
   .tab.active { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+  /* A tab whose item you are on says so in the colour alone; the item
+     under it is the one with the ground. */
+  .tab.open { background: none; }
+  /* The items under the tab you are on — a Quill's screens — stand under
+     it, in from its icon and a size smaller, the way a program on a
+     computer lists the pages of the section it is in. The phone's strip
+     for the same is not needed where the rail is. */
+  .tabs .tab.sub {
+    display: flex;
+    min-height: 32px;
+    padding-left: 42px;
+    font-size: 13.5px;
+    font-weight: 500;
+  }
+  .tabs .tab.sub .pixel-icon { width: 14px; height: 14px; }
+  .subtabs { display: none; }
+  #app:has(> nav.subtabs) main { padding-bottom: calc(72px + var(--bottom)); }
+  #app:has(> nav.subtabs) #toast { bottom: 24px; }
   /* The pip goes to the end of the row, the way a sidebar counts. */
   .tab.pipped::after {
     position: static;

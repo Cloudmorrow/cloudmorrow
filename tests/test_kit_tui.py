@@ -600,3 +600,55 @@ async def test_removing_a_quill_that_brought_data_asks_what_goes_with_it(app):
         await settle(app, pilot)
         assert ("uninstall", "tasks", ["tasks.effort", "runtime:ffmpeg"]) in app.client.quill_calls
         assert not screen.query("#nav-tasks")
+
+
+async def test_a_quill_with_several_screens_is_one_card_with_its_screens_under_it(app):
+    """A CRM is CRM in the sidebar, with one key: its screens are the items
+    under its card, listed only while you are on one of them, and the card
+    itself opens the first."""
+    from cloudmorrow.tui.widgets.sidebar import NavCard
+
+    quill = dict(READING_QUILL, id="fleet", name="Fleet", summary="The cars, and their visits to the garage.")
+    quill["screens"] = [
+        dict(READING_QUILL["screens"][0], id="cars", label="Cars"),
+        dict(READING_QUILL["screens"][0], id="visits", label="Visits"),
+    ]
+    app.client.quill_list.append(quill)
+    from tests.tui_harness import feature_row
+
+    app.client.feature_list.append(feature_row("fleet", "Fleet"))
+    async with app.run_test(size=(120, 40)) as pilot:
+        screen = await start(app, pilot)
+        # One card, the Quill's, with a key; the screens are not cards beside it.
+        fleet = screen.query_one("#nav-fleet", NavCard)
+        assert fleet.tag and fleet.has_class("-parent")
+        assert [label for label in tab_labels(screen) if label.startswith("Fleet")] == [f"Fleet  {fleet.tag}"]
+        assert not screen.query_one("#nav-fleet-cars", NavCard).display
+        assert shelves(screen)[1] == ("HOME", ["Chat", "Fleet"])
+        # Chosen, the card opens the first screen, and its items appear under it.
+        await pilot.click("#nav-fleet")
+        await settle(app, pilot)
+        assert screen.query_one("#panes").current == "pane-fleet-cars"
+        assert fleet.active
+        cars, visits = screen.query_one("#nav-fleet-cars", NavCard), screen.query_one("#nav-fleet-visits", NavCard)
+        assert cars.display and cars.active and cars.has_class("-sub") and not cars.tag
+        assert visits.display and not visits.active and visits.has_class("-last")
+        assert shelves(screen)[1] == ("HOME", ["Chat", "Fleet", "Cars", "Visits"])
+        await pilot.click("#nav-fleet-visits")
+        await settle(app, pilot)
+        assert screen.query_one("#panes").current == "pane-fleet-visits"
+        assert fleet.active and visits.active and not cars.active
+        # Somewhere else: the items go, the card stays, unlit.
+        await pilot.click("#nav-tasks")
+        await settle(app, pilot)
+        assert not fleet.active and not cars.display and not visits.display
+        assert shelves(screen)[1] == ("HOME", ["Chat", "Fleet"])
+        # The Quill's key is the first screen's.
+        await pilot.press(fleet.tag)
+        await settle(app, pilot)
+        assert screen.query_one("#panes").current == "pane-fleet-cars"
+        # Switched off, the card goes with its items; on again, it is back.
+        screen.apply_features(["notes", "tasks", "files", "chat", "secrets"])
+        assert not fleet.display and not cars.display
+        screen.apply_features(["notes", "tasks", "files", "chat", "secrets", "fleet"])
+        assert fleet.display

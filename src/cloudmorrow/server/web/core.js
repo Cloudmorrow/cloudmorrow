@@ -430,7 +430,7 @@ export const icons = {
 
 // -- what the features register ---------------------------------------------------
 const screens = new Map();   // name in the hash → async (arg, extra) => renders it
-const tabList = [];          // [{name, label, icon, href(active), feature, admin}] as registered, or a slot
+const tabList = [];          // [{name, label, icon, href(active), feature, admin, screens}] as registered, or a slot
 const shellHooks = [];       // run after every screen is put on the page
 const signOutHooks = [];     // run when the session ends, to drop what was loaded
 const signInHooks = [];      // run with the server's answer when a session starts
@@ -443,7 +443,10 @@ export function registerScreen(name, render) { screens.set(name, render); }
     only — and, since a phone's bar has no room for a section, only in the
     rail. `icon` may be a function, for an icon the library has not read yet.
     `section` names the shelf it stands on in the rail (a Quill's category),
-    and `rank` where that shelf comes among the others. */
+    and `rank` where that shelf comes among the others. `screens`, when
+    there are any, are the items under the tab — a Quill's screens, each
+    `{name, label, icon, href}` — drawn only while one of them is the
+    screen on show: under the tab in the rail, in a strip above the bar. */
 export function registerTab(tab) { tabList.push(tab); }
 /** A place in the tab order for tabs that arrive later — the Quills, which
     only the server knows. Held where it is called, so the order of app.js
@@ -504,7 +507,10 @@ export function setAdmin(yes) {
 export function redrawTabs() {
   const bar = app.querySelector(":scope > nav.tabs");
   if (!bar) return;
-  const active = bar.querySelector(".tab.active");
+  // The item lit under an open tab names the screen; the tab itself only
+  // names the Quill.
+  const active = bar.querySelector(".tab.sub.active") || bar.querySelector(".tab.active");
+  for (const strip of app.querySelectorAll(":scope > nav.subtabs")) strip.remove();
   bar.outerHTML = tabs(active ? active.dataset.tab : "");
 }
 
@@ -717,6 +723,7 @@ function placeTabs(newTabs) {
   if (!same) { bar.innerHTML = newTabs.innerHTML; return; }
   shown.forEach((t, i) => {
     t.classList.toggle("active", wanted[i].classList.contains("active"));
+    t.classList.toggle("open", wanted[i].classList.contains("open"));
     t.setAttribute("href", wanted[i].getAttribute("href"));
     if (wanted[i].hasAttribute("aria-current")) t.setAttribute("aria-current", "page");
     else t.removeAttribute("aria-current");
@@ -725,17 +732,20 @@ function placeTabs(newTabs) {
 
 /** Light one tab, before its screen is fetched: the answer to the tap is
     the tap itself, not the server's reply a moment later. */
+// Until the screen is drawn: the tab named, and the tab it is an item of.
 function lightTab(name) {
-  for (const t of app.querySelectorAll(":scope > nav.tabs > .tab")) {
+  for (const t of app.querySelectorAll(":scope > nav > .tab")) {
     const on = t.dataset.tab === name;
+    const open = !on && (t.dataset.screens || "").split(" ").includes(name);
     t.classList.toggle("active", on);
+    t.classList.toggle("open", open);
     if (on) t.setAttribute("aria-current", "page");
     else t.removeAttribute("aria-current");
   }
 }
 
 app.addEventListener("click", (event) => {
-  const tab = event.target.closest("nav.tabs > .tab");
+  const tab = event.target.closest("nav.tabs > .tab, nav.subtabs > .tab");
   if (!tab || tab.parentElement.parentElement !== app) return;
   if (event.defaultPrevented || event.metaKey || event.ctrlKey) return;
   // The tab you are on, tapped again, takes you to the top of it.
@@ -815,25 +825,39 @@ export function heading(title, right = "") {
 // Administration at the foot, with the server's pages under it. The
 // phone's bar runs all but the last together, keeps that one behind a row
 // in Me, and the stylesheet keeps the labels off it.
+//
+// A tab with items under it — a Quill with several screens — is one tab,
+// the Quill's, wherever it stands. Its items are drawn only while you are
+// in it: under the tab in the rail, where the rail has the height, and in
+// a strip of their own above the phone's bar, where the bar has not. A tab
+// whose item is on show is `open`; the item is `active`.
 // Which tab was last lit, for the screens that draw none of their own.
 let lastTab = "";
 export function tabs(active) {
   if (active) lastTab = active;
-  const draw = (t) =>
-    `<a class="tab${t.admin ? " admin" : ""}${t.cloud ? " cloud" : ""}${t.name === active ? " active" : ""}"` +
-    ` data-tab="${t.name}" href="${t.href(t.name === active)}"` +
-    `${t.name === active ? ' aria-current="page"' : ""}>${typeof t.icon === "function" ? t.icon() : t.icon}` +
-    `<span>${t.label}</span></a>`;
+  const itemOf = (t) => (t.screens || []).find((s) => s.name === active);
+  const drawItem = (s) =>
+    `<a class="tab sub${s.name === active ? " active" : ""}" data-tab="${s.name}" href="${s.href()}"` +
+    `${s.name === active ? ' aria-current="page"' : ""}>${s.icon || ""}<span>${s.label}</span></a>`;
+  const draw = (t) => {
+    const on = t.name === active;
+    const open = !on && !!itemOf(t);
+    return `<a class="tab${t.admin ? " admin" : ""}${t.cloud ? " cloud" : ""}${on ? " active" : ""}${open ? " open" : ""}"` +
+      ` data-tab="${t.name}"${t.screens && t.screens.length ? ` data-screens="${t.screens.map((s) => s.name).join(" ")}"` : ""}` +
+      ` href="${t.href(on)}"${on ? ' aria-current="page"' : ""}>${typeof t.icon === "function" ? t.icon() : t.icon}` +
+      `<span>${t.label}</span></a>` + (open ? t.screens.map(drawItem).join("") : "");
+  };
   const shown = shownTabs();
   const section = (title, list) =>
     list.length ? `<div class="rail-section">${esc(title)}</div>` + list.map(draw).join("") : "";
   const own = shown.filter((t) => !t.admin && !t.cloud);
+  const opened = shown.find(itemOf);
   return `<nav class="tabs"><div class="rail-head">${wordmark(CLOUD_NAME)}</div>` +
     own.filter((t) => !t.section).map(draw).join("") +
     shelves(own.filter((t) => t.section)).map((s) => section(s.title, s.tabs)).join("") +
     section("Your cloud", shown.filter((t) => t.cloud)) +
     section("Administration", shown.filter((t) => t.admin)) +
-    `</nav>`;
+    `</nav>` + (opened ? `<nav class="subtabs" aria-label="${esc(opened.label)}">${opened.screens.map(drawItem).join("")}</nav>` : "");
 }
 
 /** The shelves the tabs with a `section` stand on, in rank order and then
