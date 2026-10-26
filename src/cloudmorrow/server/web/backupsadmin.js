@@ -4,22 +4,24 @@
    backups go — an S3 bucket, Amazon's or anybody's who speaks the same —
    and when, and what; the last run, with Back up now and its log; and
    what is in the bucket, each backup a row, and on each a sheet with its
-   parts to tick and Restore. A backup or a restore runs on the server
+   parts to tick and Restore — and, on a drive or a share, a look inside,
+   folder by folder, to pick single files as they were that day, or save a
+   copy of one. A backup or a restore runs on the server
    for as long as it takes, so this page asks every two seconds how it is
    going and writes the lines as they come, and when a restore brings the
    database back the server restarts itself, as an update does, and the
    page waits for it the same way. Every question is a sheet (dialog.js);
    the secret key is typed once and never shown again. */
 
-import { api, esc, toast } from "./core.js";
+import { api, apiRaw, esc, toast } from "./core.js";
 import { ask, openSheet } from "./dialog.js";
 
 // The parts a backup is made of, and the words for each. The keys are the
 // server's (backups.py, PARTS).
 const PARTS = [
   ["database", "Database", "Accounts, circles, roles, every record, the settings and the secrets, which Quills are installed."],
-  ["drives", "Everybody's files", "Each person's drive: My Files with their notes in it. One archive per person."],
-  ["shares", "Shares", "Every share, wherever its folder is. One archive per share."],
+  ["drives", "Everybody's files", "Each person's drive: My Files with their notes in it. Only what changed since the day before goes up."],
+  ["shares", "Shares", "Every share, wherever its folder is. Only what changed goes up."],
   ["quills", "Quills", "The installed Quills, people's own, the datamodels and the runtimes fetched for them."],
   ["keys", "Keys", "The token signing key, the identity key and the push key."],
 ];
@@ -96,8 +98,10 @@ export async function drawBackups(panel) {
           <span class="with-unit"><input name="keep_days" type="number" min="1" max="3650" value="${s.keep_days}" required
             inputmode="numeric"><span class="unit">days</span></span></label>
       </div>
-      <p class="note">The server's own clock, in its time zone. A daily backup older than the days kept is
-        taken out of the bucket after the next one lands.</p>
+      <p class="note">The server's own clock, in its time zone. Every day is a complete picture, but only what
+        changed since the day before goes up, so a file is there as it was on each day kept. A daily backup
+        older than the days kept is taken out of the bucket after the next one lands, and with it whatever no
+        other day still needs.</p>
       <p class="group-label">What</p>
       <div class="group">${PARTS.map(part).join("")}
         <label class="row feature-row seal-key"><span class="main"><span class="title">The sealing key too</span>
@@ -184,7 +188,7 @@ export async function drawBackups(panel) {
     const line = (label, told) => {
       if (!told) return `<div class="row"><span class="main">${label}</span><span class="value muted">none yet</span></div>`;
       const verdict = told.ok ? `<span class="good">ok</span>` : `<span class="bad">failed</span>`;
-      const size = told.size ? ` · ${sizeOf(told.size)}` : "";
+      const size = (told.size ? ` · ${sizeOf(told.size)}` : "") + (told.size && told.added != null ? `, ${sizeOf(told.added)} new` : "");
       return `<div class="row"><span class="main"><span class="title">${label}</span>
         <span class="meta"><span class="preview">${esc(whenSaid(told.finished_at || told.started_at))}${size}${
           told.ok ? "" : " · " + esc(told.error || "")}</span></span></span>${verdict}</div>`;
@@ -193,7 +197,11 @@ export async function drawBackups(panel) {
       ? `<div class="row"><span class="main"><span class="title">${status.running === "restore" ? "Restoring" : "Backing up"}…</span>
           <span class="meta"><span class="preview">${esc(status.step || "")}</span></span></span></div>`
       : "";
-    statusBox.innerHTML = `<div class="group">${running}${line("Last backup", last)}${line("Last restore", restore)}</div>`
+    const held = status.store && status.store.objects
+      ? `<div class="row"><span class="main"><span class="title">In the store</span>
+          <span class="meta"><span class="preview">${esc(sizeOf(status.store.bytes))} in ${status.store.objects.toLocaleString()} objects, every day's files once</span></span></span></div>`
+      : "";
+    statusBox.innerHTML = `<div class="group">${running}${line("Last backup", last)}${line("Last restore", restore)}${held}</div>`
       + (status.settings.configured ? "" : `<p class="note">Say where backups go, and Save, before backing up.</p>`);
     runButton.disabled = Boolean(status.running) || !status.settings.configured;
     runButton.textContent = status.running === "backup" ? "Backing up…" : "Back up now";
@@ -259,7 +267,7 @@ export async function drawBackups(panel) {
     list.innerHTML = `<div class="group">${found.map((b) => `
       <button class="row backup-row" type="button" data-stamp="${esc(b.stamp)}">
         <span class="main"><span class="title">${esc(whenSaid(b.made_at))}</span>
-        <span class="meta"><span class="preview">${esc(sizeOf(b.size))} · ${esc((b.parts || []).map((p) => PART_LABELS[p] || p).join(", "))}${
+        <span class="meta"><span class="preview">${esc(sizeOf(b.size))}${b.format >= 2 ? `, ${esc(sizeOf(b.added))} new` : ""} · ${esc((b.parts || []).map((p) => PART_LABELS[p] || p).join(", "))}${
           b.drives ? ` · ${b.drives} drive${b.drives === 1 ? "" : "s"}` : ""}${
           b.shares ? ` · ${b.shares} share${b.shares === 1 ? "" : "s"}` : ""}</span></span></span>
         ${b.key_matches ? "" : `<span class="role-chip other-key">another key</span>`}
@@ -277,23 +285,30 @@ export async function drawBackups(panel) {
       toast(err.message);
       return;
     }
-    const box = (name, value, label, note, checked = false) => `<label class="row feature-row">
+    const browsable = (m.cloudmorrow_backup || 1) >= 2;
+    // Single files and folders picked inside a drive or a share: drives/bram/files/Notes/a.md, a folder with a slash.
+    const picked = new Set();
+    const box = (name, value, label, note, where = "") => `<div class="row feature-row">
       <span class="main"><span class="title">${esc(label)}</span>${note ? `<span class="meta"><span class="preview">${esc(note)}</span></span>` : ""}</span>
-      <input type="checkbox" name="${name}" value="${esc(value)}"${checked ? " checked" : ""}></label>`;
+      ${where ? `<button type="button" class="browse-in" data-where="${esc(where)}" data-label="${esc(label)}">files…</button>` : ""}
+      <input type="checkbox" name="${name}" value="${esc(value)}"></div>${
+        where ? `<div class="browse-pane" data-where="${esc(where)}" hidden></div>` : ""}`;
     const group = (label, rows, all) => (rows ? `<p class="group-label">${label}${all ? ` <button type="button" class="all-of" data-all="${all}">all</button>` : ""}</p>
       <div class="group">${rows}</div>` : "");
-    const drives = (m.drives || []).map((d) => box("drive", d.name, d.name, `${sizeOf(d.size)} · ${d.files} files`)).join("");
-    const shares = (m.shares || []).map((s) => box("share", s.name, s.name, `${sizeOf(s.size)} · ${s.files} files`)).join("");
+    const drives = (m.drives || []).map((d) => box("drive", d.name, d.name, `${sizeOf(d.size)} · ${d.files} files`, browsable ? `drives/${d.name}` : "")).join("");
+    const shares = (m.shares || []).map((s) => box("share", s.name, s.name, `${sizeOf(s.size)} · ${s.files} files`, browsable ? `shares/${s.name}` : "")).join("");
     const keyNote = m.key_matches
       ? ""
       : `<p class="note warn">Sealed with another key than this server's. Its rows open here only if the sealing key
           comes back with it (tick Keys, when the backup carries it) or the right key file is put in place first.</p>`;
+    const oldNote = browsable ? "" : `<p class="note muted">From before single files could be looked at: whole drives and shares only.</p>`;
     const { sheet, close } = openSheet(
       `<form class="restore-form">
         <h2 class="act-sheet-title">${esc(whenSaid(m.made_at))}</h2>
-        <p class="act-description">${esc(m.cloud || "")} · Cloudmorrow ${esc(m.version || "")} · ${esc(sizeOf(m.size))} in ${esc(String(m.took || 0))} s
+        <p class="act-description">${esc(m.cloud || "")} · Cloudmorrow ${esc(m.version || "")} · ${esc(sizeOf(m.size))}${
+          browsable ? `, ${esc(sizeOf(m.added || 0))} new that day` : ""} in ${esc(String(m.took || 0))} s
           · ${esc(m.by ? `by ${m.by}` : "")}</p>
-        ${keyNote}
+        ${keyNote}${oldNote}
         <div class="restore-parts">
           ${m.database ? group("Database", box("database", "1", "Database", `${m.database.engine} · ${sizeOf(m.database.size)}`)) : ""}
           ${group("Files", drives, "drive")}
@@ -301,6 +316,7 @@ export async function drawBackups(panel) {
           ${m.quills || m.keys ? group("Server", (m.quills ? box("quills", "1", "Quills", `${sizeOf(m.quills.size)} · ${m.quills.files} files`) : "")
             + (m.keys ? box("keys", "1", "Keys", (m.keys.files || []).join(", ")) : "")) : ""}
         </div>
+        <p class="note picked-note" hidden></p>
         <div class="act-buttons">
           <button type="button" class="act-button" data-answer="no">Cancel</button>
           <button type="button" class="act-button" data-answer="delete">Delete</button>
@@ -310,6 +326,13 @@ export async function drawBackups(panel) {
       "restore-sheet",
     );
     const form = sheet.querySelector("form");
+    const pickedNote = form.querySelector(".picked-note");
+    const sayPicked = () => {
+      pickedNote.hidden = picked.size === 0;
+      pickedNote.textContent = picked.size
+        ? `${picked.size} single ${picked.size === 1 ? "file or folder" : "files and folders"} picked: ${[...picked].map((p) => p.split("/").slice(2).join("/")).join(", ")}`
+        : "";
+    };
     for (const button of form.querySelectorAll(".all-of")) {
       button.addEventListener("click", () => {
         const boxes = [...form.querySelectorAll(`input[name="${button.dataset.all}"]`)];
@@ -317,10 +340,82 @@ export async function drawBackups(panel) {
         for (const b of boxes) b.checked = !every;
       });
     }
+
+    // -- a look inside a drive or a share, folder by folder ------------------------------
+    async function drawBrowse(pane, where, path) {
+      pane.innerHTML = `<p class="note muted">Looking…</p>`;
+      let told;
+      try {
+        told = await api("GET", `/api/server/backups/${encodeURIComponent(stamp)}/files?where=${encodeURIComponent(where)}&path=${encodeURIComponent(path)}`);
+      } catch (err) {
+        pane.innerHTML = `<p class="note warn">${esc(err.message)}</p>`;
+        return;
+      }
+      const crumbs = [["", where.split("/")[1]], ...told.path.split("/").filter(Boolean).map((name, i, all) => [all.slice(0, i + 1).join("/"), name])];
+      const crumbRow = crumbs.map(([to, name], i) => (i === crumbs.length - 1
+        ? `<span class="crumb here">${esc(name)}</span>`
+        : `<button type="button" class="crumb" data-path="${esc(to)}">${esc(name)}</button>`)).join(`<span class="sep">/</span>`);
+      const rel = (name) => (told.path ? `${told.path}/${name}` : name);
+      const pick = (name, folder) => `${where}/${rel(name)}${folder ? "/" : ""}`;
+      const folders = told.folders.map((f) => `<div class="row browse-row">
+        <input type="checkbox" data-pick="${esc(pick(f.name, true))}"${picked.has(pick(f.name, true)) ? " checked" : ""} aria-label="Pick the folder ${esc(f.name)}">
+        <button type="button" class="main enter" data-path="${esc(rel(f.name))}"><span class="title">${esc(f.name)}/</span>
+          <span class="meta"><span class="preview">${f.files} file${f.files === 1 ? "" : "s"} · ${esc(sizeOf(f.size))}</span></span></button></div>`).join("");
+      const files = told.files.map((f) => `<div class="row browse-row">
+        <input type="checkbox" data-pick="${esc(pick(f.name, false))}"${picked.has(pick(f.name, false)) ? " checked" : ""} aria-label="Pick ${esc(f.name)}">
+        <span class="main"><span class="title">${esc(f.name)}</span>
+          <span class="meta"><span class="preview">${esc(sizeOf(f.size))} · ${esc(whenSaid(f.modified))}</span></span></span>
+        <button type="button" class="pull" data-path="${esc(pick(f.name, false))}" data-name="${esc(f.name)}" aria-label="Save a copy of ${esc(f.name)}">save</button></div>`).join("");
+      pane.innerHTML = `<div class="crumbs">${crumbRow}</div>${folders}${files}${
+        !folders && !files ? `<p class="note muted">Nothing in this folder that day.</p>` : ""}`;
+      for (const crumb of pane.querySelectorAll(".crumb[data-path]")) {
+        crumb.addEventListener("click", () => drawBrowse(pane, where, crumb.dataset.path));
+      }
+      for (const enter of pane.querySelectorAll(".enter")) {
+        enter.addEventListener("click", () => drawBrowse(pane, where, enter.dataset.path));
+      }
+      for (const tick of pane.querySelectorAll("input[data-pick]")) {
+        tick.addEventListener("change", () => {
+          if (tick.checked) picked.add(tick.dataset.pick); else picked.delete(tick.dataset.pick);
+          sayPicked();
+        });
+      }
+      for (const pull of pane.querySelectorAll(".pull")) {
+        pull.addEventListener("click", async () => {
+          pull.disabled = true;
+          try {
+            const res = await apiRaw("GET", `/api/server/backups/${encodeURIComponent(stamp)}/file?path=${encodeURIComponent(pull.dataset.path)}`, { fail: "could not fetch the file" });
+            const url = URL.createObjectURL(await res.blob());
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = pull.dataset.name;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 10_000);
+          } catch (err) {
+            toast(err.message);
+          } finally {
+            pull.disabled = false;
+          }
+        });
+      }
+    }
+    for (const button of form.querySelectorAll(".browse-in")) {
+      button.addEventListener("click", () => {
+        const pane = form.querySelector(`.browse-pane[data-where="${button.dataset.where.replace(/"/g, '\\"')}"]`);
+        if (!pane) return;
+        pane.hidden = !pane.hidden;
+        button.textContent = pane.hidden ? "files…" : "close";
+        if (!pane.hidden && !pane.dataset.drawn) {
+          pane.dataset.drawn = "1";
+          drawBrowse(pane, button.dataset.where, "");
+        }
+      });
+    }
+
     form.querySelector('[data-answer="no"]').addEventListener("click", close);
     form.querySelector('[data-answer="delete"]').addEventListener("click", async () => {
       close();
-      if (!(await ask(`Delete the backup from ${whenSaid(m.made_at)}?\n\nIt is taken out of the bucket. The server is not touched.`))) return;
+      if (!(await ask(`Delete the backup from ${whenSaid(m.made_at)}?\n\nIt is taken out of the bucket, with whatever no other day still needs. The server is not touched.`))) return;
       try {
         await api("DELETE", "/api/server/backups/" + encodeURIComponent(stamp));
         toast("Deleted");
@@ -331,17 +426,18 @@ export async function drawBackups(panel) {
     });
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      const picked = (name) => [...form.querySelectorAll(`input[name="${name}"]:checked`)].map((b) => b.value);
+      const ticked = (name) => [...form.querySelectorAll(`input[name="${name}"]:checked`)].map((b) => b.value);
       const choice = {
-        database: picked("database").length > 0,
-        drives: picked("drive"),
-        shares: picked("share"),
-        quills: picked("quills").length > 0,
-        keys: picked("keys").length > 0,
+        database: ticked("database").length > 0,
+        drives: ticked("drive"),
+        shares: ticked("share"),
+        paths: [...picked],
+        quills: ticked("quills").length > 0,
+        keys: ticked("keys").length > 0,
         restart: true,
         force: false,
       };
-      if (!choice.database && !choice.drives.length && !choice.shares.length && !choice.quills && !choice.keys) {
+      if (!choice.database && !choice.drives.length && !choice.shares.length && !choice.paths.length && !choice.quills && !choice.keys) {
         toast("Tick what to restore");
         return;
       }
@@ -350,6 +446,7 @@ export async function drawBackups(panel) {
       if (choice.database) said.push("the database");
       if (choice.drives.length) said.push(`the files of ${choice.drives.join(", ")}`);
       if (choice.shares.length) said.push(`the share${choice.shares.length === 1 ? "" : "s"} ${choice.shares.join(", ")}`);
+      if (choice.paths.length) said.push(choice.paths.length === 1 ? choice.paths[0] : `${choice.paths.length} single files and folders`);
       if (choice.quills) said.push("the Quills");
       if (choice.keys) said.push("the keys");
       const restarts = choice.database || choice.quills || choice.keys;

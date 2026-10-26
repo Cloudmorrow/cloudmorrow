@@ -62,22 +62,43 @@ def test_now_backs_up_and_watches_then_list_and_show(cm):
     assert ran.exit_code == 0, ran.output
     assert "bram's files:" in ran.output
     assert "Done:" in ran.output
-    stamps = {key.split("/")[1] for key in cm.store.keys("home/")}
+    stamps = cm.store.stamps("home/")
     assert len(stamps) == 1
     stamp = stamps.pop()
+    assert "new" in ran.output
 
     listed = cm("backup", "list")
     assert listed.exit_code == 0, listed.output
-    assert stamp in listed.output and "this server's" in listed.output
+    assert stamp in listed.output and "this server's" in listed.output and "New" in listed.output
 
     shown = cm("backup", "show", stamp)
     assert shown.exit_code == 0, shown.output
-    assert "drive bram:" in shown.output and "2 files" in shown.output
+    assert "drive bram:" in shown.output and "2 files" in shown.output and "new" in shown.output
+
+    status = cm("backup", "status")
+    assert "The bucket holds" in status.output and "3 objects" in status.output
+
+
+def test_files_looks_in_a_backup_and_get_pulls_one_out(cm, tmp_path):
+    assert cm("backup", "now").exit_code == 0
+    stamp = next(iter(cm.store.stamps("home/")))
+    top = cm("backup", "files", stamp, "drives/bram", "files")
+    assert top.exit_code == 0, top.output
+    assert "Notes/" in top.output and "Photos/" in top.output and "1 file" in top.output
+    notes = cm("backup", "files", stamp, "drives/bram", "files/Notes")
+    assert notes.exit_code == 0, notes.output
+    assert "hello.md" in notes.output and "8 B" in notes.output
+    out = tmp_path / "hello-then.md"
+    got = cm("backup", "get", stamp, "drives/bram/files/Notes/hello.md", "-o", str(out))
+    assert got.exit_code == 0, got.output
+    assert out.read_text(encoding="utf-8") == "# Hello\n"
+    missing = cm("backup", "files", stamp, "drives/nobody")
+    assert missing.exit_code != 0 and "no files of nobody" in missing.output
 
 
 def test_restore_puts_a_drive_back_and_asks_first(cm):
     assert cm("backup", "now").exit_code == 0
-    stamp = next(iter({key.split("/")[1] for key in cm.store.keys("home/")}))
+    stamp = next(iter(cm.store.stamps("home/")))
     note = cm.config.files_root("bram") / "Notes" / "hello.md"
     note.unlink()
     said_no = cm("backup", "restore", stamp, "--drive", "bram", input="n\n")
@@ -94,12 +115,17 @@ def test_restore_puts_a_drive_back_and_asks_first(cm):
     everything = cm("backup", "restore", stamp, "--all", "--yes")
     assert everything.exit_code == 0, everything.output
     assert "the files of bram, guest" in everything.output
+    # One file by its path.
+    note.write_text("changed\n", encoding="utf-8")
+    one = cm("backup", "restore", stamp, "--path", "drives/bram/files/Notes/hello.md", "--yes")
+    assert one.exit_code == 0, one.output
+    assert "drives/bram/files/Notes/hello.md" in one.output and note.read_text(encoding="utf-8") == "# Hello\n"
 
 
 def test_delete_takes_a_backup_out(cm):
     assert cm("backup", "now").exit_code == 0
-    stamp = next(iter({key.split("/")[1] for key in cm.store.keys("home/")}))
+    stamp = next(iter(cm.store.stamps("home/")))
     gone = cm("backup", "delete", stamp, "--yes")
     assert gone.exit_code == 0, gone.output
-    assert cm.store.keys("home/") == []
+    assert cm.store.keys("home/") == [], "the snapshot and the objects only it named"
     assert "No backups" in cm("backup", "list").output

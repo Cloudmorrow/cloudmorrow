@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import datetime as dt
 import gzip
+import hashlib
 import io
 import json
+import os
 import sqlite3
 import tarfile
 import time
@@ -18,7 +20,7 @@ import time
 import pytest
 
 from cloudmorrow.server import backups as backups_module
-from cloudmorrow.server.backups import PARTS, BackupError, Choice, key_fingerprint
+from cloudmorrow.server.backups import PARTS, BackupError, Choice, key_fingerprint, split_path
 from cloudmorrow.server.s3 import Bucket, S3Error, Uploader, region_of
 from tests.conftest import GUEST, sqlite_only, token_for
 from tests.fake_s3 import FakeS3
@@ -69,6 +71,27 @@ def a_drive_with_files(client, config):
     (config.files_root("bram") / "Photos" / "cat.jpg").write_bytes(b"\xff\xd8" + b"cat" * 100)
     state.ensure_drive(GUEST[0])
     (config.files_root(GUEST[0]) / "Notes" / "mine.md").write_text("guest's\n", encoding="utf-8")
+
+
+def sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def index_of(store, key: str) -> dict:
+    return json.loads(gzip.decompress(store.objects[key]))
+
+
+def object_puts(store) -> list[str]:
+    return [key for method, key in store.requests if method == "PUT" and "/objects/" in key]
+
+
+def back_up(client, auth, parts=None) -> str:
+    body = {"parts": parts} if parts else {}
+    started = client.post("/api/server/backup/run", headers=auth, json=body)
+    assert started.status_code == 202, started.text
+    status = wait_done(client)
+    assert status["last"]["ok"], status["last"]
+    return status["last"]["stamp"]
 
 
 # -- the bucket -----------------------------------------------------------------------
@@ -204,66 +227,212 @@ def test_back_up_now_puts_every_part_in_the_bucket_with_a_manifest(client, auth,
     assert status["running"] is None
     assert status["last"]["ok"], status["last"]
     stamp = status["last"]["stamp"]
-    keys = store.keys("home/")
-    assert (
-        keys
-        == [
-            f"home/{stamp}/database.sqlite.gz" if state.db.engine.name == "sqlite" else f"home/{stamp}/database.pgdump",
-            f"home/{stamp}/drives/bram.tar.gz",
-            f"home/{stamp}/drives/guest.tar.gz",
-            f"home/{stamp}/keys.tar.gz",
-            f"home/{stamp}/manifest.json",
-            f"home/{stamp}/quills.tar.gz",
-            f"home/{stamp}/shares/{share.name}.tar.gz",
-        ]
-        or state.db.engine.name != "sqlite"
-    )
+    snapshot = [k for k in store.keys("home/") if not k.startswith("home/objects/")]
+    sqlite = state.db.engine.name == "sqlite"
+    assert snapshot == [
+        f"home/{stamp}/database.index.gz" if sqlite else f"home/{stamp}/database.pgdump",
+        f"home/{stamp}/drives/bram.index.gz",
+        f"home/{stamp}/drives/guest.index.gz",
+        f"home/{stamp}/keys.tar.gz",
+        f"home/{stamp}/manifest.json",
+        f"home/{stamp}/quills.tar.gz",
+        f"home/{stamp}/shares/{share.name}.index.gz",
+    ]
+    # The store holds each file's content once, under its digest, in a folder by its first two letters.
+    hello, cat, mine, sun = (sha(b"# Hello\n"), sha(b"\xff\xd8" + b"cat" * 100), sha(b"guest's\n"), sha(b"sun"))
+    assert {hello, cat, mine, sun} <= store.digests("home/")
+    assert store.objects[f"home/objects/{hello[:2]}/{hello}"] == b"# Hello\n"
 
     manifest = json.loads(store.objects[f"home/{stamp}/manifest.json"])
-    assert manifest["cloudmorrow_backup"] == 1 and manifest["stamp"] == stamp
+    assert manifest["cloudmorrow_backup"] == 2 and manifest["stamp"] == stamp
     assert manifest["parts"] == list(PARTS)
     assert manifest["sealed_with"] == key_fingerprint(state.sealer.master)
     assert [d["name"] for d in manifest["drives"]] == ["bram", "guest"]
     bram = manifest["drives"][0]
-    assert bram["files"] == 2 and bram["size"] > 0 and len(bram["sha256"]) == 64
+    assert bram["files"] == 2 and bram["size"] == 8 + 302 and bram["added"] == 8 + 302 and bram["unchanged"] == 0
     assert manifest["shares"][0]["name"] == share.name and manifest["shares"][0]["files"] == 1
     assert manifest["keys"]["sealing_key"] is True
     assert "sealing.key" in manifest["keys"]["files"] and "secret.key" in manifest["keys"]["files"]
+    assert manifest["files"] == 4
     assert manifest["size"] == sum(
         p["size"]
         for p in (manifest["database"], manifest["quills"], manifest["keys"], *manifest["drives"], *manifest["shares"])
     )
-    # The drive's archive holds the files by their path in the drive.
-    with tarfile.open(fileobj=io.BytesIO(store.objects[bram["key"]]), mode="r:gz") as tar:
-        names = sorted(m.name for m in tar.getmembers() if m.isfile())
-    assert names == ["files/Notes/hello.md", "files/Photos/cat.jpg"]
+    assert manifest["added"] > 0 and manifest["rehash"] is False
+    # The drive's index names its files by their path in the drive, with digest, size, mtime and mode.
+    index = index_of(store, bram["key"])
+    assert sorted(index["files"]) == ["files/Notes/hello.md", "files/Photos/cat.jpg"]
+    assert index["dirs"] == ["files", "files/Notes", "files/Photos"]
+    digest, size, mtime_ns, mode = index["files"]["files/Notes/hello.md"]
+    assert digest == hello and size == 8
+    assert mtime_ns == (config.files_root("bram") / "Notes" / "hello.md").stat().st_mtime_ns
+    assert mode == 0o644
     # And the lines said what went.
-    assert any(line.startswith("bram's files:") for line in status["last"]["lines"])
+    assert any(line.startswith("bram's files: 310 B, 2 files, 310 B new") for line in status["last"]["lines"])
     assert status["last"]["lines"][-1].startswith("Done:")
+    assert status["last"]["added"] == manifest["added"] and status["last"]["files"] == 4
+    assert status["last"]["store"]["objects"] == len(store.digests("home/"))
+    assert status["store"]["objects"] == len(store.digests("home/"))
 
     listed = client.get("/api/server/backups", headers=auth)
     assert listed.status_code == 200
     assert [b["stamp"] for b in listed.json()] == [stamp]
     assert listed.json()[0]["drives"] == 2 and listed.json()[0]["key_matches"] is True
+    assert listed.json()[0]["format"] == 2 and listed.json()[0]["added"] == manifest["added"]
     described = client.get(f"/api/server/backups/{stamp}", headers=auth)
     assert described.status_code == 200 and described.json()["key_matches"] is True
 
 
-@sqlite_only
-def test_the_database_copy_is_whole_and_opens(client, auth, store, config):
-    set_up(client, auth, store, parts=["database"])
+def test_the_second_backup_sends_only_what_changed(client, auth, store, config):
+    a_drive_with_files(client, config)
+    set_up(client, auth, store, parts=["drives"])
+    first = back_up(client, auth)
+    sent_first = object_puts(store)
+    assert len(sent_first) == 3, "every file once"
+    store.requests.clear()
+
+    files = config.files_root("bram")
+    (files / "Notes" / "hello.md").write_text("# Hello again\n", encoding="utf-8")  # changed
+    (files / "Notes" / "new.md").write_text("new\n", encoding="utf-8")  # new
+    (files / "Photos" / "cat.jpg").rename(files / "Photos" / "kitten.jpg")  # renamed
+    (files / "Photos" / "copy.jpg").write_bytes(b"\xff\xd8" + b"cat" * 100)  # a copy of one there
+    second = back_up(client, auth)
+    assert second != first
+    sent = object_puts(store)
+    assert sorted(k.rsplit("/", 1)[-1] for k in sent) == sorted([sha(b"# Hello again\n"), sha(b"new\n")]), (
+        "the changed and the new file; the rename and the copy cost nothing"
+    )
+    manifest = json.loads(store.objects[f"home/{second}/manifest.json"])
+    bram = manifest["drives"][0]
+    assert bram["files"] == 4 and bram["added_files"] == 2 and bram["added"] == 14 + 4
+    assert bram["unchanged"] == 0, "kitten.jpg is a new path: read and hashed, then found in the store"
+    assert manifest["drives"][1]["unchanged"] == 1, "the guest's note, by size and mtime, unread"
+    index = index_of(store, bram["key"])
+    assert sorted(index["files"]) == [
+        "files/Notes/hello.md",
+        "files/Notes/new.md",
+        "files/Photos/copy.jpg",
+        "files/Photos/kitten.jpg",
+    ]
+    assert index["files"]["files/Photos/kitten.jpg"][0] == index["files"]["files/Photos/copy.jpg"][0]
+    # The first snapshot is still whole: its index names the content it saw.
+    old = index_of(store, f"home/{first}/drives/bram.index.gz")
+    assert old["files"]["files/Notes/hello.md"][0] == sha(b"# Hello\n")
+    assert (
+        f"home/objects/{sha(b'# Hello' + chr(10).encode())[:2]}/{sha(b'# Hello' + chr(10).encode())}" in store.objects
+    )
+    status = client.get("/api/server/backup", headers=auth).json()
+    assert status["store"]["objects"] == len(store.digests("home/")) == 5
+    assert status["last"]["added"] < json.loads(store.objects[f"home/{first}/manifest.json"])["added"]
+    assert any("18 B new" in line for line in status["last"]["lines"])
+
+
+def test_a_file_untouched_by_size_and_mtime_is_not_read_until_the_monthly_check(client, auth, store, config):
+    a_drive_with_files(client, config)
+    set_up(client, auth, store, parts=["drives"])
+    first = back_up(client, auth)
+    assert client.app.state.cloudmorrow.settings.get(backups_module.LAST_REHASH), "the first run counts as a full read"
+    hello = config.files_root("bram") / "Notes" / "hello.md"
+    was = hello.stat()
+    # Changed under the same size and the same mtime: what rsync's quick check misses too.
+    hello.write_text("# Hallo\n", encoding="utf-8")
+    os.utime(hello, ns=(was.st_atime_ns, was.st_mtime_ns))
+    store.requests.clear()
+    second = back_up(client, auth)
+    assert object_puts(store) == [], "trusted: nothing sent"
+    assert index_of(store, f"home/{second}/drives/bram.index.gz")["files"]["files/Notes/hello.md"][0] == sha(
+        b"# Hello\n"
+    )
+    # A month on, every file is read again and the change is caught.
+    client.app.state.cloudmorrow.settings.set(backups_module.LAST_REHASH, "2020-01-01")
+    third = back_up(client, auth)
+    assert [k.rsplit("/", 1)[-1] for k in object_puts(store)] == [sha(b"# Hallo\n")]
+    manifest = json.loads(store.objects[f"home/{third}/manifest.json"])
+    assert manifest["rehash"] is True and manifest["drives"][0]["unchanged"] == 0
+    status = client.get("/api/server/backup", headers=auth).json()
+    assert any("monthly check" in line for line in status["last"]["lines"])
+    assert client.app.state.cloudmorrow.settings.get(backups_module.LAST_REHASH) == dt.date.today().isoformat()
+    assert first != second != third
+
+
+def test_a_large_file_goes_up_in_parts_and_is_checked(client, auth, store, config, monkeypatch):
+    monkeypatch.setattr(backups_module, "IN_MEMORY", 1024)
+    monkeypatch.setattr(backups_module, "PART_SIZE", 4096)
+    a_drive_with_files(client, config)
+    big = bytes(range(256)) * 40
+    (config.files_root("bram") / "big.bin").write_bytes(big)
+    set_up(client, auth, store, parts=["drives"])
+    stamp = back_up(client, auth)
+    key = f"home/objects/{sha(big)[:2]}/{sha(big)}"
+    assert store.objects[key] == big
+    assert ("POST", key) in store.requests, "begun as a multipart upload"
+    assert not store.uploads
+    assert index_of(store, f"home/{stamp}/drives/bram.index.gz")["files"]["files/big.bin"][1] == len(big)
+    # Up again: known, so hashed and not sent.
+    store.requests.clear()
+    back_up(client, auth)
+    assert object_puts(store) == []
+
+
+def test_a_backup_that_fails_half_way_takes_its_new_objects_back(client, auth, store, config):
+    a_drive_with_files(client, config)
+    set_up(client, auth, store, parts=["drives"])
+    first = back_up(client, auth)
+    (config.files_root("bram") / "Notes" / "later.md").write_text("later\n", encoding="utf-8")
+    store.fail_keys.add("manifest.json")
     client.post("/api/server/backup/run", headers=auth, json={})
     status = wait_done(client)
-    assert status["last"]["ok"], status["last"]
-    key = f"home/{status['last']['stamp']}/database.sqlite.gz"
+    assert status["last"]["ok"] is False and "500" in status["last"]["error"]
+    assert sha(b"later\n") not in store.digests("home/"), "the failed run's object is gone"
+    assert sha(b"# Hello\n") in store.digests("home/"), "the first backup's are not"
+    assert store.stamps("home/") == {first, status["last"]["stamp"]}, "the half folder is swept as unfinished later"
+    assert client.get("/api/server/backup", headers=auth).json()["store"]["objects"] == 3
+
+
+def pieces_of(store, stamp: str) -> bytes:
+    index = index_of(store, f"home/{stamp}/database.index.gz")
+    whole = b""
+    for digest, size, _stored in index["chunks"]:
+        data = gzip.decompress(store.objects[f"home/objects/{digest[:2]}/{digest}"])
+        assert sha(data) == digest and len(data) == size
+        whole += data
+    assert len(whole) == index["size"]
+    return whole
+
+
+@sqlite_only
+def test_the_database_goes_up_in_pieces_and_only_the_changed_ones_again(client, auth, store, config, monkeypatch):
+    monkeypatch.setattr(backups_module, "CHUNK_SIZE", 16 * 1024)
+    set_up(client, auth, store, parts=["database"])
+    first = back_up(client, auth)
+    index = index_of(store, f"home/{first}/database.index.gz")
+    assert index["engine"] == "sqlite" and index["chunk_size"] == 16 * 1024 and len(index["chunks"]) > 4
     unpacked = config.data_dir.parent / "copy.sqlite"
-    unpacked.write_bytes(gzip.decompress(store.objects[key]))
+    unpacked.write_bytes(pieces_of(store, first))
     copy = sqlite3.connect(unpacked)
     assert copy.execute("PRAGMA quick_check").fetchone()[0] == "ok"
     assert copy.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 2
     copy.close()
     # Nothing left in the tmp folder.
     assert not list((client.app.state.cloudmorrow.config.data_dir / "tmp").iterdir())
+    manifest = json.loads(store.objects[f"home/{first}/manifest.json"])
+    assert manifest["database"]["chunked"] and manifest["database"]["chunks"] == len(index["chunks"])
+    assert manifest["database"]["added"] > 0
+
+    # One row changed: a few pages, so a few pieces, not the file.
+    client.app.state.cloudmorrow.settings.set_name("Renamed")
+    store.requests.clear()
+    second = back_up(client, auth)
+    sent = object_puts(store)
+    assert 0 < len(sent) < len(index["chunks"]), f"{len(sent)} of {len(index['chunks'])} pieces"
+    again = index_of(store, f"home/{second}/database.index.gz")
+    assert len(again["chunks"]) >= len(index["chunks"])
+    assert sum(a[0] == b[0] for a, b in zip(index["chunks"], again["chunks"], strict=False)) > 0, "most pieces the same"
+    whole = pieces_of(store, second)
+    unpacked.write_bytes(whole)
+    copy = sqlite3.connect(unpacked)
+    assert copy.execute("SELECT value FROM settings WHERE key = 'name'").fetchone()[0] == "Renamed"
+    copy.close()
 
 
 def test_a_backup_that_fails_says_so_and_leaves_no_manifest(client, auth, store):
@@ -283,8 +452,8 @@ def test_only_some_parts_when_asked(client, auth, store, config):
     status = wait_done(client)
     stamp = status["last"]["stamp"]
     assert store.keys(f"home/{stamp}/") == [
-        f"home/{stamp}/drives/bram.tar.gz",
-        f"home/{stamp}/drives/guest.tar.gz",
+        f"home/{stamp}/drives/bram.index.gz",
+        f"home/{stamp}/drives/guest.index.gz",
         f"home/{stamp}/manifest.json",
     ]
     manifest = json.loads(store.objects[f"home/{stamp}/manifest.json"])
@@ -320,8 +489,7 @@ def test_the_clock_runs_todays_backup_once_its_time_has_come(client, auth, store
     assert backups.tick(dt.datetime(2026, 10, 23, 9, 0).astimezone()) is False
     assert backups.tick(dt.datetime(2026, 10, 24, 3, 0).astimezone()) is True
     wait_done(client)
-    stamps = {key.split("/")[1] for key in store.keys("home/")}
-    assert len(stamps) == 2, "two backups, each in a folder of its own"
+    assert len(store.stamps("home/")) == 2, "two backups, each in a folder of its own"
 
 
 def test_the_clock_does_nothing_when_backups_are_off_or_unset(client, auth, store):
@@ -350,12 +518,55 @@ def test_the_sweep_takes_old_and_unfinished_backups_away(client, auth, store, bu
     # And somebody else's folder, which is not a backup and is left alone.
     bucket.put("home/notes.txt", b"mine")
 
-    gone = backups.sweep()
-    assert sorted(gone) == sorted([stamped(8), stamped(30), stamped(3)])
+    swept = backups.sweep()
+    assert sorted(swept["backups"]) == sorted([stamped(8), stamped(30), stamped(3)])
+    assert swept["objects"] == 0 and swept["totals"]["objects"] == 0, "nothing from before the store"
     left = {k.split("/")[1] for k in store.keys("home/")}
     assert left == {stamped(1), stamped(6), stamped(0.1), "notes.txt"}
     listed = client.get("/api/server/backups", headers=auth).json()
     assert [b["stamp"] for b in listed] == [stamped(1), stamped(6)], "newest first, finished only"
+
+
+def test_the_sweep_takes_the_objects_only_old_backups_named_and_keeps_the_shared_ones(client, auth, store, config):
+    a_drive_with_files(client, config)
+    set_up(client, auth, store, parts=["drives"], keep_days=7)
+    backups = backups_of(client)
+    day = dt.datetime(2026, 10, 1, 3, 0, tzinfo=dt.UTC)
+    backups.now = lambda: day
+    first = back_up(client, auth)
+    hello_old = sha(b"# Hello\n")
+    (config.files_root("bram") / "Notes" / "hello.md").write_text("# Hello again\n", encoding="utf-8")
+    day = dt.datetime(2026, 10, 5, 3, 0, tzinfo=dt.UTC)
+    second = back_up(client, auth)
+    assert hello_old in store.digests("home/"), "the first snapshot still names it"
+    # Ten days on: the first is past the seven kept, the second is not.
+    day = dt.datetime(2026, 10, 11, 3, 0, tzinfo=dt.UTC)
+    swept = backups.sweep()
+    assert swept["backups"] == [first] and swept["objects"] == 1
+    assert store.stamps("home/") == {second}
+    assert hello_old not in store.digests("home/"), "named by the first only: gone"
+    assert sha(b"# Hello again\n") in store.digests("home/")
+    assert sha(b"guest's\n") in store.digests("home/"), "shared by both: kept"
+    assert swept["totals"]["objects"] == len(store.digests("home/")) == 3
+    assert swept["totals"]["bytes"] == 14 + 302 + 8
+    # A third backup on the same day: the running totals carry on from the sweep's count.
+    (config.files_root("bram") / "Notes" / "third.md").write_text("3\n", encoding="utf-8")
+    back_up(client, auth)
+    status = client.get("/api/server/backup", headers=auth).json()
+    assert status["store"]["objects"] == 4 and status["store"]["bytes"] == 14 + 302 + 8 + 2
+
+
+def test_deleting_a_backup_takes_the_objects_only_it_named(client, auth, store, config):
+    a_drive_with_files(client, config)
+    set_up(client, auth, store, parts=["drives"])
+    first = back_up(client, auth)
+    (config.files_root("bram") / "Notes" / "hello.md").write_text("# Changed\n", encoding="utf-8")
+    second = back_up(client, auth)
+    gone = client.delete(f"/api/server/backups/{first}", headers=auth)
+    assert gone.status_code == 204
+    assert store.stamps("home/") == {second}
+    assert sha(b"# Hello\n") not in store.digests("home/")
+    assert store.digests("home/") == {sha(b"# Changed\n"), sha(b"\xff\xd8" + b"cat" * 100), sha(b"guest's\n")}
 
 
 # -- restoring ------------------------------------------------------------------------------
@@ -393,6 +604,154 @@ def test_a_drive_and_a_share_come_back_over_what_is_there(client, auth, store, c
     assert (share.path / "holiday.jpg").read_bytes() == b"sun"
     assert guest_note.read_text(encoding="utf-8") == "guest changed\n", "only the drive asked for"
     assert any(line.startswith("bram's files: 2 files put back") for line in done["lines"])
+    # Each file comes back with the mtime and mode it had.
+    index = index_of(store, f"home/{stamp}/drives/bram.index.gz")
+    assert (config.files_root("bram") / "Photos" / "cat.jpg").stat().st_mtime_ns == index["files"][
+        "files/Photos/cat.jpg"
+    ][2]
+    # Restored again, nothing is written: every file is already there as it was.
+    client.post(f"/api/server/backups/{stamp}/restore", headers=auth, json={"drives": ["bram"], "restart": False})
+    done = wait_done(client)["last_restore"]
+    assert done["ok"] and any("0 files put back, 2 files already there" in line for line in done["lines"])
+
+
+def test_one_file_or_one_folder_comes_back_as_it_was_that_day(client, auth, store, config):
+    a_drive_with_files(client, config)
+    set_up(client, auth, store, parts=["drives"])
+    stamp = back_up(client, auth)
+    files = config.files_root("bram")
+    (files / "Notes" / "hello.md").write_text("changed\n", encoding="utf-8")
+    (files / "Notes" / "new.md").write_text("new\n", encoding="utf-8")
+    (files / "Photos" / "cat.jpg").unlink()
+
+    asked = client.post(
+        f"/api/server/backups/{stamp}/restore",
+        headers=auth,
+        json={"paths": ["drives/bram/files/Notes/hello.md"], "restart": False},
+    )
+    assert asked.status_code == 202, asked.text
+    done = wait_done(client)["last_restore"]
+    assert done["ok"], done
+    assert done["paths"] == ["drives/bram/files/Notes/hello.md"] and done["drives"] == []
+    assert (files / "Notes" / "hello.md").read_text(encoding="utf-8") == "# Hello\n"
+    assert (files / "Notes" / "new.md").exists() and not (files / "Photos" / "cat.jpg").exists(), "only the one file"
+    assert any(line.startswith("From bram's files, files/Notes/hello.md: 1 file put back") for line in done["lines"])
+
+    # A folder, with the slash, brings everything under it.
+    asked = client.post(
+        f"/api/server/backups/{stamp}/restore",
+        headers=auth,
+        json={"paths": ["drives/bram/files/Photos/"], "restart": False},
+    )
+    assert asked.status_code == 202, asked.text
+    done = wait_done(client)["last_restore"]
+    assert done["ok"] and (files / "Photos" / "cat.jpg").read_bytes().startswith(b"\xff\xd8")
+
+    # What is not there, or not a single thing, is said before anything starts.
+    restore = lambda body: client.post(f"/api/server/backups/{stamp}/restore", headers=auth, json=body)  # noqa: E731
+    assert "has no files/Notes/gone.md" in restore({"paths": ["drives/bram/files/Notes/gone.md"]}).text
+    assert "has no files of ada" in restore({"paths": ["drives/ada/x"]}).text
+    assert "whole drive" in restore({"paths": ["drives/bram"]}).text
+    assert restore({"paths": ["elsewhere/bram/x"]}).status_code == 400
+    assert restore({"paths": ["drives/bram/../x"]}).status_code == 400
+    # A path inside a drive restored whole is not restored twice.
+    asked = restore({"drives": ["bram"], "paths": ["drives/bram/files/Notes/hello.md"], "restart": False})
+    assert asked.status_code == 202
+    done = wait_done(client)["last_restore"]
+    assert done["ok"] and done["paths"] == []
+
+
+def test_a_backup_can_be_browsed_and_one_file_pulled_out(client, auth, store, config):
+    a_drive_with_files(client, config)
+    set_up(client, auth, store, parts=["drives"])
+    stamp = back_up(client, auth)
+    top = client.get(f"/api/server/backups/{stamp}/files", headers=auth, params={"where": "drives/bram"})
+    assert top.status_code == 200, top.text
+    assert top.json()["where"] == "drives/bram" and top.json()["path"] == ""
+    assert [(f["name"], f["files"], f["size"]) for f in top.json()["folders"]] == [("files", 2, 310)]
+    assert top.json()["files"] == []
+    inside = client.get(
+        f"/api/server/backups/{stamp}/files", headers=auth, params={"where": "drives/bram", "path": "files/"}
+    )
+    assert inside.json()["path"] == "files"
+    assert [(f["name"], f["files"], f["size"]) for f in inside.json()["folders"]] == [
+        ("Notes", 1, 8),
+        ("Photos", 1, 302),
+    ]
+    notes = client.get(
+        f"/api/server/backups/{stamp}/files", headers=auth, params={"where": "drives/bram", "path": "files/Notes"}
+    )
+    assert notes.json()["folders"] == []
+    assert [(f["name"], f["size"]) for f in notes.json()["files"]] == [("hello.md", 8)]
+    assert notes.json()["files"][0]["modified"].startswith("20")
+    assert (
+        client.get(f"/api/server/backups/{stamp}/files", headers=auth, params={"where": "drives/ada"}).status_code
+        == 400
+    )
+    assert (
+        client.get(
+            f"/api/server/backups/{stamp}/files", headers=auth, params={"where": "drives/bram", "path": "Nowhere"}
+        ).status_code
+        == 400
+    )
+    assert client.get(f"/api/server/backups/{stamp}/files", headers=auth, params={"where": "bram"}).status_code == 400
+
+    pulled = client.get(
+        f"/api/server/backups/{stamp}/file", headers=auth, params={"path": "drives/bram/files/Notes/hello.md"}
+    )
+    assert pulled.status_code == 200, pulled.text
+    assert pulled.content == b"# Hello\n"
+    assert pulled.headers["content-length"] == "8" and "hello.md" in pulled.headers["content-disposition"]
+    assert pulled.headers["content-type"].startswith("text/markdown")
+    assert (
+        client.get(f"/api/server/backups/{stamp}/file", headers=auth, params={"path": "drives/bram/nope"}).status_code
+        == 400
+    )
+    assert (
+        client.get(f"/api/server/backups/{stamp}/file", headers=auth, params={"path": "drives/bram"}).status_code == 400
+    )
+
+
+def test_a_backup_from_before_the_store_is_still_listed_and_restored_whole(client, auth, store, config, bucket):
+    """Format 1: an archive per drive. Whole drives come back; there is nothing to browse."""
+    a_drive_with_files(client, config)
+    set_up(client, auth, store, parts=["drives"])
+    stamp = "20261001T030000Z"
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+        tar.add(config.files_root("bram"), arcname="files")
+    bucket.put(f"home/{stamp}/drives/bram.tar.gz", buffer.getvalue())
+    manifest = {
+        "cloudmorrow_backup": 1,
+        "stamp": stamp,
+        "made_at": "2026-10-01T03:00:00+00:00",
+        "parts": ["drives"],
+        "database": None,
+        "drives": [{"name": "bram", "key": f"home/{stamp}/drives/bram.tar.gz", "size": 1, "files": 1}],
+        "shares": [],
+        "quills": None,
+        "keys": None,
+        "size": 1,
+        "sealed_with": key_fingerprint(client.app.state.cloudmorrow.sealer.master),
+    }
+    bucket.put(f"home/{stamp}/manifest.json", json.dumps(manifest).encode())
+    listed = client.get("/api/server/backups", headers=auth).json()
+    assert [(b["stamp"], b["format"]) for b in listed] == [(stamp, 1)]
+    browse = client.get(f"/api/server/backups/{stamp}/files", headers=auth, params={"where": "drives/bram"})
+    assert browse.status_code == 400 and "before single files" in browse.text
+    refused = client.post(f"/api/server/backups/{stamp}/restore", headers=auth, json={"paths": ["drives/bram/Notes/x"]})
+    assert refused.status_code == 400 and "before single files" in refused.text
+    (config.files_root("bram") / "Notes" / "hello.md").unlink()
+    asked = client.post(
+        f"/api/server/backups/{stamp}/restore", headers=auth, json={"drives": ["bram"], "restart": False}
+    )
+    assert asked.status_code == 202, asked.text
+    done = wait_done(client)["last_restore"]
+    assert done["ok"], done
+    assert (config.files_root("bram") / "Notes" / "hello.md").read_text(encoding="utf-8") == "# Hello\n"
+    # A new backup lands beside it in the same folder, and the old one is swept by age like any other.
+    back_up(client, auth)
+    assert stamp in store.stamps("home/")
 
 
 @sqlite_only
@@ -537,6 +896,46 @@ def test_an_archive_cannot_reach_outside_where_it_is_put(client, auth, store, co
     assert (dest / "files" / "ok.txt").read_bytes() == b"ok"
     assert not (config.notes_dir.parent / "escaped.txt").exists()
     assert not list(config.notes_dir.parent.glob("escaped.txt"))
+
+
+def test_an_index_cannot_reach_outside_where_it_is_put_either(client, auth, store, config, bucket):
+    """An index with a path that climbs out, or an object that is not what it says, is skipped."""
+    set_up(client, auth, store)
+    backups = backups_of(client)
+    good, bad = sha(b"ok"), sha(b"bad")
+    bucket.put(f"home/objects/{good[:2]}/{good}", b"ok")
+    bucket.put(f"home/objects/{bad[:2]}/{bad}", b"bad")
+    wrong = sha(b"what the index says")
+    bucket.put(f"home/objects/{wrong[:2]}/{wrong}", b"something else")
+    index = {
+        "files": {
+            "ok.txt": [good, 2, 1_700_000_000_000_000_000, 0o600],
+            "../../escaped.txt": [bad, 3, 0, 0o644],
+            "/abs.txt": [bad, 3, 0, 0o644],
+            "sub/../../up.txt": [bad, 3, 0, 0o644],
+            "liar.txt": [wrong, 19, 0, 0o644],
+        },
+        "dirs": ["sub", "../out"],
+    }
+    bucket.put("home/evil.index.gz", gzip.compress(json.dumps(index).encode()))
+    dest = config.notes_dir / "victim"
+    told = backups._restore_index(backups_module.Store(bucket, "home/"), "home/evil.index.gz", dest)
+    assert told == {"files": 1, "unchanged": 0, "skipped": 4}
+    assert (dest / "ok.txt").read_bytes() == b"ok"
+    assert oct((dest / "ok.txt").stat().st_mode & 0o777) == "0o600"
+    assert (dest / "ok.txt").stat().st_mtime_ns == 1_700_000_000_000_000_000
+    assert (dest / "sub").is_dir() and not (config.notes_dir / "out").exists()
+    assert not (dest / "liar.txt").exists() and not list(dest.glob(".cloudmorrow-restore-*"))
+    assert not (config.notes_dir.parent / "escaped.txt").exists() and not (config.notes_dir / "up.txt").exists()
+
+
+def test_paths_are_read_strictly():
+    assert split_path("drives/bram/Notes/a.md") == ("drives", "bram", "Notes/a.md")
+    assert split_path("shares/photos/2024/") == ("shares", "photos", "2024/")
+    assert split_path("drives/bram") == ("drives", "bram", "")
+    for bad in ("bram/Notes", "drives", "drives//x", "drives/bram/../x", "drives/bram/a/./b", "quills/x"):
+        with pytest.raises(BackupError):
+            split_path(bad)
 
 
 def test_the_status_says_what_is_going_on_while_it_goes(client, auth, store, config):

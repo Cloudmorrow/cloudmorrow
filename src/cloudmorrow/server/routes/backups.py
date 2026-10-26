@@ -8,12 +8,18 @@ come together, since the page needs both at once.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import mimetypes
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 
 from cloudmorrow.server.backups import BackupError, Backups, Choice
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_admin_user, get_state
+from cloudmorrow.server.s3 import read_chunks
 from cloudmorrow.server.schemas import (
+    BackupFilesOut,
     BackupRestoreRequest,
     BackupRunRequest,
     BackupSettingsOut,
@@ -121,6 +127,43 @@ def describe_backup(stamp: str, state: AppState = Depends(get_state), _: User = 
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
+@router.get("/backups/{stamp}/files", response_model=BackupFilesOut)
+def browse_backup(
+    stamp: str,
+    where: str = Query(..., description="drives/<name> or shares/<name>"),
+    path: str = Query("", description="a folder in it; blank for its top"),
+    state: AppState = Depends(get_state),
+    _: User = Depends(get_admin_user),
+) -> BackupFilesOut:
+    """What one backup holds under a folder of a drive or a share, for picking
+    single files to restore. Backups from before the store (format 1) have
+    no index to browse and answer 400."""
+    try:
+        return BackupFilesOut(**_backups(state).files(stamp, where, path))
+    except BackupError as exc:
+        raise _refused(exc) from exc
+
+
+@router.get("/backups/{stamp}/file")
+def download_backup_file(
+    stamp: str,
+    path: str = Query(..., description="drives/<name>/<path> or shares/<name>/<path>"),
+    state: AppState = Depends(get_state),
+    _: User = Depends(get_admin_user),
+) -> StreamingResponse:
+    """One file as it was in that backup, streamed out of the bucket."""
+    try:
+        body, size, name = _backups(state).open_file(stamp, path)
+    except BackupError as exc:
+        raise _refused(exc) from exc
+    media = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    headers = {
+        "Content-Length": str(size),
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}",
+    }
+    return StreamingResponse(read_chunks(body), media_type=media, headers=headers)
+
+
 @router.delete("/backups/{stamp}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_backup(stamp: str, state: AppState = Depends(get_state), _: User = Depends(get_admin_user)) -> None:
     try:
@@ -136,14 +179,16 @@ def restore_backup(
     state: AppState = Depends(get_state),
     admin: User = Depends(get_admin_user),
 ) -> BackupStatusOut:
-    """Put the chosen parts of one backup back, on a thread. When the database,
-    the Quills or the keys are among them the server restarts itself afterwards,
-    as an update does — `last_restore` says `restarting`, or why not."""
+    """Put the chosen parts of one backup back, on a thread: whole parts, and
+    single files or folders by path. When the database, the Quills or the
+    keys are among them the server restarts itself afterwards, as an update
+    does — `last_restore` says `restarting`, or why not."""
     backups = _backups(state)
     choice = Choice(
         database=payload.database,
         drives=list(payload.drives),
         shares=list(payload.shares),
+        paths=list(payload.paths),
         quills=payload.quills,
         keys=payload.keys,
         restart=payload.restart,

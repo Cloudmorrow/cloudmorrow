@@ -183,8 +183,22 @@
 .restore-sheet .feature-row { align-items: center; }
 .restore-sheet .feature-row input[type="checkbox"] { margin: 0; width: 20px; height: 20px; accent-color: var(--accent); }
 .restore-sheet .note { margin: 0 16px 10px; font-size: 14px; line-height: 1.45; }
+.restore-sheet .note.picked-note { margin-top: 8px; color: var(--accent); }
+/* A look inside a drive: the small word on its row, and under it the
+   folder as it was that day, crumbs on top, a tick on each thing and
+   "save" on a file. */
+.restore-sheet .browse-in, .restore-sheet .browse-row .pull { font: inherit; font-size: 14px; color: var(--accent); background: none; border: 0; padding: 4px 8px; cursor: pointer; white-space: nowrap; }
+.restore-sheet .browse-pane { margin: 0 0 6px 12px; padding-left: 10px; border-left: 2px solid var(--line); }
+.restore-sheet .browse-pane .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 6px 8px 2px; font-size: 14px; color: var(--muted); }
+.restore-sheet .browse-pane .crumb { font: inherit; color: var(--accent); background: none; border: 0; padding: 2px 4px; cursor: pointer; }
+.restore-sheet .browse-pane .crumb.here { color: var(--ink); font-weight: 600; padding: 2px 4px; }
+.restore-sheet .browse-pane .sep { color: var(--muted); }
+.restore-sheet .browse-row { align-items: center; gap: 10px; padding-left: 6px; }
+.restore-sheet .browse-row input[type="checkbox"] { margin: 0; width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+.restore-sheet .browse-row .main.enter { font: inherit; text-align: left; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.restore-sheet .browse-row .main.enter .title { color: var(--accent); }
 @media (min-width: 900px) and (min-height: 600px) {
-  .restore-sheet { max-width: 520px; }
+  .restore-sheet { max-width: 560px; }
 }
 
 /* The switch and the chips are labels: the guide's semi-condensed face. */

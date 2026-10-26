@@ -152,7 +152,8 @@ carries the database; with a server of your own, its backups are yours,
 as the server is. The key stays where it is, and a dump without it opens
 nothing, as before. The server's own backups — Administration, Backups:
 every day into an S3 bucket, the database as a copy of the file or a
-`pg_dump`, the drives and shares as archives, and restoring any part of
+`pg_dump`, the drives and shares as indexes over one content store so
+only what changed goes up, and restoring any part of
 one back (`server/backups.py`, MANUAL.md *Backups*) — work on either
 engine; on PostgreSQL they need `pg_dump` and `pg_restore` on the
 server's path, which the container image does not carry yet.

@@ -1920,27 +1920,49 @@ tiny probe and takes it away, so a wrong key or region is said now rather
 than at three in the morning.
 
 **When**: **Every day** at the time you give, on the server's own clock,
-kept for as many days as you say. A daily backup older than that is taken
-out of the bucket after the next one lands, and so is a folder left by a
-backup that never finished. Off, nothing runs on its own and **Back up
-now** is the only way; it is also the way to take one before something
-you are about to do.
+kept for as many days as you say. Every day's backup is a complete picture
+of that day, but only what changed since the day before goes up: the first
+backup is the full one, and from then on a night with a few new photos
+sends a few photos. A daily backup older than the days kept is taken out
+of the bucket after the next one lands, and with it whatever no other day
+still needs; so is a folder left by a backup that never finished. Off,
+nothing runs on its own and **Back up now** is the only way; it is also
+the way to take one before something you are about to do.
 
 **What** is five parts, each ticked on its own, so a server with its
 files on a disk of their own can send only its database:
 
 | part | what it is | in the bucket |
 | --- | --- | --- |
-| **Database** | accounts, circles, roles, every record of every Quill, the settings, the secrets, which Quills are installed | `database.sqlite.gz`, a copy at one moment with the write-ahead log folded in; or `database.pgdump` from `pg_dump` |
-| **Everybody's files** | each person's drive — My Files, their notes in it — and the drives of accounts since deleted, whose files stay | `drives/<name>.tar.gz`, one per drive |
-| **Shares** | every share, wherever its folder is | `shares/<name>.tar.gz`, one per share |
+| **Database** | accounts, circles, roles, every record of every Quill, the settings, the secrets, which Quills are installed | a copy at one moment with the write-ahead log folded in, in 4 MiB pieces in the store, and `database.index.gz` naming them; or `database.pgdump` from `pg_dump`, whole |
+| **Everybody's files** | each person's drive — My Files, their notes in it — and the drives of accounts since deleted, whose files stay | `drives/<name>.index.gz`, one per drive: every file's path, digest, size, mtime and mode |
+| **Shares** | every share, wherever its folder is | `shares/<name>.index.gz`, one per share |
 | **Quills** | the installed Quills, people's own, the datamodels, the runtimes fetched for them | `quills.tar.gz` |
 | **Keys** | the token signing key, the identity key, the push key | `keys.tar.gz` |
 
-And `manifest.json`, which lists them with their sizes and digests, the
-Cloudmorrow version, and a fingerprint of the key the database was sealed
-with. A backup is one folder in the bucket named by its moment,
-`20261023T030000Z`, and anything that reads S3 reads it.
+And `manifest.json`, which lists them with their sizes, what that day
+added, the Cloudmorrow version, and a fingerprint of the key the database
+was sealed with. A backup is one folder in the bucket named by its moment,
+`20261023T030000Z`, beside one **store** shared by every backup:
+`objects/ab/abcdef…`, an object per distinct content, named by its
+SHA-256. A file goes into the store once; each day's index says which
+files there were and which content each had. A file whose size and mtime
+are what the last index saw is not even read; one that changed is hashed,
+and sent only if the store does not have that content yet — so a renamed
+or copied file costs nothing, and a file edited on Monday and again on
+Thursday is there both ways, each from its day. Once a month every file
+is read in full again, in case something changed under the same mtime.
+The database is cut into 4 MiB pieces and stored the same way: SQLite
+rewrites only the pages it touches, in place, so the pieces holding
+untouched pages have the digest they had yesterday. A PostgreSQL dump is
+a compressed stream with no such stability and goes up whole; it is
+small. The page says what the store holds, and each backup what it added.
+
+The bucket is readable with anything that speaks S3, but the files in it
+are the store's objects, by digest: it takes an index to make sense of
+them, which is what the page, `cm backup files` and `cm backup get` do.
+Backups made before Cloudmorrow 0.51 — an archive per drive — stay listed
+and restorable, whole drives only, until they age out.
 
 **The sealing key** is off by default and stays off unless you tick **The
 sealing key too**. The database goes up as it is on disk — sealed — so a
@@ -1954,18 +1976,31 @@ you would not give the disk. Either way, keep a copy of the key file
 somewhere that is not the server.
 
 **Restore** opens from the list under **In the bucket**: each backup a
-row with its date, size and parts, and on tapping one a sheet of what it
-holds — the database, each person's files, each share, the Quills, the
-keys — with a box beside each and **all** on the groups. Tick what you
-want and **Restore**: what the backup has goes over what is on the server
-now, and what it does not have is left alone, so a file made since a
-backup stays and a file deleted since comes back. Before the database is
-put back, a copy of today's is kept in `<data_dir>/before-restore/` (the
-last three), so a restore is never the end of the road. A restore that
-brings the database, the Quills or the keys back ends with the server
-restarting itself, as an update does, so nothing in memory remembers the
-old rows; the page waits for it and comes back on the restored data.
-Only files, nothing restarts.
+row with its date, size and what it added, and on tapping one a sheet of
+what it holds — the database, each person's files, each share, the
+Quills, the keys — with a box beside each and **all** on the groups. Tick
+what you want and **Restore**: what the backup has goes over what is on
+the server now, and what it does not have is left alone, so a file made
+since a backup stays and a file deleted since comes back. A file already
+there with the same size and mtime is left as it is, so putting a big
+drive back after losing a folder costs the folder. Each file is checked
+against its digest as it comes down, and lands with the mtime and mode
+it had. Before the database is put back, a copy of today's is kept in
+`<data_dir>/before-restore/` (the last three), so a restore is never the
+end of the road. A restore that brings the database, the Quills or the
+keys back ends with the server restarting itself, as an update does, so
+nothing in memory remembers the old rows; the page waits for it and
+comes back on the restored data. Only files, nothing restarts.
+
+**One file, as it was that day**: on a drive's or a share's row in the
+sheet, **files…** opens the drive as it was in that backup, folder by
+folder, each folder and file with a box. Tick what you want — a folder
+takes everything under it — and **Restore** puts only those back, where
+they were; **save** beside a file pulls a copy of it out onto this
+computer without touching the server, for the time you want to look at
+last Tuesday's version of a document beside today's. A drive's own
+files are under `files/` in it; a path is said as
+`drives/<name>/files/Notes/plan.md`, or `shares/<name>/…`.
 
 Two refusals worth knowing. A backup whose database was sealed with
 another key than this server's is marked **another key** in the list, and
@@ -1993,6 +2028,9 @@ cm backup show 20261023T030000Z
 cm backup restore 20261023T030000Z --all
 cm backup restore 20261023T030000Z --drive bram --share photos
 cm backup restore 20261023T030000Z --database --no-restart   # and restart when it suits you
+cm backup files 20261023T030000Z drives/bram files/Notes     # what was in a folder that day
+cm backup get 20261023T030000Z drives/bram/files/Notes/plan.md -o plan-then.md
+cm backup restore 20261023T030000Z --path drives/bram/files/Notes/plan.md --path drives/bram/files/Photos/2024/
 cm backup delete 20261023T030000Z
 ```
 

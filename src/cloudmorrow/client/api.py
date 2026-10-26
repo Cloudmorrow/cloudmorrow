@@ -184,6 +184,18 @@ class CloudmorrowClient:
     async def backup(self, stamp: str) -> dict:
         return (await self._request("GET", f"/api/server/backups/{stamp}", timeout=120.0)).json()
 
+    async def backup_files(self, stamp: str, where: str, path: str = "") -> dict:
+        """What a backup holds under one folder of `drives/<name>` or `shares/<name>`."""
+        params = {"where": where, "path": path}
+        return (await self._request("GET", f"/api/server/backups/{stamp}/files", params=params, timeout=120.0)).json()
+
+    async def backup_file(self, stamp: str, path: str) -> bytes:
+        """One file as it was in a backup: `drives/<name>/<path>`."""
+        response = await self._request(
+            "GET", f"/api/server/backups/{stamp}/file", params={"path": path}, timeout=DEPLOY_TIMEOUT
+        )
+        return response.content
+
     async def delete_backup(self, stamp: str) -> None:
         await self._request("DELETE", f"/api/server/backups/{stamp}", timeout=120.0)
 
