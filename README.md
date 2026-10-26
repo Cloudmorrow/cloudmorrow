@@ -89,8 +89,9 @@ It is free software under the [GNU AGPL v3](LICENSE).
 - **Backed up to a bucket.** An administrator names an S3 bucket — Amazon's
   or anybody's — and every day the server puts a copy of everything there:
   the database, everybody's files, the shares, the Quills, the keys; kept as
-  long as you say. Any backup is restored from the same page, all of it or
-  one person's files. See [the manual](docs/MANUAL.md#backups-everything-into-a-bucket-and-back).
+  long as you say, and only what changed goes up. Any day is restored from
+  the same page, all of it, one person's files, or one file as it was that
+  day. See [the manual](docs/MANUAL.md#backups-everything-into-a-bucket-and-back).
 - **Switches, not settings.** An administrator can turn any whole area off
   for the server. Each person can hide any area from their own screens. That,
   and the list of accounts, is the whole administration panel.

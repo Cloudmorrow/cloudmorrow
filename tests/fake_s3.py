@@ -24,6 +24,8 @@ class FakeS3:
         self.objects: dict[str, bytes] = {}
         self.uploads: dict[str, dict[int, bytes]] = {}
         self.requests: list[tuple[str, str]] = []
+        # Keys (by suffix) whose PUT the fake answers with a 500, for tests of a run that fails half way.
+        self.fail_keys: set[str] = set()
         self.lock = threading.Lock()
         fake = self
 
@@ -128,6 +130,8 @@ class FakeS3:
                 if not self._signed(body):
                     return
                 fake.requests.append(("PUT", key))
+                if any(key.endswith(suffix) for suffix in fake.fail_keys):
+                    return self._error(500, "InternalError", "the fake was told to fail this one")
                 if "uploadId" in query:
                     upload = query["uploadId"][0]
                     number = int(query["partNumber"][0])
@@ -204,3 +208,15 @@ class FakeS3:
     def keys(self, prefix: str = "") -> list[str]:
         with self.lock:
             return sorted(k for k in self.objects if k.startswith(prefix))
+
+    def stamps(self, prefix: str = "") -> set[str]:
+        """The snapshot folders under *prefix*, the store's own folder left out."""
+        return {
+            k[len(prefix) :].split("/", 1)[0]
+            for k in self.keys(prefix)
+            if "/" in k[len(prefix) :] and not k[len(prefix) :].startswith("objects/")
+        }
+
+    def digests(self, prefix: str = "") -> set[str]:
+        """What the content store under *prefix* holds, by digest."""
+        return {k.rsplit("/", 1)[-1] for k in self.keys(prefix + "objects/")}

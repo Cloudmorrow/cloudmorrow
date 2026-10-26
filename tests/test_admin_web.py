@@ -292,5 +292,21 @@ def test_the_backups_page_asks_on_the_page_and_calls_the_backup_api():
         '"GET", "/api/server/backups"',
         '"DELETE", "/api/server/backups/"',
         "/restore`",
+        "/files?where=",
+        "/file?path=",
     ):
         assert call in source, call
+
+
+def test_the_restore_sheet_browses_a_backup_and_sends_the_picked_paths():
+    """A drive or a share row opens a look inside (format 2 only), each file
+    and folder with a tick, and what is ticked goes as `paths` with the
+    restore. Saving a copy goes through apiRaw, never a bare link that would
+    lose the token."""
+    source = (WEB / "backupsadmin.js").read_text(encoding="utf-8")
+    assert "const browsable = (m.cloudmorrow_backup || 1) >= 2;" in source
+    assert 'class="browse-in"' in source and 'class="browse-pane"' in source
+    assert "paths: [...picked]," in source
+    assert 'apiRaw("GET", `/api/server/backups/${encodeURIComponent(stamp)}/file?path=' in source
+    assert "a.download = pull.dataset.name;" in source
+    assert "In the store" in source, "the page says what the store holds"

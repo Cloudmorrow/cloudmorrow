@@ -604,6 +604,8 @@ class BackupStatusOut(BaseModel):
     lines: list[str] = []
     last: dict | None = None
     last_restore: dict | None = None
+    # What the content store holds: objects, bytes, and when that was counted.
+    store: dict | None = None
 
 
 class BackupRunRequest(BaseModel):
@@ -617,8 +619,13 @@ class BackupSummaryOut(BaseModel):
     made_at: str = ""
     cloud: str = ""
     version: str = ""
+    # 1: an archive per drive; 2: the content store, with single files to browse and restore.
+    format: int = 1
     parts: list[str] = []
+    # What the backup is a picture of, and what it added to the bucket.
     size: int = 0
+    added: int = 0
+    files: int = 0
     took: float = 0
     drives: int = 0
     shares: int = 0
@@ -632,10 +639,34 @@ class BackupRestoreRequest(BaseModel):
     database: bool = False
     drives: list[str] = []
     shares: list[str] = []
+    # Single files or folders: `drives/<name>/<path>`, `shares/<name>/<path>`; a folder ends in a slash.
+    paths: list[str] = []
     quills: bool = False
     keys: bool = False
     restart: bool = True
     force: bool = False
+
+
+class BackupFolderOut(BaseModel):
+    name: str
+    files: int = 0
+    size: int = 0
+
+
+class BackupFileOut(BaseModel):
+    name: str
+    size: int = 0
+    modified: str = ""
+
+
+class BackupFilesOut(BaseModel):
+    """What a backup holds under one folder of a drive or a share."""
+
+    stamp: str
+    where: str
+    path: str = ""
+    folders: list[BackupFolderOut] = []
+    files: list[BackupFileOut] = []
 
 
 class BackupTestOut(BaseModel):

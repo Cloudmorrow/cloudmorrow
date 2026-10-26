@@ -11,12 +11,20 @@ you watch, run one, look at what is in the bucket, and put it back.
     cloudmorrow backup show 20261023T030000Z
     cloudmorrow backup restore 20261023T030000Z --all
     cloudmorrow backup restore 20261023T030000Z --drive bram --share Photos
+    cloudmorrow backup restore 20261023T030000Z --path drives/bram/Notes/plan.md
+    cloudmorrow backup files 20261023T030000Z drives/bram Notes
+    cloudmorrow backup get 20261023T030000Z drives/bram/Notes/plan.md -o plan.md
     cloudmorrow backup delete 20261023T030000Z
+
+Every backup is a complete picture of its day, and every file in it is
+there as it was that day: `files` looks, `get` pulls one out, `restore
+--path` puts one back where it was.
 """
 
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -63,6 +71,8 @@ def _said_last(label: str, last: dict | None) -> str:
     verdict = "[green]ok[/]" if last.get("ok") else f"[red]failed[/] — {last.get('error', '')}"
     when = last.get("finished_at") or last.get("started_at") or ""
     size = f", {size_of(last['size'])}" if last.get("size") else ""
+    if last.get("added") is not None and last.get("size"):
+        size += f", {size_of(last['added'])} new"
     return f"{label}: {last.get('stamp', '')} {verdict} ({when}{size})"
 
 
@@ -79,6 +89,9 @@ def status() -> None:
             console.print(f"[yellow]{told['running'].capitalize()} running[/]: {told.get('step') or '…'}")
         console.print(_said_last("Last backup", told.get("last")))
         console.print(_said_last("Last restore", told.get("last_restore")))
+        store = told.get("store") or {}
+        if store.get("objects"):
+            console.print(f"The bucket holds {size_of(store.get('bytes', 0))} in {plural(store['objects'], 'object')}")
 
     run(_status())
 
@@ -119,7 +132,10 @@ def now(
             last = told.get("last") or {}
             if not last.get("ok"):
                 fail(f"the backup failed: {last.get('error', 'no word why')}")
-            console.print(f"[green]Done:[/] {last.get('stamp')} · {size_of(last.get('size', 0))}")
+            console.print(
+                f"[green]Done:[/] {last.get('stamp')} · {size_of(last.get('size', 0))}"
+                + (f", {size_of(last['added'])} new" if last.get("added") is not None else "")
+            )
 
     run(_now())
 
@@ -139,6 +155,7 @@ def list_backups() -> None:
         table.add_column("Stamp")
         table.add_column("Made")
         table.add_column("Size", justify="right")
+        table.add_column("New", justify="right")
         table.add_column("Parts")
         table.add_column("Key")
         for b in found:
@@ -150,6 +167,7 @@ def list_backups() -> None:
                 b["stamp"],
                 (b.get("made_at") or "")[:16].replace("T", " "),
                 size_of(b.get("size", 0)),
+                size_of(b.get("added", 0)) if b.get("format", 1) >= 2 else "all",
                 what,
                 "[green]this server's[/]" if b.get("key_matches") else "[yellow]another[/]",
             )
@@ -176,21 +194,79 @@ def show(stamp: StampArg) -> None:
                 else "[yellow]another key[/] than this server's"
             )
         )
+        new = lambda part: f", {size_of(part['added'])} new" if part.get("added") is not None else ""  # noqa: E731
         if told.get("database"):
-            console.print(f"  database ({told['database']['engine']}): {size_of(told['database']['size'])}")
+            console.print(
+                f"  database ({told['database']['engine']}): {size_of(told['database']['size'])}{new(told['database'])}"
+            )
         for d in told.get("drives") or []:
-            console.print(f"  drive {d['name']}: {size_of(d['size'])}, {plural(d.get('files', 0), 'file')}")
+            console.print(f"  drive {d['name']}: {size_of(d['size'])}, {plural(d.get('files', 0), 'file')}{new(d)}")
         for s in told.get("shares") or []:
-            console.print(f"  share {s['name']}: {size_of(s['size'])}, {plural(s.get('files', 0), 'file')}")
+            console.print(f"  share {s['name']}: {size_of(s['size'])}, {plural(s.get('files', 0), 'file')}{new(s)}")
         if told.get("quills"):
             console.print(
                 f"  quills: {size_of(told['quills']['size'])}, {plural(told['quills'].get('files', 0), 'file')}"
             )
         if told.get("keys"):
             console.print(f"  keys: {', '.join(told['keys'].get('files') or [])}")
-        console.print(f"{size_of(told.get('size', 0))} in all, in {told.get('took', 0)} s")
+        console.print(
+            f"{size_of(told.get('size', 0))} in all"
+            + (f", {size_of(told['added'])} new" if told.get("added") is not None else "")
+            + f", in {told.get('took', 0)} s"
+        )
+        if told.get("cloudmorrow_backup", 1) < 2:
+            console.print("[dim]From before the store: whole drives only, nothing to browse.[/]")
 
     run(_show())
+
+
+@app.command("files")
+def files(
+    stamp: StampArg,
+    where: Annotated[str, typer.Argument(help="drives/<name> or shares/<name>.")],
+    path: Annotated[str, typer.Argument(help="A folder in it; nothing for its top.")] = "",
+) -> None:
+    """What a backup holds under one folder of a drive or a share."""
+
+    async def _files() -> None:
+        _, api = client()
+        async with api:
+            told = await api.backup_files(stamp, where, path)
+        head = f"{told['where']}/{told['path']}" if told.get("path") else told["where"]
+        console.print(f"[{TITLE}]{stamp}[/] · {head}")
+        for folder in told.get("folders") or []:
+            inside = f"{plural(folder.get('files', 0), 'file')}, {size_of(folder.get('size', 0))}"
+            console.print(f"  {folder['name']}/  [dim]{inside}[/]")
+        for file in told.get("files") or []:
+            when = (file.get("modified") or "")[:16].replace("T", " ")
+            console.print(f"  {file['name']}  [dim]{size_of(file.get('size', 0))} · {when}[/]")
+        if not told.get("folders") and not told.get("files"):
+            console.print("  [dim]empty[/]")
+
+    run(_files())
+
+
+@app.command("get")
+def get(
+    stamp: StampArg,
+    path: Annotated[str, typer.Argument(help="drives/<name>/<path> or shares/<name>/<path>.")],
+    out: Annotated[
+        Path | None, typer.Option("--out", "-o", help="Where to write it; the file's own name here.")
+    ] = None,
+) -> None:
+    """Pull one file out of a backup, as it was that day, onto this computer."""
+
+    async def _get() -> None:
+        _, api = client()
+        async with api:
+            data = await api.backup_file(stamp, path)
+        target = out or Path(path.rstrip("/").rsplit("/", 1)[-1])
+        if target.is_dir():
+            target = target / path.rstrip("/").rsplit("/", 1)[-1]
+        target.write_bytes(data)
+        console.print(f"[green]Wrote[/] {target} ({size_of(len(data))})")
+
+    run(_get())
 
 
 @app.command("restore")
@@ -204,6 +280,10 @@ def restore(
     all_drives: Annotated[bool, typer.Option("--drives", help="Everybody's files.")] = False,
     shares: Annotated[list[str] | None, typer.Option("--share", help="One share, by name. Repeatable.")] = None,
     all_shares: Annotated[bool, typer.Option("--shares", help="Every share.")] = False,
+    paths: Annotated[
+        list[str] | None,
+        typer.Option("--path", help="One file or folder: drives/<name>/<path> or shares/<name>/<path>. Repeatable."),
+    ] = None,
     quills: Annotated[bool, typer.Option("--quills", help="The installed Quills, datamodels and runtimes.")] = False,
     keys: Annotated[bool, typer.Option("--keys", help="The server's keys.")] = False,
     restart: Annotated[
@@ -228,6 +308,7 @@ def restore(
                 "shares": [s["name"] for s in told.get("shares") or []]
                 if everything or all_shares
                 else list(shares or []),
+                "paths": list(paths or []),
                 "quills": (everything or quills) and bool(told.get("quills")),
                 "keys": (everything or keys) and bool(told.get("keys")),
                 "restart": restart,
@@ -235,10 +316,17 @@ def restore(
             }
             if everything and not told.get("database"):
                 choice["database"] = False
-            if not (choice["database"] or choice["drives"] or choice["shares"] or choice["quills"] or choice["keys"]):
+            if not (
+                choice["database"]
+                or choice["drives"]
+                or choice["shares"]
+                or choice["paths"]
+                or choice["quills"]
+                or choice["keys"]
+            ):
                 fail(
                     "say what to restore: --all, --database, --drive NAME, --drives, "
-                    "--share NAME, --shares, --quills, --keys"
+                    "--share NAME, --shares, --path drives/NAME/PATH, --quills, --keys"
                 )
             said = []
             if choice["database"]:
@@ -247,6 +335,8 @@ def restore(
                 said.append(f"the files of {', '.join(choice['drives'])}")
             if choice["shares"]:
                 said.append(f"the shares {', '.join(choice['shares'])}")
+            if choice["paths"]:
+                said.append(", ".join(choice["paths"]))
             if choice["quills"]:
                 said.append("the Quills")
             if choice["keys"]:
