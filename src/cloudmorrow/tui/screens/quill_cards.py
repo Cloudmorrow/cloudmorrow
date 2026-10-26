@@ -1,12 +1,21 @@
-"""The workspace's Quill cards: one card and pane per screen of every installed Quill.
+"""The workspace's Quill cards: one card per installed Quill, a pane per screen.
 
 The workspace asks the server which Quills there are after sign-in and
 again whenever the features are asked for (after an install or a removal
 in Administration, after Settings), and this is what keeps its sidebar and
-its switcher in step with the answer: a card and a pane for each screen,
-drawn from the kit by tui/panes/kit.py, each with a function key of its
-own, the ones that changed drawn again, and the ones whose Quill went taken
-out. A Quill's `go`, and its actions on ctrl+e, come through here too.
+its switcher in step with the answer: a pane for each screen, drawn from
+the kit by tui/panes/kit.py, the ones that changed drawn again, and the
+ones whose Quill went taken out. A Quill's `go`, and its actions on
+ctrl+e, come through here too.
+
+A Quill is one card, with one function key: a CRM is CRM in the sidebar,
+not Sales, Pipeline, Organisations, People and Activities side by side
+with everything else. A Quill with one screen is that screen's card
+(`#nav-<quill>`, its pane `#pane-<quill>`), as the built-in cards were. A
+Quill with several has a card of its own (`#nav-<quill>`, no pane: chosen,
+it opens the first screen) and under it an item per screen (`#nav-<quill>-
+<screen>`, one line each), shown only while one of its screens is the pane
+on show — the card is lit, and its items are listed under it.
 
 The cards stand on shelves, one per category of the catalog's — PERSONAL,
 HOME, BUSINESS, DEVELOPER — in the catalog's order, each a section label
@@ -87,10 +96,16 @@ class QuillCards:
         # each card is on.
         self._shelves: dict[str, SectionLabel] = {}
         self._shelf_of: dict[str, str] = {}
+        # The Quills with several screens: the Quill's own card (by its id)
+        # and the key of its first screen, which the card opens; the keys of
+        # its screens' items, in order; and which Quill each item is under.
+        self._quill_cards: dict[str, str] = {}
+        self._screens_of: dict[str, list[str]] = {}
+        self._sub_of: dict[str, str] = {}
 
     # -- Quill cards -------------------------------------------------------
     async def sync_quills(self) -> None:
-        """One card and pane per screen of every installed Quill.
+        """A pane per screen of every installed Quill, and a card per Quill.
 
         Asked on sign-in and again whenever the features are (after an
         install or a removal in Administration, after Settings). A pane whose
@@ -125,25 +140,63 @@ class QuillCards:
             if key not in wanted or wanted[key][2] != signature:
                 await self._drop_quill_pane(key)
         cloud = self.query_one("#nav-section-cloud", SectionLabel)
+        # Which screens are under one card: a Quill's, when it has several.
+        screens_of: dict[str, list[str]] = {}
+        for key, (quill, _, _) in wanted.items():
+            screens_of.setdefault(str(quill["id"]), []).append(key)
         for key, (quill, screen, signature) in wanted.items():
             if key in self._quill_panes:
                 continue
+            quill_id = str(quill["id"])
+            keys = screens_of[quill_id]
+            under = quill_id if len(keys) > 1 else ""
+            first = key == keys[0]
             if quill.get("composed"):
                 # Under YOUR CLOUD: after whatever is there already, which is
                 # everything up to the Administration label.
                 card = await self._add_quill_pane(
-                    key, quill, screen, before=self.query_one("#nav-section-admin", SectionLabel)
+                    key,
+                    quill,
+                    screen,
+                    before=self.query_one("#nav-section-admin", SectionLabel),
+                    under=under,
+                    first=first,
                 )
                 if card is not None:
                     self._quill_panes[key] = signature
                     self._cloud_panes.add(key)
                 continue
             # Among the Quills, anywhere for now: `shelve` puts it in place.
-            card = await self._add_quill_pane(key, quill, screen, before=cloud)
+            card = await self._add_quill_pane(key, quill, screen, before=cloud, under=under, first=first)
             if card is not None:
                 self._quill_panes[key] = signature
         await self.shelve([(key, quill) for key, (quill, _, _) in wanted.items() if not quill.get("composed")])
+        current = self.query_one("#panes", ContentSwitcher).current or ""
+        self.reveal_screens(current[len("pane-") :])
         self.show_sections()
+
+    def pane_key(self, key: str) -> str:
+        """The pane a card opens: its own, or a Quill's first screen's."""
+        return self._quill_cards.get(key, key)
+
+    def reveal_screens(self, key: str) -> None:
+        """The items under a Quill's card are there while one of its screens
+        is on show — *key* names the pane — and the card is lit with it."""
+        showing = getattr(self, "_showing", None)
+        for quill_id, keys in self._screens_of.items():
+            open_ = key in keys
+            for card in self.query(f"#nav-{quill_id}"):
+                if isinstance(card, NavCard):
+                    card.set_active(open_)
+            last = None
+            for sub in keys:
+                for card in self.query(f"#nav-{sub}"):
+                    card.display = open_ and (showing is None or sub in showing)
+                    card.set_class(False, "-last")
+                    if card.display:
+                        last = card
+            if last is not None:
+                last.set_class(True, "-last")
 
     async def shelve(self, quills: list[tuple[str, dict]]) -> None:
         """Stand the Quills' cards on their shelves: a section label per category,
@@ -160,7 +213,13 @@ class QuillCards:
                 continue
             label, rank = shelf_of(quill)
             rank = rank if rank is not None else len(shelves)
-            shelves.setdefault(label, (rank, []))[1].append(key)
+            rank, keys = shelves.setdefault(label, (rank, []))
+            # A Quill's own card stands before the items under it.
+            under = self._sub_of.get(key)
+            if under and under not in keys:
+                keys.append(under)
+                self._shelf_of[under] = label
+            keys.append(key)
             self._shelf_of[key] = label
         for label, heading in list(self._shelves.items()):
             if label not in shelves:
@@ -188,7 +247,7 @@ class QuillCards:
     def show_sections(self) -> None:
         """The shelves and YOUR CLOUD, each shown while a card of its own is."""
         showing = {card.nav_key for card in self._place_cards() if card.display}
-        quills = (showing & set(self._quill_panes)) - self._cloud_panes
+        quills = (showing & (set(self._quill_panes) | set(self._quill_cards))) - self._cloud_panes
         for label, heading in self._shelves.items():
             heading.display = any(self._shelf_of.get(key) == label for key in quills)
         # The rest are its: the built-in cards, and the composed ones.
@@ -210,24 +269,50 @@ class QuillCards:
             self._quill_keys[key] = free
         return free
 
-    async def _add_quill_pane(self, key: str, quill: dict, screen: dict, *, after=None, before=None) -> NavCard | None:
+    async def _add_quill_pane(
+        self, key: str, quill: dict, screen: dict, *, after=None, before=None, under: str = "", first: bool = True
+    ) -> NavCard | None:
+        """A pane for the screen, and its card: the Quill's own when it is the
+        Quill's only screen, else an item under the Quill's card (*under*
+        names the Quill), which is made with the first of them, and holds
+        the function key for them all."""
         if self.query(f"#pane-{key}") or self.query(f"#nav-{key}"):
             # Half there from a sync that was cut short by the next one.
             await self._drop_quill_pane(key)
-        pane = pane_for(quill, screen, tab_key=self._free_key(key), id=f"pane-{key}")
+        # One key per Quill: the first screen's, which its card opens.
+        pane = pane_for(quill, screen, tab_key=self._free_key(key) if first else "", id=f"pane-{key}")
         if pane is None:
             # A kit this terminal does not draw yet: no card, and no key held.
             self._quill_keys.pop(key, None)
             return None
         # A Quill of somebody's own is switched by its key, `~alice.budget`.
-        self._feature_of[key] = str(quill.get("key") or quill["id"])
+        feature = str(quill.get("key") or quill["id"])
+        self._feature_of[key] = feature
         # Mounted hidden: the switcher only hides what it had at the start.
         pane.display = False
         await self.query_one("#panes", ContentSwitcher).mount(pane)
-        card = NavCard(key, pane.TAB_LABEL, tag=pane.TAB_KEY, id=f"nav-{key}")
+        sidebar = self.query_one("#sidebar", VerticalScroll)
+        summary = str(quill.get("summary") or quill.get("name") or "")
+        if under and under not in self._quill_cards:
+            own = NavCard(under, str(quill.get("name") or under), tag=pane.TAB_KEY, id=f"nav-{under}")
+            own.add_class("-parent")
+            own.set_class(self.has_class("-narrow"), "-line")
+            own.set_status("none", summary)
+            await sidebar.mount(own, after=after, before=before)
+            self._quill_cards[under] = key
+            self._screens_of[under] = []
+            self._feature_of[under] = feature
+            after, before = own, None
+        if under:
+            card = NavCard(key, pane.TAB_LABEL, sub=True, id=f"nav-{key}")
+            card.display = False
+            self._screens_of[under].append(key)
+            self._sub_of[key] = under
+        else:
+            card = NavCard(key, pane.TAB_LABEL, tag=pane.TAB_KEY, id=f"nav-{key}")
+            card.set_status("none", summary)
         card.set_class(self.has_class("-narrow"), "-line")
-        card.set_status("none", str(quill.get("summary") or quill.get("name") or ""))
-        await self.query_one("#sidebar", VerticalScroll).mount(card, after=after, before=before)
+        await sidebar.mount(card, after=after, before=before)
         # Its card says how it is from the start, not only once visited.
         pane.reload()
         return card
@@ -248,6 +333,22 @@ class QuillCards:
         self._shelf_of.pop(key, None)
         self._feature_of.pop(key, None)
         self._quill_keys.pop(key, None)
+        # An item under a Quill's card: the card goes with its last item.
+        under = self._sub_of.pop(key, None)
+        if under is not None:
+            keys = self._screens_of.get(under, [])
+            if key in keys:
+                keys.remove(key)
+            if keys:
+                if self._quill_cards.get(under) == key:
+                    self._quill_cards[under] = keys[0]
+            else:
+                for widget in self.query(f"#nav-{under}"):
+                    await widget.remove()
+                self._quill_cards.pop(under, None)
+                self._screens_of.pop(under, None)
+                self._shelf_of.pop(under, None)
+                self._feature_of.pop(under, None)
 
     def go_to(self, quill_id: str, screen_id: str, params: dict | None = None) -> None:
         """A Quill's `go`: to one of its screens, a view asked again with *params*."""

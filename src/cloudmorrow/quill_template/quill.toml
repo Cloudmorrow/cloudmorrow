@@ -21,6 +21,7 @@ datamodels = []                # foundational datamodels: task, contact, vehicle
 # A view: a screen its code draws, from the primitives every surface can draw.
 [[screens]]
 id = "overview"
+icon = "chart-bar"
 label = "{{name}}"
 view = "overview"
 model = "{{id}}.item"
@@ -28,6 +29,7 @@ model = "{{id}}.item"
 # A kit screen: declared, no code at all.
 [[screens]]
 id = "items"
+icon = "list-lines"
 kit = "list"
 label = "Items"
 model = "{{id}}.item"

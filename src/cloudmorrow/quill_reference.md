@@ -58,10 +58,11 @@ model = "contact"
 access = "read"                    # read or write
 why = "to show who looks after each plant"
 
-[[screens]]                        # one tab per screen, on every surface
+[[screens]]                        # the Quill is one tab, on every surface; its screens are the items under it
 id = "plants"
 kit = "list"                       # list, board, detail, form, calendar, grid, editor, sheet, thread, timeline
 label = "Plants"
+icon = "plant-pot"                 # the item's own mark, from the library: no two screens look alike
 model = "plants.plant"
 title = "name"
 subtitle = "last_watered"

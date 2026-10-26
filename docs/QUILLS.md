@@ -28,7 +28,7 @@ stay, in the shape every other Quill already reads.
 | **Core** | This repository. Accounts, sealing, the record store, the gate, the Quill runtime, the kit renderers for every surface, the CLI, the MCP server. Nothing a person would call an app. |
 | **Quill** | A software package: one repository with a `quill.toml` at its root, and a `quill.py` when it has code. It declares the data it uses, the screens it shows, what can be done in it, and the jobs, hooks, webhooks, APIs and services it runs. |
 | **Quill Catalog** | [`Cloudmorrow/quill-catalog`](https://github.com/Cloudmorrow/quill-catalog): one `catalog.toml` naming every published Quill, its repository, a pinned release and a category. Your server reads it; a pull request adds to it. |
-| **Category** | Where a Quill is shelved: in the catalog, and in the web app's rail and the terminal app's sidebar, where its tabs stand under the category's heading. Home, Personal, Business, Developer, … in the catalog's order. |
+| **Category** | Where a Quill is shelved: in the catalog, and in the web app's rail and the terminal app's sidebar, where its tab stands under the category's heading. Home, Personal, Business, Developer, … in the catalog's order. |
 | **Datamodel** | A kind of data with standard fields: `task`, `contact`, `vehicle`. Records belong to the person, never to a Quill. |
 | **Foundational datamodel** | One of the standard datamodels in [`Cloudmorrow/datamodels`](https://github.com/Cloudmorrow/datamodels), the ones Cloudmorrow decides on. Grouped into **domains** — Tasks, Customers (CRM), Fleet, Calendars, Messaging, Notes, Secrets, Files — which you can choose at install on their own, with or without a Quill that uses them. |
 | **Extended datamodel** | What a Quill adds: fields of its own on a foundational datamodel (`fleet.odometer` on a `vehicle`), or a new datamodel under its own name (`fleet.service_visit`). Anybody's next Quill may use either. |
@@ -151,7 +151,9 @@ The tab's icon is a pixel mark from the icon library
 rows. The app's own nine (`notes`, `tasks`, `files`, `secrets`, `settings`,
 `chat`, `calendar`, `me`, `today`) and the CRM's `funnel` may be named too.
 A name the library does not have shows the quill mark, and `cm quill check`
-says so. The library is CC0 — public domain, free to use anywhere — and the
+says so. A screen names its own the same way (`icon = "handshake"` on a
+`[[screens]]` table), for the item it is under the Quill's tab: give every
+screen one, and no two of a Quill's items look alike. The library is CC0 — public domain, free to use anywhere — and the
 web app reads all of it once from `GET /icons.json`; the package README says
 how to add one.
 
@@ -295,10 +297,14 @@ stream is down, and marks the space seen (`POST …/seen`) as it is read. The un
 spaces themselves (`unread`, and `last`: the newest line), and the number on
 the phone's icon adds them up across every space whose Quill is on for you.
 
-A Quill's screens become a tab, in the order of `[[screens]]`, on every
-surface; Quills from the catalog stand in the catalog's order (Notes, then
-Tasks), and the rest follow, oldest first. The clients open on the first tab
-there is. An administrator switches a Quill off for the server; a person
+A Quill is one tab, by the Quill's name and icon, on every surface; its
+screens are the items under that tab, in the order of `[[screens]]`, and a
+client shows them only while you are in the Quill — under the tab in the
+web app's rail and the terminal's sidebar, in a strip above the phone's bar.
+A Quill with one screen is that screen's tab and has nothing under it.
+Quills from the catalog stand in the catalog's order (Notes, then Tasks),
+and the rest follow, oldest first. The clients open on the first tab there
+is, on its first screen. An administrator switches a Quill off for the server; a person
 switches its tab off for themselves — the same two switches the included
 features have always had.
 

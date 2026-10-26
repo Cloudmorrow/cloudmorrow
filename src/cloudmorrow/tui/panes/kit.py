@@ -80,7 +80,8 @@ def screen_key(quill: dict, screen: dict) -> str:
 
     A Quill with one screen is known by its own id, the way a built-in tab is
     known by its feature — so Tasks is `tab-tasks` whether it is a Quill or
-    not. A Quill with several screens gets one key each.
+    not. A Quill with several screens has one key per screen, under the one
+    card that is the Quill's (tui/screens/quill_cards.py).
     """
     screens = quill.get("screens") or []
     if len(screens) <= 1:

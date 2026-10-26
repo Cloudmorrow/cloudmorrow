@@ -30,6 +30,7 @@ status = { kind = "enum", values = ["lead", "prospect", "customer", "partner", "
 # The first tab: the numbers, what is due, what is closing, and the stages.
 [[screens]]
 id = "sales"
+icon = "chart-up"
 label = "Sales"
 view = "sales"
 model = "deal"
@@ -38,6 +39,7 @@ model = "deal"
 # so each book has its own, and the circle on a card wins it.
 [[screens]]
 id = "pipeline"
+icon = "handshake"
 kit = "board"
 label = "Pipeline"
 model = "deal"
@@ -50,6 +52,7 @@ done = { outcome = "won" }
 
 [[screens]]
 id = "organisations"
+icon = "briefcase"
 kit = "list"
 label = "Organisations"
 model = "organisation"
@@ -60,6 +63,7 @@ fields = ["crm.status", "industry", "website", "email", "phone", "address", "not
 
 [[screens]]
 id = "people"
+icon = "people"
 kit = "list"
 label = "People"
 model = "contact"
@@ -70,6 +74,7 @@ fields = ["organisation", "role", "email", "phone", "address", "birthday", "note
 
 [[screens]]
 id = "activities"
+icon = "clipboard"
 kit = "list"
 label = "Activities"
 model = "activity"
