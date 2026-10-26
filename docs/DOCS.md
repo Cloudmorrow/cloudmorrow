@@ -10,7 +10,7 @@ written — in My Files, on WebDAV, in a backup of the folder, and open to
 anything that reads JSON. A Word file (`.docx`) in the same folder is a
 document too: the server reads it as the same blocks and writes it back
 as Word, so Word's files are edited here and nothing else, and any
-document can be exported as one.
+document can be exported as one — or as a PDF, or as Markdown.
 
 ## The screen
 
@@ -113,10 +113,20 @@ and Ctrl+U work as everywhere; plain text pasted comes in as paragraphs.
 It saves as you type, as blocks and runs — nothing of the browser's own
 markup; changing the title renames the file, and a Word file stays a
 Word file. One changed elsewhere since it was opened is not written over.
-**Export** writes `Name.docx` beside the document (asking before it
-replaces one) and hands it over to save; on a Word file it hands the file
-over. On a computer the list and the page are side by side, and the list
-folds away. Read-only, the page shows and nothing types into it.
+**Open** (the folder in the bar) picks a document from anywhere on the
+cloud — another folder of your drive, a fileshare — through the picker
+every file screen shares (`filepick.js`: the shares, then the folders,
+then the files that are documents); it opens by its record, the file
+staying where it is, and the stamp says where. **Export** offers Word,
+PDF and Markdown, and hands the file over to save — through the record
+API's `GET /api/records/file/<id>/export?as=docx`, which makes Word's
+package, a PDF (`quill/pdf.py`: Helvetica on A4, headings larger,
+lists with their markers, quotes set in, tables ruled, links that open)
+or Markdown from the same blocks, and hands a Word file over as itself
+(`as=docs` is the file). Nothing is written beside the document. On a
+computer the list and the page are side by side, and the list folds
+away. Read-only, the page shows and nothing types into it; Open and
+Export are still there.
 
 **Terminal** (`tui/panes/kit_docs.py`): the editor's tree and its live
 editor, the document shown and edited as Markdown — `# ` a heading, `- `
@@ -126,8 +136,9 @@ a bullet (two spaces in, a level), `1. ` a numbered item, `> ` a quote,
 a line. What is typed is kept as the document's file, never as Markdown;
 how a paragraph is aligned has no Markdown and is lost on the way
 through. `f6` imports a Word, `.docs` or Markdown file on this machine as
-a document; `f7` exports the open one by the name given (`.docx`, `.docs`
-or `.md`).
+a document; `f7` exports the open one by the name given (`.docx`, `.pdf`,
+`.docs` or `.md`); `f5` opens a document from anywhere on the cloud by
+`share:path` (`team:Plans/Offer.docx`).
 
 **Command line** (`cli/quillrun/docs.py`):
 
@@ -139,8 +150,9 @@ cm docs add Letter "# Hi" "words"       # or from the words given
 cm docs edit Letter                     # $EDITOR with the Markdown, or the new Markdown from stdin
 cm docs search invoice                  # names and words
 cm docs set Letter name=Offer           # renames the file; path=2026/Offer moves it to a folder that is there
-cm docs export Letter                   # Letter.docx here; or a name ending .docx, .docs or .md
+cm docs export Letter                   # Letter.docx here; or a name ending .docx, .pdf, .docs or .md
 cm docs import ./Offer.docx [2026/Offer]   # a Word, .docs or Markdown file, as a document
+cm docs show team:Plans/Offer.docx      # a document anywhere on the cloud: share:path
 cm docs delete Letter
 ```
 

@@ -1,0 +1,52 @@
+/* Picking a file from anywhere (filepick.js): the shares, a folder's
+   folders and files, in the sheet every question comes up in. */
+
+.act-pick { display: flex; flex-direction: column; }
+.act-pick .act-sheet-title { flex: none; }
+.pick-where {
+  flex: none;
+  margin: 0;
+  padding: 8px 16px 6px;
+  color: var(--muted);
+  font-size: 13px;
+  min-height: 1.2em;
+  overflow-wrap: anywhere;
+}
+.pick-where:empty { display: none; }
+.pick-rows {
+  flex: 1 1 auto;
+  min-height: 120px;
+  max-height: 55vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--line);
+}
+.pick-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pick-row:hover { background: var(--field); }
+.pick-row:active { background: var(--card-2); }
+.pick-row.up { color: var(--accent); font-weight: 500; }
+.pick-row.file { color: var(--accent); }
+.pick-icon { flex: none; display: inline-flex; width: 22px; justify-content: center; color: var(--muted); }
+.pick-row.up .pick-icon, .pick-row.file .pick-icon { color: inherit; }
+.pick-main { display: flex; flex-direction: column; min-width: 0; }
+.pick-title { font-size: 16px; overflow-wrap: anywhere; }
+.pick-sub { color: var(--muted); font-size: 13px; }
+.pick-empty { margin: 0; padding: 20px 16px; color: var(--muted); text-align: center; }
+@media (min-width: 900px) and (min-height: 600px) {
+  .act-pick { width: 440px; max-width: calc(100vw - 32px); }
+  .pick-rows { max-height: 60vh; }
+}

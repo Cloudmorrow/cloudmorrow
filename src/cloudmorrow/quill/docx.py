@@ -27,6 +27,9 @@ R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 PKG = "http://schemas.openxmlformats.org/package/2006/relationships"
 NS = {"w": W, "r": R}
 
+WORD_SUFFIX = ".docx"
+MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
 
 class DocxError(ValueError):
     """Not a Word file the kit can read."""

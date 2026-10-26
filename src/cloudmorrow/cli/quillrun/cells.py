@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 from rich.markup import escape
 from rich.table import Table
@@ -14,7 +14,7 @@ from cloudmorrow.cli.common import fail
 from cloudmorrow.cli.quillrun.screen import Screen, _pairs
 from cloudmorrow.client.api import ApiError, CloudmorrowClient
 from cloudmorrow.console import TITLE
-from cloudmorrow.quill import cells
+from cloudmorrow.quill import cells, convert
 from cloudmorrow.quill.screens import listing_filters, page_fields, page_path, page_title, sheet_fields
 
 
@@ -32,12 +32,30 @@ def _title(bound: dict, record: dict) -> str:
     return page_title(bound, record) or "Untitled"
 
 
+async def anywhere(api: CloudmorrowClient, model: str, key: str, noun: str) -> dict | None:
+    """`share:folder/name.ext` names a file anywhere on the cloud, not only
+    under the screen's root: the record, or nothing when *key* is no such
+    thing. A share's name has no slash, and the path is said whole."""
+    share, colon, path = key.partition(":")
+    if not colon or not share or "/" in share or not path.strip("/"):
+        return None
+    path = path.strip("/")
+    try:
+        found = await api.records(model, share=share, path=path)
+    except ApiError as exc:
+        fail(f"no {noun} at {key!r}: {exc}")
+    for record in found:
+        if str(record["fields"].get("path") or "").strip("/") == path:
+            return record
+    fail(f"no {noun} at {key!r}")
+
+
 def _find_sheet(bound: dict, records: list[dict], key: str) -> dict:
     """A sheet by its path, its title, or its id — whole, or the start of one."""
-    suffix = bound["suffix"]
     wanted = key.strip().strip("/")
-    if suffix and wanted.lower().endswith(suffix.lower()):
-        wanted = wanted[: -len(suffix)]
+    for suffix in bound["suffixes"]:
+        if wanted.lower().endswith(suffix.lower()):
+            wanted = wanted[: -len(suffix)]
     for test in (
         lambda r: _key(bound, r) == wanted,
         lambda r: r["id"] == key,
@@ -115,7 +133,7 @@ async def _act_cells(
 ) -> None:
     bound = _bound(screen)
     if action in ("edit", "search", "say", "move", "done", "undone", "groups", "put"):
-        fail(f"a sheet has list, show, get, set, add, delete and history, not {action}")
+        fail(f"a sheet has list, show, get, set, add, export, delete and history, not {action}")
     records = await api.records(screen.model, **listing_filters(bound))
     records.sort(key=lambda r: str(r.get("updated_at") or ""), reverse=True)
     if action == "list":
@@ -126,7 +144,11 @@ async def _act_cells(
         table.add_column("Sheet")
         table.add_column("Changed", style="dim")
         for record in records:
-            table.add_row(escape(_key(bound, record)), str(record.get("updated_at") or "")[:16].replace("T", " "))
+            name = str(record["fields"].get(bound["title"]) or "")
+            table.add_row(
+                escape(_key(bound, record)) + ("  [dim]Excel[/]" if name.lower().endswith(".xlsx") else ""),
+                str(record.get("updated_at") or "")[:16].replace("T", " "),
+            )
         quillrun.out.print(table)
         if not records:
             quillrun.console.print(f'[dim]nothing yet — cm {screen.quill["id"]} add "<name>" starts one[/]')
@@ -140,9 +162,22 @@ async def _act_cells(
         made = await api.create_record(screen.model, {**page_fields(bound, name), bound["cells"]: cells.file_text({})})
         quillrun.console.print(f"[green]Added[/] {escape(_key(bound, made))}")
         return
-    found = await api.record(screen.model, _find_sheet(bound, records, args[0])["id"])
+    elsewhere = await anywhere(api, screen.model, args[0], "sheet")
+    found = await api.record(screen.model, (elsewhere or _find_sheet(bound, records, args[0]))["id"])
     if action == "show":
         _print_sheet(bound, found, raw=raw, plain=plain)
+    elif action == "export":
+        stem = Path(_key(bound, found)).name
+        target = Path(args[1]).expanduser() if len(args) > 1 else Path.cwd() / f"{stem}.xlsx"
+        try:
+            data = convert.sheet_bytes(_sheet_of(bound, found), target.suffix, stem)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+        except convert.ConvertError as exc:
+            fail(str(exc))
+        except OSError as exc:
+            fail(f"cannot write {target}: {exc.strerror or exc}")
+        quillrun.console.print(f"[green]Wrote[/] {escape(str(target))}")
     elif action == "get":
         name = _cell_name(screen, action, args)
         sheet = _sheet_of(bound, found)
@@ -173,4 +208,4 @@ async def _act_cells(
         await api.delete_record(screen.model, found["id"])
         quillrun.console.print(f"[green]Deleted[/] {escape(_key(bound, found))}")
     else:
-        fail(f"a sheet has list, show, get, set, add, delete and history, not {action}")
+        fail(f"a sheet has list, show, get, set, add, export, delete and history, not {action}")

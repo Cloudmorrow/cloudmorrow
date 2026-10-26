@@ -43,14 +43,17 @@ A `sheet` screen is sheets of cells, `.cell` files worked out here (docs/CELLS.m
     cm cells get Budget B4             # one cell, worked out
     cm cells set Budget B4 "=SUM(B1:B3)"
     cm cells set Budget name=Costs     # renames the file
+    cm cells export Budget ./Budget.xlsx  # an Excel file on this machine (or .pdf, .csv, .cell)
+    cm cells show my-files:Reports/Q3.xlsx   # a sheet anywhere on the cloud: share:path
 A `document` screen is documents, `.docs` files and Word's, edited as Markdown (docs/DOCS.md):
 
     cm docs list                       # every document, folders and all
     cm docs show Letter                # as Markdown; --raw for the .docs file; --plain for JSON
     cm docs add Letter                 # from stdin, or $EDITOR, as Markdown
     cm docs edit Letter                # $EDITOR, or the new Markdown from stdin
-    cm docs export Letter ./Letter.docx   # a Word file on this machine (or .md, .docs)
+    cm docs export Letter ./Letter.docx   # a Word file on this machine (or .pdf, .md, .docs)
     cm docs import ./Letter.docx       # a Word (or Markdown) file from this machine, as a document
+    cm docs show team:Plans/Offer.docx # a document anywhere on the cloud: share:path
 
 A `grid` (files) takes its group and folder as words instead:
 
@@ -144,7 +147,7 @@ from cloudmorrow.cli.quillrun.thread import _thread, space_name  # noqa: F401
 from cloudmorrow.cli.quillrun.timeline import _act_timeline
 from cloudmorrow.client.api import CloudmorrowClient
 
-# A timeline's words that no other screen has; a document's export is its too.
+# A timeline's words that no other screen has; a document's and a sheet's export is theirs too.
 TIMELINE_ONLY = ("cut", "trim", "rm", "frame", "export")
 # A document's word that no other screen has.
 DOCUMENT_ONLY = ("import",)
@@ -245,8 +248,8 @@ async def dispatch(
     found = _quill(await api.quills(), quill)
     declared = {a["id"]: a for a in found.get("actions", [])}
     shown = next((s for s in found.get("screens") or [] if s["id"] == screen_id or not screen_id), {})
-    # A timeline's or a document's `export` is its screen's, whatever the action is called.
-    exports = shown.get("kit") in ("timeline", "document") and action == "export"
+    # A timeline's, a document's or a sheet's `export` is its screen's, whatever the action is called.
+    exports = shown.get("kit") in ("timeline", "document", "sheet") and action == "export"
     if action in declared and not exports:
         await _press(api, found, declared[action], args, plain)
         return

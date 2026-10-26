@@ -3,8 +3,12 @@
    A screen binds the file `model`, its `title`, and `cells`: the text
    field the file's text is in — one JSON object, {"cells": {"A1": "Rent",
    "B4": "=SUM(B1:B3)"}} — and says, as an editor's does, `where` the files
-   are (a share, and the folder under it: `within`) and their `suffix`.
-   The sheets are listed newest first, by their path under that folder;
+   are (a share, and the folder under it: `within`) and their `suffix`:
+   `.cell`, and Excel's `.xlsx`, which the server reads and writes as the
+   same text. The sheets are listed newest first, by their path under
+   that folder; Open picks one from anywhere on the cloud (filepick.js),
+   and Export hands the open one over as Excel, PDF or CSV, made by the
+   server (the record API's /export).
    one opens as a grid with a formula bar over it, worked out by
    kit_cells_rules.js, the same rules the terminal and the command line
    follow in quill/cells.py. Nothing here knows what a budget is.
@@ -30,28 +34,32 @@
      #/r/<quill>/<screen>/<model>/<id>   a sheet */
 
 import {
-  SAVE_DELAY, api, app, back, baseName, esc, fileStem, formatDate, heading, icons, mount, nav, occupy,
+  SAVE_DELAY, api, app, back, baseName, esc, fileStem, formatDate, go, heading, icons, mount, nav, occupy,
   recordsUrl, renderRoute, replace, seconds, sectionOf, setStatus, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
 import { mayWrite, sheetHash } from "./kit.js";
 import {
-  fixedFields, foldButton, folded, trimSlashes, underRoot, wholePath, wide, wireFold, withQuery,
-  withSuffix, withoutSuffix,
+  aOr, download, fixedFields, foldButton, folded, openButton, ownIcons, placeOf as placeOfFile, suffixesOf, trimSlashes,
+  underRoot, wholePath, wide, wireFold, withQuery, withSuffix, withoutSuffix,
 } from "./kit_editor.js";
 import { CellError, SIDES, Sheet, colName, extent, isFormula, parseRef, rangeName, refName, wantsRef } from "./kit_cells_rules.js";
 import { ask } from "./dialog.js";
 import { choose } from "./actions.js";
+import { pickFile } from "./filepick.js";
 
 const NEW = "~new";
+const EXCEL = ".xlsx";
+// What a sheet goes out as, by suffix: what the server's /export makes.
+const EXPORTS = [[".xlsx", "Excel"], [".pdf", "PDF"], [".csv", "CSV"]];
 
 // -- the screen's bindings ---------------------------------------------------------
 function bind(at) {
   const { quill, screen } = at;
   const model = quill.models[screen.model];
   const where = Object.fromEntries(Object.entries(screen.where || {}).map(([k, v]) => [k, String(v)]));
-  const suffix = screen.suffix || "";
-  const filters = suffix ? { ...where, suffix } : where;
+  const suffixes = suffixesOf(screen);
+  const filters = suffixes.length ? { ...where, suffix: suffixes.join(",") } : where;
   return {
     at,
     model,
@@ -59,7 +67,8 @@ function bind(at) {
     cells: screen.cells || "text",
     path: screen.path || "",
     where,
-    suffix,
+    suffix: suffixes[0] || "",
+    suffixes,
     root: trimSlashes(where.within || ""),
     // On every listing: the share, the folder, the suffix.
     query: new URLSearchParams(filters).toString(),
@@ -77,6 +86,13 @@ const openArg = (b, id) => `${b.at.quill.id}/${b.at.screen.id}/${b.model.id}/${i
 const titleOf = (b, r) => withoutSuffix(b, String(r.fields[b.title] || "").trim())
   || baseName(withoutSuffix(b, underRoot(b, r.fields[b.path]))) || "Untitled";
 const keyOf = (b, r) => (b.path ? withoutSuffix(b, underRoot(b, r.fields[b.path])) : "") || titleOf(b, r);
+// A file of a suffix other than the first says so in the list: XLSX.
+const kindOf = (b, r) => {
+  const name = String(r.fields[b.title] || "").toLowerCase();
+  const found = (b.suffixes || []).slice(1).find((x) => name.endsWith(x.toLowerCase())) || "";
+  return found.replace(/^\./, "").toUpperCase();
+};
+const isExcel = (name) => String(name || "").toLowerCase().endsWith(EXCEL);
 const listSheets = (b) => api("GET", recordsUrl(b.model.id, "", withQuery(b, "")));
 const byNewest = (a, c) => (seconds(c.updated_at) || 0) - (seconds(a.updated_at) || 0);
 
@@ -88,7 +104,8 @@ function listView(b, records, openId = "") {
   const rows = records.slice().sort(byNewest);
   // A listing leaves a file's text out, so a row is its path and its date.
   const row = (r) => `<a class="row${r.id === openId ? " current" : ""}" href="${openHash(b, r.id)}">
-      <span class="main"><span class="title">${esc(keyOf(b, r))}</span>
+      <span class="main"><span class="title-line"><span class="title">${esc(keyOf(b, r))}</span>${
+        kindOf(b, r) ? `<span class="kind">${esc(kindOf(b, r))}</span>` : ""}</span>
       <span class="meta"><span class="date">${esc(formatDate(seconds(r.updated_at) || 0))}</span></span></span></a>`;
   const show = (listing, items, { searching = false } = {}) => {
     if (!items.length) {
@@ -139,18 +156,28 @@ export async function renderCells(at, arg) {
   }
   if (arg === NEW) return renderSheet(b, { isNew: true, arg: `${at.quill.id}/${at.screen.id}/${arg}` });
   const view = listView(b, await listSheets(b));
+  const right = openButton(b);
   if (wide()) {
-    mount(nav({ title: view.title }) + `
+    mount(nav({ title: view.title, right }) + `
       <main class="split">
         <section class="side">${view.html}</section>
         <section class="page"><p class="empty mascot"><b>Nothing open</b>Choose a ${esc(b.noun)} on the left${
-          b.writes ? ", or start one with the pen" : ""}.</p></section>
+          b.writes ? ", or start one with the pen" : ""}, or open one from anywhere with the folder.</p></section>
       </main>` + tabs(at.tab));
   } else {
-    mount(nav({ title: view.title }) + `<main>${view.html}</main>` + tabs(at.tab));
+    mount(nav({ title: view.title, right }) + `<main>${view.html}</main>` + tabs(at.tab));
   }
   wireShell();
   view.wire(app.querySelector("main"));
+  app.querySelector(".nav .open").addEventListener("click", () => openOther(b));
+}
+
+// -- opening from anywhere ------------------------------------------------------------
+// A sheet picked from any share and folder opens by its record: the grid
+// is the same, and the file stays where it is.
+async function openOther(b) {
+  const picked = await pickFile({ suffixes: b.suffixes, title: `Open ${aOr(b.noun)}`, model: b.model.id });
+  if (picked) go(openHash(b, picked.id));
 }
 
 /** One sheet: the kit's own page, in place of the record sheet. */
@@ -171,6 +198,9 @@ let open = null;
 function sheetState(b, record) {
   return {
     id: record.id, stem: titleOf(b, record), rev: record.rev,
+    excel: isExcel(record.fields[b.title]),
+    // Where it is, when that is not the screen's own folder: opened from elsewhere.
+    where: placeOfFile(b, record),
     sheet: Sheet.fromText(record.fields[b.cells]),
     modified: seconds(record.updated_at) || Date.now() / 1000,
   };
@@ -178,7 +208,8 @@ function sheetState(b, record) {
 
 async function renderSheet(b, { record = null, isNew = false, arg }) {
   const ed = isNew
-    ? { isNew: true, created: false, id: "", stem: "", rev: null, sheet: new Sheet(), modified: Date.now() / 1000 }
+    ? { isNew: true, created: false, id: "", stem: "", rev: null, excel: false, where: "", sheet: new Sheet(),
+        modified: Date.now() / 1000 }
     : { isNew: false, created: false, ...sheetState(b, record) };
   // `at` is the cell that is selected — the one the formula bar edits —
   // and `anchor` the far corner of the selection, the same cell when it is
@@ -196,12 +227,15 @@ async function renderSheet(b, { record = null, isNew = false, arg }) {
   occupy(hold);
 
   const parent = b.at.base;
-  const actions = !b.writes ? "" : `<button class="done strong" hidden>Done</button>` +
-    `<button class="delete" aria-label="Delete ${esc(b.noun)}">${icons.trash}</button>`;
+  const actions = (b.writes ? `<button class="done strong" hidden>Done</button>` : "") + openButton(b) +
+    (ed.isNew ? "" : `<button class="export" aria-label="Export" title="Export">${ownIcons.export}</button>`) +
+    (b.writes ? `<button class="delete" aria-label="Delete ${esc(b.noun)}">${icons.trash}</button>` : "");
   const page = `
       <div class="editor cells${b.writes ? "" : " read-only"}">
         <input class="title" placeholder="Title" value="${esc(ed.isNew ? "" : ed.stem)}" autocapitalize="sentences" enterkeyhint="next"${b.writes ? "" : " readonly"}>
-        <p class="stamp"><span class="when">${esc(formatDate(ed.modified, { long: true }))}</span><span class="status"></span></p>
+        <p class="stamp"><span class="when">${esc(formatDate(ed.modified, { long: true }))}</span>${
+          ed.excel ? `<span class="badge">Excel</span>` : ""}${
+          ed.where ? `<span class="badge where">${esc(ed.where)}</span>` : ""}<span class="status"></span></p>
         ${b.writes ? formatBar() : ""}
         <div class="formula-bar"><span class="where">A1</span><input class="formula" spellcheck="false" autocapitalize="none" autocorrect="off" placeholder="Type a value, or =SUM(B1:B3)"${b.writes ? "" : " readonly"}></div>
         <div class="grid-wrap" tabindex="0"><table class="grid"></table></div>
@@ -232,6 +266,17 @@ async function renderSheet(b, { record = null, isNew = false, arg }) {
   ed.table = box.querySelector(".grid");
   const done = app.querySelector(".nav .done");
   const del = app.querySelector(".nav .delete");
+  const openEl = app.querySelector(".nav .open");
+  const exportEl = app.querySelector(".nav .export");
+  openEl.addEventListener("click", () => openOther(b));
+  if (exportEl) exportEl.addEventListener("click", () => exportMenu(ed));
+  // While the sheet is being typed in, the bar is Done's.
+  const editing = (on) => {
+    if (done) done.hidden = !on;
+    openEl.hidden = on;
+    if (del) del.hidden = on;
+    if (exportEl) exportEl.hidden = on;
+  };
 
   ed.changed = () => {
     ed.dirty = true;
@@ -249,11 +294,9 @@ async function renderSheet(b, { record = null, isNew = false, arg }) {
   ed.titleEl.addEventListener("keydown", (event) => {
     if (event.key === "Enter") { event.preventDefault(); ed.wrap.focus(); }
   });
-  box.addEventListener("focusin", () => { done.hidden = false; del.hidden = true; });
+  box.addEventListener("focusin", () => editing(true));
   box.addEventListener("focusout", () => {
-    setTimeout(() => {
-      if (!box.contains(document.activeElement)) { done.hidden = true; del.hidden = false; }
-    }, 0);
+    setTimeout(() => { if (!box.contains(document.activeElement)) editing(false); }, 0);
     if (ed.dirty) { clearTimeout(ed.timer); saveSheet(ed); }
   });
   done.addEventListener("click", () => { commit(ed); if (document.activeElement) document.activeElement.blur(); });
@@ -969,8 +1012,10 @@ async function createUnique(ed, stem, text) {
 
 async function renameTo(ed, stem) {
   const { b } = ed;
+  // An Excel file stays an Excel file under its new name.
+  const name = ed.excel ? stem + EXCEL : withSuffix(b, stem);
   try {
-    const renamed = await api("PATCH", recordsUrl(b.model.id, ed.id), { fields: { [b.title]: withSuffix(b, stem) } });
+    const renamed = await api("PATCH", recordsUrl(b.model.id, ed.id), { fields: { [b.title]: name } });
     ed.stem = titleOf(b, renamed);
     ed.rev = renamed.rev;
     moved(ed, renamed);
@@ -982,6 +1027,25 @@ async function renameTo(ed, stem) {
     }
     throw err;
   }
+}
+
+// -- export ---------------------------------------------------------------------------------
+// The sheet handed over to save in another shape — Excel, PDF, CSV —
+// made by the server from the same cells; a sheet that is an Excel file
+// already is handed over as it is. Nothing is written beside it.
+function exportMenu(ed) {
+  if (ed.isNew) return;
+  choose("Export as", EXPORTS.map(([suffix, label]) => ({ label, run: () => exportAs(ed, suffix) })));
+}
+
+async function exportAs(ed, suffix) {
+  if (ed.editing) commit(ed);
+  if (ed.dirty) { clearTimeout(ed.timer); await saveSheet(ed); }
+  while (ed.saving) await new Promise((r) => setTimeout(r, 50));
+  try {
+    await download(ed.b, ed.id, suffix, ed.stem + suffix);
+    toast(`Saved ${ed.stem}${suffix}`);
+  } catch (err) { toast(err.message); }
 }
 
 // Leaving saves what is there, and throws away a sheet that never got a

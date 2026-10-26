@@ -7,7 +7,10 @@ it on the web and the phone, in the terminal and on the command line
 (`cm <quill> …`); a Quill declares it in TOML. A sheet is a file: a
 `.cell` file in a folder of your drive, holding its cells exactly as
 typed — in My Files, on WebDAV, in a backup of the folder, and open to
-anything that reads JSON.
+anything that reads JSON. An Excel file (`.xlsx`) in the same folder is a
+sheet too: the server reads it as the same cells and writes it back as
+Excel, so Excel's files are edited here and nothing else, and any sheet
+can be exported as one — or as a PDF, or as CSV.
 
 ## The screen
 
@@ -18,7 +21,7 @@ kit = "sheet"
 label = "Cells"
 model = "file"                                        # the foundational file
 where = { share = "my-files", within = "Documents" }  # whose drive, which folder
-suffix = ".cell"                                      # which files are sheets
+suffix = [".cell", ".xlsx"]                           # which files are sheets; a new one is the first
 title = "name"
 cells = "text"                                        # the file's text: the sheet
 path = "path"
@@ -26,14 +29,36 @@ path = "path"
 
 It is an editor's kind of screen (docs/QUILLS.md): `where` is the filters
 every listing is made with — a file's `share`, and `within`, the folder
-the sheets are under — and `suffix` says which files are sheets and what a
-new one is called. The sheets are listed newest first, by their path
-under that folder and without the suffix; one opens as a grid. The record
-sheet every screen has is not used for a sheet: the grid is its page.
+the sheets are under — and `suffix` says which files are sheets, one or
+a list, the first being what a new one is called. The sheets are listed
+newest first, by their path under that folder and without the suffix;
+one opens as a grid. The record sheet every screen has is not used for a
+sheet: the grid is its page.
 
 A Quill that ships this screen ships a first sheet the same way Notes
 ships its welcome note: a per-owner dataset of the `file` datamodel, with
-the same `where` and the file's `text`.
+the same `where` (the suffixes by commas) and the file's `text`.
+
+## Excel, PDF and CSV
+
+An `.xlsx` is a zip of XML; `quill/xlsx.py` reads its first worksheet
+into a sheet — each cell's text, number or formula, and the borders its
+style gives it — and writes a sheet back as a small, plain package Excel
+opens as it is: the same cells, a formula with the value it came to, the
+borders. Other sheets, fonts, colours, number formats and charts are
+passed over; a percentage comes back as the number Excel keeps. The
+server treats an Excel file as a text file: reading its `text` gives the
+sheet as a `.cell` file would hold it, writing `text` writes Excel's
+package, so an Excel file in the folder is listed, opened, edited and
+saved like any sheet, on every surface. A file up to 25 MB is read.
+
+**Export** hands a sheet over in another shape through the record API —
+`GET /api/records/file/<id>/export?as=xlsx` — as Excel, as a PDF
+(`quill/pdf.py`: a ruled grid of what the cells come to, headings in
+grey, the borders in black, landscape when wide, more pages when wider)
+or as CSV of the values; `as=cell` is the file itself. The same shapes
+come out of the terminal's and the command line's `export`
+(`quill/convert.py`). Nothing is written beside the sheet.
 
 ## The file
 
@@ -162,8 +187,9 @@ reads it:
 ## On each surface
 
 **Web and phone** (`kit_cells.js`): the sheets, newest first, with a
-search box and the pen; a sheet is its title — the file's name — the
-formula bar (the cell's name and what is typed in it) and the grid, as
+search box and the pen, an Excel file saying so; a sheet is its title —
+the file's name — the formula bar (the cell's name and what is typed in
+it) and the grid, as
 many rows and columns as are used with room beyond, scrolling both ways
 with the headings held. A tap or click selects a cell, a drag or Shift
 with a click or an arrow a block of them, a row's or a column's heading
@@ -184,10 +210,16 @@ arrows point one out instead, as in Excel: the cell's name is written
 where the caret is and follows as they move, Shift and an arrow make it a
 range, a click on a cell points the same way, and Enter keeps the name and
 typing goes on. Numbers stand to the right, errors are red.
-The sheet saves as you type; changing the title renames the file. One
-changed elsewhere since it was opened is not written over. On a computer
-the list and the sheet are side by side, and the list folds away.
-Read-only, the grid shows and nothing types into it.
+The sheet saves as you type; changing the title renames the file, and an
+Excel file stays an Excel file. One changed elsewhere since it was opened
+is not written over. **Open** (the folder in the bar) picks a sheet from
+anywhere on the cloud — another folder of your drive, a fileshare —
+through the picker every file screen shares (`filepick.js`: the shares,
+then the folders, then the files that are sheets); it opens by its record,
+the file staying where it is, and the stamp says where. **Export** offers
+Excel, PDF and CSV, and hands the file over to save. On a computer the
+list and the sheet are side by side, and the list folds away. Read-only,
+the grid shows and nothing types into it; Open and Export are still there.
 
 **Terminal** (`tui/panes/kit_cells.py`): the sheets down the left, the
 grid on the right with the cell's name and what is typed in it over it.
@@ -195,7 +227,10 @@ Arrows move, Enter or typing edits on the line above the grid, Enter
 commits and moves down, Tab across, Escape leaves it, Delete clears; a
 formula wanting a reference is pointed out with the arrows as on the web,
 `ctrl+s` saves (it saves on its own too); `ctrl+n` a new sheet, `f2`
-rename or move (`2026/Costs` puts it in a folder that is there), `del` delete.
+rename or move (`2026/Costs` puts it in a folder that is there), `del`
+delete; `f5` opens a sheet from anywhere on the cloud by `share:path`
+(`my-files:Reports/Q3.xlsx`), `f7` exports the open one by the name
+given (`.xlsx`, `.pdf`, `.csv` or `.cell`).
 
 **Command line** (`cli/quillrun/cells.py`):
 
@@ -207,6 +242,8 @@ cm cells show Budget --raw             # as typed: the formulas
 cm cells get Budget B4                 # one cell, worked out (--raw: as typed)
 cm cells set Budget B4 "=SUM(B1:B3)"   # one cell; set Budget B4 "" clears it
 cm cells set Budget name=Costs         # renames the file; path=2026/Costs moves it to a folder that is there
+cm cells export Budget [./Budget.xlsx] # an Excel file on this machine; or a name ending .pdf, .csv or .cell
+cm cells show my-files:Reports/Q3.xlsx # a sheet anywhere on the cloud: share:path, Excel or .cell
 cm cells delete Budget
 cm cells show Budget --plain           # {"A1": {"raw": …, "value": …, "shown": …}}
 ```

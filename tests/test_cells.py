@@ -253,7 +253,8 @@ STYLED_TYPED = (
 def test_the_format_is_written_beside_the_cells_and_the_rest_kept():
     sheet = cells.Sheet.from_text(STYLED_TYPED)
     assert sheet.to_text() == STYLED_TEXT
-    assert sheet.border("a1") == ["top", "bottom"] and sheet.border("B2") == list(cells.SIDES) == ["top", "right", "bottom", "left"]
+    assert sheet.border("a1") == ["top", "bottom"]
+    assert sheet.border("B2") == list(cells.SIDES) == ["top", "right", "bottom", "left"]
     assert sheet.border("C3") == [] and sheet.border("nope") == []
     sheet.set_border("A1", ["left", "top"])
     assert sheet.border("A1") == ["top", "left"], "in the sides' order, however they were said"
@@ -264,7 +265,8 @@ def test_the_format_is_written_beside_the_cells_and_the_rest_kept():
     with pytest.raises(ValueError):
         sheet.set_border("nope", ["top"])
     assert cells.parse_file('{"a1": "1"}') == ({"A1": "1"}, {}, {})
-    assert cells.parse_file("[1]") == ({}, {}, {}) and cells.parse_file('{"cells": 1, "format": {"A1": {"border": "top"}}}') == ({}, {}, {})
+    assert cells.parse_file("[1]") == ({}, {}, {})
+    assert cells.parse_file('{"cells": 1, "format": {"A1": {"border": "top"}}}') == ({}, {}, {})
 
 
 # -- rows and columns -------------------------------------------------------------------
@@ -332,7 +334,8 @@ def test_javascript_moves_the_same(tmp_path):
     script = tmp_path / "moves.mjs"
     script.write_text(
         f'import {{ Sheet, shiftFormula }} from "{rules}";\n'
-        "const shifts = " + json.dumps(SHIFTS) + ".map(([raw, axis, at, count]) => shiftFormula(raw, axis, at, count));\n"
+        "const shifts = " + json.dumps(SHIFTS) + ".map(([raw, axis, at, count]) =>"
+        " shiftFormula(raw, axis, at, count));\n"
         "const sheet = Sheet.fromText(" + json.dumps(MOVED_TYPED) + ");\n"
         "sheet.deleteRows(1); sheet.insertCols(0, 2); sheet.set('A7', 'new');\n"
         "const styled = Sheet.fromText(" + json.dumps(STYLED_TYPED) + ");\n"
