@@ -43,6 +43,15 @@ A `sheet` screen is sheets of cells, `.cell` files worked out here (docs/CELLS.m
     cm cells get Budget B4             # one cell, worked out
     cm cells set Budget B4 "=SUM(B1:B3)"
     cm cells set Budget name=Costs     # renames the file
+A `document` screen is documents, `.docs` files and Word's, edited as Markdown (docs/DOCS.md):
+
+    cm docs list                       # every document, folders and all
+    cm docs show Letter                # as Markdown; --raw for the .docs file; --plain for JSON
+    cm docs add Letter                 # from stdin, or $EDITOR, as Markdown
+    cm docs edit Letter                # $EDITOR, or the new Markdown from stdin
+    cm docs export Letter ./Letter.docx   # a Word file on this machine (or .md, .docs)
+    cm docs import ./Letter.docx       # a Word (or Markdown) file from this machine, as a document
+
 A `grid` (files) takes its group and folder as words instead:
 
     cm files list                      # the groups: My Files, the shares
@@ -117,6 +126,7 @@ from cloudmorrow.cli.quillrun.actions import _list_actions, _press, _view
 from cloudmorrow.cli.quillrun.board import _lane_named, _lanes  # noqa: F401
 from cloudmorrow.cli.quillrun.cells import _act_cells
 from cloudmorrow.cli.quillrun.data import _act_data
+from cloudmorrow.cli.quillrun.docs import _act_docs
 from cloudmorrow.cli.quillrun.editor import _act_editor
 from cloudmorrow.cli.quillrun.grid import _act_grid
 from cloudmorrow.cli.quillrun.history import _history
@@ -134,8 +144,10 @@ from cloudmorrow.cli.quillrun.thread import _thread, space_name  # noqa: F401
 from cloudmorrow.cli.quillrun.timeline import _act_timeline
 from cloudmorrow.client.api import CloudmorrowClient
 
-# A timeline's words that no other screen has.
+# A timeline's words that no other screen has; a document's export is its too.
 TIMELINE_ONLY = ("cut", "trim", "rm", "frame", "export")
+# A document's word that no other screen has.
+DOCUMENT_ONLY = ("import",)
 ACTIONS = (
     "list",
     "add",
@@ -153,6 +165,7 @@ ACTIONS = (
     "say",
     "history",
     *TIMELINE_ONLY,
+    *DOCUMENT_ONLY,
     *PROJECT_WORDS,
 )
 
@@ -232,8 +245,8 @@ async def dispatch(
     found = _quill(await api.quills(), quill)
     declared = {a["id"]: a for a in found.get("actions", [])}
     shown = next((s for s in found.get("screens") or [] if s["id"] == screen_id or not screen_id), {})
-    # A timeline's `export` is its screen's, whatever the action is called.
-    exports = shown.get("kit") == "timeline" and action == "export"
+    # A timeline's or a document's `export` is its screen's, whatever the action is called.
+    exports = shown.get("kit") in ("timeline", "document") and action == "export"
     if action in declared and not exports:
         await _press(api, found, declared[action], args, plain)
         return
@@ -282,6 +295,9 @@ async def _act(
     if screen.kit == "sheet":
         await _act_cells(api, screen, action, args, plain, raw)
         return
+    if screen.kit == "document":
+        await _act_docs(api, screen, action, args, plain, raw)
+        return
     if screen.kit == "grid":
         await _act_grid(api, screen, action, args, plain)
         return
@@ -293,4 +309,6 @@ async def _act(
         return
     if action in TIMELINE_ONLY:
         fail(f"{action} is a timeline's; {screen.quill['id']} is a {screen.kit}")
+    if action in DOCUMENT_ONLY:
+        fail(f"{action} is a document's; {screen.quill['id']} is a {screen.kit}")
     await _act_records(api, screen, action, args, group, index, plain, days, reveal)

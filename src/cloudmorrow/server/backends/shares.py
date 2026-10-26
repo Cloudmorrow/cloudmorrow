@@ -55,6 +55,11 @@ def _matches(fields: dict, where: dict) -> bool:
     return True
 
 
+def _suffixes(value: object) -> tuple[str, ...]:
+    """The suffixes a listing keeps: one, or several by commas, lower-cased."""
+    return tuple(part.strip().lower() for part in str(value or "").split(",") if part.strip())
+
+
 def _join(folder: str, name: str) -> str:
     return f"{folder}/{name}" if folder else name
 
@@ -414,7 +419,7 @@ class SharesBackend:
 
     def _text_of(self, target: Path) -> str | None:
         """A text file's words; nothing for a folder, a picture, or a text too big to read whole."""
-        if not self._is_text(target) or target.stat().st_size > pages.MAX_TEXT_BYTES:
+        if not self._is_text(target) or pages.too_big(target):
             return None
         try:
             return pages.read_text(target)
@@ -422,10 +427,10 @@ class SharesBackend:
             return None
 
     def _preview_of(self, target: Path) -> str:
-        if not self._is_text(target) or target.stat().st_size > pages.MAX_TEXT_BYTES:
+        if not self._is_text(target) or pages.too_big(target):
             return ""
         try:
-            return pages.preview(pages.read_text(target), target.stem)
+            return pages.preview_of(target)
         except OSError:
             return ""
 
@@ -457,7 +462,8 @@ class SharesBackend:
             )
         share = self._server_side(principal, name)
         within = where.pop("within", None)
-        suffix = str(where.pop("suffix", "") or "").strip().lower()
+        # One suffix, or several by commas: `suffix=.docs,.docx`.
+        suffix = _suffixes(where.pop("suffix", ""))
         folder = str(where.pop("folder", "") or "").strip("/ ")
         if "path" in where and not folder:
             folder = str(where["path"]).strip("/ ").rpartition("/")[0]
@@ -644,7 +650,7 @@ class SharesBackend:
         """Every folder under the root, parents first, each with how many files
         it holds directly (of the `suffix`, when one is asked for)."""
         _share, root, top = self._root(principal, where)
-        suffix = str((where or {}).get("suffix") or "").strip().lower()
+        suffix = _suffixes((where or {}).get("suffix"))
         found: list[dict] = []
 
         def walk(rel: str, directory: Path) -> None:

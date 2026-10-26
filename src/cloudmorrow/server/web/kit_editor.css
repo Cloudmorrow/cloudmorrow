@@ -134,3 +134,17 @@
   main.split .row.current { background: color-mix(in srgb, var(--accent) 15%, transparent); }
   main.split .row.current .title { color: var(--accent); }
 }
+
+/* A file of another suffix than the first, in a list of several kinds: DOCX beside its name. */
+.row .title-line .kind {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}

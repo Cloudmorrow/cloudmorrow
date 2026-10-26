@@ -1,0 +1,16 @@
+# The document everybody starts with: what Docs is, in Docs. A .docs file in
+# the Documents folder of the person's drive, like every document.
+[[records]]
+share = "my-files"
+path = "Documents/Welcome.docs"
+text = """
+{
+  "blocks": [
+    {"kind": "heading", "level": 1, "runs": [{"text": "Welcome to Docs"}]},
+    {"kind": "paragraph", "runs": [{"text": "A document is a page of "}, {"text": "headings", "bold": true}, {"text": ", paragraphs, lists, quotes and tables. Type here; it saves as you type."}]},
+    {"kind": "bullet", "runs": [{"text": "Every document is a .docs file in the Documents folder of your drive."}]},
+    {"kind": "bullet", "runs": [{"text": "A Word file in that folder opens here too, and is saved back as Word."}]},
+    {"kind": "bullet", "runs": [{"text": "Export writes a Word file beside any document."}]}
+  ]
+}
+"""

@@ -463,6 +463,7 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     from cloudmorrow.tui.panes.kit_calendar import CalendarPane
     from cloudmorrow.tui.panes.kit_cells import CellsPane
     from cloudmorrow.tui.panes.kit_data import DataPane
+    from cloudmorrow.tui.panes.kit_docs import DocsPane
     from cloudmorrow.tui.panes.kit_editor import EditorPane
     from cloudmorrow.tui.panes.kit_grid import GridPane
     from cloudmorrow.tui.panes.kit_grouped import GroupedListPane, draws_here
@@ -488,6 +489,8 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
         return EditorPane(quill, screen, **kwargs)
     if kit == "sheet":
         return CellsPane(quill, screen, **kwargs)
+    if kit == "document":
+        return DocsPane(quill, screen, **kwargs)
     if kit == "list" and draws_here(quill["models"][screen["model"]], screen):
         return GroupedListPane(quill, screen, **kwargs)
     if kit == "list" and screen.get("vault"):

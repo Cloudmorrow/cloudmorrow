@@ -107,3 +107,11 @@ summary = "Sheets of cells and formulas: plain .cell files in the Documents fold
 repo = "quill-cells"
 category = "productivity"
 publisher = "Cloudmorrow"
+
+[[quills]]
+id = "docs"
+name = "Docs"
+summary = "Documents: a basic Word, over .docs files and Word's own, in the Documents folder of your drive."
+repo = "quill-docs"
+category = "productivity"
+publisher = "Cloudmorrow"

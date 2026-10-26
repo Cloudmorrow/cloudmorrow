@@ -16,26 +16,39 @@ import re
 import secrets
 from pathlib import Path
 
+from cloudmorrow.quill import docs, docx
+
 __all__ = [
     "IMAGE_DIR",
     "IMAGE_TYPES",
     "MAX_IMAGE_BYTES",
     "MAX_TEXT_BYTES",
     "image_name",
+    "is_document",
     "is_image_name",
     "is_text",
     "preview",
+    "preview_of",
     "read_text",
     "search",
     "sniff_image",
+    "too_big",
+    "words_of",
     "write_text",
 ]
 
 # A text file bigger than this is not read whole: not as a field, not for
 # a preview, not for a search. Two megabytes of Markdown is a book.
 MAX_TEXT_BYTES = 2_000_000
-# Names Python may not know as text yet; `.cell` is a sheet (docs/CELLS.md).
-TEXT_SUFFIXES = frozenset({".md", ".markdown", ".txt", ".text", ".rst", ".org", ".cell"})
+# A Word file carries its pictures and fonts along; what the kit keeps of it is small.
+MAX_WORD_BYTES = 25_000_000
+# Names Python may not know as text yet; `.cell` is a sheet (docs/CELLS.md),
+# `.docs` a document (docs/DOCS.md).
+TEXT_SUFFIXES = frozenset({".md", ".markdown", ".txt", ".text", ".rst", ".org", ".cell", ".docs"})
+# A document's file: its own, or Word's, read and written as the same text
+# (quill/docx.py turns a .docx into a document's blocks and back).
+DOCUMENT_SUFFIXES = frozenset({".docs", ".docx"})
+WORD_SUFFIX = ".docx"
 
 PREVIEW_CHARS = 120
 PREVIEW_BYTES = 4096
@@ -60,20 +73,56 @@ def is_text(path: Path | str, mime: str = "") -> bool:
     does not know as text yet?"""
     if mime.startswith("text/"):
         return True
-    return Path(path).suffix.lower() in TEXT_SUFFIXES
+    suffix = Path(path).suffix.lower()
+    return suffix in TEXT_SUFFIXES or suffix == WORD_SUFFIX
+
+
+def is_document(path: Path | str) -> bool:
+    """A document of the document kit: its own `.docs`, or a Word file."""
+    return Path(path).suffix.lower() in DOCUMENT_SUFFIXES
+
+
+def too_big(path: Path) -> bool:
+    """Too big to read whole as a field, a preview or a search."""
+    limit = MAX_WORD_BYTES if Path(path).suffix.lower() == WORD_SUFFIX else MAX_TEXT_BYTES
+    return path.stat().st_size > limit
 
 
 def read_text(path: Path) -> str:
     """The file's words. Bytes that are not UTF-8 become the replacement
-    character rather than an error: a page is read to be shown."""
+    character rather than an error: a page is read to be shown. A Word
+    file's text is the document in it, as a `.docs` file would hold it."""
+    if path.suffix.lower() == WORD_SUFFIX:
+        try:
+            return docx.read_docx(path.read_bytes()).to_text()
+        except docx.DocxError:
+            return ""
     return path.read_bytes().decode("utf-8", errors="replace")
 
 
 def write_text(path: Path, text: str) -> None:
-    """Write the whole of *text* so the file is whole or untouched."""
+    """Write the whole of *text* so the file is whole or untouched. A Word
+    file is written as Word's own package, from the document in *text*."""
     tmp = path.with_name(f".{path.name}.tmp")
-    tmp.write_bytes(text.encode("utf-8"))
+    if path.suffix.lower() == WORD_SUFFIX:
+        tmp.write_bytes(docx.write_docx(docs.Doc.from_text(text)))
+    else:
+        tmp.write_bytes(text.encode("utf-8"))
     os.replace(tmp, path)
+
+
+def words_of(path: Path) -> str:
+    """What a search reads and a preview shows: a page's text, or a
+    document's words alone, a block a line."""
+    text = read_text(path)
+    return docs.Doc.from_text(text).text if is_document(path) else text
+
+
+def preview_of(path: Path) -> str:
+    """The line or two a list shows under a file's name."""
+    if is_document(path):
+        return docs.preview(docs.Doc.from_text(read_text(path)))
+    return preview(read_text(path), path.stem)
 
 
 def preview(text: str, stem: str, *, chars: int = PREVIEW_CHARS) -> str:
@@ -118,8 +167,8 @@ def search(files: list[tuple[str, Path, str]], query: str, *, limit: int = MAX_S
         line = path.name if hit else ""
         if is_text(path, mime):
             try:
-                if path.stat().st_size <= MAX_TEXT_BYTES:
-                    for candidate in read_text(path).splitlines():
+                if not too_big(path):
+                    for candidate in words_of(path).splitlines():
                         if needle in candidate.casefold():
                             hit, line = True, candidate.strip()[:200]
                             break

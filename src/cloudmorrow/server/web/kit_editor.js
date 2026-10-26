@@ -53,9 +53,9 @@ export const wide = () => matchMedia("(min-width: 900px) and (min-height: 600px)
 const FOLDED = "editor.folded";
 export const folded = () => store.get(FOLDED) === "1";
 
-const FOLDERS = "~folders";
-const TOP = "~top";
-const NEW = "~new";
+export const FOLDERS = "~folders";
+export const TOP = "~top";
+export const NEW = "~new";
 
 
 // -- the screen's bindings ---------------------------------------------------------
@@ -64,8 +64,8 @@ function bind(at) {
   const model = quill.models[screen.model];
   const can = new Set(model.can || []);
   const where = Object.fromEntries(Object.entries(screen.where || {}).map(([k, v]) => [k, String(v)]));
-  const suffix = screen.suffix || "";
-  const filters = suffix ? { ...where, suffix } : where;
+  const suffixes = suffixesOf(screen);
+  const filters = suffixes.length ? { ...where, suffix: suffixes.join(",") } : where;
   return {
     at,
     model,
@@ -73,7 +73,8 @@ function bind(at) {
     body: screen.body,
     path: screen.path || "",
     where,
-    suffix,
+    suffix: suffixes[0] || "",
+    suffixes,
     root: trimSlashes(where.within || ""),
     // On every listing, search and folder call; on the pictures, the root alone.
     query: new URLSearchParams(filters).toString(),
@@ -88,8 +89,12 @@ function bind(at) {
 }
 
 // -- paths: under the root in the tree, whole in the record store ---------------------
-// Shared with the sheet (kit_cells.js), whose bindings have the same
-// `root`, `suffix`, `where`, `model` and `query`.
+// Shared with the sheet (kit_cells.js) and the document (kit_docs.js),
+// whose bindings have the same `root`, `suffix`, `suffixes`, `where`,
+// `model` and `query`.
+/** The screen's `suffix`: one, or a list; the first is what a new file is called. */
+export const suffixesOf = (screen) =>
+  (typeof screen.suffix === "string" ? [screen.suffix] : (screen.suffix || [])).map(String).filter(Boolean);
 export const trimSlashes = (s) => String(s || "").replace(/^\/+|\/+$/g, "");
 export const withQuery = (b, rest) => rest + (b.query ? (rest.includes("?") ? "&" : "?") + b.query : "");
 export const underRoot = (b, raw) => {
@@ -97,10 +102,12 @@ export const underRoot = (b, raw) => {
   if (b.root && path.startsWith(b.root + "/")) return path.slice(b.root.length + 1);
   return b.root && path === b.root ? "" : path;
 };
-export const withoutSuffix = (b, s) =>
-  (b.suffix && s.toLowerCase().endsWith(b.suffix.toLowerCase()) ? s.slice(0, -b.suffix.length) : s);
-export const withSuffix = (b, s) =>
-  (b.suffix && !s.toLowerCase().endsWith(b.suffix.toLowerCase()) ? s + b.suffix : s);
+const hasSuffix = (b, s) => (b.suffixes || [b.suffix]).some((x) => x && s.toLowerCase().endsWith(x.toLowerCase()));
+export const withoutSuffix = (b, s) => {
+  const found = (b.suffixes || [b.suffix]).find((x) => x && s.toLowerCase().endsWith(x.toLowerCase()));
+  return found ? s.slice(0, -found.length) : s;
+};
+export const withSuffix = (b, s) => (b.suffix && !hasSuffix(b, s) ? s + b.suffix : s);
 export const wholePath = (b, path) => (b.root ? b.root + "/" : "") + withSuffix(b, trimSlashes(path));
 const wholeFolder = (b, path) => {
   const p = trimSlashes(path);
@@ -111,7 +118,7 @@ const wholeFolder = (b, path) => {
 export const fixedFields = (b) => Object.fromEntries(
   Object.entries(b.where).filter(([k]) => (b.model.fields || []).some((f) => f.name === k)));
 
-const listHash = (b, key) => b.at.base + (key ? "/" + encodePath(key) : "");
+export const listHash = (b, key) => b.at.base + (key ? "/" + encodePath(key) : "");
 const pageArg = (b, id) =>
   `${b.at.quill.id}/${b.at.screen.id}/${b.model.id}/${id}`;
 const pageHash = (b, id) =>
@@ -120,14 +127,18 @@ const pageHash = (b, id) =>
 // -- the pages and the folders ---------------------------------------------------------
 // [{id, path, title, folder, modified, preview}], and the folders in tree
 // order: [{path, name, depth, count}], the top first.
-async function load(b) {
+export async function load(b) {
   const rows = await api("GET", recordsUrl(b.model.id, "", withQuery(b, "?previews=true")));
   const pages = rows.map((r) => {
+    const name = String(r.fields[b.title] || "").trim();
     const path = withoutSuffix(b, underRoot(b, r.fields[b.path || b.title]));
+    // A file of a suffix other than the first says so, when there are several.
+    const kind = (b.suffixes || []).slice(1).find((x) => name.toLowerCase().endsWith(x.toLowerCase())) || "";
     return {
       id: r.id,
       path,
-      title: withoutSuffix(b, String(r.fields[b.title] || "").trim()) || baseName(path) || "Untitled",
+      title: withoutSuffix(b, name) || baseName(path) || "Untitled",
+      kind: kind.replace(/^\./, "").toUpperCase(),
       folder: b.path ? folderOf(path) : "",
       modified: seconds(r.updated_at) || 0,
       preview: r.preview || "",
@@ -160,8 +171,9 @@ const byNewest = (a, c) => c.modified - a.modified;
 
 // -- a list: the folders, every page, or one folder's ----------------------------------------
 // Returns what the list screen is, for a phone to draw alone and a computer
-// to draw beside a page: {title, backTo, backLabel, html, wire}.
-function listView(b, data, key, openId = "") {
+// to draw beside a page: {title, backTo, backLabel, html, wire}. The
+// document kit draws the same list over its files (kit_docs.js).
+export function listView(b, data, key, openId = "") {
   const hasFolders = !!b.path;
   const compose = !b.writes ? "" : `<a class="button compose" href="${listHash(b, NEW + (key && !key.startsWith("~") ? "/" + key : ""))}" aria-label="New ${esc(b.noun)}">${icons.compose}</a>`;
 
@@ -201,6 +213,7 @@ function listView(b, data, key, openId = "") {
 
   const row = (p) => `<a class="row${p.id === openId ? " current" : ""}" href="${pageHash(b, p.id)}">
       <span class="main"><span class="title-line"><span class="title">${esc(p.title)}</span>` +
+      (p.kind ? `<span class="kind">${esc(p.kind)}</span>` : "") +
       (all && p.folder ? `<span class="where">${own.folderSmall}<span>${esc(p.folder)}</span></span>` : "") +
       `</span>
       <span class="meta"><span class="date">${esc(formatDate(p.modified))}</span>` +
@@ -290,7 +303,7 @@ async function newFolder(b, parent) {
 }
 
 // Which list a computer shows beside a page: the last one looked at.
-const lastList = new Map();
+export const lastList = new Map();
 
 /** The editor's list screens, and a page not written yet. */
 export async function renderEditor(at, arg) {
@@ -324,7 +337,7 @@ export async function renderEditor(at, arg) {
 
 // On a computer the bar has no back button — the list is right there —
 // so the way up to the folders is over the list instead.
-const sideBack = (view) => (view.backTo
+export const sideBack = (view) => (view.backTo
   ? `<a class="side-back" href="${view.backTo}">${icons.chevronLeft}${esc(view.backLabel)}</a>` : "");
 
 // The handle on the line between the list and the page.
@@ -343,7 +356,7 @@ export function wireFold() {
   });
 }
 
-const aOr = (label) => (/^[aeiou]/i.test(label) ? "an " : "a ") + label;
+export const aOr = (label) => (/^[aeiou]/i.test(label) ? "an " : "a ") + label;
 
 /** One page: the editor's own, in place of the record sheet. */
 export async function renderEditorPage(at, id, arg) {

@@ -236,11 +236,23 @@ class EditorPane(KitPane):
         self.current_rev = record.get("rev")
         self.dirty = False
         body = str((record.get("fields") or {}).get(self.body_field) or "")
-        self.query_one(LiveMarkdownEditor).load_text(body)
+        self.query_one(LiveMarkdownEditor).load_text(self.body_to_show(body))
         self.query_one("#editor-path", Static).update(f"[{SECOND}]{self.current_path}[/]")
         self.status()
         self.query_one(NoteTree).select_path(self.current_path)
         self.update_picture()
+
+    # What the editor shows of a body, and keeps of what was typed: a page's
+    # text as it is; a document (kit_docs.py) as Markdown, kept as its file.
+    def body_to_show(self, body: str) -> str:
+        return body
+
+    def body_to_keep(self, text: str) -> str:
+        return text
+
+    def new_body(self, stem: str) -> str:
+        """What a new page starts as: a heading saying its name."""
+        return f"# {stem}\n\n"
 
     def forget_open_page(self) -> None:
         self.current_id = self.current_path = None
@@ -298,7 +310,7 @@ class EditorPane(KitPane):
             saved = await self.api.update_record(
                 self.model_id,
                 record_id,
-                {self.body_field: content},
+                {self.body_field: self.body_to_keep(content)},
                 rev=None if force else self.current_rev,
             )
         except AuthError as exc:
@@ -409,7 +421,7 @@ class EditorPane(KitPane):
         stem = PurePosixPath(name).name
         try:
             record = await self.api.create_record(
-                self.model_id, {**self._fields_for(path), self.body_field: f"# {stem}\n\n"}
+                self.model_id, {**self._fields_for(path), self.body_field: self.new_body(stem)}
             )
         except ApiError as exc:
             self.status(str(exc), error=True)
