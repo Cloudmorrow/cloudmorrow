@@ -11,6 +11,11 @@ label = "Personal"
 description = "Your own lists, plans and notes."
 
 [[categories]]
+id = "productivity"
+label = "Productivity"
+description = "The work of the day: tasks, the calendar, and sheets of numbers."
+
+[[categories]]
 id = "home"
 label = "Home"
 description = "The household: shopping, chores, the car, the plants."
@@ -39,7 +44,7 @@ id = "tasks"
 name = "Tasks"
 summary = "Boards with three lanes: To Do, Doing, Done."
 repo = "quill-tasks"
-category = "personal"
+category = "productivity"
 publisher = "Cloudmorrow"
 foundation = true
 
@@ -57,7 +62,7 @@ id = "calendar"
 name = "Calendar"
 summary = "Your own calendar, the ones you share, and one for everybody."
 repo = "quill-calendar"
-category = "personal"
+category = "productivity"
 publisher = "Cloudmorrow"
 foundation = true
 
@@ -98,7 +103,7 @@ publisher = "Cloudmorrow"
 [[quills]]
 id = "cells"
 name = "Cells"
-summary = "Sheets of cells and formulas: plain .cell files in the Cells folder of your drive."
+summary = "Sheets of cells and formulas: plain .cell files in the Documents folder of your drive."
 repo = "quill-cells"
-category = "business"
+category = "productivity"
 publisher = "Cloudmorrow"

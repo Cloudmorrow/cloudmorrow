@@ -194,36 +194,41 @@ def test_javascript_shows_every_cell_the_same(tmp_path):
     assert json.loads(done.stdout) == SHOWN
 
 
-# -- the field ---------------------------------------------------------------------------
-def test_the_cells_are_written_by_row_then_column():
+# -- the file ----------------------------------------------------------------------------
+BUDGET_TEXT = '{\n  "cells": {\n    "A1": "3",\n    "AA1": "wide",\n    "B2": "=A1*2",\n    "A10": "x"\n  }\n}\n'
+
+
+def test_the_file_is_the_cells_by_row_then_column():
     sheet = cells.Sheet({"B2": "=A1*2", "A10": "x", "A1": "3", "AA1": "wide", "C1": "  "})
-    assert list(sheet.to_field().items()) == [("A1", "3"), ("AA1", "wide"), ("B2", "=A1*2"), ("A10", "x")]
-    assert cells.parse_cells(sheet.to_field()) == {"A1": "3", "B2": "=A1*2", "AA1": "wide", "A10": "x"}
-    for nothing in ("", "not json", "[1]", None, 3, []):
+    assert sheet.to_text() == BUDGET_TEXT
+    assert cells.parse_cells(sheet.to_text()) == {"A1": "3", "B2": "=A1*2", "AA1": "wide", "A10": "x"}
+    for nothing in ("", "not json", "[1]", None, 3, [], '{"cells": [1]}'):
         assert cells.parse_cells(nothing) == {}
     # A key that is no cell, or an empty value, is left out; names are made proper.
-    assert cells.parse_cells({"a1": "1", "nope": "2", "B2": "", "C3": None}) == {"A1": "1"}
-    assert cells.parse_cells('{"a1": "1"}') == {"A1": "1"}, "the same as text, for a sheet typed by hand"
+    assert cells.parse_cells({"cells": {"a1": "1", "nope": "2", "B2": "", "C3": None}}) == {"A1": "1"}
+    assert cells.parse_cells('{"a1": "1"}') == {"A1": "1"}, "the cells alone, nothing around them, are a sheet too"
+    assert cells.parse_cells('{"cells": {"a1": "1"}, "columns": {"A": 20}}') == {"A1": "1"}, "beside whatever else"
+    assert cells.file_text({}) == '{\n  "cells": {}\n}\n'
 
 
 @node
-def test_javascript_writes_the_same_cells(tmp_path):
+def test_javascript_writes_the_same_file(tmp_path):
     script = tmp_path / "dump.mjs"
     rules = (WEB / "kit_cells_rules.js").as_uri()
     script.write_text(
         f'import {{ Sheet }} from "{rules}";\nimport {{ readFileSync }} from "node:fs";\n'
-        "process.stdout.write(JSON.stringify(Sheet.fromField(JSON.parse(readFileSync(0, 'utf8'))).toField()));\n",
+        "process.stdout.write(Sheet.fromText(readFileSync(0, 'utf8')).toText());\n",
         encoding="utf-8",
     )
     sheet = cells.Sheet({"B2": "=A1*2", "A10": "x", "a1": "3", "AA1": "wïde", "D4": 'say "hi"', "nope": "1"})
-    done = subprocess.run(
-        ["node", str(script)], input=json.dumps(sheet.cells), capture_output=True, text=True, check=False
-    )
+    typed = json.dumps(sheet.cells)
+    done = subprocess.run(["node", str(script)], input=typed, capture_output=True, text=True, check=False)
     assert done.returncode == 0, done.stderr
-    assert json.loads(done.stdout) == {"A1": "3", "AA1": "wïde", "B2": "=A1*2", "D4": 'say "hi"', "A10": "x"}
-    assert list(json.loads(done.stdout)) == list(
-        cells.parse_cells(sheet.cells) and cells.ordered_cells(cells.parse_cells(sheet.cells))
-    )
+    assert done.stdout == cells.Sheet.from_text(typed).to_text(), "byte for byte"
+    assert json.loads(done.stdout) == {"cells": {"A1": "3", "AA1": "wïde", "B2": "=A1*2", "D4": 'say "hi"', "A10": "x"}}
+    # And an empty sheet the same.
+    done = subprocess.run(["node", str(script)], input="", capture_output=True, text=True, check=False)
+    assert done.stdout == cells.file_text({})
 
 
 # Where a cell's name may go in what is typed so far, and a range's name

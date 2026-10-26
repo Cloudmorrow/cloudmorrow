@@ -1,8 +1,9 @@
 """The sheet kit's arithmetic: a sheet's cells, and their formulas.
 
-A sheet is a record — the foundational `sheet`: a name, and `cells`, a
-JSON field with one entry per cell that has something in it, keyed by the
-cell's name: `{"A1": "Rent", "B1": "1200", "B4": "=SUM(B1:B3)"}`. What is
+A sheet is a `.cell` file: a text file in a folder of somebody's drive —
+`Documents/Budget.cell` — holding one JSON object with `cells` in it, one
+entry per cell that has something in it, keyed by the cell's name:
+`{"cells": {"A1": "Rent", "B1": "1200", "B4": "=SUM(B1:B3)"}}`. What is
 kept is what was typed, as typed; everything else — that `1200` is a
 number, that `=SUM(B1:B3)` is a formula and what it comes to — is worked
 out on reading, here, and in kit_cells_rules.js for the web app, by the
@@ -24,8 +25,8 @@ error value: `#DIV/0!`, `#REF!` (a cell that is no cell), `#NAME?` (a
 function nobody has), `#VALUE!` (text where a number was wanted),
 `#CIRC!` (a formula that needs itself), `#N/A`.
 
-Nothing here draws or fetches: a Sheet is made from a record's cells,
-asked what they come to, and gives them back for writing.
+Nothing here draws or fetches: a Sheet is made from a file's text, asked
+what its cells come to, and gives the text back for writing.
 """
 
 from __future__ import annotations
@@ -80,16 +81,19 @@ def ref_name(row: int, col: int) -> str:
 
 
 def parse_cells(value: Any) -> dict[str, str]:
-    """The cells of a record's `cells` field, by name, as typed: the JSON
-    object, or the same as text. Anything else is an empty sheet: there is
-    nothing in it to lose. Names are made proper (`a1` → `A1`); a key that
-    is no cell, or an empty value, is left out."""
+    """The cells of a `.cell` file, by name, as typed: the file's text, or
+    the object it holds — `{"cells": {…}}`, or the cells alone. Anything
+    else is an empty sheet: there is nothing in it to lose. Names are made
+    proper (`a1` → `A1`); a key that is no cell, or an empty value, is left
+    out."""
     cells = value
     if isinstance(value, str):
         try:
             cells = json.loads(value) if value.strip() else {}
         except ValueError:
             return {}
+    if isinstance(cells, dict) and isinstance(cells.get("cells"), dict):
+        cells = cells["cells"]
     if not isinstance(cells, dict):
         return {}
     found: dict[str, str] = {}
@@ -111,6 +115,12 @@ def sort_key(name: str) -> tuple[int, int]:
 def ordered_cells(cells: dict[str, str]) -> dict[str, str]:
     """The cells as they are written: those with something, by row then column."""
     return {name: cells[name] for name in sorted(cells, key=sort_key) if str(cells[name]).strip()}
+
+
+def file_text(cells: dict[str, str]) -> str:
+    """A `.cell` file's text: one JSON object with the cells in it, a cell
+    a line, by row then column — the same bytes kit_cells_rules.js writes."""
+    return json.dumps({"cells": ordered_cells(cells)}, indent=2, ensure_ascii=False) + "\n"
 
 
 def extent(cells: dict[str, str]) -> tuple[int, int]:
@@ -791,7 +801,7 @@ FUNCTIONS = {
 
 
 class Sheet:
-    """The cells of one file, and what each comes to."""
+    """The cells of one `.cell` file, and what each comes to."""
 
     def __init__(self, cells: dict[str, str] | None = None) -> None:
         self.cells: dict[str, str] = dict(cells or {})
@@ -799,13 +809,13 @@ class Sheet:
         self._busy: set[str] = set()
 
     @classmethod
-    def from_field(cls, value: Any) -> Sheet:
-        """From a record's `cells` field."""
+    def from_text(cls, value: Any) -> Sheet:
+        """From a `.cell` file's text (a file record's `text` field)."""
         return cls(parse_cells(value))
 
-    def to_field(self) -> dict[str, str]:
-        """For a record's `cells` field."""
-        return ordered_cells(self.cells)
+    def to_text(self) -> str:
+        """The `.cell` file's text, for writing back."""
+        return file_text(self.cells)
 
     def raw(self, name: str) -> str:
         return self.cells.get(name, "")

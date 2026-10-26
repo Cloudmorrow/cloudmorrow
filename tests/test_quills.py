@@ -90,7 +90,7 @@ def models_source() -> Path:
 
 def test_the_catalog_is_read_with_its_categories(registry):
     catalog = load_catalog(str(QUILL_CATALOG))
-    assert [c["id"] for c in catalog.categories] == ["personal", "home", "business", "developer"]
+    assert [c["id"] for c in catalog.categories] == ["personal", "productivity", "home", "business", "developer"]
     assert catalog.entry("tasks")["foundation"] is True
     with pytest.raises(QuillError):
         catalog.entry("nope")
@@ -107,15 +107,15 @@ def test_the_quills_are_shelved_by_the_catalogs_categories(registry, tmp_path):
     registry.install_from_catalog("crm")
     registry.install_from_catalog("tasks")
     told = {q["id"]: q for q in registry.installed()}
-    assert (told["tasks"]["category_label"], told["tasks"]["category_rank"]) == ("Personal", 0)
-    assert (told["crm"]["category_label"], told["crm"]["category_rank"]) == ("Business", 2)
+    assert (told["tasks"]["category_label"], told["tasks"]["category_rank"]) == ("Productivity", 1)
+    assert (told["crm"]["category_label"], told["crm"]["category_rank"]) == ("Business", 3)
     # One the catalog does not name comes after every shelf it does; Other last.
-    assert registry.shelf("garden") == ("Garden", 4)
-    assert registry.shelf("") == ("Other", 5)
+    assert registry.shelf("garden") == ("Garden", 5)
+    assert registry.shelf("") == ("Other", 6)
     # Remembered beside the Quills: a server started again knows without the catalog.
     assert (tmp_path / "quill-categories.json").is_file()
     again = QuillRegistry(tmp_path / "quills", tmp_path / "datamodels", "")
-    assert again.shelf("business") == ("Business", 2)
+    assert again.shelf("business") == ("Business", 3)
 
 
 def test_the_install_sheet_says_everything_a_quill_adds(registry, tmp_path):
@@ -240,7 +240,7 @@ def test_an_administrator_installs_from_the_catalog_and_the_tabs_follow(client, 
     assert [(q["id"], q["enabled"]) for q in quills] == [("tasks", True), ("data", True)]
     assert set(quills[0]["models"]) == {"board", "task"}
     # Its tabs stand on the shelf of its category, the first in the catalog.
-    assert (quills[0]["category_label"], quills[0]["category_rank"]) == ("Personal", 0)
+    assert (quills[0]["category_label"], quills[0]["category_rank"]) == ("Productivity", 1)
     after = {q["id"]: q for q in client.get("/api/quills/catalog", headers=auth).json()["quills"]}
     assert after["tasks"]["installed_version"] == "1.2.0"
     # The fixture catalog names no release, so there is no telling whether a

@@ -34,7 +34,7 @@ def test_the_sheet_is_its_own_file_drawn_from_the_kit(client):
 def test_nothing_in_the_sheet_is_named_for_one_quill():
     for source, name in ((CELLS_JS, "kit_cells.js"), (RULES_JS, "rules"), (CELLS_CSS, "css")):
         code = js_code(source)
-        for word in ("budget", "Budget"):
+        for word in ("budget", "Budget", "Documents", "my-files"):
             assert word not in code, f"{name} names {word!r}"
         # The Quill is Cells; the kit's own names (parseCells, renderCells) are about cells.
         assert not re.search(r"(?<![a-z])Cells", code), f"{name} names the Cells Quill"
@@ -42,7 +42,7 @@ def test_nothing_in_the_sheet_is_named_for_one_quill():
 
 def test_it_reads_the_bindings_and_writes_only_where_it_may():
     code = js_code(CELLS_JS)
-    for binding in ("screen.title", "screen.cells"):
+    for binding in ("screen.title", "screen.cells", "screen.path", "screen.where", "screen.suffix"):
         assert binding in code, binding
     assert "writes: mayWrite(model)" in code
     assert ".access" not in code
@@ -61,11 +61,14 @@ def test_it_never_opens_a_browser_window():
 
 def test_the_calls_it_makes_are_the_record_apis():
     code = js_code(CELLS_JS)
-    # A sheet saves with the revision it read, and shows theirs on a 409.
-    assert "{ fields, rev: ed.rev }" in code
+    # A sheet saves its file's text with the revision it read, and shows theirs on a 409.
+    assert "{ fields: { [b.cells]: text }, rev: ed.rev }" in code
     assert "err.status === 409 && err.detail && err.detail.current" in code
     assert 'api("POST", recordsUrl(b.model.id), { fields })' in code
     assert 'api("DELETE", recordsUrl(b.model.id, ed.id))' in code
+    # Every listing is made within the folder, of the suffix: the editor's query.
+    assert 'recordsUrl(b.model.id, "", withQuery(b, ""))' in code
+    assert "recordsUrl(b.model.id))" not in code
 
 
 def test_side_by_side_is_the_computers_split():
@@ -82,30 +85,41 @@ def test_the_record_calls_it_makes_exist(client):
         "id": "sheets",
         "kit": "sheet",
         "label": "Cells",
-        "model": "sheet",
+        "model": "file",
+        "where": {"share": "my-files", "within": "Documents"},
+        "suffix": ".cell",
         "title": "name",
-        "cells": "cells",
+        "cells": "text",
+        "path": "path",
     }
-    assert quill["models"]["sheet"]["fields"][1]["kind"] == "json"
-    # The welcome sheet is seeded the first time the list is read.
-    rows = client.get("/api/records/sheet", headers=auth).json()
-    assert [r["fields"]["name"] for r in rows] == ["Budget"]
-    assert rows[0]["fields"]["cells"]["B5"] == "=SUM(B1:B3)"
-    made = client.post("/api/records/sheet", headers=auth, json={"fields": {"name": "New sheet", "cells": {}}})
-    assert made.status_code == 201, made.text
-    sheet = made.json()
-    saved = client.patch(
-        f"/api/records/sheet/{sheet['id']}",
+    assert next(f for f in quill["models"]["file"]["fields"] if f["name"] == "text")["kind"] == "text"
+    # The welcome sheet is seeded the first time the folder is listed; a
+    # listing leaves the text out, and reading one file gives it.
+    listing = "/api/records/file?share=my-files&within=Documents&suffix=.cell"
+    rows = client.get(listing, headers=auth).json()
+    assert [r["fields"]["path"] for r in rows] == ["Documents/Budget.cell"]
+    assert rows[0]["fields"]["text"] is None
+    budget = client.get(f"/api/records/file/{rows[0]['id']}", headers=auth).json()
+    assert '"B5": "=SUM(B1:B3)"' in budget["fields"]["text"]
+    # A new sheet is a .cell file under the folder; its text is written back with its rev.
+    made = client.post(
+        "/api/records/file",
         headers=auth,
-        json={"fields": {"cells": {"A1": "1", "B1": "=A1*2"}, "name": "Doubles"}, "rev": sheet["rev"]},
+        json={"fields": {"share": "my-files", "path": "Documents/New sheet.cell", "text": '{\n  "cells": {}\n}\n'}},
+    )
+    assert made.status_code == 201, made.text
+    saved = client.patch(
+        f"/api/records/file/{made.json()['id']}",
+        headers=auth,
+        json={"fields": {"text": '{\n  "cells": {\n    "A1": "1"\n  }\n}\n'}, "rev": made.json()["rev"]},
     )
     assert saved.status_code == 200, saved.text
-    assert saved.json()["fields"] == {"name": "Doubles", "cells": {"A1": "1", "B1": "=A1*2"}, "notes": None}
-    stale = client.patch(
-        f"/api/records/sheet/{sheet['id']}", headers=auth, json={"fields": {"cells": {}}, "rev": sheet["rev"]}
+    # Renamed, it is a new id: the sheet's address moves with it.
+    renamed = client.patch(
+        f"/api/records/file/{made.json()['id']}", headers=auth, json={"fields": {"name": "Costs.cell"}}
     )
-    assert stale.status_code == 409 and stale.json()["detail"]["current"]["fields"]["cells"] == {
-        "A1": "1",
-        "B1": "=A1*2",
-    }
-    assert client.delete(f"/api/records/sheet/{sheet['id']}", headers=auth).status_code == 204
+    assert renamed.status_code == 200 and renamed.json()["id"] != made.json()["id"]
+    assert sorted(r["fields"]["path"] for r in client.get(listing, headers=auth).json()) == [
+        "Documents/Budget.cell",
+        "Documents/Costs.cell",
+    ]

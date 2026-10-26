@@ -3,10 +3,11 @@
    command line follow, held to the same cases by one test (docs/CELLS.md).
    Pure: nothing here touches the page or the server.
 
-   A sheet is a record whose `cells` field is a JSON object with one entry
-   per cell that has something in it, keyed by the cell's name: {"A1":
-   "Rent", "B1": "1200", "B4": "=SUM(B1:B3)"}. What is kept is what was
-   typed; what it is — a number, a formula, text — is worked out on reading.
+   A sheet is a `.cell` file: its text is one JSON object with `cells` in
+   it, one entry per cell that has something in it, keyed by the cell's
+   name: {"cells": {"A1": "Rent", "B1": "1200", "B4": "=SUM(B1:B3)"}}. What
+   is kept is what was typed; what it is — a number, a formula, text — is
+   worked out on reading.
 
    A value is a number, a string, a boolean, null (blank) or an Error. */
 
@@ -46,15 +47,19 @@ export function parseRef(text) {
 export const refName = (row, col) => `${colName(col)}${row + 1}`;
 
 // -- the cells ----------------------------------------------------------------------
-/** The cells of a record's `cells` field, by name, as typed: the object, or
-    the same as text; anything else is an empty sheet. */
+const isObject = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+
+/** The cells of a `.cell` file, by name, as typed: the file's text, or the
+    object it holds — {cells: {…}}, or the cells alone; anything else is an
+    empty sheet. */
 export function parseCells(value) {
   let cells = value;
   if (typeof value === "string") {
     try { cells = value.trim() ? JSON.parse(value) : {}; }
     catch { return {}; }
   }
-  if (!cells || typeof cells !== "object" || Array.isArray(cells)) return {};
+  if (isObject(cells) && isObject(cells.cells)) cells = cells.cells;
+  if (!isObject(cells)) return {};
   const found = {};
   for (const [key, raw] of Object.entries(cells)) {
     const at = parseRef(key);
@@ -83,6 +88,10 @@ export function orderedCells(cells) {
   }
   return ordered;
 }
+
+/** A `.cell` file's text: one JSON object with the cells in it, a cell a
+    line, by row then column — the same bytes quill/cells.py writes. */
+export const fileText = (cells) => JSON.stringify({ cells: orderedCells(cells) }, null, 2) + "\n";
 
 /** [rows, cols] the sheet is drawn with: what is used, with room beyond it. */
 export function extent(cells) {
@@ -519,8 +528,10 @@ export class Sheet {
     this.cache = new Map();
     this.busy = new Set();
   }
-  static fromField(value) { return new Sheet(parseCells(value)); }
-  toField() { return orderedCells(this.cells); }
+  /** From a `.cell` file's text (a file record's `text` field). */
+  static fromText(value) { return new Sheet(parseCells(value)); }
+  /** The `.cell` file's text, for writing back. */
+  toText() { return fileText(this.cells); }
   raw(name) { return this.cells[name] || ""; }
   /** What is typed into a cell; nothing clears it. */
   set(name, raw) {
@@ -600,7 +611,7 @@ function operate(symbol, left, right) {
 
 /** Every cell of a sheet, as shown: {name: text}, for a test to compare. */
 export function shownCells(value) {
-  const sheet = Sheet.fromField(value);
+  const sheet = Sheet.fromText(value);
   const out = {};
   for (const name of Object.keys(sheet.cells).sort(byPlace)) out[name] = sheet.shown(name);
   return out;

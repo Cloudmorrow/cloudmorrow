@@ -1,8 +1,10 @@
 """The kit's `sheet` in the terminal: the sheets on the left, the grid on the right.
 
-A sheet screen binds a datamodel, its title, and `cells`, a json field
-holding what is typed in each cell by name (docs/CELLS.md). The sheets are
-listed newest first; the one picked is drawn as a grid, worked out by
+A sheet screen is over `.cell` files: it binds the file datamodel, its
+title, and `cells`, the text field the file's text is in, and says `where`
+the files are — a share, and the folder under it — and their `suffix`
+(docs/CELLS.md). The sheets are listed newest first, by their path under
+that folder; the one picked is drawn as a grid, worked out by
 quill/cells.py, with the cell's name and what is typed in it over it.
 
 Arrows move; Enter, or typing, edits the cell on the line above the grid;
@@ -29,7 +31,7 @@ from textual.widgets import DataTable, Input, Static
 
 from cloudmorrow.client.api import ApiError, AuthError
 from cloudmorrow.quill import cells
-from cloudmorrow.quill.screens import sheet_fields
+from cloudmorrow.quill.screens import listing_filters, page_fields, page_path, page_title, sheet_fields
 from cloudmorrow.tui.kitdata import is_conflict
 from cloudmorrow.tui.panes.kit import KitPane
 from cloudmorrow.tui.screens.modals import ConfirmModal, ConflictModal, PromptModal
@@ -96,6 +98,9 @@ class CellsPane(KitPane):
         self.bound = sheet_fields(screen, self.model)
         self.title_field: str = self.bound["title"]
         self.cells_field: str = self.bound["cells"]
+        # What every listing is made with: the share and the folder the
+        # sheets are under, and the suffix that says which files are sheets.
+        self.filters: dict = listing_filters(self.bound)
         self.ACTIONS = self.offer(
             [
                 Action("new_record", f"New {self.noun}", "^n", variant="primary"),
@@ -117,6 +122,11 @@ class CellsPane(KitPane):
         self.rows = 0
         self.cols = 0
 
+    @property
+    def noun(self) -> str:
+        """A sheet, whatever the file datamodel calls itself."""
+        return "sheet"
+
     def content(self) -> ComposeResult:
         with Horizontal(id="cells-body"):
             yield DataTable(id="cells-list", cursor_type="row", zebra_stripes=True)
@@ -133,7 +143,7 @@ class CellsPane(KitPane):
 
     def on_mount(self) -> None:
         table = self.query_one("#cells-list", DataTable)
-        table.add_columns("SHEET", "CELLS")
+        table.add_columns("SHEET", "CHANGED")
 
     # -- the sheets -----------------------------------------------------------------
     @property
@@ -149,14 +159,18 @@ class CellsPane(KitPane):
         return self.query_one("#cells-formula", Input)
 
     def title_of(self, record: dict) -> str:
-        return str((record.get("fields") or {}).get(self.title_field) or "").strip() or "Untitled"
+        return page_title(self.bound, record) or "Untitled"
+
+    def path_of(self, record: dict) -> str:
+        """A sheet's path under the root, without the suffix: what the list says."""
+        return page_path(self.bound, record) or self.title_of(record)
 
     @work(exclusive=True, group="kit-list")
     async def reload(self, select: str | None = None) -> None:
         if self.api is None:
             return
         try:
-            self.records = await self.api.records(self.model_id)
+            self.records = await self.api.records(self.model_id, **self.filters)
         except ApiError as exc:
             await self.went_wrong(exc)
             return
@@ -169,8 +183,8 @@ class CellsPane(KitPane):
         row = table.cursor_row
         table.clear()
         for record in self.records:
-            count = len(cells.parse_cells((record.get("fields") or {}).get(self.cells_field)))
-            table.add_row(f"[b]{self.title_of(record)}[/]", f"[{MUTED}]{count}[/]", key=str(record["id"]))
+            changed = str(record.get("updated_at") or "")[:10]
+            table.add_row(f"[b]{self.path_of(record)}[/]", f"[{MUTED}]{changed}[/]", key=str(record["id"]))
         if keep is not None:
             row = next((i for i, r in enumerate(self.records) if r["id"] == keep), row)
         if self.records:
@@ -221,7 +235,7 @@ class CellsPane(KitPane):
         self.current_rev = record.get("rev")
         self.dirty = False
         self.point = None
-        self.sheet = cells.Sheet.from_field((record.get("fields") or {}).get(self.cells_field))
+        self.sheet = cells.Sheet.from_text((record.get("fields") or {}).get(self.cells_field))
         self.draw_grid(keep=(0, 0))
         self.query_one("#cells-name", Static).update(f"[{SECOND}]{self.title_of(record)}[/]")
         self.status()
@@ -263,7 +277,7 @@ class CellsPane(KitPane):
             await self._save()
 
     async def _save(self, *, force: bool = False) -> None:
-        content = self.sheet.to_field()
+        content = self.sheet.to_text()
         record_id = self.current_id
         try:
             saved = await self.api.update_record(
@@ -287,7 +301,7 @@ class CellsPane(KitPane):
             return
         self.current_rev = saved.get("rev")
         # Anything typed while the request was in flight keeps the sheet dirty.
-        self.dirty = self.sheet.to_field() != content
+        self.dirty = self.sheet.to_text() != content
         self.status("" if self.dirty else "saved")
         for record in self.records:
             if record["id"] == record_id:
@@ -491,11 +505,14 @@ class CellsPane(KitPane):
 
     @work(group="ui")
     async def new_sheet(self) -> None:
-        name = await self.app.push_screen_wait(PromptModal(f"New {self.noun}", placeholder="name"))
+        hint = "name, or folder/name" if self.bound["path"] else "name"
+        name = await self.app.push_screen_wait(PromptModal(f"New {self.noun}", placeholder=hint))
         if not name:
             return
         try:
-            record = await self.api.create_record(self.model_id, {self.title_field: name, self.cells_field: {}})
+            record = await self.api.create_record(
+                self.model_id, {**page_fields(self.bound, name), self.cells_field: cells.file_text({})}
+            )
         except ApiError as exc:
             self.status(str(exc), error=True)
             return
@@ -510,18 +527,22 @@ class CellsPane(KitPane):
 
     @work(group="ui")
     async def rename(self, record: dict) -> None:
-        name = await self.app.push_screen_wait(PromptModal("Rename", value=self.title_of(record), placeholder="name"))
-        if not name or name == self.title_of(record):
+        """A sheet renamed, or moved: a file kept by its path is a new id afterwards."""
+        was = self.path_of(record)
+        hint = "new name, or folder/name" if self.bound["path"] else "new name"
+        path = await self.app.push_screen_wait(PromptModal("Rename", value=was, placeholder=hint))
+        if not path or path == was:
             return
         try:
-            renamed = await self.api.update_record(self.model_id, record["id"], {self.title_field: name})
+            renamed = await self.api.update_record(self.model_id, record["id"], page_fields(self.bound, path))
         except ApiError as exc:
             self.status(str(exc), error=True)
             return
         if self.current_id == record["id"]:
+            self.current_id = str(renamed["id"])
             self.current_rev = renamed.get("rev")
             self.query_one("#cells-name", Static).update(f"[{SECOND}]{self.title_of(renamed)}[/]")
-        self.reload(select=str(record["id"]))
+        self.reload(select=str(renamed["id"]))
 
     def act_delete_record(self) -> None:
         record = self.selected

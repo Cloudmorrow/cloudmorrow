@@ -88,25 +88,27 @@ function bind(at) {
 }
 
 // -- paths: under the root in the tree, whole in the record store ---------------------
-const trimSlashes = (s) => String(s || "").replace(/^\/+|\/+$/g, "");
-const withQuery = (b, rest) => rest + (b.query ? (rest.includes("?") ? "&" : "?") + b.query : "");
-const underRoot = (b, raw) => {
+// Shared with the sheet (kit_cells.js), whose bindings have the same
+// `root`, `suffix`, `where`, `model` and `query`.
+export const trimSlashes = (s) => String(s || "").replace(/^\/+|\/+$/g, "");
+export const withQuery = (b, rest) => rest + (b.query ? (rest.includes("?") ? "&" : "?") + b.query : "");
+export const underRoot = (b, raw) => {
   const path = trimSlashes(raw);
   if (b.root && path.startsWith(b.root + "/")) return path.slice(b.root.length + 1);
   return b.root && path === b.root ? "" : path;
 };
-const withoutSuffix = (b, s) =>
+export const withoutSuffix = (b, s) =>
   (b.suffix && s.toLowerCase().endsWith(b.suffix.toLowerCase()) ? s.slice(0, -b.suffix.length) : s);
-const withSuffix = (b, s) =>
+export const withSuffix = (b, s) =>
   (b.suffix && !s.toLowerCase().endsWith(b.suffix.toLowerCase()) ? s + b.suffix : s);
-const wholePath = (b, path) => (b.root ? b.root + "/" : "") + withSuffix(b, trimSlashes(path));
+export const wholePath = (b, path) => (b.root ? b.root + "/" : "") + withSuffix(b, trimSlashes(path));
 const wholeFolder = (b, path) => {
   const p = trimSlashes(path);
   if (!b.root) return p;
   return p ? b.root + "/" + p : b.root;
 };
 // The filters that are fields of the datamodel go on every page written: a file's share.
-const fixedFields = (b) => Object.fromEntries(
+export const fixedFields = (b) => Object.fromEntries(
   Object.entries(b.where).filter(([k]) => (b.model.fields || []).some((f) => f.name === k)));
 
 const listHash = (b, key) => b.at.base + (key ? "/" + encodePath(key) : "");

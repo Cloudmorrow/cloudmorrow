@@ -47,9 +47,3 @@ id = "attestations"
 label = "Attestations"
 description = "A frozen copy of a space's records at one moment, and the signed word of whoever validated it."
 datamodels = ["snapshot", "attestation"]
-
-[[domains]]
-id = "sheets"
-label = "Sheets"
-description = "Small spreadsheets: cells, numbers and formulas, kept as typed."
-datamodels = ["sheet"]

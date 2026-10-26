@@ -132,28 +132,16 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
         elif kit == "timeline":
             _check_timeline(manifest, screen, model, model_of, thing, need, where)
         elif kit == "sheet":
-            # A spreadsheet: a title, and `cells`, a json field holding what
-            # is typed in each cell by name (docs/CELLS.md).
-            need(model, thing + " cells", screen.get("cells") or "cells", ("json",))
+            # A spreadsheet over `.cell` files: a title, and `cells`, the
+            # text field the file's text is in (docs/CELLS.md); its pages
+            # are found the way an editor's are.
+            need(model, thing + " cells", screen.get("cells") or "text", ("text",))
+            _check_pages(where, thing, screen, model, need)
         elif kit == "editor":
             # A page of text with a title; `path`, when bound, is a string
             # like `folder/sub/title` whose folders are the tree beside it.
-            # `where` is the filters every listing is made with — a file's
-            # share, and the folder the pages are under — and `suffix` says
-            # which files are pages, and what a new one is called.
             need(model, thing + " body", screen.get("body"), ("markdown", "text"))
-            if screen.get("path"):
-                need(model, thing + " path", screen["path"], ("string",))
-            filters = screen.get("where", {})
-            if not isinstance(filters, dict) or not all(
-                isinstance(k, str) and isinstance(v, (str, int, bool)) for k, v in filters.items()
-            ):
-                raise QuillError(
-                    f'{where}: {thing} where is a table of filters: where = {{ share = "my-files", within = "Notes" }}'
-                )
-            suffix = screen.get("suffix", "")
-            if not isinstance(suffix, str) or (suffix and not suffix.startswith(".")):
-                raise QuillError(f'{where}: {thing} suffix is a file suffix, like ".md"')
+            _check_pages(where, thing, screen, model, need)
         elif kit == "grid":
             # Files: folders and tiles, in groups (the shares) picked first.
             if not model.backend:
@@ -353,6 +341,26 @@ def _check_thread(manifest: Manifest, screen: dict, model: Datamodel, models: di
                 raise QuillError(f"{where}: {thing} made_as {how}: {value!r} is not a value of {name}")
             if how == "direct" and not f.indexed:
                 raise QuillError(f"{where}: {thing} made_as direct marks a space by {name}, which must be indexed")
+
+
+def _check_pages(where: str, thing: str, screen: dict, model, need) -> None:
+    """A screen over files in a folder — an editor, a sheet. `where` is the
+    filters every listing is made with — a file's share, and the folder the
+    pages are under — and `suffix` says which files are pages, and what a
+    new one is called; `path`, when bound, is a string like
+    `folder/sub/title`."""
+    if screen.get("path"):
+        need(model, thing + " path", screen["path"], ("string",))
+    filters = screen.get("where", {})
+    if not isinstance(filters, dict) or not all(
+        isinstance(k, str) and isinstance(v, (str, int, bool)) for k, v in filters.items()
+    ):
+        raise QuillError(
+            f'{where}: {thing} where is a table of filters: where = {{ share = "my-files", within = "Notes" }}'
+        )
+    suffix = screen.get("suffix", "")
+    if not isinstance(suffix, str) or (suffix and not suffix.startswith(".")):
+        raise QuillError(f'{where}: {thing} suffix is a file suffix, like ".md"')
 
 
 def _check_calendar(screen: dict, model: Datamodel, models: dict[str, Datamodel], thing: str, need, where: str) -> None:
