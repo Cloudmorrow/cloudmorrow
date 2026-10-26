@@ -733,10 +733,15 @@ class Backups:
             manifest["size"] = sum(part["size"] for part in parts_made)
             manifest["files"] = sum(part.get("files", 0) for part in manifest["drives"] + manifest["shares"])
             # What went up: the store's new objects, and the archives and indexes.
+            # What went up: the store's new objects, the indexes, the archives
+            # that go whole each day, and a PostgreSQL dump, which does too.
+            whole = [manifest["quills"], manifest["keys"]]
+            if manifest["database"] and not manifest["database"].get("chunked"):
+                whole.append(manifest["database"])
             manifest["added"] = (
                 store.added_bytes
                 + sum(part.get("index_size", 0) for part in parts_made)
-                + sum(part["size"] for part in (manifest["quills"], manifest["keys"]) if part)
+                + sum(part["size"] for part in whole if part)
             )
             finished = self.now()
             manifest["finished_at"] = _iso(finished)
