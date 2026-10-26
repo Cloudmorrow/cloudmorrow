@@ -221,11 +221,13 @@ async function drawServer(panel) {
       offline for a few seconds, and this app comes back on the new version by itself.
       The same as <code>cloudmorrow update server</code> from a computer.</p>
     <div class="update-notice" aria-live="polite"><p class="note muted">Looking for a newer version…</p></div>
-    <div class="group"><button class="row primary update-server" type="button">Update server</button></div>
+    <div class="group"><button class="row primary update-server" type="button" disabled>Update server</button></div>
     <div class="update-log" hidden></div>`;
   // Whether a newer release is out, found after the page is up: the look
-  // fetches the server's git remote, which is a moment the page need not wait.
-  lookForUpdates(panel.querySelector(".update-notice"));
+  // fetches the server's git remote, which is a moment the page need not
+  // wait. The button waits for it: there is nothing to press for until a
+  // newer release is found, so it wakes with the box above it.
+  lookForUpdates(panel.querySelector(".update-notice"), panel.querySelector(".update-server"));
 
   const form = panel.querySelector("form.server-settings");
   form.addEventListener("submit", async (event) => {
@@ -309,8 +311,11 @@ const shortCommit = (commit) => (commit || "").slice(0, 8);
 // version, and Release notes — a sheet listing every release from the one
 // this server runs to the latest, newest first, each with the note on its
 // tag and what went into it. Nothing when the server is on the latest, and
-// a quiet line when it cannot look (no checkout, no network).
-async function lookForUpdates(box) {
+// a quiet line when it cannot look (no checkout, no network). The Update
+// button is asleep until the look is done: there is nothing to update to
+// when the server runs the latest, so it only wakes for a newer release —
+// or when the look could not tell, since the update itself still can.
+async function lookForUpdates(box, button) {
   let found;
   try {
     found = await api("GET", "/api/server/updates");
@@ -318,10 +323,12 @@ async function lookForUpdates(box) {
     box.innerHTML = `<p class="note muted">${esc(err.status === 404
       ? "This server is from before it could look for a newer version."
       : "Could not look for a newer version: " + err.message)}</p>`;
+    button.disabled = false;
     return;
   }
   if (found.error) {
     box.innerHTML = `<p class="note muted">Could not look for a newer version: ${esc(found.error)}</p>`;
+    button.disabled = false;
     return;
   }
   if (!found.available) {
@@ -342,6 +349,7 @@ async function lookForUpdates(box) {
     </div>
   </div>`;
   box.querySelector(".release-notes").addEventListener("click", () => showReleaseNotes(found));
+  button.disabled = false;
 }
 
 function showReleaseNotes(found) {

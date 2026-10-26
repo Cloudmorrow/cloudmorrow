@@ -246,6 +246,21 @@ def test_the_server_side_says_when_a_newer_version_is_out():
     assert "Could not look for a newer version" in look
 
 
+def test_the_update_button_sleeps_until_a_newer_version_is_found():
+    """Nothing to press for while the server runs the latest: the button is
+    drawn disabled, and only the look wakes it — for a newer release, or when
+    it could not tell (the update itself still can)."""
+    server = ADMIN_JS.split("async function drawServer", 1)[1].split("const shortCommit", 1)[0]
+    assert 'class="row primary update-server" type="button" disabled>' in server
+    assert 'lookForUpdates(panel.querySelector(".update-notice"), panel.querySelector(".update-server"))' in server
+    look = ADMIN_JS.split("async function lookForUpdates", 1)[1].split("\nfunction showReleaseNotes", 1)[0]
+    latest, newer = look.split("if (!found.available) {", 1)
+    assert latest.count("button.disabled = false;") == 2, "woken when the look fails, and when the route is missing"
+    quiet = newer.split("const count = ", 1)[0]
+    assert "button.disabled" not in quiet, "asleep on the latest version"
+    assert newer.rstrip().endswith("button.disabled = false;\n}"), "woken once a newer release is listed"
+
+
 # -- the Backups side ---------------------------------------------------------------
 def test_backups_is_a_side_of_administration():
     """The sixth side, with its own file, imported by the app and drawn by the switch."""
