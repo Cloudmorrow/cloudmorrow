@@ -190,25 +190,33 @@ def tracks_of(project: dict) -> list[dict]:
 # keeps them whole. The web app does the same in kit_editor.js.
 
 
+def suffixes_of(screen: dict) -> list[str]:
+    """The screen's `suffix`: one, or a list; the first is what a new file is called."""
+    raw = screen.get("suffix") or []
+    return [str(s) for s in ([raw] if isinstance(raw, str) else raw) if str(s)]
+
+
 def editor_fields(screen: dict, model: dict) -> dict:
     """What an editor draws from, and the filters and root it works within."""
     where = {str(k): str(v) for k, v in (screen.get("where") or {}).items()}
+    suffixes = suffixes_of(screen)
     return {
         "title": screen.get("title") or model.get("title") or "title",
         "body": screen.get("body") or "body",
         "path": screen.get("path") or "",
         "where": where,
         "root": where.get("within", "").strip("/"),
-        "suffix": str(screen.get("suffix") or ""),
+        "suffix": suffixes[0] if suffixes else "",
+        "suffixes": suffixes,
         "fields": {f.get("name") for f in model.get("fields", [])},
     }
 
 
 def listing_filters(bound: dict) -> dict[str, str]:
-    """What every listing, search and folder call sends: `where`, and the suffix."""
+    """What every listing, search and folder call sends: `where`, and the suffixes."""
     filters = dict(bound["where"])
-    if bound["suffix"]:
-        filters["suffix"] = bound["suffix"]
+    if bound["suffixes"]:
+        filters["suffix"] = ",".join(bound["suffixes"])
     return filters
 
 
@@ -224,8 +232,17 @@ def under_root(bound: dict, raw: str) -> str:
 
 
 def _without_suffix(bound: dict, text: str) -> str:
-    suffix = bound["suffix"]
-    return text[: -len(suffix)] if suffix and text.lower().endswith(suffix.lower()) else text
+    for suffix in bound["suffixes"]:
+        if text.lower().endswith(suffix.lower()):
+            return text[: -len(suffix)]
+    return text
+
+
+def _with_suffix(bound: dict, text: str) -> str:
+    """With the first suffix, unless it has one of them already."""
+    if bound["suffix"] and not any(text.lower().endswith(s.lower()) for s in bound["suffixes"]):
+        return text + bound["suffix"]
+    return text
 
 
 def page_path(bound: dict, record: dict) -> str:
@@ -241,9 +258,7 @@ def page_title(bound: dict, record: dict) -> str:
 
 def whole_path(bound: dict, path: str) -> str:
     """A tree path as the record store keeps it: under the root, with the suffix."""
-    path = str(path or "").strip("/")
-    if bound["suffix"] and not path.lower().endswith(bound["suffix"].lower()):
-        path += bound["suffix"]
+    path = _with_suffix(bound, str(path or "").strip("/"))
     return f"{bound['root']}/{path}" if bound["root"] else path
 
 
@@ -263,7 +278,7 @@ def page_fields(bound: dict, path: str) -> dict:
         fields[bound["path"]] = whole_path(bound, path)
     else:
         name = path.rsplit("/", 1)[-1]
-        fields[bound["title"]] = whole_path(bound, name) if not bound["root"] else name + bound["suffix"]
+        fields[bound["title"]] = whole_path(bound, name) if not bound["root"] else _with_suffix(bound, name)
     return fields
 
 
@@ -280,6 +295,17 @@ def sheet_fields(screen: dict, model: dict) -> dict:
     bound["cells"] = screen.get("cells") or "text"
     del bound["body"]
     return bound
+
+
+# -- documents -------------------------------------------------------------------
+# A document screen is an editor's kind of screen over `.docs` files — and
+# Word's `.docx`, read and written as the same text by the server
+# (docs/DOCS.md): it binds the same title, body, path, where and suffix.
+
+
+def document_fields(screen: dict, model: dict) -> dict:
+    """What a document draws from, and the filters and root it works within."""
+    return editor_fields(screen, model)
 
 
 # -- a record's history --------------------------------------------------------

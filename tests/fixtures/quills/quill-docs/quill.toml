@@ -1,0 +1,32 @@
+# A local copy of Cloudmorrow/quill-docs for the kit's tests: a document
+# screen over the .docs and .docx files in the Documents folder of a drive.
+[quill]
+id = "docs"
+name = "Docs"
+version = "1.0.0"
+summary = "Documents: a basic Word, over .docs files and Word's own, in the Documents folder of your drive."
+category = "productivity"
+icon = "document"
+publisher = "Cloudmorrow"
+license = "AGPL-3.0-or-later"
+
+[uses]
+datamodels = ["file"]
+
+[[screens]]
+id = "docs"
+kit = "document"
+label = "Docs"
+model = "file"
+where = { share = "my-files", within = "Documents" }
+suffix = [".docs", ".docx"]
+title = "name"
+body = "text"
+path = "path"
+
+[[datasets]]
+id = "welcome"
+model = "file"
+seed = "per-owner"
+where = { share = "my-files", within = "Documents", suffix = ".docs,.docx" }
+file = "datasets/welcome.toml"

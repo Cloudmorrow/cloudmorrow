@@ -142,6 +142,12 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
             # like `folder/sub/title` whose folders are the tree beside it.
             need(model, thing + " body", screen.get("body"), ("markdown", "text"))
             _check_pages(where, thing, screen, model, need)
+        elif kit == "document":
+            # A document over `.docs` files (and Word's): a title, and `body`,
+            # the text field the file's text is in (docs/DOCS.md); its pages
+            # are found the way an editor's are.
+            need(model, thing + " body", screen.get("body") or "text", ("text",))
+            _check_pages(where, thing, screen, model, need)
         elif kit == "grid":
             # Files: folders and tiles, in groups (the shares) picked first.
             if not model.backend:
@@ -359,8 +365,9 @@ def _check_pages(where: str, thing: str, screen: dict, model, need) -> None:
             f'{where}: {thing} where is a table of filters: where = {{ share = "my-files", within = "Notes" }}'
         )
     suffix = screen.get("suffix", "")
-    if not isinstance(suffix, str) or (suffix and not suffix.startswith(".")):
-        raise QuillError(f'{where}: {thing} suffix is a file suffix, like ".md"')
+    suffixes = [suffix] if isinstance(suffix, str) else suffix
+    if not isinstance(suffixes, list) or not all(isinstance(s, str) and s.startswith(".") for s in suffixes if s):
+        raise QuillError(f'{where}: {thing} suffix is a file suffix, like ".md", or a list of them')
 
 
 def _check_calendar(screen: dict, model: Datamodel, models: dict[str, Datamodel], thing: str, need, where: str) -> None:

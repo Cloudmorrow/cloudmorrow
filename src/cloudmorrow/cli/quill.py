@@ -219,6 +219,22 @@ def preview(plan: dict) -> str:
             lines.append("  opening one: the grid, beside the list")
             lines.append("")
             continue
+        elif screen["kit"] == "document":
+            doc = f"· <{title}>"
+            lines.append(f"  {doc:<26}│ [H1] [H2] [B] [I] [U] [•] [1.] [❝] [🔗]")
+            lines.append(f"  {doc:<26}│ A letter")
+            lines.append(f"  {'':<26}│ Dear you, …")
+            suffixes = screen.get("suffix") or [".docs", ".docx"]
+            suffixes = [suffixes] if isinstance(suffixes, str) else suffixes
+            within = (screen.get("where") or {}).get("within") or ""
+            lines.append(f"  a document is a {' or '.join(suffixes)} file" + (f" under {within}" if within else ""))
+            lines.append(
+                f"  its blocks are its {screen.get('body') or 'text'}; a Word file is read and written as one"
+                " (docs/DOCS.md)"
+            )
+            lines.append("  opening one: the page, beside the list")
+            lines.append("")
+            continue
         elif screen["kit"] == "timeline":
             lines.extend(_timeline_sketch(plan, screen, title))
             lines.append("")
