@@ -1,28 +1,32 @@
 # A local copy of Cloudmorrow/quill-cells for the kit's tests: a sheet
-# screen over the foundational `sheet` datamodel.
+# screen over the .cell files in the Documents folder of a drive.
 [quill]
 id = "cells"
 name = "Cells"
-version = "1.0.0"
+version = "2.0.0"
 summary = "Small spreadsheets: cells, numbers and formulas, worked out on every surface."
-category = "business"
+category = "productivity"
 icon = "grid"
 publisher = "Cloudmorrow"
 license = "AGPL-3.0-or-later"
 
 [uses]
-datamodels = ["sheet"]
+datamodels = ["file"]
 
 [[screens]]
 id = "sheets"
 kit = "sheet"
 label = "Cells"
-model = "sheet"
+model = "file"
+where = { share = "my-files", within = "Documents" }
+suffix = ".cell"
 title = "name"
-cells = "cells"
+cells = "text"
+path = "path"
 
 [[datasets]]
 id = "welcome"
-model = "sheet"
+model = "file"
 seed = "per-owner"
+where = { share = "my-files", within = "Documents", suffix = ".cell" }
 file = "datasets/welcome.toml"

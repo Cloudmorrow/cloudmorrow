@@ -1,4 +1,4 @@
-"""`cm <quill> …` for a sheet: listed, added, shown worked out, a cell set, against a real server."""
+"""`cm <quill> …` for a sheet: .cell files listed, added, shown worked out, a cell set, against a real server."""
 
 from __future__ import annotations
 
@@ -69,13 +69,17 @@ def test_a_cell_is_set_cleared_and_the_sheet_renamed(cm):
     assert "#DIV/0!" in cm("set", "Budget", "C1", "=1/0")
     plain = json.loads(cm("show", "Budget", plain=True))
     assert plain["C1"] == {"raw": "=1/0", "value": {"error": "#DIV/0!"}, "shown": "#DIV/0!"}
-    assert "Saved Costs" in cm("set", "Budget", "name=Costs")
-    assert "Costs" in cm("list")
+    assert "Saved Costs" in cm("set", "Budget", "name=Costs"), "renamed: the file is Documents/Costs.cell now"
+    listed = cm("list")
+    assert "Costs" in listed and "Budget" not in listed
+    assert cm("get", "Costs", "B5") == "1650\n"
 
 
 def test_a_sheet_is_added_and_deleted(cm):
     assert "Added Trip" in cm("add", "Trip")
     assert "is empty" in cm("show", "Trip")
+    with pytest.raises(typer.Exit):
+        cm("add", "trip")
     assert "Deleted Trip" in cm("delete", "Trip")
     with pytest.raises(typer.Exit):
         cm("show", "Trip")

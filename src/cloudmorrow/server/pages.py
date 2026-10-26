@@ -34,8 +34,8 @@ __all__ = [
 # A text file bigger than this is not read whole: not as a field, not for
 # a preview, not for a search. Two megabytes of Markdown is a book.
 MAX_TEXT_BYTES = 2_000_000
-# Names Python may not know as text yet.
-TEXT_SUFFIXES = frozenset({".md", ".markdown", ".txt", ".text", ".rst", ".org"})
+# Names Python may not know as text yet; `.cell` is a sheet (docs/CELLS.md).
+TEXT_SUFFIXES = frozenset({".md", ".markdown", ".txt", ".text", ".rst", ".org", ".cell"})
 
 PREVIEW_CHARS = 120
 PREVIEW_BYTES = 4096

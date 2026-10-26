@@ -36,12 +36,13 @@ An `editor` screen is pages of Markdown, found by their path:
     cm notes edit ideas/garden         # $EDITOR, or the new text from stdin
     cm notes search tomatoes           # names and every line
 
-A `sheet` screen is sheets of cells, worked out here (docs/CELLS.md):
+A `sheet` screen is sheets of cells, `.cell` files worked out here (docs/CELLS.md):
 
-    cm cells add "Budget"              # a new, empty sheet
+    cm cells add Budget                # a new, empty sheet: Documents/Budget.cell
     cm cells show Budget               # the sheet as a table; --raw for the formulas
     cm cells get Budget B4             # one cell, worked out
     cm cells set Budget B4 "=SUM(B1:B3)"
+    cm cells set Budget name=Costs     # renames the file
 A `grid` (files) takes its group and folder as words instead:
 
     cm files list                      # the groups: My Files, the shares

@@ -1,15 +1,20 @@
 # The sheet everybody starts with: a small budget, with a formula at the
-# bottom.
+# bottom. A .cell file in the Documents folder of the person's drive, like
+# every sheet.
 [[records]]
-name = "Budget"
-notes = "A first sheet: type a number, or a formula starting with ="
-
-[records.cells]
-A1 = "Rent"
-B1 = "1200"
-A2 = "Food"
-B2 = "450"
-A3 = "Travel"
-B3 = "120"
-A5 = "Total"
-B5 = "=SUM(B1:B3)"
+share = "my-files"
+path = "Documents/Budget.cell"
+text = """
+{
+  "cells": {
+    "A1": "Rent",
+    "B1": "1200",
+    "A2": "Food",
+    "B2": "450",
+    "A3": "Travel",
+    "B3": "120",
+    "A5": "Total",
+    "B5": "=SUM(B1:B3)"
+  }
+}
+"""

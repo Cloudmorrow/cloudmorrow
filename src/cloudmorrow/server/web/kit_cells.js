@@ -1,8 +1,10 @@
-/* The kit's `sheet`: a spreadsheet, one record a sheet (docs/CELLS.md).
+/* The kit's `sheet`: a spreadsheet, one `.cell` file a sheet (docs/CELLS.md).
 
-   A screen binds a `model`, its `title`, and `cells`: a json field holding
-   what is typed in each cell, by name — {"A1": "Rent", "B4":
-   "=SUM(B1:B3)"}. The sheets are listed like any records, newest first;
+   A screen binds the file `model`, its `title`, and `cells`: the text
+   field the file's text is in — one JSON object, {"cells": {"A1": "Rent",
+   "B4": "=SUM(B1:B3)"}} — and says, as an editor's does, `where` the files
+   are (a share, and the folder under it: `within`) and their `suffix`.
+   The sheets are listed newest first, by their path under that folder;
    one opens as a grid with a formula bar over it, worked out by
    kit_cells_rules.js, the same rules the terminal and the command line
    follow in quill/cells.py. Nothing here knows what a budget is.
@@ -22,12 +24,15 @@
      #/r/<quill>/<screen>/<model>/<id>   a sheet */
 
 import {
-  SAVE_DELAY, api, app, back, esc, formatDate, heading, icons, mount, nav, occupy, recordsUrl,
-  renderRoute, replace, seconds, sectionOf, setStatus, tabs, toast, vacate, wireShell,
+  SAVE_DELAY, api, app, back, baseName, esc, fileStem, formatDate, heading, icons, mount, nav, occupy,
+  recordsUrl, renderRoute, replace, seconds, sectionOf, setStatus, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
 import { mayWrite, sheetHash } from "./kit.js";
-import { foldButton, folded, wide, wireFold } from "./kit_editor.js";
+import {
+  fixedFields, foldButton, folded, trimSlashes, underRoot, wholePath, wide, wireFold, withQuery,
+  withSuffix, withoutSuffix,
+} from "./kit_editor.js";
 import { CellError, Sheet, colName, extent, isFormula, rangeName, refName, wantsRef } from "./kit_cells_rules.js";
 import { ask } from "./dialog.js";
 
@@ -37,21 +42,35 @@ const NEW = "~new";
 function bind(at) {
   const { quill, screen } = at;
   const model = quill.models[screen.model];
+  const where = Object.fromEntries(Object.entries(screen.where || {}).map(([k, v]) => [k, String(v)]));
+  const suffix = screen.suffix || "";
+  const filters = suffix ? { ...where, suffix } : where;
   return {
     at,
     model,
     title: screen.title || model.title || "name",
-    cells: screen.cells || "cells",
+    cells: screen.cells || "text",
+    path: screen.path || "",
+    where,
+    suffix,
+    root: trimSlashes(where.within || ""),
+    // On every listing: the share, the folder, the suffix.
+    query: new URLSearchParams(filters).toString(),
     label: screen.label || quill.name,
-    noun: model.label.toLowerCase(),
+    // A sheet, whatever the file datamodel calls itself.
+    noun: "sheet",
     writes: mayWrite(model),
   };
 }
 
 const openHash = (b, id) => sheetHash(b.at, b.model.id, id);
 const openArg = (b, id) => `${b.at.quill.id}/${b.at.screen.id}/${b.model.id}/${id}`;
-const titleOf = (b, r) => String(r.fields[b.title] || "").trim() || "Untitled";
-const countOf = (b, r) => Object.keys(Sheet.fromField(r.fields[b.cells]).cells).length;
+// A sheet's title is its file's name without the suffix; what the list
+// says is its path under the root, when one is bound.
+const titleOf = (b, r) => withoutSuffix(b, String(r.fields[b.title] || "").trim())
+  || baseName(withoutSuffix(b, underRoot(b, r.fields[b.path]))) || "Untitled";
+const keyOf = (b, r) => (b.path ? withoutSuffix(b, underRoot(b, r.fields[b.path])) : "") || titleOf(b, r);
+const listSheets = (b) => api("GET", recordsUrl(b.model.id, "", withQuery(b, "")));
 const byNewest = (a, c) => (seconds(c.updated_at) || 0) - (seconds(a.updated_at) || 0);
 
 // -- the list -----------------------------------------------------------------------------
@@ -60,13 +79,10 @@ const byNewest = (a, c) => (seconds(c.updated_at) || 0) - (seconds(a.updated_at)
 function listView(b, records, openId = "") {
   const compose = !b.writes ? "" : `<a class="button compose" href="${b.at.base}/${NEW}" aria-label="New ${esc(b.noun)}">${icons.compose}</a>`;
   const rows = records.slice().sort(byNewest);
-  const row = (r) => {
-    const n = countOf(b, r);
-    return `<a class="row${r.id === openId ? " current" : ""}" href="${openHash(b, r.id)}">
-      <span class="main"><span class="title">${esc(titleOf(b, r))}</span>
-      <span class="meta"><span class="date">${esc(formatDate(seconds(r.updated_at) || 0))}</span>` +
-      `<span class="preview">${n ? `${n} cell${n === 1 ? "" : "s"}` : "Empty"}</span></span></span></a>`;
-  };
+  // A listing leaves a file's text out, so a row is its path and its date.
+  const row = (r) => `<a class="row${r.id === openId ? " current" : ""}" href="${openHash(b, r.id)}">
+      <span class="main"><span class="title">${esc(keyOf(b, r))}</span>
+      <span class="meta"><span class="date">${esc(formatDate(seconds(r.updated_at) || 0))}</span></span></span></a>`;
   const show = (listing, items, { searching = false } = {}) => {
     if (!items.length) {
       listing.innerHTML = searching
@@ -100,7 +116,7 @@ function listView(b, records, openId = "") {
       search.addEventListener("input", () => {
         const needle = search.value.trim().toLowerCase();
         if (!needle) { show(listing, rows); return; }
-        show(listing, rows.filter((r) => titleOf(b, r).toLowerCase().includes(needle)), { searching: true });
+        show(listing, rows.filter((r) => keyOf(b, r).toLowerCase().includes(needle)), { searching: true });
       });
     },
   };
@@ -115,8 +131,7 @@ export async function renderCells(at, arg) {
     return renderRoute();
   }
   if (arg === NEW) return renderSheet(b, { isNew: true, arg: `${at.quill.id}/${at.screen.id}/${arg}` });
-  const records = await api("GET", recordsUrl(b.model.id));
-  const view = listView(b, records);
+  const view = listView(b, await listSheets(b));
   if (wide()) {
     mount(nav({ title: view.title }) + `
       <main class="split">
@@ -149,7 +164,7 @@ let open = null;
 function sheetState(b, record) {
   return {
     id: record.id, stem: titleOf(b, record), rev: record.rev,
-    sheet: Sheet.fromField(record.fields[b.cells]),
+    sheet: Sheet.fromText(record.fields[b.cells]),
     modified: seconds(record.updated_at) || Date.now() / 1000,
   };
 }
@@ -182,7 +197,7 @@ async function renderSheet(b, { record = null, isNew = false, arg }) {
       </div>`;
   let view = null;
   if (wide()) {
-    view = listView(b, await api("GET", recordsUrl(b.model.id)), ed.id);
+    view = listView(b, await listSheets(b), ed.id);
     mount(nav({ title: ed.stem || "New", right: actions }) + `
       <main class="split${folded() ? " folded" : ""}">
         <section class="side">${view.html}</section>
@@ -488,6 +503,14 @@ function wireGrid(ed) {
 }
 
 // -- saving --------------------------------------------------------------------------------
+// The sheet's address has moved — made, or renamed, which for a file kept
+// by its path is a new id. The screen stays the sheet's.
+function moved(ed, record) {
+  ed.id = record.id;
+  ed.arg = openArg(ed.b, record.id);
+  replace(openHash(ed.b, record.id));
+}
+
 async function saveSheet(ed, { keepalive = false } = {}) {
   if (!ed.dirty) return;
   if (ed.saving) { ed.pending = true; return; }
@@ -496,22 +519,20 @@ async function saveSheet(ed, { keepalive = false } = {}) {
   ed.saving = true;
   setStatus(ed, "Saving…");
   try {
-    const title = ed.titleEl.value.trim();
-    const fields = { [b.cells]: ed.sheet.toField() };
+    const title = fileStem(ed.titleEl.value);
+    const text = ed.sheet.toText();
     if (ed.isNew) {
       if (!title && !Object.keys(ed.sheet.cells).length) { setStatus(ed, ""); return; }
-      fields[b.title] = title || `New ${b.noun}`;
-      const made = await api("POST", recordsUrl(b.model.id), { fields });
+      const made = await createUnique(ed, title || `New ${b.noun}`, text);
       ed.isNew = false;
       ed.created = true;
       Object.assign(ed, sheetState(b, made), { sheet: ed.sheet });
-      ed.arg = openArg(b, made.id);
-      replace(openHash(b, made.id));
+      moved(ed, made);
     } else {
-      if (title && title !== ed.stem) fields[b.title] = title;
+      if (title && title !== ed.stem) await renameTo(ed, title);
       let saved;
       try {
-        saved = await api("PATCH", recordsUrl(b.model.id, ed.id), { fields, rev: ed.rev }, { keepalive });
+        saved = await api("PATCH", recordsUrl(b.model.id, ed.id), { fields: { [b.cells]: text }, rev: ed.rev }, { keepalive });
       } catch (err) {
         const current = err.status === 409 && err.detail && err.detail.current;
         if (!current) throw err;
@@ -529,7 +550,6 @@ async function saveSheet(ed, { keepalive = false } = {}) {
         return;
       }
       ed.rev = saved.rev;
-      ed.stem = titleOf(b, saved);
       ed.modified = seconds(saved.updated_at) || ed.modified;
     }
     const center = app.querySelector(".nav .center .text");
@@ -545,6 +565,41 @@ async function saveSheet(ed, { keepalive = false } = {}) {
   }
 }
 
+// A new sheet is a file nobody else under the root has the name of: "New
+// sheet", then "New sheet 2" — the server says no to a second of the same.
+async function createUnique(ed, stem, text) {
+  const { b } = ed;
+  let taken = new Set();
+  try { taken = new Set((await listSheets(b)).map((r) => keyOf(b, r))); }
+  catch { /* the server will say if it is taken */ }
+  for (let n = 1; n < 100; n += 1) {
+    const name = n === 1 ? stem : `${stem} ${n}`;
+    if (taken.has(name)) continue;
+    const fields = { ...fixedFields(b), [b.cells]: text };
+    if (b.path) fields[b.path] = wholePath(b, name);
+    else fields[b.title] = withSuffix(b, name);
+    return api("POST", recordsUrl(b.model.id), { fields });
+  }
+  throw new Error(`Too many called ${stem}`);
+}
+
+async function renameTo(ed, stem) {
+  const { b } = ed;
+  try {
+    const renamed = await api("PATCH", recordsUrl(b.model.id, ed.id), { fields: { [b.title]: withSuffix(b, stem) } });
+    ed.stem = titleOf(b, renamed);
+    ed.rev = renamed.rev;
+    moved(ed, renamed);
+  } catch (err) {
+    if (err.status === 400) {
+      toast(err.message);
+      ed.titleEl.value = ed.stem;
+      return;
+    }
+    throw err;
+  }
+}
+
 // Leaving saves what is there, and throws away a sheet that never got a
 // name or a cell.
 async function leaveSheet(ed) {
@@ -553,7 +608,7 @@ async function leaveSheet(ed) {
   if (ed.editing) commit(ed);
   if (ed.dirty) await saveSheet(ed);
   while (ed.saving) await new Promise((r) => setTimeout(r, 50));
-  if (ed.created && !ed.titleEl.value.trim() && !Object.keys(ed.sheet.cells).length) {
+  if (ed.created && !fileStem(ed.titleEl.value) && !Object.keys(ed.sheet.cells).length) {
     try { await api("DELETE", recordsUrl(ed.b.model.id, ed.id)); }
     catch { /* it will show up; fine */ }
   }

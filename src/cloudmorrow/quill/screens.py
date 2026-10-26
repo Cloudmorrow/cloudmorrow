@@ -268,16 +268,18 @@ def page_fields(bound: dict, path: str) -> dict:
 
 
 # -- sheets --------------------------------------------------------------------
-# A screen binds a title and `cells`, a json field: what is typed in each
-# cell, by name (docs/CELLS.md). The web app does the same in kit_cells.js.
+# A sheet screen is an editor's kind of screen over `.cell` files: it binds
+# a title and `cells`, the text field the file's text is in, and takes
+# `where`, `suffix` and `path` as an editor does (docs/CELLS.md). The web
+# app does the same in kit_cells.js.
 
 
-def sheet_fields(screen: dict, model: dict) -> dict[str, str]:
-    """What a sheet draws from: its title, and the field its cells are in."""
-    return {
-        "title": screen.get("title") or model.get("title") or "name",
-        "cells": screen.get("cells") or "cells",
-    }
+def sheet_fields(screen: dict, model: dict) -> dict:
+    """What a sheet draws from, and the filters and root it works within."""
+    bound = editor_fields(screen, model)
+    bound["cells"] = screen.get("cells") or "text"
+    del bound["body"]
+    return bound
 
 
 # -- a record's history --------------------------------------------------------

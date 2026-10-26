@@ -210,9 +210,12 @@ def preview(plan: dict) -> str:
             lines.append(f"  {sheet:<26}│      A          B          C")
             lines.append(f"  {'':<26}│ 1    Rent          1200")
             lines.append(f"  {'':<26}│ 4    Total         3000")
+            within = (screen.get("where") or {}).get("within") or ""
             lines.append(
-                f"  the cells are {screen.get('cells') or 'cells'}, as typed, formulas and all (docs/CELLS.md)"
+                f"  a sheet is a {screen.get('suffix') or '.cell'} file" + (f" under {within}" if within else "")
             )
+            cells_field = screen.get("cells") or "text"
+            lines.append(f"  its cells are its {cells_field}, as typed, formulas and all (docs/CELLS.md)")
             lines.append("  opening one: the grid, beside the list")
             lines.append("")
             continue
