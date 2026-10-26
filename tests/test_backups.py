@@ -306,10 +306,12 @@ def test_one_run_at_a_time(client, auth, store, config, monkeypatch):
 def test_the_clock_runs_todays_backup_once_its_time_has_come(client, auth, store, config):
     set_up(client, auth, store, parts=["drives"], time="03:00", enabled=True)
     backups = backups_of(client)
-    tz = dt.datetime.now().astimezone().tzinfo
-    early = dt.datetime(2026, 10, 23, 2, 59, tzinfo=tz)
+    # Local times of that day, in that day's own offset: today's offset
+    # pinned on an October date is an hour out once the clocks have gone
+    # back, and 02:59 lands past three.
+    early = dt.datetime(2026, 10, 23, 2, 59).astimezone()
     assert backups.tick(early) is False
-    due = dt.datetime(2026, 10, 23, 3, 1, tzinfo=tz)
+    due = dt.datetime(2026, 10, 23, 3, 1).astimezone()
     assert backups.tick(due) is True
     wait_done(client)
     assert backups.status()["last"]["ok"]
