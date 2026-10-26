@@ -85,6 +85,24 @@ def test_a_sheet_is_added_and_deleted(cm):
         cm("show", "Trip")
 
 
+def test_export_writes_excel_pdf_and_csv_and_a_sheet_is_found_anywhere(cm, tmp_path):
+    from cloudmorrow.quill import xlsx
+
+    target = tmp_path / "out" / "Budget.xlsx"
+    assert "Wrote" in cm("export", "Budget", str(target))
+    assert xlsx.read_xlsx(target.read_bytes()).raw("B5") == "=SUM(B1:B3)"
+    cm("export", "Budget", str(tmp_path / "Budget.pdf"))
+    assert (tmp_path / "Budget.pdf").read_bytes().startswith(b"%PDF-")
+    cm("export", "Budget", str(tmp_path / "Budget.csv"))
+    assert (tmp_path / "Budget.csv").read_text(encoding="utf-8").startswith("Rent,")
+    with pytest.raises(typer.Exit):
+        cm("export", "Budget", str(tmp_path / "Budget.docx"))
+    # A sheet anywhere on the cloud, by share:path — an Excel file too.
+    assert "Rent" in cm("show", "my-files:Documents/Budget.cell")
+    with pytest.raises(typer.Exit):
+        cm("show", "my-files:Documents/Nope.cell")
+
+
 def test_what_is_no_cell_or_no_sheet_says_so(cm):
     for argv in (("get", "Budget", "nope"), ("get", "Budget"), ("set", "Budget"), ("edit", "Budget"), ("show", "Nope")):
         with pytest.raises(typer.Exit):

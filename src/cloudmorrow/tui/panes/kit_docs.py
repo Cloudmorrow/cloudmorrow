@@ -10,8 +10,9 @@ What is typed is kept as the document's file, never as Markdown; what
 Markdown cannot say — how a paragraph is aligned — is lost on the way.
 
 Import reads a Word, `.docs` or Markdown file on this machine in as a
-document; Export writes the open one out as Word (`.docx`), `.docs` or
-Markdown, by the name given.
+document; Export writes the open one out as Word (`.docx`), PDF, `.docs`
+or Markdown, by the name given. Open (f5) opens a document from anywhere
+on the cloud — `share:folder/name.docx` — by its record, wherever it is.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from pathlib import Path, PurePosixPath
 
 from textual import work
 
+from cloudmorrow.cli.quillrun.cells import anywhere
 from cloudmorrow.cli.quillrun.docs import DocFileError, read_file, write_file
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.quill import docs
@@ -28,6 +30,7 @@ from cloudmorrow.tui.screens.modals import ConfirmModal, PromptModal
 from cloudmorrow.tui.theme import MUTED
 from cloudmorrow.tui.widgets.editor import LiveMarkdownEditor
 from cloudmorrow.tui.widgets.note_tree import NoteTree
+from cloudmorrow.tui.widgets.toolbar import Action
 
 IMPORTS = (".docx", ".docs", ".md", ".markdown", ".txt")
 
@@ -35,11 +38,19 @@ IMPORTS = (".docx", ".docs", ".md", ".markdown", ".txt")
 class DocsPane(EditorPane):
     """The editor over documents: Markdown in, the document's file out."""
 
+    BINDINGS = [
+        *EditorPane.BINDINGS,
+        ("f5", "fire('open_anywhere')", "Open…"),
+    ]
+
     def __init__(self, quill: dict, screen: dict, **kwargs) -> None:
         super().__init__(quill, screen, **kwargs)
         # A document keeps no pictures: the editor's photo button is not offered.
         self.attaches = False
-        self.ACTIONS = self.offer([a for a in self.ACTIONS if a.id != "insert_image"])
+        self.ACTIONS = self.offer(
+            [a for a in self.ACTIONS if a.id != "insert_image"]
+            + [Action("open_anywhere", "Open…", "f5", hint="A document anywhere on the cloud: share:folder/name")]
+        )
 
     @property
     def noun(self) -> str:
@@ -58,7 +69,31 @@ class DocsPane(EditorPane):
     def update_picture(self) -> None:
         """A document keeps no pictures; the panel stays empty."""
 
-    # -- import and export: Word, .docs or Markdown files on this machine ---------------
+    # -- a document from anywhere on the cloud -------------------------------------------
+    def act_open_anywhere(self) -> None:
+        self.open_anywhere()
+
+    @work(group="ui")
+    async def open_anywhere(self) -> None:
+        answer = await self.app.push_screen_wait(
+            PromptModal(
+                f"Open {self.noun} from anywhere",
+                placeholder="my-files:Reports/Offer.docx",
+                detail="[dim]A share's name, a colon, and the file's path in it.[/]",
+            )
+        )
+        if not answer:
+            return
+        try:
+            record = await anywhere(self.api, self.model_id, answer.strip(), self.noun)
+        except SystemExit:
+            record = None
+        if record is None:
+            self.status(f"No {self.noun} at {answer.strip()}", error=True)
+            return
+        self.open_page(str(record["id"]))
+
+    # -- import and export: Word, PDF, .docs or Markdown files on this machine -----------
     @work(group="ui")
     async def import_file(self) -> None:
         answer = await self.app.push_screen_wait(
@@ -116,7 +151,7 @@ class DocsPane(EditorPane):
             PromptModal(
                 f"Export {self.current_path}",
                 value=str(default),
-                detail="[dim]As Word (.docx), .docs or Markdown (.md), by the name. An existing file is replaced.[/]",
+                detail="[dim]As Word (.docx), PDF, .docs or Markdown (.md), by the name. One there is replaced.[/]",
             )
         )
         if not answer:

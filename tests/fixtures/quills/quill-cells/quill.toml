@@ -19,7 +19,7 @@ kit = "sheet"
 label = "Cells"
 model = "file"
 where = { share = "my-files", within = "Documents" }
-suffix = ".cell"
+suffix = [".cell", ".xlsx"]
 title = "name"
 cells = "text"
 path = "path"
@@ -28,5 +28,5 @@ path = "path"
 id = "welcome"
 model = "file"
 seed = "per-owner"
-where = { share = "my-files", within = "Documents", suffix = ".cell" }
+where = { share = "my-files", within = "Documents", suffix = ".cell,.xlsx" }
 file = "datasets/welcome.toml"

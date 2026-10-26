@@ -70,7 +70,15 @@ def test_the_docs_screen_is_a_docs_pane():
     assert isinstance(pane, DocsPane)
     assert pane.filters == {"share": "my-files", "within": "Notes", "suffix": ".md,.docx"}
     assert pane.bound["suffix"] == ".md" and pane.bound["suffixes"] == [".md", ".docx"]
-    assert [a.id for a in pane.ACTIONS] == ["new_page", "new_folder", "search", "rename", "import_file", "export_file"]
+    assert [a.id for a in pane.ACTIONS] == [
+        "new_page",
+        "new_folder",
+        "search",
+        "rename",
+        "import_file",
+        "export_file",
+        "open_anywhere",
+    ]
     assert pane.noun == "document"
 
 

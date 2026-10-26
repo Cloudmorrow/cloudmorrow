@@ -148,3 +148,19 @@
   letter-spacing: 0.04em;
   vertical-align: middle;
 }
+
+/* A badge in the stamp under the title: a Word or Excel file, or where a
+   file opened from elsewhere lives (kit_docs.js, kit_cells.js). */
+.editor .stamp .badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+.editor .stamp .badge.where { text-transform: none; letter-spacing: 0; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }

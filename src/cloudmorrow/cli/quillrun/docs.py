@@ -12,11 +12,11 @@ from rich.table import Table
 # quillrun.out, .console and .emit, looked up as they print: see screen.py.
 from cloudmorrow.cli import quillrun
 from cloudmorrow.cli.common import edit_text, fail, stdin_is_a_terminal
-from cloudmorrow.cli.quillrun.cells import _moved_fields
+from cloudmorrow.cli.quillrun.cells import _moved_fields, anywhere
 from cloudmorrow.cli.quillrun.screen import Screen
 from cloudmorrow.client.api import ApiError, CloudmorrowClient
 from cloudmorrow.console import TITLE
-from cloudmorrow.quill import docs, docx
+from cloudmorrow.quill import convert, docs, docx
 from cloudmorrow.quill.screens import document_fields, listing_filters, page_fields, page_path, page_title
 
 WORD = ".docx"
@@ -89,16 +89,13 @@ def read_file(source: Path) -> docs.Doc:
 
 
 def write_file(doc: docs.Doc, target: Path) -> None:
-    """A document to a file on this machine, by its name: Word's, `.docs`, or Markdown."""
-    suffix = target.suffix.lower()
+    """A document to a file on this machine, by its name: Word's, PDF,
+    `.docs`, or Markdown (quill/convert.py), Markdown for a name that says
+    nothing."""
+    suffix = target.suffix.lower() if target.suffix.lower() in convert.DOCUMENT_FORMATS else ".md"
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        if suffix == WORD:
-            target.write_bytes(docx.write_docx(doc))
-        elif suffix == ".docs":
-            target.write_text(doc.to_text(), encoding="utf-8")
-        else:
-            target.write_text(docs.to_markdown(doc), encoding="utf-8")
+        target.write_bytes(convert.document_bytes(doc, suffix, target.stem))
     except OSError as exc:
         raise DocFileError(f"cannot write {target}: {exc.strerror or exc}") from None
 
@@ -160,7 +157,8 @@ async def _act_docs(
         made = await api.create_record(screen.model, {**page_fields(bound, path), body: doc.to_text()})
         quillrun.console.print(f"[green]{'Imported' if action == 'import' else 'Added'}[/] {escape(_key(bound, made))}")
         return
-    found = await api.record(screen.model, _find_doc(bound, records, args[0])["id"])
+    elsewhere = await anywhere(api, screen.model, args[0], "document")
+    found = await api.record(screen.model, (elsewhere or _find_doc(bound, records, args[0]))["id"])
     doc = _doc_of(bound, found)
     if action == "show":
         if plain:

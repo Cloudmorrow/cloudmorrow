@@ -19,6 +19,8 @@ are asked. A sheet you may only read shows, and nothing types into it.
 
 from __future__ import annotations
 
+from pathlib import Path, PurePosixPath
+
 from rich.text import Text
 from textual import work
 from textual.app import ComposeResult
@@ -29,8 +31,9 @@ from textual.message import Message
 from textual.timer import Timer
 from textual.widgets import DataTable, Input, Static
 
+from cloudmorrow.cli.quillrun.cells import anywhere
 from cloudmorrow.client.api import ApiError, AuthError
-from cloudmorrow.quill import cells
+from cloudmorrow.quill import cells, convert
 from cloudmorrow.quill.screens import listing_filters, page_fields, page_path, page_title, sheet_fields
 from cloudmorrow.tui.kitdata import is_conflict
 from cloudmorrow.tui.panes.kit import KitPane
@@ -89,6 +92,8 @@ class CellsPane(KitPane):
         ("ctrl+n", "fire('new_record')", "New"),
         ("ctrl+s", "fire('save')", "Save"),
         ("f2", "fire('rename')", "Rename"),
+        ("f5", "fire('open_anywhere')", "Open…"),
+        ("f7", "fire('export_file')", "Export"),
         ("delete", "fire('delete_record')", "Delete"),
     ]
     WRITING = frozenset({"new_record", "save", "rename", "delete_record"})
@@ -106,13 +111,18 @@ class CellsPane(KitPane):
                 Action("new_record", f"New {self.noun}", "^n", variant="primary"),
                 Action("save", "Save", "^s"),
                 Action("rename", "Rename", "f2"),
+                Action("open_anywhere", "Open…", "f5", hint="A sheet anywhere on the cloud: share:folder/name"),
+                Action("export_file", "Export", "f7", hint="Write the open sheet out as Excel, PDF or CSV"),
                 Action("delete_record", "Delete", "del"),
             ]
         )
         self.sheet = cells.Sheet()
-        # The sheet that is open: its id and its rev.
+        # The sheet that is open: its id and its rev; and whether it was
+        # opened from elsewhere, outside the list.
         self.current_id: str | None = None
         self.current_rev: object = None
+        self.current_title = ""
+        self.away = False
         self.dirty = False
         # A reference being pointed out on the line: where it is written in
         # the text (start, end), and the cells it names (anchor, at).
@@ -193,8 +203,9 @@ class CellsPane(KitPane):
         if self.writes:
             empty = f"Nothing here yet — New {self.noun} starts one."
         self.status("" if self.records else empty, note=True)
-        # The one open may have gone, or come back with another rev.
-        if self.current_id and self.current_id not in {r["id"] for r in self.records}:
+        # The one open may have gone, or come back with another rev; one
+        # opened from elsewhere was never in the list.
+        if self.current_id and not self.away and self.current_id not in {r["id"] for r in self.records}:
             self.forget_open()
 
     def card_status(self) -> tuple[str, str] | None:
@@ -233,16 +244,22 @@ class CellsPane(KitPane):
     def _show(self, record: dict) -> None:
         self.current_id = str(record["id"])
         self.current_rev = record.get("rev")
+        self.current_title = self.title_of(record)
+        self.away = self.current_id not in {r["id"] for r in self.records}
         self.dirty = False
         self.point = None
         self.sheet = cells.Sheet.from_text((record.get("fields") or {}).get(self.cells_field))
         self.draw_grid(keep=(0, 0))
-        self.query_one("#cells-name", Static).update(f"[{SECOND}]{self.title_of(record)}[/]")
+        fields = record.get("fields") or {}
+        where = f"  [{MUTED}]{fields.get('share', '')}:{fields.get('path', '')}[/]" if self.away else ""
+        self.query_one("#cells-name", Static).update(f"[{SECOND}]{self.title_of(record)}[/]{where}")
         self.status()
 
     def forget_open(self) -> None:
         self.current_id = None
         self.current_rev = None
+        self.current_title = ""
+        self.away = False
         self.dirty = False
         self.point = None
         self.sheet = cells.Sheet()
@@ -565,6 +582,63 @@ class CellsPane(KitPane):
             self.forget_open()
         self.reload()
         self.status(f"Deleted {self.title_of(record)}")
+
+    # -- a sheet from anywhere on the cloud, and the open one out as a file ---------------
+    def act_open_anywhere(self) -> None:
+        self.open_anywhere()
+
+    @work(group="ui")
+    async def open_anywhere(self) -> None:
+        answer = await self.app.push_screen_wait(
+            PromptModal(
+                f"Open {self.noun} from anywhere",
+                placeholder="my-files:Reports/Q3.xlsx",
+                detail="[dim]A share's name, a colon, and the file's path in it.[/]",
+            )
+        )
+        if not answer:
+            return
+        try:
+            record = await anywhere(self.api, self.model_id, answer.strip(), self.noun)
+        except SystemExit:
+            record = None
+        if record is None:
+            self.status(f"No {self.noun} at {answer.strip()}", error=True)
+            return
+        self.open_sheet(str(record["id"]))
+
+    def act_export_file(self) -> None:
+        self.export_file()
+
+    @work(group="ui")
+    async def export_file(self) -> None:
+        if self.current_id is None:
+            self.status("Nothing open to export.", error=True)
+            return
+        if self.dirty:
+            await self._save()
+        stem = PurePosixPath(self.current_title or "sheet").name
+        answer = await self.app.push_screen_wait(
+            PromptModal(
+                "Export the sheet",
+                value=str(Path.cwd() / f"{stem}.xlsx"),
+                detail="[dim]As Excel (.xlsx), PDF, CSV or .cell, by the name. An existing file is replaced.[/]",
+            )
+        )
+        if not answer:
+            return
+        target = Path(answer).expanduser()
+        try:
+            data = convert.sheet_bytes(self.sheet, target.suffix, target.stem)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+        except convert.ConvertError as exc:
+            self.status(str(exc), error=True)
+            return
+        except OSError as exc:
+            self.status(f"cannot write {target}: {exc.strerror or exc}", error=True)
+            return
+        self.status(f"Wrote {target}")
 
     # -- the status line the workspace shows for this pane ---------------------------------
     def status_detail(self) -> str:

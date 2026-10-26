@@ -81,6 +81,13 @@ def test_export_writes_word_and_import_reads_it(cm, tmp_path):
     md = tmp_path / "Welcome.md"
     cm("export", "Welcome", str(md))
     assert md.read_text(encoding="utf-8").startswith("# Welcome to Docs\n")
+    pdf = tmp_path / "Welcome.pdf"
+    cm("export", "Welcome", str(pdf))
+    assert pdf.read_bytes().startswith(b"%PDF-")
+    # A document anywhere on the cloud, by share:path.
+    assert cm("show", "my-files:Documents/Welcome.docs").startswith("# Welcome to Docs\n")
+    with pytest.raises(typer.Exit):
+        cm("show", "my-files:Documents/Nope.docs")
     # Imported, a Word file becomes a document; a Markdown file too.
     assert "Imported Again" in cm("import", str(target), "Again")
     assert json.loads(cm("show", "Again", raw=True))["blocks"] == welcome.blocks

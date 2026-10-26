@@ -42,7 +42,7 @@ def test_nothing_in_the_sheet_is_named_for_one_quill():
 
 def test_it_reads_the_bindings_and_writes_only_where_it_may():
     code = js_code(CELLS_JS)
-    for binding in ("screen.title", "screen.cells", "screen.path", "screen.where", "screen.suffix"):
+    for binding in ("screen.title", "screen.cells", "screen.path", "screen.where", "suffixesOf(screen)"):
         assert binding in code, binding
     assert "writes: mayWrite(model)" in code
     assert ".access" not in code
@@ -87,7 +87,7 @@ def test_the_record_calls_it_makes_exist(client):
         "label": "Cells",
         "model": "file",
         "where": {"share": "my-files", "within": "Documents"},
-        "suffix": ".cell",
+        "suffix": [".cell", ".xlsx"],
         "title": "name",
         "cells": "text",
         "path": "path",
@@ -95,7 +95,7 @@ def test_the_record_calls_it_makes_exist(client):
     assert next(f for f in quill["models"]["file"]["fields"] if f["name"] == "text")["kind"] == "text"
     # The welcome sheet is seeded the first time the folder is listed; a
     # listing leaves the text out, and reading one file gives it.
-    listing = "/api/records/file?share=my-files&within=Documents&suffix=.cell"
+    listing = "/api/records/file?share=my-files&within=Documents&suffix=.cell,.xlsx"
     rows = client.get(listing, headers=auth).json()
     assert [r["fields"]["path"] for r in rows] == ["Documents/Budget.cell"]
     assert rows[0]["fields"]["text"] is None
@@ -123,3 +123,52 @@ def test_the_record_calls_it_makes_exist(client):
         "Documents/Budget.cell",
         "Documents/Costs.cell",
     ]
+
+
+def test_an_excel_file_is_a_sheet_and_export_hands_one_over(client):
+    """An .xlsx under the folder is listed as a sheet and read as a .cell
+    file's text; writing the text writes Excel's package; /export makes
+    Excel, PDF or CSV from any sheet."""
+    from cloudmorrow.quill import cells, xlsx
+
+    client.app.state.cloudmorrow.quills.install_from_catalog("cells")
+    auth = {"Authorization": f"Bearer {token_for(client, *ADMIN)}"}
+    listing = "/api/records/file?share=my-files&within=Documents&suffix=.cell,.xlsx"
+    budget = client.get(listing, headers=auth).json()[0]
+    trip = cells.Sheet({"A1": "Fuel", "B1": "80", "B2": "=B1*2"})
+    trip.set_border("B2", ["top"])
+    put = client.post(
+        "/api/records/file/upload?share=my-files&folder=Documents&name=Trip.xlsx",
+        headers={**auth, "Content-Type": "application/octet-stream"},
+        content=xlsx.write_xlsx(trip),
+    )
+    assert put.status_code in (200, 201), put.text
+    rows = client.get(listing + "&previews=true", headers=auth).json()
+    assert sorted(r["fields"]["path"] for r in rows) == ["Documents/Budget.cell", "Documents/Trip.xlsx"]
+    excel = next(r for r in rows if r["fields"]["path"].endswith(".xlsx"))
+    assert excel["preview"] == "Fuel · 80 · 160"
+    got = client.get(f"/api/records/file/{excel['id']}", headers=auth).json()
+    read = cells.Sheet.from_text(got["fields"]["text"])
+    assert read.cells == trip.cells and read.border("B2") == ["top"]
+    read.set("A2", "Snacks")
+    saved = client.patch(
+        f"/api/records/file/{excel['id']}", headers=auth, json={"fields": {"text": read.to_text()}, "rev": got["rev"]}
+    )
+    assert saved.status_code == 200, saved.text
+    raw = client.get(f"/api/records/file/{excel['id']}/content", headers=auth).content
+    assert raw[:2] == b"PK" and xlsx.read_xlsx(raw).cells == read.cells
+    # A search finds what was typed into an Excel file too.
+    hits = client.get(listing + "&q=snacks", headers=auth).json()
+    assert [r["fields"]["path"] for r in hits] == ["Documents/Trip.xlsx"]
+    # Export: the budget as Excel, PDF and CSV; an Excel file as itself.
+    base = f"/api/records/file/{budget['id']}/export"
+    out = client.get(base + "?as=xlsx", headers=auth)
+    assert out.status_code == 200 and 'filename="Budget.xlsx"' in out.headers["content-disposition"]
+    assert xlsx.read_xlsx(out.content).raw("B5") == "=SUM(B1:B3)"
+    pdf = client.get(base + "?as=pdf", headers=auth)
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF-")
+    csv = client.get(base + "?as=csv", headers=auth)
+    assert csv.status_code == 200 and csv.text.splitlines()[0].startswith("Rent,")
+    assert client.get(base + "?as=docx", headers=auth).status_code == 400
+    same = client.get(f"/api/records/file/{excel['id']}/export?as=xlsx", headers=auth)
+    assert same.content == raw

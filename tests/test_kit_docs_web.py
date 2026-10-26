@@ -20,6 +20,8 @@ DOCS_JS = (WEB / "kit_docs.js").read_text(encoding="utf-8")
 RULES_JS = (WEB / "kit_docs_rules.js").read_text(encoding="utf-8")
 DOCS_CSS = (WEB / "kit_docs.css").read_text(encoding="utf-8")
 KIT_JS = (WEB / "kit.js").read_text(encoding="utf-8")
+EDITOR_JS = (WEB / "kit_editor.js").read_text(encoding="utf-8")
+PICK_JS = (WEB / "filepick.js").read_text(encoding="utf-8")
 
 
 def test_the_document_is_its_own_file_drawn_from_the_kit(client):
@@ -61,6 +63,19 @@ def test_it_never_opens_a_browser_window():
     assert 'from "./dialog.js"' in DOCS_JS
 
 
+def test_the_picker_is_generic_and_asks_in_the_sheet():
+    """filepick.js opens a file from anywhere: the shares, then folders, then
+    files of the suffixes wanted — in dialog.js's sheet, named for no Quill."""
+    code = js_code(PICK_JS)
+    assert 'from "./dialog.js"' in PICK_JS and "openSheet(" in code
+    assert not re.search(r"(?<![.\w])(confirm|prompt|alert)\(", code)
+    for word in ("Documents", "Docs", "Cells", "Welcome"):
+        assert word not in code, word
+    assert 'recordsUrl("share")' in code
+    assert 'e.fields.kind === "folder"' in code
+    assert '@import "./filepick.css";' in (WEB / "app.css").read_text(encoding="utf-8")
+
+
 def test_the_calls_it_makes_are_the_record_apis():
     code = js_code(DOCS_JS)
     # A document saves its file's text with the revision it read, and shows theirs on a 409.
@@ -68,8 +83,10 @@ def test_the_calls_it_makes_are_the_record_apis():
     assert "err.status === 409 && err.detail && err.detail.current" in code
     assert 'api("POST", recordsUrl(b.model.id), { fields })' in code
     assert 'api("DELETE", recordsUrl(b.model.id, ed.id))' in code
-    # Export fetches the Word file's bytes the way the files grid does.
-    assert 'apiRaw("GET", recordsUrl(b.model.id, target.id) + "/content"' in code
+    # Export is the record API's /export, through the editor kit's download; Open is the picker's.
+    assert "download(ed.b, ed.id, suffix, ed.stem + suffix)" in code
+    assert 'from "./filepick.js"' in code and "pickFile({ suffixes: b.suffixes" in code
+    assert '"/export?as=" + encodeURIComponent(suffix' in js_code(EDITOR_JS)
     # The list is the editor's, over these files.
     assert "listView(b, await load(b), key)" in code
 
@@ -152,3 +169,51 @@ def test_the_record_calls_it_makes_exist(client):
         "Documents/Welcome.docs",
         "Documents/Welcome.docx",
     ]
+
+
+def test_export_hands_a_document_over_in_another_shape(client):
+    """/export makes Word, PDF, Markdown or .docs from a document's text — and
+    hands a Word file over as itself — with a name to save it by."""
+    client.app.state.cloudmorrow.quills.install_from_catalog("docs")
+    auth = {"Authorization": f"Bearer {token_for(client, *ADMIN)}"}
+    listing = "/api/records/file?share=my-files&within=Documents&suffix=.docs,.docx"
+    welcome = client.get(listing, headers=auth).json()[0]
+    text = client.get(f"/api/records/file/{welcome['id']}", headers=auth).json()["fields"]["text"]
+    base = f"/api/records/file/{welcome['id']}/export"
+    word = client.get(base + "?as=docx", headers=auth)
+    assert word.status_code == 200, word.text
+    assert word.headers["content-type"].startswith("application/vnd.openxmlformats")
+    assert 'filename="Welcome.docx"' in word.headers["content-disposition"]
+    assert docx.read_docx(word.content).blocks == docs.Doc.from_text(text).blocks
+    pdf = client.get(base + "?as=.pdf", headers=auth)
+    assert pdf.status_code == 200 and pdf.headers["content-type"] == "application/pdf"
+    assert pdf.content.startswith(b"%PDF-") and 'filename="Welcome.pdf"' in pdf.headers["content-disposition"]
+    md = client.get(base + "?as=md", headers=auth)
+    assert md.status_code == 200 and md.text.startswith("# Welcome to Docs\n")
+    same = client.get(base + "?as=docs", headers=auth)
+    assert same.status_code == 200 and same.text == text
+    # Not a shape a document takes, or no shape at all: said so.
+    assert client.get(base + "?as=xlsx", headers=auth).status_code == 400
+    assert "goes out as" in client.get(base, headers=auth).json()["detail"]
+    # A Word file asked for as Word is its own bytes, untouched.
+    package = docx.write_docx(docs.Doc([{"kind": "paragraph", "runs": [{"text": "Hi"}]}]))
+    put = client.post(
+        "/api/records/file/upload?share=my-files&folder=Documents&name=Hi.docx",
+        headers={**auth, "Content-Type": "application/octet-stream"},
+        content=package,
+    )
+    assert put.status_code in (200, 201), put.text
+    again = client.get(f"/api/records/file/{put.json()['id']}/export?as=docx", headers=auth)
+    assert again.content == package
+    # Opened from anywhere: a document in another folder, or another share, is
+    # read and written by its record like one under Documents.
+    made = client.post(
+        "/api/records/file",
+        headers=auth,
+        json={"fields": {"share": "my-files", "path": "Plans/Offer.docs", "text": text}},
+    )
+    assert made.status_code == 201, made.text
+    away = client.get(f"/api/records/file/{made.json()['id']}", headers=auth).json()
+    assert away["fields"]["path"] == "Plans/Offer.docs" and away["fields"]["text"] == text
+    assert client.get(f"/api/records/file/{made.json()['id']}/export?as=pdf", headers=auth).status_code == 200
+    assert client.get("/api/records/share", headers=auth).json()[0]["fields"]["label"] == "My Files"

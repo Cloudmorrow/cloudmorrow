@@ -183,7 +183,14 @@ def test_the_cells_screen_is_a_cells_pane():
     assert isinstance(pane, CellsPane)
     assert (pane.title_field, pane.cells_field) == ("name", "text")
     assert pane.filters == {"share": "my-files", "within": ROOT, "suffix": SUFFIX}
-    assert [a.id for a in pane.ACTIONS] == ["new_record", "save", "rename", "delete_record"]
+    assert [a.id for a in pane.ACTIONS] == [
+        "new_record",
+        "save",
+        "rename",
+        "open_anywhere",
+        "export_file",
+        "delete_record",
+    ]
 
 
 async def test_the_sheets_are_listed_and_one_opens_worked_out(app):
@@ -324,7 +331,8 @@ async def test_read_only_shows_and_takes_nothing(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_cells(app, pilot)
         pane = screen.query_one(CellsPane)
-        assert not pane.writes and [a.id for a in pane.ACTIONS] == []
+        # Reading sheets still opens one from anywhere, and exports it.
+        assert not pane.writes and [a.id for a in pane.ACTIONS] == ["open_anywhere", "export_file"]
         pane.open_sheet(files.id_of("Budget"))
         await settle(app, pilot)
         assert str(pane.query_one(SheetGrid).get_cell("3", "B")) == "1650"

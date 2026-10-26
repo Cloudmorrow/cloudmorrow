@@ -12,8 +12,11 @@
    of the browser's own markup is saved.
 
    The page saves as you type; changing the title renames the file; one
-   changed elsewhere since it was opened is not written over. Export writes
-   a Word file beside the document, and hands it over to save.
+   changed elsewhere since it was opened is not written over. Open picks a
+   document from anywhere on the cloud — another folder, a fileshare —
+   through filepick.js, and it opens here by its record, wherever it is.
+   Export hands the document over to save as Word, PDF or Markdown, made
+   by the server from the same blocks (the record API's /export).
 
    The addresses, under the screen's own (quills.js):
      #/q/<quill>/<screen>                the folders, every document, or one folder's
@@ -21,22 +24,23 @@
      #/r/<quill>/<screen>/<model>/<id>   a document */
 
 import {
-  SAVE_DELAY, api, apiRaw, app, back, baseName, esc, fileStem, folderOf, formatDate, icons, joinPath, mount,
+  SAVE_DELAY, api, app, back, baseName, esc, fileStem, folderOf, formatDate, go, icons, joinPath, mount,
   nav, occupy, previousHash, recordsUrl, renderRoute, replace, seconds, setStatus, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { mayWrite } from "./kit.js";
 import {
-  NEW, TOP, aOr, fixedFields, foldButton, folded, lastList, listHash, listView, load, sideBack,
-  suffixesOf, trimSlashes, underRoot, wholePath, wide, wireFold, withSuffix, withoutSuffix,
+  NEW, TOP, aOr, download, fixedFields, foldButton, folded, lastList, listHash, listView, load, openButton,
+  ownIcons, placeOf, sideBack, suffixesOf, trimSlashes, underRoot, wholePath, wide, wireFold, withSuffix,
+  withoutSuffix,
 } from "./kit_editor.js";
 import { Doc, block, run } from "./kit_docs_rules.js";
 import { ask, askText } from "./dialog.js";
+import { choose } from "./actions.js";
+import { pickFile } from "./filepick.js";
 
 const WORD = ".docx";
-
-const own = {
-  word: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8 13l1.5 5 1.5-4 1.5 4 1.5-5"/></svg>',
-};
+// What a document goes out as, by suffix: what the server's /export makes.
+const EXPORTS = [[".docx", "Word"], [".pdf", "PDF"], [".md", "Markdown"]];
 
 // -- the screen's bindings ---------------------------------------------------------
 function bind(at) {
@@ -85,18 +89,29 @@ export async function renderDocs(at, arg) {
   const key = b.path ? arg : "";
   lastList.set(at.tab, key);
   const view = listView(b, await load(b), key);
+  const right = openButton(b);
   if (wide()) {
-    mount(nav({ title: view.title }) + `
+    mount(nav({ title: view.title, right }) + `
       <main class="split">
         <section class="side">${sideBack(view)}${view.html}</section>
         <section class="page"><p class="empty mascot"><b>Nothing open</b>Choose ${esc(aOr(b.noun))} on the left${
-          b.writes ? ", or start one with the pen" : ""}.</p></section>
+          b.writes ? ", or start one with the pen" : ""}, or open one from anywhere with the folder.</p></section>
       </main>` + tabs(at.tab));
   } else {
-    mount(nav({ back: view.backTo, backLabel: view.backLabel, title: view.title }) + `<main>${view.html}</main>` + tabs(at.tab));
+    mount(nav({ back: view.backTo, backLabel: view.backLabel, title: view.title, right }) +
+      `<main>${view.html}</main>` + tabs(at.tab));
   }
   wireShell();
   view.wire(app.querySelector("main"));
+  app.querySelector(".nav .open").addEventListener("click", () => openOther(b));
+}
+
+// -- opening from anywhere ------------------------------------------------------------
+// A document picked from any share and folder opens by its record: the
+// page is the same, and the file stays where it is.
+async function openOther(b) {
+  const picked = await pickFile({ suffixes: b.suffixes, title: `Open ${aOr(b.noun)}`, model: b.model.id });
+  if (picked) go(pageHash(b, picked.id));
 }
 
 /** One document: the kit's own page, in place of the record sheet. */
@@ -266,8 +281,10 @@ function pageState(b, record) {
   const name = String(record.fields[b.title] || "").trim();
   const stem = withoutSuffix(b, name) || baseName(withoutSuffix(b, underRoot(b, record.fields[b.path])));
   const path = b.path ? withoutSuffix(b, underRoot(b, record.fields[b.path])) : stem;
+  // Where it is, when that is not the screen's own folder: opened from elsewhere.
+  const where = placeOf(b, record);
   return {
-    id: record.id, stem, folder: b.path ? folderOf(path) : "", rev: record.rev, word: isWord(name),
+    id: record.id, stem, folder: b.path && !where ? folderOf(path) : "", where, rev: record.rev, word: isWord(name),
     doc: Doc.fromText(record.fields[b.body]),
     modified: seconds(record.updated_at) || Date.now() / 1000,
   };
@@ -290,7 +307,8 @@ const toolbar = () => `<div class="doc-tools" role="toolbar">${TOOLS.map(([kind,
 
 async function renderPage(b, { record = null, isNew = false, folder = "", arg }) {
   const ed = isNew
-    ? { isNew: true, created: false, id: "", stem: "", folder, rev: null, word: false, doc: new Doc(), modified: Date.now() / 1000 }
+    ? { isNew: true, created: false, id: "", stem: "", folder, where: "", rev: null, word: false, doc: new Doc(),
+        modified: Date.now() / 1000 }
     : { isNew: false, created: false, ...pageState(b, record) };
   Object.assign(ed, { b, arg, dirty: false, saving: false, pending: false, timer: null });
   open = ed;
@@ -306,14 +324,15 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
     ? listHash(b, ed.folder || (previousHash() === listHash(b, TOP) ? TOP : listKey))
     : listHash(b, "");
   const parentLabel = ed.folder ? baseName(ed.folder) : b.label;
-  const actions = `<button class="done strong" hidden>Done</button>` +
-    (ed.isNew ? "" : `<button class="word" aria-label="Export to Word" title="Export to Word">${own.word}</button>`) +
+  const actions = `<button class="done strong" hidden>Done</button>` + openButton(b) +
+    (ed.isNew ? "" : `<button class="export" aria-label="Export" title="Export">${ownIcons.export}</button>`) +
     (b.writes ? `<button class="delete" aria-label="Delete ${esc(b.noun)}">${icons.trash}</button>` : "");
   const page = `
       <div class="editor doc${b.writes ? "" : " read-only"}">
         <input class="title" placeholder="Title" value="${esc(ed.isNew ? "" : ed.stem)}" autocapitalize="sentences" enterkeyhint="next"${b.writes ? "" : " readonly"}>
         <p class="stamp"><span class="when">${esc(formatDate(ed.modified, { long: true }))}</span>${
-          ed.word ? `<span class="badge">Word</span>` : ""}<span class="status"></span></p>
+          ed.word ? `<span class="badge">Word</span>` : ""}${
+          ed.where ? `<span class="badge where">${esc(ed.where)}</span>` : ""}<span class="status"></span></p>
         ${b.writes ? toolbar() : ""}
         <div class="doc-body" ${b.writes ? 'contenteditable="true"' : ""} spellcheck="true">${blocksHtml(ed.doc.blocks)}</div>
       </div>`;
@@ -338,8 +357,17 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
   ed.bodyEl = box.querySelector(".doc-body");
   const done = app.querySelector(".nav .done");
   const del = app.querySelector(".nav .delete");
-  const word = app.querySelector(".nav .word");
-  if (word) word.addEventListener("click", () => exportWord(ed));
+  const openEl = app.querySelector(".nav .open");
+  const exportEl = app.querySelector(".nav .export");
+  openEl.addEventListener("click", () => openOther(b));
+  if (exportEl) exportEl.addEventListener("click", () => exportMenu(ed));
+  // While the page is being typed in, the bar is Done's.
+  const editing = (on) => {
+    done.hidden = !on;
+    openEl.hidden = on;
+    if (del) del.hidden = on;
+    if (exportEl) exportEl.hidden = on;
+  };
 
   ed.changed = () => {
     ed.dirty = true;
@@ -385,11 +413,9 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
     }
     ed.changed();
   });
-  box.addEventListener("focusin", () => { done.hidden = false; if (del) del.hidden = true; if (word) word.hidden = true; });
+  box.addEventListener("focusin", () => editing(true));
   box.addEventListener("focusout", () => {
-    setTimeout(() => {
-      if (!box.contains(document.activeElement)) { done.hidden = true; if (del) del.hidden = false; if (word) word.hidden = false; }
-    }, 0);
+    setTimeout(() => { if (!box.contains(document.activeElement)) editing(false); }, 0);
     if (ed.dirty) { clearTimeout(ed.timer); savePage(ed); }
   });
   done.addEventListener("click", () => document.activeElement && document.activeElement.blur());
@@ -499,50 +525,21 @@ async function renameTo(ed, stem) {
   }
 }
 
-// -- Word ----------------------------------------------------------------------------------
-// The document as a Word file beside it — `Letter.docx` next to
-// `Letter.docs`, in the same folder, the server writing Word's package
-// from the same blocks — and handed over to save. A document that is a
-// Word file already is simply handed over.
-async function exportWord(ed) {
-  const { b } = ed;
+// -- export ---------------------------------------------------------------------------------
+// The document handed over to save in another shape — Word, PDF, Markdown
+// — made by the server from the same blocks; a document that is a Word
+// file already is handed over as it is. Nothing is written beside it.
+function exportMenu(ed) {
   if (ed.isNew) return;
+  choose("Export as", EXPORTS.map(([suffix, label]) => ({ label, run: () => exportAs(ed, suffix) })));
+}
+
+async function exportAs(ed, suffix) {
   if (ed.dirty) { clearTimeout(ed.timer); await savePage(ed); }
   while (ed.saving) await new Promise((r) => setTimeout(r, 50));
-  let target = ed.word ? { id: ed.id, name: ed.stem + WORD } : null;
-  if (!target) {
-    const name = ed.stem + WORD;
-    const path = (b.root ? b.root + "/" : "") + joinPath(ed.folder, name);
-    const fields = { ...fixedFields(b), [b.path || b.title]: b.path ? path : name, [b.body]: ed.doc.toText() };
-    try {
-      const made = await api("POST", recordsUrl(b.model.id), { fields });
-      target = { id: made.id, name };
-    } catch (err) {
-      if (err.status !== 400 || !/already/.test(err.message)) { toast(err.message); return; }
-      // There is one by that name already: written over, if they say so.
-      if (!await ask(`Replace ${name}?`, { yes: "Replace" })) return;
-      const folder = (b.root ? b.root + "/" : "") + ed.folder;
-      const query = "?" + new URLSearchParams({ ...fixedFields(b), folder: folder.replace(/\/$/, "") }).toString();
-      let there = null;
-      try { there = (await api("GET", recordsUrl(b.model.id, "", query))).find((r) => String(r.fields[b.title] || "") === name); }
-      catch { /* said below */ }
-      if (!there) { toast(`Could not find ${name}`); return; }
-      try { await api("PATCH", recordsUrl(b.model.id, there.id), { fields: { [b.body]: ed.doc.toText() } }); }
-      catch (err2) { toast(err2.message); return; }
-      target = { id: there.id, name };
-    }
-  }
   try {
-    const res = await apiRaw("GET", recordsUrl(b.model.id, target.id) + "/content", { fail: "Could not fetch it" });
-    const url = URL.createObjectURL(await res.blob());
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = target.name;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    toast(ed.word ? `Saved ${target.name}` : `${target.name} is beside it, and saved`);
+    await download(ed.b, ed.id, suffix, ed.stem + suffix);
+    toast(`Saved ${ed.stem}${suffix}`);
   } catch (err) { toast(err.message); }
 }
 

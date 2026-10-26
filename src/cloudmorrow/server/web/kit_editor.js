@@ -30,7 +30,7 @@
      #/r/<quill>/<screen>/<model>/<id>   a page */
 
 import {
-  SAVE_DELAY, SEARCH_DELAY, api, app, back, baseName, encodePath, esc, fileStem, folderOf,
+  SAVE_DELAY, SEARCH_DELAY, api, apiRaw, app, back, baseName, encodePath, esc, fileStem, folderOf,
   formatDate, heading, icons, joinPath, mount, nav, occupy, previousHash, recordsUrl, renderRoute,
   replace, seconds, sectionOf, setStatus, store, tabs, toast, vacate, wireShell,
 } from "./core.js";
@@ -44,7 +44,46 @@ const own = {
   pages: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M6.5 7h7M6.5 10.5h7M6.5 14h4"/></svg>',
   folderSmall: '<svg width="14" height="12" viewBox="0 0 22 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h5l2 2.5h9a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H3a1.5 1.5 0 0 1-1.5-1.5z"/></svg>',
   newFolder: '<svg width="22" height="18" viewBox="0 0 22 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h5l2 2.5h9a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H3a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M11 7.5v6M8 10.5h6"/></svg>',
+  // Open from anywhere: a folder with a way out of it; Export: a way down to a line.
+  open: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10.5v6M9.5 13l2.5-2.5 2.5 2.5"/></svg>',
+  export: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>',
 };
+// The icons the kits over files share (kit_docs.js, kit_cells.js).
+export const ownIcons = own;
+
+/** The Open button a bar over files has: a file from anywhere on the cloud (filepick.js). */
+export const openButton = (b) =>
+  `<button class="open" aria-label="Open ${esc(aOr(b.noun))} from anywhere" title="Open from anywhere">${own.open}</button>`;
+
+/**
+ * Where a record's file is, when that is not under the screen's own root:
+ * `folder`, or `share/folder` in another share; "" at home.
+ */
+export function placeOf(b, record) {
+  const path = trimSlashes(record.fields[b.path || b.title] || "");
+  const share = String(record.fields.share || "");
+  const home = (!b.root || path.startsWith(b.root + "/")) && (!b.where.share || !share || share === b.where.share);
+  if (home) return "";
+  const folder = folderOf(path);
+  return share && share !== b.where.share ? share + (folder ? "/" + folder : "") : folder || "/";
+}
+
+/**
+ * The record's file in another shape, handed to the browser to save: the
+ * record API's /export, by suffix (`.pdf`), as *name*.
+ */
+export async function download(b, id, suffix, name) {
+  const res = await apiRaw("GET", recordsUrl(b.model.id, id) + "/export?as=" + encodeURIComponent(suffix.replace(/^\./, "")),
+    { fail: "Could not export it" });
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
 
 // A computer, by the same measure desktop.css draws its rail by.
 export const wide = () => matchMedia("(min-width: 900px) and (min-height: 600px)").matches;

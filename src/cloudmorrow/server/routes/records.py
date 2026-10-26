@@ -20,11 +20,13 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
+from cloudmorrow.server import pages
 from cloudmorrow.server.backends import AttachmentTooBig
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_current_user, get_principal, get_state
@@ -411,6 +413,30 @@ def record_content(
     # Someone's files: nobody's cache but the browser's own, and asked about
     # again next time — a cheap 304 when nothing changed.
     return FileResponse(path, media_type=media_type, headers=PRIVATE)
+
+
+@router.get("/{model}/{record_id}/export")
+def record_export(
+    model: str,
+    record_id: str,
+    fmt: str = Query("", alias="as"),
+    state: AppState = Depends(get_state),
+    principal: Principal = Depends(get_principal),
+) -> Response:
+    """The record's file in another shape, to save: a document as Word, PDF,
+    Markdown or `.docs` (docs/DOCS.md), a sheet as Excel, PDF, CSV or
+    `.cell` (docs/CELLS.md). `as` names the shape by its suffix: `as=pdf`."""
+    switched_on(state, model)
+    try:
+        path, _media_type = state.records.content(principal, model, record_id)
+        data, media_type, name = pages.export(path, fmt)
+    except pages.ExportError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    except ERRORS as exc:
+        raise http_error(exc) from exc
+    plain = name.encode("ascii", errors="replace").decode().replace('"', "")
+    headers = {**PRIVATE, "Content-Disposition": f"attachment; filename=\"{plain}\"; filename*=UTF-8''{quote(name)}"}
+    return Response(content=data, media_type=media_type, headers=headers)
 
 
 @router.post("/{model}/{record_id}/media")
