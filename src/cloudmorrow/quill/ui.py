@@ -214,8 +214,23 @@ def _columns(cols) -> list[dict]:
     return out
 
 
-def table(records, *, columns, open: bool = True, actions=(), empty: str = "") -> dict:  # noqa: A002
-    """Records, a row each. Opening a row shows its sheet; *actions* are ids, per row."""
+def table(
+    records,
+    *,
+    columns,
+    open: bool = True,  # noqa: A002
+    actions=(),
+    empty: str = "",
+    go: str | None = None,
+    param: str = "record",
+    params: dict | None = None,
+) -> dict:
+    """Records, a row each. Opening a row shows its sheet; *actions* are ids, per row.
+
+    With *go*, opening a row goes to that screen of this Quill instead, with
+    the row's id as the parameter *param* (and *params* besides): a list
+    whose rows open in a view of the Quill's own.
+    """
     return _node(
         "table",
         records=_records(records),
@@ -223,6 +238,9 @@ def table(records, *, columns, open: bool = True, actions=(), empty: str = "") -
         open=open,
         actions=list(actions),
         empty=empty,
+        go=go,
+        param=param if go else None,
+        params=dict(params) if go and params else None,
     )
 
 
@@ -235,8 +253,14 @@ def cards(
     badge: str | None = None,
     open: bool = True,  # noqa: A002
     empty: str = "",
+    go: str | None = None,
+    param: str = "record",
+    params: dict | None = None,
 ) -> dict:
-    """Records, a card each: *title*, *subtitle*, *body* and *badge* are field names."""
+    """Records, a card each: *title*, *subtitle*, *body* and *badge* are field names.
+
+    With *go*, opening a card goes to that screen, as a table's rows do.
+    """
     return _node(
         "cards",
         records=_records(records),
@@ -246,6 +270,9 @@ def cards(
         badge=badge,
         open=open,
         empty=empty,
+        go=go,
+        param=param if go else None,
+        params=dict(params) if go and params else None,
     )
 
 
@@ -339,6 +366,9 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
         "open": (bool, False),
         "actions": (list, False),
         "empty": (str, False),
+        "go": (str, False),
+        "param": (str, False),
+        "params": (dict, False),
     },
     "cards": {
         "records": (list, True),
@@ -348,6 +378,9 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
         "badge": (str, False),
         "open": (bool, False),
         "empty": (str, False),
+        "go": (str, False),
+        "param": (str, False),
+        "params": (dict, False),
     },
     "gallery": {
         "records": (list, True),
@@ -446,7 +479,7 @@ def check(tree, *, actions=None, screens=None) -> dict:
                 if actions is not None and name not in actions:
                     raise TreeError(f"{where}: {kind} runs {name!r}, which the manifest does not declare")
         if node.get("go") and screens is not None and node["go"] not in screens:
-            raise TreeError(f"{where}: button goes to {node['go']!r}, which is not a screen")
+            raise TreeError(f"{where}: {kind} goes to {node['go']!r}, which is not a screen")
         child_key = CONTAINERS.get(kind)
         if child_key:
             for i, child in enumerate(node[child_key]):

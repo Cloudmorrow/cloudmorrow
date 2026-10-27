@@ -120,3 +120,87 @@ def test_two_quills_with_code_in_one_interpreter_each_run_their_own(tmp_path):
         assert q.act("hello").toast == "other"
         assert fleet.act("add-van", name="Van").toast == "Added Van"
         assert q.act("hello").toast == "other"
+
+
+# -- spaces from code: a thread made shared with its people, and looked in ----------------
+def _letters(tmp_path):
+    """A Quill whose code makes a shared space with people in it, and writes in it."""
+    folder = tmp_path / "quill-letters"
+    (folder / "datamodels").mkdir(parents=True)
+    (folder / "quill.toml").write_text(
+        '[quill]\nid = "letters"\nname = "Letters"\nversion = "0.1.0"\ncode = "quill.py"\n'
+        '[[screens]]\nid = "post"\nlabel = "Post"\nview = "post"\nmodel = "letters.letter"\n'
+        '[[screens]]\nid = "one"\nlabel = "One"\nview = "one"\nmodel = "letters.letter"\n'
+        '[[actions]]\nid = "write"\nlabel = "Write"\n[actions.fields]\n'
+        'to = { kind = "string", required = true }\nsubject = { kind = "string", required = true }\n'
+        '[[actions]]\nid = "answer"\nlabel = "Answer"\non = "letters.letter"\n'
+        '[[actions]]\nid = "looked"\nlabel = "Looked"\non = "letters.letter"\n',
+        encoding="utf-8",
+    )
+    (folder / "datamodels" / "letter.toml").write_text(
+        '[datamodel]\nid = "letters.letter"\nversion = 1\nlabel = "Letter"\ndescription = "A letter."\n'
+        'scopes = ["personal", "shared"]\ntitle = "subject"\nspace = true\n'
+        '[fields]\nsubject = { kind = "string", required = true }\n',
+        encoding="utf-8",
+    )
+    (folder / "datamodels" / "line.toml").write_text(
+        '[datamodel]\nid = "letters.line"\nversion = 1\nlabel = "Line"\ndescription = "A line of a letter."\n'
+        'scopes = ["personal", "shared"]\ntitle = "body"\nin_space = "letter"\nauthored = true\n'
+        '[fields]\nletter = { kind = "link", to = "letters.letter", required = true, indexed = true, on_delete = "cascade" }\n'
+        'body = { kind = "text", required = true }\n'
+        '[[notify]]\nwhen = "created"\nto = "members"\nunread = true\n',
+        encoding="utf-8",
+    )
+    (folder / "quill.py").write_text(
+        "from cloudmorrow.quill import action, toast, ui, view\n\n"
+        "@action\ndef write(ctx, to, subject):\n"
+        "    people = [p for p in to.split(',') if p in ctx.people()]\n"
+        "    made = ctx.records.create('letters.letter', subject=subject, scope='shared', members=people)\n"
+        "    ctx.records.create('letters.line', letter=made.id, body='hello ' + ', '.join(people))\n"
+        "    return toast(f'{made.id}: {len(made.members)} people')\n\n"
+        "@action\ndef answer(ctx, letter):\n"
+        "    ctx.records.create('letters.line', letter=letter.id, body='and hello back')\n\n"
+        "@action\ndef looked(ctx, letter):\n"
+        "    ctx.records.seen('letters.letter', letter.id)\n\n"
+        "@view\ndef post(ctx):\n"
+        "    letters = ctx.records.list('letters.letter')\n"
+        "    return ui.stack(\n"
+        "        ui.text(', '.join(f'{x[\"subject\"]} {x.unread}' for x in letters)),\n"
+        "        ui.table(letters, columns=['subject'], go='one', param='letter'),\n"
+        "    )\n\n"
+        "@view\ndef one(ctx):\n"
+        "    return ui.text(ctx.params.get('letter') or '')\n",
+        encoding="utf-8",
+    )
+    return folder
+
+
+def test_code_makes_a_shared_space_with_its_people_and_sees_what_is_unread(tmp_path):
+    with Harness(_letters(tmp_path), datamodels=DATAMODELS) as q:
+        sam = q.as_user("sam")
+        kim = q.as_user("kim")
+        assert sorted(q.as_user("sam").act("write", to="kim,nobody", subject="Lunch").toast.split(": ")[1:]) == [
+            "1 people"
+        ]
+        (letter,) = kim.list("letters.letter")
+        assert letter["subject"] == "Lunch" and letter.scope == "shared" and sorted(letter.members) == ["kim"]
+        assert [line["body"] for line in kim.list("letters.line", letter=letter.id)] == ["hello kim"]
+        assert q.list("letters.letter") == []  # the administrator was not written to
+        # Written to, and not yet looked at: unread, until the code says the person looked.
+        assert "Lunch 1" in kim.view("post").text()
+        assert kim.act("looked", letter).ok
+        assert "Lunch 0" in kim.view("post").text()
+        # An answer in the same space reaches the writer, as news.
+        assert kim.act("answer", letter).ok
+        assert "Lunch 1" in sam.view("post").text()
+        # The table's rows go to the Quill's own screen, with the letter's id.
+        (table,) = kim.view("post").find("table")
+        assert table["go"] == "one" and table["param"] == "letter"
+        assert kim.view("one", letter=letter.id).text().strip() == letter.id
+
+
+def test_code_lists_everybody_on_the_server_but_the_person(tmp_path):
+    with Harness(_letters(tmp_path), datamodels=DATAMODELS) as q:
+        q.as_user("sam")
+        q.as_user("kim")
+        assert q.as_user("sam").act("write", to="kim,sam,admin", subject="Who").toast.endswith("1 people")

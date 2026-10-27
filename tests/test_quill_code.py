@@ -516,3 +516,17 @@ def test_in_the_sandbox_a_machine_handler_sees_only_its_folder(fleet, tmp_path, 
     (tmp_path / "quills").mkdir(exist_ok=True)
     (tmp_path / "quills" / "sandbox").symlink_to(runtime.parent, target_is_directory=True)
     assert machine.run("fleet", "import-exports") == {"made": 1}
+
+
+def test_a_table_or_cards_may_go_to_a_screen_of_the_quills_own():
+    from cloudmorrow.quill import ui
+    from cloudmorrow.quill.ui import TreeError
+
+    rows = [{"id": "r1", "model": "letter", "fields": {"subject": "Hi"}}]
+    table = ui.table(rows, columns=["subject"], go="one", param="letter", params={"folder": "inbox"})
+    assert table["go"] == "one" and table["param"] == "letter" and table["params"] == {"folder": "inbox"}
+    assert "go" not in ui.table(rows, columns=["subject"]) and "param" not in ui.table(rows, columns=["subject"])
+    assert ui.cards(rows, title="subject", go="one")["param"] == "record"
+    ui.check(ui.stack(table), actions=set(), screens={"one", "post"})
+    with pytest.raises(TreeError, match="goes to 'two'"):
+        ui.check(ui.stack(ui.cards(rows, title="subject", go="two")), actions=set(), screens={"one"})

@@ -226,9 +226,18 @@ class HostCalls:
 
     def op_records_create(self, args: dict) -> dict:
         record = self.state.records.create(
-            self.principal, self._model(args), dict(args.get("fields") or {}), index=args.get("index")
+            self.principal,
+            self._model(args),
+            dict(args.get("fields") or {}),
+            index=args.get("index"),
+            scope=str(args["scope"]) if args.get("scope") else None,
+            members=[str(m) for m in args.get("members") or ()],
+            announce=args.get("announce", True) is not False,
         )
         return self._out(record)
+
+    def op_records_seen(self, args: dict) -> None:
+        self.state.records.mark_seen(self.principal, self._model(args), str(args.get("id", "")))
 
     def op_records_patch(self, args: dict) -> dict:
         record = self.state.records.update(
@@ -255,10 +264,18 @@ class HostCalls:
 
     # -- roles and approvals -------------------------------------------------------------
     def op_people(self, args: dict) -> list[str]:
+        role = str(args.get("role", "") or "")
+        if not role:
+            # Everybody a space could be shared with: the people on this server, not them.
+            return sorted(
+                u.username
+                for u in self.state.users.list()
+                if u.is_active and u.user_type == "human" and u.username != self.principal.username
+            )
         roles = getattr(self.state, "roles", None)
         if roles is None:
             return []
-        return roles.people(str(args.get("role", "")), str(args.get("circle", "") or ""))
+        return roles.people(role, str(args.get("circle", "") or ""))
 
     def op_approvals_ask(self, args: dict) -> dict:
         approvals = getattr(self.state, "approvals", None)
