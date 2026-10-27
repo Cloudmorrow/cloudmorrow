@@ -111,8 +111,11 @@
 .row.elsewhere .icon { color: var(--muted); }
 .row.elsewhere .title { color: var(--ink); }
 
-/* The name of a place, and what is beside it, in the heading. */
-.heading .more { color: var(--accent); }
+/* The name of a place, and what is beside it, in the heading: the “…”,
+   at the top of a group the bin before the plus, and in the Trash Empty,
+   in the colour of what cannot be undone. */
+.heading .more, .heading .bin { color: var(--accent); }
+.heading .empty-trash { color: var(--bad); gap: 6px; }
 
 /* A record's own page: what can be done to it, under its facts. Delete
    is the one that cannot be undone, and says so in its colour. */

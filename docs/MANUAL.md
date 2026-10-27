@@ -2205,13 +2205,16 @@ in, and no rename, move or delete — the Files Quill's `group_writes` reads
 the share's `writable` field.
 
 **The Trash.** Deleting loses nothing yet: the file or folder moves to a
-`Trash` folder at the top of the share (My Files has one of its own), where
-its page says when it was deleted and where it was, and has **Restore** in
-place of Rename and Move — back to where it was, the folders made again if
-they are gone, the name numbered if it is taken since — and **Delete for
-good**. The “…” on a folder in the Trash offers the same two. Thirty days
-after something went to the Trash the server removes it for good; deleting
-the Trash folder itself empties it. Something put in the Trash another way
+`Trash` folder at the top of the share (My Files has one of its own). On
+the web it is not among the folders but the bin beside the plus; open it
+and what is in it is listed, with **Empty** beside the title to delete all
+of it for good, after a question. A deleted file's page says when it was
+deleted and where it was, and has **Restore** in place of Rename and Move
+— back to where it was, the folders made again if they are gone, the name
+numbered if it is taken since — and **Delete for good**. The “…” on a
+folder in the Trash offers the same two. Thirty days after something went
+to the Trash the server removes it for good; deleting the Trash folder
+itself — in the terminal, or on the command line — empties it. Something put in the Trash another way
 — over a mount — counts from when the server first sees it there, and is
 restored to the top of the share. A note deleted in Notes goes to My
 Files' Trash the same way.

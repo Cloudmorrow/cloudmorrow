@@ -272,14 +272,42 @@ def test_a_deleted_file_has_restore_and_a_delete_for_good():
     assert 'label: "Restore folder"' in folder and 'label: "Delete folder for good"' in folder
 
 
+def test_the_trash_is_a_bin_beside_the_plus_and_empties():
+    """The screen's `trash` names the folder the server keeps what is
+    deleted in. At the top of a group that folder is not listed but a bin
+    before the plus; in it, nothing goes in by the plus, a drop or a paste,
+    and Empty deletes the folder itself, which the server takes as
+    emptying it. Not there to list — never made, or emptied — it is there
+    to open, and empty."""
+    code = code_of(GRID_JS)
+    assert 'trash: screen.trash || ""' in code
+    folder = code[code.index("async function renderFolder(") : code.index("function photoName(")]
+    assert "const isTrash = Boolean(b.trash) && folder === b.trash;" in folder
+    assert "if (isTrash && (err.status === 404 || err.status === 400)) return [];" in folder
+    assert "entries.filter((e) => !(e.is_dir && e.name === b.trash))" in folder
+    assert 'class="button bin" href="${folderHash(at, group, b.trash)}"' in folder
+    assert '<button class="empty-trash" hidden>' in folder
+    assert "emptyEl.hidden = !sorted.length;" in folder
+    # Nothing is wired to take files in where nothing may go in.
+    stop = folder.index("if (!takesIn) return;")
+    assert folder.index('emptyEl.addEventListener("click", () => emptyTrash(place, reload))') < stop
+    for wired in ('.heading .add").addEventListener', 'addEventListener("drop"', "openFolder = { main: mainEl"):
+        assert stop < folder.index(wired), wired
+    empty = code[code.index("async function emptyTrash(") : code.index("async function folderEntry(")]
+    assert "const trash = await folderEntry(b, group, folder);" in empty
+    assert 'await api("DELETE", recordsUrl(b.model.id, trash.id));' in empty
+    assert ".heading .bin" in GRID_CSS and ".heading .empty-trash" in GRID_CSS
+
+
 # -- read is drawn as read (docs/CIRCLES.md) -----------------------------------------
 def test_a_folder_you_may_only_read_takes_nothing_in():
     code = code_of(GRID_JS)
     assert "writes: mayWrite(model)," in code
     # No plus, no folder menu, no file inputs.
-    assert '(b.writes ? `<button class="add"' in code
-    assert "const moreButton = folder && b.writes" in code
-    assert '${b.writes ? `<input type="file" class="pick-input"' in code
+    assert "const takesIn = b.writes && !inTrash;" in code
+    assert '(takesIn ? `<button class="add"' in code
+    assert "const moreButton = folder && b.writes && !isTrash" in code
+    assert '${takesIn ? `<input type="file" class="pick-input"' in code
     # Dropping and pasting are wired after this, and not at all when read.
     folder = code[code.index("async function renderFolder(") : code.index("function photoName(")]
     stop = folder.index("if (!b.writes) return;")

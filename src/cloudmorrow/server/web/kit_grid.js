@@ -25,6 +25,10 @@
    when it went, `deleted_from` where it was — has Restore in place of
    Rename and Move, and a Delete that is for good. The server sweeps the
    Trash of what has sat there a month; the kit only draws what it says.
+   The screen's `trash` names the folder at the top of a group the server
+   keeps it in: that one is not among the folders but a bin before the
+   plus, and in it an Empty button in place of the “…”, which deletes the
+   folder itself — what the server takes as emptying it.
 
    A group whose `group_open` field is false is listed and not opened — it
    is somewhere this server cannot show — with its `group_subtitle` saying
@@ -99,6 +103,7 @@ function bind(at) {
     mime: screen.mime || "",
     deleted: screen.deleted || "",
     deletedFrom: screen.deleted_from || "",
+    trash: screen.trash || "",
     groupTitle: groupModel.title,
     groupSubtitle: screen.group_subtitle || "",
     groupOpen: screen.group_open || "",
@@ -280,9 +285,21 @@ async function listFolder(b, group, folder) {
 }
 
 async function renderFolder(at, b, group, folder) {
+  // The Trash is made by the first delete and goes when it is emptied: not
+  // there to list, it is there to open, and empty.
+  const isTrash = Boolean(b.trash) && folder === b.trash;
+  const inTrash = Boolean(b.trash) && (isTrash || folder.startsWith(b.trash + "/"));
+  const list = async () => {
+    try {
+      return await listFolder(b, group, folder);
+    } catch (err) {
+      if (isTrash && (err.status === 404 || err.status === 400)) return [];
+      throw err;
+    }
+  };
   let entries;
   try {
-    entries = await listFolder(b, group, folder);
+    entries = await list();
   } catch (err) {
     // Gone, or a place this server cannot show after all: back a step.
     if (err.status === 404 || err.status === 400) {
@@ -299,17 +316,24 @@ async function renderFolder(at, b, group, folder) {
   const parent = folder ? folderHash(at, group, folderOf(folder)) : at.base;
   const parentLabel = folder ? (folderOf(folder) ? baseName(folderOf(folder)) : groupName) : at.screen.label;
   const title = folder ? baseName(folder) : groupName;
-  const moreButton = folder && b.writes
+  // Nothing goes into the Trash, or into what is in it, but by being deleted.
+  const takesIn = b.writes && !inTrash;
+  const moreButton = folder && b.writes && !isTrash
     ? `<button class="more" aria-label="${esc(title)}: rename, move or delete">${own.more}</button>` : "";
+  // At the top of a group the Trash is a bin, not a folder; in it, Empty.
+  const binButton = !folder && b.trash
+    ? `<a class="button bin" href="${folderHash(at, group, b.trash)}" aria-label="${esc(b.trash)}">${icons.trash}</a>` : "";
+  const emptyButton = isTrash && b.writes
+    ? `<button class="empty-trash" hidden>${icons.trash}<span>Empty</span></button>` : "";
   mount(nav({ back: parent, backLabel: parentLabel, title }) + `
     <main>
-      ${heading(title, moreButton + (b.writes ? `<button class="add" aria-label="Add">${own.plus}</button>` : ""))}
+      ${heading(title, moreButton + binButton + emptyButton + (takesIn ? `<button class="add" aria-label="Add">${own.plus}</button>` : ""))}
       <div class="sort-row">
         <div class="sort" role="group" aria-label="Sort by"></div>
         <div class="view-switch" role="group" aria-label="Show as"></div>
       </div>
       <div class="listing"></div>
-      ${b.writes ? `<input type="file" class="pick-input" multiple hidden>
+      ${takesIn ? `<input type="file" class="pick-input" multiple hidden>
       <input type="file" class="camera-input" accept="image/*" capture="environment" hidden>` : ""}
     </main>` + tabs(at.tab));
   wireShell();
@@ -317,6 +341,9 @@ async function renderFolder(at, b, group, folder) {
   const sortEl = app.querySelector(".sort");
   const viewEl = app.querySelector(".view-switch");
   const listingEl = app.querySelector(".listing");
+  const emptyEl = app.querySelector(".heading .empty-trash");
+  // The Trash is drawn beside the title, not among the folders.
+  const shown = () => (folder || !b.trash ? entries : entries.filter((e) => !(e.is_dir && e.name === b.trash)));
   let choice = sortChoice(at);
   let view = viewChoice(at);
 
@@ -356,9 +383,12 @@ async function renderFolder(at, b, group, folder) {
     viewEl.innerHTML = VIEWS.map(([key, label]) =>
       `<button class="${key === view ? "active" : ""}" data-view="${key}" aria-pressed="${key === view}" aria-label="${label}">${own[key]}</button>`).join("");
     if (watcher) { watcher.disconnect(); watcher = null; }
-    const sorted = sortEntries(entries, choice);
+    const sorted = sortEntries(shown(), choice);
+    if (emptyEl) emptyEl.hidden = !sorted.length;
     if (!sorted.length) {
-      listingEl.innerHTML = `<p class="empty mascot"><b>Nothing here yet</b>This folder is empty.${b.writes ? " Add something with the plus." : ""}</p>`;
+      listingEl.innerHTML = isTrash
+        ? `<p class="empty mascot"><b>The ${esc(b.trash)} is empty</b>What you delete waits here before it goes for good.</p>`
+        : `<p class="empty mascot"><b>Nothing here yet</b>This folder is empty.${takesIn ? " Add something with the plus." : ""}</p>`;
     } else if (view === "grid") {
       listingEl.innerHTML = `<div class="tiles">${sorted.map(tile).join("")}</div>`;
       watcher = watchTiles(b, listingEl);
@@ -386,7 +416,7 @@ async function renderFolder(at, b, group, folder) {
   });
 
   const reload = async () => {
-    entries = await listFolder(b, group, folder);
+    entries = await list();
     show();
   };
   const place = { b, group, folder };
@@ -394,16 +424,6 @@ async function renderFolder(at, b, group, folder) {
   openFolder = null;
   if (!b.writes) return;
 
-  // Adding: the plus opens a sheet with the ways in. A picker or the camera
-  // ends in a file input, which has to be clicked from the tap itself for
-  // the phone to open it.
-  const pickInput = app.querySelector(".pick-input");
-  const cameraInput = app.querySelector(".camera-input");
-  app.querySelector(".heading .add").addEventListener("click", () => openSheet([
-    { icon: own.pick, label: "Choose a file", run: () => pickInput.click() },
-    { icon: own.camera, label: "Take a photo", run: () => cameraInput.click() },
-    { icon: own.newFolder, label: "New folder", run: () => newFolder(place, reload) },
-  ]));
   const more = app.querySelector(".heading .more");
   if (more) {
     // Which choices depends on where the folder is: one in the Trash is
@@ -421,6 +441,19 @@ async function renderFolder(at, b, group, folder) {
       ]);
     });
   }
+  if (emptyEl) emptyEl.addEventListener("click", () => emptyTrash(place, reload));
+  if (!takesIn) return;
+
+  // Adding: the plus opens a sheet with the ways in. A picker or the camera
+  // ends in a file input, which has to be clicked from the tap itself for
+  // the phone to open it.
+  const pickInput = app.querySelector(".pick-input");
+  const cameraInput = app.querySelector(".camera-input");
+  app.querySelector(".heading .add").addEventListener("click", () => openSheet([
+    { icon: own.pick, label: "Choose a file", run: () => pickInput.click() },
+    { icon: own.camera, label: "Take a photo", run: () => cameraInput.click() },
+    { icon: own.newFolder, label: "New folder", run: () => newFolder(place, reload) },
+  ]));
   pickInput.addEventListener("change", async () => {
     const picked = [...pickInput.files];
     pickInput.value = "";
@@ -583,6 +616,18 @@ async function change(b, entry, what) {
 /** What was done, said in a few words. */
 const saidDone = (done, name) =>
   done.gone ? `Deleted ${name} for good` : done.deleted ? `Moved ${name} to the Trash` : done.restored ? `Restored ${name}` : "";
+
+/** The Trash, emptied: deleting the folder itself is how the server takes it. */
+async function emptyTrash({ b, group, folder }, reload) {
+  const trash = await folderEntry(b, group, folder);
+  if (!trash) return;
+  if (!await ask(`Empty the ${trash.name}?\n\nEverything in it is deleted for good.`, { yes: "Empty", tone: "danger" })) return;
+  try {
+    await api("DELETE", recordsUrl(b.model.id, trash.id));
+    toast(`Emptied the ${trash.name}`);
+    await reload();
+  } catch (err) { toast(err.message); }
+}
 
 /** The folder's own record, which is in the listing of the folder it is in. */
 async function folderEntry(b, group, folder) {

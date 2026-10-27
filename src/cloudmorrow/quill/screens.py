@@ -125,6 +125,9 @@ def grid_fields(screen: dict, model: dict) -> dict[str, str]:
         # Restore; a screen without them has delete and no Trash to show.
         "deleted": screen.get("deleted") or "",
         "deleted_from": screen.get("deleted_from") or "",
+        # The name of the Trash folder at the top of a group: the web draws
+        # it as a bin beside the plus, not among the folders.
+        "trash": screen.get("trash") or "",
         "subtitle": screen.get("group_subtitle") or "",
     }
 
