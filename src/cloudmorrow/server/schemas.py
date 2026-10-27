@@ -292,7 +292,8 @@ class SetupRequest(BaseModel):
     username: str
     password: str = Field(min_length=8)
     # The standard quills to have, by id. Left out, the server's own boot
-    # work installs the catalog's foundation quills, as before.
+    # work installs the catalog's foundation quills: Files, Calendar, Notes
+    # and Tasks.
     quills: list[str] | None = None
 
 

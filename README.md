@@ -141,8 +141,9 @@ want elsewhere; everything people keep goes under the data directory, in
 keeps its records in (the built-in one, a file in the data directory,
 which is right for most; or PostgreSQL, in a container it runs beside the
 server or on a server you already have), and which of the
-standard quills it should have (Notes, Tasks, Calendar, Channels, Files,
-Secrets; all of them unless you untick some). Then it creates a service
+standard quills it should have (every one Cloudmorrow makes, with Files,
+Calendar, Notes and Tasks ticked to begin with; the rest can be added from
+Administration later). Then it creates a service
 user, clones the code into `/opt/cloudmorrow` (or where you said), builds a
 virtualenv, writes the config and the systemd unit, generates the
 encryption key, starts the service and makes your account. The terminal
@@ -194,7 +195,7 @@ Then, with `cloud.example.com` standing for your cloud's address
 
 No terminal at hand? Skip the account question. A server with no accounts
 shows a setup page on its first visit instead: name the cloud, choose a
-username and password, tick the standard quills, and it is yours. That page is how a hosted tenant is set up too.
+username and password, tick the standard quills you want, and it is yours. That page is how a hosted tenant is set up too.
 
 Rather run it as a container? `deploy/docker/` has the image, a compose
 file and a Caddyfile:

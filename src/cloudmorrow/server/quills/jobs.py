@@ -2,10 +2,12 @@
 
 At boot:
 
-* A server that has never had a Quill installed gets the catalog's
-  foundation Quills — the ones marked `foundation = true` — so a fresh
-  install has Tasks the way it always had. Once; after that, what is
-  installed is the administrator's business.
+* A server that has never had a Quill installed, and was not asked, gets
+  the catalog's foundation Quills — the ones marked `foundation = true`:
+  Files, Calendar, Notes and Tasks — so a fresh install has them the way
+  it always had. Once; after that, what is installed is the
+  administrator's business. The installer and the setup page ask instead,
+  offering every `standard = true` Quill with those four ticked.
 * A feature that was built in and is a Quill now (Notes) is installed from
   the catalog on a server that had it on, so nothing goes missing in the
   move. Its data never moved: notes are the files they were.
@@ -100,7 +102,7 @@ def _legacy_rows(db: Database) -> bool:
 
 
 def install_foundation(db: Database | Path, registry: QuillRegistry) -> list[str]:
-    """The catalog's foundation Quills, on a server that has never had any."""
+    """The catalog's foundation Quills, on a server that has never had any and was not asked."""
     db = open_database(db)
     if read_meta(db, SEEDED) or registry.quills:
         return []

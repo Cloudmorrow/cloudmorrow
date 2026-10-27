@@ -37,6 +37,7 @@ summary = "Markdown notes in folders, with pictures."
 repo = "quill-notes"
 category = "personal"
 publisher = "Cloudmorrow"
+standard = true
 foundation = true
 
 [[quills]]
@@ -46,6 +47,7 @@ summary = "Boards with three lanes: To Do, Doing, Done."
 repo = "quill-tasks"
 category = "productivity"
 publisher = "Cloudmorrow"
+standard = true
 foundation = true
 
 [[quills]]
@@ -55,6 +57,7 @@ summary = "Your own drive on the server, your fileshares, and what is in them."
 repo = "quill-files"
 category = "personal"
 publisher = "Cloudmorrow"
+standard = true
 foundation = true
 
 [[quills]]
@@ -64,6 +67,7 @@ summary = "Your own calendar, the ones you share, and one for everybody."
 repo = "quill-calendar"
 category = "productivity"
 publisher = "Cloudmorrow"
+standard = true
 foundation = true
 
 [[quills]]
@@ -73,7 +77,7 @@ summary = "Channels, direct messages, and the count on the icon."
 repo = "quill-chat"
 category = "home"
 publisher = "Cloudmorrow"
-foundation = true
+standard = true
 
 [[quills]]
 id = "channels"
@@ -82,6 +86,7 @@ summary = "Channels, threads, mentions and reactions: a team's conversations, on
 repo = "quill-channels"
 category = "business"
 publisher = "Cloudmorrow"
+standard = true
 
 [[quills]]
 id = "secrets"
@@ -90,7 +95,7 @@ summary = "Keys and passwords in vaults and environments, sealed, and never show
 repo = "quill-secrets"
 category = "developer"
 publisher = "Cloudmorrow"
-foundation = true
+standard = true
 
 [[quills]]
 id = "crm"
@@ -99,6 +104,7 @@ summary = "Customers for a company: organisations, people, a pipeline of deals, 
 repo = "quill-crm"
 category = "business"
 publisher = "Cloudmorrow"
+standard = true
 
 [[quills]]
 id = "cells"
@@ -107,6 +113,7 @@ summary = "Sheets of cells and formulas: plain .cell files in the Documents fold
 repo = "quill-cells"
 category = "productivity"
 publisher = "Cloudmorrow"
+standard = true
 
 [[quills]]
 id = "docs"
@@ -115,3 +122,4 @@ summary = "Documents: a basic Word, over .docs files and Word's own, in the Docu
 repo = "quill-docs"
 category = "productivity"
 publisher = "Cloudmorrow"
+standard = true

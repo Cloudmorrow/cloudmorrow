@@ -75,7 +75,9 @@ Options:
                       its password is asked for, or read from
                       \$CLOUDMORROW_ADMIN_PASSWORD)
   --quills LIST       standard quills to have, comma-separated, or 'all'
-                      (asked if not given; 'cloudmorrow-server quill standard' lists them)
+                      (asked if not given, with Files, Calendar, Notes and
+                      Tasks ticked; without a terminal those four;
+                      'cloudmorrow-server quill standard' lists them)
   --repo URL          git URL to clone                  (default: this checkout's
                       origin, else $DEFAULT_REPO)
   --branch NAME       branch to deploy                  (default: $BRANCH)
@@ -1272,9 +1274,11 @@ fi
 
 # --- the standard quills --------------------------------------------------
 # Chosen before the service first starts, because a running server reads
-# what is installed when it boots. Asked once: a re-run keeps the choice,
-# and an administrator changes it from Administration afterwards. Quills
-# from the catalog are downloaded from GitHub; one that cannot be reached is
+# what is installed when it boots. Every Quill Cloudmorrow makes is offered,
+# with Files, Calendar, Notes and Tasks ticked; without a terminal those
+# four are what the server gets. Asked once: a re-run keeps the choice, and
+# an administrator changes it from Administration afterwards. Quills from
+# the catalog are downloaded from GitHub; one that cannot be reached is
 # said, and the rest of the install goes on.
 if [ -n "$DRY_RUN" ]; then
 	if [ -n "$QUILLS" ]; then

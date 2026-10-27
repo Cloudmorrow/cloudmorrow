@@ -92,6 +92,7 @@ def test_the_catalog_is_read_with_its_categories(registry):
     catalog = load_catalog(str(QUILL_CATALOG))
     assert [c["id"] for c in catalog.categories] == ["personal", "productivity", "home", "business", "developer"]
     assert catalog.entry("tasks")["foundation"] is True
+    assert catalog.entry("chat")["standard"] is True and not catalog.entry("chat").get("foundation")
     with pytest.raises(QuillError):
         catalog.entry("nope")
 
@@ -288,15 +289,10 @@ def test_a_bad_request_is_a_400_with_the_reason(client, auth):
 # -- boot ------------------------------------------------------------------------------
 def test_a_fresh_server_gets_the_foundation_quills_once(config, users, registry, tmp_path):
     db = config.db_path
-    assert install_foundation(db, registry) == [
-        "notes",
-        "tasks",
-        "files",
-        "calendar",
-        "chat",
-        "secrets",
-    ]
-    for quill in ("notes", "tasks", "files", "calendar", "chat", "secrets"):
+    # Files, Calendar, Notes and Tasks; Chat and Secrets are standard, offered
+    # by the installer, but not what a server nobody asked gets.
+    assert install_foundation(db, registry) == ["notes", "tasks", "files", "calendar"]
+    for quill in ("notes", "tasks", "files", "calendar"):
         registry.uninstall(quill)
     # Removed by an administrator, they stay removed.
     assert install_foundation(db, registry) == []

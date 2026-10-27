@@ -362,7 +362,10 @@ def test_the_old_chat_moves_into_records_once(config, users, tmp_path):
     registry = QuillRegistry(tmp_path / "quills", tmp_path / "models", str(QUILL_CATALOG))
     store = RecordStore(db, registry.models, registry.expiries)
     boot(db, registry, store)
-    assert "chat" in registry.quills, "a server that had chat gets the Quill"
+    # Nothing was chosen for this server, so the boot work installed the four
+    # foundation Quills; Chat is not among them, and the old chat tables are
+    # what bring the messaging Quill in: Channels, which replaced Chat.
+    assert "channels" in registry.quills, "a server that had chat gets the Quill"
     bram, guest = Principal.person("bram"), Principal.person("guest")
 
     spaces = {c.fields["name"]: c for c in store.list(bram, "channel")}
