@@ -2,9 +2,13 @@
 
 Two kinds, one list, because a person choosing does not care which is which:
 
-* **Catalog quills** marked `foundation = true` in the Quill Catalog —
-  Notes, Tasks, Files, Calendar, Chat and Secrets today. Choosing one
-  installs it; leaving one out installs nothing.
+* **Catalog quills** marked `standard = true` in the Quill Catalog: the ones
+  Cloudmorrow makes itself. Choosing one installs it; leaving one out
+  installs nothing. The four marked `foundation = true` as well — Files,
+  Calendar, Notes and Tasks — are ticked to begin with, and are what a
+  server nobody asked gets (an install with no terminal, or the boot work
+  on a server set up some other way). Everything else in the catalog is
+  added from Administration once the server runs.
 * **Built-in features** that are still part of the core while the kit
   grows to draw them — none left. Choosing one
   leaves it on; leaving one out switches it off for the server, which an
@@ -14,7 +18,7 @@ Two kinds, one list, because a person choosing does not care which is which:
 
 A choice is made once, by the installer (or `cloudmorrow-server quill
 choose`), before the server first starts. It is remembered, so the boot
-work that would otherwise install every foundation Quill on a fresh server
+work that would otherwise install the foundation Quills on a fresh server
 stands aside.
 """
 
@@ -43,6 +47,8 @@ class Choice:
     summary: str
     # "quill": installed from the catalog. "built-in": part of the core, on or off.
     kind: str
+    # Ticked to begin with: the foundation ones, and a built-in that is on.
+    on: bool = True
 
 
 def choices(config: ServerConfig) -> tuple[list[Choice], Catalog | None, str]:
@@ -56,9 +62,15 @@ def choices(config: ServerConfig) -> tuple[list[Choice], Catalog | None, str]:
         problem = str(exc)
     if catalog is not None:
         found += [
-            Choice(entry["id"], entry.get("name", entry["id"]), entry.get("summary", ""), "quill")
+            Choice(
+                entry["id"],
+                entry.get("name", entry["id"]),
+                entry.get("summary", ""),
+                "quill",
+                on=bool(entry.get("foundation")),
+            )
             for entry in catalog.quills
-            if entry.get("foundation")
+            if entry.get("standard") or entry.get("foundation")
         ]
     taken = {c.id for c in found}
     found += [
@@ -66,9 +78,15 @@ def choices(config: ServerConfig) -> tuple[list[Choice], Catalog | None, str]:
         for feature in FEATURES
         if feature.key not in taken
     ]
-    # By name: a person choosing reads a list, not an architecture.
-    found.sort(key=lambda c: c.name.casefold())
+    # The ticked ones first, then by name: a person choosing reads a list,
+    # not an architecture, and sees what most clouds start with at the top.
+    found.sort(key=lambda c: (not c.on, c.name.casefold()))
     return found, catalog, problem
+
+
+def ticked(options: list[Choice]) -> set[str]:
+    """What a server nobody asked gets: the ones ticked to begin with."""
+    return {o.id for o in options if o.on}
 
 
 def chosen_already(config: ServerConfig) -> bool:

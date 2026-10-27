@@ -118,7 +118,11 @@ def test_the_page_offers_the_standard_quills_and_setup_applies_the_choice(config
     client = fresh(config)
     offered = client.get("/api/setup/quills").json()
     ids = [q["id"] for q in offered["quills"]]
-    assert {"tasks", "notes", "chat", "calendar", "files", "secrets"} <= set(ids)
+    assert {"tasks", "notes", "chat", "calendar", "files", "secrets", "crm", "docs"} <= set(ids)
+    # The four ticked to begin with; the rest offered, unticked.
+    ticked = [q["id"] for q in offered["quills"] if q["on"]]
+    assert ticked == ["calendar", "files", "notes", "tasks"]
+    assert ids[:4] == ticked, "the ticked ones first, then the rest by name"
     assert offered["problem"] == ""
     made = client.post(
         "/api/setup",

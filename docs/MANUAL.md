@@ -1183,8 +1183,11 @@ Calendar, Channels and Secrets today, and whatever the
 how, is on its own page in the catalog — this manual only borrows them as
 examples.
 
-**On a fresh server** the catalog's foundation Quills are installed at first
-boot. A server from before each was a Quill gets it the first time the new
+**On a fresh server** the installer, or the setup page when there is no
+terminal, offers every standard Quill (the ones Cloudmorrow makes itself)
+with Files, Calendar, Notes and Tasks ticked to begin with. A server
+nobody asked — one installed without a terminal — gets those four at
+first boot. A server from before each was a Quill gets it the first time the new
 version starts: Notes if it was on (the notes themselves never move; they
 are files), Tasks with its boards and tasks moved into the record store, and
 Calendar with its calendars and events moved the same way. Nothing
@@ -2199,8 +2202,8 @@ account's own tree, `<notes_dir>/<username>/files/`, and their notes are
 the `Notes` folder in it.
 
 **The Files Quill.** What is in them is on screen through the **Files**
-Quill, a foundation Quill in the catalog: installed on a new server with
-Tasks, and at boot on a server that had Files built in (the switch keeps
+Quill, a foundation Quill in the catalog: ticked on a new server with
+Calendar, Notes and Tasks, and installed at boot on a server that had Files built in (the switch keeps
 its name, `files`, and its setting). The files do not move for it — the
 core serves the drive and the shares as `share` and `file` records through
 the record API (the `shares` backend), with each file's bytes at

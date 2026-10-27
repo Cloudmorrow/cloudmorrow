@@ -49,7 +49,7 @@ __PAGE_CSS__
     <fieldset class="field" id="quill-field" hidden style="border:0;margin:0;padding:0">
       <legend class="label">Quills to start with</legend>
       <div class="quills" id="quills"></div>
-      <small id="quill-note">All of them, unless you untick some. Add or remove any later from Administration.</small>
+      <small id="quill-note">The ticked ones are what most clouds start with; tick any others you want. Add or remove any later from Administration.</small>
     </fieldset>
 
     <button class="action" type="submit">Create my cloud</button>
@@ -71,7 +71,7 @@ __PAGE_CSS__
   fetch("/api/setup/quills").then((r) => (r.ok ? r.json() : null)).then((data) => {
     if (!data || !data.quills.length) return;
     list.innerHTML = data.quills.map((q) => `
-      <label class="quill"><input type="checkbox" name="quill" value="${esc(q.id)}" checked>
+      <label class="quill"><input type="checkbox" name="quill" value="${esc(q.id)}"${q.on ? " checked" : ""}>
         <b>${esc(q.name)}</b><span>${esc(q.summary)}</span></label>`).join("");
     if (data.problem) {
       document.getElementById("quill-note").textContent =

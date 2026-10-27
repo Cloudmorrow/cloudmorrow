@@ -62,7 +62,7 @@ def standard_quills(state: AppState = Depends(get_state)) -> dict:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="already set up")
     options, _, problem = choices(state.config)
     return {
-        "quills": [{"id": o.id, "name": o.name, "summary": o.summary} for o in options],
+        "quills": [{"id": o.id, "name": o.name, "summary": o.summary, "on": o.on} for o in options],
         "problem": problem,
     }
 

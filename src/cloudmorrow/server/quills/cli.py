@@ -28,7 +28,7 @@ from cloudmorrow.console import TITLE
 from cloudmorrow.console import console as make_console
 from cloudmorrow.server.config import ServerConfig, load_config
 from cloudmorrow.server.quills import QuillError, QuillRegistry
-from cloudmorrow.server.quills.standard import choices, choose, chosen_already
+from cloudmorrow.server.quills.standard import choices, choose, chosen_already, ticked
 
 app = typer.Typer(help="Quills on this server.", no_args_is_help=True)
 console = make_console()
@@ -58,15 +58,20 @@ def standard(config_path: ConfigOption = None) -> None:
     for column in ("id", "name", "what it is", ""):
         table.add_column(column)
     for option in options:
-        table.add_row(option.id, option.name, option.summary, "built in" if option.kind == "built-in" else "")
+        marks = []
+        if option.kind == "built-in":
+            marks.append("built in")
+        if option.on:
+            marks.append("ticked to begin with")
+        table.add_row(option.id, option.name, option.summary, ", ".join(marks))
     console.print(table)
     if problem:
         console.print(f"[yellow]The catalog could not be read, so only the built-in ones are here: {problem}[/]")
 
 
 def _ask(options: list, terminal: str = "/dev/tty") -> set[str]:
-    """The question, on the terminal: a box for each, every one ticked to begin with."""
-    items = [Item(o.id, o.name, o.summary, on=True) for o in options]
+    """The question, on the terminal: a box for each, the foundation ones ticked to begin with."""
+    items = [Item(o.id, o.name, o.summary, on=o.on) for o in options]
     title = "Which software should your cloud start with?"
     return set(pick(Checklist(title, items, colour="NO_COLOR" not in os.environ), terminal))
 
@@ -78,7 +83,11 @@ def choose_cmd(
     once: Annotated[bool, typer.Option("--once", help="Do nothing if a choice was made before.")] = False,
     config_path: ConfigOption = None,
 ) -> None:
-    """Choose the standard quills: install the ones from the catalog, switch off built-ins left out."""
+    """Choose the standard quills: install the ones from the catalog, switch off built-ins left out.
+
+    Neither --only nor --ask takes the ones ticked to begin with: Files,
+    Calendar, Notes and Tasks.
+    """
     config = _config(config_path)
     if once and chosen_already(config):
         console.print("[dim]The standard quills were chosen before; nothing to do.[/]")
@@ -91,7 +100,7 @@ def choose_cmd(
     elif ask:
         wanted = _ask(options)
     else:
-        wanted = {o.id for o in options}
+        wanted = ticked(options)
     try:
         done = choose(config, wanted)
     except QuillError as exc:
