@@ -6,6 +6,7 @@ is held to what docs/QUILLCODE.md promises of it.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import pytest
@@ -189,7 +190,9 @@ def test_code_makes_a_shared_space_with_its_people_and_sees_what_is_unread(tmp_p
         assert "Lunch 1" in kim.view("post").text()
         assert kim.act("looked", letter).ok
         assert "Lunch 0" in kim.view("post").text()
-        # An answer in the same space reaches the writer, as news.
+        # An answer in the same space reaches the writer, as news (from the next second on:
+        # what counts as unread is stamped to the second).
+        time.sleep(1.05)
         assert kim.act("answer", letter).ok
         assert "Lunch 1" in sam.view("post").text()
         # The table's rows go to the Quill's own screen, with the letter's id.
