@@ -9,6 +9,9 @@
    Safari's own tab there is no service worker registration to push and
    `setAppBadge` does nothing. So the card below says which of those two
    situations you are in rather than offering a button that cannot work.
+   Only on iOS, though: a computer's browser, and Android's, push to a plain
+   tab, and the card asks it for permission the way any site does. The count
+   on the icon is still the installed app's; a tab gets the banner.
 
    Everything here fails quietly. A phone with notifications turned off is a
    phone that reads its messages when it opens the app, which is what the app
@@ -28,6 +31,15 @@ export const supported = () =>
 // badging to a tab, and says so only by silently doing nothing.
 export const installed = () =>
   window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+// iOS is the one place a tab cannot be pushed to. An iPad says it is a Mac,
+// and is told apart by its touch screen. The same test install.js makes.
+export const isIOS = () =>
+  /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+// Whether the app has to be on the home screen before notifications can work
+// here: only on iOS. Everywhere else a tab is asked like any other site.
+export const needsInstall = () => isIOS() && !installed();
 
 const badgeHooks = [];
 const pushHooks = [];
@@ -84,7 +96,7 @@ function keyBytes(text) {
 
 export function state() {
   if (!supported()) return "unsupported";
-  if (!installed()) return "not-installed";
+  if (needsInstall()) return "not-installed";
   return Notification.permission;   // "default" | "granted" | "denied"
 }
 
@@ -154,16 +166,30 @@ function deviceLabel() {
 }
 
 // -- the card in Me ------------------------------------------------------------------
-const WORDS = {
-  unsupported: ["Notifications", "This browser cannot show them."],
-  "not-installed": ["Notifications", "Add Cloudmorrow to your Home Screen first, then turn them on here."],
-  default: ["Notifications", "Get a banner and a count on the icon when somebody writes."],
-  denied: ["Notifications", "Turned off in Settings › Notifications › Cloudmorrow."],
-  granted: ["Notifications are on", "This device gets a banner and the count on its icon."],
-};
+// What the card says in each state. The words for a phone app with an icon
+// of its own, and for a tab in a browser: a tab gets the banner and no
+// count, and turning them back on is in the browser's site settings, not in
+// the phone's Settings.
+function words() {
+  const app = installed();
+  return {
+    unsupported: ["Notifications", "This browser cannot show them."],
+    "not-installed": ["Notifications", "Add Cloudmorrow to your Home Screen first, then turn them on here."],
+    default: ["Notifications", app
+      ? "Get a banner and a count on the icon when somebody writes."
+      : "Get a banner from this browser when somebody writes."],
+    denied: ["Notifications", isIOS()
+      ? "Turned off in Settings › Notifications › Cloudmorrow."
+      : "Turned off for this site. Allow them in the browser's site settings — the icon beside the address."],
+    granted: ["Notifications are on", app
+      ? "This device gets a banner and the count on its icon."
+      : "This browser gets a banner while it is running."],
+  };
+}
 
 export function pushCard() {
   const where = state();
+  const WORDS = words();
   const [title, line] = WORDS[where] || WORDS.default;
   const button =
     where === "default" ? `<button class="push-on">Turn on</button>` :
