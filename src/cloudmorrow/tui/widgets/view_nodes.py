@@ -131,6 +131,15 @@ class ViewOpen(Message):
         super().__init__()
 
 
+def goes_to(node: dict, record: dict) -> dict | None:
+    """Where a row or a card of *node* goes when opened: a `go` screen, as a button's node, else None."""
+    if not node.get("go"):
+        return None
+    params = dict(node.get("params") or {})
+    params[str(node.get("param") or "record")] = record["id"]
+    return {"ui": "button", "label": "", "go": node["go"], "params": params}
+
+
 # -- the pieces --------------------------------------------------------------------------------
 class ViewButton(Button):
     """A `button` (or an `empty`'s): runs an action, opens a record, or goes to a screen."""
@@ -455,7 +464,12 @@ class TableNode(Vertical):
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         event.stop()
         record = self.selected
-        if record is not None and self.node.get("open", True):
+        if record is None:
+            return
+        goes = goes_to(self.node, record)
+        if goes is not None:
+            self.post_message(ViewAct(goes))
+        elif self.node.get("open", True):
             self.post_message(ViewOpen(record))
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -639,7 +653,10 @@ class ViewCard(Static, can_focus=True):
         self.action_open()
 
     def action_open(self) -> None:
-        if self.node.get("open", True):
+        goes = goes_to(self.node, self.record)
+        if goes is not None:
+            self.post_message(ViewAct(goes))
+        elif self.node.get("open", True):
             self.post_message(ViewOpen(self.record))
 
 

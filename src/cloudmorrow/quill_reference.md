@@ -173,7 +173,10 @@ def log_service(ctx, vehicle, date, km):
 fields)`, `move`, `delete` — each a `Record`: fields by `record["name"]`,
 envelope as `.id`, `.rev`, `.model`), `ctx.fetch(url, method=, headers=,
 json=)`, `ctx.secret(key)`, `ctx.now()`, `ctx.log(...)`, and on a machine
-`ctx.folder(name)` and `ctx.run([...])` (a program in `needs.run` the machine
+`ctx.records.create(..., scope=, members=)` makes a space, shared with its
+members; `ctx.records.seen(model, id)` is the person having looked in one;
+`ctx.people()` is everybody on the server but them. `ctx.folder(name)` and
+`ctx.run([...])` (a program in `needs.run` the machine
 allows, or one of a runtime in `needs.runtimes`). A refusal raises `Refused`,
 `NotFound`, `Invalid` or `Conflict`. `print` goes to the Quill's log
 (`cm quill logs <quill> code`).
@@ -181,7 +184,9 @@ allows, or one of a runtime in `needs.runtimes`). A refusal raises `Refused`,
 Primitives (`ui.`): `stack`, `row`, `columns`, `tabs`, `text(style=)`,
 `markdown`, `image`, `badge`, `stat`, `empty`, `divider`, `field(record,
 name, edit=)`, `form(action)`, `button(label, action= | open= | go=)`,
-`menu`, `table(records, columns=, actions=)`, `cards(records, title=, …)`,
+`menu`, `table(records, columns=, actions=, go=, param=)`, `cards(records,
+title=, …, go=, param=)` (a row or a card opens its sheet, or with `go` a
+screen of the Quill's own, the record's id as `param`),
 `gallery(records, title=, subtitle=, badge=, stars=, rate=, actions=)` (files
 as picture tiles with five stars; a star runs `rate` with `stars=`),
 `lanes(records, field=, title=)`, `month(records, date=, title=)`. Every

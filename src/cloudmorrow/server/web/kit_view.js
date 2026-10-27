@@ -157,6 +157,10 @@ const titled = (v, record, name) => {
 };
 /** A record opens on its sheet, if its datamodel is one this Quill shows you. */
 const sheetOf = (v, record) => (record && modelOf(v, record) ? sheetHash(v.at, record.model, record.id) : "");
+/** Where a table's row or a card goes: a screen of the Quill's own (`go`), with the record's id, else its sheet. */
+const rowGoes = (v, n, record) => n.go
+  ? screenAt(v.at.quill.id, n.go, { ...(n.params || {}), [n.param || "record"]: record.id })
+  : n.open !== false ? sheetOf(v, record) : "";
 
 // Every link field the tree says, so its titles are fetched once, before
 // anything is drawn, rather than a request per row.
@@ -453,7 +457,7 @@ function drawTable(v, n) {
   const head = labels.map((label) => `<th scope="col">${esc(label)}</th>`).join("") +
     (actions.length ? `<th class="v-row-actions"><span class="v-hidden">Actions</span></th>` : "");
   const rows = n.records.map((r) => {
-    const hash = n.open !== false ? sheetOf(v, r) : "";
+    const hash = rowGoes(v, n, r);
     const cells = n.columns.map((c, i) => {
       const text = say(v, r, c.field) || "—";
       const inner = i === 0 && hash ? `<a href="${esc(hash)}">${esc(text)}</a>` : esc(text);
@@ -473,7 +477,7 @@ function drawTable(v, n) {
 function drawCards(v, n) {
   if (!n.records.length) return none(n.empty);
   return `<div class="v-cards">` + n.records.map((r) => {
-    const hash = n.open !== false ? sheetOf(v, r) : "";
+    const hash = rowGoes(v, n, r);
     const badge = n.badge ? say(v, r, n.badge) : "";
     const inner = `<span class="v-card-head"><span class="title">${esc(titled(v, r, n.title))}</span>` +
       (badge ? `<span class="v-badge">${esc(badge)}</span>` : "") + `</span>` +

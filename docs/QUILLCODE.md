@@ -198,8 +198,8 @@ hook started by an assistant's change is the same.
 | `ctx.user` | who it runs for: `.username`, `.name`, `.admin`, `.circles`, `.roles` |
 | `ctx.quill`, `ctx.where` | this Quill's id; `"server"` or `"machine"` |
 | `ctx.params` | a view's parameters, by name and as attributes; `.record` when opened on one |
-| `ctx.records` | `list(model, q=, last=, **where)`, `get`, `create(model, fields=None, **values)`, `patch(model, id, fields, rev=)`, `move(model, id, fields, index=)`, `delete` — the record API, through the gate |
-| `ctx.people(role=, circle=)` | who holds a role, as usernames ([FLOWS.md](FLOWS.md)) |
+| `ctx.records` | `list(model, q=, last=, **where)`, `get`, `create(model, fields=None, scope=, members=, announce=, **values)`, `patch(model, id, fields, rev=)`, `move(model, id, fields, index=)`, `delete`, `seen(model, id)` — the record API, through the gate. A space is made with its `scope` and, shared, its `members`; `seen` is the person having looked in one. A space's record says `.members`, `.unread` and `.last` |
+| `ctx.people(role=, circle=)` | who holds a role, as usernames ([FLOWS.md](FLOWS.md)); with no role, everybody on the server but the person it runs for |
 | `ctx.approvals.ask(record, role=, question=)` | a yes or no asked of whoever holds the role; the answer comes back as a hook on `approval` |
 | `ctx.fetch(url, method=, headers=, json=, body=)` | https to a host in `[[fetch]]`, and there only after a redirect too; a `Response` (`.status`, `.ok`, `.json()`, `.text`) |
 | `ctx.secret(key)` | a key in `[[secrets]]`, from the person's own vault |
@@ -246,7 +246,7 @@ one:
 | `field(record, name, edit=)` | one field of a record, with its kind's widget; editable saves as it changes |
 | `form(action, values=, record=)` | an action's form, drawn in place |
 | `button(label, action= \| open= \| go=)`, `menu` | run an action, open a record, go to a screen |
-| `table(records, columns=, actions=)`, `cards(records, title=, …)` | records, a row or a card each; opening one shows its sheet |
+| `table(records, columns=, actions=, go=, param=)`, `cards(records, title=, …, go=, param=)` | records, a row or a card each; opening one shows its sheet — or, with `go`, a screen of the Quill's own, with the record's id as `param` |
 | `gallery(records, title=, subtitle=, badge=, stars=, rate=, actions=)` | records as tiles with their own picture (a file's thumbnail; a video's is a frame of it) and five stars; pressing a star runs `rate` with `stars=` |
 | `lanes(records, field=, title=)` | records in columns by an enum; dragging moves the record, as a board does |
 | `month(records, date=, title=)` | records on a month |

@@ -3,8 +3,9 @@
     ctx.user            who it runs for: .username, .name, .admin, .circles, .roles
     ctx.quill           this Quill's id
     ctx.params          a view's parameters; .record when opened on one
-    ctx.records         list, get, create, patch, move, delete — through the gate
-    ctx.people(role=)   who holds a role, as usernames; circle= narrows to one circle
+    ctx.records         list, get, create, patch, move, delete, seen — through the gate
+    ctx.people()        everybody on the server but the person, as usernames;
+                        role= who holds a role, circle= narrows that to one circle
     ctx.approvals       ask(record, role=, question=) a yes or no of whoever holds a role
     ctx.fetch(url)      HTTP, to a host the manifest lists in [[fetch]] only
     ctx.secret(key)     a secret the manifest lists in [[secrets]], from the person's vault
@@ -109,6 +110,20 @@ class Record(Mapping):
     def position(self) -> int:
         return self._data.get("position", 0)
 
+    # A space's envelope: who is in it, and what is news to the person asking.
+    @property
+    def members(self) -> list[str]:
+        return list(self._data.get("members") or ())
+
+    @property
+    def unread(self) -> int:
+        return int(self._data.get("unread") or 0)
+
+    @property
+    def last(self) -> dict | None:
+        """The newest thing written in the space that counts as unread: who, when."""
+        return dict(self._data["last"]) if self._data.get("last") else None
+
     @property
     def created_at(self) -> str:
         return self._data.get("created_at", "")
@@ -154,12 +169,37 @@ class Records:
     def get(self, model: str, id: str) -> Record:  # noqa: A002
         return Record(self._host("records.get", {"model": model, "id": _plain(id)}))
 
-    def create(self, model: str, fields: dict | None = None, *, index: int | None = None, **values) -> Record:
-        """A new record. Fields as keywords, or a dict for names with a dot in them."""
+    def create(
+        self,
+        model: str,
+        fields: dict | None = None,
+        *,
+        index: int | None = None,
+        scope: str | None = None,
+        members: list[str] | tuple[str, ...] = (),
+        announce: bool = True,
+        **values,
+    ) -> Record:
+        """A new record. Fields as keywords, or a dict for names with a dot in them.
+
+        A space is made with its *scope* (`personal`, `shared`, `public`) and,
+        shared, with its *members* in it at once, each of them told — unless
+        *announce* is off, for a space whose first line is the news.
+        """
         args = {"model": model, "fields": _plain(_fields(fields, values))}
         if index is not None:
             args["index"] = index
+        if scope is not None:
+            args["scope"] = str(scope)
+        if members:
+            args["members"] = [str(m) for m in members]
+        if not announce:
+            args["announce"] = False
         return Record(self._host("records.create", args))
+
+    def seen(self, model: str, id: str) -> None:  # noqa: A002
+        """The person has looked in this space: what is in it is no longer unread to them."""
+        self._host("records.seen", {"model": model, "id": _plain(id)})
 
     def patch(self, model: str, id: str, fields: dict | None = None, *, rev=None, **values) -> Record:  # noqa: A002
         args = {"model": model, "id": _plain(id), "fields": _plain(_fields(fields, values))}
@@ -333,8 +373,10 @@ class Context:
             )
         )
 
-    def people(self, *, role: str, circle: str = "") -> list[str]:
-        """Who holds *role*: everywhere, and in *circle* when one is named. Usernames."""
+    def people(self, *, role: str = "", circle: str = "") -> list[str]:
+        """Usernames. With *role*, who holds it: everywhere, and in *circle* when
+        one is named. Without, everybody on the server but the person it runs for
+        — who a space could be shared with."""
         return [str(u) for u in self._host("people", {"role": role, "circle": circle})]
 
     def secret(self, key: str) -> str:
