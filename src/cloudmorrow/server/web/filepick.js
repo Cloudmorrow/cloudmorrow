@@ -10,7 +10,9 @@
    the `share` datamodel lists them, each with a line about whose it is.
    In a share, the folders come first and then the files whose name ends
    in one of the suffixes wanted; the rest are not shown, since they could
-   not be opened. Nothing here is named for one Quill. */
+   not be opened. A folder is picked the same way (`pickFolder`), to put
+   something in: the folders alone, and a button that takes the one open.
+   Nothing here is named for one Quill. */
 
 import { api, esc, recordsUrl, toast } from "./core.js";
 import { openSheet } from "./dialog.js";
@@ -41,20 +43,42 @@ const rowHtml = (icon, title, subtitle, attrs, kind = "") =>
  * `suffixes` says which files may be picked; `title` heads the sheet.
  */
 export function pickFile({ suffixes = [], title = "Open", model = "file" } = {}) {
+  return pick({ suffixes, title, model });
+}
+
+/**
+ * A folder picked from anywhere, to put something in: resolves
+ * `{group, folder, label}` — the share, the folder in it ("" for its top)
+ * and the share's name — or null for no. `within` keeps it to one share,
+ * for what cannot leave the one it is in; `button` is what the button
+ * that takes the open folder says; `not` names folders at a share's top
+ * that are not on offer (the Trash).
+ */
+export function pickFolder({ title = "Choose a folder", model = "file", within = "", button = "Put it here", not = [] } = {}) {
+  return pick({ title, model, folders: true, within, button, not });
+}
+
+function pick({ suffixes = [], title, model, folders = false, within = "", button = "", not = [] }) {
   return new Promise((resolve) => {
     const { backdrop, sheet, close } = openSheet(
       `<p class="act-sheet-title">${esc(title)}</p><p class="pick-where"></p>` +
       `<div class="pick-rows"><p class="pick-empty">Loading…</p></div>` +
+      (folders ? `<button type="button" class="sheet-row pick-here" disabled>${esc(button)}</button>` : "") +
       `<button type="button" class="sheet-row cancel">Cancel</button>`,
       "act-choose act-pick", () => resolve(null));
     const whereEl = sheet.querySelector(".pick-where");
     const rowsEl = sheet.querySelector(".pick-rows");
-    let at = remembered ? { ...remembered } : null;
+    const hereEl = sheet.querySelector(".pick-here");
+    // Where it starts: the share it is kept to, else where it was last,
+    // else the shares.
+    let at = within ? { share: within, folder: "", label: "" }
+      : remembered && (!folders || remembered.share) ? { ...remembered } : null;
     let shown = 0;
 
     async function show() {
       const turn = ++shown;
       rowsEl.innerHTML = `<p class="pick-empty">Loading…</p>`;
+      if (hereEl) hereEl.disabled = !at;
       try {
         if (!at) {
           whereEl.textContent = "";
@@ -65,29 +89,47 @@ export function pickFile({ suffixes = [], title = "Open", model = "file" } = {})
             || `<p class="pick-empty">Nothing to open.</p>`;
           return;
         }
+        if (!at.label) {
+          // Kept to one share: its name is looked up once.
+          const shares = await api("GET", recordsUrl("share"));
+          if (turn !== shown) return;
+          const own = shares.find((s) => s.id === at.share);
+          at.label = (own && own.fields.label) || at.share;
+        }
         whereEl.textContent = at.label + (at.folder ? " › " + at.folder.replace(/\//g, " › ") : "");
         const query = "?" + new URLSearchParams({ share: at.share, folder: at.folder }).toString();
         const entries = await api("GET", recordsUrl(model, "", query));
         if (turn !== shown) return;
-        const folders = entries.filter((e) => e.fields.kind === "folder").map((e) => e.fields).sort(byName);
-        const files = entries.filter((e) => e.fields.kind !== "folder" && endsWithOne(e.fields.name, suffixes))
+        const foldersHere = entries.filter((e) => e.fields.kind === "folder").map((e) => e.fields)
+          .filter((f) => at.folder || !not.includes(f.name)).sort(byName);
+        const files = folders ? [] : entries.filter((e) => e.fields.kind !== "folder" && endsWithOne(e.fields.name, suffixes))
           .map((e) => ({ ...e.fields, id: e.id })).sort(byName);
-        const up = rowHtml(own.up, at.folder ? "Back" : "All places", "", 'data-up="1"', "up");
+        // Kept to one share, there is nowhere above its top to go.
+        const up = at.folder ? rowHtml(own.up, "Back", "", 'data-up="1"', "up")
+          : within ? "" : rowHtml(own.up, "All places", "", 'data-up="1"', "up");
         rowsEl.innerHTML = up
-          + folders.map((f) => rowHtml(own.folder, f.name, "", `data-folder="${esc(f.path)}"`)).join("")
+          + foldersHere.map((f) => rowHtml(own.folder, f.name, "", `data-folder="${esc(f.path)}"`)).join("")
           + files.map((f) => rowHtml(own.file, f.name, "", `data-id="${esc(f.id)}"`, "file")).join("")
-          + (!folders.length && !files.length ? `<p class="pick-empty">Nothing to open here.</p>` : "");
+          + (!foldersHere.length && !files.length
+            ? `<p class="pick-empty">${folders ? "No folders in here." : "Nothing to open here."}</p>` : "");
       } catch (err) {
         if (turn !== shown) return;
         rowsEl.innerHTML = `<p class="pick-empty">${esc(err.message)}</p>`;
-        if (at && err.status !== 401) { at = null; toast(err.message); show(); }
+        if (at && !within && err.status !== 401) { at = null; toast(err.message); show(); }
       }
     }
 
     backdrop.addEventListener("click", (event) => {
-      const row = event.target.closest(".pick-row, .cancel");
+      const row = event.target.closest(".pick-row, .cancel, .pick-here");
       if (!row) return;
       if (row.classList.contains("cancel")) { close(); resolve(null); return; }
+      if (row.classList.contains("pick-here")) {
+        if (!at) return;
+        remembered = { ...at };
+        close();
+        resolve({ group: at.share, folder: at.folder, label: at.label });
+        return;
+      }
       if (row.dataset.share !== undefined) {
         at = { share: row.dataset.share, folder: "", label: row.querySelector(".pick-title").textContent };
         show();

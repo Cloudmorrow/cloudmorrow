@@ -46,6 +46,9 @@
 .pick-title { font-size: 16px; overflow-wrap: anywhere; }
 .pick-sub { color: var(--muted); font-size: 13px; }
 .pick-empty { margin: 0; padding: 20px 16px; color: var(--muted); text-align: center; }
+/* The button that takes the folder open: filled, and off until one is. */
+.pick-here { color: var(--accent); font-weight: 600; }
+.pick-here:disabled { color: var(--muted); font-weight: 500; }
 @media (min-width: 900px) and (min-height: 600px) {
   .act-pick { width: 440px; max-width: calc(100vw - 32px); }
   .pick-rows { max-height: 60vh; }

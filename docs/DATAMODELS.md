@@ -369,6 +369,7 @@ for any datamodel whose backend keeps some:
 | `GET /api/records/{model}/{id}/export?as=pdf` | a document as Word, PDF, Markdown or `.docs`, a sheet as Excel, PDF, CSV or `.cell`, to save (docs/DOCS.md, docs/CELLS.md); 400 for anything else |
 | `GET /api/records/{model}/{id}/thumb?size=256` | a small JPEG of a picture; 415 when it is not one the server can scale |
 | `POST /api/records/{model}/upload?field=value…` | a new record from the body's bytes, the query saying where and what it is called |
+| `POST /api/records/{model}/{id}/copy {fields}` | a copy of a file, or of a folder and all in it, where the fields say (`share`, `folder`, `name`, each the original's unless said); nothing said is a duplicate beside it, and a taken name is numbered. A backend that copies says `copy` in `can` |
 
 A share's id is its name (`my-files` for the person's own drive); a file's
 is the share and the path in it, encoded, and it is listed a folder at a

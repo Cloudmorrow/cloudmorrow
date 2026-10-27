@@ -67,12 +67,14 @@ from cloudmorrow.server.routes import (
 from cloudmorrow.server.routes import (
     server as server_routes,
 )
+from cloudmorrow.server.routes import syncs as syncs_routes
 from cloudmorrow.server.secrets import SecretStore
 from cloudmorrow.server.settings import SettingsStore
 from cloudmorrow.server.shares import Protected, ShareStore
 from cloudmorrow.server.signin_limits import SigninLimits
 from cloudmorrow.server.snapshots import SnapshotStore, install_datamodels
 from cloudmorrow.server.state import AppState
+from cloudmorrow.server.syncs import SyncStore
 from cloudmorrow.server.today import Weather
 from cloudmorrow.server.transport import install as require_tls
 from cloudmorrow.server.update import deployed_commit
@@ -156,6 +158,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         users=user_store,
         agents=AgentStore(db),
         jobs=JobStore(db),
+        syncs=SyncStore(db),
         secrets=SecretStore(db, sealer.master),
         notifications=NotificationStore(db),
         features=feature_store,
@@ -314,6 +317,8 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     app.include_router(sharefiles.router, dependencies=[*in_files, Depends(circles.require_data("file"))])
     app.include_router(agents.router)
     app.include_router(agents.agent_router)
+    app.include_router(syncs_routes.router)
+    app.include_router(syncs_routes.agent_router)
     app.include_router(agentquills.router)
     app.include_router(notifications.router)
     app.include_router(notifications.agent_router)

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 
@@ -183,6 +184,49 @@ class SharesBackend:
         except OSError as exc:
             raise RecordError(f"the server cannot delete {path}: {exc.strerror or exc}") from None
         return 1
+
+    def copy(self, principal: Principal, model: Datamodel, record_id: str, fields: dict) -> Record:
+        """A copy of a file, or of a folder and everything in it, where
+        *fields* say: `share` (the same one unless said), `folder` (the same
+        unless said) and `name` (its own unless said); a taken name is
+        numbered, as a put file's is. Nothing said is a duplicate beside the
+        original. Reading the original is enough; the place it goes must be
+        one the caller may change."""
+        if self._is_share(model):
+            raise RecordError("a share is not copied; what is in it is")
+        share, path = self._locate(principal, record_id)
+        source = self._existing(share, path, record_id)
+        if fileops.in_trash(path):
+            raise RecordError("what is in the Trash is restored, not copied")
+        to_share = self._server_side(principal, str(fields.get("share") or share.name), write=True)
+        folder = str(fields.get("folder", path.rpartition("/")[0]) or "").strip("/ ")
+        try:
+            name = fileops.file_name(str(fields.get("name") or source.name))
+        except fileops.FileOpError as exc:
+            raise RecordError(str(exc)) from None
+        if any(part.startswith(".") for part in Path(folder).parts):
+            raise RecordError("not a usable folder")
+        if fileops.in_trash(_join(folder, name)):
+            raise RecordError("nothing is copied into the Trash; delete it instead")
+        if to_share.name == share.name and source.is_dir() and (folder + "/").startswith(path + "/"):
+            raise RecordError("a folder cannot be copied into itself")
+        try:
+            parent = fileops.inside(to_share, folder)
+            parent.mkdir(parents=True, exist_ok=True)
+            if source.is_dir():
+                target = fileops.free_name(parent, name)
+                try:
+                    shutil.copytree(source, target, symlinks=False)
+                except BaseException:
+                    shutil.rmtree(target, ignore_errors=True)
+                    raise
+            else:
+                target = fileops.place(source, parent, name)
+        except fileops.FileOpError as exc:
+            raise RecordError(str(exc)) from None
+        except OSError as exc:
+            raise RecordError(f"the server cannot copy {path}: {exc.strerror or exc}") from None
+        return self._file_record(model, to_share, _join(folder, target.name), target)
 
     def sweep(self) -> int:
         """Every share's Trash, and every drive's, swept of what has been

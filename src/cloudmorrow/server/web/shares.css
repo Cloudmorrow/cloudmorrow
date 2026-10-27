@@ -55,7 +55,6 @@
 .who-row select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* In the Files list: the button above, and the line under each share. */
-.share-new { margin-bottom: 18px; }
 .row.share-who { min-height: 40px; padding-left: 54px; }
 .row.share-who .preview { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row.share-who .said { color: var(--accent); font-weight: 600; font-size: 14px; }

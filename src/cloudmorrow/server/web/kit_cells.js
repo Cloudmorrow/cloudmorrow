@@ -45,7 +45,7 @@ import {
 } from "./kit_editor.js";
 import { CellError, SIDES, Sheet, colName, extent, isFormula, parseRef, rangeName, refName, wantsRef } from "./kit_cells_rules.js";
 import { ask } from "./dialog.js";
-import { choose } from "./actions.js";
+import { choose, menu } from "./actions.js";
 import { pickFile } from "./filepick.js";
 
 const NEW = "~new";
@@ -608,50 +608,9 @@ function menuChoices(ed, kind) {
   return [...clear, ...rows, { sep: true }, ...cols];
 }
 
-let menuOpen = null;
-function closeMenu() { if (menuOpen) menuOpen(); }
-
 /** The menu for the selection: at the pointer on a computer, a sheet from the bottom on a phone. */
-function openMenu(ed, kind, { x = null, y = null } = {}) {
-  closeMenu();
-  const choices = menuChoices(ed, kind);
-  if (matchMedia("(pointer: coarse)").matches || x === null) {
-    choose("", choices.filter((c) => !c.sep));
-    return;
-  }
-  const menu = document.createElement("div");
-  menu.className = "cell-menu";
-  menu.setAttribute("role", "menu");
-  menu.innerHTML = choices.map((c, i) => (c.sep ? "<hr>" :
-    `<button type="button" role="menuitem"${c.tone === "danger" ? ' class="danger"' : ""} data-choice="${i}">${esc(c.label)}</button>`)).join("");
-  document.body.appendChild(menu);
-  menu.style.left = `${Math.max(8, Math.min(x, innerWidth - menu.offsetWidth - 8))}px`;
-  menu.style.top = `${Math.max(8, Math.min(y, innerHeight - menu.offsetHeight - 8))}px`;
-  const items = [...menu.querySelectorAll("button")];
-  const gone = new AbortController();
-  const close = () => { menu.remove(); gone.abort(); menuOpen = null; };
-  menuOpen = close;
-  menu.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-choice]");
-    if (!button) return;
-    close();
-    ed.wrap.focus();
-    choices[+button.dataset.choice].run();
-  });
-  menu.addEventListener("keydown", (event) => {
-    const i = items.indexOf(document.activeElement);
-    if (event.key === "ArrowDown") items[(i + 1) % items.length].focus();
-    else if (event.key === "ArrowUp") items[(i - 1 + items.length) % items.length].focus();
-    else if (event.key === "Escape" || event.key === "Tab") { close(); ed.wrap.focus(); }
-    else return;
-    event.preventDefault();
-  });
-  const { signal } = gone;
-  document.addEventListener("mousedown", (event) => { if (!menu.contains(event.target)) close(); }, { capture: true, signal });
-  document.addEventListener("scroll", close, { capture: true, signal });
-  addEventListener("resize", close, { signal });
-  addEventListener("hashchange", close, { signal });
-  items[0].focus();
+function openMenu(ed, kind, at = {}) {
+  menu(menuChoices(ed, kind), at);
 }
 
 // How many cells rows (or columns) `from` to `to` hold.

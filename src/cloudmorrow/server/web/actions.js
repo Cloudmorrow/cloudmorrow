@@ -17,7 +17,12 @@
    Three places press one: the record sheet, for every action `on` the
    record's datamodel, from whichever Quill declares it; the bar under a
    Quill's title, for its actions that are on nothing; and a view's
-   buttons, forms and rows (kit_view.js). All three come through `press`. */
+   buttons, forms and rows (kit_view.js). All three come through `press`.
+
+   The menu a thing has — a right-click on a computer, a long press on a
+   phone — is here too (`menu`, `contextMenus`), so every kit's is the
+   same one; and which Quills edit a file of a given name (`editorsFor`),
+   read off the screens the manifests declare. */
 
 import { ApiError, api, app, esc, go, parseHash, route, toast } from "./core.js";
 import { ask, openSheet } from "./dialog.js";
@@ -28,6 +33,18 @@ let quills = [];
 export function knowQuills(list) { quills = list; }
 
 const quillById = (id) => quills.find((q) => q.id === id);
+
+/** The screen's `suffix`: one, or a list; what files it is over. */
+const suffixList = (screen) =>
+  (typeof screen.suffix === "string" ? [screen.suffix] : (screen.suffix || [])).map(String).filter(Boolean);
+
+/** The screens that edit a file called *name*, by its suffix: `[{quill, screen}]`, in the Quills' order. */
+export const editorsFor = (name) => {
+  const lower = String(name || "").toLowerCase();
+  return quills.flatMap((quill) => (quill.screens || [])
+    .filter((screen) => suffixList(screen).some((s) => lower.endsWith(s.toLowerCase())))
+    .map((screen) => ({ quill, screen })));
+};
 const actionIn = (quill, id) => (quill && quill.actions || []).find((a) => a.id === id);
 /** An action by its Quill's id and its own. */
 export const findAction = (quillId, actionId) => actionIn(quillById(quillId), actionId);
@@ -90,6 +107,116 @@ export function choose(title, choices) {
     if (row.dataset.choice) choices[Number(row.dataset.choice)].run();
   });
 }
+
+// -- a menu on a thing ------------------------------------------------------------------------
+// The choices a right-click, a long press or the menu key offers on a
+// thing: `[{label, run, tone, sep}]`. On a computer a small menu at the
+// pointer, with the arrows, Enter and Escape working; on a phone, or with
+// no place given, the sheet from the bottom that `choose` is. One at a
+// time — opening one closes the last — and what was focused is again after.
+let menuOpen = null;
+export function closeMenu() { if (menuOpen) menuOpen(); }
+
+export function menu(choices, { x = null, y = null } = {}) {
+  closeMenu();
+  if (!choices.length) return;
+  if (matchMedia("(pointer: coarse)").matches || x === null) {
+    choose("", choices.filter((c) => !c.sep));
+    return;
+  }
+  const was = document.activeElement;
+  const box = document.createElement("div");
+  box.className = "context-menu";
+  box.setAttribute("role", "menu");
+  box.innerHTML = choices.map((c, i) => (c.sep ? "<hr>" :
+    `<button type="button" role="menuitem"${c.tone === "danger" ? ' class="danger"' : ""} data-choice="${i}">${esc(c.label)}</button>`)).join("");
+  document.body.appendChild(box);
+  box.style.left = `${Math.max(8, Math.min(x, innerWidth - box.offsetWidth - 8))}px`;
+  box.style.top = `${Math.max(8, Math.min(y, innerHeight - box.offsetHeight - 8))}px`;
+  const items = [...box.querySelectorAll("button")];
+  const gone = new AbortController();
+  const close = () => {
+    box.remove();
+    gone.abort();
+    menuOpen = null;
+    if (was && was.isConnected && typeof was.focus === "function") was.focus();
+  };
+  menuOpen = close;
+  box.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-choice]");
+    if (!button) return;
+    close();
+    choices[+button.dataset.choice].run();
+  });
+  box.addEventListener("keydown", (event) => {
+    const i = items.indexOf(document.activeElement);
+    if (event.key === "ArrowDown") items[(i + 1) % items.length].focus();
+    else if (event.key === "ArrowUp") items[(i - 1 + items.length) % items.length].focus();
+    else if (event.key === "Escape" || event.key === "Tab") close();
+    else return;
+    event.preventDefault();
+  });
+  const { signal } = gone;
+  document.addEventListener("mousedown", (event) => { if (!box.contains(event.target)) close(); }, { capture: true, signal });
+  document.addEventListener("scroll", close, { capture: true, signal });
+  addEventListener("resize", close, { signal });
+  addEventListener("hashchange", close, { signal });
+  items[0].focus();
+}
+
+// A finger held this long on a thing asks for its menu.
+const LONG_PRESS = 500;
+
+/**
+ * Menus on the things under *root* that match *selector*, and on the room
+ * around them: a right-click on a computer, a long press on a phone.
+ * `choicesFor(el, event)` answers the choices for a thing, `blank(event)`
+ * for the room; nothing from either leaves the browser's own menu. The
+ * press that became a menu is not also a tap on the thing.
+ */
+export function contextMenus(root, selector, choicesFor, { blank = null } = {}) {
+  const open = (event, el) => {
+    const choices = el ? choicesFor(el, event) : (blank ? blank(event) : null);
+    if (!choices || !choices.length) return false;
+    event.preventDefault();
+    menu(choices, { x: event.clientX, y: event.clientY });
+    return true;
+  };
+  let pressed = null;   // the press under way: where it began, and its timer
+  const end = () => { if (pressed) clearTimeout(pressed.timer); pressed = null; };
+  root.addEventListener("contextmenu", (event) => {
+    end();
+    if (held()) { event.preventDefault(); return; }
+    const el = event.target.closest(selector);
+    open(event, el && root.contains(el) ? el : null);
+  });
+  root.addEventListener("pointerdown", (event) => {
+    end();
+    if (event.pointerType === "mouse" || event.button !== 0) return;
+    const el = event.target.closest(selector);
+    const { clientX, clientY, target } = event;
+    pressed = { x: clientX, y: clientY, timer: setTimeout(() => {
+      pressed = null;
+      if (open({ clientX, clientY, target, preventDefault() {} }, el && root.contains(el) ? el : null)) heldAt = Date.now();
+    }, LONG_PRESS) };
+  });
+  root.addEventListener("pointermove", (event) => {
+    if (pressed && Math.hypot(event.clientX - pressed.x, event.clientY - pressed.y) > 10) end();
+  });
+  for (const type of ["pointerup", "pointercancel"]) root.addEventListener(type, end);
+}
+
+// When a press became a menu: the tap the finger's lift makes — on the
+// thing, or on the sheet that has opened over it — and the browser's own
+// menu are taken back, once, wherever they land.
+let heldAt = 0;
+const held = () => heldAt && Date.now() - heldAt < 1500;
+document.addEventListener("click", (event) => {
+  if (!held()) return;
+  heldAt = 0;
+  event.preventDefault();
+  event.stopPropagation();
+}, { capture: true });
 
 // -- the form ---------------------------------------------------------------------------------
 // An action's fields are a datamodel's fields, so they are drawn with the

@@ -150,7 +150,7 @@ async def _act_grid(api: CloudmorrowClient, screen: Screen, action: str, args: l
         folder, _, name = rest[0].strip("/").rpartition("/")
         await api.create_record(screen.model, {**grid.where(group, folder), grid.name: name, grid.kind: "folder"})
         quillrun.console.print(f"[green]Made[/] {escape(rest[0].strip('/'))}/")
-    elif action in ("show", "delete", "set", "restore"):
+    elif action in ("show", "delete", "set", "restore", "copy"):
         if not rest:
             fail(f"which one? {command} {action} {group} <path>")
         record = await _entry(api, grid, group, rest[0])
@@ -163,6 +163,16 @@ async def _act_grid(api: CloudmorrowClient, screen: Screen, action: str, args: l
         elif action == "set":
             changed = await api.update_record(screen.model, record["id"], _pairs(rest[1:], screen), rev=record["rev"])
             quillrun.console.print(f"[green]Saved[/] {escape(str(changed['fields'].get(grid.name, '')))}")
+        elif action == "copy":
+            # To a folder, in this group or another (`group:folder`); with
+            # neither, a duplicate beside it. A taken name is numbered.
+            fields: dict = {}
+            if len(rest) > 1:
+                where, sep, folder = rest[1].rpartition(":")
+                fields = {**grid.where(where if sep else group, folder)}
+            made = await api.copy_record(screen.model, record["id"], fields)
+            copied = escape(str(made["fields"].get(grid.name, "")))
+            quillrun.console.print(f"[green]Copied[/] {escape(rest[0])} to {copied}")
         elif action == "restore":
             # Back where it was before it was deleted; the server makes the
             # folders on the way if they are gone, and numbers a taken name.
@@ -182,4 +192,4 @@ async def _act_grid(api: CloudmorrowClient, screen: Screen, action: str, args: l
             await api.delete_record(screen.model, record["id"])
             quillrun.console.print(f"[green]Moved[/] {escape(rest[0])} to the Trash")
     else:
-        fail(f"a {screen.kit} has list, get, put, add, show, set, delete and restore, not {action}")
+        fail(f"a {screen.kit} has list, get, put, add, show, set, copy, delete and restore, not {action}")

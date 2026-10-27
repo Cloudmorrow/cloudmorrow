@@ -40,3 +40,4 @@ modified = "modified"
 mime = "mime"
 deleted = "deleted"             # in the Trash: when it went there, and Restore instead of Delete
 deleted_from = "deleted_from"   # …and where it was, which Restore puts it back to
+trash = "Trash"                 # the folder the server keeps them in: a bin beside the plus, not among the folders

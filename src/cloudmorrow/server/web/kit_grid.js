@@ -17,14 +17,27 @@
    type, as a list or as tiles; a tile for a picture shows the picture,
    small, fetched as it scrolls into view and a few at a time. The plus puts
    something in: one picked, a photo taken, or a new folder; a computer can
-   drag files in, or paste one. A record is renamed, moved and deleted from
-   its own page, a folder from the “…” beside its name.
+   drag files in, or paste one; the room around the rows has a menu with a
+   new folder and a new, empty text file by any name. A record is renamed,
+   moved and deleted from its own page, a folder from the “…” beside its
+   name — and every row and tile has a menu (a right-click, a long press on
+   a phone: actions.js's) with Open, the Quills that edit that kind of file,
+   Rename, Duplicate, Copy to, Move to and Delete. Select beside the title,
+   or Shift or Ctrl with a click, picks several for one of those; and a row
+   or tile dragged onto a folder moves there, with whatever is picked.
+   The magnifier beside the title opens a search through the folder and
+   everything under it — names, and the lines of text files, as the record
+   API searches (`within` and `q`) — whose hits say where each one is.
 
    Deleting does not lose anything: the server moves what is deleted to a
    Trash folder, and a record in there — the screen's `deleted` field says
    when it went, `deleted_from` where it was — has Restore in place of
    Rename and Move, and a Delete that is for good. The server sweeps the
    Trash of what has sat there a month; the kit only draws what it says.
+   The screen's `trash` names the folder at the top of a group the server
+   keeps it in: that one is not among the folders but a bin before the
+   plus, and in it an Empty button in place of the “…”, which deletes the
+   folder itself — what the server takes as emptying it.
 
    A group whose `group_open` field is false is listed and not opened — it
    is somewhere this server cannot show — with its `group_subtitle` saying
@@ -39,18 +52,24 @@
    still opens, and is still sent on or saved. */
 
 import {
-  api, apiRaw, app, back, baseName, encodePath, esc, folderOf, formatDate, heading, icons, joinPath,
+  api, apiRaw, app, back, baseName, encodePath, esc, folderOf, formatDate, go, heading, icons, joinPath,
   localDay, mount, nav, onSignOut, pad2, recordsUrl, renderRoute, replace, route, seconds, store,
   tabs, toast, wireShell,
 } from "./core.js";
 import { mayWrite, plural } from "./kit.js";
 import { ask, askText } from "./dialog.js";
+import { contextMenus, editorsFor, menu } from "./actions.js";
+import { pickFolder } from "./filepick.js";
 
 const own = {
   place: '<svg width="22" height="20" viewBox="0 0 22 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="2" width="19" height="6" rx="1.5"/><rect x="1.5" y="12" width="19" height="6" rx="1.5"/><path d="M5 5h.01M5 15h.01" stroke-linecap="round" stroke-width="2.4"/></svg>',
   first: '<svg width="22" height="20" viewBox="0 0 22 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12.5V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v7.5"/><rect x="1.5" y="12.5" width="19" height="5.5" rx="1.5"/><path d="M16.5 15.25h.01" stroke-width="2.4"/></svg>',
   away: '<svg width="22" height="20" viewBox="0 0 22 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="19" height="12" rx="1.5"/><path d="M7 17.5h8M11 14.5v3"/></svg>',
   folder: '<svg width="22" height="18" viewBox="0 0 22 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h5l2 2.5h9a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H3a1.5 1.5 0 0 1-1.5-1.5z"/></svg>',
+  // A folder's tile: the folder itself, filled, with its tab.
+  folderFull: '<svg width="22" height="18" viewBox="0 0 22 18" fill="currentColor"><path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h5l2 2.5h9a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H3a1.5 1.5 0 0 1-1.5-1.5z"/></svg>',
+  copy: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',
+  edit: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="m11 15 9.5-9.5-2-2L9 13l-.5 2.5z"/></svg>',
   file: '<svg width="20" height="22" viewBox="0 0 20 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.5 2h8l5 5v13a1 1 0 0 1-1 1h-12a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M11.5 2v5h5"/></svg>',
   image: '<svg width="22" height="20" viewBox="0 0 22 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2" width="19" height="16" rx="2"/><circle cx="7.5" cy="7.5" r="2"/><path d="m20.5 14-5-5-8 8"/></svg>',
   video: '<svg width="22" height="20" viewBox="0 0 22 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="3" width="13" height="14" rx="2"/><path d="m14.5 8 6-3v10l-6-3z"/></svg>',
@@ -75,8 +94,9 @@ const own = {
 
 // -- what else may add to a grid ---------------------------------------------------
 // A hook's `groups({at, model, records})` is asked when the groups are
-// drawn; it answers null, or `{after(record) → html, wire(root)}`: a line
-// drawn under each group, and what it does once it is on the page.
+// drawn; it answers null, or `{after(record) → html, wire(root), menu()}`:
+// a line drawn under each group, what it does once it is on the page, and
+// choices for the “…” beside the title (actions.js's menu).
 const hooks = [];
 export function registerGridHook(hook) { hooks.push(hook); }
 
@@ -99,6 +119,7 @@ function bind(at) {
     mime: screen.mime || "",
     deleted: screen.deleted || "",
     deletedFrom: screen.deleted_from || "",
+    trash: screen.trash || "",
     groupTitle: groupModel.title,
     groupSubtitle: screen.group_subtitle || "",
     groupOpen: screen.group_open || "",
@@ -121,6 +142,7 @@ function entryOf(b, record) {
     id: record.id,
     rev: record.rev,
     name: String(f[b.title] || ""),
+    group: String(f[b.group] || ""),
     folder: String(f[b.folder] || ""),
     is_dir: f[b.kind] === "folder",
     size: Number(b.size ? f[b.size] : 0) || 0,
@@ -241,8 +263,9 @@ async function renderGroups(at, b) {
     catch { return null; }
   }))).filter(Boolean);
   const after = (r) => extras.map((x) => (x.after ? x.after(r) : "")).join("");
-  // What a hook puts above the groups: a button that makes one, say.
-  const top = extras.map((x) => (x.top ? x.top() : "")).join("");
+  // What the hooks offer beside the title: making a group, say.
+  const choices = extras.flatMap((x) => (x.menu ? x.menu() : []));
+  const moreButton = choices.length ? `<button class="more" aria-label="More">${own.more}</button>` : "";
   const rowOf = (r, index) => {
     const about = b.groupSubtitle ? String(r.fields[b.groupSubtitle] || "") : "";
     const meta = about ? `<span class="meta"><span class="preview">${esc(about)}</span></span>` : "";
@@ -260,14 +283,20 @@ async function renderGroups(at, b) {
   const [first, ...rest] = records;
   mount(nav({ title: at.screen.label }) + `
     <main class="grid-groups">
-      ${heading(at.screen.label)}
-      ${top}
+      ${heading(at.screen.label, moreButton)}
       ${first ? `<div class="group">${rowOf(first, 0)}${after(first)}</div>` : ""}
       ${rest.length ? `<div class="group-label">${esc(plural(b.groupModel.label))}</div>
         <div class="group">${rest.map((r, i) => rowOf(r, i + 1) + after(r)).join("")}</div>` : ""}
       ${records.length ? "" : `<p class="empty mascot"><b>Nothing here yet</b>There is nowhere to open yet.</p>`}
     </main>` + tabs(at.tab));
   wireShell();
+  const more = app.querySelector(".heading .more");
+  if (more) {
+    more.addEventListener("click", () => {
+      const box = more.getBoundingClientRect();
+      menu(choices, { x: box.right - 200, y: box.bottom + 4 });
+    });
+  }
   for (const x of extras) if (x.wire) x.wire(app);
 }
 
@@ -280,9 +309,21 @@ async function listFolder(b, group, folder) {
 }
 
 async function renderFolder(at, b, group, folder) {
+  // The Trash is made by the first delete and goes when it is emptied: not
+  // there to list, it is there to open, and empty.
+  const isTrash = Boolean(b.trash) && folder === b.trash;
+  const inTrash = Boolean(b.trash) && (isTrash || folder.startsWith(b.trash + "/"));
+  const list = async () => {
+    try {
+      return await listFolder(b, group, folder);
+    } catch (err) {
+      if (isTrash && (err.status === 404 || err.status === 400)) return [];
+      throw err;
+    }
+  };
   let entries;
   try {
-    entries = await listFolder(b, group, folder);
+    entries = await list();
   } catch (err) {
     // Gone, or a place this server cannot show after all: back a step.
     if (err.status === 404 || err.status === 400) {
@@ -299,17 +340,41 @@ async function renderFolder(at, b, group, folder) {
   const parent = folder ? folderHash(at, group, folderOf(folder)) : at.base;
   const parentLabel = folder ? (folderOf(folder) ? baseName(folderOf(folder)) : groupName) : at.screen.label;
   const title = folder ? baseName(folder) : groupName;
-  const moreButton = folder && b.writes
+  // Nothing goes into the Trash, or into what is in it, but by being deleted.
+  const takesIn = b.writes && !inTrash;
+  const moreButton = folder && b.writes && !isTrash
     ? `<button class="more" aria-label="${esc(title)}: rename, move or delete">${own.more}</button>` : "";
+  // At the top of a group the Trash is a bin, not a folder; in it, Empty.
+  const binButton = !folder && b.trash
+    ? `<a class="button bin" href="${folderHash(at, group, b.trash)}" aria-label="${esc(b.trash)}">${icons.trash}</a>` : "";
+  const emptyButton = isTrash && b.writes
+    ? `<button class="empty-trash" hidden>${icons.trash}<span>Empty</span></button>` : "";
+  // A search through the folder and all under it, in the heading: the
+  // magnifier opens the field, Escape or Cancel closes it. Not at the
+  // groups, which are not a folder.
+  const findButton = `<button class="find" aria-label="Search" aria-pressed="false">${icons.search}</button>`;
+  const findField = `<input class="find-input" type="search" placeholder="Search ${esc(title)}" aria-label="Search ${esc(title)}" autocapitalize="none" autocorrect="off" spellcheck="false" hidden>`;
+  // Several at once: Select, then what can be done to them, by where they are.
+  const selectButton = `<button class="choose" aria-pressed="false" hidden>Select</button>`;
+  const bulk = inTrash
+    ? (b.writes ? [["restore", "Restore"], ["delete", "Delete for good", "danger"]] : [])
+    : [["copy", "Copy to…"], ...(b.writes ? [["move", "Move to…"], ["delete", "Delete", "danger"]] : [])];
+  const bulkButtons = bulk.map(([what, label, tone]) =>
+    `<button type="button" class="${tone || ""}" data-bulk="${what}" disabled>${label}</button>`).join("");
   mount(nav({ back: parent, backLabel: parentLabel, title }) + `
     <main>
-      ${heading(title, moreButton + (b.writes ? `<button class="add" aria-label="Add">${own.plus}</button>` : ""))}
+      ${heading(title, findField + findButton + selectButton + moreButton + binButton + emptyButton + (takesIn ? `<button class="add" aria-label="Add">${own.plus}</button>` : ""))}
       <div class="sort-row">
         <div class="sort" role="group" aria-label="Sort by"></div>
         <div class="view-switch" role="group" aria-label="Show as"></div>
       </div>
+      <div class="choose-bar" hidden>
+        <span class="count"></span>
+        <button type="button" class="all">All</button>
+        ${bulkButtons}
+      </div>
       <div class="listing"></div>
-      ${b.writes ? `<input type="file" class="pick-input" multiple hidden>
+      ${takesIn ? `<input type="file" class="pick-input" multiple hidden>
       <input type="file" class="camera-input" accept="image/*" capture="environment" hidden>` : ""}
     </main>` + tabs(at.tab));
   wireShell();
@@ -317,18 +382,43 @@ async function renderFolder(at, b, group, folder) {
   const sortEl = app.querySelector(".sort");
   const viewEl = app.querySelector(".view-switch");
   const listingEl = app.querySelector(".listing");
+  const emptyEl = app.querySelector(".heading .empty-trash");
+  const selectEl = app.querySelector(".heading .choose");
+  const barEl = app.querySelector(".choose-bar");
+  const mainEl = app.querySelector("main");
+  const findEl = app.querySelector(".heading .find");
+  const findInput = app.querySelector(".heading .find-input");
+  // The Trash is drawn beside the title, not among the folders.
+  const shown = () => (folder || !b.trash ? entries : entries.filter((e) => !(e.is_dir && e.name === b.trash)));
   let choice = sortChoice(at);
   let view = viewChoice(at);
 
+  const hrefOf = (entry) => (entry.is_dir ? folderHash(at, group, joinPath(folder, entry.name)) : itemHash(at, b, entry.id));
+  // Every row and tile says which record it is, can be picked, and — where
+  // it may be moved — dragged onto a folder.
+  const check = `<span class="check" aria-hidden="true">${icons.tick}</span>`;
+  const itemAttrs = (entry) => `data-id="${esc(entry.id)}"${takesIn ? ' draggable="true"' : ""}`;
+  // A hit says where it is under this folder, and the line that matched.
+  const whereSaid = (entry) => {
+    const under = folder && entry.folder.startsWith(folder + "/") ? entry.folder.slice(folder.length + 1) : (folder === entry.folder ? "" : entry.folder);
+    return under ? `<span class="date">${esc(under)}</span>` : "";
+  };
   const row = (entry) => {
     const kind = kindOf(entry);
+    if (found !== null && !entry.is_dir) {
+      return `<a class="row has-icon" href="${hrefOf(entry)}" ${itemAttrs(entry)}>${check}
+        <span class="icon">${own[kind] || own.file}</span>
+        <span class="main"><span class="title">${esc(entry.name)}</span>
+        <span class="meta">${whereSaid(entry)}${entry.preview ? `<span class="preview">${esc(entry.preview)}</span>` : ""}` +
+        `<span class="type">${esc(typeLabel(entry))}</span></span></span></a>`;
+    }
     if (entry.is_dir) {
-      return `<a class="row has-icon" href="${folderHash(at, group, joinPath(folder, entry.name))}">
+      return `<a class="row has-icon folder" href="${hrefOf(entry)}" ${itemAttrs(entry)}>${check}
         <span class="icon">${own.folder}</span>
         <span class="main"><span class="title">${esc(entry.name)}</span></span>
         <span class="chevron">${icons.chevronRight}</span></a>`;
     }
-    return `<a class="row has-icon" href="${itemHash(at, b, entry.id)}">
+    return `<a class="row has-icon" href="${hrefOf(entry)}" ${itemAttrs(entry)}>${check}
       <span class="icon">${own[kind] || own.file}</span>
       <span class="main"><span class="title">${esc(entry.name)}</span>
       <span class="meta">${entry.modified ? `<span class="date">${esc(formatDate(entry.modified))}</span>` : ""}` +
@@ -340,13 +430,16 @@ async function renderFolder(at, b, group, folder) {
   // tile scrolls into view, not before.
   const tile = (entry) => {
     const kind = kindOf(entry);
-    const href = entry.is_dir ? folderHash(at, group, joinPath(folder, entry.name)) : itemHash(at, b, entry.id);
     const thumb = kind === "image" ? ` data-thumb="${esc(entry.id)}" data-stamp="${esc(entry.rev)}"` : "";
-    return `<a class="tile ${kind}" href="${href}"${thumb}>
-      <span class="thumb"><span class="icon">${own[kind] || own.file}</span></span>
+    return `<a class="tile ${kind}" href="${hrefOf(entry)}" ${itemAttrs(entry)}${thumb}>
+      <span class="thumb">${check}<span class="icon">${entry.is_dir ? own.folderFull : own[kind] || own.file}</span></span>
       <span class="name">${esc(entry.name)}</span></a>`;
   };
   let watcher = null;
+  let sorted = [];
+  // What the search found, or null when there is none on: the listing is
+  // those instead, each saying where it is.
+  let found = null;
   const show = () => {
     sortEl.innerHTML = SORTS.map(([key, label]) => {
       const active = key === choice.key;
@@ -356,16 +449,67 @@ async function renderFolder(at, b, group, folder) {
     viewEl.innerHTML = VIEWS.map(([key, label]) =>
       `<button class="${key === view ? "active" : ""}" data-view="${key}" aria-pressed="${key === view}" aria-label="${label}">${own[key]}</button>`).join("");
     if (watcher) { watcher.disconnect(); watcher = null; }
-    const sorted = sortEntries(entries, choice);
+    sorted = sortEntries(found !== null ? found : shown(), choice);
+    if (emptyEl) emptyEl.hidden = !sorted.length;
+    selectEl.hidden = !sorted.length && !selecting;
     if (!sorted.length) {
-      listingEl.innerHTML = `<p class="empty mascot"><b>Nothing here yet</b>This folder is empty.${b.writes ? " Add something with the plus." : ""}</p>`;
+      listingEl.innerHTML = found !== null
+        ? `<p class="empty"><b>Nothing found</b>No name or line in here says “${esc(findInput.value.trim())}”.</p>`
+        : isTrash
+        ? `<p class="empty mascot"><b>The ${esc(b.trash)} is empty</b>What you delete waits here before it goes for good.</p>`
+        : `<p class="empty mascot"><b>Nothing here yet</b>This folder is empty.${takesIn ? " Add something with the plus." : ""}</p>`;
     } else if (view === "grid") {
       listingEl.innerHTML = `<div class="tiles">${sorted.map(tile).join("")}</div>`;
       watcher = watchTiles(b, listingEl);
     } else {
       listingEl.innerHTML = `<div class="group">${sorted.map(row).join("")}</div>`;
     }
+    showSelection();
   };
+
+  // -- several at once ------------------------------------------------------------
+  // Select, or Shift or Ctrl with a click, picks; Shift from the last one
+  // picked takes the run between. Picked, a click picks rather than opens.
+  const picked = new Set();
+  let selecting = false;
+  let anchorId = null;
+  const byId = (id) => sorted.find((e) => e.id === id);
+  const chosen = () => sorted.filter((e) => picked.has(e.id));
+  const showSelection = () => {
+    for (const id of [...picked]) if (!byId(id)) picked.delete(id);
+    mainEl.classList.toggle("selecting", selecting);
+    selectEl.textContent = selecting ? "Done" : "Select";
+    selectEl.setAttribute("aria-pressed", String(selecting));
+    barEl.hidden = !selecting;
+    barEl.querySelector(".count").textContent = `${picked.size} selected`;
+    for (const button of barEl.querySelectorAll("[data-bulk]")) button.disabled = !picked.size;
+    for (const el of listingEl.querySelectorAll("[data-id]")) el.classList.toggle("picked", picked.has(el.dataset.id));
+  };
+  const setSelecting = (on) => {
+    selecting = on;
+    if (!on) { picked.clear(); anchorId = null; }
+    showSelection();
+  };
+  selectEl.addEventListener("click", () => setSelecting(!selecting));
+  barEl.querySelector(".all").addEventListener("click", () => {
+    for (const entry of sorted) picked.add(entry.id);
+    showSelection();
+  });
+  listingEl.addEventListener("click", (event) => {
+    const item = event.target.closest("[data-id]");
+    if (!item || !(selecting || event.ctrlKey || event.metaKey || event.shiftKey)) return;
+    event.preventDefault();
+    const id = item.dataset.id;
+    if (event.shiftKey && anchorId && byId(anchorId)) {
+      const ids = sorted.map((e) => e.id);
+      const [from, to] = [ids.indexOf(anchorId), ids.indexOf(id)].sort((p, q) => p - q);
+      for (const one of ids.slice(from, to + 1)) picked.add(one);
+    } else if (picked.has(id)) picked.delete(id);
+    else picked.add(id);
+    anchorId = id;
+    selecting = true;
+    showSelection();
+  });
   show();
   viewEl.addEventListener("click", (event) => {
     const button = event.target.closest("[data-view]");
@@ -386,24 +530,103 @@ async function renderFolder(at, b, group, folder) {
   });
 
   const reload = async () => {
-    entries = await listFolder(b, group, folder);
-    show();
+    entries = await list();
+    if (found !== null) await find();
+    else show();
   };
   const place = { b, group, folder };
+
+  // -- the search ------------------------------------------------------------------
+  // Through the folder and everything under it, as typed, a moment after
+  // the last letter; the hits are files, with the line that matched.
+  let asked = 0;
+  const find = async () => {
+    const q = findInput.value.trim();
+    const turn = ++asked;
+    if (!q) { found = null; show(); return; }
+    const query = `?${encodeURIComponent(b.group)}=${encodeURIComponent(group)}` +
+      `&within=${encodeURIComponent(folder)}&q=${encodeURIComponent(q)}`;
+    let hits;
+    try { hits = await api("GET", recordsUrl(b.model.id) + query); }
+    catch (err) { if (turn === asked) toast(err.message); return; }
+    if (turn !== asked) return;
+    found = hits.map((r) => ({ ...entryOf(b, r), preview: String(r.fields.preview || "") }))
+      .filter((e) => !(b.trash && !folder && (e.folder === b.trash || e.folder.startsWith(b.trash + "/"))));
+    show();
+  };
+  let typing = null;
+  const openFind = (on) => {
+    findInput.hidden = !on;
+    findEl.setAttribute("aria-pressed", String(on));
+    mainEl.classList.toggle("finding", on);
+    if (on) { findInput.focus(); return; }
+    findInput.value = "";
+    found = null;
+    show();
+  };
+  findEl.addEventListener("click", () => openFind(findInput.hidden));
+  findInput.addEventListener("input", () => {
+    clearTimeout(typing);
+    typing = setTimeout(find, 250);
+  });
+  findInput.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") { event.preventDefault(); openFind(false); }
+    if (event.key === "Enter") { event.preventDefault(); clearTimeout(typing); find(); }
+  });
+  barEl.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-bulk]");
+    if (!button) return;
+    const said = await changeMany(b, chosen(), button.dataset.bulk);
+    if (said) toast(said);
+    setSelecting(false);
+    await reload();
+  });
+
+  // -- the menu on a row, a tile, and the room around them ------------------------
+  const editHash = (e, id) =>
+    `#/r/${encodeURIComponent(e.quill.id)}/${encodeURIComponent(e.screen.id)}/${encodeURIComponent(e.screen.model)}/${encodeURIComponent(id)}`;
+  const editors = (entry) => (entry.is_dir || entry.deleted ? [] : editorsFor(entry.name)
+    .filter((e) => e.screen.model === b.model.id)
+    .map((e) => ({ label: `Edit with ${e.quill.name}`, run: () => go(editHash(e, entry.id)) })));
+  const act = async (entry, what) => {
+    const done = await change(b, entry, what);
+    if (!done) return;
+    const said = saidDone(done, entry.name);
+    if (said) toast(said);
+    await reload();
+  };
+  const choicesFor = (entry) => {
+    const open = [{ label: "Open", run: () => go(hrefOf(entry)) }, ...editors(entry)];
+    if (inTrash) {
+      return b.writes ? [...open, { sep: true },
+        { label: "Restore", run: () => act(entry, "restore") },
+        { label: "Delete for good", tone: "danger", run: () => act(entry, "delete") }] : open;
+    }
+    const copy = { label: "Copy to…", run: () => act(entry, "copy") };
+    if (!b.writes) return [...open, { sep: true }, copy];
+    return [...open, { sep: true },
+      { label: "Rename…", run: () => act(entry, "rename") },
+      { label: "Duplicate", run: () => act(entry, "duplicate") },
+      copy,
+      { label: "Move to…", run: () => act(entry, "move") },
+      { sep: true },
+      { label: "Delete", tone: "danger", run: () => act(entry, "delete") }];
+  };
+  const blank = (event) => (takesIn && !event.target.closest(".heading, .sort-row, .choose-bar, button, input") ? [
+    { label: "New folder…", run: () => newFolder(place, reload) },
+    { label: "New text file…", run: () => newTextFile(place, reload) },
+    { sep: true },
+    { label: "Choose a file…", run: () => app.querySelector(".pick-input").click() },
+  ] : null);
+  contextMenus(mainEl, "[data-id]", (el) => {
+    const entry = byId(el.dataset.id);
+    return entry ? choicesFor(entry) : null;
+  }, { blank });
+
   // Nothing goes in, by any of the ways below, where nothing may be written.
   openFolder = null;
   if (!b.writes) return;
 
-  // Adding: the plus opens a sheet with the ways in. A picker or the camera
-  // ends in a file input, which has to be clicked from the tap itself for
-  // the phone to open it.
-  const pickInput = app.querySelector(".pick-input");
-  const cameraInput = app.querySelector(".camera-input");
-  app.querySelector(".heading .add").addEventListener("click", () => openSheet([
-    { icon: own.pick, label: "Choose a file", run: () => pickInput.click() },
-    { icon: own.camera, label: "Take a photo", run: () => cameraInput.click() },
-    { icon: own.newFolder, label: "New folder", run: () => newFolder(place, reload) },
-  ]));
   const more = app.querySelector(".heading .more");
   if (more) {
     // Which choices depends on where the folder is: one in the Trash is
@@ -416,11 +639,73 @@ async function renderFolder(at, b, group, folder) {
         { icon: icons.trash, label: "Delete folder for good", bad: true, run: () => folderAction(at, place, "delete", here) },
       ] : [
         { icon: own.rename, label: "Rename folder", run: () => folderAction(at, place, "rename", here) },
-        { icon: own.move, label: "Move folder", run: () => folderAction(at, place, "move", here) },
+        { icon: own.copy, label: "Duplicate folder", run: () => folderAction(at, place, "duplicate", here) },
+        { icon: own.copy, label: "Copy folder to…", run: () => folderAction(at, place, "copy", here) },
+        { icon: own.move, label: "Move folder to…", run: () => folderAction(at, place, "move", here) },
         { icon: icons.trash, label: "Delete folder", bad: true, run: () => folderAction(at, place, "delete", here) },
       ]);
     });
   }
+  if (emptyEl) emptyEl.addEventListener("click", () => emptyTrash(place, reload));
+  if (!takesIn) return;
+
+  // -- dragged onto a folder ---------------------------------------------------------
+  // A row or tile dragged onto a folder moves there — with everything
+  // picked, when the one dragged is among it. The folder lights up on the
+  // way over; what is dragged fades. A drag carrying the computer's own
+  // files is the drop below, not this.
+  let dragging = null;
+  listingEl.addEventListener("dragstart", (event) => {
+    const item = event.target.closest("[data-id]");
+    if (!item) return;
+    const id = item.dataset.id;
+    dragging = picked.has(id) ? chosen() : [byId(id)].filter(Boolean);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", id);
+    item.classList.add("dragging");
+  });
+  const dropFolder = (event) => {
+    if (!dragging) return null;
+    const item = event.target.closest("[data-id]");
+    const target = item && byId(item.dataset.id);
+    if (!target || !target.is_dir || dragging.some((e) => e.id === target.id)) return null;
+    return { item, target };
+  };
+  listingEl.addEventListener("dragover", (event) => {
+    const over = dropFolder(event);
+    for (const el of listingEl.querySelectorAll(".drop-target")) if (!over || el !== over.item) el.classList.remove("drop-target");
+    if (!over) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    over.item.classList.add("drop-target");
+  });
+  listingEl.addEventListener("dragend", () => {
+    dragging = null;
+    for (const el of listingEl.querySelectorAll(".dragging, .drop-target")) el.classList.remove("dragging", "drop-target");
+  });
+  listingEl.addEventListener("drop", async (event) => {
+    const over = dropFolder(event);
+    if (!over) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const moving = dragging;
+    dragging = null;
+    const said = await moveAll(b, moving, joinPath(folder, over.target.name), over.target.name);
+    if (said) toast(said);
+    setSelecting(false);
+    await reload();
+  });
+
+  // Adding: the plus opens a sheet with the ways in. A picker or the camera
+  // ends in a file input, which has to be clicked from the tap itself for
+  // the phone to open it.
+  const pickInput = app.querySelector(".pick-input");
+  const cameraInput = app.querySelector(".camera-input");
+  app.querySelector(".heading .add").addEventListener("click", () => openSheet([
+    { icon: own.pick, label: "Choose a file", run: () => pickInput.click() },
+    { icon: own.camera, label: "Take a photo", run: () => cameraInput.click() },
+    { icon: own.newFolder, label: "New folder", run: () => newFolder(place, reload) },
+  ]));
   pickInput.addEventListener("change", async () => {
     const picked = [...pickInput.files];
     pickInput.value = "";
@@ -441,7 +726,6 @@ async function renderFolder(at, b, group, folder) {
   // neither — nothing it can do produces a drag carrying files.
   const carriesFiles = (event) =>
     [...((event.dataTransfer && event.dataTransfer.types) || [])].includes("Files");
-  const mainEl = app.querySelector("main");
   // `dragenter` and `dragleave` fire again for every child the pointer
   // crosses, so the two are counted rather than believed.
   let over = 0;
@@ -535,10 +819,23 @@ async function newFolder({ b, group, folder }, reload) {
   } catch (err) { toast(err.message); }
 }
 
-// -- renaming, moving, deleting, restoring ---------------------------------------------------
-/** What was done to a record: the record as it is now, `{ deleted: true }`
-    when it went to the Trash, `{ gone: true }` when it went for good, or null
-    when nothing happened. */
+/** An empty text file, by any name: notes.md, todo.txt; one with no suffix is Markdown. */
+async function newTextFile(place, reload) {
+  let name = (await askText("File name", "", { placeholder: "notes.md" }) || "").trim();
+  if (!name) return;
+  if (!name.includes(".")) name += ".md";
+  await uploadAll(place, [[new Blob([], { type: "text/plain" }), name]]);
+  await reload();
+}
+
+// -- renaming, moving, deleting, restoring, copying -------------------------------------------
+/** Where a picked folder is, in a few words. */
+const placeSaid = (to) => (to.folder ? baseName(to.folder) : to.label);
+
+/** What was done to a record: the record as it is now; `{ deleted: true }`
+    when it went to the Trash, `{ gone: true }` when it went for good,
+    `{ copied, to }` or `{ duplicated, name }` for a copy; or null when
+    nothing happened. */
 async function change(b, entry, what) {
   const noun = entry.is_dir ? "folder" : b.model.label.toLowerCase();
   try {
@@ -548,11 +845,20 @@ async function change(b, entry, what) {
       return await api("PATCH", recordsUrl(b.model.id, entry.id), { fields: { [b.title]: name }, rev: entry.rev });
     }
     if (what === "move") {
-      const to = await askText(`Move “${entry.name}” to which folder? Empty is the top.`, entry.folder);
-      if (to === null) return null;
-      const target = to.trim().replace(/^\/+|\/+$/g, "");
-      if (target === entry.folder) return null;
-      return await api("PATCH", recordsUrl(b.model.id, entry.id), { fields: { [b.folder]: target }, rev: entry.rev });
+      // A folder in the same group, picked: a file does not leave its group.
+      const to = await pickFolder({ title: `Move “${entry.name}” to`, model: b.model.id, within: entry.group, button: "Move here", not: [b.trash] });
+      if (!to || to.folder === entry.folder) return null;
+      return await api("PATCH", recordsUrl(b.model.id, entry.id), { fields: { [b.folder]: to.folder }, rev: entry.rev });
+    }
+    if (what === "copy") {
+      const to = await pickFolder({ title: `Copy “${entry.name}” to`, model: b.model.id, button: "Copy here", not: [b.trash] });
+      if (!to) return null;
+      await api("POST", recordsUrl(b.model.id, entry.id) + "/copy", { fields: { [b.group]: to.group, [b.folder]: to.folder } });
+      return { copied: true, to };
+    }
+    if (what === "duplicate") {
+      const made = await api("POST", recordsUrl(b.model.id, entry.id) + "/copy", { fields: {} });
+      return { duplicated: true, name: String(made.fields[b.title] || "") };
     }
     if (what === "restore") {
       // Back where it was: the server makes the folders on the way if they
@@ -582,7 +888,77 @@ async function change(b, entry, what) {
 
 /** What was done, said in a few words. */
 const saidDone = (done, name) =>
-  done.gone ? `Deleted ${name} for good` : done.deleted ? `Moved ${name} to the Trash` : done.restored ? `Restored ${name}` : "";
+  done.gone ? `Deleted ${name} for good` : done.deleted ? `Moved ${name} to the Trash` : done.restored ? `Restored ${name}`
+    : done.copied ? `Copied ${name} to ${placeSaid(done.to)}` : done.duplicated ? `Made ${done.name}` : "";
+
+/** Several moved into one folder: what was done, in a few words, or "" when nothing was. */
+async function moveAll(b, entries, folderPath, said) {
+  const moving = entries.filter((e) => e.folder !== folderPath);
+  if (!moving.length) return "";
+  try {
+    for (const entry of moving) {
+      await api("PATCH", recordsUrl(b.model.id, entry.id), { fields: { [b.folder]: folderPath }, rev: entry.rev });
+    }
+  } catch (err) {
+    toast(err.status === 409 ? "That changed somewhere else; look again" : err.message);
+    return "";
+  }
+  return `Moved ${moving.length === 1 ? moving[0].name : moving.length + " items"} to ${said}`;
+}
+
+/** The same to several at once — one question, one folder picked — and
+    what was done, in a few words, or "" when nothing was. */
+async function changeMany(b, entries, what) {
+  const n = entries.length;
+  if (!n) return "";
+  const them = n === 1 ? `“${entries[0].name}”` : `${n} items`;
+  try {
+    if (what === "delete") {
+      const forGood = Boolean(entries[0].deleted) || !b.deleted;
+      const yes = forGood
+        ? await ask(`Delete ${them} for good?\n\nIt cannot be undone.`)
+        : await ask(`Move ${them} to the Trash?`, { yes: "Move" });
+      if (!yes) return "";
+      for (const entry of entries) await api("DELETE", recordsUrl(b.model.id, entry.id));
+      return forGood ? `Deleted ${them} for good` : `Moved ${them} to the Trash`;
+    }
+    if (what === "restore") {
+      for (const entry of entries) {
+        const to = entry.deletedFrom || entry.name;
+        await api("PATCH", recordsUrl(b.model.id, entry.id), { fields: { [b.folder]: folderOf(to), [b.title]: baseName(to) }, rev: entry.rev });
+      }
+      return `Restored ${them}`;
+    }
+    if (what === "move") {
+      const to = await pickFolder({ title: `Move ${them} to`, model: b.model.id, within: entries[0].group, button: "Move here", not: [b.trash] });
+      if (!to) return "";
+      return await moveAll(b, entries, to.folder, placeSaid(to));
+    }
+    if (what === "copy") {
+      const to = await pickFolder({ title: `Copy ${them} to`, model: b.model.id, button: "Copy here", not: [b.trash] });
+      if (!to) return "";
+      for (const entry of entries) {
+        await api("POST", recordsUrl(b.model.id, entry.id) + "/copy", { fields: { [b.group]: to.group, [b.folder]: to.folder } });
+      }
+      return `Copied ${them} to ${placeSaid(to)}`;
+    }
+  } catch (err) {
+    toast(err.status === 409 ? "That changed somewhere else; look again" : err.message);
+  }
+  return "";
+}
+
+/** The Trash, emptied: deleting the folder itself is how the server takes it. */
+async function emptyTrash({ b, group, folder }, reload) {
+  const trash = await folderEntry(b, group, folder);
+  if (!trash) return;
+  if (!await ask(`Empty the ${trash.name}?\n\nEverything in it is deleted for good.`, { yes: "Empty", tone: "danger" })) return;
+  try {
+    await api("DELETE", recordsUrl(b.model.id, trash.id));
+    toast(`Emptied the ${trash.name}`);
+    await reload();
+  } catch (err) { toast(err.message); }
+}
 
 /** The folder's own record, which is in the listing of the folder it is in. */
 async function folderEntry(b, group, folder) {
@@ -602,6 +978,10 @@ async function folderAction(at, { b, group, folder }, what, entry = null) {
   if (done.deleted || done.gone) {
     toast(saidDone(done, entry.name));
     back(folderHash(at, group, folderOf(folder)));
+    return;
+  }
+  if (done.copied || done.duplicated) {
+    toast(saidDone(done, entry.name));
     return;
   }
   const moved = entryOf(b, done);
@@ -766,12 +1146,22 @@ export async function renderGridItem(at, id) {
     ...(entry.deleted ? [["Deleted", formatDate(entry.deleted, { long: true })]] : []),
     ...(entry.deleted ? [["Was in", groupName + (folderOf(entry.deletedFrom) ? "/" + folderOf(entry.deletedFrom) : "")]] : []),
   ];
-  const actions = entry.deleted ? `
-        <button class="row has-icon" data-do="restore"><span class="icon">${own.restore}</span><span class="main"><span class="title">Restore</span></span></button>
-        <button class="row has-icon danger" data-do="delete"><span class="icon">${icons.trash}</span><span class="main"><span class="title">Delete for good</span></span></button>` : `
-        <button class="row has-icon" data-do="rename"><span class="icon">${own.rename}</span><span class="main"><span class="title">Rename</span></span></button>
-        <button class="row has-icon" data-do="move"><span class="icon">${own.move}</span><span class="main"><span class="title">Move to another folder</span></span></button>
-        <button class="row has-icon danger" data-do="delete"><span class="icon">${icons.trash}</span><span class="main"><span class="title">Delete</span></span></button>`;
+  const actionRow = (what, label, icon, danger = false) =>
+    `<button class="row has-icon${danger ? " danger" : ""}" data-do="${what}"><span class="icon">${icon}</span><span class="main"><span class="title">${label}</span></span></button>`;
+  // The Quills that edit this kind of file, then what can be done to it:
+  // copying needs only reading; the rest, writing; in the Trash, Restore
+  // and a Delete that is for good.
+  const editRows = entry.deleted ? "" : editorsFor(entry.name).filter((e) => e.screen.model === b.model.id).map((e) =>
+    `<a class="row has-icon" href="#/r/${encodeURIComponent(e.quill.id)}/${encodeURIComponent(e.screen.id)}/${encodeURIComponent(e.screen.model)}/${encodeURIComponent(entry.id)}">` +
+    `<span class="icon">${own.edit}</span><span class="main"><span class="title">Edit with ${esc(e.quill.name)}</span></span></a>`).join("");
+  const copyRow = entry.deleted ? "" : actionRow("copy", "Copy to another folder", own.copy);
+  const actions = editRows + copyRow + (entry.deleted ? (b.writes ? `
+        ${actionRow("restore", "Restore", own.restore)}
+        ${actionRow("delete", "Delete for good", icons.trash, true)}` : "") : (b.writes ? `
+        ${actionRow("rename", "Rename", own.rename)}
+        ${actionRow("duplicate", "Duplicate", own.copy)}
+        ${actionRow("move", "Move to another folder", own.move)}
+        ${actionRow("delete", "Delete", icons.trash, true)}` : ""));
   const sending = canSendFiles();
   mount(nav({
     back: parent, backLabel: entry.folder ? baseName(entry.folder) : groupName, title: entry.name,
@@ -784,7 +1174,7 @@ export async function renderGridItem(at, id) {
       <h1 class="large file-name">${esc(entry.name)}</h1>
       <div class="group facts">${facts.map(([label, value]) =>
         `<div class="row"><span class="main">${esc(label)}</span><span class="value">${esc(value)}</span></div>`).join("")}</div>
-      ${b.writes ? `<div class="group item-actions">${actions}
+      ${actions ? `<div class="group item-actions">${actions}
       </div>` : ""}
     </main>`);
   wireShell();
@@ -812,6 +1202,10 @@ export async function renderGridItem(at, id) {
     button.addEventListener("click", async () => {
       const done = await change(b, entry, button.dataset.do);
       if (!done) return;
+      if (done.copied || done.duplicated) {
+        toast(saidDone(done, entry.name));
+        return;
+      }
       if (done.deleted || done.gone) {
         toast(saidDone(done, entry.name));
         back(parent);

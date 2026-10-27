@@ -1,0 +1,14 @@
+/* Local backups (localbackups.js): the machines, the folders backed up
+   from them, and the two buttons each has. */
+
+.local-backups .sync-row { align-items: flex-start; }
+.local-backups .sync-row .main { padding-top: 2px; }
+.local-backups .sync-row .meta { white-space: normal; overflow-wrap: anywhere; }
+.local-backups .sync-row.bad .last { color: var(--bad); }
+.local-backups .sync-actions { flex: none; display: flex; gap: 6px; margin-top: 4px; }
+.local-backups .value.good { color: var(--good, var(--accent)); }
+.local-backups .add-sync:disabled { opacity: .5; cursor: default; }
+@media (max-width: 599px) {
+  .local-backups .sync-row { flex-wrap: wrap; }
+  .local-backups .sync-actions { width: 100%; justify-content: flex-end; }
+}

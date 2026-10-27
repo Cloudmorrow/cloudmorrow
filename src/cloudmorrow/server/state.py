@@ -30,6 +30,7 @@ from cloudmorrow.server.sealed import Sealer
 from cloudmorrow.server.secrets import SecretStore
 from cloudmorrow.server.settings import SettingsStore
 from cloudmorrow.server.shares import ShareStore
+from cloudmorrow.server.syncs import SyncStore
 from cloudmorrow.server.today import Weather
 from cloudmorrow.server.webpush import PushStore
 
@@ -51,6 +52,8 @@ class AppState:
     users: UserStore
     agents: AgentStore
     jobs: JobStore
+    # Local backups: folders on people's machines their agents copy into My Files (syncs.py).
+    syncs: SyncStore
     secrets: SecretStore
     notifications: NotificationStore
     features: FeatureStore

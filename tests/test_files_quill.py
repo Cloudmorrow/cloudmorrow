@@ -318,6 +318,79 @@ def test_deleting_moves_to_the_trash_and_moving_back_restores(files, config):
     assert back["fields"]["name"] == "2025 2.pdf" and (root / "2025.pdf").read_bytes() == b"new"
 
 
+def test_a_file_or_a_folder_is_copied_where_it_is_told_and_duplicated_beside_itself(files, config):
+    """`POST …/copy` makes a copy where the fields say: another folder, the
+    same one (a duplicate, numbered), another share the caller may change,
+    or under another name; a folder goes with everything in it. Into itself,
+    out of the Trash, into the Trash, or into a share shared to read: no."""
+    root = drive(config)
+    (root / "Photos" / "2025").mkdir(parents=True)
+    (root / "Photos" / "cat.jpg").write_bytes(b"cat")
+    (root / "Photos" / "2025" / "dog.jpg").write_bytes(b"dog")
+    photos = {f["fields"]["name"]: f for f in call(files, "GET", "/api/records/file?share=my-files&folder=Photos")}
+    cat, year = photos["cat.jpg"], photos["2025"]
+    # Nothing said: a duplicate beside it, numbered like a put file.
+    twin = call(files, "POST", f"/api/records/file/{cat['id']}/copy", {"fields": {}}, expect=201)
+    assert twin["fields"]["path"] == "Photos/cat 2.jpg" and (root / "Photos" / "cat 2.jpg").read_bytes() == b"cat"
+    assert (root / "Photos" / "cat.jpg").read_bytes() == b"cat"
+    # To another folder, made on the way, under another name.
+    moved = call(
+        files,
+        "POST",
+        f"/api/records/file/{cat['id']}/copy",
+        {"fields": {"folder": "Albums/Pets", "name": "kitty.jpg"}},
+        expect=201,
+    )
+    assert (
+        moved["fields"]["path"] == "Albums/Pets/kitty.jpg"
+        and (root / "Albums" / "Pets" / "kitty.jpg").read_bytes() == b"cat"
+    )
+    # A folder, with everything in it.
+    whole = call(files, "POST", f"/api/records/file/{year['id']}/copy", {"fields": {"folder": ""}}, expect=201)
+    assert whole["fields"]["path"] == "2025" and whole["fields"]["kind"] == "folder"
+    assert (root / "2025" / "dog.jpg").read_bytes() == b"dog" and (root / "Photos" / "2025" / "dog.jpg").exists()
+    # Not into itself, and nothing to do with the Trash.
+    bad = call(
+        files, "POST", f"/api/records/file/{year['id']}/copy", {"fields": {"folder": "Photos/2025/deeper"}}, expect=400
+    )
+    assert "into itself" in bad["detail"]
+    call(files, "POST", f"/api/records/file/{cat['id']}/copy", {"fields": {"folder": "Trash"}}, expect=400)
+    call(files, "DELETE", f"/api/records/file/{twin['id']}", expect=204)
+    gone = call(files, "GET", "/api/records/file?share=my-files&folder=Trash")[0]
+    call(files, "POST", f"/api/records/file/{gone['id']}/copy", {"fields": {"folder": ""}}, expect=400)
+    # Across shares: into one of your own, yes; into one shared with you to read, no.
+    call(
+        files,
+        "POST",
+        "/api/shares",
+        {"name": "media", "members": [{"kind": "user", "who": "guest", "access": "read"}]},
+        expect=201,
+    )
+    across = call(
+        files,
+        "POST",
+        f"/api/records/file/{cat['id']}/copy",
+        {"fields": {"share": "media", "folder": "Pets"}},
+        expect=201,
+    )
+    assert across["fields"]["share"] == "media" and across["fields"]["path"] == "Pets/cat.jpg"
+    assert (config.shares_root("bram") / "media" / "Pets" / "cat.jpg").read_bytes() == b"cat"
+    theirs = call(files, "GET", "/api/records/file?share=media&folder=Pets", who=GUEST)[0]
+    # The guest may read it there, so may copy it home, and not back beside it.
+    home = call(
+        files,
+        "POST",
+        f"/api/records/file/{theirs['id']}/copy",
+        {"fields": {"share": "my-files", "folder": ""}},
+        who=GUEST,
+        expect=201,
+    )
+    assert home["fields"]["share"] == "my-files" and (drive(config, "guest") / "cat.jpg").read_bytes() == b"cat"
+    call(files, "POST", f"/api/records/file/{theirs['id']}/copy", {"fields": {}}, who=GUEST, expect=403)
+    # The datamodel says it copies.
+    assert "copy" in next(q for q in call(files, "GET", "/api/quills") if q["id"] == "files")["models"]["file"]["can"]
+
+
 def test_a_deleted_folder_goes_whole_and_what_is_in_it_knows_its_old_place(files, config):
     root = drive(config)
     (root / "Tax" / "2024").mkdir(parents=True)
