@@ -227,6 +227,28 @@ def test_your_quills_has_its_three_tabs_a_sheet_and_the_endpoints_that_answer_a_
         assert client.get(path, headers=guest_auth).status_code == 200, path
 
 
+def test_the_quills_split_fills_the_window_and_its_columns_scroll_on_their_own():
+    """On a computer the list and the sheet are the window's height under the
+    bar, each scrolling itself — never a list column stuck to the bar and
+    sized to the window, which starts lower than that and ran below it."""
+    css = (WEB / "quillsadmin.css").read_text(encoding="utf-8")
+    wide = css.split("@media (min-width: 900px) and (min-height: 600px) {", 1)[1]
+    assert "#app:has(.quills-split) { height: 100dvh; }" in wide
+    main = wide.split("main:has(> .quills-split) {", 1)[1].split("}", 1)[0]
+    assert "flex: 1;" in main and "min-height: 0;" in main and "flex-direction: column;" in main
+    split = wide.split("  .quills-split {", 1)[1].split("}", 1)[0]
+    assert "grid-template-rows: minmax(0, 1fr);" in split and "min-height: 0;" in split
+    for column in (".side", ".page"):
+        rules = wide.split(f".quills-split {column} {{", 1)[1].split("}", 1)[0]
+        assert "overflow-y: auto;" in rules and "min-height: 0;" in rules, column
+        assert "sticky" not in rules and "100vh" not in rules, column
+    # Both pages put the split right under the main it fills.
+    admin_js = (WEB / "quillsadmin.js").read_text(encoding="utf-8")
+    mine_js = (WEB / "myquills.js").read_text(encoding="utf-8")
+    assert 'panel.classList.toggle("quills-split", split);' in admin_js
+    assert '<div class="${split ? "quills-split" : "quills-stack"}">' in mine_js
+
+
 def test_the_quills_side_has_its_three_tabs_and_the_update_buttons():
     """Server Quills, User Quills and the Catalog; a tick per installed Quill, and
     an update of the ticked ones or of all, each an install again from the catalog
