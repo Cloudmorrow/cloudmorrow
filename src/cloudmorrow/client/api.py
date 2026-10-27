@@ -881,6 +881,11 @@ class CloudmorrowClient:
         response = await self._request("GET", f"/api/records/{model}/{record_id}/thumb", params={"size": size})
         return response.content
 
+    async def copy_record(self, model: str, record_id: str, fields: dict) -> dict:
+        """A copy of a record with bytes, where *fields* say; nothing said is a duplicate."""
+        response = await self._request("POST", f"/api/records/{model}/{record_id}/copy", json={"fields": fields})
+        return response.json()
+
     async def upload_record(self, model: str, fields: dict, data: bytes) -> dict:
         """A new record from bytes: *fields* say where it goes and what it is called."""
         response = await self._request(

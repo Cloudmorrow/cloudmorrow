@@ -248,7 +248,7 @@ TEXT_KINDS = ("string", "text", "markdown", "email", "url", "phone")
 # What a datamodel can do besides the five calls, and the backend method
 # that does it. The store searches its own records; a backend has folders
 # and attachments when it has the methods. See `RecordStore.capabilities`.
-BACKEND_CAPABILITIES = {"folders": "folders", "attachments": "attach", "content": "content"}
+BACKEND_CAPABILITIES = {"folders": "folders", "attachments": "attach", "content": "content", "copy": "copy"}
 
 PREVIEW_CHARS = 120
 
@@ -1421,6 +1421,11 @@ class RecordStore:
         self._check(principal, "write", model_id)
         model = self.model(model_id)
         return self._content_backend(model).put(principal, model, dict(fields), source)
+
+    def copy(self, principal: Principal, model_id: str, record_id: str, fields: dict) -> Record:
+        """A copy of a record and its bytes, where *fields* say; the backend's own verb."""
+        model, backend = self._capable(principal, model_id, "write", "copy")
+        return backend.copy(principal, model, record_id, dict(fields))
 
     def delete(self, principal: Principal, model_id: str, record_id: str) -> int:
         """Delete a record, and follow links that cascade. Returns how many went."""

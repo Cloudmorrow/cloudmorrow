@@ -24,6 +24,7 @@ import "./push.js";
 import "./desktop.js";
 import "./desktopbridge.js";
 import "./shares.js";
+import "./localbackups.js";
 import "./fresh.js";
 import { start } from "./core.js";
 

@@ -259,6 +259,7 @@ def test_nothing_private_is_handed_to_the_page():
         "agent_status",
         "notify",
         "open_folder",
+        "pick_folder",
         "mounted_here",
         "shares",
         "mount",

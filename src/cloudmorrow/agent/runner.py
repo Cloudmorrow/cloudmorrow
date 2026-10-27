@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from cloudmorrow.agent.client import AgentApiError, AgentClient
 from cloudmorrow.agent.config import AgentConfig
 from cloudmorrow.agent.quills import MachineQuills
+from cloudmorrow.agent.sync import LocalSyncs
 from cloudmorrow.agent.tasks import TaskError, run_task
 
 log = logging.getLogger("cloudmorrow.agent")
@@ -36,6 +37,8 @@ class AgentRunner:
         self._stop = False
         # Quills' machine handlers switched on here (agent/quills.py).
         self.quills = MachineQuills(config, self.client)
+        # The folders here the person backs up into My Files (agent/sync.py).
+        self.syncs = LocalSyncs(config, self.client)
 
     def stop(self, *_: object) -> None:
         log.info("stopping after the current job")
@@ -91,6 +94,15 @@ class AgentRunner:
         except Exception:  # somebody's code must not stop the agent
             log.exception("a Quill's machine handler failed")
 
+    def run_syncs(self) -> None:
+        try:
+            for ran in self.syncs.tick():
+                log.info("backed up %s", ran)
+        except AgentApiError:
+            raise
+        except Exception:  # a backup must not stop the agent
+            log.exception("a local backup failed")
+
     def tick(self) -> None:
         """One heartbeat, then drain whatever work is waiting."""
         self.client.heartbeat(socket.gethostname(), platform.platform())
@@ -99,6 +111,8 @@ class AgentRunner:
             pass
         if self.config.allow_quill_code:
             self.run_quills()
+        if self.config.allow_backup:
+            self.run_syncs()
 
     # -- the loop ----------------------------------------------------------
     def run_forever(self, *, max_ticks: int | None = None) -> RunnerStats:

@@ -198,6 +198,10 @@ class FakeApi:
     async def delete_record(self, model, record_id):
         self.calls.append(("delete", record_id))
 
+    async def copy_record(self, model, record_id, fields):
+        self.calls.append(("copy", record_id, dict(fields)))
+        return {"id": "f_5", "fields": {"name": "cv 2.txt", **fields}}
+
 
 @pytest.fixture()
 def screen():
@@ -250,6 +254,17 @@ def test_cm_files_delete_goes_to_the_trash_and_restore_comes_back(screen, capsys
         asyncio.run(_act_grid(api, screen, "restore", ["my-files", "cv.txt"], False))
 
 
+def test_cm_files_copy_duplicates_or_copies_to_a_folder(screen, capsys):
+    api = FakeApi()
+    asyncio.run(_act_grid(api, screen, "copy", ["my-files", "cv.txt"], False))
+    assert api.calls[-1] == ("copy", "f_2", {})
+    assert "Copied cv.txt to cv 2.txt" in capsys.readouterr().err
+    asyncio.run(_act_grid(api, screen, "copy", ["my-files", "cv.txt", "Letters"], False))
+    assert api.calls[-1] == ("copy", "f_2", {"share": "my-files", "folder": "Letters"})
+    asyncio.run(_act_grid(api, screen, "copy", ["my-files", "cv.txt", "media:Pets"], False))
+    assert api.calls[-1] == ("copy", "f_2", {"share": "media", "folder": "Pets"})
+
+
 # -- the Trash, in the browser ----------------------------------------------------------
 def test_a_deleted_file_has_restore_and_a_delete_for_good():
     """A record whose `deleted` field is set is in the Trash: its page has
@@ -260,8 +275,8 @@ def test_a_deleted_file_has_restore_and_a_delete_for_good():
     assert 'deleted: screen.deleted || ""' in code and 'deletedFrom: screen.deleted_from || ""' in code
     assert "deleted: (b.deleted && seconds(f[b.deleted])) || 0," in code
     item = code[code.index("export async function renderGridItem(") :]
-    assert "const actions = entry.deleted ? `" in item
-    assert 'data-do="restore"' in item and "Delete for good" in item
+    assert "const actions = editRows + copyRow + (entry.deleted ? (b.writes ? `" in item
+    assert 'actionRow("restore"' in item and "Delete for good" in item
     assert '["Deleted", formatDate(entry.deleted, { long: true })]' in item
     change = code[code.index("async function change(") : code.index("const saidDone")]
     assert "const to = entry.deletedFrom || entry.name;" in change
@@ -299,6 +314,52 @@ def test_the_trash_is_a_bin_beside_the_plus_and_empties():
     assert ".heading .bin" in GRID_CSS and ".heading .empty-trash" in GRID_CSS
 
 
+def test_every_row_and_tile_has_a_menu_and_several_are_picked_at_once():
+    """A right-click or a long press (actions.js's menu) on a row or tile:
+    Open, the Quills that edit that kind of file, Rename, Duplicate, Copy
+    to, Move to, Delete — fewer where less may be done. Select, Shift or
+    Ctrl with a click, picks several for one of those; a row dragged onto a
+    folder moves there with what is picked; the room around the rows makes
+    a folder or an empty text file."""
+    code = code_of(GRID_JS)
+    assert 'import { contextMenus, editorsFor, menu } from "./actions.js";' in code
+    assert 'import { pickFolder } from "./filepick.js";' in code
+    folder = code[code.index("async function renderFolder(") : code.index("function photoName(")]
+    for label in (
+        '"Open"',
+        "`Edit with ${e.quill.name}`",
+        '"Rename…"',
+        '"Duplicate"',
+        '"Copy to…"',
+        '"Move to…"',
+        '"Delete"',
+        '"Restore"',
+    ):
+        assert f"label: {label}" in folder, label
+    assert 'contextMenus(mainEl, "[data-id]", (el) => {' in folder and "{ blank }" in folder
+    assert 'label: "New folder…"' in folder and 'label: "New text file…"' in folder
+    assert "if (!item || !(selecting || event.ctrlKey || event.metaKey || event.shiftKey)) return;" in folder
+    assert "for (const one of ids.slice(from, to + 1)) picked.add(one);" in folder
+    assert (
+        'listingEl.addEventListener("dragstart"' in folder
+        and "dragging = picked.has(id) ? chosen() : [byId(id)].filter(Boolean);" in folder
+    )
+    assert "await moveAll(b, moving, joinPath(folder, over.target.name), over.target.name);" in folder
+    # Copying is the record API's copy; a duplicate is one with nothing said.
+    change = code[code.index("async function change(") : code.index("const saidDone")]
+    assert '+ "/copy", { fields: { [b.group]: to.group, [b.folder]: to.folder } }' in change
+    assert '+ "/copy", { fields: {} }' in change
+    # The search: the folder and all under it, names and lines, as the record API searches.
+    assert "`&within=${encodeURIComponent(folder)}&q=${encodeURIComponent(q)}`" in folder
+    assert 'findInput.addEventListener("input"' in folder
+    # A folder's tile is the folder itself, filled.
+    assert "entry.is_dir ? own.folderFull : own[kind] || own.file" in folder
+    assert ".tile.folder .thumb .icon svg { width: 100%; height: auto; }" in GRID_CSS
+    # The groups' “…” is what the hooks offer.
+    groups = code[code.index("async function renderGroups(") : code.index("async function listFolder(")]
+    assert "const choices = extras.flatMap((x) => (x.menu ? x.menu() : []));" in groups
+
+
 # -- read is drawn as read (docs/CIRCLES.md) -----------------------------------------
 def test_a_folder_you_may_only_read_takes_nothing_in():
     code = code_of(GRID_JS)
@@ -320,7 +381,10 @@ def test_a_folder_you_may_only_read_takes_nothing_in():
 def test_a_file_you_may_only_read_is_not_renamed_moved_or_deleted():
     code = code_of(GRID_JS)
     item = code[code.index("export async function renderGridItem(") :]
-    assert '${b.writes ? `<div class="group item-actions">' in item
+    # Copying, and the Quills that edit it, need only reading; the rest is behind b.writes.
+    assert 'const copyRow = entry.deleted ? "" : actionRow("copy"' in item
+    for what in ("rename", "duplicate", "move"):
+        assert f'actionRow("{what}"' in item[item.index("(b.writes ? `") :], what
     # Sending it on, or saving it, is reading.
     assert 'app.querySelector(".download").addEventListener' in item
 

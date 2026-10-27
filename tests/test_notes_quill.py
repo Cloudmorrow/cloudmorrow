@@ -74,7 +74,7 @@ def test_notes_is_an_editor_over_the_markdown_files_in_the_notes_folder(api):
     # Nothing of its own: the file datamodel (and the share it links to), which
     # does folders and pictures too.
     assert notes["models"].keys() == {"file", "share"}
-    assert notes["models"]["file"]["can"] == ["search", "folders", "attachments", "content"]
+    assert notes["models"]["file"]["can"] == ["search", "folders", "attachments", "content", "copy"]
     assert "editor" in KIT_READY
 
 

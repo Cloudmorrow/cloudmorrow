@@ -100,6 +100,24 @@ CREATE TABLE IF NOT EXISTS jobs (
     finished_at  TEXT
 );
 CREATE INDEX IF NOT EXISTS jobs_agent_status ON jobs (agent_id, status);
+-- Local backups (syncs.py): a folder on one of a person's machines, copied
+-- into their drive by that machine's agent and kept up to date.
+CREATE TABLE IF NOT EXISTS local_syncs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner         TEXT    NOT NULL,
+    agent_id      INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    path          TEXT    NOT NULL,
+    into_folder   TEXT    NOT NULL,
+    every_minutes INTEGER NOT NULL DEFAULT 60,
+    run_now       INTEGER NOT NULL DEFAULT 1,
+    last_run      TEXT,
+    last_ok       INTEGER,
+    last_said     TEXT    NOT NULL DEFAULT '',
+    files         INTEGER NOT NULL DEFAULT 0,
+    bytes         INTEGER NOT NULL DEFAULT 0,
+    created_at    TEXT    NOT NULL,
+    UNIQUE (owner, agent_id, path)
+);
 CREATE TABLE IF NOT EXISTS secrets (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     owner        TEXT    NOT NULL,

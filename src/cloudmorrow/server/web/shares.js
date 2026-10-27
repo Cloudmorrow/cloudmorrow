@@ -9,8 +9,9 @@
    its permissions, before anything is made.
 
    The Files Quill draws the shares, with the kit's grid; this adds to that
-   list through `registerGridHook` — a New share button above it, and under
-   each share whose it is and who has it, which opens the share's own page.
+   list through `registerGridHook` — New share in the “…” beside the title,
+   and under each share whose it is and who has it, which opens the
+   share's own page.
    It knows the core's `share` datamodel and the `/api/shares` routes, and
    nothing of the Quill.
 
@@ -18,7 +19,7 @@
      #/share/<name>    one share: whose, who has it, where it is */
 
 import {
-  api, app, back, esc, mount, nav, previousHash, registerScreen, renderRoute, replace, session,
+  api, app, back, esc, go, mount, nav, previousHash, registerScreen, renderRoute, replace, session,
   toast, wireShell,
 } from "./core.js";
 import { registerGridHook } from "./kit_grid.js";
@@ -44,7 +45,7 @@ registerGridHook({
   async groups({ model }) {
     if (model.id !== "share") return null;
     return {
-      top: () => `<div class="group share-new"><a class="row primary" href="#/share">New share</a></div>`,
+      menu: () => [{ label: "New share…", run: () => go("#/share") }],
       after: (share) => {
         if (share.fields.kind === "drive") return "";
         const mine = share.fields.can_manage;

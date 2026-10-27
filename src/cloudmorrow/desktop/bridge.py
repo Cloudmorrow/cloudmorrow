@@ -149,6 +149,18 @@ class Bridge:
     def open_folder(self, path: str) -> dict:
         return {"opened": str(system.open_folder(str(path)))}
 
+    @bridged
+    def pick_folder(self) -> dict:
+        """A folder on this computer, picked in the system's own dialog: `{path}`, or `{error}` for none."""
+        if self._window is None:
+            return {"error": "No window to pick in"}
+        import webview
+
+        picked = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+        if not picked:
+            return {"error": "Nothing picked"}
+        return {"path": str(picked[0] if isinstance(picked, (list, tuple)) else picked)}
+
     # -- shares, mounted here ---------------------------------------------------
     @staticmethod
     def _where(name: str) -> dict:

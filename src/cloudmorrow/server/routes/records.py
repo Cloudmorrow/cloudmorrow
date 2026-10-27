@@ -359,6 +359,26 @@ def move_record(
     return record.to_dict()
 
 
+@router.post("/{model}/{record_id}/copy", status_code=status.HTTP_201_CREATED)
+def copy_record(
+    model: str,
+    record_id: str,
+    payload: RecordChange,
+    state: AppState = Depends(get_state),
+    principal: Principal = Depends(get_principal),
+) -> dict:
+    """A copy of a record that has bytes — a file, or a folder and all in it —
+    where the fields say (`share`, `folder`, `name`; each the original's unless
+    said), for a datamodel whose backend copies. Nothing said is a duplicate
+    beside the original, under a numbered name."""
+    switched_on(state, model)
+    try:
+        record = state.records.copy(principal, model, record_id, payload.fields)
+    except ERRORS as exc:
+        raise http_error(exc) from exc
+    return record.to_dict()
+
+
 @router.delete("/{model}/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_record(
     model: str,

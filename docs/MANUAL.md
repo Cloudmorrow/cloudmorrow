@@ -2145,6 +2145,25 @@ share's page says its address under *Mount at*, for any WebDAV client —
 a phone's file manager, a Windows drive letter — with your username and
 password.
 
+**Local backups.** A folder on one of your computers, copied into My
+Files by that computer's agent and kept up to date: Files, “…”, **Local
+backups**. The page lists your machines and the folders backed up from
+each — where each lands (`Backups/<machine>/<folder>` unless you say
+otherwise), how often (every hour unless you say), and how the last pass
+went — with **Run now** and **Remove** on each (what was copied stays).
+**Add a folder** needs a machine that can do the copying: in the desktop
+app on a computer whose agent is running, the folder is picked in the
+system's own dialog; from anywhere, a machine of yours whose agent is
+online can be named and the folder typed. With neither — a phone, a
+browser on a computer with nothing installed — the page says what is
+needed and the button is off: the command line (`cm`) installed on a
+computer, where `cloudmorrow login` enrols and starts its agent, or the
+desktop app. Each pass sends what is new or changed under the folder
+(by size and the moment it changed), takes what is gone to the Trash
+here, passes over hidden files and links, and refuses a folder outside
+the machine's `backup_roots` like a backup job would. The files are then
+the drive's like any other: `cm files list my-files Backups/laptop`.
+
 #### In the terminal app
 
 **Files** (`f5`): `m` mounts the selected share on this machine, `u`
@@ -2195,14 +2214,34 @@ One opens as its folders and files, the way a file manager shows them —
 sorted by name, date, size or type, folders first — as a list, or as tiles
 with a picture of each photo (the switch beside the sort; the choice is
 kept). A file opens when tapped: a picture shown, its facts, a button that
-opens the phone's share sheet (or saves it), and Rename, Move and Delete.
+opens the phone's share sheet (or saves it), and Rename, Duplicate, Copy
+to another folder, Move to another folder and Delete, with **Edit with
+Docs** or **Edit with Cells** above them for a file one of those edits.
 The plus beside the title puts something in the folder you are in: a file
 chosen from the phone, one its camera takes there and then, or a new
 folder; on a computer a file dragged onto the folder or pasted goes in too.
-The “…” beside a folder's name renames, moves or deletes it. A share you
-may only read opens with none of that: no plus, nothing dropped or pasted
-in, and no rename, move or delete — the Files Quill's `group_writes` reads
-the share's `writable` field.
+The “…” beside a folder's name renames, duplicates, copies, moves or
+deletes it.
+
+Every row and tile has a menu — a right-click on a computer, a finger held
+on it on a phone — with Open, Edit with…, Rename, Duplicate, Copy to…,
+Move to…, and Delete; Copy to and Move to ask for the folder in a picker
+of the shares and their folders (a move stays in its share). A right-click
+on the room around the rows makes a new folder, a new empty text file by
+any name (`notes.md`, `todo.txt`; no suffix is `.md`), or picks a file to
+put in. **Select** beside the title — or Shift or Ctrl with a click, the
+way every file manager has it — picks several: the bar under the sort
+says how many, with Copy to, Move to and Delete (Restore and Delete for
+good in the Trash) for all of them at once, and **All**. A row or tile
+dragged onto a folder moves there, with everything picked when the one
+dragged is among it. The magnifier beside the title searches the folder
+and everything under it — names, and the lines of text files — and each
+hit says where it is; Escape closes it. A share you may only read opens
+with none of what writes: no plus, nothing dropped or pasted in, no
+rename, move or delete, and Copy to and Edit with alone in the menus — the
+Files Quill's `group_writes` reads the share's `writable` field. At the
+top of Files, the “…” beside the title has **New share…** and **Local
+backups…**.
 
 **The Trash.** Deleting loses nothing yet: the file or folder moves to a
 `Trash` folder at the top of the share (My Files has one of its own). On
@@ -2240,6 +2279,9 @@ cm files list my-files Photos                  # a folder
 cm files get my-files Photos/cat.jpg ~/Desktop
 cm files put my-files Photos ./dog.jpg
 cm files add my-files Photos/2026              # a new folder
+cm files copy my-files Photos/cat.jpg          # a duplicate beside it: cat 2.jpg
+cm files copy my-files Photos/cat.jpg Albums   # a copy in another folder
+cm files copy my-files Photos/cat.jpg media:Pets   # …or in another share you may change
 cm files delete my-files Photos/old.jpg        # to the Trash
 cm files restore my-files Trash/old.jpg        # back to Photos
 cm files delete my-files Trash/old.jpg         # for good
@@ -2350,6 +2392,12 @@ What a job can be:
 | `sysinfo` | hostname, platform, CPUs, load, disk usage |
 | `backup` | tar.gz some paths into the agent's backup dir, with retention |
 | `shell` | run a command — **off unless that machine enables it** |
+
+Besides jobs, each tick the agent runs the **local backups** the person set
+up for that machine in Files (above): the folders are read below
+`backup_roots` like a backup job's, and the copies go into the person's
+My Files through the agent's own calls (`/api/agent/syncs`), never the
+record API.
 
 Everything a machine may do is declared in its own `~/.config/cloudmorrow/agent.toml`
 rather than decided by the server: backups only read below `backup_roots`

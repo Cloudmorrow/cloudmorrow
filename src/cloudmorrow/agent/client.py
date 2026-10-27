@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import httpx
 
 from cloudmorrow import __version__
@@ -83,6 +85,42 @@ class AgentClient:
 
     def claim_job(self) -> dict | None:
         return self._post("/api/agent/jobs/claim", {})
+
+    # -- local backups (agent/sync.py) --------------------------------------
+    def syncs(self) -> list[dict]:
+        """The folders on this machine to back up, with when each last ran."""
+        return self._get("/api/agent/syncs") or []  # type: ignore[return-value]
+
+    def sync_files(self, sync_id: int) -> dict:
+        """What the drive holds under a backup's folder: {path: {size, modified}}."""
+        return self._get(f"/api/agent/syncs/{sync_id}/files") or {}  # type: ignore[return-value]
+
+    def sync_put(self, sync_id: int, rel: str, source: Path, modified: float) -> dict:
+        """One file up, streamed from *source*, written over what the drive had."""
+        try:
+            with open(source, "rb") as handle:
+                response = self._client.put(
+                    f"/api/agent/syncs/{sync_id}/file",
+                    params={"path": rel, "modified": f"{modified:.3f}"},
+                    content=handle,
+                    headers={**self._headers(), "Content-Type": "application/octet-stream"},
+                    timeout=httpx.Timeout(600.0, connect=10.0),
+                )
+        except httpx.HTTPError as exc:
+            raise AgentApiError.unreachable(self.config.server_url, exc) from exc
+        return self._check(response) or {}
+
+    def sync_remove(self, sync_id: int, rel: str) -> dict:
+        try:
+            response = self._client.delete(
+                f"/api/agent/syncs/{sync_id}/file", params={"path": rel}, headers=self._headers()
+            )
+        except httpx.HTTPError as exc:
+            raise AgentApiError.unreachable(self.config.server_url, exc) from exc
+        return self._check(response) or {}
+
+    def sync_done(self, sync_id: int, result: dict) -> dict:
+        return self._post(f"/api/agent/syncs/{sync_id}/done", result) or {}
 
     def report(self, job_id: int, status: str, result: dict) -> None:
         self._post(f"/api/agent/jobs/{job_id}/result", {"status": status, "result": result})
