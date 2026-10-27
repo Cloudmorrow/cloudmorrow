@@ -179,9 +179,7 @@ def test_code_makes_a_shared_space_with_its_people_and_sees_what_is_unread(tmp_p
     with Harness(_letters(tmp_path), datamodels=DATAMODELS) as q:
         sam = q.as_user("sam")
         kim = q.as_user("kim")
-        assert sorted(q.as_user("sam").act("write", to="kim,nobody", subject="Lunch").toast.split(": ")[1:]) == [
-            "1 people"
-        ]
+        assert sam.act("write", to="kim,nobody", subject="Lunch").toast.endswith(": 1 people")
         (letter,) = kim.list("letters.letter")
         assert letter["subject"] == "Lunch" and letter.scope == "shared" and sorted(letter.members) == ["kim"]
         assert [line["body"] for line in kim.list("letters.line", letter=letter.id)] == ["hello kim"]
