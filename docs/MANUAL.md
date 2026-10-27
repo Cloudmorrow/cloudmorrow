@@ -1465,9 +1465,13 @@ On iOS none of this exists until the app is on the home screen — in a Safari
 tab there is no service worker to push and `setAppBadge` does nothing. So
 **Me** says which of those situations you are in rather than offering a
 button that cannot work: add it to the Home Screen, open it from there, and
-**Turn on** appears. Once it is on, **Send a test** pushes you, because
-everything between the server and the banner fails silently and otherwise the
-only test is asking somebody to message you.
+**Turn on** appears. Only on iOS: a computer's browser, and Android's, push
+to a plain tab, so there **Turn on** is there at once and asks the browser
+for permission the way any site does. A tab gets the banner while the
+browser is running; the count on the icon is the installed app's. Once it is
+on, **Send a test** pushes you, because everything between the server and
+the banner fails silently and otherwise the only test is asking somebody to
+message you.
 
 Set `push_subject` in the server config to the `mailto:` or `https:` URL a
 push service should complain to. Left empty it is derived from `public_url`,
