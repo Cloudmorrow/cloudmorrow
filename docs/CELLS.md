@@ -186,10 +186,11 @@ reads it:
 
 ## On each surface
 
-**Web and phone** (`kit_cells.js`): the sheets, newest first, with a
-search box and the pen, an Excel file saying so; a sheet is its title —
-the file's name — the formula bar (the cell's name and what is typed in
-it) and the grid, as
+**Web and phone** (`kit_cells.js`): the sheets, newest first, each
+saying where its file is as Files says it (`My Files/Documents/Budget.cell`,
+cut at the start when the line is too short), with a search box and the
+pen, an Excel file saying so; a sheet is its title — the file's name — the
+formula bar (the cell's name and what is typed in it) and the grid, as
 many rows and columns as are used with room beyond, scrolling both ways
 with the headings held. A tap or click selects a cell, a drag or Shift
 with a click or an arrow a block of them, a row's or a column's heading

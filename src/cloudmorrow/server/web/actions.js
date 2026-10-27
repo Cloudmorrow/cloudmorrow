@@ -24,7 +24,7 @@
    same one; and which Quills edit a file of a given name (`editorsFor`),
    read off the screens the manifests declare. */
 
-import { ApiError, api, app, esc, go, parseHash, route, toast } from "./core.js";
+import { ApiError, api, app, encodePath, esc, go, parseHash, route, toast } from "./core.js";
 import { ask, openSheet } from "./dialog.js";
 import { linkTitles, read, segments, widget } from "./kit.js";
 
@@ -33,6 +33,22 @@ let quills = [];
 export function knowQuills(list) { quills = list; }
 
 const quillById = (id) => quills.find((q) => q.id === id);
+
+/**
+ * The address of a folder in Files — the first installed grid screen that
+ * groups files by share, whichever Quill it is in (kit_grid.js's folder
+ * address) — or "" when nothing here shows files.
+ */
+export function folderInFiles(share, folder = "") {
+  for (const quill of quills) {
+    for (const screen of quill.screens || []) {
+      if (screen.kit !== "grid" || screen.group !== "share") continue;
+      return `#/q/${encodeURIComponent(quill.id)}/${encodeURIComponent(screen.id)}/${encodeURIComponent(share)}`
+        + (folder ? "/" + encodePath(folder) : "");
+    }
+  }
+  return "";
+}
 
 /** The screen's `suffix`: one, or a list; what files it is over. */
 const suffixList = (screen) =>

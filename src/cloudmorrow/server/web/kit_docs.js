@@ -30,8 +30,8 @@ import {
 import { mayWrite } from "./kit.js";
 import {
   NEW, TOP, aOr, download, fixedFields, foldButton, folded, lastList, listHash, listView, load, openButton,
-  ownIcons, placeOf, sideBack, suffixesOf, trimSlashes, underRoot, wholePath, wide, wireFold, withSuffix,
-  withoutSuffix,
+  ownIcons, placeOf, shareLabels, showWhereabouts, sideBack, suffixesOf, trimSlashes, underRoot, whereIs, whereNew,
+  whereabouts, wholePath, wide, wireFold, withSuffix, withoutSuffix,
 } from "./kit_editor.js";
 import { Doc, block, run } from "./kit_docs_rules.js";
 import { ask, askText } from "./dialog.js";
@@ -327,6 +327,7 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
   const actions = `<button class="done strong" hidden>Done</button>` + openButton(b) +
     (ed.isNew ? "" : `<button class="export" aria-label="Export" title="Export">${ownIcons.export}</button>`) +
     (b.writes ? `<button class="delete" aria-label="Delete ${esc(b.noun)}">${icons.trash}</button>` : "");
+  const names = await shareLabels();
   const page = `
       <div class="editor doc${b.writes ? "" : " read-only"}">
         <input class="title" placeholder="Title" value="${esc(ed.isNew ? "" : ed.stem)}" autocapitalize="sentences" enterkeyhint="next"${b.writes ? "" : " readonly"}>
@@ -335,6 +336,7 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
           ed.where ? `<span class="badge where">${esc(ed.where)}</span>` : ""}<span class="status"></span></p>
         ${b.writes ? toolbar() : ""}
         <div class="doc-body" ${b.writes ? 'contenteditable="true"' : ""} spellcheck="true">${blocksHtml(ed.doc.blocks)}</div>
+        ${whereabouts(ed.isNew ? whereNew(b, ed.folder, names) : whereIs(b, record, names))}
       </div>`;
   let view = null;
   if (wide()) {
@@ -439,6 +441,7 @@ function moved(ed, record) {
   ed.id = record.id;
   ed.arg = pageArg(ed.b, record.id);
   replace(pageHash(ed.b, record.id));
+  showWhereabouts(whereIs(ed.b, record));
 }
 
 const bodyDoc = (ed) => new Doc(blocksOf(ed.bodyEl));

@@ -38,6 +38,7 @@ import { installCard } from "./install.js";
 import { mayWrite } from "./kit.js";
 import { bodyMarkup, bodyText, focusBody, mountBody, photoButton, setBody } from "./pictures.js";
 import { ask, askText } from "./dialog.js";
+import { folderInFiles } from "./actions.js";
 
 const own = {
   folder: '<svg width="22" height="18" viewBox="0 0 22 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h5l2 2.5h9a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H3a1.5 1.5 0 0 1-1.5-1.5z"/></svg>',
@@ -66,6 +67,57 @@ export function placeOf(b, record) {
   if (home) return "";
   const folder = folderOf(path);
   return share && share !== b.where.share ? share + (folder ? "/" + folder : "") : folder || "/";
+}
+
+// -- where a file is, said as Files says it --------------------------------------------
+// `My Files/Notes/ideas/garden.md`: the share by the name Files shows it
+// under, then the file's path in it, suffix and all — the same line for a
+// note, a document and a sheet, so a list says where each one is and a
+// page says it whole underneath. The shares' names are one call, the one
+// the picker makes, asked with each listing and kept for a minute between.
+let shareNames = { at: 0, names: new Map() };
+export async function shareLabels() {
+  if (Date.now() - shareNames.at < 60_000) return shareNames.names;
+  try {
+    const shares = await api("GET", recordsUrl("share"));
+    shareNames = { at: Date.now(), names: new Map(shares.map((s) => [s.id, String(s.fields.label || s.id)])) };
+  } catch { /* the share's id says nearly as much until the names come */ }
+  return shareNames.names;
+}
+
+const said = (share, path, names) => {
+  const name = share ? names.get(share) || share : "";
+  return name && path ? `${name}/${path}` : name || path;
+};
+
+/** Where a record's file is: `{share, folder, said}`, said as `My Files/Notes/ideas/garden.md`. */
+export function whereIs(b, record, names = shareNames.names) {
+  const path = trimSlashes(String(record.fields[b.path || b.title] || ""));
+  const share = String(record.fields.share || b.where.share || "");
+  return { share, folder: folderOf(path), said: said(share, path, names) };
+}
+
+/** Where a page not written yet will be: its folder, said with a slash after it. */
+export function whereNew(b, folder, names = shareNames.names) {
+  const under = trimSlashes(joinPath(b.root, folder));
+  const share = String(b.where.share || "");
+  return { share, folder: under, said: said(share, under, names) + "/" };
+}
+
+// The whole of it, wrapped in a way to its folder in Files when Files is here.
+const placeLink = (where) => {
+  const inner = `<bdi>${esc(where.said)}</bdi>`;
+  const files = where.share ? folderInFiles(where.share, where.folder) : "";
+  return files ? `<a href="${files}" title="Open the folder in Files">${inner}</a>` : inner;
+};
+
+/** The line under an open page saying where its file is, whole. */
+export const whereabouts = (where) => `<p class="whereabouts">${placeLink(where)}</p>`;
+
+/** The line said again, after a page is made or renamed. */
+export function showWhereabouts(where) {
+  const line = app.querySelector(".editor .whereabouts");
+  if (line) line.innerHTML = placeLink(where);
 }
 
 /**
@@ -164,10 +216,12 @@ const pageHash = (b, id) =>
   `#/r/${encodeURIComponent(b.at.quill.id)}/${encodeURIComponent(b.at.screen.id)}/${encodeURIComponent(b.model.id)}/${encodeURIComponent(id)}`;
 
 // -- the pages and the folders ---------------------------------------------------------
-// [{id, path, title, folder, modified, preview}], and the folders in tree
-// order: [{path, name, depth, count}], the top first.
+// [{id, path, title, folder, place, modified, preview}], and the folders in
+// tree order: [{path, name, depth, count}], the top first.
 export async function load(b) {
-  const rows = await api("GET", recordsUrl(b.model.id, "", withQuery(b, "?previews=true")));
+  const [rows, names] = await Promise.all([
+    api("GET", recordsUrl(b.model.id, "", withQuery(b, "?previews=true"))), shareLabels(),
+  ]);
   const pages = rows.map((r) => {
     const name = String(r.fields[b.title] || "").trim();
     const path = withoutSuffix(b, underRoot(b, r.fields[b.path || b.title]));
@@ -179,6 +233,8 @@ export async function load(b) {
       title: withoutSuffix(b, name) || baseName(path) || "Untitled",
       kind: kind.replace(/^\./, "").toUpperCase(),
       folder: b.path ? folderOf(path) : "",
+      // Where it is, said as Files says it: the list's line under the title.
+      place: whereIs(b, r, names).said,
       modified: seconds(r.updated_at) || 0,
       preview: r.preview || "",
     };
@@ -253,8 +309,8 @@ export function listView(b, data, key, openId = "") {
   const row = (p) => `<a class="row${p.id === openId ? " current" : ""}" href="${pageHash(b, p.id)}">
       <span class="main"><span class="title-line"><span class="title">${esc(p.title)}</span>` +
       (p.kind ? `<span class="kind">${esc(p.kind)}</span>` : "") +
-      (all && p.folder ? `<span class="where">${own.folderSmall}<span>${esc(p.folder)}</span></span>` : "") +
       `</span>
+      <span class="path"><bdi>${esc(p.place)}</bdi></span>
       <span class="meta"><span class="date">${esc(formatDate(p.modified))}</span>` +
       `<span class="preview">${esc(p.preview || "No additional text")}</span>` +
       `</span></span></a>`;
@@ -460,11 +516,13 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
   const actions = !b.writes ? "" : `<button class="done strong" hidden>Done</button>` +
     (ed.attachments ? photoButton : "") +
     `<button class="delete" aria-label="Delete ${esc(b.noun)}">${icons.trash}</button>`;
+  const names = await shareLabels();
   const page = `
       <div class="editor${b.writes ? "" : " read-only"}">
         <input class="title" placeholder="Title" value="${esc(ed.isNew ? "" : ed.stem)}" autocapitalize="sentences" enterkeyhint="next"${b.writes ? "" : " readonly"}>
         <p class="stamp"><span class="when">${esc(formatDate(ed.modified, { long: true }))}</span><span class="status"></span></p>
         ${bodyMarkup}
+        ${whereabouts(ed.isNew ? whereNew(b, ed.folder, names) : whereIs(b, record, names))}
       </div>`;
   let view = null;
   if (wide()) {
@@ -547,6 +605,7 @@ function moved(ed, record) {
   ed.id = record.id;
   ed.arg = pageArg(ed.b, record.id);
   replace(pageHash(ed.b, record.id));
+  showWhereabouts(whereIs(ed.b, record));
 }
 
 async function saveEditor(ed, { keepalive = false } = {}) {

@@ -105,11 +105,14 @@ not opened.
 ## On each surface
 
 **Web and phone** (`kit_docs.js`): the editor's list — folders, the
-documents in one newest first with their first words, search — and a
-document as its title (the file's name), a bar of styles (paragraph,
-heading 1 to 3, bold, italic, underline, strike, bullets, numbers, quote,
-link, left, centre, right) and the page, edited in place; Ctrl+B, Ctrl+I
-and Ctrl+U work as everywhere; plain text pasted comes in as paragraphs.
+documents in one newest first with their first words, search, each row
+saying where its file is as Files says it (`My Files/Documents/Offer.docs`,
+cut at the start when the line is too short) — and a document as its
+title (the file's name), a bar of styles (paragraph, heading 1 to 3, bold,
+italic, underline, strike, bullets, numbers, quote, link, left, centre,
+right) and the page, edited in place, with where the file is, whole, under
+it — a link to its folder in Files; Ctrl+B, Ctrl+I and Ctrl+U work as
+everywhere; plain text pasted comes in as paragraphs.
 It saves as you type, as blocks and runs — nothing of the browser's own
 markup; changing the title renames the file, and a Word file stays a
 Word file. One changed elsewhere since it was opened is not written over.
