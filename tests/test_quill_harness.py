@@ -146,7 +146,8 @@ def _letters(tmp_path):
     (folder / "datamodels" / "line.toml").write_text(
         '[datamodel]\nid = "letters.line"\nversion = 1\nlabel = "Line"\ndescription = "A line of a letter."\n'
         'scopes = ["personal", "shared"]\ntitle = "body"\nin_space = "letter"\nauthored = true\n'
-        '[fields]\nletter = { kind = "link", to = "letters.letter", required = true, indexed = true, on_delete = "cascade" }\n'
+        '[fields]\nletter = { kind = "link", to = "letters.letter", required = true, indexed = true,'
+        ' on_delete = "cascade" }\n'
         'body = { kind = "text", required = true }\n'
         '[[notify]]\nwhen = "created"\nto = "members"\nunread = true\n',
         encoding="utf-8",
