@@ -355,7 +355,7 @@ async function renderFolder(at, b, group, folder) {
   const findButton = `<button class="find" aria-label="Search" aria-pressed="false">${icons.search}</button>`;
   const findField = `<input class="find-input" type="search" placeholder="Search ${esc(title)}" aria-label="Search ${esc(title)}" autocapitalize="none" autocorrect="off" spellcheck="false" hidden>`;
   // Several at once: Select, then what can be done to them, by where they are.
-  const selectButton = `<button class="select" aria-pressed="false" hidden>Select</button>`;
+  const selectButton = `<button class="choose" aria-pressed="false" hidden>Select</button>`;
   const bulk = inTrash
     ? (b.writes ? [["restore", "Restore"], ["delete", "Delete for good", "danger"]] : [])
     : [["copy", "Copy to…"], ...(b.writes ? [["move", "Move to…"], ["delete", "Delete", "danger"]] : [])];
@@ -368,7 +368,7 @@ async function renderFolder(at, b, group, folder) {
         <div class="sort" role="group" aria-label="Sort by"></div>
         <div class="view-switch" role="group" aria-label="Show as"></div>
       </div>
-      <div class="select-bar" hidden>
+      <div class="choose-bar" hidden>
         <span class="count"></span>
         <button type="button" class="all">All</button>
         ${bulkButtons}
@@ -383,8 +383,8 @@ async function renderFolder(at, b, group, folder) {
   const viewEl = app.querySelector(".view-switch");
   const listingEl = app.querySelector(".listing");
   const emptyEl = app.querySelector(".heading .empty-trash");
-  const selectEl = app.querySelector(".heading .select");
-  const barEl = app.querySelector(".select-bar");
+  const selectEl = app.querySelector(".heading .choose");
+  const barEl = app.querySelector(".choose-bar");
   const mainEl = app.querySelector("main");
   const findEl = app.querySelector(".heading .find");
   const findInput = app.querySelector(".heading .find-input");
@@ -612,7 +612,7 @@ async function renderFolder(at, b, group, folder) {
       { sep: true },
       { label: "Delete", tone: "danger", run: () => act(entry, "delete") }];
   };
-  const blank = (event) => (takesIn && !event.target.closest(".heading, .sort-row, .select-bar, button, input") ? [
+  const blank = (event) => (takesIn && !event.target.closest(".heading, .sort-row, .choose-bar, button, input") ? [
     { label: "New folder…", run: () => newFolder(place, reload) },
     { label: "New text file…", run: () => newTextFile(place, reload) },
     { sep: true },
