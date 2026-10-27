@@ -40,8 +40,9 @@ import {
 import { installCard } from "./install.js";
 import { mayWrite, sheetHash } from "./kit.js";
 import {
-  aOr, download, fixedFields, foldButton, folded, openButton, ownIcons, placeOf as placeOfFile, suffixesOf, trimSlashes,
-  underRoot, wholePath, wide, wireFold, withQuery, withSuffix, withoutSuffix,
+  aOr, download, fixedFields, foldButton, folded, openButton, ownIcons, placeOf as placeOfFile, shareLabels,
+  showWhereabouts, suffixesOf, trimSlashes, underRoot, whereIs, whereNew, whereabouts, wholePath, wide, wireFold,
+  withQuery, withSuffix, withoutSuffix,
 } from "./kit_editor.js";
 import { CellError, SIDES, Sheet, colName, extent, isFormula, parseRef, rangeName, refName, wantsRef } from "./kit_cells_rules.js";
 import { ask } from "./dialog.js";
@@ -93,7 +94,12 @@ const kindOf = (b, r) => {
   return found.replace(/^\./, "").toUpperCase();
 };
 const isExcel = (name) => String(name || "").toLowerCase().endsWith(EXCEL);
-const listSheets = (b) => api("GET", recordsUrl(b.model.id, "", withQuery(b, "")));
+// The sheets, each with `place`: where its file is, said as Files says it.
+async function listSheets(b) {
+  const [rows, names] = await Promise.all([api("GET", recordsUrl(b.model.id, "", withQuery(b, ""))), shareLabels()]);
+  for (const r of rows) r.place = whereIs(b, r, names).said;
+  return rows;
+}
 const byNewest = (a, c) => (seconds(c.updated_at) || 0) - (seconds(a.updated_at) || 0);
 
 // -- the list -----------------------------------------------------------------------------
@@ -102,10 +108,11 @@ const byNewest = (a, c) => (seconds(c.updated_at) || 0) - (seconds(a.updated_at)
 function listView(b, records, openId = "") {
   const compose = !b.writes ? "" : `<a class="button compose" href="${b.at.base}/${NEW}" aria-label="New ${esc(b.noun)}">${icons.compose}</a>`;
   const rows = records.slice().sort(byNewest);
-  // A listing leaves a file's text out, so a row is its path and its date.
+  // A listing leaves a file's text out, so a row is its name, where it is, and its date.
   const row = (r) => `<a class="row${r.id === openId ? " current" : ""}" href="${openHash(b, r.id)}">
-      <span class="main"><span class="title-line"><span class="title">${esc(keyOf(b, r))}</span>${
+      <span class="main"><span class="title-line"><span class="title">${esc(titleOf(b, r))}</span>${
         kindOf(b, r) ? `<span class="kind">${esc(kindOf(b, r))}</span>` : ""}</span>
+      <span class="path"><bdi>${esc(r.place || keyOf(b, r))}</bdi></span>
       <span class="meta"><span class="date">${esc(formatDate(seconds(r.updated_at) || 0))}</span></span></span></a>`;
   const show = (listing, items, { searching = false } = {}) => {
     if (!items.length) {
@@ -140,7 +147,7 @@ function listView(b, records, openId = "") {
       search.addEventListener("input", () => {
         const needle = search.value.trim().toLowerCase();
         if (!needle) { show(listing, rows); return; }
-        show(listing, rows.filter((r) => keyOf(b, r).toLowerCase().includes(needle)), { searching: true });
+        show(listing, rows.filter((r) => (r.place || keyOf(b, r)).toLowerCase().includes(needle)), { searching: true });
       });
     },
   };
@@ -230,6 +237,7 @@ async function renderSheet(b, { record = null, isNew = false, arg }) {
   const actions = (b.writes ? `<button class="done strong" hidden>Done</button>` : "") + openButton(b) +
     (ed.isNew ? "" : `<button class="export" aria-label="Export" title="Export">${ownIcons.export}</button>`) +
     (b.writes ? `<button class="delete" aria-label="Delete ${esc(b.noun)}">${icons.trash}</button>` : "");
+  const names = await shareLabels();
   const page = `
       <div class="editor cells${b.writes ? "" : " read-only"}">
         <input class="title" placeholder="Title" value="${esc(ed.isNew ? "" : ed.stem)}" autocapitalize="sentences" enterkeyhint="next"${b.writes ? "" : " readonly"}>
@@ -239,6 +247,7 @@ async function renderSheet(b, { record = null, isNew = false, arg }) {
         ${b.writes ? formatBar() : ""}
         <div class="formula-bar"><span class="where">A1</span><input class="formula" spellcheck="false" autocapitalize="none" autocorrect="off" placeholder="Type a value, or =SUM(B1:B3)"${b.writes ? "" : " readonly"}></div>
         <div class="grid-wrap" tabindex="0"><table class="grid"></table></div>
+        ${whereabouts(ed.isNew ? whereNew(b, "", names) : whereIs(b, record, names))}
       </div>`;
   let view = null;
   if (wide()) {
@@ -895,6 +904,7 @@ function moved(ed, record) {
   ed.id = record.id;
   ed.arg = openArg(ed.b, record.id);
   replace(openHash(ed.b, record.id));
+  showWhereabouts(whereIs(ed.b, record));
 }
 
 async function saveSheet(ed, { keepalive = false } = {}) {
