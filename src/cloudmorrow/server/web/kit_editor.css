@@ -79,13 +79,15 @@
 /* -- side by side ------------------------------------------------------------ */
 /* Only a computer draws the split; a phone never gets `main.split`. The
    list keeps a column of its own and scrolls on its own, so the page
-   beside it stays where it is while you look for the next one. */
+   beside it stays where it is while you look for the next one. The room
+   between the list and the line is the list's own padding, not a gap in
+   the grid: the pane that scrolls ends at the line, so its scrollbar runs
+   along the line, where the split is, not down the edge of the rows. */
 @media (min-width: 900px) and (min-height: 600px) {
   #app:has(main.split) { --column: 1180px; }
   main.split {
     display: grid;
-    grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
-    gap: 28px;
+    grid-template-columns: minmax(288px, 368px) minmax(0, 1fr);
     min-height: calc(100vh - var(--bar-h) - 56px);
   }
   main.split .side {
@@ -94,14 +96,9 @@
     top: calc(var(--bar-h) + 8px);
     max-height: calc(100vh - var(--bar-h) - 24px);
     overflow-y: auto;
-    padding-right: 4px;
+    padding-right: 28px;
   }
   main.split .side .heading h1 { font-size: 26px; }
-  /* The pen's negative margin (base.css) puts its glyph on the column's
-     edge. Here the column is the pane, whose edge is 4px of padding away —
-     and a glyph past the edge of a pane that scrolls is a scrollbar along
-     the bottom of the list, for good. */
-  main.split .side .heading .actions { margin-right: -4px; }
   main.split .page {
     min-width: 0;
     padding-left: 28px;
