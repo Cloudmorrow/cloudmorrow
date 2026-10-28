@@ -1,0 +1,10 @@
+[datamodel]
+id = "fleet.notice"
+version = 1
+label = "Notice"
+description = "A line the garage put in somebody's hands."
+scopes = ["personal"]
+title = "text"
+
+[fields]
+text = { kind = "string", required = true }

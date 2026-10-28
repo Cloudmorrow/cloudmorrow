@@ -198,13 +198,28 @@ hook started by an assistant's change is the same.
 | `ctx.user` | who it runs for: `.username`, `.name`, `.admin`, `.circles`, `.roles` |
 | `ctx.quill`, `ctx.where` | this Quill's id; `"server"` or `"machine"` |
 | `ctx.params` | a view's parameters, by name and as attributes; `.record` when opened on one |
-| `ctx.records` | `list(model, q=, last=, **where)`, `get`, `create(model, fields=None, scope=, members=, announce=, **values)`, `patch(model, id, fields, rev=)`, `move(model, id, fields, index=)`, `delete`, `seen(model, id)` — the record API, through the gate. A space is made with its `scope` and, shared, its `members`; `seen` is the person having looked in one. A space's record says `.members`, `.unread` and `.last` |
+| `ctx.records` | `list(model, q=, last=, **where)`, `get`, `create(model, fields=None, scope=, members=, announce=, owner=, by=, **values)`, `patch(model, id, fields, rev=)`, `move(model, id, fields, index=)`, `delete`, `seen(model, id)` — the record API, through the gate. A space is made with its `scope` and, shared, its `members`; `seen` is the person having looked in one. A space's record says `.members`, `.unread` and `.last`. `owner=` delivers (below) |
 | `ctx.people(role=, circle=)` | who holds a role, as usernames ([FLOWS.md](FLOWS.md)); with no role, everybody on the server but the person it runs for |
 | `ctx.approvals.ask(record, role=, question=)` | a yes or no asked of whoever holds the role; the answer comes back as a hook on `approval` |
 | `ctx.fetch(url, method=, headers=, json=, body=)` | https to a host in `[[fetch]]`, and there only after a redirect too; a `Response` (`.status`, `.ok`, `.json()`, `.text`) |
 | `ctx.secret(key)` | a key in `[[secrets]]`, from the person's own vault |
 | `ctx.now()`, `ctx.log(...)` | the time; a line in the Quill's log |
 | `ctx.folder(name)`, `ctx.run([...])` | on a machine: a folder the person picked; a program the manifest lists and the machine allows |
+
+**Delivery.** A job or a webhook runs as the administrator who installed
+the Quill, and sees their records alone — so mail that arrived for Sam
+could not reach Sam's inbox. `ctx.records.create(..., owner="sam")` is
+how it does: the record is made as Sam's, exactly as if Sam had written
+it — Sam's circles, what a link may reach from where Sam stands, whose
+change it is — and the installer never sees it. It is news to Sam: a
+delivery into a space tells everybody in it, Sam included, and marks
+nothing as looked at. A record delivered into one of Sam's spaces may say
+who it is `by=` — an outside address — and is then that sender's rather
+than Sam's: unread to Sam until they look, theirs to read and never to
+change. Only a job or a webhook may deliver, only a server Quill (never
+somebody's own), and only a datamodel the Quill itself introduced;
+anything else is refused. A view or an action, pressed by a person, writes
+as that person and nobody else.
 
 A refusal arrives as an exception: `Refused`, `NotFound`, `Invalid`,
 `Conflict`. A record is a `Record`: its fields by name (`van["name"]`,

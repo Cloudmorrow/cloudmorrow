@@ -175,6 +175,27 @@ def test_a_message_is_unread_until_looked_at_and_its_members_are_told(spaces):
     assert theirs["unread"] == 0
 
 
+def test_a_delivery_into_somebodys_space_is_news_to_them_and_the_deliverer_sees_nothing(spaces):
+    store = spaces.client.app.state.cloudmorrow.records
+    told = []
+    store.on_notify.append(lambda record, rule, people: told.append((record.fields["body"], people)))
+    postman = Principal("quill", "bram", quill="talk", models=frozenset({"channel", "message"}))
+    room = store.create(postman, "channel", {"name": "Sam's mail"}, scope="shared", owner="guest")
+    assert room.owner == "guest" and room.scope == "shared" and room.members == []
+    mail = store.create(postman, "message", {"channel": room.id, "body": "hello"}, owner="guest", by="ada@example.org")
+    assert mail.owner == "ada@example.org" and told == [("hello", ["guest"])]
+    theirs = next(c for c in spaces("GET", "/api/records/channel", who=spaces.guest) if c["id"] == room.id)
+    assert theirs["unread"] == 1
+    assert [m["fields"]["body"] for m in spaces("GET", "/api/records/message", who=spaces.guest)] == ["hello"]
+    # The postman, who is the administrator, has nothing of it.
+    assert all(c["id"] != room.id for c in spaces("GET", "/api/records/channel"))
+    assert spaces("GET", "/api/records/message") == []
+    # Theirs to read, not to change; the thread is theirs to delete, mail and all.
+    spaces("PATCH", f"/api/records/message/{mail.id}", {"fields": {"body": "x"}}, who=spaces.guest, expect=403)
+    spaces("DELETE", f"/api/records/channel/{room.id}", who=spaces.guest, expect=204)
+    assert spaces("GET", "/api/records/message", who=spaces.guest) == []
+
+
 def test_deleting_a_space_takes_everybodys_things_in_it(spaces):
     room = spaces("POST", "/api/records/channel", {"fields": {"name": "tmp"}, "scope": "public"}, expect=201)
     spaces(

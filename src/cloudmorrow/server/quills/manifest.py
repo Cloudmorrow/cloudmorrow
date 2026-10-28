@@ -374,6 +374,8 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
     for screen in screens:
         if "icon" in screen and not isinstance(screen["icon"], str):
             raise QuillError(f"{where}: screen {screen['id']!r} icon is a name from the icon library")
+        if "admin" in screen and not isinstance(screen["admin"], bool):
+            raise QuillError(f"{where}: screen {screen['id']!r} admin is true or false")
         kit = screen.get("kit")
         if kit not in KIT:
             raise QuillError(f"{where}: screen {screen['id']!r} kit is one of {', '.join(KIT)}")

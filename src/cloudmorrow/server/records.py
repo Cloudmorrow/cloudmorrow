@@ -39,6 +39,7 @@ nothing, and nobody's leaving takes the conversation with them.
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 import json
 import secrets
@@ -1193,6 +1194,8 @@ class RecordStore:
         members: Iterable[str] = (),
         announce: bool = True,
         by_server: bool = False,
+        owner: str | None = None,
+        by: str | None = None,
     ) -> Record:
         """Make a record. For a shared space, *members* are put in it at once.
 
@@ -1202,7 +1205,20 @@ class RecordStore:
 
         A `server_made` datamodel's records come only from the server's own
         route, which says so with *by_server*; the generic API is refused.
+
+        With *owner*, the record is made as that person's — a delivery, which
+        only a Quill's job or webhook may ask for (quills/code.py says who).
+        Everything from here on is as if they wrote it: the gate and their
+        circles, what a link may reach, and whose change it is — except that
+        a delivery is news to them: whoever is in the space is told, the
+        owner included, and nothing is marked as looked at. A record
+        delivered into a space may say who it is *by* — an outside address —
+        and is then that sender's rather than the owner's: unread to the
+        owner until they look, theirs to read and not to change.
         """
+        delivered = bool(owner and owner != principal.username)
+        if delivered:
+            principal = dataclasses.replace(principal, username=owner)
         self._check(principal, "write", model_id)
         model = self.model(model_id)
         if model.server_made and not by_server:
@@ -1212,6 +1228,7 @@ class RecordStore:
             self._changed(principal, "created", made, None)
             return made
         owner = principal.username
+        written_as = by if (delivered and by and model.in_space) else owner
         record_id = _new_id()
         now = iso_stamp()
         scope = self._scope_for(model, scope)
@@ -1227,7 +1244,7 @@ class RecordStore:
             conn.execute(
                 "INSERT INTO records (id, model, owner, scope, rev, position, indexed, body,"
                 f" written_by, created_at, updated_at, seq) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, {self._next})",
-                (record_id, model.id, owner, scope, position, indexed, body, principal.writer, now, now),
+                (record_id, model.id, written_as, scope, position, indexed, body, principal.writer, now, now),
             )
             if model.ordered and index is not None:
                 self._renumber(conn, model, owner, self._group(model, fields), moved=record_id, insert_at=index)
@@ -1238,8 +1255,8 @@ class RecordStore:
                     (record_id, username, owner, now),
                 )
             self._log(conn, principal, model.id, record_id, "created", 1, [n for n in incoming if n in model.by_name])
-            recipients = self._recipients(conn, model, fields, owner) if model.notify else []
-            if model.in_space and any(rule.get("unread") for rule in model.notify):
+            recipients = self._recipients(conn, model, fields, "" if delivered else owner) if model.notify else []
+            if not delivered and model.in_space and any(rule.get("unread") for rule in model.notify):
                 # Writing in a space is looking at it: what was above your
                 # line is not news to you, and neither is your line.
                 conn.execute(

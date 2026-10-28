@@ -178,6 +178,8 @@ class Records:
         scope: str | None = None,
         members: list[str] | tuple[str, ...] = (),
         announce: bool = True,
+        owner: str | None = None,
+        by: str | None = None,
         **values,
     ) -> Record:
         """A new record. Fields as keywords, or a dict for names with a dot in them.
@@ -185,8 +187,19 @@ class Records:
         A space is made with its *scope* (`personal`, `shared`, `public`) and,
         shared, with its *members* in it at once, each of them told — unless
         *announce* is off, for a space whose first line is the news.
+
+        *owner* delivers: the record is made as that person's, and is news to
+        them. Only a job or a webhook of a server Quill may, and only with a
+        datamodel the Quill introduced — mail into somebody's inbox. A record
+        delivered into one of their spaces may say who it is *by*, an outside
+        address: it is then unread to them until they look, and not theirs
+        to change.
         """
         args = {"model": model, "fields": _plain(_fields(fields, values))}
+        if owner:
+            args["owner"] = str(owner)
+        if by:
+            args["by"] = str(by)
         if index is not None:
             args["index"] = index
         if scope is not None:
