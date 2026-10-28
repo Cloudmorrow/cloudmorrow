@@ -119,50 +119,49 @@
   }
   /* The editor is at least as tall as the panel, so its foot is the panel's. */
   main.split .page > .editor { flex: 1; }
-  /* The way up to the folders, which a phone has in the bar. */
+  /* The line over the list: the way up to the folders, which a phone has
+     in the bar, and at its right end the button that folds the list away.
+     It keeps the top while the list scrolls under it. */
+  main.split .side-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 4px 0 2px;
+    background: var(--bg);
+  }
   main.split .side-back {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    margin: 6px 0 2px;
     color: var(--accent);
     font-size: 14.5px;
     font-weight: 600;
   }
   main.split .side-back svg { width: 9px; height: 14px; }
-  main.split .page > .empty { margin-top: 18vh; }
-  /* The handle that folds the list away sits beside the line between them,
-     in the page's gutter, at the top of the panel, and stays there while
-     the page scrolls under it. Beside, not on: a panel that scrolls clips
-     whatever hangs past its edge. It is the page's first child, and keeps
-     its place in the column with a negative margin the height of itself. */
   main.split .fold {
-    position: sticky;
-    top: 6px;
-    align-self: start;
-    margin: 6px 0 -32px -31px;
-    z-index: 1;
-    width: 26px;
-    height: 26px;
+    margin-left: auto;
+    width: 28px;
+    height: 28px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--line);
-    border-radius: 50%;
-    background: var(--bg);
+    border-radius: 6px;
     color: var(--muted);
   }
-  main.split .fold:hover { color: var(--accent); border-color: var(--accent); }
-  main.split .fold svg { width: 8px; height: 12px; transition: transform .15s; }
-  /* Folded, the page has the whole width, and its lines a reading measure.
-     It keeps a margin either side, and the handle lives in the left one:
-     in a window too narrow for the measure to leave room, the page would
-     otherwise run under it and the handle sit on the title. */
-  main.split.folded { grid-template-columns: minmax(0, 1fr); }
-  main.split.folded .side { display: none; }
-  main.split.folded .page { padding: 0 48px; border-left: 0; }
-  main.split.folded .fold { margin-left: -46px; }
-  main.split.folded .fold svg { transform: rotate(180deg); }
+  main.split .fold:hover { color: var(--accent); }
+  main.split .fold svg { width: 18px; height: 16px; }
+  main.split .page > .empty { margin-top: 18vh; }
+  /* Folded, the list is its top line alone — the button on it brings the
+     list back — and the page has the rest of the width, its lines a
+     reading measure. */
+  main.split.folded { grid-template-columns: auto minmax(0, 1fr); }
+  main.split.folded .side { padding-right: 0; }
+  main.split.folded .side > :not(.side-head), main.split.folded .side-back { display: none; }
+  main.split.folded .page { padding: 0 48px 0 20px; border-left: 0; }
   main.split.folded .page .editor { max-width: 780px; margin: 0 auto; width: 100%; }
   /* The page that is open is the one lit in the list: Sky, as current is. */
   main.split .row.current { background: color-mix(in srgb, var(--accent) 15%, transparent); }

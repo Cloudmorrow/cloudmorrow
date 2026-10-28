@@ -45,6 +45,8 @@ const own = {
   pages: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M6.5 7h7M6.5 10.5h7M6.5 14h4"/></svg>',
   folderSmall: '<svg width="14" height="12" viewBox="0 0 22 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h5l2 2.5h9a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H3a1.5 1.5 0 0 1-1.5-1.5z"/></svg>',
   newFolder: '<svg width="22" height="18" viewBox="0 0 22 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h5l2 2.5h9a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H3a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M11 7.5v6M8 10.5h6"/></svg>',
+  // The list beside a page: a panel with a pane at its left, to fold away and bring back.
+  sidebar: '<svg width="18" height="16" viewBox="0 0 20 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="1.5" width="17" height="15" rx="2.5"/><path d="M7.5 1.5v15"/></svg>',
   // Open from anywhere: a folder with a way out of it; Export: a way down to a line.
   open: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10.5v6M9.5 13l2.5-2.5 2.5 2.5"/></svg>',
   export: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>',
@@ -418,7 +420,7 @@ export async function renderEditor(at, arg) {
   if (wide()) {
     mount(nav({ title: view.title }) + `
       <main class="split">
-        <section class="side">${sideBack(view)}${view.html}</section>
+        <section class="side">${sideHead(view, { fold: false })}${view.html}</section>
         <section class="page"><p class="empty mascot"><b>Nothing open</b>Choose ${esc(aOr(b.noun))} on the left${
           b.writes ? ", or start one with the pen" : ""}.</p></section>
       </main>` + tabs(at.tab));
@@ -431,13 +433,16 @@ export async function renderEditor(at, arg) {
 }
 
 // On a computer the bar has no back button — the list is right there —
-// so the way up to the folders is over the list instead.
-export const sideBack = (view) => (view.backTo
-  ? `<a class="side-back" href="${view.backTo}">${icons.chevronLeft}${esc(view.backLabel)}</a>` : "");
-
-// The handle on the line between the list and the page.
-export const foldButton = () => `<button class="fold" type="button" aria-label="${folded() ? "Show the list" : "Hide the list"}"` +
-  ` title="${folded() ? "Show the list" : "Hide the list"}">${icons.chevronLeft}</button>`;
+// so the way up to the folders is the line over the list, and at its right
+// end, beside a page, the button that folds the list away. Folded, the
+// list is that line alone, the button on it to bring the list back. The
+// kits over files draw the same line (kit_docs.js, kit_cells.js).
+const foldButton = () => `<button class="fold" type="button" aria-label="${folded() ? "Show the list" : "Hide the list"}"` +
+  ` title="${folded() ? "Show the list" : "Hide the list"}">${own.sidebar}</button>`;
+export function sideHead(view, { fold = true } = {}) {
+  const back = view.backTo ? `<a class="side-back" href="${view.backTo}">${icons.chevronLeft}${esc(view.backLabel)}</a>` : "";
+  return back || fold ? `<div class="side-head">${back}${fold ? foldButton() : ""}</div>` : "";
+}
 
 export function wireFold() {
   const split = app.querySelector("main.split");
@@ -529,8 +534,8 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
     view = listView(b, await load(b), listKey, ed.id);
     mount(nav({ title: ed.stem || "New", right: actions }) + `
       <main class="split${folded() ? " folded" : ""}">
-        <section class="side">${sideBack(view)}${view.html}</section>
-        <section class="page">${foldButton()}${page}</section>
+        <section class="side">${sideHead(view)}${view.html}</section>
+        <section class="page">${page}</section>
       </main>` + tabs(b.at.tab));
   } else {
     mount(nav({ back: parent, backLabel: parentLabel, title: ed.stem, right: actions }) +

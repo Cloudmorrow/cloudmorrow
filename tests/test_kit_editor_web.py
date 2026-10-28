@@ -72,6 +72,17 @@ def test_the_calls_it_makes_are_the_record_apis():
 def test_side_by_side_is_the_computer_only(client):
     assert "min-width: 900px) and (min-height: 600px)" in EDITOR_JS
     assert '<main class="split">' in EDITOR_JS
+    # The line over the list: the way to the folders, and at its right end
+    # the button that folds the list away — beside a page, not on the list
+    # screen. Folded, that line is all that is left of the list.
+    head = EDITOR_JS.split("export function sideHead", 1)[1].split("\n}", 1)[0]
+    assert '<div class="side-head">${back}${fold ? foldButton() : ""}</div>' in head
+    assert '<section class="side">${sideHead(view, { fold: false })}${view.html}</section>' in EDITOR_JS
+    assert '<section class="side">${sideHead(view)}${view.html}</section>' in EDITOR_JS
+    assert "${foldButton()}${page}" not in EDITOR_JS
+    fold = EDITOR_CSS.split("main.split .fold {", 1)[1].split("}", 1)[0]
+    assert "margin-left: auto;" in fold
+    assert "main.split.folded .side > :not(.side-head), main.split.folded .side-back { display: none; }" in EDITOR_CSS
     media = js_code(EDITOR_CSS).split("@media (min-width: 900px) and (min-height: 600px)", 1)
     assert len(media) == 2 and "main.split {" in media[1]
     assert "main.split" not in media[0]

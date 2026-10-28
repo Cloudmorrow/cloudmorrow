@@ -94,6 +94,8 @@ def test_the_calls_it_makes_are_the_record_apis():
 def test_side_by_side_is_the_computers_split():
     assert 'from "./kit_editor.js"' in DOCS_JS
     assert '<main class="split">' in DOCS_JS
+    assert '<section class="side">${sideHead(view, { fold: false })}${view.html}</section>' in DOCS_JS
+    assert '<section class="side">${sideHead(view)}${view.html}</section>' in DOCS_JS
 
 
 def test_the_record_calls_it_makes_exist(client):

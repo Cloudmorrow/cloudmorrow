@@ -24,32 +24,31 @@
    datamodel you may only read (docs/CIRCLES.md) open read-only: the grid
    shows, and nothing types into it.
 
-   On a phone it is the list, then the sheet; on a computer the list and
-   the sheet are side by side, and the list folds away (kit_editor.js's
-   split, shared).
+   The list is the editor's (kit_editor.js): the folders, every sheet
+   newest first, or one folder's, with the first cells of each. On a phone
+   it is the list, then the sheet; on a computer the list and the sheet are
+   side by side, and the list folds away (the editor's split, shared).
 
    The addresses, under the screen's own (quills.js):
-     #/q/<quill>/<screen>                every sheet, newest first
-     #/q/<quill>/<screen>/~new           a sheet not made yet
+     #/q/<quill>/<screen>                the folders, every sheet, or one folder's
+     #/q/<quill>/<screen>/~new[/folder]  a sheet not made yet
      #/r/<quill>/<screen>/<model>/<id>   a sheet */
 
 import {
-  SAVE_DELAY, api, app, back, baseName, esc, fileStem, formatDate, go, heading, icons, mount, nav, occupy,
-  recordsUrl, renderRoute, replace, seconds, sectionOf, setStatus, tabs, toast, vacate, wireShell,
+  SAVE_DELAY, api, app, back, baseName, esc, fileStem, folderOf, formatDate, go, icons, joinPath, mount, nav,
+  occupy, previousHash, recordsUrl, renderRoute, replace, seconds, setStatus, tabs, toast, vacate, wireShell,
 } from "./core.js";
-import { installCard } from "./install.js";
 import { mayWrite, sheetHash } from "./kit.js";
 import {
-  aOr, download, fixedFields, foldButton, folded, openButton, ownIcons, placeOf as placeOfFile, shareLabels,
-  showWhereabouts, suffixesOf, trimSlashes, underRoot, whereIs, whereNew, whereabouts, wholePath, wide, wireFold,
-  withQuery, withSuffix, withoutSuffix,
+  NEW, TOP, aOr, download, fixedFields, folded, lastList, listHash, listView, load, openButton, ownIcons,
+  placeOf as placeOfFile, shareLabels, showWhereabouts, sideHead, suffixesOf, trimSlashes, underRoot, whereIs,
+  whereNew, whereabouts, wholePath, wide, wireFold, withSuffix, withoutSuffix,
 } from "./kit_editor.js";
 import { CellError, SIDES, Sheet, colName, extent, isFormula, parseRef, rangeName, refName, wantsRef } from "./kit_cells_rules.js";
 import { ask } from "./dialog.js";
 import { choose, menu } from "./actions.js";
 import { pickFile } from "./filepick.js";
 
-const NEW = "~new";
 const EXCEL = ".xlsx";
 // What a sheet goes out as, by suffix: what the server's /export makes.
 const EXPORTS = [[".xlsx", "Excel"], [".pdf", "PDF"], [".csv", "CSV"]];
@@ -58,6 +57,7 @@ const EXPORTS = [[".xlsx", "Excel"], [".pdf", "PDF"], [".csv", "CSV"]];
 function bind(at) {
   const { quill, screen } = at;
   const model = quill.models[screen.model];
+  const can = new Set(model.can || []);
   const where = Object.fromEntries(Object.entries(screen.where || {}).map(([k, v]) => [k, String(v)]));
   const suffixes = suffixesOf(screen);
   const filters = suffixes.length ? { ...where, suffix: suffixes.join(",") } : where;
@@ -73,6 +73,8 @@ function bind(at) {
     root: trimSlashes(where.within || ""),
     // On every listing: the share, the folder, the suffix.
     query: new URLSearchParams(filters).toString(),
+    keepsFolders: !!screen.path && can.has("folders"),
+    search: can.has("search"),
     label: screen.label || quill.name,
     // A sheet, whatever the file datamodel calls itself.
     noun: "sheet",
@@ -82,97 +84,37 @@ function bind(at) {
 
 const openHash = (b, id) => sheetHash(b.at, b.model.id, id);
 const openArg = (b, id) => `${b.at.quill.id}/${b.at.screen.id}/${b.model.id}/${id}`;
-// A sheet's title is its file's name without the suffix; what the list
-// says is its path under the root, when one is bound.
+// A sheet's title is its file's name without the suffix, or its file's.
 const titleOf = (b, r) => withoutSuffix(b, String(r.fields[b.title] || "").trim())
   || baseName(withoutSuffix(b, underRoot(b, r.fields[b.path]))) || "Untitled";
-const keyOf = (b, r) => (b.path ? withoutSuffix(b, underRoot(b, r.fields[b.path])) : "") || titleOf(b, r);
-// A file of a suffix other than the first says so in the list: XLSX.
-const kindOf = (b, r) => {
-  const name = String(r.fields[b.title] || "").toLowerCase();
-  const found = (b.suffixes || []).slice(1).find((x) => name.endsWith(x.toLowerCase())) || "";
-  return found.replace(/^\./, "").toUpperCase();
-};
 const isExcel = (name) => String(name || "").toLowerCase().endsWith(EXCEL);
-// The sheets, each with `place`: where its file is, said as Files says it.
-async function listSheets(b) {
-  const [rows, names] = await Promise.all([api("GET", recordsUrl(b.model.id, "", withQuery(b, ""))), shareLabels()]);
-  for (const r of rows) r.place = whereIs(b, r, names).said;
-  return rows;
-}
-const byNewest = (a, c) => (seconds(c.updated_at) || 0) - (seconds(a.updated_at) || 0);
 
-// -- the list -----------------------------------------------------------------------------
-// What the list screen is, for a phone to draw alone and a computer to draw
-// beside a sheet: {title, html, wire}.
-function listView(b, records, openId = "") {
-  const compose = !b.writes ? "" : `<a class="button compose" href="${b.at.base}/${NEW}" aria-label="New ${esc(b.noun)}">${icons.compose}</a>`;
-  const rows = records.slice().sort(byNewest);
-  // A listing leaves a file's text out, so a row is its name, where it is, and its date.
-  const row = (r) => `<a class="row${r.id === openId ? " current" : ""}" href="${openHash(b, r.id)}">
-      <span class="main"><span class="title-line"><span class="title">${esc(titleOf(b, r))}</span>${
-        kindOf(b, r) ? `<span class="kind">${esc(kindOf(b, r))}</span>` : ""}</span>
-      <span class="path"><bdi>${esc(r.place || keyOf(b, r))}</bdi></span>
-      <span class="meta"><span class="date">${esc(formatDate(seconds(r.updated_at) || 0))}</span></span></span></a>`;
-  const show = (listing, items, { searching = false } = {}) => {
-    if (!items.length) {
-      listing.innerHTML = searching
-        ? `<p class="empty">Nothing matches.</p>`
-        : `<p class="empty mascot"><b>Nothing here yet</b>${b.writes
-          ? `Start your first ${esc(b.noun)} with the pen, and it will show up here.` : "When there is, it will show up here."}</p>`;
-      return;
-    }
-    if (searching) { listing.innerHTML = `<div class="group">${items.map(row).join("")}</div>`; return; }
-    // Newest first already, so the sections fall out in order: Today,
-    // Yesterday, Last 7 Days, Last 30 Days, each month, each year.
-    const sections = new Map();
-    for (const r of items) {
-      const label = sectionOf(seconds(r.updated_at) || 0);
-      if (!sections.has(label)) sections.set(label, []);
-      sections.get(label).push(r);
-    }
-    listing.innerHTML = [...sections].map(([label, group]) =>
-      `<p class="group-label">${esc(label)}</p><div class="group">${group.map(row).join("")}</div>`).join("");
-  };
-  return {
-    title: b.label,
-    html: `${heading(b.label, compose)}
-      <div class="search">${icons.search}<input type="search" placeholder="Search" autocapitalize="none" autocorrect="off"></div>
-      <div class="install-slot">${installCard()}</div>
-      <div class="listing"></div>`,
-    wire(root) {
-      const listing = root.querySelector(".listing");
-      const search = root.querySelector("input[type=search]");
-      show(listing, rows);
-      search.addEventListener("input", () => {
-        const needle = search.value.trim().toLowerCase();
-        if (!needle) { show(listing, rows); return; }
-        show(listing, rows.filter((r) => (r.place || keyOf(b, r)).toLowerCase().includes(needle)), { searching: true });
-      });
-    },
-  };
-}
-
-/** The list of sheets, and a sheet not made yet. */
+// -- the list: the editor's, over these files ------------------------------------------
+/** The folders, the sheets, or one folder's; and a sheet not made yet. */
 export async function renderCells(at, arg) {
   const b = bind(at);
-  if (arg === NEW && !b.writes) {
+  if ((arg === NEW || arg.startsWith(NEW + "/")) && !b.writes) {
     toast(`You can read ${b.noun}s here, not write them`);
     replace(at.base);
     return renderRoute();
   }
-  if (arg === NEW) return renderSheet(b, { isNew: true, arg: `${at.quill.id}/${at.screen.id}/${arg}` });
-  const view = listView(b, await listSheets(b));
+  if (arg === NEW || arg.startsWith(NEW + "/")) {
+    return renderSheet(b, { isNew: true, folder: arg.slice(NEW.length + 1), arg: `${at.quill.id}/${at.screen.id}/${arg}` });
+  }
+  const key = b.path ? arg : "";
+  lastList.set(at.tab, key);
+  const view = listView(b, await load(b), key);
   const right = openButton(b);
   if (wide()) {
     mount(nav({ title: view.title, right }) + `
       <main class="split">
-        <section class="side">${view.html}</section>
+        <section class="side">${sideHead(view, { fold: false })}${view.html}</section>
         <section class="page"><p class="empty mascot"><b>Nothing open</b>Choose a ${esc(b.noun)} on the left${
           b.writes ? ", or start one with the pen" : ""}, or open one from anywhere with the folder.</p></section>
       </main>` + tabs(at.tab));
   } else {
-    mount(nav({ title: view.title, right }) + `<main>${view.html}</main>` + tabs(at.tab));
+    mount(nav({ back: view.backTo, backLabel: view.backLabel, title: view.title, right }) +
+      `<main>${view.html}</main>` + tabs(at.tab));
   }
   wireShell();
   view.wire(app.querySelector("main"));
@@ -203,19 +145,21 @@ export async function renderCellsPage(at, id, arg) {
 let open = null;
 
 function sheetState(b, record) {
+  // Where it is, when that is not the screen's own folder: opened from elsewhere.
+  const where = placeOfFile(b, record);
+  const path = b.path ? withoutSuffix(b, underRoot(b, record.fields[b.path])) : "";
   return {
     id: record.id, stem: titleOf(b, record), rev: record.rev,
     excel: isExcel(record.fields[b.title]),
-    // Where it is, when that is not the screen's own folder: opened from elsewhere.
-    where: placeOfFile(b, record),
+    where, folder: b.path && !where ? folderOf(path) : "",
     sheet: Sheet.fromText(record.fields[b.cells]),
     modified: seconds(record.updated_at) || Date.now() / 1000,
   };
 }
 
-async function renderSheet(b, { record = null, isNew = false, arg }) {
+async function renderSheet(b, { record = null, isNew = false, folder = "", arg }) {
   const ed = isNew
-    ? { isNew: true, created: false, id: "", stem: "", rev: null, excel: false, where: "", sheet: new Sheet(),
+    ? { isNew: true, created: false, id: "", stem: "", folder, rev: null, excel: false, where: "", sheet: new Sheet(),
         modified: Date.now() / 1000 }
     : { isNew: false, created: false, ...sheetState(b, record) };
   // `at` is the cell that is selected — the one the formula bar edits —
@@ -233,7 +177,11 @@ async function renderSheet(b, { record = null, isNew = false, arg }) {
   };
   occupy(hold);
 
-  const parent = b.at.base;
+  const listKey = lastList.has(b.at.tab) ? lastList.get(b.at.tab) : "";
+  const parent = b.path
+    ? listHash(b, ed.folder || (previousHash() === listHash(b, TOP) ? TOP : listKey))
+    : listHash(b, "");
+  const parentLabel = ed.folder ? baseName(ed.folder) : b.label;
   const actions = (b.writes ? `<button class="done strong" hidden>Done</button>` : "") + openButton(b) +
     (ed.isNew ? "" : `<button class="export" aria-label="Export" title="Export">${ownIcons.export}</button>`) +
     (b.writes ? `<button class="delete" aria-label="Delete ${esc(b.noun)}">${icons.trash}</button>` : "");
@@ -247,18 +195,18 @@ async function renderSheet(b, { record = null, isNew = false, arg }) {
         ${b.writes ? formatBar() : ""}
         <div class="formula-bar"><span class="where">A1</span><input class="formula" spellcheck="false" autocapitalize="none" autocorrect="off" placeholder="Type a value, or =SUM(B1:B3)"${b.writes ? "" : " readonly"}></div>
         <div class="grid-wrap" tabindex="0"><table class="grid"></table></div>
-        ${whereabouts(ed.isNew ? whereNew(b, "", names) : whereIs(b, record, names))}
+        ${whereabouts(ed.isNew ? whereNew(b, ed.folder, names) : whereIs(b, record, names))}
       </div>`;
   let view = null;
   if (wide()) {
-    view = listView(b, await listSheets(b), ed.id);
+    view = listView(b, await load(b), listKey, ed.id);
     mount(nav({ title: ed.stem || "New", right: actions }) + `
       <main class="split${folded() ? " folded" : ""}">
-        <section class="side">${view.html}</section>
-        <section class="page">${foldButton()}${page}</section>
+        <section class="side">${sideHead(view)}${view.html}</section>
+        <section class="page">${page}</section>
       </main>` + tabs(b.at.tab));
   } else {
-    mount(nav({ back: parent, backLabel: b.label, title: ed.stem, right: actions }) +
+    mount(nav({ back: parent, backLabel: parentLabel, title: ed.stem, right: actions }) +
       `<main>${page}</main>`);
   }
   wireShell();
@@ -961,18 +909,18 @@ async function saveSheet(ed, { keepalive = false } = {}) {
   }
 }
 
-// A new sheet is a file nobody else under the root has the name of: "New
+// A new sheet is a file nobody else in its folder has the name of: "New
 // sheet", then "New sheet 2" — the server says no to a second of the same.
 async function createUnique(ed, stem, text) {
   const { b } = ed;
   let taken = new Set();
-  try { taken = new Set((await listSheets(b)).map((r) => keyOf(b, r))); }
+  try { taken = new Set((await load(b)).pages.filter((p) => p.folder === ed.folder).map((p) => p.title)); }
   catch { /* the server will say if it is taken */ }
   for (let n = 1; n < 100; n += 1) {
     const name = n === 1 ? stem : `${stem} ${n}`;
     if (taken.has(name)) continue;
     const fields = { ...fixedFields(b), [b.cells]: text };
-    if (b.path) fields[b.path] = wholePath(b, name);
+    if (b.path) fields[b.path] = wholePath(b, joinPath(ed.folder, name));
     else fields[b.title] = withSuffix(b, name);
     return api("POST", recordsUrl(b.model.id), { fields });
   }

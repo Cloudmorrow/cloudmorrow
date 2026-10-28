@@ -41,10 +41,8 @@ def test_every_row_has_the_path_under_its_title():
     assert "place: whereIs(b, r, names).said" in EDITOR_JS
     # The folder chip the All list had is gone: the path says it, on every list.
     assert 'class="where"' not in editor_row and "folderSmall" not in editor_row
-    cells_row = CELLS_JS.split("const row = (r) =>", 1)[1].split("</a>`", 1)[0]
-    assert '<span class="title">${esc(titleOf(b, r))}</span>' in cells_row
-    assert '<span class="path"><bdi>${esc(r.place || keyOf(b, r))}</bdi></span>' in cells_row
-    assert "r.place = whereIs(b, r, names).said" in CELLS_JS
+    # The sheet's rows are the editor's.
+    assert "listView(b, await load(b)" in CELLS_JS and "const row = (r) =>" not in CELLS_JS
 
 
 def test_a_path_too_long_for_its_line_loses_its_start():
