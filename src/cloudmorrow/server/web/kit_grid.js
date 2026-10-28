@@ -709,7 +709,7 @@ async function renderFolder(at, b, group, folder) {
   pickInput.addEventListener("change", async () => {
     const picked = [...pickInput.files];
     pickInput.value = "";
-    await uploadAll(place, picked.map((file) => [file, file.name]));
+    await uploadAll(place, picked.map((file) => [file, fileName(file)]));
     await reload();
   });
   cameraInput.addEventListener("change", async () => {
@@ -750,7 +750,7 @@ async function renderFolder(at, b, group, folder) {
     mainEl.classList.remove("dropping");
     const dropped = [...event.dataTransfer.files];
     if (!dropped.length) return;
-    await uploadAll(place, dropped.map((file) => [file, file.name]));
+    await uploadAll(place, dropped.map((file) => [file, fileName(file)]));
     await reload();
   });
   // A paste lands on the document when nothing is focused, so it cannot be
@@ -773,9 +773,26 @@ addEventListener("paste", async (event) => {
   // A screenshot arrives called image.png every single time, which is no
   // name for the third one. The moment it was taken is, and it sorts.
   await uploadAll(place, pasted.map((file) =>
-    [file, file.name && file.name !== "image.png" ? file.name : photoName(file)]));
+    [file, file.name && file.name !== "image.png" ? fileName(file) : photoName(file)]));
   await reload();
 });
+
+// A phone's picker can hand a photo over as "1000001234" or "image", with
+// no suffix at all, and the name is what the type is read from everywhere.
+// So a name without one gets one from what the browser says the file is;
+// the server does the same from the bytes, for a browser that says nothing.
+const EXT_OF_TYPE = {
+  "image/jpeg": "jpg", "image/svg+xml": "svg", "video/quicktime": "mov",
+  "audio/mpeg": "mp3", "audio/mp4": "m4a", "application/pdf": "pdf",
+};
+function fileName(file) {
+  const name = file.name || "file";
+  if (extOf(name)) return name;
+  const [kind, subtype] = (file.type || "").split("/");
+  const ext = EXT_OF_TYPE[file.type]
+    || (["image", "video", "audio"].includes(kind) && /^[a-z0-9]+$/.test(subtype || "") ? subtype : "");
+  return ext ? `${name}.${ext}` : name;
+}
 
 function photoName(file) {
   const now = new Date();

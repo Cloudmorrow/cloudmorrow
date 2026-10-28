@@ -821,7 +821,7 @@ class SharesBackend:
         share, folder, name = self._destination(principal, fields)
         parent = self._folder_in(share, folder)
         try:
-            target = fileops.place(source, parent, name)
+            target = fileops.place(source, parent, fileops.with_suffix(name, source))
         except fileops.FileOpError as exc:
             raise ContentError(exc.status, str(exc)) from None
         return self._file_record(model, share, _join(folder, target.name), target)

@@ -197,6 +197,55 @@ def place(source: Path, folder: Path, name: str) -> Path:
     return target
 
 
+# -- a name with a suffix ------------------------------------------------------
+# A phone's picker can hand a photo over as "1000001234" or "image", with no
+# suffix at all. The name is what everything reads the type from, so without
+# one the picture is a plain file to the grid, the thumbnails and the mount.
+# The bytes say what it is; an uploaded name with no suffix gets one from them.
+_FTYP_SUFFIX = {
+    b"qt  ": ".mov",
+    b"M4A ": ".m4a",
+    b"avif": ".avif",
+    b"heic": ".heic",
+    b"heix": ".heic",
+    b"heif": ".heic",
+    b"mif1": ".heic",
+    b"msf1": ".heic",
+}
+_PILLOW_SUFFIX = {
+    "JPEG": ".jpg",
+    "PNG": ".png",
+    "GIF": ".gif",
+    "WEBP": ".webp",
+    "BMP": ".bmp",
+    "TIFF": ".tiff",
+}
+
+
+def sniffed_suffix(source: Path) -> str:
+    """The suffix *source*'s bytes call for: a picture Pillow recognises, or an
+    ISO media file (a phone's video, a HEIC) by its brand. "" for anything else."""
+    try:
+        with open(source, "rb") as handle:
+            head = handle.read(12)
+    except OSError:
+        return ""
+    if head[4:8] == b"ftyp":
+        return _FTYP_SUFFIX.get(head[8:12], ".mp4")
+    try:
+        from PIL import Image
+
+        with Image.open(source) as image:
+            return _PILLOW_SUFFIX.get(image.format or "", "")
+    except Exception:  # noqa: BLE001 - not a picture, or not one Pillow reads
+        return ""
+
+
+def with_suffix(name: str, source: Path) -> str:
+    """*name* as given when it has a suffix, else with the one its bytes say."""
+    return name if os.path.splitext(name)[1] else name + sniffed_suffix(source)
+
+
 # -- thumbnails ---------------------------------------------------------------
 # A grid shows a folder of pictures as pictures. A phone's photo is a few
 # megabytes, and a folder holds hundreds, so it asks for a small one: the

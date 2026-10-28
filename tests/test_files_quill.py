@@ -228,6 +228,45 @@ def test_a_file_is_put_in_a_folder_and_a_taken_name_gets_a_number(files, config)
     assert bad.status_code == 400
 
 
+def test_an_upload_with_no_suffix_gets_one_from_its_bytes(files, config):
+    """A phone's picker can hand a photo over as "1000001234", no suffix at
+    all, and the name is what the type is read from. The bytes say what it
+    is: a picture Pillow knows, or a phone's video or HEIC by its brand.
+    Bytes the server does not know keep the name as given."""
+    import io
+
+    from PIL import Image
+
+    root = drive(config)
+    auth = headers(files)
+    png = io.BytesIO()
+    Image.new("RGB", (2, 2), "red").save(png, "PNG")
+    jpg = io.BytesIO()
+    Image.new("RGB", (2, 2), "red").save(jpg, "JPEG")
+    heic = b"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heic"
+    mp4 = b"\x00\x00\x00\x18ftypisom\x00\x00\x02\x00isomiso2"
+    mov = b"\x00\x00\x00\x14ftypqt  \x00\x00\x00\x00qt  "
+    cases = [
+        ("1000001234", png.getvalue(), "1000001234.png"),
+        ("image", jpg.getvalue(), "image.jpg"),
+        ("IMG_0001", heic, "IMG_0001.heic"),
+        ("clip", mp4, "clip.mp4"),
+        ("clip", mov, "clip.mov"),
+        ("notes", b"just some text", "notes"),
+        ("photo.jpeg", png.getvalue(), "photo.jpeg"),
+    ]
+    for given, content, expected in cases:
+        made = files.post(f"/api/records/file/upload?share=my-files&name={given}", content=content, headers=auth)
+        assert made.status_code == 201, made.text
+        assert made.json()["fields"]["name"] == expected, given
+        assert (root / expected).read_bytes() == content
+    # Named for what it is, it is a picture to the listing and has a thumbnail.
+    listed = {e["fields"]["name"]: e for e in call(files, "GET", "/api/records/file?share=my-files")}
+    assert listed["1000001234.png"]["fields"]["mime"] == "image/png"
+    thumb = files.get(f"/api/records/file/{listed['image.jpg']['id']}/thumb?size=128", headers=auth)
+    assert thumb.status_code == 200
+
+
 def test_folders_are_made_renamed_moved_and_deleted(files, config):
     root = drive(config)
     made = call(
