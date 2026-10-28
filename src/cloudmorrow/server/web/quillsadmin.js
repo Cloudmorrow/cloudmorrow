@@ -35,8 +35,8 @@
    may write it. A circle with `* = write` has it already, and says so. */
 
 import {
-  api, app, esc, formatDate, icons, mount, nav, registerScreen, renderRoute, replace, seconds, store, toast,
-  wireShell,
+  api, app, esc, formatDate, icons, loader, mount, nav, registerScreen, renderRoute, replace, seconds, store,
+  toast, wireShell,
 } from "./core.js";
 import { loadFeatures } from "./features.js";
 import { refreshQuills } from "./quills.js";
@@ -122,7 +122,19 @@ export async function drawQuills(panel) {
   if (split && shown) await openSheet(ctx, shown);
 }
 
-/** Open a Quill's sheet: beside the list on a computer, as its own screen on a phone. */
+/** What a Quill is called, from the lists already read, for the line under the loader. */
+function nameOf(ctx, id) {
+  const installed = Object.values(ctx.all || {}).filter(Array.isArray).flat();
+  const known = [...installed, ...((ctx.catalog && ctx.catalog.quills) || [])].find((q) => q && q.id === id);
+  return (known && known.name) || id;
+}
+
+// Which sheet was asked for last: a sheet takes a moment to build — the
+// plan comes from the catalog's release — and a row clicked meanwhile wins.
+let asked = 0;
+
+/** Open a Quill's sheet: beside the list on a computer, as its own screen on a phone.
+    Whatever was there goes at once, and the loader stands in until the sheet is built. */
 async function openSheet(ctx, id) {
   if (!wide()) { location.hash = "#/adminquill/" + encodeURIComponent(id); return; }
   shown = id;
@@ -131,7 +143,10 @@ async function openSheet(ctx, id) {
   }
   const page = ctx.panel.querySelector(".page");
   if (!page) return;
+  const turn = ++asked;
+  page.innerHTML = loader(`Reading ${nameOf(ctx, id)}`);
   const sheet = await buildSheet(id);
+  if (turn !== asked) return;
   if (!sheet) {
     shown = "";
     page.innerHTML = `<p class="empty"><b>Nothing open</b>Choose a Quill on the left.</p>`;
@@ -469,18 +484,25 @@ function catalogRow(q) {
 // -- the sheet ------------------------------------------------------------------------
 /** A Quill's sheet, as a screen of its own: the phone's way, and a link's. */
 async function renderQuill(id) {
+  // A computer has the sheet beside the list; a link to one lands there.
+  if (wide()) {
+    shown = id;
+    return backToQuills();
+  }
+  // The screen is there before anything is read: the bar, and the loader
+  // where the sheet will be, so the row tapped is answered at once.
+  mount(nav({ back: "#/admin/quills", backLabel: "Quills", title: "Quill" }) + `
+    <main class="quill-sheet">${loader("Reading the Quill")}</main>`);
+  wireShell();
+  const turn = ++asked;
   const me = await api("GET", "/api/auth/me");
   if (!me.is_admin) {
     toast("Administration is for administrators");
     replace("#/me");
     return renderRoute();
   }
-  // A computer has the sheet beside the list; a link to one lands there.
-  if (wide()) {
-    shown = id;
-    return backToQuills();
-  }
   const sheet = await buildSheet(id, me);
+  if (turn !== asked) return;
   if (!sheet) return backToQuills();
   mount(nav({ back: "#/admin/quills", backLabel: "Quills", title: sheet.name }) + `
     <main class="quill-sheet">${sheet.html}</main>`);
@@ -545,12 +567,14 @@ async function buildSheet(id, me = null) {
         installed ? `<span class="quill-chip on">v${esc(installed)} installed</span>` : "",
         newer ? `<span class="quill-chip new">v${esc(plan.version)} in the catalog</span>` : "",
       ].filter(Boolean).join(" · ")}</p>
-      ${installed ? switchRow(name, feature) : ""}
-      ${installed ? `<div class="group sheet-actions">
-        ${newer ? `<button class="row primary update-quill" type="button">Update to v${esc(plan.version)}</button>`
-          : entry ? `<button class="row" type="button" disabled>Up to date</button>` : ""}
-        ${again ? `<button class="row reinstall-quill" type="button">Reinstall v${esc(installed)}</button>` : ""}
-        <button class="row bad remove-quill" type="button">Remove ${esc(name)}</button>
+      ${installed ? settingsBox(name, feature) : ""}
+      ${installed ? `<p class="group-label">Version</p><div class="group sheet-actions">
+        ${standingRow(plan, installed, entry, newer, origin)}
+        <div class="sheet-buttons">
+          ${newer ? `<button class="act-button primary update-quill" type="button">Update to v${esc(plan.version)}</button>` : ""}
+          ${again ? `<button class="act-button reinstall-quill" type="button">Reinstall v${esc(installed)}</button>` : ""}
+          <button class="act-button danger remove-quill" type="button">Remove ${esc(name)}</button>
+        </div>
       </div>
       ${again ? "" : dropped
         ? `<p class="shelf-note">The catalog no longer has ${esc(name)}, so it cannot be installed again or updated: remove it, and install what replaced it from the catalog.</p>`
@@ -560,7 +584,7 @@ async function buildSheet(id, me = null) {
       ${whoGetsIt(fresh, circles)}
       ${whoItIsFor(circles, audience, installed)}
       ${adoptSheet(plan.adopt || [])}
-      ${installed ? "" : `<div class="group"><button class="row primary add-quill" type="button">Install ${esc(name)}</button></div>`}`;
+      ${installed ? "" : `<div class="sheet-buttons"><button class="act-button primary add-quill" type="button">Install ${esc(name)}</button></div>`}`;
 
   const wire = (holder, after) => {
     const running = holder.querySelector(".quill-running");
@@ -661,12 +685,13 @@ async function buildSheet(id, me = null) {
         return gone([]);
       }
       // What it brought, each ticked to keep; the administrator unticks what goes.
-      remove.closest(".group").insertAdjacentHTML("afterend", removeSheet(name, brought));
-      remove.closest(".group").hidden = true;
+      const box = remove.closest(".sheet-actions");
+      box.insertAdjacentHTML("afterend", removeSheet(name, brought));
+      box.hidden = true;
       const sheet = holder.querySelector(".remove-sheet");
       sheet.querySelector(".cancel").addEventListener("click", () => {
         sheet.remove();
-        remove.closest(".group").hidden = false;
+        box.hidden = false;
       });
       sheet.querySelector(".confirm").addEventListener("click", async () => {
         const drop = [...sheet.querySelectorAll("input[type=checkbox]:not(:checked)")].map((b) => b.value);
@@ -675,6 +700,12 @@ async function buildSheet(id, me = null) {
     });
   };
   return { name, html, wire };
+}
+
+/** An installed Quill's settings, first on its sheet: the server's switch
+    now, and in the same box whatever a Quill comes to have settings for. */
+function settingsBox(name, feature) {
+  return `<p class="group-label">Settings</p><div class="group quill-settings">${switchRow(name, feature)}</div>`;
 }
 
 /** The server's switch on an installed Quill: off takes its tabs out of every
@@ -686,10 +717,22 @@ function switchRow(name, feature) {
     const when = seconds(feature.updated_at);
     turned = ` Switched ${on ? "on" : "off"} by ${feature.changed_by}${when ? ` ${formatDate(when)}` : ""}.`;
   }
-  return `<div class="group"><label class="row feature-row server-switch">
+  return `<label class="row feature-row server-switch">
     <span class="main"><span class="title">On for everybody</span>
     <span class="meta"><span class="preview">${esc(`Off takes its tabs out of every client and closes its part of the API.${turned}`)}</span></span></span>
-    <input type="checkbox"${on ? " checked" : ""} aria-label="${esc(name)} is on"></label></div>`;
+    <input type="checkbox"${on ? " checked" : ""} aria-label="${esc(name)} is on"></label>`;
+}
+
+/** Where the installed Quill stands against the catalog, said as a fact above
+    the buttons: a newer release, up to date, or installed from somewhere else. */
+function standingRow(plan, installed, entry, newer, origin) {
+  const fact = (title, note) => `<div class="row sheet-fact"><span class="main"><span class="title">${esc(title)}</span>
+    <span class="meta"><span class="preview">${esc(note)}</span></span></span></div>`;
+  if (newer) return fact(`v${plan.version} is in the catalog`, `v${installed} is installed here.`);
+  if (entry) return fact("Up to date", `v${installed}, from the catalog.`);
+  if (origin.dev) return fact(`v${installed}`, "Installed from a folder, with cm quill dev.");
+  if (origin.repo) return fact(`v${installed}`, `Installed from ${origin.repo}.`);
+  return fact(`v${installed}`, origin.catalog ? "Installed from the catalog." : "Installed from a source.");
 }
 
 async function removeQuill(id, name, drop, done) {
@@ -727,8 +770,10 @@ export function removeSheet(name, brought) {
       records, read-only. Untick what should go with it — records and all, for good.${programs
         ? " A program only this quill needed is unticked: it goes too, unless you tick it to keep it for later." : ""}</p>
     <div class="group choices">${rows}</div>
-    <div class="group"><button class="row bad confirm" type="button">Remove ${esc(name)}</button></div>
-    <div class="group"><button class="row cancel" type="button">Keep it</button></div>
+    <div class="sheet-buttons">
+      <button class="act-button danger confirm" type="button">Remove ${esc(name)}</button>
+      <button class="act-button cancel" type="button">Keep it</button>
+    </div>
   </div>`;
 }
 
@@ -746,7 +791,7 @@ function whoItIsFor(circles, audience, installed) {
       <span class="title">${esc(c.name)}</span><span class="meta"><span class="preview">${esc(c.members.join(", ") || "nobody")}</span></span></span>
       <input type="checkbox" value="${esc(c.id)}"${chosen.has(c.id.toLowerCase()) || chosen.has(c.name.toLowerCase()) ? " checked" : ""}
         aria-label="${esc(c.name)}"></label>`).join("")}</div>
-    ${installed ? `<div class="group"><button class="row change-audience" type="button">Change who it is for</button></div>` : ""}`;
+    ${installed ? `<div class="sheet-buttons"><button class="act-button change-audience" type="button">Change who it is for</button></div>` : ""}`;
 }
 
 /** Somebody's own Quill of the same id: tick to bring their records into this one. */

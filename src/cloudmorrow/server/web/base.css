@@ -389,6 +389,35 @@ h1.large {
   color: var(--muted);
 }
 .empty b { color: var(--ink); font-family: var(--display); font-size: 19px; font-weight: 600; display: block; margin-bottom: 4px; }
+/* Something on its way (core.js loader): the cloud, its dots lit in a wave
+   from its left edge, and a line under it. The wave is the dots' own
+   delay, one step per dot along the diagonal. */
+.loader {
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--muted);
+  animation: screen-in .25s ease-out;
+}
+.loader .pixel-loader {
+  width: 92px;
+  height: auto;
+  margin: 0 auto 18px;
+  color: var(--accent);
+}
+.loader .pixel-loader rect {
+  opacity: .22;
+  animation: pixel-wave 1.5s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+.loader p { margin: 0; font-family: var(--display); font-size: 16px; font-weight: 600; color: var(--ink); }
+@keyframes pixel-wave {
+  0%, 60%, 100% { opacity: .22; }
+  20% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loader { animation: none; }
+  .loader .pixel-loader rect { animation: none; opacity: .7; }
+}
 /* The hedgehog, where a screen would otherwise be blank: the one place the
    guide lets it sit in the app. The words beside it still say what to do. */
 .empty.mascot { padding-top: 28px; }
