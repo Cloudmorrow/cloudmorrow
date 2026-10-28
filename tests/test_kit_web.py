@@ -259,7 +259,11 @@ def test_the_quills_side_has_its_three_tabs_and_the_update_buttons():
     assert 'class="chip-button update-all"' in ADMIN_JS
     assert "update_available" in ADMIN_JS
     assert "{ id: quill.id, audience }" in ADMIN_JS
-    for button in ('class="act-button primary update-quill"', 'class="act-button reinstall-quill"', 'class="act-button danger remove-quill"'):
+    for button in (
+        'class="act-button primary update-quill"',
+        'class="act-button reinstall-quill"',
+        'class="act-button danger remove-quill"',
+    ):
         assert button in ADMIN_JS, button
 
 

@@ -341,14 +341,29 @@ def test_a_quill_sheet_tells_its_facts_from_its_buttons():
     quills = (WEB / "quillsadmin.js").read_text(encoding="utf-8")
     html = quills.split("const html = `", 1)[1].split("const wire =", 1)[0]
     assert html.index("settingsBox(name, feature)") < html.index('<p class="group-label">Version</p>')
-    assert html.index('<p class="group-label">Version</p>') < html.index("standingRow(plan, installed, entry, newer, origin)")
+    assert html.index('<p class="group-label">Version</p>') < html.index(
+        "standingRow(plan, installed, entry, newer, origin)"
+    )
     assert html.index("standingRow(") < html.index('<div class="sheet-buttons">')
-    assert '<p class="group-label">Settings</p><div class="group quill-settings">${switchRow(name, feature)}</div>' in quills
+    assert (
+        '<p class="group-label">Settings</p><div class="group quill-settings">${switchRow(name, feature)}</div>'
+        in quills
+    )
     # Up to date is a fact, not a dead button.
-    assert 'disabled>Up to date</button>' not in quills
+    assert "disabled>Up to date</button>" not in quills
     assert 'fact("Up to date"' in quills
-    for button in ("add-quill", "change-audience", "update-quill", "reinstall-quill", "remove-quill", "confirm", "cancel"):
-        assert f'class="act-button' in quills and f' {button}"' in quills or f'class="act-button {button}"' in quills, button
+    for button in (
+        "add-quill",
+        "change-audience",
+        "update-quill",
+        "reinstall-quill",
+        "remove-quill",
+        "confirm",
+        "cancel",
+    ):
+        assert f'class="act-button' in quills and f' {button}"' in quills or f'class="act-button {button}"' in quills, (
+            button
+        )
     assert 'class="row ' not in html.split("sheet-buttons")[1].split("</div>")[0]
     css = (WEB / "quillsadmin.css").read_text(encoding="utf-8")
     assert ".row.sheet-fact:active { background: none; }" in css
