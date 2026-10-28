@@ -1,30 +1,31 @@
-# Cloudmorrow
+<p align="center">
+  <a href="https://cloudmorrow.com"><img src="docs/images/morrow.png" width="240" alt="Morrow, the hedgehog, sitting on his own cloud"></a>
+</p>
 
-**A local cloud anyone can install, on hardware they own.** A person, a
-company, a school, a club: your data lives on your own machine, in
-standard shapes, and you choose which apps sit around it and what each
-may touch. Notes, tasks, a calendar, chat, files and secrets come in the
-box; everything else is an app from the store at cloudmorrow.com, or one
-you build yourself. No subscription, no account with anyone, and nothing
-you write ever touches a disk unencrypted.
+<h1 align="center">Cloudmorrow</h1>
 
-```
-  ██████╗██╗      ██████╗ ██╗   ██╗██████╗ ███╗   ███╗ ██████╗ ██████╗ ██████╗  ██████╗ ██╗    ██╗
- ██╔════╝██║     ██╔═══██╗██║   ██║██╔══██╗████╗ ████║██╔═══██╗██╔══██╗██╔══██╗██╔═══██╗██║    ██║
- ██║     ██║     ██║   ██║██║   ██║██║  ██║██╔████╔██║██║   ██║██████╔╝██████╔╝██║   ██║██║ █╗ ██║
- ██║     ██║     ██║   ██║██║   ██║██║  ██║██║╚██╔╝██║██║   ██║██╔══██╗██╔══██╗██║   ██║██║███╗██║
- ╚██████╗███████╗╚██████╔╝╚██████╔╝██████╔╝██║ ╚═╝ ██║╚██████╔╝██║  ██║██║  ██║╚██████╔╝╚███╔███╔╝
-  ╚═════╝╚══════╝ ╚═════╝  ╚═════╝ ╚═════╝ ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝  ╚══╝╚══╝ 
-                               own your data, choose your apps
-```
+<p align="center"><b>Keep your data. Change the software.</b></p>
 
-Cloudmorrow is one Python service that runs on whatever you have: a
-Raspberry Pi, an old laptop, a NAS, a small VPS, a box in the server room. It
-installs with one command, serves a phone app from its own address, and hands
-every other machine on the network a one-line install command. Everyone gets an account; everything they
-write is encrypted before it touches the disk.
+<p align="center">
+  A cloud you install on hardware you own. Your data stays on your machine, encrypted,
+  in standard shapes every app agrees on. The apps around it, called Quills, you pick,
+  change and throw away as your needs change.
+</p>
 
-It is free software under the [GNU AGPL v3](LICENSE).
+<p align="center">
+  <a href="https://cloudmorrow.com">Website</a> ·
+  <a href="https://cloudmorrow.com/install">Install</a> ·
+  <a href="https://cloudmorrow.com/quills">Quill Catalog</a> ·
+  <a href="https://cloudmorrow.com/datamodels">Datamodels</a> ·
+  <a href="docs/MANUAL.md">Manual</a> ·
+  <a href="https://cloudmorrow.com/donate">Donate</a>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-2a6fdb" alt="AGPL-3.0"></a>
+  <a href="https://github.com/Cloudmorrow/cloudmorrow/tags"><img src="https://img.shields.io/github/v/tag/Cloudmorrow/cloudmorrow?label=release&color=2a6fdb" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/python-3.11%2B-2a6fdb" alt="Python 3.11 or newer">
+</p>
 
 <p align="center">
   <img src="docs/images/desktop-tasks.webp" width="49%" alt="The Tasks Quill in a desktop browser: three lanes, To Do, Doing and Done, beside a sidebar listing every Quill">
@@ -34,268 +35,59 @@ It is free software under the [GNU AGPL v3](LICENSE).
   <img src="docs/images/phone-tasks.webp" width="24%" alt="The same Tasks board in the web app on a phone: the lanes stacked, a card in each">
   <img src="docs/images/cloud.svg" width="74%" alt="How a cloud fits together: five surfaces reach the server through its gate; inside, the installed Quills sit above one record store; the Quill Catalog supplies Quills and the datamodels they use at install; records export any time">
 </p>
-<p align="center"><sub>One Quill, Tasks, as the kit draws it in the browser, in the terminal and on the phone, and the shape of the cloud behind them. How it fits together is in <a href="docs/QUILLS.md">docs/QUILLS.md</a> and <a href="docs/DATAMODELS.md">docs/DATAMODELS.md</a>.</sub></p>
+<p align="center"><sub>One Quill, Tasks, as the kit draws it in the browser, in the terminal and on the phone, and the shape of the cloud behind them. Nobody wrote three screens: the Quill describes one, and every surface renders it, the command line and your assistant included.</sub></p>
 
-## What you get
+## Install
 
-- **Notes.** Markdown files in folders, with pictures. Written on the phone,
-  in the terminal, or by piping a file in. Each note is a real file on the
-  server, so a copy of the folder is a backup. Notes is a
-  [Quill](docs/QUILLS.md) too, [in a repository of its own](https://github.com/Cloudmorrow/quill-notes).
-- **Tasks.** Boards with three lanes: ToDo, Doing, Done. Drag a card, tick a
-  subtask. Done cleans itself out after a week. A
-  [Quill](docs/QUILLS.md), [in a repository of its own](https://github.com/Cloudmorrow/quill-tasks).
-- **Quills.** Everything beyond the foundation is a Quill: a package from the
-  [Quill Catalog](https://github.com/Cloudmorrow/quill-catalog), shelved by
-  category, that shows you what data it uses, extends and introduces before
-  you say yes. A Quill has no UI code: its screens come from one kit, so each
-  one is on the phone, in the browser, in the terminal, on the command line
-  (`cm tasks list`) and to your assistant at once. Build your own with
-  `cm quill new`, or ask your assistant to. Anybody on the server may have
-  [Quills of their own](docs/SHARING.md): over their own data, run as them,
-  shared with people who say yes, promoted for everyone by an administrator,
-  and exported for the catalog.
-- **Calendar.** One of your own, plus the ones you share with the people on
-  your server. Every calendar you can see is drawn at once, so nobody
-  double-books the meeting room or the car.
-- **Channels.** Channels and direct messages between the people on your
-  server, with threads, @mentions, reactions and pinned messages, real push
-  notifications and an unread count on the phone's icon.
-- **Files.** A private drive per account, and shares anybody can make for
-  what a team or a household keeps together: shared with people and
-  circles, to change or only to read, and with everybody when an
-  administrator says so. Served over WebDAV so Finder, a Windows drive
-  letter, a phone's file manager or `rclone` can mount them.
-- **Secrets.** Keys and passwords in vaults you name, encrypted, never
-  printed unless you ask. `.env` files in and out, or `secret run` to hand
-  them to a program with no file at all. Part of the foundation: an app is
-  given a secret when you say so and never owns one.
-- **Three ways in.** A web app made for the phone (add it to the home
-  screen), the same app grown up for a laptop browser, and a terminal app you
-  can use with a mouse.
-- **A desktop app that mounts your shares.** The same web app in a window of
-  its own (`cloudmorrow app`, or the icon in your applications menu), with
-  the client behind it: **Mount on this computer** beside each share, the
-  folder it landed in a click away, and one sign-in shared with the terminal
-  app. Linux today; macOS and Windows are next.
-- **An assistant, if you want one.** The server speaks MCP, so Claude or any
-  other MCP client can read and write your notes and every Quill's records as
-  you, after you sign in and say yes — and, for an administrator, write,
-  check and install a new Quill in the conversation. Secrets are never on
-  that list.
-- **Encrypted at rest.** Notes, messages, events, tasks, secrets and pictures
-  are ciphertext on disk, under one key the server holds. You sign in with a
-  password and never handle a key. See [docs/ENCRYPTION.md](docs/ENCRYPTION.md).
-- **Backed up to a bucket.** An administrator names an S3 bucket — Amazon's
-  or anybody's — and every day the server puts a copy of everything there:
-  the database, everybody's files, the shares, the Quills, the keys; kept as
-  long as you say, and only what changed goes up. Any day is restored from
-  the same page, all of it, one person's files, or one file as it was that
-  day. See [the manual](docs/MANUAL.md#backups-everything-into-a-bucket-and-back).
-- **Switches, not settings.** An administrator can turn any whole area off
-  for the server. Each person can hide any area from their own screens. That,
-  and the list of accounts, is the whole administration panel.
-
-## Where this is going
-
-Cloudmorrow is becoming your personal platform for everything, for a
-person, a household, a company or an institution: the place your data
-lives, in standard shapes
-every app agrees on, with apps around it that each have clearly drawn
-access. Notes, tasks, chat and calendar come in the box. A shopping list,
-a reading log or the budget you fetch from the store at cloudmorrow.com,
-tweak, or build yourself by dragging in the data elements it needs and
-describing the rest to an assistant, and it turns up on the phone, in the
-browser, in the terminal and as tools an assistant can use. The concept
-is [Concept.md](Concept.md); how software is packaged, found and built is
-[docs/QUILLS.md](docs/QUILLS.md); the data model is [docs/DATA.md](docs/DATA.md);
-the plan for the rest is [docs/PLATFORM.md](docs/PLATFORM.md).
-
-## Two ways to get one
-
-- **Your own machine.** The installer below: one command, five questions.
-- **A hosted tenant.** The same server as a container, one per customer, on
-  a service we run at a low monthly price. The server side is built; the
-  shop is not yet.
-
-[docs/HOSTING.md](docs/HOSTING.md) has the plan for the hosted tenant, and
-how a cloud is reached.
-
-## Install a server
-
-You need a Linux machine with systemd and Python 3.11 or newer. The
-installer adds `git`, `sudo` and Python's venv module if they are missing,
-or says the command that would. One command:
+A Linux machine with systemd and Python 3.11 or newer: a Raspberry Pi, an old
+laptop, a NAS, a small VPS, a box in the server room.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Cloudmorrow/cloudmorrow/main/deploy/install-server.sh | sudo sh
 ```
 
-It asks six questions: what your cloud is called, a username and password
-for the first account, which becomes the administrator, where on the
-machine it goes (the code, the settings and the data, each on a row with
-its usual place filled in; Enter takes them all, or change the ones you
-want elsewhere; everything people keep goes under the data directory, in
-`files/`), which of the machine's addresses it answers on
-(every one unless you tick others, or type your own), which database it
-keeps its records in (the built-in one, a file in the data directory,
-which is right for most; or PostgreSQL, in a container it runs beside the
-server or on a server you already have), and which of the
-standard quills it should have (every one Cloudmorrow makes, with Files,
-Calendar, Notes and Tasks ticked to begin with; the rest can be added from
-Administration later). Then it creates a service
-user, clones the code into `/opt/cloudmorrow` (or where you said), builds a
-virtualenv, writes the config and the systemd unit, generates the
-encryption key, starts the service and makes your account. The terminal
-app is on the server too: `cm` at the box signs in to the server beside
-it, whichever addresses it answers on, and an administrator has
-Administration there as anywhere. Run it again any time: if the server is running and answering, it
-asks whether to update it, and Enter says yes; if not, it updates and
-reinstalls it and checks again (`--update` does that without asking, and
-without a terminal a server that is well is left alone). It keeps your
-config, notes, database and accounts, and never asks a question it already
-has the answer to.
+It asks six questions and it is running. Then:
 
-Every answer can be a flag instead, for a script or a machine with no
-terminal, and `--dry-run` says what it would do without doing any of it:
+1. Open the server's address in a browser and sign in.
+2. On each computer, run the one line **Me → Add a device** shows. It installs
+   the terminal app, `cm`, and the desktop app that mounts your shares.
+3. On a phone, open `/app` and **Add to Home Screen**.
 
-```bash
-sudo sh install-server.sh --name "The Larsens" --user alice --quills all
-```
+Every answer can be a flag, `--dry-run` says what it would do, and running it
+again updates. Containers, reverse proxies, PostgreSQL, updates and backups
+are in [docs/INSTALL.md](docs/INSTALL.md); the short version is at
+[cloudmorrow.com/install](https://cloudmorrow.com/install).
 
-**How it is reached** is this machine's address. On a home network the
-box also announces itself as `<name>.local`, and `cm login` finds it there.
-Reaching it from outside is your own setup, and Cloudmorrow needs none of
-it: a domain and a reverse proxy, or a VPN such as Tailscale if you use one.
+## What is in the box
 
-Have a domain and a reverse proxy of your own? Give
-`--public-url https://cloud.example.com`. Caddy is the easy choice: it
-fetches and renews the certificate itself, and the whole config is what the
-installer prints at the end.
-
-```
-cloud.example.com {
-	reverse_proxy 127.0.0.1:8787
-}
-```
-
-An nginx example is in [deploy/nginx.conf.example](deploy/nginx.conf.example).
-
-Then, with `cloud.example.com` standing for your cloud's address
-(or `http://<name>.local:8787` at home):
-
-1. Open it in a browser and sign in.
-2. On each computer, install the terminal app (`cm`) and the desktop app,
-   which also mounts your fileshares, with the line **Me → Add a device**
-   shows: `curl -fsSL https://cloud.example.com/install.sh | sh`. It
-   signs you in.
-3. On a phone, open `https://cloud.example.com/app`, sign in, and use
-   **Add to Home Screen**: it opens like any other app, with your cloud's
-   name under the icon.
-
-No terminal at hand? Skip the account question. A server with no accounts
-shows a setup page on its first visit instead: name the cloud, choose a
-username and password, tick the standard quills you want, and it is yours. That page is how a hosted tenant is set up too.
-
-Rather run it as a container? `deploy/docker/` has the image, a compose
-file and a Caddyfile:
-
-```bash
-cd deploy/docker && CLOUDMORROW_DOMAIN=cloud.example.com docker compose up -d
-```
-
-The server keeps its config in `/etc/cloudmorrow/server.toml`, the database
-under `/var/lib/cloudmorrow`, everyone's files beside it in
-`/var/lib/cloudmorrow/files` (a folder per person, and the Shares folder) and
-the encryption key in `/etc/cloudmorrow/cloudmorrow.key` — unless you put them
-elsewhere when the installer asked, or with `--prefix`, `--config-dir`,
-`--data-dir`, `--files-dir` and `--shares-dir`; a re-run finds them where they
-are. Every key in the
-config, the cloud's name included, is explained in
-[deploy/server.example.toml](deploy/server.example.toml).
-
-### Only at home?
-
-Without an address of its own, the cloud is plain
-`http://<name>.local:8787` on your network. Picking it from the list `cm
-login` shows is saying that is how it is meant to be; a client given the
-address by hand opts in with `cloudmorrow config set allow_insecure_http
-true`, because talking to a server in the clear should be a decision rather
-than a default.
-
-## Install on your computers
-
-Open the server's address in a browser and copy the one command it shows:
-
-```bash
-curl -fsSL https://cloud.example.com/install.sh | sh
-cloudmorrow login
-cloudmorrow                  # the terminal app; `cm` is the same thing in two letters
-```
-
-It needs Python 3.11 or newer and nothing else. It installs into your home
-directory, points the command line at your server, and registers the machine
-as one of yours so it can serve shares and run backups. On a Linux computer
-with a desktop it adds the desktop app and puts it in the applications menu
-(`--no-desktop` skips that; a machine reached over ssh gets the terminal app
-alone). Every `cloudmorrow` command reads `RESOURCE ACTION`:
-
-```
-cloudmorrow secret  list | get | set | import | export | run | vaults | remove
-cloudmorrow share   list | add | with | unshare | mount | unmount | remove
-cloudmorrow agent   list | run | jobs
-cloudmorrow update  [server | all]
-cloudmorrow app
-cloudmorrow uninstall
-```
-
-## Adding people
-
-Each person gets their own account and their own notes, files, boards and
-calendar. Shared calendars, channels and shares are how you meet in the
-middle. An administrator adds accounts from the **Administration** screen in
-the app or the terminal, or from the server:
-
-```bash
-sudo -u cloudmorrow /opt/cloudmorrow/venv/bin/cloudmorrow-server user create sam
-```
-
-## Keeping it up to date
-
-There is no package registry in the loop. The server pulls its own code from
-git, and every other machine installs from the server.
-
-```bash
-cloudmorrow update server    # the server pulls, reinstalls and restarts itself
-cloudmorrow update           # then this machine installs what the server now serves
-cloudmorrow update all       # both, in that order
-```
-
-The first one goes through the API, so an administrator can do it from a
-laptop without a shell on the server. Set `allow_api_update = false` in the
-config if you would rather it always went over ssh.
-
-## Backing it up
-
-Three things, and the third is the one people forget:
-
-| what | where |
+| | |
 | --- | --- |
-| everyone's files and shares | `/var/lib/cloudmorrow/files` |
-| accounts, tasks, chat, calendar, secrets | `/var/lib/cloudmorrow` |
-| the encryption key | `/etc/cloudmorrow/cloudmorrow.key` |
+| **Notes, Tasks, Calendar, Files** | The foundation, ticked on a fresh server. Markdown files in folders; boards with three lanes; your calendar and the shared ones drawn together; a drive per person and shares a team keeps, mountable over WebDAV. |
+| **Channels, Secrets** | Standard too: a team's conversations with threads, mentions and push notifications; keys and passwords in sealed vaults, handed to a program with no file at all. |
+| **Every other Quill** | From the [Quill Catalog](https://github.com/Cloudmorrow/quill-catalog): CRM, Cells, Docs, Media, CutMorrow, DevProject. Each says what data it touches before you say yes, and takes its screens with it when it goes. |
+| **Three ways in** | A web app made for the phone, the same app grown up for a laptop browser, and a terminal app you can use with a mouse. One kit draws every Quill on all of them, and on the command line. |
+| **An assistant, if you want one** | The server speaks MCP. Claude or any other client reads and writes your records as you, after you say yes. Secrets are never on that list. |
+| **Encrypted at rest** | Notes, messages, events, tasks and secrets are ciphertext on disk under one key the server holds. You sign in with a password and never handle a key. |
+| **Backed up** | Name an S3 bucket, anybody's, and every day only what changed goes up. Restore any day, one person's files, or one file as it was. |
+| **Somebody says yes** | Roles name who is responsible, flows ask them before a thing goes on, and a space's records can be frozen and signed by an outside party: the books at year end, validated by the accountant. |
 
-Tasks, chat, calendar and secrets are ciphertext without the third.
-Back the key up with the data and keep the copy somewhere that is not the
-server. Lose it and there is no recovery, by design. Files in the drives and
-shares are stored as they are, so they need no key, and are not yet encrypted.
+## Quills
+
+A Quill is a package: a manifest, a datamodel, screens described once, and
+sometimes code. It has no UI of its own. Take one from the catalog, change it,
+or make one with `cm quill new` and an assistant. Anybody on the server may
+have Quills of their own, shared with people who say yes.
+
+How they are packaged, found and built: [docs/QUILLS.md](docs/QUILLS.md) and
+[docs/QUILLCODE.md](docs/QUILLCODE.md). Start from
+[quill-template](https://github.com/Cloudmorrow/quill-template). The shapes
+every Quill agrees on live in [datamodels](https://github.com/Cloudmorrow/datamodels).
 
 ## How it is built
 
-One FastAPI service with a database (SQLite, or PostgreSQL) and a folder of files, a Textual terminal
-app, a plain HTML web app, and a small agent that runs on each machine. No
-containers, no build step, no JavaScript framework. The layout, the API and
-every command are described in [docs/MANUAL.md](docs/MANUAL.md).
+One FastAPI service with a database (SQLite, or PostgreSQL) and a folder of
+files, a Textual terminal app, a plain HTML web app, and a small agent that
+runs on each machine. No containers, no build step, no JavaScript framework.
 
 ```bash
 uv venv && uv pip install -e '.[tui,server,dev]'
@@ -310,13 +102,15 @@ server, so a change to the terminal app needs no deploy to try.
 
 - [docs/MANUAL.md](docs/MANUAL.md): every feature, command, config key and
   API route, with the reasoning behind them.
+- [docs/INSTALL.md](docs/INSTALL.md): the server, the computers, the people,
+  updates and backups.
 - [docs/QUILLS.md](docs/QUILLS.md): what a Quill is, its manifest, the
   kit of screens, the rules it keeps, and the catalog.
 - [docs/QUILLCODE.md](docs/QUILLCODE.md): a Quill that runs code: views,
   actions, services, runtimes, the sandbox.
-- [docs/TIMELINE.md](docs/TIMELINE.md): the timeline kit, a video editor
-- [docs/CELLS.md](docs/CELLS.md): the sheet kit, a spreadsheet of cells and formulas
-  on every surface.
+- [docs/TIMELINE.md](docs/TIMELINE.md): the timeline kit, a video editor.
+- [docs/CELLS.md](docs/CELLS.md): the sheet kit, a spreadsheet of cells and
+  formulas on every surface.
 - [docs/SHARING.md](docs/SHARING.md): Quills of people's own: shared,
   promoted, exported, and the policy for them.
 - [docs/DATAMODELS.md](docs/DATAMODELS.md): the shape of the data: fields,
@@ -327,36 +121,23 @@ server, so a change to the terminal app needs no deploy to try.
 - [docs/ENCRYPTION.md](docs/ENCRYPTION.md): what is encrypted, how, what it
   protects against and what it does not.
 - [docs/ATTESTATIONS.md](docs/ATTESTATIONS.md): a frozen copy of a space's
-  records with a digest, and an outside party's signed word on it: the
-  books at year end, validated by the accountant.
+  records with a digest, and an outside party's signed word on it.
 - [Concept.md](Concept.md): what Cloudmorrow is, in one page.
-- [docs/DATA.md](docs/DATA.md): the data concept: elements with standard
-  fields, extensions apps add, scopes, storage, the change feed, export,
-  and the registry and store at cloudmorrow.com.
-- [docs/PLATFORM.md](docs/PLATFORM.md): the plan for Cloudmorrow as a
-  platform: your data, guarded access, one kit of screens on every device,
-  and apps you build by talking to an assistant.
-- [docs/HOSTING.md](docs/HOSTING.md): a hosted tenant, and how a cloud is
-  reached.
+- [docs/DATA.md](docs/DATA.md), [docs/PLATFORM.md](docs/PLATFORM.md),
+  [docs/HOSTING.md](docs/HOSTING.md): the data concept, the plan for the
+  platform, and a hosted tenant.
 - [deploy/](deploy): the installer, the container, the systemd unit, and
   Caddy, nginx, server and agent examples.
 
 ## Contributing
 
-Issues and pull requests are welcome at
-[github.com/Cloudmorrow/cloudmorrow](https://github.com/Cloudmorrow/cloudmorrow).
-Run `pytest` and `ruff check src tests` before you push. If you add something
-that stores what a person wrote, seal it; the last section of
-[docs/ENCRYPTION.md](docs/ENCRYPTION.md) says how.
+Issues and pull requests are welcome. Run `pytest` and `ruff check src tests`
+before you push. If you add something that stores what a person wrote, seal
+it; the last section of [docs/ENCRYPTION.md](docs/ENCRYPTION.md) says how.
 
-## Releasing and deploying
-
-`make deploy` shows what is released and live — the core's version, and
-the commits live on cloudmorrow.com and the mail Worker — and
-offers to release or deploy whatever is behind. A release is a git tag on
-main (`vX.Y.Z`), and the only version number there is:
-`make deploy WHAT=explain` says how the pieces fit together, and the top
-of [scripts/deploy.py](scripts/deploy.py) lists every step.
+A release is a git tag on main (`vX.Y.Z`), and the only version number there
+is. `make deploy` shows what is released and live and offers to release or
+deploy whatever is behind; `make deploy WHAT=explain` says how the pieces fit.
 
 ## License
 
