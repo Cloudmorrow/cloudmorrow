@@ -1,8 +1,15 @@
 /* The card that offers to put the app on the home screen.
 
-   Chrome and Edge, on Android and the desktop, hand the page an install
-   prompt it may show from a button of its own. iOS hands out nothing: there
-   the card can only say which two taps do it. Neither shows once installed.
+   Chrome and Edge, on Android, hand the page an install prompt it may show
+   from a button of its own. iOS hands out nothing: there the card can only
+   say which two taps do it. Neither shows once installed.
+
+   A computer gets no card at all. Desktop Chrome offers the same prompt,
+   but what it makes is a browser window with Chrome's own title bar and an
+   Uninstall button on it, and a computer has the desktop app for this: the
+   same page in a window of its own that can also mount a share. So the card
+   is for a hand-held thing only, told apart by what it is (a phone or tablet
+   by its user agent) or by how it is held (touch, nothing to hover with).
    A screen that wants the card puts an `.install-slot` where it should go. */
 
 import { app, onShell, store, wordmark } from "./core.js";
@@ -24,9 +31,11 @@ addEventListener("appinstalled", () => {
 const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent)
   || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isHandheld = () => isIOS() || /Android|Mobile/.test(navigator.userAgent)
+  || matchMedia("(hover: none) and (pointer: coarse)").matches;
 
 export function installCard() {
-  if (isStandalone()) return "";
+  if (isStandalone() || !isHandheld()) return "";
   const answered = Number(store.get("install-answered") || 0);
   if (Date.now() - answered < 30 * 86400000) return "";
   const brand = `<div class="brand">${wordmark()}</div>`;

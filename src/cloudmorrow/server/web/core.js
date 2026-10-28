@@ -767,8 +767,12 @@ export function nav({ back: backTo, backLabel, title, right = "" }) {
   // inside something, and its corner is that something's to use.
   if (backTo === undefined) right += meLink();
   // What the window is called, for a browser with twenty tabs open. A
-  // phone has no use for it and no way to see it; it costs one line.
-  document.title = title ? `${title} · ${CLOUD_NAME}` : CLOUD_NAME;
+  // phone has no use for it and no way to see it; it costs one line. An
+  // app window (from a home screen, or Chrome's) is the cloud's already
+  // and writes the app's name on itself, so there the title is the screen's
+  // alone, not "Plan · bramcloud" under a "bramcloud -" of the window's own.
+  const own = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  document.title = title ? (own ? title : `${title} · ${CLOUD_NAME}`) : CLOUD_NAME;
   // The wordmark sits in the middle of the bar on every screen, and stays
   // put: the screen's title is the large one below, not something that
   // slides in beside it. The hidden span keeps the title for a feature
