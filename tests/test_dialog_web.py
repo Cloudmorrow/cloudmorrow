@@ -39,3 +39,22 @@ def test_the_dialog_is_the_sheet_every_screen_shares():
     assert "sheet-backdrop" in code and 'role="dialog"' in code
     assert "export function ask(" in code and "export function askText(" in code
     assert "./dialog.css" in (WEB / "app.css").read_text(encoding="utf-8")
+
+
+def test_a_sheet_sits_above_the_phone_keyboard():
+    """A phone keyboard covers the bottom of the window without shrinking it:
+    core.js measures what it hides into `--keyboard`, and every sheet — and
+    the formatting bar — keeps its bottom above that, so a line to type in
+    is never behind the keys."""
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    assert "window.visualViewport" in core
+    assert 'setProperty("--keyboard"' in core
+    assert "watchKeyboard();" in core.split("export function start()")[1]
+    assert "--keyboard: 0px;" in (WEB / "base.css").read_text(encoding="utf-8")
+    sheet = (WEB / "kit_grid.css").read_text(encoding="utf-8")
+    backdrop = sheet.split(".sheet-backdrop {")[1].split("}")[0]
+    assert "bottom: var(--keyboard);" in backdrop
+    assert "var(--keyboard)" in (WEB / "actions.css").read_text(encoding="utf-8")
+    assert "bottom: var(--keyboard);" in (WEB / "format.css").read_text(encoding="utf-8")
+    # One measurement, in one place: the bar no longer takes its own.
+    assert "visualViewport" not in (WEB / "format.js").read_text(encoding="utf-8")

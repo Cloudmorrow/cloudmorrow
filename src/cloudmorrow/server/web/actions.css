@@ -72,7 +72,7 @@
 
 /* -- the sheet an action's form or question comes up in ------------------------ */
 .act-sheet {
-  max-height: calc(100dvh - 24px - var(--top) - var(--bottom));
+  max-height: calc(100dvh - 24px - var(--top) - var(--bottom) - var(--keyboard));
   overflow-y: auto;
   overscroll-behavior: contain;
 }
