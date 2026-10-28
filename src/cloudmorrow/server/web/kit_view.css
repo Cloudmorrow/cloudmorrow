@@ -195,6 +195,9 @@
 
 /* -- cards ----------------------------------------------------------------------- */
 .v-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+/* A finger held on a row, card or tile is its menu (actions.js), not the
+   browser's own callout on the link in it. */
+.v-table tbody tr, .v-card, .v-tile, .v-lane-card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .v-card {
   display: flex;
   flex-direction: column;

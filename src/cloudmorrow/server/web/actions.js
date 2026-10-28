@@ -21,8 +21,10 @@
 
    The menu a thing has — a right-click on a computer, a long press on a
    phone — is here too (`menu`, `contextMenus`), so every kit's is the
-   same one; and which Quills edit a file of a given name (`editorsFor`),
-   read off the screens the manifests declare. */
+   same one, and what a record's holds (`recordChoices`: Open and its
+   actions) is said once for every row, card and tile; and which Quills
+   edit a file of a given name (`editorsFor`), read off the screens the
+   manifests declare. */
 
 import { ApiError, api, app, encodePath, esc, go, parseHash, route, toast } from "./core.js";
 import { ask, openSheet } from "./dialog.js";
@@ -220,6 +222,31 @@ export function contextMenus(root, selector, choicesFor, { blank = null } = {}) 
     if (pressed && Math.hypot(event.clientX - pressed.x, event.clientY - pressed.y) > 10) end();
   });
   for (const type of ["pointerup", "pointercancel"]) root.addEventListener(type, end);
+}
+
+/**
+ * The menu a record has wherever it is drawn — a row of a list, a card on
+ * a board, a row, card or tile in a view: Open (when *open* is where it
+ * opens), the actions the screen declares on it (*extra*, `[{quill,
+ * action}]`), then every action `on` its datamodel from whichever Quill
+ * declares it — the ones its sheet has — none twice. Nothing is declared
+ * for the menu itself: a record's actions are its menu.
+ */
+export function recordChoices(record, { open = "", extra = [], here = hereNow(), after = null } = {}) {
+  const choices = [];
+  if (open) choices.push({ label: "Open", run: () => go(open) });
+  const seen = new Set();
+  const add = ({ quill, action }) => {
+    const key = `${quill.id}/${action.id}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    choices.push({ label: action.label, tone: action.tone, run: () => press(quill, action, { record: record.id, here, after }) });
+  };
+  extra.forEach(add);
+  const own = actionsOn(record.model).filter(({ quill, action }) => !seen.has(`${quill.id}/${action.id}`));
+  if (own.length && choices.length) choices.push({ sep: true });
+  own.forEach(add);
+  return choices;
 }
 
 // When a press became a menu: the tap the finger's lift makes — on the

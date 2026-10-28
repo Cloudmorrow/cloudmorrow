@@ -40,7 +40,9 @@ import { renderTimeline, timelineSheet } from "./kit_timeline.js";
 import { renderView } from "./kit_view.js";
 import { dataSheet, renderData } from "./kit_data.js";
 // And a Quill's actions, on every record's sheet.
-import { formFields, linksFor, readFields, sheetSection, wireFields, wireSheetSection } from "./actions.js";
+import {
+  contextMenus, formFields, linksFor, readFields, recordChoices, sheetSection, wireFields, wireSheetSection,
+} from "./actions.js";
 import { ask, askText, openSheet } from "./dialog.js";
 
 const own = {
@@ -312,6 +314,11 @@ async function renderBoard(at, arg) {
     } catch (err) { toast(err.message); }
   };
 
+  recordMenus(listing, at, model, () => records, async () => {
+    records = groupModel && !group ? [] : await api("GET", listUrl());
+    show();
+  });
+
   // -- dragging a card ------------------------------------------------------
   // What the mouse has instead of the circle and the lane control, and the
   // same move the TUI's own drag ends in. The whole board comes back after
@@ -504,10 +511,10 @@ async function renderList(at) {
       (said.length ? `<span class="preview">${esc(said.join(" · "))}</span>` : "");
     const text = `<span class="title">${esc(titleOf(model, r, title))}</span>${meta ? `<span class="meta">${meta}</span>` : ""}`;
     if (!tick) {
-      return `<a class="row" href="${sheetHash(at, model.id, r.id)}"><span class="main">${text}</span>${icons.chevronRight}</a>`;
+      return `<a class="row" data-id="${esc(r.id)}" href="${sheetHash(at, model.id, r.id)}"><span class="main">${text}</span>${icons.chevronRight}</a>`;
     }
     const on = !!r.fields[tick.name];
-    return `<div class="row card${on ? " is-done" : ""}">
+    return `<div class="row card${on ? " is-done" : ""}" data-id="${esc(r.id)}">
       ${writes ? `<button class="tick" data-id="${esc(r.id)}" aria-label="${esc(tick.label)}" aria-pressed="${on}">${circle(on ? "done" : "")}</button>`
         : stillTick(on ? "done" : "", on ? tick.label : `Not ${tick.label.toLowerCase()}`)}
       <a class="main" href="${sheetHash(at, model.id, r.id)}">${text}</a></div>`;
@@ -534,9 +541,24 @@ async function renderList(at) {
     show();
   };
   show();
+  recordMenus(listing, at, model, () => records, async () => {
+    records = await api("GET", recordsUrl(model.id));
+    show();
+  });
   wirePen(quill, model, title, async (fields) => {
     records.push(await api("POST", recordsUrl(model.id), { fields }));
     show();
+  });
+}
+
+// The menu every row and card has — a right-click on a computer, a finger
+// held on it on a phone: Open, and the actions on the record's datamodel,
+// the ones its sheet has (actions.js). Wired once on the listing, which
+// stays while the rows in it are drawn again.
+function recordMenus(listing, at, model, recordsNow, again) {
+  contextMenus(listing, ".row[data-id]", (el) => {
+    const record = recordsNow().find((r) => r.id === el.dataset.id);
+    return record ? recordChoices(record, { open: sheetHash(at, model.id, record.id), here: at, after: again }) : null;
   });
 }
 

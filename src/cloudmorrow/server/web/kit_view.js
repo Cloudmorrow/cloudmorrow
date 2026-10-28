@@ -28,8 +28,8 @@ import {
   WEEKDAYS, addDays, addMonths, dateOf, longDay, monthOf, today, weeksOf,
 } from "./kit_calendar.js";
 import {
-  choose, findAction, formFields, hideFromBar, linksFor, onRedrawHere, press, readFields, run,
-  said, screenAt, wireFields,
+  choose, contextMenus, findAction, formFields, hideFromBar, linksFor, onRedrawHere, press, readFields,
+  recordChoices, run, said, screenAt, wireFields,
 } from "./actions.js";
 import { ask } from "./dialog.js";
 
@@ -56,7 +56,7 @@ export async function renderView(at, arg) {
   const v = {
     at, params, root, tree: null,
     open: new Map(), months: new Map(), revs: new Map(), thumbs: new Map(),
-    links: {}, formLinks: {}, handlers: [], edits: [], forms: [], lanes: [], amber: false,
+    links: {}, formLinks: {}, handlers: [], menus: [], edits: [], forms: [], lanes: [], amber: false,
   };
   v.draw = () => draw(v);
   v.paint = () => paint(v);
@@ -72,6 +72,9 @@ export async function renderView(at, arg) {
     event.stopPropagation();
     handler(el, event);
   });
+  // And one for the menu a row, card or tile has — a right-click on a
+  // computer, a finger held on it on a phone — numbered the same way.
+  contextMenus(root, "[data-menu]", (el) => v.menus[Number(el.dataset.menu)] || null);
   await draw(v);
 }
 
@@ -112,6 +115,7 @@ function trimmed(v, tree) {
 /** Draw the tree as it was last sent: after a fetch, and when a tab or a month changes. */
 function paint(v) {
   v.handlers = [];
+  v.menus = [];
   v.edits = [];
   v.forms = [];
   v.lanes = [];
@@ -130,6 +134,18 @@ function paint(v) {
 const doing = (v, fn) => {
   v.handlers.push(fn);
   return `data-do="${v.handlers.length - 1}"`;
+};
+
+/** The menu a record's row, card or tile has, as the attribute it carries:
+    Open (to *hash*), the *actions* the view declares on it, and the actions
+    on its datamodel (actions.js, `recordChoices`); "" when it has none. */
+const menuOn = (v, record, hash, actions = []) => {
+  const choices = recordChoices(record, {
+    open: hash || "", extra: actions.map((action) => ({ quill: v.at.quill, action })), here: v.at, after: v.draw,
+  });
+  if (!choices.length) return "";
+  v.menus.push(choices);
+  return `data-menu="${v.menus.length - 1}"`;
 };
 
 // -- reading records ------------------------------------------------------------------------
@@ -468,7 +484,7 @@ function drawTable(v, n) {
       ? `<button type="button" class="act-chip" ${doing(v, runOn(actions[0]))}>${esc(actions[0].label)}</button>`
       : `<button type="button" class="v-more" aria-label="More" ${doing(v, () => choose(titled(v, r, n.columns[0] && n.columns[0].field),
         actions.map((a) => ({ label: a.label, tone: a.tone, run: runOn(a) }))))}>${glyphs.more}</button>`;
-    return `<tr${hash ? ` class="v-opens" ${doing(v, () => go(hash))}` : ""}>${cells}` +
+    return `<tr ${menuOn(v, r, hash, actions)}${hash ? ` class="v-opens" ${doing(v, () => go(hash))}` : ""}>${cells}` +
       (actions.length ? `<td class="v-row-actions">${buttons}</td>` : "") + `</tr>`;
   }).join("");
   return `<div class="v-table"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
@@ -483,7 +499,8 @@ function drawCards(v, n) {
       (badge ? `<span class="v-badge">${esc(badge)}</span>` : "") + `</span>` +
       (n.subtitle && say(v, r, n.subtitle) ? `<span class="v-card-sub">${esc(say(v, r, n.subtitle))}</span>` : "") +
       (n.body && say(v, r, n.body) ? `<span class="v-card-body">${esc(say(v, r, n.body))}</span>` : "");
-    return hash ? `<a class="v-card" href="${esc(hash)}">${inner}</a>` : `<div class="v-card">${inner}</div>`;
+    const menu = menuOn(v, r, hash);
+    return hash ? `<a class="v-card" ${menu} href="${esc(hash)}">${inner}</a>` : `<div class="v-card" ${menu}>${inner}</div>`;
   }).join("") + `</div>`;
 }
 
@@ -522,7 +539,7 @@ function drawGallery(v, n) {
       : `<button type="button" class="v-more" aria-label="More" ${doing(v, () => choose(title,
         actions.map((a) => ({ label: a.label, tone: a.tone, run: runOn(a) }))))}>${glyphs.more}</button>`;
     const sub = n.subtitle ? say(v, r, n.subtitle) : "";
-    return `<div class="v-tile">` +
+    return `<div class="v-tile" ${menuOn(v, r, hash, actions)}>` +
       (hash ? `<a class="v-tile-pic" href="${esc(hash)}">${pic}</a>` : `<span class="v-tile-pic">${pic}</span>`) +
       `<span class="v-tile-text"><span class="title">${esc(title)}</span>` +
       (sub ? `<span class="v-tile-sub">${esc(sub)}</span>` : "") + `</span>` +
@@ -564,7 +581,7 @@ function drawLanes(v, n) {
         const body = n.body ? say(v, r, n.body) : "";
         const text = `<span class="title">${esc(titled(v, r, n.title))}</span>` +
           (body ? `<span class="meta"><span class="preview">${esc(body)}</span></span>` : "");
-        return `<div class="row v-lane-card" data-id="${esc(r.id)}"${drags ? ' draggable="true"' : ""}>` +
+        return `<div class="row v-lane-card" data-id="${esc(r.id)}" ${menuOn(v, r, hash)}${drags ? ' draggable="true"' : ""}>` +
           (hash ? `<a class="main" href="${esc(hash)}">${text}</a>` : `<span class="main">${text}</span>`) + `</div>`;
       }).join("") : `<div class="nothing">Nothing here</div>`) +
       `</div></div>`;
