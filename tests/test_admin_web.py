@@ -361,9 +361,7 @@ def test_a_quill_sheet_tells_its_facts_from_its_buttons():
         "confirm",
         "cancel",
     ):
-        assert f'class="act-button' in quills and f' {button}"' in quills or f'class="act-button {button}"' in quills, (
-            button
-        )
+        assert re.search(rf'class="act-button[^"]* {button}"', quills), button
     assert 'class="row ' not in html.split("sheet-buttons")[1].split("</div>")[0]
     css = (WEB / "quillsadmin.css").read_text(encoding="utf-8")
     assert ".row.sheet-fact:active { background: none; }" in css
