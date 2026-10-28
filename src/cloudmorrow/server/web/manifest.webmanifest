@@ -2,7 +2,7 @@
   "id": "/app",
   "name": "Cloudmorrow",
   "short_name": "Cloudmorrow",
-  "description": "Your Cloudmorrow notes, in the browser — made for the phone.",
+  "description": "Your own cloud on your phone: files, notes, calendar, tasks and every Quill on it.",
   "start_url": "/app",
   "scope": "/app",
   "display": "standalone",
