@@ -2566,6 +2566,13 @@ pytest
 ruff check src tests
 ```
 
+`pytest` runs a worker per core (pytest-xdist; `pytest -n 0` is one
+process), and a test that drives the terminal app through Textual's pilot
+gets one more go if it fails, since those wait on the app's own timing
+(`tests/conftest.py`). On GitHub the same suite runs on four workers, on
+SQLite and on PostgreSQL, for every pull request, every push to main and
+every tag; a branch is not tested on its own pushes.
+
 ### Running the checkout
 
 The `cloudmorrow` on your PATH is the installed client, in its own venv: it does
