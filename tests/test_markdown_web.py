@@ -107,7 +107,8 @@ def test_the_list_beside_a_page_folds_and_stays_folded():
     assert 'store.set(FOLDED, now ? "1" : null)' in code
     assert '<main class="split${folded() ? " folded" : ""}">' in code
     media = js_code(EDITOR_CSS).split("@media (min-width: 900px) and (min-height: 600px)", 1)[1]
-    assert "main.split.folded .side { display: none; }" in media
+    # Folded, the list is its top line alone, with the button that brings it back.
+    assert "main.split.folded .side > :not(.side-head), main.split.folded .side-back { display: none; }" in media
 
 
 # -- the rules, under node ------------------------------------------------------------

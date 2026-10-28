@@ -29,8 +29,8 @@ import {
 } from "./core.js";
 import { mayWrite } from "./kit.js";
 import {
-  NEW, TOP, aOr, download, fixedFields, foldButton, folded, lastList, listHash, listView, load, openButton,
-  ownIcons, placeOf, shareLabels, showWhereabouts, sideBack, suffixesOf, trimSlashes, underRoot, whereIs, whereNew,
+  NEW, TOP, aOr, download, fixedFields, folded, lastList, listHash, listView, load, openButton,
+  ownIcons, placeOf, shareLabels, showWhereabouts, sideHead, suffixesOf, trimSlashes, underRoot, whereIs, whereNew,
   whereabouts, wholePath, wide, wireFold, withSuffix, withoutSuffix,
 } from "./kit_editor.js";
 import { Doc, block, run } from "./kit_docs_rules.js";
@@ -93,7 +93,7 @@ export async function renderDocs(at, arg) {
   if (wide()) {
     mount(nav({ title: view.title, right }) + `
       <main class="split">
-        <section class="side">${sideBack(view)}${view.html}</section>
+        <section class="side">${sideHead(view, { fold: false })}${view.html}</section>
         <section class="page"><p class="empty mascot"><b>Nothing open</b>Choose ${esc(aOr(b.noun))} on the left${
           b.writes ? ", or start one with the pen" : ""}, or open one from anywhere with the folder.</p></section>
       </main>` + tabs(at.tab));
@@ -343,8 +343,8 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
     view = listView(b, await load(b), listKey, ed.id);
     mount(nav({ title: ed.stem || "New", right: actions }) + `
       <main class="split${folded() ? " folded" : ""}">
-        <section class="side">${sideBack(view)}${view.html}</section>
-        <section class="page">${foldButton()}${page}</section>
+        <section class="side">${sideHead(view)}${view.html}</section>
+        <section class="page">${page}</section>
       </main>` + tabs(b.at.tab));
   } else {
     mount(nav({ back: parent, backLabel: parentLabel, title: ed.stem, right: actions }) + `<main>${page}</main>`);

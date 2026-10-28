@@ -66,14 +66,31 @@ def test_the_calls_it_makes_are_the_record_apis():
     assert "err.status === 409 && err.detail && err.detail.current" in code
     assert 'api("POST", recordsUrl(b.model.id), { fields })' in code
     assert 'api("DELETE", recordsUrl(b.model.id, ed.id))' in code
-    # Every listing is made within the folder, of the suffix: the editor's query.
-    assert 'recordsUrl(b.model.id, "", withQuery(b, ""))' in code
+    # Every listing is the editor's: within the folder, of the suffix, folders and all.
+    assert "listView(b, await load(b), key)" in code and "listView(b, await load(b), listKey, ed.id)" in code
     assert "recordsUrl(b.model.id))" not in code
+
+
+def test_the_list_is_the_editors_folders_and_all():
+    """The sheets are listed as notes and documents are: the folders, every
+    sheet, or one folder's; a new sheet lands in the folder it was started
+    in; the way back from a sheet is the list it came from."""
+    code = js_code(CELLS_JS)
+    assert 'keepsFolders: !!screen.path && can.has("folders")' in code
+    assert "renderSheet(b, { isNew: true, folder: arg.slice(NEW.length + 1)" in code
+    assert "fields[b.path] = wholePath(b, joinPath(ed.folder, name))" in code
+    assert "listHash(b, ed.folder || (previousHash() === listHash(b, TOP) ? TOP : listKey))" in code
+    assert "whereNew(b, ed.folder, names)" in code
+    assert "const row = (r) =>" not in code, "the sheet draws no rows of its own"
 
 
 def test_side_by_side_is_the_computers_split():
     assert 'from "./kit_editor.js"' in CELLS_JS
     assert '<main class="split">' in CELLS_JS
+    # The line over the list is the editor's: the way to the folders, and the fold.
+    assert '<section class="side">${sideHead(view, { fold: false })}${view.html}</section>' in CELLS_JS
+    assert '<section class="side">${sideHead(view)}${view.html}</section>' in CELLS_JS
+    assert "foldButton" not in CELLS_JS and "side-back" not in CELLS_JS
 
 
 def test_the_record_calls_it_makes_exist(client):

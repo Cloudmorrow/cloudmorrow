@@ -229,7 +229,8 @@ editor opens its own page instead, and takes pictures when its datamodel has
 `attachments`. The page is live Markdown on every surface: the line you are
 on shows its marks (`## `, `**`, `- [ ] `), every other line is drawn as it
 reads, and a task's box ticks with a click. On a computer the list beside
-the page folds away with the handle on the line between them.
+the page folds away with the button at the right end of the line over it,
+and comes back with the same button, all that is left of the list.
 
 A screen whose things are in spaces (`space` on a `calendar`) also gets the
 spaces: a list of them — yours, shared, everybody's — the way to make one

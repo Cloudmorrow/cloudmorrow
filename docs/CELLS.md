@@ -30,9 +30,9 @@ path = "path"
 It is an editor's kind of screen (docs/QUILLS.md): `where` is the filters
 every listing is made with — a file's `share`, and `within`, the folder
 the sheets are under — and `suffix` says which files are sheets, one or
-a list, the first being what a new one is called. The sheets are listed
-newest first, by their path under that folder and without the suffix;
-one opens as a grid. The record sheet every screen has is not used for a
+a list, the first being what a new one is called. The list is the
+editor's: the folders under that folder, every sheet newest first, or one
+folder's, each with its first cells under its name; one opens as a grid. The record sheet every screen has is not used for a
 sheet: the grid is its page.
 
 A Quill that ships this screen ships a first sheet the same way Notes
