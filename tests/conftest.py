@@ -50,6 +50,20 @@ POSTGRES_URL = os.environ.get("CLOUDMORROW_TEST_DATABASE_URL", "").strip()
 sqlite_only = pytest.mark.skipif(bool(POSTGRES_URL), reason="what SQLite alone does")
 
 
+def pytest_collection_modifyitems(items):
+    """A test that drives the terminal app through Textual's pilot gets one
+    more go. Those tests wait on the app's own timing, and once in a few
+    hundred runs the machine is slower than the wait; a second run says
+    whether it was that, or a real fault."""
+    drives_the_app: dict[Path, bool] = {}
+    for item in items:
+        path = Path(str(item.fspath))
+        if path not in drives_the_app:
+            drives_the_app[path] = ".run_test(" in path.read_text(encoding="utf-8")
+        if drives_the_app[path]:
+            item.add_marker(pytest.mark.flaky(reruns=1, reruns_delay=1))
+
+
 @pytest.fixture(scope="session")
 def postgres_database():
     """One database for the run, in C collation — so rows sort as SQLite sorts

@@ -38,6 +38,10 @@ def cm(client, auth, store, config, monkeypatch):
 
     monkeypatch.setattr(backup_cli, "client", api_for)
     monkeypatch.setattr(backup_cli, "POLL", 0.05)
+    # The list is a table, and a narrow console cuts the stamps short. rich
+    # reads COLUMNS when the console is made, at import, so the runner's own
+    # COLUMNS comes too late when the machine had one set: pin the width.
+    monkeypatch.setattr(backup_cli.console, "_width", 200)
     app = typer.Typer()
     app.add_typer(backup_cli.app, name="backup")
 
