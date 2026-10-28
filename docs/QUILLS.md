@@ -193,6 +193,13 @@ what each element needs:
 | `data` | nothing: every datamodel the Quill has, or `models` (a list of ids) | the datamodels by domain, the records of one, the sheet of each — to look at | the same, wider | the datamodels down the left, a table of the records of one | `cm <quill> list [datamodel]`, `show <datamodel> <id>` |
 | `timeline` | `model` (the projects), `pieces`, optional `effects`, `media` (a share and a folder: the material), `frames` (an api that draws frames), `export` (an action); the fields are [TIMELINE.md](TIMELINE.md)'s | the projects, then the viewer over the tracks, the material as a sheet | the material, the viewer and the tracks together, live video with sound | frames where the terminal shows pictures, the tracks as rows of text, every edit on a key | `cm <quill> list`, `add`, `show`, `cut`, `trim`, `move`, `rm`, `frame`, `export` |
 
+A screen with `admin = true` is an administrator's alone: the server's
+settings for the Quill — a mail domain, an outside account everybody's
+mail goes through — rather than a tab on everybody's menu. Nobody else is
+shown it, on any surface, and the server refuses to draw it for them. It
+is still one screen of the Quill, under its own menu, so the Quill's
+settings are where the Quill is and not in Administration.
+
 A board's lanes are an enum's values, fixed by the datamodel — To Do,
 Doing, Done — or, when `lane` is a link, the records it links to, in their
 own order (`ordered_within`), which people add, rename, reorder and delete

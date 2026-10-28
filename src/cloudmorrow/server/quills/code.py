@@ -182,12 +182,14 @@ class _Redirects(urllib.request.HTTPRedirectHandler):
 class HostCalls:
     """Answers one handler's requests, as one principal. Raises the SDK's exceptions."""
 
-    def __init__(self, code: QuillCode, manifest: Manifest, principal: Principal, *, via: str) -> None:
+    def __init__(self, code: QuillCode, manifest: Manifest, principal: Principal, *, via: str, kind: str = "") -> None:
         self.code = code
         self.state = code.state
         self.manifest = manifest
         self.principal = principal
         self.via = via
+        # Which kind of handler is asking: a job or a webhook may deliver.
+        self.kind = kind
 
     def __call__(self, op: str, args: dict) -> object:
         handler = getattr(self, "op_" + op.replace(".", "_"), None)
@@ -225,16 +227,43 @@ class HostCalls:
         return self._out(self.state.records.get(self.principal, self._model(args), str(args.get("id", ""))))
 
     def op_records_create(self, args: dict) -> dict:
+        model = self._model(args)
+        owner = str(args.get("owner") or "").strip()
+        by = str(args.get("by") or "").strip()
+        if owner and owner != self.principal.username:
+            self._may_deliver(model, owner)
+        elif by:
+            raise sdk.Invalid("by= says who a delivery is from: it goes with owner=")
+        if by and not self.state.records.model(model).in_space:
+            raise sdk.Invalid(f"by= is for a record delivered into a space; {model} is not in one")
         record = self.state.records.create(
             self.principal,
-            self._model(args),
+            model,
             dict(args.get("fields") or {}),
             index=args.get("index"),
             scope=str(args["scope"]) if args.get("scope") else None,
             members=[str(m) for m in args.get("members") or ()],
             announce=args.get("announce", True) is not False,
+            owner=owner or None,
+            by=by or None,
         )
         return self._out(record)
+
+    def _may_deliver(self, model: str, owner: str) -> None:
+        """Delivery: a job or a webhook of a server Quill makes a record of one of
+        the Quill's own datamodels as somebody else's — mail into their inbox.
+        The record is theirs from the start; the installer never sees it. A
+        handler pressed by a person, and a Quill of somebody's own, never
+        write as anybody but who they run for."""
+        if self.kind not in ("job", "webhook"):
+            raise sdk.Refused("only a job or a webhook delivers a record to somebody")
+        if self.manifest.personal:
+            raise sdk.Refused("a Quill of somebody's own delivers to nobody")
+        if model not in {m.id for m in self.manifest.introduces}:
+            raise sdk.Refused(f"{self.manifest.id} delivers only its own datamodels, not {model}")
+        found = self.state.users.get(owner)
+        if found is None or not found.is_active:
+            raise sdk.NotFound(f"nobody here is called {owner}")
 
     def op_records_seen(self, args: dict) -> None:
         self.state.records.mark_seen(self.principal, self._model(args), str(args.get("id", "")))
@@ -536,7 +565,7 @@ class QuillCode:
     ) -> object:
         """Run one handler as *principal*; its result, or CodeError."""
         data = {"quill": manifest.id, "user": self._user(principal.username), "where": "server", **(ctx or {})}
-        host = HostCalls(self, manifest, principal, via=via)
+        host = HostCalls(self, manifest, principal, via=via, kind=kind)
         try:
             return self._guest(manifest, principal.username).call(kind, name, data, args or {}, host, timeout=timeout)
         except Failed as failure:
@@ -555,6 +584,10 @@ class QuillCode:
         screen = next((s for s in manifest.screens if s["id"] == screen_id), None)
         if screen is None or screen["kit"] != "view":
             raise CodeError("notfound", f"{manifest.name} has no view called {screen_id}")
+        if screen.get("admin"):
+            user = self.state.users.get(username)
+            if user is None or not user.is_admin:
+                raise CodeError("refused", f"{screen.get('label') or screen_id} is for an administrator")
         principal = self.principal_for(manifest, username, via="person")
         ctx: dict = {"params": {str(k): str(v) for k, v in params.items()}}
         if record:

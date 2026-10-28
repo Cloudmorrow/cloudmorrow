@@ -60,7 +60,7 @@ def test_the_install_sheet_says_what_the_code_does_without_running_it(fleet):
     plan = client.post("/api/quills/plan", json={"source": str(FLEET)}, headers=admin).json()
     code = plan["quill_code"]
     assert code["sandboxed"] is True
-    assert code["views"] == ["Garage"]
+    assert code["views"] == ["Garage", "Keys"]
     assert "Log a service" in code["actions"]
     assert code["hooks"] == ["when a fleet.visit is created"]
     assert code["fetch"] == [{"host": "api.example.com", "why": "to read each van's odometer from the tracker"}]
@@ -71,11 +71,41 @@ def test_the_install_sheet_says_what_the_code_does_without_running_it(fleet):
 def test_every_client_is_told_the_actions_and_the_view(fleet):
     client, admin, _ = fleet
     quill = next(q for q in client.get("/api/quills", headers=admin).json() if q["id"] == "fleet")
-    assert [s["kit"] for s in quill["screens"]] == ["view", "list"]
+    assert [s["kit"] for s in quill["screens"]] == ["view", "list", "view"]
     log_service = next(a for a in quill["actions"] if a["id"] == "log-service")
     assert log_service["on"] == "vehicle"
     assert [f["name"] for f in log_service["fields"]] == ["date", "km", "note"]
     assert log_service["fields"][0]["required"] is True
+
+
+def test_an_admin_screen_is_the_administrators_alone(fleet):
+    client, admin, guest = fleet
+    for_admin = next(q for q in client.get("/api/quills", headers=admin).json() if q["id"] == "fleet")
+    for_guest = next(q for q in client.get("/api/quills", headers=guest).json() if q["id"] == "fleet")
+    assert [s["id"] for s in for_admin["screens"]] == ["garage", "vans", "keys"]
+    assert [s["id"] for s in for_guest["screens"]] == ["garage", "vans"]
+    drawn = client.get("/api/quills/fleet/views/keys", headers=admin)
+    assert drawn.status_code == 200 and "for an administrator" in str(drawn.json()["tree"])
+    refused = client.get("/api/quills/fleet/views/keys", headers=guest)
+    assert refused.status_code == 403 and "Keys is for an administrator" in refused.text
+
+
+def test_a_job_delivers_a_record_of_its_own_to_somebody_and_an_action_may_not(fleet):
+    client, admin, guest = fleet
+    state_of(client).code.run_job("fleet", "deliver")
+    theirs = client.get("/api/records/fleet.notice", headers=guest).json()
+    assert [(r["fields"]["text"], r["owner"]) for r in theirs] == [("delivered", "guest")]
+    # ctx.people() is everybody but the installer, and the installer sees no delivery.
+    assert client.get("/api/records/fleet.notice", headers=admin).json() == []
+    pressed = press(client, admin, "hand-over", fields={"who": "guest"})
+    assert pressed.status_code == 403 and "only a job or a webhook delivers" in pressed.text
+    assert len(client.get("/api/records/fleet.notice", headers=guest).json()) == 1
+
+
+def test_a_screen_admin_flag_is_a_bool():
+    with pytest.raises(QuillError, match="admin is true or false"):
+        screen = '[[screens]]\nid = "keys"\nkit = "list"\nmodel = "vehicle"\ntitle = "name"\nadmin = "yes"\n'
+        parse_manifest(_manifest(screen))
 
 
 def _manifest(extra: str) -> dict:
@@ -233,7 +263,7 @@ def test_a_call_job_runs_as_the_installer_and_is_not_run_again_before_its_time(f
     add_van(client, admin)
     state = state_of(client)
     started = state.code.run_due()
-    assert started == ["fleet/nightly"]
+    assert started == ["fleet/nightly", "fleet/deliver"]
     import time
 
     for _ in range(200):

@@ -52,6 +52,22 @@ def nightly(ctx):
     ctx.log("checked", len(ctx.records.list("vehicle")), "vans")
 
 
+@view("keys")
+def keys(ctx):
+    return ui.stack(ui.text("Keys", style="title"), ui.text("The tracker's keys, for an administrator"))
+
+
+@job
+def deliver(ctx):
+    for who in ctx.people():
+        ctx.records.create("fleet.notice", owner=who, text="delivered")
+
+
+@action("hand_over")
+def hand_over(ctx, who):
+    ctx.records.create("fleet.notice", owner=who, text="handed over")
+
+
 @webhook
 def tracker_ping(ctx, request):
     body = request.json()

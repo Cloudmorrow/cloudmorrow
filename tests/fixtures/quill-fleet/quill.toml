@@ -28,6 +28,14 @@ label = "Vans"
 model = "vehicle"
 title = "name"
 
+# The server's settings for the Quill: an administrator's alone.
+[[screens]]
+id = "keys"
+label = "Keys"
+view = "keys"
+model = "vehicle"
+admin = true
+
 [[actions]]
 id = "log-service"
 label = "Log a service"
@@ -64,6 +72,19 @@ id = "nightly"
 action = "call"
 handler = "nightly"
 every = "1d"
+
+# Delivers a notice to everybody: a record of theirs, made by the job.
+[[jobs]]
+id = "deliver"
+action = "call"
+handler = "deliver"
+every = "1d"
+
+[[actions]]
+id = "hand-over"
+label = "Hand a notice to somebody"
+[actions.fields]
+who = { kind = "string", required = true }
 
 [[webhooks]]
 id = "tracker"

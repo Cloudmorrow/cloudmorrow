@@ -104,8 +104,10 @@ def _screen_needs(screen: dict, models: dict[str, dict]) -> set[str]:
     return needs
 
 
-def fitted(quill: dict, access: Access) -> dict:
-    """*quill* as *access* may use it: see the module's docstring."""
+def fitted(quill: dict, access: Access, *, admin: bool = False) -> dict:
+    """*quill* as *access* may use it: see the module's docstring. A screen
+    marked `admin = true` is an administrator's alone: the server's settings
+    for the Quill, not a tab on everybody's menu."""
     models = quill["models"]
     kept = {}
     for model_id, model in models.items():
@@ -118,7 +120,11 @@ def fitted(quill: dict, access: Access) -> dict:
                 f for f in model["fields"] if f["kind"] != "link" or not f.get("to") or access.may("read", f["to"])
             ],
         }
-    screens = [screen for screen in quill["screens"] if all(needed in kept for needed in _screen_needs(screen, models))]
+    screens = [
+        screen
+        for screen in quill["screens"]
+        if (admin or not screen.get("admin")) and all(needed in kept for needed in _screen_needs(screen, models))
+    ]
     own = set(quill["uses"]) | set(quill["introduces"]) | set(quill["extends"])
     available = bool(screens) if quill["screens"] else any(m in kept for m in own)
     # An action on records they cannot see is not theirs to press; one they
@@ -136,7 +142,9 @@ def fitted(quill: dict, access: Access) -> dict:
 def _for(state: AppState, user: User, quill: dict) -> dict:
     quill = _with_models(state, quill)
     access = state.shelf or state.circles
-    return fitted(quill, access.access_for(user.username)) if access else quill
+    if not access:
+        return quill if user.is_admin else quill | {"screens": [s for s in quill["screens"] if not s.get("admin")]}
+    return fitted(quill, access.access_for(user.username), admin=bool(user.is_admin))
 
 
 def _shelf_of(state: AppState, user: User) -> list:
