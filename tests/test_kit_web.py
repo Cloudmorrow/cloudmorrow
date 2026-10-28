@@ -259,7 +259,7 @@ def test_the_quills_side_has_its_three_tabs_and_the_update_buttons():
     assert 'class="chip-button update-all"' in ADMIN_JS
     assert "update_available" in ADMIN_JS
     assert "{ id: quill.id, audience }" in ADMIN_JS
-    for button in ('class="row primary update-quill"', 'class="row reinstall-quill"', 'class="row bad remove-quill"'):
+    for button in ('class="act-button primary update-quill"', 'class="act-button reinstall-quill"', 'class="act-button danger remove-quill"'):
         assert button in ADMIN_JS, button
 
 
@@ -309,7 +309,7 @@ def test_the_install_sheet_calls_the_endpoints_that_exist(client, auth):
 
 def test_the_install_buttons_do_not_borrow_the_install_card():
     """`.install` is the home-screen card's; a button called that grew its padding."""
-    assert 'class="row primary add-quill"' in ADMIN_JS
+    assert 'class="act-button primary add-quill"' in ADMIN_JS
     assert '"row primary install"' not in ADMIN_JS
 
 

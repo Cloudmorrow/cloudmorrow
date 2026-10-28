@@ -220,8 +220,9 @@
    mouse never sees that, and a row that does nothing until it is clicked
    is most of what makes an app feel like a page. */
 @media (hover: hover) and (pointer: fine) and (min-width: 900px) and (min-height: 600px) {
-  /* A row that is a button — the amber Save — is a button (base.css), not a row. */
-  .row:not(.primary):hover { background: var(--card-2); }
+  /* A row that is a button — the amber Save — is a button (base.css), not a
+     row; and a row that is a fact to read (a Quill sheet's) is not lit either. */
+  .row:not(.primary):not(.sheet-fact):hover { background: var(--card-2); }
   /* The rows that are a filled colour already brighten instead. */
   .row.bad:hover, .sheet-row:hover { filter: brightness(1.12); }
   .tab:hover { background: var(--card); color: var(--bar-ink); }

@@ -58,7 +58,7 @@ def test_the_hover_is_behind_hover_and_the_press_is_not():
 def test_no_screen_turns_a_button_grey_or_brightens_it_on_its_own():
     """The generic row hover stops at the row that is a button, and no stylesheet
     keeps a hover or a press of its own for a button base.css already has."""
-    assert ".row:not(.primary):hover { background: var(--card-2); }" in DESKTOP
+    assert ".row:not(.primary):not(.sheet-fact):hover { background: var(--card-2); }" in DESKTOP
     assert ".row.primary:hover" not in DESKTOP
     assert ".nav button:not(.strong):hover" in DESKTOP
     own = re.compile(
