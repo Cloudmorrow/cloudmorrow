@@ -174,11 +174,15 @@ def test_every_row_card_and_tile_has_the_shared_menu():
     """A right-click or a long press on a record anywhere in a view opens the
     one menu actions.js draws, with Open and the record's actions: the view
     wires `contextMenus` once and each record primitive hands out a number."""
-    code = VIEW_JS   # not js_code: an `image/*` in a string would swallow the page from there
+    code = VIEW_JS  # not js_code: an `image/*` in a string would swallow the page from there
     assert 'contextMenus(root, "[data-menu]"' in code
     assert "v.menus = [];" in code
-    for primitive, start in (("table", "function drawTable"), ("cards", "function drawCards"),
-                             ("gallery", "function drawGallery"), ("lanes", "function drawLanes")):
+    for primitive, start in (
+        ("table", "function drawTable"),
+        ("cards", "function drawCards"),
+        ("gallery", "function drawGallery"),
+        ("lanes", "function drawLanes"),
+    ):
         body = code.split(start, 1)[1].split("\nfunction ", 1)[0]
         assert "menuOn(v, r, hash" in body, primitive
     # The choices are the shared ones, so a view's menu says what a list's does.
