@@ -915,8 +915,26 @@ export function setStatus(ed, text, bad = false) {
   ed.statusEl.classList.toggle("bad", bad);
 }
 
+// -- the keyboard ---------------------------------------------------------------------------
+// A phone keyboard covers the bottom of the window, and the window does not
+// shrink for it: what is pinned to the bottom — a sheet with a line to type
+// in — would sit behind it. So the page is told how much of it is hidden,
+// in `--keyboard`, and the stylesheet keeps the sheets above that.
+function watchKeyboard() {
+  const view = window.visualViewport;
+  if (!view) return;
+  const sit = () => {
+    const covered = window.innerHeight - view.height - view.offsetTop;
+    document.documentElement.style.setProperty("--keyboard", `${Math.max(0, Math.round(covered))}px`);
+  };
+  view.addEventListener("resize", sit);
+  view.addEventListener("scroll", sit);
+  sit();
+}
+
 // -- go ---------------------------------------------------------------------------------------
 export function start() {
+  watchKeyboard();
   addEventListener("hashchange", route);
   addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") flush();

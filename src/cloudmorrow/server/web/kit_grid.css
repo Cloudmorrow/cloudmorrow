@@ -277,6 +277,8 @@ main.dropping .listing > * { pointer-events: none; }
 .sheet-backdrop {
   position: fixed;
   inset: 0;
+  /* Above the keyboard, when one is up: a line to type in is no use behind it. */
+  bottom: var(--keyboard);
   z-index: 15;
   display: flex;
   align-items: flex-end;

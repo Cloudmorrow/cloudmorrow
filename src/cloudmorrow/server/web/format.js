@@ -209,33 +209,17 @@ function run(name) {
   box.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-// The keyboard covers the bottom of the window, and the window does not
-// shrink for it — so the bar is moved up by however much of it is hidden.
-function sit(bar) {
-  const view = window.visualViewport;
-  if (!view) return;
-  // `bottom` for the keyboard, so `transform` is left free for the slide.
-  const covered = window.innerHeight - view.height - view.offsetTop;
-  bar.style.bottom = `${Math.max(0, Math.round(covered))}px`;
-}
-
 export function start() {
   const bar = build();
+  // The bar sits above the keyboard: `--keyboard` (core.js) says how much
+  // of the window it covers, and format.css puts the bar's bottom there.
   const show = () => {
     const box = area();
     const selected = box && box.selectionStart !== box.selectionEnd;
-    if (selected) sit(bar);
     bar.classList.toggle("up", Boolean(selected));
   };
   document.addEventListener("selectionchange", show);
   document.addEventListener("focusout", () => setTimeout(show, 0));
-  if (window.visualViewport) {
-    for (const event of ["resize", "scroll"]) {
-      window.visualViewport.addEventListener(event, () => {
-        if (bar.classList.contains("up")) sit(bar);
-      });
-    }
-  }
 }
 
 // Imported by node for the tests, where there is no document to wire up.

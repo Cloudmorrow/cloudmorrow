@@ -103,11 +103,12 @@ def test_the_css_block_is_a_drop_in_for_base_css():
     base = (WEB / "base.css").read_text(encoding="utf-8")
     root = base.split(":root {", 1)[1].split("}", 1)[0]
     declared = set(re.findall(r"^\s*(--[a-z0-9-]+):", root, re.M))
-    # Not these: the type stacks, the phone's own safe areas, and the gap the
+    # Not these: the type stacks, the phone's own safe areas, the gap the
     # bar keeps above itself to clear what iOS paints over the top of a Home
-    # Screen app. None of them is a thing a palette has an opinion about.
-    # Anything else added to :root has to be answered for by every theme.
-    declared -= {"--sans", "--system", "--display", "--mono", "--top", "--bottom", "--bar-top"}
+    # Screen app, and how much of the window the keyboard hides. None of
+    # them is a thing a palette has an opinion about. Anything else added
+    # to :root has to be answered for by every theme.
+    declared -= {"--sans", "--system", "--display", "--mono", "--top", "--bottom", "--bar-top", "--keyboard"}
     body = BRAND_JS.split("function cssFor", 1)[1].split("\n}", 1)[0]
     emitted = set(re.findall(r"(--[a-z0-9-]+):", body))
     assert declared <= emitted, f"themes say nothing about {sorted(declared - emitted)}"

@@ -76,6 +76,8 @@
           "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
   --top: env(safe-area-inset-top, 0px);
   --bottom: env(safe-area-inset-bottom, 0px);
+  /* How much of the bottom of the window the phone keyboard hides (core.js). */
+  --keyboard: 0px;
   /* What the bar at the top puts above itself. In a browser that is the
      notch, and nothing on a desktop. */
   --bar-top: var(--top);

@@ -4,7 +4,8 @@
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  /* Above the keyboard, by however much of the window it covers (core.js). */
+  bottom: var(--keyboard);
   z-index: 20;
   background: var(--bar);
   border-top: 1px solid var(--line);
