@@ -287,6 +287,24 @@ def test_a_deleted_file_has_restore_and_a_delete_for_good():
     assert 'label: "Restore folder"' in folder and 'label: "Delete folder for good"' in folder
 
 
+def test_a_picked_file_without_a_suffix_gets_one_from_its_type():
+    """A phone's picker can hand a photo over as "1000001234", and the name
+    is what the type is read from everywhere. So what is picked, dropped or
+    pasted goes up under `fileName`, which adds the suffix the browser's
+    type calls for when the name has none and leaves a name with one alone;
+    the camera's photos keep their timestamp names."""
+    code = code_of(GRID_JS)
+    named = code[code.index("function fileName(") : code.index("function photoName(")]
+    assert "if (extOf(name)) return name;" in named
+    assert '"image/jpeg": "jpg"' in code and '"video/quicktime": "mov"' in code
+    assert '["image", "video", "audio"].includes(kind)' in named
+    assert "return ext ? `${name}.${ext}` : name;" in named
+    assert "picked.map((file) => [file, fileName(file)])" in code
+    assert "dropped.map((file) => [file, fileName(file)])" in code
+    assert 'file.name !== "image.png" ? fileName(file) : photoName(file)' in code
+    assert "taken.map((file) => [file, photoName(file)])" in code
+
+
 def test_the_trash_is_a_bin_beside_the_plus_and_empties():
     """The screen's `trash` names the folder the server keeps what is
     deleted in. At the top of a group that folder is not listed but a bin
