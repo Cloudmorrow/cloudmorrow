@@ -68,14 +68,15 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
+    grid-template-columns: minmax(328px, 428px) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
-    gap: 28px;
   }
+  /* The room before the line is the list's padding, not a gap in the
+     grid, so the list's scrollbar runs along the line (kit_editor.css). */
   .quills-split .side {
     min-height: 0;
     overflow-y: auto;
-    padding-right: 4px;
+    padding-right: 28px;
   }
   .quills-split .page {
     min-width: 0;
