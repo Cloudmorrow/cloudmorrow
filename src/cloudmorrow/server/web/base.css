@@ -490,7 +490,11 @@ h1.large {
 #app:has(> nav.subtabs) #toast { bottom: calc(108px + var(--bottom)); }
 
 /* -- the editor ---------------------------------------------------------- */
-.editor { padding-top: 4px; min-height: 70vh; cursor: text; }
+/* A column, so the line under the text that says where the file is can
+   keep to the editor's foot (kit_editor.css) when the text stops short of
+   it; nothing in it shrinks, the body grows as it is typed. */
+.editor { display: flex; flex-direction: column; padding-top: 4px; min-height: 70vh; cursor: text; }
+.editor > * { flex: none; }
 .editor .title {
   width: 100%;
   border: 0;

@@ -64,46 +64,61 @@
 .row .path bdi { direction: ltr; unicode-bidi: isolate; }
 
 /* Under an open page, where its file is, whole: the same line, wrapping
-   rather than cut, and a way to its folder in Files when Files is here. */
+   rather than cut, and a way to its folder in Files when Files is here.
+   At the editor's foot, not under the last line: a short note leaves it
+   at the bottom of the panel, a long one pushes it down past the text. */
 .editor .whereabouts {
-  margin: 28px 0 0;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
+  margin: auto 0 0;
+  padding-top: 28px;
   font-size: 13px;
   color: var(--muted);
   overflow-wrap: anywhere;
+}
+.editor .whereabouts::before {
+  content: "";
+  display: block;
+  margin-bottom: 10px;
+  border-top: 1px solid var(--line);
 }
 .editor .whereabouts a { color: inherit; text-decoration: none; }
 .editor .whereabouts a:hover { color: var(--accent); text-decoration: underline; }
 
 /* -- side by side ------------------------------------------------------------ */
 /* Only a computer draws the split; a phone never gets `main.split`. The
-   list keeps a column of its own and scrolls on its own, so the page
-   beside it stays where it is while you look for the next one. The room
-   between the list and the line is the list's own padding, not a gap in
-   the grid: the pane that scrolls ends at the line, so its scrollbar runs
-   along the line, where the split is, not down the edge of the rows. */
+   split fills the window under the bar, and the list and the page each
+   scroll on their own — the window never does — so the page beside the
+   list stays where it is while you look for the next one, and the foot of
+   a page is the foot of its panel. The room between the list and the line
+   is the list's own padding, not a gap in the grid: the pane that scrolls
+   ends at the line, so its scrollbar runs along the line, where the split
+   is, not down the edge of the rows. */
 @media (min-width: 900px) and (min-height: 600px) {
-  #app:has(main.split) { --column: 1180px; }
+  #app:has(main.split) { --column: 1180px; height: 100dvh; }
   main.split {
+    flex: 1;
+    min-height: 0;
     display: grid;
     grid-template-columns: minmax(288px, 368px) minmax(0, 1fr);
-    min-height: calc(100vh - var(--bar-h) - 56px);
+    grid-template-rows: minmax(0, 1fr);
+    padding-bottom: 16px;
   }
   main.split .side {
-    align-self: start;
-    position: sticky;
-    top: calc(var(--bar-h) + 8px);
-    max-height: calc(100vh - var(--bar-h) - 24px);
+    min-height: 0;
     overflow-y: auto;
     padding-right: 28px;
   }
   main.split .side .heading h1 { font-size: 26px; }
   main.split .page {
     min-width: 0;
-    padding-left: 28px;
+    min-height: 0;
+    overflow-y: auto;
+    padding-left: 32px;
     border-left: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
   }
+  /* The editor is at least as tall as the panel, so its foot is the panel's. */
+  main.split .page > .editor { flex: 1; }
   /* The way up to the folders, which a phone has in the bar. */
   main.split .side-back {
     display: inline-flex;
@@ -116,15 +131,19 @@
   }
   main.split .side-back svg { width: 9px; height: 14px; }
   main.split .page > .empty { margin-top: 18vh; }
-  /* The handle that folds the list away sits on the line between them. */
-  main.split .page { position: relative; }
+  /* The handle that folds the list away sits beside the line between them,
+     in the page's gutter, at the top of the panel, and stays there while
+     the page scrolls under it. Beside, not on: a panel that scrolls clips
+     whatever hangs past its edge. It is the page's first child, and keeps
+     its place in the column with a negative margin the height of itself. */
   main.split .fold {
-    position: absolute;
+    position: sticky;
     top: 6px;
-    left: -15px;
+    align-self: start;
+    margin: 6px 0 -32px -31px;
     z-index: 1;
-    width: 30px;
-    height: 30px;
+    width: 26px;
+    height: 26px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -142,9 +161,9 @@
   main.split.folded { grid-template-columns: minmax(0, 1fr); }
   main.split.folded .side { display: none; }
   main.split.folded .page { padding: 0 48px; border-left: 0; }
-  main.split.folded .fold { left: 0; }
+  main.split.folded .fold { margin-left: -46px; }
   main.split.folded .fold svg { transform: rotate(180deg); }
-  main.split.folded .page .editor { max-width: 780px; margin: 0 auto; }
+  main.split.folded .page .editor { max-width: 780px; margin: 0 auto; width: 100%; }
   /* The page that is open is the one lit in the list: Sky, as current is. */
   main.split .row.current { background: color-mix(in srgb, var(--accent) 15%, transparent); }
   main.split .row.current .title { color: var(--accent); }
