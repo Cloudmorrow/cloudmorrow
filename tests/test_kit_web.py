@@ -500,3 +500,15 @@ def test_the_editor_opens_pages_you_may_only_read_read_only():
     # A paste, a drop or a backspace would add or take a picture: stopped.
     assert '["paste", "drop", "dragover", "keydown"]' in page
     assert 'const compose = !b.writes ? "" :' in editor
+
+
+def test_every_list_row_and_board_card_has_the_shared_menu():
+    """A right-click or a long press on a row or a card opens the one menu
+    actions.js draws — Open, and the actions on the record's datamodel, the
+    ones its sheet has — wired once on the listing for the list and the board."""
+    code = js_code(KIT_JS)
+    assert 'contextMenus(listing, ".row[data-id]"' in code
+    assert "recordChoices(record, { open: sheetHash(at, model.id, record.id)" in code
+    assert code.count("recordMenus(listing, at, model, () => records") == 2
+    # A row without a tick is a link, and it carries its id like the others.
+    assert '<a class="row" data-id="${esc(r.id)}" href="${sheetHash(at, model.id, r.id)}"' in code

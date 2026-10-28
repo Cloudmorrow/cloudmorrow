@@ -170,8 +170,13 @@ names mean.
 
 ### Screens
 
-Each screen names a kit element and binds it to fields. The kit, and what
-each element needs:
+Each screen names a kit element and binds it to fields. Every record a kit
+draws — a row, a card, a tile — opens the record's sheet, and has a menu
+(a right-click on a computer, a finger held on it on a phone) with Open
+and the actions on its datamodel, from whichever Quill declares them; a
+Quill declares the actions, never the menu
+([QUILLCODE.md](QUILLCODE.md), *Actions, on every surface*). The kit, and
+what each element needs:
 
 | kit | binds | on the phone | on the full web app | in the terminal | on the command line |
 | --- | --- | --- | --- | --- | --- |

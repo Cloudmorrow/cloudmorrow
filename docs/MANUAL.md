@@ -738,7 +738,11 @@ screens, **Folders**, the notes in one, and the note, with the pen beside
 the title for a new one; Tasks is a board whose cards are dragged between
 lanes; Files is folders and tiles. Each Quill's own guide is on its page in
 the [catalog](https://cloudmorrow.com/quills). Every row opens the record's
-sheet: every field, editable, with delete.
+sheet: every field, editable, with delete. Every row, card and tile also
+has a menu — a right-click on a computer, a finger held on it on a phone —
+with **Open** and whatever the Quills can do to that record, the same
+buttons its sheet has; in Files the menu is the file's own (see
+[Fileshares](#fileshares)).
 
 The last tab is **Data**: every kind of data on the server your circles give
 you, by domain, and the records in each — the same records the Quills draw,

@@ -66,6 +66,9 @@
    the line in the warning colour. */
 .row .meta .date.expires { color: var(--warn); opacity: 1; }
 .kit-list .row svg { flex: none; color: var(--muted); }
+/* A finger held on a row or card is its menu (actions.js), not the browser's
+   own callout on the link in it. */
+.kit-list .row, .board .row.card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 
 /* -- an enum: a row of buttons, one lit ------------------------------------- */
 .segments {

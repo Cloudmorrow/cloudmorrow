@@ -222,6 +222,21 @@ One declaration, drawn everywhere by the core:
 | command line | `cm fleet log-service <vehicle> date=2026-09-28 km=1200`; `cm fleet actions` lists them |
 | assistant | an MCP tool, `fleet_log_service`, with the form as its schema and the record's id |
 | a view | `ui.button(…, action="log-service")`, `ui.form("log-service")`, `ui.table(…, actions=[…])` |
+| a record's menu | a right-click, a long press or the menu key on any row, card or tile the record is: Open, then its actions (below) |
+
+On the phone and in the web app every record a screen draws — a row of a
+list, a card on a board, a row, card or tile in a view — also has a menu:
+a right-click on a computer, a finger held on it on a phone, the menu
+key. In it is **Open**, then the actions the view declares on the row
+(`table(…, actions=[…])`, `gallery(…, actions=[…])`), then every action
+`on` the record's datamodel from whichever Quill declares it — the same
+ones its sheet has — none twice. Nothing is declared for the menu itself:
+a record's actions are its menu, and the core draws it (`actions.js`:
+`recordChoices`, `contextMenus`), so every Quill's is the same one. On a
+computer it is a small menu at the pointer, with the arrows, Enter and
+Escape working; on a phone it is the sheet from the bottom. A kit with
+things of its own, as the grid has files, puts its own choices in the same
+menu.
 
 The form is checked before the code runs — required fields, kinds, enum
 values, links to records the person can see — and an action `on` a
