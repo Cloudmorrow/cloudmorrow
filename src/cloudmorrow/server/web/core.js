@@ -264,6 +264,35 @@ export function wordmark(text = "CLOUDMORROW") {
     ` role="img" aria-label="${esc(text)}">${dots}</svg>`;
 }
 
+// Something being fetched that takes a moment: a cloud of the wordmark's
+// dots, lit one after another across it, and under it a line saying what
+// is on its way. It goes where the thing will be, the instant it is asked
+// for, so a tap is never answered with nothing. The dots are numbered
+// (--i) for the CSS to stagger; reduced motion makes it a still cloud.
+const CLOUD = [
+  "....XXXX.....",
+  "...XXXXXX.XX.",
+  "..XXXXXXXXXXX",
+  ".XXXXXXXXXXXX",
+  "XXXXXXXXXXXXX",
+  "XXXXXXXXXXXXX",
+  ".XXXXXXXXXXX.",
+];
+export function loader(text = "One moment") {
+  let dots = "";
+  let i = 0;
+  CLOUD.forEach((row, y) => {
+    [...row].forEach((cell, x) => {
+      if (cell !== "X") return;
+      dots += `<rect x="${x + 0.08}" y="${y + 0.08}" width="0.84" height="0.84" rx="0.14" style="--i: ${x + y}"/>`;
+      i += 1;
+    });
+  });
+  return `<div class="loader" role="status" aria-live="polite">` +
+    `<svg class="pixel-loader" viewBox="0 0 ${CLOUD[0].length} ${CLOUD.length}" fill="currentColor" aria-hidden="true">${dots}</svg>` +
+    `<p>${esc(text)}…</p></div>`;
+}
+
 // The icons every tab is drawn with: eight dots across, because a glyph
 // needs the room a letter does not, and outlines one dot thick so they
 // carry the weight of the type beside them. Same drawing as the wordmark

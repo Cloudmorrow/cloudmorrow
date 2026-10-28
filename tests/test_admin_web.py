@@ -310,3 +310,25 @@ def test_the_restore_sheet_browses_a_backup_and_sends_the_picked_paths():
     assert 'apiRaw("GET", `/api/server/backups/${encodeURIComponent(stamp)}/file?path=' in source
     assert "a.download = pull.dataset.name;" in source
     assert "In the store" in source, "the page says what the store holds"
+
+
+def test_a_quill_row_answers_at_once_with_the_loader():
+    """A tap on a Quill row clears what was open and shows the loader before the
+    sheet is read; a row tapped meanwhile wins over the slower one."""
+    quills = (WEB / "quillsadmin.js").read_text(encoding="utf-8")
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    assert "export function loader(" in core
+    assert 'class="loader" role="status" aria-live="polite"' in core
+    assert 'class="pixel-loader"' in core and 'style="--i: ${x + y}"' in core
+    # On a computer: into the page beside the list, before buildSheet.
+    split = quills.split("async function openSheet(", 1)[1].split("\nasync function", 1)[0]
+    assert split.index("page.innerHTML = loader(`Reading ${nameOf(ctx, id)}`)") < split.index("await buildSheet(id)")
+    assert "const turn = ++asked;" in split and "if (turn !== asked) return;" in split
+    # On a phone: the screen with the loader is mounted before anything is read.
+    phone = quills.split("async function renderQuill(", 1)[1].split("\nasync function", 1)[0]
+    assert phone.index('loader("Reading the Quill")') < phone.index('api("GET", "/api/auth/me")')
+    assert phone.index('loader("Reading the Quill")') < phone.index("await buildSheet(id, me)")
+    assert "if (turn !== asked) return;" in phone
+    css = (WEB / "base.css").read_text(encoding="utf-8")
+    assert "@keyframes pixel-wave" in css and "calc(var(--i, 0) * 55ms)" in css
+    assert ".loader .pixel-loader rect { animation: none;" in css, "reduced motion gets a still cloud"

@@ -35,8 +35,8 @@
    may write it. A circle with `* = write` has it already, and says so. */
 
 import {
-  api, app, esc, formatDate, icons, mount, nav, registerScreen, renderRoute, replace, seconds, store, toast,
-  wireShell,
+  api, app, esc, formatDate, icons, loader, mount, nav, registerScreen, renderRoute, replace, seconds, store,
+  toast, wireShell,
 } from "./core.js";
 import { loadFeatures } from "./features.js";
 import { refreshQuills } from "./quills.js";
@@ -122,7 +122,19 @@ export async function drawQuills(panel) {
   if (split && shown) await openSheet(ctx, shown);
 }
 
-/** Open a Quill's sheet: beside the list on a computer, as its own screen on a phone. */
+/** What a Quill is called, from the lists already read, for the line under the loader. */
+function nameOf(ctx, id) {
+  const installed = Object.values(ctx.all || {}).filter(Array.isArray).flat();
+  const known = [...installed, ...((ctx.catalog && ctx.catalog.quills) || [])].find((q) => q && q.id === id);
+  return (known && known.name) || id;
+}
+
+// Which sheet was asked for last: a sheet takes a moment to build — the
+// plan comes from the catalog's release — and a row clicked meanwhile wins.
+let asked = 0;
+
+/** Open a Quill's sheet: beside the list on a computer, as its own screen on a phone.
+    Whatever was there goes at once, and the loader stands in until the sheet is built. */
 async function openSheet(ctx, id) {
   if (!wide()) { location.hash = "#/adminquill/" + encodeURIComponent(id); return; }
   shown = id;
@@ -131,7 +143,10 @@ async function openSheet(ctx, id) {
   }
   const page = ctx.panel.querySelector(".page");
   if (!page) return;
+  const turn = ++asked;
+  page.innerHTML = loader(`Reading ${nameOf(ctx, id)}`);
   const sheet = await buildSheet(id);
+  if (turn !== asked) return;
   if (!sheet) {
     shown = "";
     page.innerHTML = `<p class="empty"><b>Nothing open</b>Choose a Quill on the left.</p>`;
@@ -469,18 +484,25 @@ function catalogRow(q) {
 // -- the sheet ------------------------------------------------------------------------
 /** A Quill's sheet, as a screen of its own: the phone's way, and a link's. */
 async function renderQuill(id) {
+  // A computer has the sheet beside the list; a link to one lands there.
+  if (wide()) {
+    shown = id;
+    return backToQuills();
+  }
+  // The screen is there before anything is read: the bar, and the loader
+  // where the sheet will be, so the row tapped is answered at once.
+  mount(nav({ back: "#/admin/quills", backLabel: "Quills", title: "Quill" }) + `
+    <main class="quill-sheet">${loader("Reading the Quill")}</main>`);
+  wireShell();
+  const turn = ++asked;
   const me = await api("GET", "/api/auth/me");
   if (!me.is_admin) {
     toast("Administration is for administrators");
     replace("#/me");
     return renderRoute();
   }
-  // A computer has the sheet beside the list; a link to one lands there.
-  if (wide()) {
-    shown = id;
-    return backToQuills();
-  }
   const sheet = await buildSheet(id, me);
+  if (turn !== asked) return;
   if (!sheet) return backToQuills();
   mount(nav({ back: "#/admin/quills", backLabel: "Quills", title: sheet.name }) + `
     <main class="quill-sheet">${sheet.html}</main>`);

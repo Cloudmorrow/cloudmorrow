@@ -85,7 +85,7 @@
     padding-left: 28px;
     border-left: 1px solid var(--line);
   }
-  .quills-split .page > .empty { margin-top: 18vh; }
+  .quills-split .page > .empty, .quills-split .page > .loader { margin-top: 18vh; }
   .quills-split .page h1.large { font-size: 26px; margin-top: 0; }
   /* The sheet that is open is the row lit in the list: Sky, as current is. */
   .quills-split .row.current { background: color-mix(in srgb, var(--accent) 15%, transparent); }
