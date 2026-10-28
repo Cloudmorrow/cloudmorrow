@@ -46,6 +46,8 @@ import {
 import { ask, askText, openSheet } from "./dialog.js";
 
 const own = {
+  // The plus on a lane: a card straight into it.
+  plus: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   // What a board is, for the button that opens its own sheet.
   more: '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
 };
@@ -237,6 +239,14 @@ async function renderBoard(at, arg) {
     ? `<a class="button" href="${sheetHash(at, groupModel.id, group.id)}" aria-label="${esc(groupModel.label)} details">${own.more}</a>`
     : "") + (writes ? `<button class="compose" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</button>` : "");
   const canAdd = (!groupModel || group) && writes && (!laneModel || lanes.length > 0);
+  const noun = model.label.toLowerCase();
+  const given = { [laneField.name]: first };
+  if (group) given[groupField.name] = group.id;
+  const offer = { given, where: group ? titleOf(groupModel, group) : "", also: screen.body ? [screen.body] : [] };
+  const make = async (fields) => {
+    records.push(await api("POST", recordsUrl(model.id), { fields }));
+    show();
+  };
   mount(nav({ title: name }) + `
     <main>
       ${heading(name, !groupModel || group ? actions : "")}
@@ -276,7 +286,10 @@ async function renderBoard(at, arg) {
         esc(laneModel.label.toLowerCase())} records, and there are none here yet.</p>`;
       return;
     }
-    if (!records.length) {
+    // Nothing on it yet: on the phone, where empty lanes are not drawn,
+    // the mascot points at the pen; on a computer the columns are there
+    // with their pluses, and the mascot is not (kit.css).
+    if (!records.length && !canAdd) {
       listing.innerHTML = emptyList(model, writes);
       return;
     }
@@ -285,11 +298,13 @@ async function renderBoard(at, arg) {
     // columns. A lane with nothing in it is hidden rather than skipped,
     // because on a board of columns an empty one is still somewhere to
     // drop a card.
-    listing.innerHTML = `<div class="board" style="--lanes: ${lanes.length}">` + lanes.map(([lane, label]) => {
+    listing.innerHTML = (records.length ? "" : emptyList(model, writes)) +
+      `<div class="board" style="--lanes: ${lanes.length}">` + lanes.map(([lane, label]) => {
       const rows = records.filter((r) => laneOf(r) === lane)
         .sort((a, b) => a.position - b.position);
       return `<div class="lane${rows.length ? "" : " lane-empty"}" data-lane="${esc(lane)}">` +
-        `<p class="group-label">${esc(label)}</p>` +
+        `<p class="group-label">${esc(label)}${canAdd
+          ? `<button type="button" class="lane-add" data-lane="${esc(lane)}" aria-label="New ${esc(noun)} in ${esc(label)}">${own.plus}</button>` : ""}</p>` +
         (rows.length
           ? `<div class="group">${rows.map(card).join("")}</div>`
           : `<div class="group nothing">Nothing here</div>`) +
@@ -297,6 +312,17 @@ async function renderBoard(at, arg) {
     }).join("") + `</div>`;
     for (const button of listing.querySelectorAll("button.tick")) {
       button.addEventListener("click", () => toggle(button.dataset.id));
+    }
+    // The plus under a lane's name: the same sheet the pen opens, with
+    // the card already in that lane.
+    for (const button of listing.querySelectorAll("button.lane-add")) {
+      button.addEventListener("click", () => {
+        const lane = button.dataset.lane;
+        const label = (lanes.find(([value]) => value === lane) || [])[1] || lane;
+        createSheet(quill, model, title, make, {
+          ...offer, given: { ...given, [laneField.name]: lane }, where: [label, offer.where].filter(Boolean).join(" on "),
+        });
+      });
     }
     if (writes) wireDragging();
   };
@@ -381,15 +407,10 @@ async function renderBoard(at, arg) {
 
   show();
 
-  // New records go in the first lane of the group on screen.
-  if (canAdd) {
-    const given = { [laneField.name]: first };
-    if (group) given[groupField.name] = group.id;
-    wirePen(quill, model, title, async (fields) => {
-      records.push(await api("POST", recordsUrl(model.id), { fields }));
-      show();
-    }, { given, where: group ? titleOf(groupModel, group) : "" });
-  }
+  // New records go in the first lane of the group on screen — or, from a
+  // lane's own plus, in that lane. The sheet offers the body too, so a
+  // card's subtasks are typed as it is made rather than on a second visit.
+  if (canAdd) wirePen(quill, model, title, make, offer);
   const more = app.querySelector(".new-group");
   if (more) more.addEventListener("click", () => newGroup(at, groupModel));
 }
@@ -427,21 +448,26 @@ export const penSays = (model) => `Make the first ${model.label.toLowerCase()} w
 /** The pen at the top of a screen: it opens the sheet that makes one. There
     is no line to type into on the page itself — making one is the pen's.
     *given* is what the screen already says (the lane, the group it is in),
-    and *create(fields)* makes the record from what the sheet adds to it. */
-export function wirePen(quill, model, title, create, { given = {}, where = "" } = {}) {
+    *also* names fields the sheet offers though the record could do without
+    them (a board's body), and *create(fields)* makes the record from what
+    the sheet adds to it. */
+export function wirePen(quill, model, title, create, { given = {}, where = "", also = [] } = {}) {
   const pen = app.querySelector(".heading .compose");
-  if (pen) pen.addEventListener("click", () => createSheet(quill, model, title, create, { given, where }));
+  if (pen) pen.addEventListener("click", () => createSheet(quill, model, title, create, { given, where, also }));
 }
 
 /** The sheet that makes one: its title first, then each field it cannot be
-    made without, drawn with the record sheet's widgets as an action's form
-    is. What goes wrong is said under the fields, and what was typed stays. */
-export async function createSheet(quill, model, title, create, { given = {}, where = "" } = {}) {
+    made without, then the ones the screen asked to offer, drawn with the
+    record sheet's widgets as an action's form is. What goes wrong is said
+    under the fields, and what was typed stays. */
+export async function createSheet(quill, model, title, create, { given = {}, where = "", also = [] } = {}) {
   const named = fieldOf(model, title);
   const head = { ...(named || { name: title, kind: "string" }), label: named ? named.label : "Name", required: true };
   const needed = model.fields.filter((f) =>
     f.required && f.name !== title && !(f.name in given) && f.default === undefined);
-  const fields = [head, ...needed];
+  const offered = also.map((n) => fieldOf(model, n))
+    .filter((f) => f && f.name !== title && !(f.name in given) && !needed.includes(f));
+  const fields = [head, ...needed, ...offered];
   const links = await linksFor(quill, fields);
   const noun = model.label.toLowerCase();
   const { sheet, close } = openSheet(

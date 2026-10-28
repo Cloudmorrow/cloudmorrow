@@ -399,6 +399,33 @@ def test_a_board_you_may_only_read_is_one_you_look_at():
     assert 'class="tick still" role="img"' in KIT_JS
 
 
+def test_a_lane_has_a_plus_that_makes_a_card_in_it():
+    """Under each lane's name a plus opens the pen's sheet with the card already in that lane."""
+    board = js_code(_function(KIT_JS, "renderBoard"))
+    assert 'class="lane-add" data-lane="${esc(lane)}" aria-label="New ${esc(noun)} in ${esc(label)}"' in board
+    # Only where the pen would be: a board you may only read has no plus.
+    assert "${esc(label)}${canAdd" in board
+    assert 'querySelectorAll("button.lane-add")' in board
+    assert "given: { ...given, [laneField.name]: lane }" in board
+    # The plus and the pen make a card the same way, on the same sheet.
+    assert "createSheet(quill, model, title, make, {" in board
+    assert "if (canAdd) wirePen(quill, model, title, make, offer);" in board
+    assert ".lane-add" in (WEB / "base.css").read_text(encoding="utf-8"), "the plus is a ghost button like the rest"
+
+
+def test_the_sheet_that_makes_a_card_offers_its_body():
+    """A board's `body` is on the sheet that makes a card, so subtasks are typed as it is made."""
+    board = js_code(_function(KIT_JS, "renderBoard"))
+    assert "also: screen.body ? [screen.body] : []" in board
+    sheet = js_code(_function(KIT_JS, "createSheet"))
+    assert "const offered = also.map((n) => fieldOf(model, n))" in sheet
+    assert "const fields = [head, ...needed, ...offered];" in sheet
+    # Offered, not needed: an offered field is never marked required, and
+    # one the screen already gives, or the title, is not asked twice.
+    assert "f && f.name !== title && !(f.name in given) && !needed.includes(f)" in sheet
+    assert "{ given, where, also }" in js_code(_function(KIT_JS, "wirePen"))
+
+
 def test_a_list_you_may_only_read_has_no_pen_and_no_ticking():
     listing = js_code(_function(KIT_JS, "renderList"))
     assert "const writes = mayWrite(model);" in listing

@@ -200,7 +200,11 @@ like any record: a pipeline's stages. On a board with a `group`, the lanes
 are only the records that link to the group on screen, so each book has
 its own pipeline. `done` then says what the finished lane has rather than
 naming it: `done = { outcome = "won" }`. A card whose lane is not one of
-them — none yet, or a stage since deleted — is drawn in the first. The CRM
+them — none yet, or a stage since deleted — is drawn in the first. The pen
+at the top makes a card in the first lane; the plus beside each lane's
+name makes one in that lane. Either way the sheet asks for the title, the
+fields a card cannot be made without, and — when the screen names a
+`body` — the body, so a task's subtasks are typed as it is made. The CRM
 is:
 
 ```toml
