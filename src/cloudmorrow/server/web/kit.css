@@ -173,6 +173,14 @@
   font-size: 16px;
   text-align: right;
 }
+/* Words run from the left, as they are typed: a subject, a name, an address.
+   A number, a date and a choice keep to the right, where a value sits on a
+   row; right-aligned typing reads as right-to-left, and nobody writes so. */
+.record .field input[type="text"],
+.record .field input[type="email"],
+.record .field input[type="url"],
+.record .field input[type="tel"],
+.record .field input[type="search"] { text-align: left; }
 .record .field select { text-align-last: right; cursor: pointer; }
 .record .field select option { color: var(--ink); background: var(--card); }
 .record .field input::placeholder { color: var(--muted); }
