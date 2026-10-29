@@ -199,7 +199,8 @@ mail goes through — rather than a tab on everybody's menu. Nobody else is
 shown it, on any surface, and the server refuses to draw it for them. It
 is never an item under the Quill's tab, for anybody: it is drawn on the
 Quill's sheet under Administration › Quills, in the Settings box under
-the server's switch (in the terminal, `s` on the Quill opens it), so every
+the server's switch — a gear on the Quill's row in the list says it has
+them, and opens them (in the terminal, `s` on the Quill does) — so every
 setting of every Quill is in the one place an administrator looks for
 settings. A `go` to the screen itself draws it again there. It is a
 `view`: the kit's elements have no settings to show. An action marked

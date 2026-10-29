@@ -743,9 +743,11 @@ class QuillsView(Pane):
     def _server_row(self, quill: dict) -> tuple[str, ...]:
         state = state_of(quill, self._running)
         newer, said = standing_of(quill, self._entries.get(quill["id"]))
+        # A gear on a Quill that has settings of its own: `s` opens them.
+        gear = f"  [{MUTED}]⚙[/]" if self._settings_of(quill["id"]) else ""
         return (
             f"[{ACCENT}]✓[/]" if quill["id"] in self._picked else " ",
-            f"  [b]{escape(str(quill.get('name') or quill['id']))}[/]",
+            f"  [b]{escape(str(quill.get('name') or quill['id']))}[/]{gear}",
             f"[{MUTED}]{escape(str(quill.get('version', '')))}[/]",
             f"[{STATE_TONES.get(state, MUTED)}]{state}[/]",
             f"[{GOOD if newer else MUTED}]{escape(said)}[/]",
