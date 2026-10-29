@@ -322,12 +322,13 @@ def test_a_quill_row_answers_at_once_with_the_loader():
     assert 'class="pixel-loader"' in core and 'style="--i: ${x + y}"' in core
     # On a computer: into the page beside the list, before buildSheet.
     split = quills.split("async function openSheet(", 1)[1].split("\nasync function", 1)[0]
-    assert split.index("page.innerHTML = loader(`Reading ${nameOf(ctx, id)}`)") < split.index("await buildSheet(id)")
+    build = "await buildSheet(id, { catalog: ctx.catalog, feature, here })"
+    assert split.index("page.innerHTML = loader(`Reading ${nameOf(ctx, id)}`)") < split.index(build)
     assert "const turn = ++asked;" in split and "if (turn !== asked) return;" in split
     # On a phone: the screen with the loader is mounted before anything is read.
     phone = quills.split("async function renderQuill(", 1)[1].split("\nasync function", 1)[0]
     assert phone.index('loader("Reading the Quill")') < phone.index('api("GET", "/api/auth/me")')
-    assert phone.index('loader("Reading the Quill")') < phone.index("await buildSheet(id, me)")
+    assert phone.index('loader("Reading the Quill")') < phone.index("await buildSheet(id, { me })")
     assert "if (turn !== asked) return;" in phone
     css = (WEB / "base.css").read_text(encoding="utf-8")
     assert "@keyframes pixel-wave" in css and "calc(var(--i, 0) * 55ms)" in css
@@ -339,8 +340,11 @@ def test_a_quill_sheet_tells_its_facts_from_its_buttons():
     with its buttons under it; a fact is a row that does not light up, and a
     thing to do is a button drawn as one."""
     quills = (WEB / "quillsadmin.js").read_text(encoding="utf-8")
-    html = quills.split("const html = `", 1)[1].split("const wire =", 1)[0]
-    assert html.index("settingsBox(name, feature, here)") < html.index('<p class="group-label">Version</p>')
+    html = quills.split("const head = sheetHead(", 1)[1].split("const wireHead =", 1)[0]
+    assert html.index("const body = `") < html.index('<p class="group-label">Version</p>')
+    head = quills.split("function sheetHead(", 1)[1].split("\nfunction ", 1)[0]
+    assert '<p class="quill-facts">${sheetFacts({ plan, installed, newer })}</p>' in head
+    assert head.index("quill-facts") < head.index("settingsBox(name, feature, here)")
     assert html.index('<p class="group-label">Version</p>') < html.index(
         "standingRow(plan, installed, entry, newer, origin)"
     )
@@ -374,3 +378,27 @@ def test_a_quill_sheet_tells_its_facts_from_its_buttons():
     assert ".row.sheet-fact:active { background: none; }" in css
     desktop = (WEB / "desktop.css").read_text(encoding="utf-8")
     assert ".row:not(.primary):not(.sheet-fact):hover" in desktop
+
+
+def test_a_server_quill_s_head_and_settings_are_drawn_from_the_list_at_once():
+    """A row on Server Quills is a Quill the list already describes: its name, lede,
+    version and settings box go on the page before anything is read, the loader
+    stands only under them, and the catalog's plan fills in the rest. The settings
+    screens need the Quill's datamodels, which one quick read of it brings; the
+    head is never drawn again, so what they show is not lost when the plan lands."""
+    quills = (WEB / "quillsadmin.js").read_text(encoding="utf-8")
+    draw = quills.split("export async function drawQuills(", 1)[1].split("\nasync function", 1)[0]
+    assert 'api("GET", "/api/server/features").catch(() => [])' in draw, "the switches come with the lists"
+    split = quills.split("async function openSheet(", 1)[1].split("\nasync function", 1)[0]
+    head = split.index("sheetHead({ name, plan: listed, installed: listed.version, newer, feature, here: listed })")
+    read = split.index('here = await api("GET", quillUrl(id))')
+    wired = split.index("if (here) wireSettings(holder, here);")
+    assert head < read < wired < split.index("await buildSheet(id, { catalog: ctx.catalog, feature, here })")
+    assert '`<div class="quill-rest">${loader(`Reading ${name}`)}</div></div>`' in split
+    assert 'holder.querySelector(".quill-rest").innerHTML = sheet.body;' in split
+    assert 'holder.querySelector(".quill-facts").innerHTML = sheet.facts;' in split
+    assert "sheet.wireBody(holder, after);" in split
+    # One builder for the head, on a phone and beside the list alike.
+    assert "function sheetHead({ name, plan, installed, newer, feature, here })" in quills
+    assert quills.count("sheetHead({") == 3, "the head is built in one place"
+    assert "return { name, head, body, facts, wire, wireHead, wireBody };" in quills

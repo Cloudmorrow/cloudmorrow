@@ -88,11 +88,13 @@ export async function drawQuills(panel) {
   let catalogProblem = "";
   let all;
   let running = [];
+  let features = [];
   try {
-    [catalog, all, running] = await Promise.all([
+    [catalog, all, running, features] = await Promise.all([
       api("GET", "/api/quills/catalog").catch((err) => { catalogProblem = err.message; return null; }),
       api("GET", "/api/quills/all"),
       api("GET", "/api/quillservices").catch(() => []),
+      api("GET", "/api/server/features").catch(() => []),
     ]);
   } catch (err) {
     panel.innerHTML = `<p class="note">The Quills could not be read: ${esc(err.message)}</p>`;
@@ -115,7 +117,7 @@ export async function drawQuills(panel) {
       drawQuills(panel);
     });
   }
-  const ctx = { panel, catalog, catalogProblem, all, running, list: panel.querySelector(".quill-list") };
+  const ctx = { panel, catalog, catalogProblem, all, running, features, list: panel.querySelector(".quill-list") };
   if (which === "server") await drawServer(ctx);
   else if (which === "own") await drawOwn(ctx);
   else drawCatalog(ctx);
@@ -165,7 +167,11 @@ function openSettings(ctx, id) {
 }
 
 /** Open a Quill's sheet: beside the list on a computer, as its own screen on a phone.
-    Whatever was there goes at once, and the loader stands in until the sheet is built. */
+    Whatever was there goes at once. A Quill on the server is on the list already,
+    so its head — name, what it says of itself, the version it is at, its switch
+    and its settings — is drawn from that at once, and the loader stands only
+    under it, for what the catalog has to be asked about. One the list does not
+    know gets the loader alone until the sheet is built. */
 async function openSheet(ctx, id) {
   if (!wide()) { location.hash = "#/adminquill/" + encodeURIComponent(id); return; }
   shown = id;
@@ -175,19 +181,56 @@ async function openSheet(ctx, id) {
   const page = ctx.panel.querySelector(".page");
   if (!page) return;
   const turn = ++asked;
-  page.innerHTML = loader(`Reading ${nameOf(ctx, id)}`);
-  const sheet = await buildSheet(id);
+  const after = async ({ removed } = {}) => {
+    if (removed) shown = "";
+    await drawQuills(ctx.panel);
+  };
+  const listed = (ctx.all.server || []).find((q) => q.id === id) || null;
+  const feature = (ctx.features || []).find((f) => f.key === id) || null;
+  const entry = (ctx.catalog && ctx.catalog.quills.find((q) => q.id === id)) || null;
+  let here = null;
+  if (listed) {
+    const name = listed.name || listed.id;
+    const newer = Boolean(entry && entry.update_available === true);
+    page.innerHTML = `<div class="quill-sheet">${sheetHead({ name, plan: listed, installed: listed.version, newer, feature, here: listed })}` +
+      `<div class="quill-rest">${loader(`Reading ${name}`)}</div></div>`;
+    const holder = page.firstElementChild;
+    wireSwitch(holder, { id, name, after });
+    if (wantSettings === id) {
+      wantSettings = "";
+      showSettings(page);
+    }
+    // The settings screens are the Quill's own code drawing its datamodels,
+    // which the list does not carry: one quick read of the Quill, and they
+    // are live, long before the catalog answers.
+    here = await api("GET", quillUrl(id)).catch(() => null);
+    if (turn !== asked) return;
+    if (here) wireSettings(holder, here);
+  } else {
+    page.innerHTML = loader(`Reading ${nameOf(ctx, id)}`);
+  }
+  const sheet = await buildSheet(id, { catalog: ctx.catalog, feature, here });
   if (turn !== asked) return;
   if (!sheet) {
+    if (listed) {
+      page.querySelector(".quill-rest").innerHTML = `<p class="shelf-note warn">The rest of the sheet could not be read.</p>`;
+      return;
+    }
     shown = "";
     page.innerHTML = `<p class="empty"><b>Nothing open</b>Choose a Quill on the left.</p>`;
     return;
   }
-  page.innerHTML = `<div class="quill-sheet">${sheet.html}</div>`;
-  sheet.wire(page.firstElementChild, async ({ removed } = {}) => {
-    if (removed) shown = "";
-    await drawQuills(ctx.panel);
-  });
+  if (listed) {
+    // The head stays as drawn, its settings live; only the facts line is
+    // said again with what the catalog knows, and the rest fills in.
+    const holder = page.firstElementChild;
+    holder.querySelector(".quill-facts").innerHTML = sheet.facts;
+    holder.querySelector(".quill-rest").innerHTML = sheet.body;
+    sheet.wireBody(holder, after);
+    return;
+  }
+  page.innerHTML = `<div class="quill-sheet">${sheet.head}<div class="quill-rest">${sheet.body}</div></div>`;
+  sheet.wire(page.firstElementChild, after);
   if (wantSettings === id) {
     wantSettings = "";
     showSettings(page);
@@ -542,11 +585,11 @@ async function renderQuill(arg) {
     replace("#/me");
     return renderRoute();
   }
-  const sheet = await buildSheet(id, me);
+  const sheet = await buildSheet(id, { me });
   if (turn !== asked) return;
   if (!sheet) return backToQuills();
   mount(nav({ back: "#/admin/quills", backLabel: "Quills", title: sheet.name }) + `
-    <main class="quill-sheet">${sheet.html}</main>`);
+    <main class="quill-sheet">${sheet.head}<div class="quill-rest">${sheet.body}</div></main>`);
   wireShell();
   sheet.wire(app.querySelector("main"), backToQuills);
   if (wantSettings === id) {
@@ -555,31 +598,33 @@ async function renderQuill(arg) {
   }
 }
 
-/** The sheet for one Quill — its name, the HTML, and what wires it into a holder
-    — or null, with a word said, when there is no such Quill. *after(what)* is
-    called once an install, update or removal has gone through. */
-async function buildSheet(id, me = null) {
+/** The sheet for one Quill — its name, the HTML in two halves (the head: name,
+    lede, facts and settings; the body: the rest), and what wires each into a
+    holder — or null, with a word said, when there is no such Quill. What is
+    known already — the catalog, the switch, the Quill itself — is taken rather
+    than read again. *after(what)* is called once an install, update or removal
+    has gone through. */
+async function buildSheet(id, { me = null, catalog = undefined, feature = null, here = null } = {}) {
   if (!me) me = await api("GET", "/api/auth/me");
   // A Quill in the catalog is described fresh from it — what installing
   // would add now. One installed from a source has only what it added.
   let plan;
   let entry = null;
-  let here = null;
-  let feature = null;
   // A catalog that cannot be read leaves an installed Quill its sheet — and
   // its Remove — described from what it added.
-  let catalog = null;
-  try { catalog = await api("GET", "/api/quills/catalog"); } catch { catalog = null; }
+  if (catalog === undefined) {
+    try { catalog = await api("GET", "/api/quills/catalog"); } catch { catalog = null; }
+  }
   try {
     entry = (catalog && catalog.quills.find((q) => q.id === id)) || null;
-    plan = entry ? await api("POST", "/api/quills/plan", { id }) : { ...(await api("GET", quillUrl(id))), from_source: true };
+    plan = entry ? await api("POST", "/api/quills/plan", { id }) : { ...(here || await api("GET", quillUrl(id))), from_source: true };
     if (plan.from_source) plan.installed_version = plan.version;
     if (plan.installed_version) {
       // Who it is for, where it came from, and whether it is on: on the
       // Quill itself and the server's switch, not in the catalog.
       [here, feature] = await Promise.all([
-        api("GET", quillUrl(id)).catch(() => null),
-        api("GET", "/api/server/features").then((rows) => rows.find((f) => f.key === id) || null).catch(() => null),
+        here || api("GET", quillUrl(id)).catch(() => null),
+        feature || api("GET", "/api/server/features").then((rows) => rows.find((f) => f.key === id) || null).catch(() => null),
       ]);
       if (here) plan.audience = here.audience;
     }
@@ -604,15 +649,9 @@ async function buildSheet(id, me = null) {
   const again = installed && (entry || (!origin.dev && !origin.catalog && origin.repo));
   const dropped = Boolean(installed && catalog && !entry && origin.catalog);
 
-  const html = `
-      <h1 class="large">${esc(name)}</h1>
-      <p class="quill-lede">${esc(plan.summary || "")}</p>
-      <p class="quill-facts">${[
-        `v${esc(plan.version)}`, esc(plan.publisher || ""), esc(plan.license || ""),
-        installed ? `<span class="quill-chip on">v${esc(installed)} installed</span>` : "",
-        newer ? `<span class="quill-chip new">v${esc(plan.version)} in the catalog</span>` : "",
-      ].filter(Boolean).join(" · ")}</p>
-      ${installed ? settingsBox(name, feature, here) : ""}
+  const facts = sheetFacts({ plan, installed, newer });
+  const head = sheetHead({ name, plan, installed, newer, feature, here });
+  const body = `
       ${installed ? `<p class="group-label">Version</p><div class="group sheet-actions">
         ${standingRow(plan, installed, entry, newer, origin)}
         <div class="sheet-buttons">
@@ -631,16 +670,13 @@ async function buildSheet(id, me = null) {
       ${adoptSheet(plan.adopt || [])}
       ${installed ? "" : `<div class="sheet-buttons"><button class="act-button primary add-quill" type="button">Install ${esc(name)}</button></div>`}`;
 
-  const wire = (holder, after) => {
+  const wireHead = (holder, after) => {
+    wireSwitch(holder, { id, name, after });
+    if (here) wireSettings(holder, here);
+  };
+  const wireBody = (holder, after) => {
     const running = holder.querySelector(".quill-running");
     if (running) drawRunning(running, id);
-    // The Quill's own settings: each screen it marked admin, drawn here by
-    // the kit as the Quill's code draws it, its buttons live.
-    for (const box of holder.querySelectorAll(".quill-admin-screen")) {
-      const screen = here && here.screens.find((s) => s.id === box.dataset.screen);
-      if (!screen) continue;
-      embedView(box, { quill: here, screen, tab: "", base: "", embedded: true }, {});
-    }
     const done = async (message, what) => {
       await refreshQuills();
       toast(message);
@@ -654,22 +690,6 @@ async function buildSheet(id, me = null) {
         await refreshQuills();
         toast(forCircles.length ? `${name} is for ${forCircles.length} circle${forCircles.length === 1 ? "" : "s"}` : `${name} is for everyone`);
       } catch (err) { toast(err.message); }
-    });
-
-    const box = holder.querySelector(".server-switch input");
-    if (box) box.addEventListener("change", async () => {
-      box.disabled = true;
-      try {
-        const turned = await api("PATCH", featureUrl(id), { enabled: box.checked });
-        // "Everywhere" includes this window: the bar is drawn from what
-        // this account has, and that has just changed.
-        await loadFeatures();
-        await done(turned.enabled ? `${name} is on.` : `${name} is off — its tabs are gone everywhere.`);
-      } catch (err) {
-        box.checked = !box.checked;
-        box.disabled = false;
-        toast(err.message);
-      }
     });
 
     const install = holder.querySelector(".add-quill");
@@ -751,7 +771,62 @@ async function buildSheet(id, me = null) {
       });
     });
   };
-  return { name, html, wire };
+  const wire = (holder, after) => { wireHead(holder, after); wireBody(holder, after); };
+  return { name, head, body, facts, wire, wireHead, wireBody };
+}
+
+/** The sheet's head: the name, what the Quill says of itself, the facts line,
+    and — installed — its settings. Drawn from the list alone when a row is
+    clicked, and from the plan on a phone. */
+function sheetHead({ name, plan, installed, newer, feature, here }) {
+  return `
+      <h1 class="large">${esc(name)}</h1>
+      <p class="quill-lede">${esc(plan.summary || "")}</p>
+      <p class="quill-facts">${sheetFacts({ plan, installed, newer })}</p>
+      ${installed ? settingsBox(name, feature, here) : ""}`;
+}
+
+/** The facts line: the version, who publishes it, its licence, and the chips
+    saying it is installed and whether the catalog has a newer one. */
+function sheetFacts({ plan, installed, newer }) {
+  return [
+    `v${esc(plan.version)}`, esc(plan.publisher || ""), esc(plan.license || ""),
+    installed ? `<span class="quill-chip on">v${esc(installed)} installed</span>` : "",
+    newer ? `<span class="quill-chip new">v${esc(plan.version)} in the catalog</span>` : "",
+  ].filter(Boolean).join(" · ");
+}
+
+/** The server's switch on the sheet, live: off takes the Quill's tabs out
+    of every client, and this window's bar is drawn again at once. */
+function wireSwitch(holder, { id, name, after }) {
+  const box = holder.querySelector(".server-switch input");
+  if (!box) return;
+  box.addEventListener("change", async () => {
+    box.disabled = true;
+    try {
+      const turned = await api("PATCH", featureUrl(id), { enabled: box.checked });
+      // "Everywhere" includes this window: the bar is drawn from what
+      // this account has, and that has just changed.
+      await loadFeatures();
+      await refreshQuills();
+      toast(turned.enabled ? `${name} is on.` : `${name} is off — its tabs are gone everywhere.`);
+      await after();
+    } catch (err) {
+      box.checked = !box.checked;
+      box.disabled = false;
+      toast(err.message);
+    }
+  });
+}
+
+/** The Quill's own settings: each screen it marked admin, drawn in its box by
+    the kit as the Quill's code draws it, its buttons live. */
+function wireSettings(holder, here) {
+  for (const box of holder.querySelectorAll(".quill-admin-screen")) {
+    const screen = here.screens.find((s) => s.id === box.dataset.screen);
+    if (!screen) continue;
+    embedView(box, { quill: here, screen, tab: "", base: "", embedded: true }, {});
+  }
 }
 
 /** An installed Quill's settings, first on its sheet: the server's switch,
