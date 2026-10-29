@@ -394,7 +394,7 @@ def test_a_server_quill_s_head_and_settings_are_drawn_from_the_list_at_once():
     read = split.index('here = await api("GET", quillUrl(id))')
     wired = split.index("if (here) wireSettings(holder, here);")
     assert head < read < wired < split.index("await buildSheet(id, { catalog: ctx.catalog, feature, here })")
-    assert "`<div class=\"quill-rest\">${loader(`Reading ${name}`)}</div></div>`" in split
+    assert '`<div class="quill-rest">${loader(`Reading ${name}`)}</div></div>`' in split
     assert 'holder.querySelector(".quill-rest").innerHTML = sheet.body;' in split
     assert 'holder.querySelector(".quill-facts").innerHTML = sheet.facts;' in split
     assert "sheet.wireBody(holder, after);" in split
