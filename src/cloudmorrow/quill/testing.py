@@ -36,6 +36,7 @@ import tempfile
 from pathlib import Path
 
 from cloudmorrow.quill import text as _text
+from cloudmorrow.quill import ui
 from cloudmorrow.quill.context import Record, Refused
 
 __all__ = ["Fetches", "Harness", "HandlerFailed", "Result", "View", "datamodels_folder"]
@@ -130,11 +131,10 @@ class View:
         def walk(node: dict) -> None:
             if node.get("ui") == kind:
                 found.append(node)
-            for key in ("children", "items"):
-                for child in node.get(key) or []:
-                    walk(child)
-            for tab in node.get("tabs") or []:
-                walk(tab["child"])
+            # The one reading of a tree's shape: a container's children, a
+            # menu's items, each tab's child, a split's side and main.
+            for child in ui.children(node):
+                walk(child)
 
         walk(self.tree)
         return found

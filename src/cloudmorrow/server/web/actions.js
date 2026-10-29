@@ -273,16 +273,33 @@ const LONG = new Set(["text", "markdown", "json"]);
 const needed = (f) => (f.required ? `<span class="act-needed" aria-label="needed">*</span>` : "");
 
 /** The form's fields, filled from *values* and then each field's default. */
-export function formFields(fields, values = {}, links = {}) {
+export function formFields(fields, values = {}, links = {}, people = []) {
   let out = "";
   let run = [];
   const flush = () => {
     if (run.length) out += `<div class="group fields">${run.join("")}</div>`;
     run = [];
   };
+  // Fields marked extra — Cc, Bcc — wait behind one link that names them,
+  // where the first of them would be, until it is pressed.
+  const extra = fields.filter((f) => f.extra);
+  let extraOpen = false;
   for (const f of fields) {
     const value = values[f.name] !== undefined ? values[f.name] : f.default;
-    if (f.kind === "enum") {
+    if (f.extra && !extraOpen) {
+      flush();
+      extraOpen = true;
+      out += `<button type="button" class="fields-more">${esc(extra.map((e) => e.label).join(", "))}</button>` +
+        `<div class="fields-extra" hidden>`;
+    } else if (!f.extra && extraOpen) {
+      flush();
+      extraOpen = false;
+      out += `</div>`;
+    }
+    if (f.suggest === "people") {
+      flush();
+      out += `<p class="group-label">${esc(f.label)}${needed(f)}</p>` + peopleWidget(f, value);
+    } else if (f.kind === "enum") {
       flush();
       out += `<p class="group-label">${esc(f.label)}${needed(f)}</p>` + segments(f, value);
     } else if (LONG.has(f.kind)) {
@@ -295,11 +312,131 @@ export function formFields(fields, values = {}, links = {}) {
     }
   }
   flush();
+  if (extraOpen) out += `</div>`;
   return out;
+}
+
+// -- people ---------------------------------------------------------------------------------
+// A field that suggests the server's people as it is typed: names become
+// chips, with the entry box after them; what the field sends is the names
+// with commas between, so the handler reads it like any string. A name
+// that is nobody here is kept as typed — an address outside — and the
+// field's `outside` warning is shown while one is in it.
+let peopleKnown = null;
+export async function peopleList() {
+  if (!peopleKnown) {
+    peopleKnown = api("GET", "/api/people").catch(() => []);
+  }
+  return peopleKnown;
+}
+
+const splitNames = (text) => String(text || "").split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
+
+function peopleWidget(f, value) {
+  const names = splitNames(value);
+  return `<div class="people-field" data-people="${esc(f.name)}" data-outside="${esc(f.outside || "")}">` +
+    `<div class="people-chips" role="list">${names.map(peopleChip).join("")}` +
+    `<input type="text" class="people-entry" autocomplete="off" autocapitalize="off" spellcheck="false"` +
+    ` aria-label="${esc(f.label)}" placeholder="${names.length ? "" : f.required ? "A name, or an address" : "optional"}"></div>` +
+    `<input type="hidden" data-field="${esc(f.name)}" value="${esc(names.join(", "))}">` +
+    `<div class="people-suggest" role="listbox" hidden></div>` +
+    `<p class="people-note" hidden>${esc(f.outside || "")}</p></div>`;
+}
+
+const peopleChip = (name) =>
+  `<span class="people-chip${name.includes("@") ? " outside" : ""}" role="listitem" data-name="${esc(name)}">${esc(name)}` +
+  `<button type="button" class="people-drop" aria-label="Remove ${esc(name)}">×</button></span>`;
+
+async function wirePeople(field) {
+  const entry = field.querySelector(".people-entry");
+  const chips = field.querySelector(".people-chips");
+  const hidden = field.querySelector("[data-field]");
+  const suggest = field.querySelector(".people-suggest");
+  const note = field.querySelector(".people-note");
+  // The server's people, read once for the page (formFields had them too,
+  // for the first drawing; here they are read again, cached, for the offers).
+  const people = await peopleList();
+  const names = () => [...chips.querySelectorAll(".people-chip")].map((c) => c.dataset.name);
+  const sync = () => {
+    const typed = entry.value.trim();
+    hidden.value = [...names(), ...(typed ? [typed] : [])].join(", ");
+    const outside = field.dataset.outside && [...names(), typed].some((n) => n.includes("@"));
+    note.hidden = !outside;
+  };
+  const add = (name) => {
+    name = name.trim().replace(/,$/, "");
+    if (!name || names().includes(name)) return;
+    entry.insertAdjacentHTML("beforebegin", peopleChip(name));
+    entry.placeholder = "";
+  };
+  const offer = () => {
+    const typed = entry.value.trim().toLowerCase();
+    const have = new Set(names());
+    const found = typed ? people.filter((p) => !have.has(p.username) &&
+      (p.username.toLowerCase().startsWith(typed) || (p.display_name || "").toLowerCase().includes(typed))) : [];
+    suggest.innerHTML = found.slice(0, 8).map((p) =>
+      `<button type="button" role="option" data-name="${esc(p.username)}"><b>${esc(p.username)}</b>` +
+      (p.display_name && p.display_name !== p.username ? ` <span>${esc(p.display_name)}</span>` : "") + `</button>`).join("");
+    suggest.hidden = !found.length;
+  };
+  const commit = () => {
+    for (const part of splitNames(entry.value)) add(part);
+    entry.value = "";
+    suggest.hidden = true;
+    sync();
+  };
+  entry.addEventListener("input", () => { offer(); sync(); });
+  entry.addEventListener("keydown", (event) => {
+    if (event.key === "," || event.key === "Enter" || event.key === "Tab" || event.key === " ") {
+      if (event.key === "Tab" && !entry.value.trim()) return;
+      if (event.key === "Enter" && !suggest.hidden && suggest.firstElementChild) {
+        event.preventDefault();
+        add(suggest.firstElementChild.dataset.name);
+        entry.value = "";
+        suggest.hidden = true;
+        sync();
+        return;
+      }
+      if (!entry.value.trim() && event.key !== "Tab") { event.preventDefault(); return; }
+      event.preventDefault();
+      commit();
+    } else if (event.key === "Backspace" && !entry.value) {
+      const last = chips.querySelector(".people-chip:last-of-type");
+      if (last) last.remove();
+      sync();
+    }
+  });
+  entry.addEventListener("blur", () => setTimeout(commit, 150));
+  suggest.addEventListener("mousedown", (event) => event.preventDefault());
+  suggest.addEventListener("click", (event) => {
+    const option = event.target.closest("[data-name]");
+    if (!option) return;
+    add(option.dataset.name);
+    entry.value = "";
+    suggest.hidden = true;
+    sync();
+    entry.focus();
+  });
+  chips.addEventListener("click", (event) => {
+    const drop = event.target.closest(".people-drop");
+    if (drop) { drop.closest(".people-chip").remove(); sync(); entry.focus(); return; }
+    if (event.target === chips) entry.focus();
+  });
+  sync();
 }
 
 /** Choosing a lane of an enum: one lit at a time, as on the sheet. */
 export function wireFields(root) {
+  for (const field of root.querySelectorAll(".people-field")) wirePeople(field);
+  for (const more of root.querySelectorAll(".fields-more")) {
+    more.addEventListener("click", () => {
+      const hidden = more.nextElementSibling;
+      if (hidden) hidden.hidden = false;
+      more.remove();
+      const first = hidden && hidden.querySelector("input:not([type=hidden]), textarea, select");
+      if (first) first.focus();
+    });
+  }
   for (const group of root.querySelectorAll(".segments")) {
     group.addEventListener("click", (event) => {
       const button = event.target.closest("button");
@@ -421,11 +558,12 @@ export async function applyEffects(effects, { quill, record = "", here = null, a
 // that is the point of it — the sheet's amber, as Done is a sheet's.
 async function openForm(quill, action, { record, args, here, after }) {
   const links = await linksFor(quill, action.fields);
+  const people = action.fields.some((f) => f.suggest === "people") ? await peopleList() : [];
   const { backdrop, sheet, close } = openSheet(
     `<form class="act-form record" novalidate>` +
     `<p class="act-sheet-title">${esc(action.label)}</p>` +
     (action.description ? `<p class="act-description">${esc(action.description)}</p>` : "") +
-    formFields(action.fields, args, links) +
+    formFields(action.fields, args, links, people) +
     `<p class="act-error" role="alert" hidden></p>` +
     `<div class="act-buttons"><button type="button" class="act-button" data-cancel>Cancel</button>` +
     `<button type="submit" class="act-button ${action.tone === "danger" ? "danger" : "primary"}">${esc(action.label)}</button></div>` +
@@ -435,7 +573,7 @@ async function openForm(quill, action, { record, args, here, after }) {
   const showError = (text) => { errorEl.textContent = text; errorEl.hidden = !text; };
   wireFields(form);
   form.querySelector("[data-cancel]").addEventListener("click", close);
-  const first = form.querySelector("input:not([type=checkbox]), textarea, select");
+  const first = form.querySelector("input:not([type=checkbox]):not([type=hidden]), textarea, select");
   if (first && matchMedia("(hover: hover)").matches) first.focus();
   form.addEventListener("submit", async (event) => {
     event.preventDefault();

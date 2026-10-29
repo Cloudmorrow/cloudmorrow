@@ -34,6 +34,10 @@
 .view-row, .view-columns {
     height: auto;
 }
+.view-split > .view-split-side { width: 1fr; }
+.view-split > .view-split-main { width: 2fr; }
+.view-split .view-cards { grid-size: 1; }
+.view-card.-current { border-left: wide $accent; }
 
 .view-row > * {
     width: auto;

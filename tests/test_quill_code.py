@@ -573,3 +573,39 @@ def test_a_table_or_cards_may_go_to_a_screen_of_the_quills_own():
     ui.check(ui.stack(table), actions=set(), screens={"one", "post"})
     with pytest.raises(TreeError, match="goes to 'two'"):
         ui.check(ui.stack(ui.cards(rows, title="subject", go="two")), actions=set(), screens={"one"})
+
+
+def test_a_form_field_may_suggest_people_warn_of_outsiders_and_wait_behind_more():
+    """`suggest`, `outside` and `extra` reach the client on the field, and are checked."""
+    manifest = parse_manifest(
+        _manifest(
+            'code = "quill.py"\n[[actions]]\nid = "send"\nlabel = "Send"\n[actions.fields]\n'
+            'to = { kind = "string", required = true, suggest = "people", outside = "Outside the server" }\n'
+            'cc = { kind = "string", suggest = "people", extra = true }\n'
+        )
+    )
+    (action,) = manifest.actions
+    to, cc = action["fields"]
+    assert to["suggest"] == "people" and to["outside"] == "Outside the server" and "extra" not in to
+    assert cc["extra"] is True
+    with pytest.raises(QuillError, match="suggest is"):
+        parse_manifest(
+            _manifest(
+                'code = "quill.py"\n[[actions]]\nid = "a"\nlabel = "A"\n[actions.fields]\n'
+                'to = { kind = "string", suggest = "robots" }\n'
+            )
+        )
+    with pytest.raises(QuillError, match="outside goes with suggest"):
+        parse_manifest(
+            _manifest(
+                'code = "quill.py"\n[[actions]]\nid = "a"\nlabel = "A"\n[actions.fields]\n'
+                'to = { kind = "string", outside = "x" }\n'
+            )
+        )
+    with pytest.raises(QuillError, match="is a string"):
+        parse_manifest(
+            _manifest(
+                'code = "quill.py"\n[[actions]]\nid = "a"\nlabel = "A"\n[actions.fields]\n'
+                'to = { kind = "text", suggest = "people" }\n'
+            )
+        )

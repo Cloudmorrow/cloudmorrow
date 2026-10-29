@@ -104,6 +104,14 @@ class Field:
     # anybody's record — pinning a message in a channel they run. Only on a
     # datamodel that lives in a space.
     managed: bool = False
+    # How a form draws it, for an action's field: `suggest = "people"` offers
+    # the server's people as it is typed (names with commas between);
+    # `outside` is a warning shown when what is typed is not one of them —
+    # an address outside the server; `extra` keeps it behind a "more" on the
+    # form until wanted, as Cc and Bcc are.
+    suggest: str = ""
+    outside: str = ""
+    extra: bool = False
 
     def label_for(self, value: str) -> str:
         """An enum value as a person reads it."""
@@ -134,6 +142,12 @@ class Field:
             row["secret"] = True
         if self.managed:
             row["managed"] = True
+        if self.suggest:
+            row["suggest"] = self.suggest
+        if self.outside:
+            row["outside"] = self.outside
+        if self.extra:
+            row["extra"] = True
         return row
 
 
@@ -339,6 +353,9 @@ def _field(where: str, name: str, spec: object) -> Field:
         "description",
         "secret",
         "managed",
+        "suggest",
+        "outside",
+        "extra",
     }
     unknown = set(spec) - known
     if unknown:
@@ -372,6 +389,19 @@ def _field(where: str, name: str, spec: object) -> Field:
     managed = spec.get("managed", False)
     if not isinstance(managed, bool):
         raise DatamodelError(f"{where}: {name!r} managed is true or false")
+    suggest = str(spec.get("suggest", "") or "")
+    if suggest not in ("", "people"):
+        raise DatamodelError(f'{where}: {name!r} suggest is "people"')
+    if suggest and kind != "string":
+        raise DatamodelError(f"{where}: {name!r} suggests people, so it is a string: names with commas between")
+    outside = spec.get("outside", "")
+    if not isinstance(outside, str):
+        raise DatamodelError(f"{where}: {name!r} outside is the warning to show, in words")
+    if outside and not suggest:
+        raise DatamodelError(f"{where}: {name!r} outside goes with suggest")
+    extra = spec.get("extra", False)
+    if not isinstance(extra, bool):
+        raise DatamodelError(f"{where}: {name!r} extra is true or false")
     default = spec.get("default")
     if kind == "enum" and default is not None and str(default) not in values:
         raise DatamodelError(f"{where}: {name!r} default {default!r} is not one of its values")
@@ -390,6 +420,9 @@ def _field(where: str, name: str, spec: object) -> Field:
         stamp_value=str(stamp.get("value", "")),
         secret=secret,
         managed=managed,
+        suggest=suggest,
+        outside=outside,
+        extra=extra,
     )
 
 

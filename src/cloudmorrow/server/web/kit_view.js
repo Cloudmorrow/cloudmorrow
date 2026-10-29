@@ -28,8 +28,8 @@ import {
   WEEKDAYS, addDays, addMonths, dateOf, longDay, monthOf, today, weeksOf,
 } from "./kit_calendar.js";
 import {
-  choose, contextMenus, findAction, formFields, hideFromBar, linksFor, onRedrawHere, press, readFields,
-  recordChoices, run, said, screenAt, wireFields,
+  choose, contextMenus, findAction, formFields, hideFromBar, linksFor, onRedrawHere, peopleList, press,
+  readFields, recordChoices, run, said, screenAt, wireFields,
 } from "./actions.js";
 import { ask } from "./dialog.js";
 
@@ -111,6 +111,7 @@ async function draw(v) {
   if (!v.root.isConnected) return;
   v.tree = trimmed(v, answer.tree);
   await fetchLinks(v, v.tree);
+  await fetchPeople(v, v.tree);
   if (v.root.isConnected) paint(v);
 }
 
@@ -197,6 +198,20 @@ function* walk(n) {
   yield n;
   for (const child of n.children || n.items || []) yield* walk(child);
   for (const tab of n.tabs || []) yield* walk(tab.child);
+  if (n.ui === "split") { yield* walk(n.side); yield* walk(n.main); }
+}
+
+/** The server's people, once, when a form in the tree suggests them. */
+async function fetchPeople(v, tree) {
+  if (v.people) return;
+  for (const n of walk(tree)) {
+    if (n.ui !== "form") continue;
+    const action = findAction(v.at.quill.id, n.action);
+    if (action && action.fields.some((f) => f.suggest === "people")) {
+      v.people = await peopleList();
+      return;
+    }
+  }
 }
 
 async function fetchLinks(v, tree) {
@@ -252,6 +267,12 @@ const DRAW = {
   columns: (v, n, p) =>
     `<div class="v-columns" style="--n: ${Math.max(1, Math.min(n.children.length, 4))}">` +
     n.children.map((c, i) => `<div class="v-column">${node(v, c, `${p}.${i}`)}</div>`).join("") + `</div>`,
+  // A list beside what is chosen in it. On a phone only one of the two has
+  // room: `show` says which, and the stylesheet hides the other there.
+  split: (v, n, p) =>
+    `<div class="v-split" data-show="${esc(n.show === "main" ? "main" : "side")}">` +
+    `<div class="v-split-side">${node(v, n.side, `${p}.0`)}</div>` +
+    `<div class="v-split-main">${node(v, n.main, `${p}.1`)}</div></div>`,
   tabs: drawTabs,
   text: (v, n) => {
     const style = n.style || "body";
@@ -446,7 +467,7 @@ function drawForm(v, n) {
   if (!action) return "";
   v.forms.push({ n, action });
   return `<form class="v-form record" novalidate data-form="${v.forms.length - 1}">` +
-    formFields(action.fields, n.values || {}, v.formLinks[action.id] || {}) +
+    formFields(action.fields, n.values || {}, v.formLinks[action.id] || {}, v.people || []) +
     `<p class="act-error" role="alert" hidden></p>` +
     `<div class="act-buttons"><button type="submit" class="act-button ${toneClass(v, action.tone === "danger" ? "danger" : "primary")}">` +
     `${esc(n.submit || action.label)}</button></div></form>`;
@@ -515,7 +536,9 @@ function drawCards(v, n) {
       (n.subtitle && say(v, r, n.subtitle) ? `<span class="v-card-sub">${esc(say(v, r, n.subtitle))}</span>` : "") +
       (n.body && say(v, r, n.body) ? `<span class="v-card-body">${esc(say(v, r, n.body))}</span>` : "");
     const menu = menuOn(v, r, hash);
-    return hash ? `<a class="v-card" ${menu} href="${esc(hash)}">${inner}</a>` : `<div class="v-card" ${menu}>${inner}</div>`;
+    const cls = `v-card${n.current && n.current === r.id ? " current" : ""}`;
+    return hash ? `<a class="${cls}" ${menu} href="${esc(hash)}"${n.current === r.id ? ' aria-current="true"' : ""}>${inner}</a>`
+      : `<div class="${cls}" ${menu}>${inner}</div>`;
   }).join("") + `</div>`;
 }
 

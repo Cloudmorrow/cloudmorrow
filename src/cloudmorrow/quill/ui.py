@@ -115,6 +115,15 @@ def columns(*children) -> dict:
     return _node("columns", children=_children(children))
 
 
+def split(side, main, *, show: str = "side") -> dict:
+    """A list beside what is chosen in it: *side* narrow on the left, *main* wide
+    on the right, on a wide screen. A phone has room for one: *show* says which,
+    "side" or "main" — the list until something is chosen, then that."""
+    if show not in ("side", "main"):
+        raise TreeError("split: show is side or main")
+    return _node("split", side=side, main=main, show=show)
+
+
 def tabs(*pairs, **named) -> dict:
     """`tabs(("Open", tree), ("Done", tree))`, or `tabs(Open=tree, Done=tree)`."""
     items = list(pairs) + list(named.items())
@@ -256,10 +265,13 @@ def cards(
     go: str | None = None,
     param: str = "record",
     params: dict | None = None,
+    current: str | None = None,
 ) -> dict:
     """Records, a card each: *title*, *subtitle*, *body* and *badge* are field names.
 
     With *go*, opening a card goes to that screen, as a table's rows do.
+    *current* is the id of the one that is open, lit as such: a list beside
+    what is chosen in it.
     """
     return _node(
         "cards",
@@ -273,6 +285,7 @@ def cards(
         go=go,
         param=param if go else None,
         params=dict(params) if go and params else None,
+        current=str(current) if current else None,
     )
 
 
@@ -339,6 +352,7 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
     "stack": {"children": (list, True), "gap": (str, False)},
     "row": {"children": (list, True), "wrap": (bool, False)},
     "columns": {"children": (list, True)},
+    "split": {"side": (dict, True), "main": (dict, True), "show": (str, False)},
     "tabs": {"tabs": (list, True)},
     "text": {"text": (str, True), "style": (str, False)},
     "markdown": {"text": (str, True)},
@@ -381,6 +395,7 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
         "go": (str, False),
         "param": (str, False),
         "params": (dict, False),
+        "current": (str, False),
     },
     "gallery": {
         "records": (list, True),
@@ -424,6 +439,8 @@ def children(node) -> list:
     kind = node.get("ui")
     if kind == "tabs":
         return [tab.get("child") or {} for tab in node.get("tabs") or [] if isinstance(tab, dict)]
+    if kind == "split":
+        return [node.get("side") or {}, node.get("main") or {}]
     key = CONTAINERS.get(kind)
     return list(node.get(key) or []) if key else []
 

@@ -73,6 +73,7 @@ RENDERERS: dict[str, str] = {
     "stack": "draw_stack",
     "row": "draw_row",
     "columns": "draw_columns",
+    "split": "draw_split",
     "tabs": "draw_tabs",
     "text": "draw_text",
     "markdown": "draw_markdown",
@@ -632,11 +633,17 @@ class ViewCard(Static, can_focus=True):
         self.node = node
         self.model = model
         self.add_class("view-card")
+        # The one that is open, when the cards stand beside it.
+        self.current = bool(node.get("current")) and node.get("current") == record.get("id")
+        if self.current:
+            self.add_class("-current")
         self.update(self.render_card())
 
     def render_card(self) -> Text:
         fields = self.record.get("fields") or {}
         text = Text()
+        if self.current:
+            text.append("▶ ", style=ACCENT)
         title = fields.get(self.node["title"])
         text.append(str(title) if title not in (None, "") else "(untitled)", style=f"bold {TEXT}")
         if self.node.get("badge"):
@@ -886,6 +893,12 @@ class Drawer:
     def draw_columns(self, node: dict, path: str) -> Widget:
         columns = [Vertical(child, classes="view-column") for child in self._children(node, "children", path)]
         return Horizontal(*columns, id=path, classes="view-columns")
+
+    def draw_split(self, node: dict, path: str) -> Widget:
+        """A list beside what is chosen in it: the side a third, the main the rest."""
+        side = Vertical(self.draw(node.get("side") or {}, f"{path}-0"), classes="view-column view-split-side")
+        main = Vertical(self.draw(node.get("main") or {}, f"{path}-1"), classes="view-column view-split-main")
+        return Horizontal(side, main, id=path, classes="view-columns view-split")
 
     def draw_tabs(self, node: dict, path: str) -> Widget:
         tabs = [

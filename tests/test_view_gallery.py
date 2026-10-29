@@ -54,3 +54,16 @@ async def test_in_the_terminal_the_number_keys_rate_the_row_you_are_on(fleet):  
         await pilot.pause()
         assert pressed and pressed[0]["action"] == "log-service" and pressed[0]["args"] == {"stars": 4}
         assert pressed[0]["record"]["id"] == van["id"]
+
+
+def test_a_split_and_the_current_card_are_said_as_text():
+    from cloudmorrow.quill import text as _text
+    from cloudmorrow.quill import ui
+
+    rows = [{"id": "a", "model": "m", "fields": {"t": "One"}}, {"id": "b", "model": "m", "fields": {"t": "Two"}}]
+    tree = ui.split(ui.cards(rows, title="t", current="b"), ui.text("Two, open"), show="main")
+    said = _text.render(ui.check(tree))
+    assert "• One" in said and "▶ Two" in said and "Two, open" in said
+    assert ui.children(tree) == [tree["side"], tree["main"]]
+    with pytest.raises(ui.TreeError, match="show is side or main"):
+        ui.split(ui.text("a"), ui.text("b"), show="both")

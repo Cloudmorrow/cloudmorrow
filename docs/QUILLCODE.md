@@ -102,6 +102,12 @@ assistant = true                      # false: not an assistant's tool
 [actions.fields]
 date = { kind = "date", required = true }
 km   = { kind = "int", required = true }
+# A string field may say `suggest = "people"`: the form offers the server's
+# people as it is typed, names with commas between; `outside = "…"` is the
+# warning shown while a name that is nobody here — an address — is in it.
+# A field with `extra = true` waits behind one link naming the extra fields
+# (Cc, Bcc) until it is pressed. All three are how a form is drawn; the
+# handler gets strings as ever.
 
 [[hooks]]
 on = "fleet.visit"
@@ -276,11 +282,12 @@ one:
 | primitive | what it is |
 | --- | --- |
 | `stack`, `row`, `columns`, `tabs` | layout; columns stack on a phone, rows wrap |
+| `split(side, main, show=)` | a list beside what is chosen in it: `side` narrow on the left, `main` wide on the right, on a computer; a phone draws only the one `show` names (`"side"` until something is chosen, then `"main"`) |
 | `text(style=)`, `markdown`, `image`, `badge`, `stat`, `empty`, `divider` | content |
 | `field(record, name, edit=)` | one field of a record, with its kind's widget; editable saves as it changes |
 | `form(action, values=, record=)` | an action's form, drawn in place |
 | `button(label, action= \| open= \| go=)`, `menu` | run an action, open a record, go to a screen |
-| `table(records, columns=, actions=, go=, param=)`, `cards(records, title=, …, go=, param=)` | records, a row or a card each; opening one shows its sheet — or, with `go`, a screen of the Quill's own, with the record's id as `param` |
+| `table(records, columns=, actions=, go=, param=)`, `cards(records, title=, …, go=, param=, current=)` | records, a row or a card each; opening one shows its sheet — or, with `go`, a screen of the Quill's own, with the record's id as `param`; `current` is the id of the card that is open, lit as such |
 | `gallery(records, title=, subtitle=, badge=, stars=, rate=, actions=)` | records as tiles with their own picture (a file's thumbnail; a video's is a frame of it) and five stars; pressing a star runs `rate` with `stars=` |
 | `lanes(records, field=, title=)` | records in columns by an enum; dragging moves the record, as a board does |
 | `month(records, date=, title=)` | records on a month |
