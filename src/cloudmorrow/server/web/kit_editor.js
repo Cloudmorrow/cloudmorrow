@@ -32,7 +32,7 @@
 import {
   SAVE_DELAY, SEARCH_DELAY, api, apiRaw, app, back, baseName, encodePath, esc, fileStem, folderOf,
   formatDate, heading, icons, joinPath, mount, nav, occupy, previousHash, recordsUrl, renderRoute,
-  replace, seconds, sectionOf, setStatus, store, tabs, toast, vacate, wireShell,
+  litDone, replace, seconds, sectionOf, setStatus, store, tabs, toast, vacate, wireSaveKey, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
 import { mayWrite } from "./kit.js";
@@ -550,6 +550,7 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
   ed.statusEl = box.querySelector(".stamp .status");
   const done = app.querySelector(".nav .done");
   const del = app.querySelector(".nav .delete");
+  ed.doneEl = done;
 
   ed.changed = () => {
     ed.dirty = true;
@@ -580,7 +581,7 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
   box.parentElement.addEventListener("click", (event) => {
     if (event.target === box || event.target === box.parentElement) focusBody(ed, { end: true });
   });
-  box.addEventListener("focusin", () => { done.hidden = false; del.hidden = true; });
+  box.addEventListener("focusin", () => { done.hidden = false; litDone(ed); del.hidden = true; });
   box.addEventListener("focusout", () => {
     setTimeout(() => {
       if (!box.contains(document.activeElement)) { done.hidden = true; del.hidden = false; }
@@ -588,6 +589,7 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
     if (ed.dirty) { clearTimeout(ed.timer); saveEditor(ed); }
   });
   done.addEventListener("click", () => document.activeElement && document.activeElement.blur());
+  wireSaveKey(ed, box, saveEditor);
   del.addEventListener("click", async () => {
     if (ed.isNew) { back(parent); return; }
     if (!await ask(`Delete “${ed.stem}”?`)) return;

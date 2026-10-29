@@ -265,6 +265,8 @@ svg { display: block; }
   font-family: var(--display);
   font-weight: 600;
 }
+/* Dark while there is nothing to save: the caret moved, nothing changed. */
+.nav button.strong:disabled { opacity: .45; box-shadow: none; }
 .nav button.danger { color: var(--bar-bad); }
 .nav .back svg { margin-left: -6px; }
 /* Who you are, in the corner: the one tab that is on every screen. */

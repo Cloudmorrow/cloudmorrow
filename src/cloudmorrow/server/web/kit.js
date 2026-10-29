@@ -18,7 +18,7 @@
 
 import {
   SAVE_DELAY, api, app, back, esc, fitArea, formatDate, heading, icons, localMinute, mount, nav, occupy,
-  recordsUrl, renderRoute, replace, seconds, session, setStatus, store, tabs, toast, vacate,
+  litDone, recordsUrl, renderRoute, replace, seconds, session, setStatus, store, tabs, toast, vacate, wireSaveKey,
   wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
@@ -931,6 +931,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   const done = app.querySelector(".nav .done");
   const del = app.querySelector(".nav .delete");
   ed.statusEl = app.querySelector(".stamp .status");
+  ed.doneEl = done;
   ed.box = box;
 
   const areas = [...box.querySelectorAll("textarea")];
@@ -988,7 +989,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   const typing = (el) => el && (el.tagName === "TEXTAREA" || el === titleEl ||
     (el.tagName === "INPUT" && ["text", "email", "tel", "url", "number", "password"].includes(el.type)));
   box.addEventListener("focusin", (event) => {
-    if (typing(event.target)) { done.hidden = false; if (del) del.hidden = true; }
+    if (typing(event.target)) { done.hidden = false; litDone(ed); if (del) del.hidden = true; }
   });
   box.addEventListener("focusout", () => {
     setTimeout(() => {
@@ -997,6 +998,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
     if (ed.dirty) { clearTimeout(ed.timer); saveSheet(ed); }
   });
   done.addEventListener("click", () => document.activeElement && document.activeElement.blur());
+  wireSaveKey(ed, box, saveSheet);
 
   if (del) del.addEventListener("click", async () => {
     // What goes with it, said before rather than found out after.

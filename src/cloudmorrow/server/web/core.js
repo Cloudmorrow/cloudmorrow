@@ -939,9 +939,27 @@ export function wireShell() {
 
 // The word after the date on an editor: Saving…, Saved, Not saved.
 export function setStatus(ed, text, bad = false) {
+  litDone(ed);
   if (!ed.statusEl) return;
   ed.statusEl.textContent = text;
   ed.statusEl.classList.toggle("bad", bad);
+}
+
+/** Done is lit while there is something typed and not yet saved, and dark
+ * otherwise: moving the caret about changes nothing, and says so. */
+export function litDone(ed) {
+  if (ed.doneEl) ed.doneEl.disabled = !ed.dirty;
+}
+
+/** Ctrl+S, or ⌘S, saves what is being typed now rather than after the pause;
+ * once saved, Done goes dark again. */
+export function wireSaveKey(ed, box, save) {
+  box.addEventListener("keydown", (event) => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== "s") return;
+    event.preventDefault();
+    clearTimeout(ed.timer);
+    save(ed);
+  });
 }
 
 // -- the keyboard ---------------------------------------------------------------------------
