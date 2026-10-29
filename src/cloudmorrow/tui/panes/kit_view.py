@@ -67,6 +67,7 @@ from cloudmorrow.tui.quill_actions import (
     run_action,
 )
 from cloudmorrow.tui.theme import BAD, MUTED
+from cloudmorrow.tui.widgets.toolbar import Action
 from cloudmorrow.tui.widgets.view_nodes import (
     Drawer,
     FieldNode,
@@ -86,6 +87,8 @@ from cloudmorrow.tui.widgets.view_nodes import (
 class ViewPane(KitPane):
     """A screen a Quill's code draws: its tree, asked for again after everything done in it."""
 
+    BINDINGS = [("n", "fire('compose')", "New")]
+
     def __init__(self, quill: dict, screen: dict, **kwargs: Any) -> None:
         # A view need not be about one datamodel; KitPane expects one.
         super().__init__(quill, {**screen, "model": screen.get("model") or ""}, **kwargs)
@@ -102,6 +105,14 @@ class ViewPane(KitPane):
         # The kit's own new and delete are not a view's: its buttons say what it does.
         self.refused = set(KitPane.WRITING)
         self.ACTIONS = ()
+        # Its pen, when the manifest names one: the action `compose` says, on
+        # the toolbar and on n, as a list's New is.
+        compose = screen.get("compose") or {}
+        self.compose_action = str(compose.get("action") or "")
+        if self.compose_action:
+            self.ACTIONS = (Action("compose", str(compose.get("label") or "New"), "n", variant="primary"),)
+        else:
+            self.refused.add("compose")
 
     @property
     def all_models(self) -> dict:
@@ -197,6 +208,10 @@ class ViewPane(KitPane):
     def on_month_node_turned(self, event: MonthNode.Turned) -> None:
         event.stop()
         self.kept[str(event.month.id)] = event.month.shown
+
+    def act_compose(self) -> None:
+        if self.compose_action:
+            self.act_on({"action": self.compose_action})
 
     @work(group="ui")
     async def act_on(self, node: dict) -> None:

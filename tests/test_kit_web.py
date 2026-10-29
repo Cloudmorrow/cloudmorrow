@@ -618,3 +618,27 @@ def test_a_form_suggests_people_warns_of_outsiders_and_keeps_extra_fields_behind
         in css
     )
     assert ".v-card.current {" in css
+
+
+def test_typed_words_run_from_the_left_on_a_sheet_row():
+    """A string, email, url or phone box on a sheet row is left-aligned: typing
+    into a right-aligned box reads as right-to-left. Numbers, dates and choices
+    keep to the right, where a row's value sits."""
+    css = KIT_CSS
+    assert '.record .field input:not([type="checkbox"]),' in css
+    left = css.split('.record .field input[type="text"],', 1)[1].split("}", 1)[0]
+    assert "text-align: left;" in left
+    for kind in ("email", "url", "tel"):
+        assert f'.record .field input[type="{kind}"],' in css, kind
+    assert '.record .field input[type="number"]' not in left and '.record .field input[type="date"]' not in left
+
+
+def test_a_views_pen_is_drawn_in_the_heading_like_a_lists_new():
+    view = (WEB / "kit_view.js").read_text(encoding="utf-8")
+    assert "const compose = at.screen.compose && findAction(at.quill.id, at.screen.compose.action);" in view
+    assert (
+        '<button class="compose" aria-label="${esc(penLabel)}" title="${esc(penLabel)}">${icons.compose}</button>'
+        in view
+    )
+    assert 'if (pen && compose) pen.addEventListener("click", () => press(at.quill, compose, ' in view
+    assert "if (v.at.screen.compose) pressed.add(v.at.screen.compose.action);" in view

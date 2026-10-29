@@ -609,3 +609,22 @@ def test_a_form_field_may_suggest_people_warn_of_outsiders_and_wait_behind_more(
                 'to = { kind = "text", suggest = "people" }\n'
             )
         )
+
+
+def test_a_view_may_name_its_pen(fleet):
+    """`compose` on a view is one of the Quill's actions, told to the client with the screen."""
+    client, admin, _ = fleet
+    quill = next(q for q in client.get("/api/quills", headers=admin).json() if q["id"] == "fleet")
+    garage = next(s for s in quill["screens"] if s["id"] == "garage")
+    assert garage["compose"] == {"action": "add-van", "label": "New van"}
+    with pytest.raises(QuillError, match="compose is"):
+        parse_manifest(
+            _manifest('code = "quill.py"\n[[screens]]\nid = "home"\nlabel = "Home"\nview = "home"\ncompose = "send"\n')
+        )
+    with pytest.raises(QuillError, match="compose is"):
+        parse_manifest(
+            _manifest(
+                'code = "quill.py"\n[[screens]]\nid = "home"\nlabel = "Home"\nview = "home"\n'
+                'compose = { action = "nope" }\n[[actions]]\nid = "send"\nlabel = "Send"\n'
+            )
+        )

@@ -193,6 +193,11 @@ what each element needs:
 | `data` | nothing: every datamodel the Quill has, or `models` (a list of ids) | the datamodels by domain, the records of one, the sheet of each — to look at | the same, wider | the datamodels down the left, a table of the records of one | `cm <quill> list [datamodel]`, `show <datamodel> <id>` |
 | `timeline` | `model` (the projects), `pieces`, optional `effects`, `media` (a share and a folder: the material), `frames` (an api that draws frames), `export` (an action); the fields are [TIMELINE.md](TIMELINE.md)'s | the projects, then the viewer over the tracks, the material as a sheet | the material, the viewer and the tracks together, live video with sound | frames where the terminal shows pictures, the tracks as rows of text, every edit on a key | `cm <quill> list`, `add`, `show`, `cut`, `trim`, `move`, `rm`, `frame`, `export` |
 
+A `view` may name its pen: `compose = { action = "send", label = "New mail" }`
+is one of the Quill's actions drawn in the heading as a list's New is — the
+pen beside the title on the phone and the web, `n` and the toolbar's one
+button in the terminal — and on no bar under the title.
+
 A screen with `admin = true` is an administrator's alone: the server's
 settings for the Quill — a mail domain, an outside account everybody's
 mail goes through — rather than a tab on everybody's menu. Nobody else is

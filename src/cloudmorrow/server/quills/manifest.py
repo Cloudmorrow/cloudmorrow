@@ -387,6 +387,20 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
         if kit == "view":
             if not str(screen.get("label", "")).strip():
                 raise QuillError(f"{where}: screen {screen['id']!r} is a view, so it says its label")
+            # Its pen: one of the Quill's actions, drawn in the heading as a
+            # list's New is, and on no bar — `{ action = "send", label = "New mail" }`.
+            compose = screen.get("compose")
+            if compose is not None:
+                known = {a["id"] for a in code.actions}
+                if (
+                    not isinstance(compose, dict)
+                    or set(compose) - {"action", "label"}
+                    or compose.get("action") not in known
+                    or not isinstance(compose.get("label", ""), str)
+                ):
+                    raise QuillError(
+                        f"{where}: screen {screen['id']!r} compose is {{ action = <one of its actions>, label = … }}"
+                    )
             continue
         if kit == "data":
             # The Quill's datamodels, every one, to look at: it names none.

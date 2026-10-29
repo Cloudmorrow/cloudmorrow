@@ -21,7 +21,7 @@
    back when the view is drawn again. */
 
 import {
-  api, apiRaw, app, esc, go, heading, mount, nav, recordsUrl, tabs, toast, wireShell,
+  api, apiRaw, app, esc, go, heading, icons, mount, nav, recordsUrl, tabs, toast, wireShell,
 } from "./core.js";
 import { canDrag, fieldOf, mayWrite, read, segments, sheetHash, spoken, titleOf, widget } from "./kit.js";
 import {
@@ -44,15 +44,22 @@ const glyphs = {
 
 export async function renderView(at, arg) {
   const params = Object.fromEntries(new URLSearchParams(arg || ""));
+  // The screen's pen: the action its manifest names as `compose`, drawn in
+  // the heading as a list's New is, and left off the bar under it.
+  const compose = at.screen.compose && findAction(at.quill.id, at.screen.compose.action);
+  const penLabel = compose ? (at.screen.compose.label || compose.label) : "";
   mount(nav({ title: at.screen.label }) + `
     <main class="view-screen">
-      ${heading(at.screen.label)}
+      ${heading(at.screen.label, compose
+    ? `<button class="compose" aria-label="${esc(penLabel)}" title="${esc(penLabel)}">${icons.compose}</button>` : "")}
       <div class="quill-view" aria-busy="true"></div>
     </main>` + tabs(at.tab));
   wireShell();
   const root = app.querySelector(".quill-view");
   const v = await embedView(root, at, params);
   onRedrawHere({ alive: () => root.isConnected, draw: v.draw });
+  const pen = app.querySelector(".heading .compose");
+  if (pen && compose) pen.addEventListener("click", () => press(at.quill, compose, { here: at, after: v.draw }));
 }
 
 /** The view drawn into *root*, a holder on a page of somebody else's: the
@@ -140,7 +147,9 @@ function paint(v) {
   wireLanes(v);
   loadThumbs(v);
   // What the view has its own button for is not in the bar as well.
-  hideFromBar(pressedIn(v.tree));
+  const pressed = pressedIn(v.tree);
+  if (v.at.screen.compose) pressed.add(v.at.screen.compose.action);
+  hideFromBar(pressed);
 }
 
 /** A handler for an element, as the attribute the element carries. */

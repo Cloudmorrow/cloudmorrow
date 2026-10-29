@@ -19,6 +19,7 @@ odometer = { kind = "int", indexed = true }
 id = "garage"
 label = "Garage"
 view = "garage"
+compose = { action = "add-van", label = "New van" }
 model = "vehicle"
 
 [[screens]]
