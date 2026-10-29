@@ -35,12 +35,13 @@
    may write it. A circle with `* = write` has it already, and says so. */
 
 import {
-  api, app, esc, formatDate, icons, loader, mount, nav, registerScreen, renderRoute, replace, seconds, store,
-  toast, wireShell,
+  api, app, esc, formatDate, icons, loader, mount, nav, pixelArt, registerScreen, renderRoute, replace, seconds,
+  store, toast, wireShell,
 } from "./core.js";
 import { loadFeatures } from "./features.js";
 import { refreshQuills } from "./quills.js";
 import { drawRunning } from "./quillservices.js";
+import { embedView } from "./kit_view.js";
 import { ask, askText } from "./dialog.js";
 
 const quillUrl = (id) => "/api/quills/" + encodeURIComponent(id);
@@ -132,6 +133,36 @@ function nameOf(ctx, id) {
 // Which sheet was asked for last: a sheet takes a moment to build — the
 // plan comes from the catalog's release — and a row clicked meanwhile wins.
 let asked = 0;
+// The sheet to open on its settings: the gear on a row was pressed.
+let wantSettings = "";
+
+// A gear, eight dots across like the tabs' marks: on the row of a Quill
+// that has settings of its own (a screen marked admin), and it opens them.
+const GEAR = [
+  "...XX...",
+  ".X.XX.X.",
+  "..XXXX..",
+  "XXX..XXX",
+  "XXX..XXX",
+  "..XXXX..",
+  ".X.XX.X.",
+  "...XX...",
+];
+const hasSettings = (quill) => (quill.screens || []).some((s) => s.admin && s.kit === "view");
+
+/** The sheet's settings box, scrolled to: the Quill's own screens under the switch. */
+function showSettings(holder) {
+  const box = holder && holder.querySelector(".quill-admin-screen");
+  const label = box && box.previousElementSibling;
+  if (box) (label || box).scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+/** The gear on a row: the Quill's sheet, open on its settings. */
+function openSettings(ctx, id) {
+  wantSettings = id;
+  if (!wide()) { location.hash = "#/adminquill/" + encodeURIComponent(id) + "/settings"; return; }
+  openSheet(ctx, id);
+}
 
 /** Open a Quill's sheet: beside the list on a computer, as its own screen on a phone.
     Whatever was there goes at once, and the loader stands in until the sheet is built. */
@@ -157,6 +188,10 @@ async function openSheet(ctx, id) {
     if (removed) shown = "";
     await drawQuills(ctx.panel);
   });
+  if (wantSettings === id) {
+    wantSettings = "";
+    showSettings(page);
+  }
 }
 
 /** A row that opens a sheet: a click, or Enter on it, that is not on a control in it. */
@@ -165,6 +200,8 @@ function wireRow(ctx, row) {
     if (event.target.closest("input, button, a")) return;
     openSheet(ctx, row.dataset.id);
   });
+  const gear = row.querySelector(".quill-gear");
+  if (gear) gear.addEventListener("click", () => openSettings(ctx, row.dataset.id));
   row.addEventListener("keydown", (event) => {
     if (event.target !== row || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();
@@ -264,6 +301,7 @@ function serverRow(quill, stood, running) {
     ${pick}
     <span class="main"><span class="title">${esc(quill.name || quill.id)}</span>
     <span class="meta"><span class="preview">v${esc(quill.version)} · ${esc(stood.said)}</span></span></span>
+    ${hasSettings(quill) ? `<button type="button" class="quill-gear" title="Settings" aria-label="Settings of ${esc(quill.name || quill.id)}">${pixelArt(GEAR)}</button>` : ""}
     ${stateChip(stateOf(quill, running))}${icons.chevronRight}</div>`;
 }
 
@@ -483,7 +521,10 @@ function catalogRow(q) {
 
 // -- the sheet ------------------------------------------------------------------------
 /** A Quill's sheet, as a screen of its own: the phone's way, and a link's. */
-async function renderQuill(id) {
+async function renderQuill(arg) {
+  // #/adminquill/<id>, or #/adminquill/<id>/settings from the gear on a row.
+  const [id, part] = arg.split("/");
+  if (part === "settings") wantSettings = id;
   // A computer has the sheet beside the list; a link to one lands there.
   if (wide()) {
     shown = id;
@@ -508,6 +549,10 @@ async function renderQuill(id) {
     <main class="quill-sheet">${sheet.html}</main>`);
   wireShell();
   sheet.wire(app.querySelector("main"), backToQuills);
+  if (wantSettings === id) {
+    wantSettings = "";
+    showSettings(app.querySelector("main"));
+  }
 }
 
 /** The sheet for one Quill — its name, the HTML, and what wires it into a holder
@@ -567,7 +612,7 @@ async function buildSheet(id, me = null) {
         installed ? `<span class="quill-chip on">v${esc(installed)} installed</span>` : "",
         newer ? `<span class="quill-chip new">v${esc(plan.version)} in the catalog</span>` : "",
       ].filter(Boolean).join(" · ")}</p>
-      ${installed ? settingsBox(name, feature) : ""}
+      ${installed ? settingsBox(name, feature, here) : ""}
       ${installed ? `<p class="group-label">Version</p><div class="group sheet-actions">
         ${standingRow(plan, installed, entry, newer, origin)}
         <div class="sheet-buttons">
@@ -589,6 +634,13 @@ async function buildSheet(id, me = null) {
   const wire = (holder, after) => {
     const running = holder.querySelector(".quill-running");
     if (running) drawRunning(running, id);
+    // The Quill's own settings: each screen it marked admin, drawn here by
+    // the kit as the Quill's code draws it, its buttons live.
+    for (const box of holder.querySelectorAll(".quill-admin-screen")) {
+      const screen = here && here.screens.find((s) => s.id === box.dataset.screen);
+      if (!screen) continue;
+      embedView(box, { quill: here, screen, tab: "", base: "", embedded: true }, {});
+    }
     const done = async (message, what) => {
       await refreshQuills();
       toast(message);
@@ -702,10 +754,15 @@ async function buildSheet(id, me = null) {
   return { name, html, wire };
 }
 
-/** An installed Quill's settings, first on its sheet: the server's switch
-    now, and in the same box whatever a Quill comes to have settings for. */
-function settingsBox(name, feature) {
-  return `<p class="group-label">Settings</p><div class="group quill-settings">${switchRow(name, feature)}</div>`;
+/** An installed Quill's settings, first on its sheet: the server's switch,
+    and under it every screen the Quill marked `admin = true` — its own
+    settings, a mail domain, a key everybody's traffic goes through — drawn
+    by the kit as the Quill's code draws them, only ever here. */
+function settingsBox(name, feature, here) {
+  const own = ((here && here.screens) || []).filter((s) => s.admin && s.kit === "view");
+  return `<p class="group-label">Settings</p><div class="group quill-settings">${switchRow(name, feature)}</div>` +
+    own.map((s) => `<p class="group-label">${esc(s.label || name)}</p>` +
+      `<div class="quill-admin-screen" data-screen="${esc(s.id)}"></div>`).join("");
 }
 
 /** The server's switch on an installed Quill: off takes its tabs out of every

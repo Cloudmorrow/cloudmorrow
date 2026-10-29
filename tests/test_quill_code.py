@@ -86,8 +86,16 @@ def test_an_admin_screen_is_the_administrators_alone(fleet):
     assert [s["id"] for s in for_guest["screens"]] == ["garage", "vans"]
     drawn = client.get("/api/quills/fleet/views/keys", headers=admin)
     assert drawn.status_code == 200 and "for an administrator" in str(drawn.json()["tree"])
+    # And the code knows what the cloud is called, for an address on it.
+    assert f"of {state_of(client).cloud_name()}" in str(drawn.json()["tree"])
     refused = client.get("/api/quills/fleet/views/keys", headers=guest)
     assert refused.status_code == 403 and "Keys is for an administrator" in refused.text
+    # An action marked admin goes with the screen: not theirs, and refused when pressed.
+    assert "rotate-keys" in [a["id"] for a in for_admin["actions"]]
+    assert "rotate-keys" not in [a["id"] for a in for_guest["actions"]]
+    assert press(client, admin, "rotate-keys").status_code == 200
+    pressed = press(client, guest, "rotate-keys")
+    assert pressed.status_code == 403 and "Rotate the keys is for an administrator" in pressed.text
 
 
 def test_a_job_delivers_a_record_of_its_own_to_somebody_and_an_action_may_not(fleet):
@@ -100,6 +108,11 @@ def test_a_job_delivers_a_record_of_its_own_to_somebody_and_an_action_may_not(fl
     pressed = press(client, admin, "hand-over", fields={"who": "guest"})
     assert pressed.status_code == 403 and "only a job or a webhook delivers" in pressed.text
     assert len(client.get("/api/records/fleet.notice", headers=guest).json()) == 1
+
+
+def test_an_action_admin_flag_is_a_bool():
+    with pytest.raises(QuillError, match="admin is true or false"):
+        parse_manifest(_manifest('code = "quill.py"\n[[actions]]\nid = "a"\nlabel = "A"\nadmin = "yes"\n'))
 
 
 def test_a_screen_admin_flag_is_a_bool():

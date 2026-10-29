@@ -71,7 +71,9 @@ export const findAction = (quillId, actionId) => actionIn(quillById(quillId), ac
 export const actionsOn = (modelId) => quills.flatMap((quill) =>
   (quill.actions || []).filter((a) => a.on === modelId).map((action) => ({ quill, action })));
 /** A Quill's actions that are on nothing: pressed from its screens. */
-export const loose = (quill) => (quill.actions || []).filter((a) => !a.on);
+// On no record, and not an administrator's settings: those are drawn by the
+// Quill's admin screen on its sheet under Administration, nowhere else.
+export const loose = (quill) => (quill.actions || []).filter((a) => !a.on && !a.admin);
 
 // The words the server gave, rather than "request failed": its `detail`
 // is {kind, message} for anything a Quill's code refused or broke on.
@@ -375,6 +377,12 @@ export async function applyEffects(effects, { quill, record = "", here = null, a
         break;
       }
       case "go": {
+        // A view drawn into another page (kit_view.js's embedView): a go
+        // to itself is drawn again there, with the parameters it names.
+        if (here && here.goHere && effect.screen === here.screen.id) {
+          await here.goHere(effect.params);
+          return error;
+        }
         const hash = screenAt(quill.id, effect.screen, effect.params);
         if (hash === location.hash) redraw = true;
         else { moved = true; go(hash); }

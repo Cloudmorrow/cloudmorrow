@@ -51,6 +51,17 @@ export async function renderView(at, arg) {
     </main>` + tabs(at.tab));
   wireShell();
   const root = app.querySelector(".quill-view");
+  const v = await embedView(root, at, params);
+  onRedrawHere({ alive: () => root.isConnected, draw: v.draw });
+}
+
+/** The view drawn into *root*, a holder on a page of somebody else's: the
+    Quill's settings on its sheet under Administration (quillsadmin.js). It
+    is the whole of a view but the page around it; a `go` to the same screen
+    draws it again here with the new parameters rather than leaving the page. */
+export async function embedView(root, at, params = {}) {
+  root.classList.add("quill-view");
+  root.setAttribute("aria-busy", "true");
   // Everything one drawing of the view needs, and what it keeps between
   // drawings: which tab is open, which month is shown, each record's rev.
   const v = {
@@ -60,7 +71,7 @@ export async function renderView(at, arg) {
   };
   v.draw = () => draw(v);
   v.paint = () => paint(v);
-  onRedrawHere({ alive: () => root.isConnected, draw: v.draw });
+  if (at.embedded) at.goHere = (next) => { v.params = { ...(next || {}) }; return v.draw(); };
   // One listener for everything pressed in the view: each drawing hands
   // out numbers, and the element pressed carries its own.
   root.addEventListener("click", (event) => {
@@ -76,6 +87,7 @@ export async function renderView(at, arg) {
   // computer, a finger held on it on a phone — numbered the same way.
   contextMenus(root, "[data-menu]", (el) => v.menus[Number(el.dataset.menu)] || null);
   await draw(v);
+  return v;
 }
 
 /** Ask for the tree, and draw it; or say why it could not be. */
@@ -343,6 +355,9 @@ function pressable(v, n) {
     return hash ? { label: n.label, tone: n.tone, href: hash, run: () => go(hash) } : null;
   }
   if (n.go) {
+    if (v.at.goHere && n.go === v.at.screen.id) {
+      return { label: n.label, tone: n.tone, run: () => v.at.goHere(n.params) };
+    }
     const hash = screenAt(quill.id, n.go, n.params);
     return { label: n.label, tone: n.tone, href: hash, run: () => (hash === location.hash ? v.draw() : go(hash)) };
   }

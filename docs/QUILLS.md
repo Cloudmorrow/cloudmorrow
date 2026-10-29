@@ -197,8 +197,16 @@ A screen with `admin = true` is an administrator's alone: the server's
 settings for the Quill — a mail domain, an outside account everybody's
 mail goes through — rather than a tab on everybody's menu. Nobody else is
 shown it, on any surface, and the server refuses to draw it for them. It
-is still one screen of the Quill, under its own menu, so the Quill's
-settings are where the Quill is and not in Administration.
+is never an item under the Quill's tab, for anybody: it is drawn on the
+Quill's sheet under Administration › Quills, in the Settings box under
+the server's switch — a gear on the Quill's row in the list says it has
+them, and opens them (in the terminal, `s` on the Quill does) — so every
+setting of every Quill is in the one place an administrator looks for
+settings. A `go` to the screen itself draws it again there. It is a
+`view`: the kit's elements have no settings to show. An action marked
+`admin = true` goes with it: the server leaves it out of everybody else's
+Quill and refuses it from them, and no surface puts it on a bar or in the
+palette — the settings screen draws its buttons.
 
 A board's lanes are an enum's values, fixed by the datamodel — To Do,
 Doing, Done — or, when `lane` is a link, the records it links to, in their

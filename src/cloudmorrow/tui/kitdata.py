@@ -181,8 +181,14 @@ def actions_on(quills: list[dict], model_id: str) -> list[tuple[dict, dict]]:
 
 
 def loose_actions(quills: list[dict]) -> list[tuple[dict, dict]]:
-    """Every (Quill, action) not on a record: the palette's."""
-    return [(quill, action) for quill in quills for action in quill.get("actions") or [] if not action.get("on")]
+    """Every (Quill, action) not on a record: the palette's. One marked admin is
+    the Quill's settings, pressed on its screen for them and nowhere else."""
+    return [
+        (quill, action)
+        for quill in quills
+        for action in quill.get("actions") or []
+        if not action.get("on") and not action.get("admin")
+    ]
 
 
 def find_action(quill: dict, action_id: str) -> dict | None:

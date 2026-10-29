@@ -54,7 +54,16 @@ def nightly(ctx):
 
 @view("keys")
 def keys(ctx):
-    return ui.stack(ui.text("Keys", style="title"), ui.text("The tracker's keys, for an administrator"))
+    return ui.stack(
+        ui.text("Keys", style="title"),
+        ui.text(f"The tracker's keys, for an administrator of {ctx.cloud}"),
+        ui.button("Rotate the keys", action="rotate-keys"),
+    )
+
+
+@action("rotate_keys")
+def rotate_keys(ctx):
+    return toast("Rotated")
 
 
 @job

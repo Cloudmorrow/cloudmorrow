@@ -66,12 +66,15 @@ function place(list) {
   quills = list.filter(yours);
   // Their actions go on every record's sheet, whichever Quill it is in.
   knowQuills(quills);
-  fillTabs(quills.filter((quill) => quill.screens.length).map((quill) => {
+  fillTabs(quills.filter((quill) => quill.screens.some((screen) => !screen.admin)).map((quill) => {
     // The items under the tab: the Quill's screens, each with the icon it
     // names, so no two look alike. A Quill with one screen has no items:
     // its tab is that screen, by the screen's name, so a thread's pip
     // and the kit's memory of the tab (`kit.<tab>`) find it as before.
-    const screens = quill.screens.map((screen) => ({
+    // A screen marked admin is the server's settings for the Quill: drawn
+    // on its sheet under Administration › Quills (quillsadmin.js), never
+    // as an item under its tab, for anybody.
+    const screens = quill.screens.filter((screen) => !screen.admin).map((screen) => ({
       name: tabName(quill, screen),
       label: screen.label || quill.name,
       icon: pixelIcon(screen.icon),
@@ -88,7 +91,7 @@ function place(list) {
       // Quill of somebody's own is switched by its key, `~alice.budget`.
       feature: quill.key || quill.id,
       // The tab opens the Quill on its first screen.
-      href: () => screenHash(quill, quill.screens[0]),
+      href: () => screenHash(quill, quill.screens.find((screen) => !screen.admin) || quill.screens[0]),
       // Data is composed by the server for whoever asks rather than
       // installed (server/dataview.py): the rail sets its tab apart from
       // the Quills, under Your cloud, as the terminal app's sidebar does.

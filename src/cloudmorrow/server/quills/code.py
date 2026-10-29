@@ -564,7 +564,13 @@ class QuillCode:
         timeout: float = CALL_TIMEOUT,
     ) -> object:
         """Run one handler as *principal*; its result, or CodeError."""
-        data = {"quill": manifest.id, "user": self._user(principal.username), "where": "server", **(ctx or {})}
+        data = {
+            "quill": manifest.id,
+            "user": self._user(principal.username),
+            "where": "server",
+            "cloud": self.state.cloud_name(),
+            **(ctx or {}),
+        }
         host = HostCalls(self, manifest, principal, via=via, kind=kind)
         try:
             return self._guest(manifest, principal.username).call(kind, name, data, args or {}, host, timeout=timeout)
@@ -642,6 +648,10 @@ class QuillCode:
             raise CodeError("notfound", f"{manifest.name} has no action {action_id}")
         if via == "assistant" and not action.get("assistant", True):
             raise CodeError("refused", f"{action['label']} is not for an assistant")
+        if action.get("admin"):
+            user = self.state.users.get(username)
+            if user is None or not user.is_admin:
+                raise CodeError("refused", f"{action['label']} is for an administrator")
         principal = self.principal_for(manifest, username, via=via)
         args: dict = {"fields": self._form(manifest, action, principal, fields or {})}
         if action.get("on"):

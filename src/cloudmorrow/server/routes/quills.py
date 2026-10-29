@@ -129,7 +129,10 @@ def fitted(quill: dict, access: Access, *, admin: bool = False) -> dict:
     available = bool(screens) if quill["screens"] else any(m in kept for m in own)
     # An action on records they cannot see is not theirs to press; one they
     # may only read is shown, and the gate says no if its code writes.
-    actions = [a for a in quill.get("actions", []) if not a.get("on") or a["on"] in kept]
+    # An action marked admin is the server's settings too: an administrator's alone.
+    actions = [
+        a for a in quill.get("actions", []) if (admin or not a.get("admin")) and (not a.get("on") or a["on"] in kept)
+    ]
     return quill | {
         "models": kept,
         "screens": screens,
@@ -143,7 +146,12 @@ def _for(state: AppState, user: User, quill: dict) -> dict:
     quill = _with_models(state, quill)
     access = state.shelf or state.circles
     if not access:
-        return quill if user.is_admin else quill | {"screens": [s for s in quill["screens"] if not s.get("admin")]}
+        if user.is_admin:
+            return quill
+        return quill | {
+            "screens": [s for s in quill["screens"] if not s.get("admin")],
+            "actions": [a for a in quill["actions"] if not a.get("admin")],
+        }
     return fitted(quill, access.access_for(user.username), admin=bool(user.is_admin))
 
 

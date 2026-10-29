@@ -545,6 +545,27 @@ def test_every_list_row_and_board_card_has_the_shared_menu():
     assert '<a class="row" data-id="${esc(r.id)}" href="${sheetHash(at, model.id, r.id)}"' in code
 
 
+def test_an_admin_screen_is_on_the_quills_sheet_and_never_under_its_tab():
+    """A screen marked admin is the Quill's settings: quills.js leaves it out of
+    the items under the tab, quillsadmin.js draws it in the Settings box of the
+    Quill's sheet through kit_view.js's embedView, and a go to itself is drawn
+    again there rather than leaving Administration."""
+    quills = (WEB / "quills.js").read_text(encoding="utf-8")
+    assert "quill.screens.filter((screen) => !screen.admin)" in quills
+    assert "quill.screens.some((screen) => !screen.admin)" in quills
+    view = (WEB / "kit_view.js").read_text(encoding="utf-8")
+    assert "export async function embedView(root, at, params = {})" in view
+    assert "if (at.embedded) at.goHere = " in view
+    admin = (WEB / "quillsadmin.js").read_text(encoding="utf-8")
+    assert 'import { embedView } from "./kit_view.js";' in admin
+    assert 'class="quill-admin-screen" data-screen="${esc(s.id)}"' in admin
+    assert 'embedView(box, { quill: here, screen, tab: "", base: "", embedded: true }, {})' in admin
+    actions = (WEB / "actions.js").read_text(encoding="utf-8")
+    assert "if (here && here.goHere && effect.screen === here.screen.id)" in actions
+    # Its actions are not on the bar either: the settings screen draws their buttons.
+    assert "filter((a) => !a.on && !a.admin)" in actions
+
+
 # -- Done means there is something to be done ------------------------------------
 def test_done_is_lit_by_a_change_not_by_the_caret():
     """Moving the caret about lights nothing; typing does, and a save puts it out.

@@ -31,6 +31,18 @@
 .row.quill-row[role="button"] { cursor: pointer; }
 .quill-row svg { flex: none; color: var(--muted); }
 .quill-row .run-state { margin-left: auto; }
+/* The gear on a Quill that has settings of its own: a button in the row,
+   lit under the pointer, that opens the sheet on them. */
+.quill-row .quill-gear {
+  margin-left: auto;
+  padding: 6px;
+  border-radius: var(--radius-control);
+  color: var(--muted);
+  line-height: 0;
+}
+.quill-row .quill-gear .pixel-icon { width: 18px; height: 18px; display: block; }
+.quill-row .quill-gear:hover, .quill-row .quill-gear:focus-visible { color: var(--accent); background: var(--card-2); }
+.quill-row .quill-gear + .run-state { margin-left: 8px; }
 .pick-row { padding-left: 12px; }
 .pick-row input.pick {
   flex: none;
@@ -148,6 +160,11 @@
 .sheet-buttons .act-button { font-weight: 600; }
 /* Settings first: the switch, and whatever else a Quill comes to have. */
 .quill-sheet .group.quill-settings { margin-bottom: 4px; }
+/* A screen the Quill marked admin, drawn by the kit (kit_view.js) under its
+   own label: the view's boxes and buttons as on any of its screens, with
+   the room under it the version box has. */
+.quill-sheet .quill-admin-screen { margin: 0 0 16px; }
+.quill-sheet .quill-admin-screen[aria-busy="true"] { min-height: 32px; }
 .quill-sheet .quill-facts .quill-chip.new { margin-left: 0; }
 .quill-sheet .readme { margin-top: 22px; }
 .quill-sheet .readme summary { cursor: pointer; font-weight: 600; list-style-position: inside; }
