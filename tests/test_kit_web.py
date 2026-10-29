@@ -555,7 +555,8 @@ def test_done_is_lit_by_a_change_not_by_the_caret():
     """
     core = js_code((WEB / "core.js").read_text(encoding="utf-8"))
     assert "export function litDone(ed) {\n  if (ed.doneEl) ed.doneEl.disabled = !ed.dirty;\n}" in core
-    assert core.index("export function setStatus(") < core.index("litDone(ed);") < core.index("export function litDone(")
+    status = _function(core, "setStatus")
+    assert "litDone(ed);" in status
     assert "export function wireSaveKey(ed, box, save) {" in core
     save_key = _function(core, "wireSaveKey")
     assert 'event.key.toLowerCase() !== "s"' in save_key
