@@ -595,3 +595,26 @@ def test_done_is_lit_by_a_change_not_by_the_caret():
         assert source.index("ed.doneEl = done;") < source.index("litDone(ed)"), name
         assert f"wireSaveKey(ed, box, {save});" in source, name
     assert ".nav button.strong:disabled {" in (WEB / "base.css").read_text(encoding="utf-8")
+
+
+def test_a_form_suggests_people_warns_of_outsiders_and_keeps_extra_fields_behind_more():
+    """A field with `suggest = "people"` is chips with the server's people offered as
+    typed (from /api/people, read once); its `outside` warning shows while an
+    address is in it; fields marked extra wait behind one link naming them."""
+    actions = (WEB / "actions.js").read_text(encoding="utf-8")
+    assert 'peopleKnown = api("GET", "/api/people").catch(() => [])' in actions
+    assert "export function formFields(fields, values = {}, links = {}, people = [])" in actions
+    assert 'if (f.suggest === "people") {' in actions
+    assert '<input type="hidden" data-field="${esc(f.name)}" value="${esc(names.join(", "))}">' in actions
+    assert 'const outside = field.dataset.outside && [...names(), typed].some((n) => n.includes("@"));' in actions
+    assert '<button type="button" class="fields-more">${esc(extra.map((e) => e.label).join(", "))}</button>' in actions
+    assert 'for (const field of root.querySelectorAll(".people-field")) wirePeople(field);' in actions
+    view = (WEB / "kit_view.js").read_text(encoding="utf-8")
+    assert "await fetchPeople(v, v.tree);" in view
+    assert 'if (n.ui === "split") { yield* walk(n.side); yield* walk(n.main); }' in view
+    css = (WEB / "kit_view.css").read_text(encoding="utf-8")
+    assert (
+        '.v-split[data-show="main"] > .v-split-side, .v-split[data-show="side"] > .v-split-main { display: none; }'
+        in css
+    )
+    assert ".v-card.current {" in css

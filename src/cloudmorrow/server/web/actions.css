@@ -110,3 +110,33 @@
 }
 
 /* What the pointer is over, and a press, are every button's: base.css. */
+
+/* -- a field that suggests people, and fields kept behind a "more" --------- */
+.people-field { margin: 0 0 12px; }
+.act-form .people-field, .act-form .fields-more { margin-left: 12px; margin-right: 12px; }
+.people-chips {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  min-height: 44px; padding: 6px 10px; cursor: text;
+  border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--card);
+}
+.people-chips:focus-within { border-color: var(--accent); }
+.people-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 4px 3px 10px; border-radius: var(--radius-button); font-size: 14px; font-weight: 600;
+  background: var(--card-2); color: var(--ink);
+}
+.people-chip.outside { background: color-mix(in srgb, var(--warn) 22%, var(--card-2)); }
+.people-drop { padding: 0 6px; font-size: 16px; line-height: 1; color: var(--muted); border-radius: var(--radius-button); }
+.people-drop:hover { color: var(--ink); }
+.people-entry { flex: 1 1 120px; min-width: 120px; padding: 4px 2px; border: 0; background: none; font: inherit; color: var(--ink); outline: none; }
+.people-suggest {
+  display: flex; flex-direction: column; margin-top: 4px;
+  border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--card); overflow: hidden;
+}
+.people-suggest button { display: flex; gap: 8px; align-items: baseline; padding: 10px 12px; text-align: left; font: inherit; color: var(--ink); }
+.people-suggest button + button { border-top: 1px solid var(--line); }
+.people-suggest button:hover, .people-suggest button:focus-visible { background: var(--card-2); }
+.people-suggest button span { color: var(--muted); font-size: 14px; }
+.people-note { margin: 6px 2px 0; font-size: 13px; color: var(--warn); }
+.fields-more { display: block; margin: -4px 0 12px; padding: 2px 0; font: inherit; font-size: 14px; color: var(--accent); }
+.fields-extra { display: contents; }

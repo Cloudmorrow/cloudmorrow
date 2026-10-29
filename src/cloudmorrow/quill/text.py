@@ -53,6 +53,8 @@ def _lines(node: dict, actions: dict) -> list[str]:
         if all(len(p) <= 1 for p in parts):
             return ["   ".join(p[0] for p in parts if p)]
         return [line for part in parts for line in part]
+    if kind == "split":
+        return _lines(node["side"], actions) + [RULE * 20] + _lines(node["main"], actions)
     if kind == "tabs":
         out = []
         for tab in node["tabs"]:
@@ -98,7 +100,7 @@ def _lines(node: dict, actions: dict) -> list[str]:
                 head += f" — {value_text(record, node['subtitle'])}"
             if node.get("badge") and value_text(record, node["badge"]):
                 head += f" [{value_text(record, node['badge'])}]"
-            out.append(f"• {head}")
+            out.append(f"{'▶' if node.get('current') == record['id'] else '•'} {head}")
             if node.get("body") and value_text(record, node["body"]):
                 out += ["  " + line for line in value_text(record, node["body"]).splitlines()[:3]]
         return out
