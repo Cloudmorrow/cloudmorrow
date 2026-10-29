@@ -402,3 +402,11 @@ def test_a_server_quill_s_head_and_settings_are_drawn_from_the_list_at_once():
     assert "function sheetHead({ name, plan, installed, newer, feature, here })" in quills
     assert quills.count("sheetHead({") == 3, "the head is built in one place"
     assert "return { name, head, body, facts, wire, wireHead, wireBody };" in quills
+
+
+def test_a_tab_in_quills_closes_the_sheet_beside_the_old_one():
+    """The open sheet survives a redraw after an install, not a change of tab."""
+    source = (WEB / "quillsadmin.js").read_text(encoding="utf-8")
+    tabs = source[source.index('panel.querySelectorAll(".quill-tabs button")') : source.index("const ctx = { panel")]
+    assert "if (button.dataset.tab === which) return;" in tabs
+    assert tabs.index('shown = "";') < tabs.index("drawQuills(panel);")
