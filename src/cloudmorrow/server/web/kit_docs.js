@@ -25,7 +25,7 @@
 
 import {
   SAVE_DELAY, api, app, back, baseName, esc, fileStem, folderOf, formatDate, go, icons, joinPath, mount,
-  nav, occupy, previousHash, recordsUrl, renderRoute, replace, seconds, setStatus, tabs, toast, vacate, wireShell,
+  litDone, nav, occupy, previousHash, recordsUrl, renderRoute, replace, seconds, setStatus, tabs, toast, vacate, wireSaveKey, wireShell,
 } from "./core.js";
 import { mayWrite } from "./kit.js";
 import {
@@ -361,11 +361,13 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
   const del = app.querySelector(".nav .delete");
   const openEl = app.querySelector(".nav .open");
   const exportEl = app.querySelector(".nav .export");
+  ed.doneEl = done;
   openEl.addEventListener("click", () => openOther(b));
   if (exportEl) exportEl.addEventListener("click", () => exportMenu(ed));
   // While the page is being typed in, the bar is Done's.
   const editing = (on) => {
     done.hidden = !on;
+    litDone(ed);
     openEl.hidden = on;
     if (del) del.hidden = on;
     if (exportEl) exportEl.hidden = on;
@@ -421,6 +423,7 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
     if (ed.dirty) { clearTimeout(ed.timer); savePage(ed); }
   });
   done.addEventListener("click", () => document.activeElement && document.activeElement.blur());
+  wireSaveKey(ed, box, savePage);
   del.addEventListener("click", async () => {
     if (ed.isNew) { back(parent); return; }
     if (!await ask(`Delete “${ed.stem}”?`)) return;

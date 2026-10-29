@@ -564,3 +564,34 @@ def test_an_admin_screen_is_on_the_quills_sheet_and_never_under_its_tab():
     assert "if (here && here.goHere && effect.screen === here.screen.id)" in actions
     # Its actions are not on the bar either: the settings screen draws their buttons.
     assert "filter((a) => !a.on && !a.admin)" in actions
+
+
+# -- Done means there is something to be done ------------------------------------
+def test_done_is_lit_by_a_change_not_by_the_caret():
+    """Moving the caret about lights nothing; typing does, and a save puts it out.
+
+    Every editor hands its Done to `ed.doneEl`, and `setStatus` — called on every
+    change and every save — keeps the button in step with `ed.dirty`. Ctrl+S (⌘S)
+    saves now rather than after the pause, in every editor alike.
+    """
+    core = js_code((WEB / "core.js").read_text(encoding="utf-8"))
+    assert "export function litDone(ed) {\n  if (ed.doneEl) ed.doneEl.disabled = !ed.dirty;\n}" in core
+    status = _function(core, "setStatus")
+    assert "litDone(ed);" in status
+    assert "export function wireSaveKey(ed, box, save) {" in core
+    save_key = _function(core, "wireSaveKey")
+    assert 'event.key.toLowerCase() !== "s"' in save_key
+    assert "event.preventDefault();" in save_key and "clearTimeout(ed.timer);" in save_key
+    editors = {
+        "kit.js": "saveSheet",
+        "kit_editor.js": "saveEditor",
+        "kit_docs.js": "savePage",
+        "kit_cells.js": "(e) => { commit(e); e.wrap.focus(); saveSheet(e); }",
+    }
+    for name, save in editors.items():
+        source = js_code((WEB / name).read_text(encoding="utf-8"))
+        assert "ed.doneEl = done;" in source, name
+        # Shown again on focus, it is lit or dark for what is unsaved then.
+        assert source.index("ed.doneEl = done;") < source.index("litDone(ed)"), name
+        assert f"wireSaveKey(ed, box, {save});" in source, name
+    assert ".nav button.strong:disabled {" in (WEB / "base.css").read_text(encoding="utf-8")
