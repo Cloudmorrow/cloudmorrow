@@ -110,10 +110,14 @@ export async function drawQuills(panel) {
       <div class="quill-list"></div>
     </div>
     ${split ? `<div class="page"><p class="empty"><b>Nothing open</b>Choose a Quill on the left.</p></div>` : ""}`;
+  // Another tab is another list: what was open beside the old one closes
+  // with it, rather than standing there as if it were still chosen.
   for (const button of panel.querySelectorAll(".quill-tabs button")) {
     button.addEventListener("click", () => {
+      if (button.dataset.tab === which) return;
       store.set("admin.quills", button.dataset.tab);
       lastLog = [];
+      shown = "";
       drawQuills(panel);
     });
   }
