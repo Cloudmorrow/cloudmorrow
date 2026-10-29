@@ -340,7 +340,7 @@ def test_a_quill_sheet_tells_its_facts_from_its_buttons():
     thing to do is a button drawn as one."""
     quills = (WEB / "quillsadmin.js").read_text(encoding="utf-8")
     html = quills.split("const html = `", 1)[1].split("const wire =", 1)[0]
-    assert html.index("settingsBox(name, feature)") < html.index('<p class="group-label">Version</p>')
+    assert html.index("settingsBox(name, feature, here)") < html.index('<p class="group-label">Version</p>')
     assert html.index('<p class="group-label">Version</p>') < html.index(
         "standingRow(plan, installed, entry, newer, origin)"
     )
@@ -349,6 +349,8 @@ def test_a_quill_sheet_tells_its_facts_from_its_buttons():
         '<p class="group-label">Settings</p><div class="group quill-settings">${switchRow(name, feature)}</div>'
         in quills
     )
+    # And under the switch, every screen the Quill marked admin: its own settings.
+    assert 'own.map((s) => `<p class="group-label">${esc(s.label || name)}</p>`' in quills
     # Up to date is a fact, not a dead button.
     assert "disabled>Up to date</button>" not in quills
     assert 'fact("Up to date"' in quills

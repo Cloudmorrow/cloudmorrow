@@ -102,6 +102,10 @@ class QuillCards:
         self._quill_cards: dict[str, str] = {}
         self._screens_of: dict[str, list[str]] = {}
         self._sub_of: dict[str, str] = {}
+        # Panes with no card: a screen the Quill marked admin, its settings,
+        # reached from Administration › Quills alone (admin_quills.py). By
+        # key, the feature each is switched by.
+        self._hidden_panes: dict[str, str] = {}
 
     # -- Quill cards -------------------------------------------------------
     async def sync_quills(self) -> None:
@@ -142,12 +146,19 @@ class QuillCards:
         cloud = self.query_one("#nav-section-cloud", SectionLabel)
         # Which screens are under one card: a Quill's, when it has several.
         screens_of: dict[str, list[str]] = {}
-        for key, (quill, _, _) in wanted.items():
-            screens_of.setdefault(str(quill["id"]), []).append(key)
+        for key, (quill, screen, _) in wanted.items():
+            if not screen.get("admin"):
+                screens_of.setdefault(str(quill["id"]), []).append(key)
         for key, (quill, screen, signature) in wanted.items():
             if key in self._quill_panes:
                 continue
             quill_id = str(quill["id"])
+            if screen.get("admin"):
+                # The Quill's settings: a pane with no card, opened from
+                # Administration › Quills.
+                if await self._add_quill_pane(key, quill, screen, first=False, hidden=True):
+                    self._quill_panes[key] = signature
+                continue
             keys = screens_of[quill_id]
             under = quill_id if len(keys) > 1 else ""
             first = key == keys[0]
@@ -162,18 +173,33 @@ class QuillCards:
                     under=under,
                     first=first,
                 )
-                if card is not None:
+                if card:
                     self._quill_panes[key] = signature
                     self._cloud_panes.add(key)
                 continue
             # Among the Quills, anywhere for now: `shelve` puts it in place.
             card = await self._add_quill_pane(key, quill, screen, before=cloud, under=under, first=first)
-            if card is not None:
+            if card:
                 self._quill_panes[key] = signature
-        await self.shelve([(key, quill) for key, (quill, _, _) in wanted.items() if not quill.get("composed")])
+        await self.shelve(
+            [
+                (key, quill)
+                for key, (quill, screen, _) in wanted.items()
+                if not (quill.get("composed") or screen.get("admin"))
+            ]
+        )
         current = self.query_one("#panes", ContentSwitcher).current or ""
         self.reveal_screens(current[len("pane-") :])
         self.show_sections()
+
+    def admin_screens(self, quill_id: str) -> list[dict]:
+        """The screens a Quill marked admin — its settings — that have a pane here."""
+        quill = next((q for q in self.app.quills if q.get("id") == quill_id), None)
+        return [
+            s
+            for s in (quill or {}).get("screens") or []
+            if s.get("admin") and screen_key(quill, s) in self._hidden_panes
+        ]
 
     def pane_key(self, key: str) -> str:
         """The pane a card opens: its own, or a Quill's first screen's."""
@@ -270,12 +296,22 @@ class QuillCards:
         return free
 
     async def _add_quill_pane(
-        self, key: str, quill: dict, screen: dict, *, after=None, before=None, under: str = "", first: bool = True
-    ) -> NavCard | None:
+        self,
+        key: str,
+        quill: dict,
+        screen: dict,
+        *,
+        after=None,
+        before=None,
+        under: str = "",
+        first: bool = True,
+        hidden: bool = False,
+    ) -> NavCard | bool | None:
         """A pane for the screen, and its card: the Quill's own when it is the
         Quill's only screen, else an item under the Quill's card (*under*
         names the Quill), which is made with the first of them, and holds
-        the function key for them all."""
+        the function key for them all. *hidden*: the pane alone, no card —
+        the Quill's settings, which Administration opens — and True for it."""
         if self.query(f"#pane-{key}") or self.query(f"#nav-{key}"):
             # Half there from a sync that was cut short by the next one.
             await self._drop_quill_pane(key)
@@ -291,6 +327,9 @@ class QuillCards:
         # Mounted hidden: the switcher only hides what it had at the start.
         pane.display = False
         await self.query_one("#panes", ContentSwitcher).mount(pane)
+        if hidden:
+            self._hidden_panes[key] = feature
+            return True
         sidebar = self.query_one("#sidebar", VerticalScroll)
         summary = str(quill.get("summary") or quill.get("name") or "")
         if under and under not in self._quill_cards:
@@ -330,6 +369,7 @@ class QuillCards:
             await widget.remove()
         self._quill_panes.pop(key, None)
         self._cloud_panes.discard(key)
+        self._hidden_panes.pop(key, None)
         self._shelf_of.pop(key, None)
         self._feature_of.pop(key, None)
         self._quill_keys.pop(key, None)

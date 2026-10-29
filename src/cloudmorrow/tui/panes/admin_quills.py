@@ -51,6 +51,7 @@ from textual.widgets import Button, Checkbox, ContentSwitcher, DataTable, Label,
 from cloudmorrow.client.api import ApiError
 from cloudmorrow.tui.panes.admin_quill_services import QuillServicesModal
 from cloudmorrow.tui.panes.base import Pane
+from cloudmorrow.tui.quill_actions import go_to
 from cloudmorrow.tui.screens.modals import ConfirmModal, Modal
 from cloudmorrow.tui.theme import ACCENT, BAD, FAINT, GOOD, MUTED, WARN
 from cloudmorrow.tui.widgets.toolbar import Action
@@ -438,9 +439,10 @@ def audience_said(quill: dict) -> str:
     return "for " + ", ".join(circles + people)
 
 
-def detail_text(quill: dict, *, entry: dict | None, state: str, feature: dict | None) -> str:
+def detail_text(quill: dict, *, entry: dict | None, state: str, feature: dict | None, settings: list[dict] = ()) -> str:
     """An installed Quill, beside the list: what it is, how it is, where it stands,
-    and everything it adds."""
+    and everything it adds. *settings* are the screens it marked admin — its
+    own settings, which `s` opens — drawn nowhere else."""
     lines: list[str] = []
     name = escape(str(quill.get("name") or quill.get("id", "?")))
     head = f"[b]{name}[/] [{MUTED}]{escape(str(quill.get('version', '')))}[/]"
@@ -464,6 +466,9 @@ def detail_text(quill: dict, *, entry: dict | None, state: str, feature: dict | 
     origin = quill.get("origin") or {}
     if origin.get("installed_by"):
         lines.append(f"[{MUTED}]installed by {escape(str(origin['installed_by']))}[/]")
+    if settings:
+        named = ", ".join(escape(str(s.get("label") or s.get("id"))) for s in settings)
+        lines.append(f"[{MUTED}]settings: {named}  [b]s[/] opens them[/]")
     lines += sections_text(quill)
     return "\n".join(lines)
 
@@ -572,6 +577,7 @@ class QuillsView(Pane):
         ("u", "fire('update_picked')", "Update selected"),
         ("U", "fire('update_all')", "Update all"),
         ("o", "fire('switch')", "On/off"),
+        ("s", "fire('settings')", "Settings"),
         ("r", "fire('running')", "Running"),
         ("d", "fire('remove')", "Remove"),
     ]
@@ -589,6 +595,7 @@ class QuillsView(Pane):
         Action(
             "switch", "On/off", "o", hint="For everybody: off takes its tabs out of every client and closes its API"
         ),
+        Action("settings", "Settings…", "s", hint="The Quill's own settings: the screen it keeps for an administrator"),
         Action("running", "Running…", "r", hint="What its code is doing: services, logs, webhook addresses"),
         Action("remove", "Remove", "d", variant="error", hint="Its tabs and jobs go; its records stay"),
     )
@@ -813,8 +820,31 @@ class QuillsView(Pane):
                 entry=self._entries.get(chosen["id"]),
                 state=state_of(installed, self._running),
                 feature=self._features.get(chosen["id"]),
+                settings=self._settings_of(chosen["id"]),
             )
         )
+
+    def _settings_of(self, quill_id: str) -> list[dict]:
+        """The screens the Quill marked admin, when the workspace has panes for them."""
+        for screen in reversed(self.app.screen_stack):
+            found = getattr(screen, "admin_screens", None)
+            if callable(found):
+                return list(found(quill_id))
+        return []
+
+    def act_settings(self) -> None:
+        """s: the Quill's own settings — the screen it marked admin — as a pane."""
+        quill = self.selected
+        installed = self._installed(quill["id"]) if quill else None
+        if installed is None:
+            self.status("Pick an installed Quill first.", error=True)
+            return
+        name = installed.get("name") or installed["id"]
+        screens = self._settings_of(installed["id"])
+        if not screens:
+            self.status(f"{name} has no settings of its own.", error=True)
+            return
+        go_to(self.app, str(installed["id"]), str(screens[0]["id"]), {})
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         """A heading is not something to stand on; step off it. Whatever is stood

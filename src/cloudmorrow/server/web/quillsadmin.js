@@ -41,6 +41,7 @@ import {
 import { loadFeatures } from "./features.js";
 import { refreshQuills } from "./quills.js";
 import { drawRunning } from "./quillservices.js";
+import { embedView } from "./kit_view.js";
 import { ask, askText } from "./dialog.js";
 
 const quillUrl = (id) => "/api/quills/" + encodeURIComponent(id);
@@ -567,7 +568,7 @@ async function buildSheet(id, me = null) {
         installed ? `<span class="quill-chip on">v${esc(installed)} installed</span>` : "",
         newer ? `<span class="quill-chip new">v${esc(plan.version)} in the catalog</span>` : "",
       ].filter(Boolean).join(" · ")}</p>
-      ${installed ? settingsBox(name, feature) : ""}
+      ${installed ? settingsBox(name, feature, here) : ""}
       ${installed ? `<p class="group-label">Version</p><div class="group sheet-actions">
         ${standingRow(plan, installed, entry, newer, origin)}
         <div class="sheet-buttons">
@@ -589,6 +590,13 @@ async function buildSheet(id, me = null) {
   const wire = (holder, after) => {
     const running = holder.querySelector(".quill-running");
     if (running) drawRunning(running, id);
+    // The Quill's own settings: each screen it marked admin, drawn here by
+    // the kit as the Quill's code draws it, its buttons live.
+    for (const box of holder.querySelectorAll(".quill-admin-screen")) {
+      const screen = here && here.screens.find((s) => s.id === box.dataset.screen);
+      if (!screen) continue;
+      embedView(box, { quill: here, screen, tab: "", base: "", embedded: true }, {});
+    }
     const done = async (message, what) => {
       await refreshQuills();
       toast(message);
@@ -702,10 +710,15 @@ async function buildSheet(id, me = null) {
   return { name, html, wire };
 }
 
-/** An installed Quill's settings, first on its sheet: the server's switch
-    now, and in the same box whatever a Quill comes to have settings for. */
-function settingsBox(name, feature) {
-  return `<p class="group-label">Settings</p><div class="group quill-settings">${switchRow(name, feature)}</div>`;
+/** An installed Quill's settings, first on its sheet: the server's switch,
+    and under it every screen the Quill marked `admin = true` — its own
+    settings, a mail domain, a key everybody's traffic goes through — drawn
+    by the kit as the Quill's code draws them, only ever here. */
+function settingsBox(name, feature, here) {
+  const own = ((here && here.screens) || []).filter((s) => s.admin && s.kit === "view");
+  return `<p class="group-label">Settings</p><div class="group quill-settings">${switchRow(name, feature)}</div>` +
+    own.map((s) => `<p class="group-label">${esc(s.label || name)}</p>` +
+      `<div class="quill-admin-screen" data-screen="${esc(s.id)}"></div>`).join("");
 }
 
 /** The server's switch on an installed Quill: off takes its tabs out of every

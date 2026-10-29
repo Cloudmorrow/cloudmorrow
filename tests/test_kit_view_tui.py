@@ -364,3 +364,30 @@ async def test_a_card_in_a_lane_moves_with_the_keys(fleet):
         await pilot.press("right_square_bracket")
         await settle(app, pilot)
         assert vans(app)[0]["fields"]["fuel"] == "diesel"
+
+
+async def test_an_admin_screen_has_no_card_and_opens_from_administration(fleet):
+    """Keys is marked admin: not under Fleet's card for anybody, but a pane all
+    the same, and `s` on Fleet under Administration › Quills opens it."""
+    app = fleet
+    async with app.run_test(size=(120, 40)) as pilot:
+        screen = await start(app, pilot)
+        assert not screen.query("#nav-fleet-keys"), "no card for the settings screen"
+        assert screen.query("#pane-fleet-keys"), "the pane is there"
+        assert screen.query("#nav-fleet-garage") and screen.query("#nav-fleet-vans")
+        assert [s["id"] for s in screen.admin_screens("fleet")] == ["keys"]
+        screen.open_admin("quills")
+        await settle(app, pilot)
+        quills = screen.query_one("#admin-view").query_one("QuillsView")
+        table = quills.query_one("#admin-server-table", DataTable)
+        row = next(i for i, q in enumerate(quills._server) if q["id"] == "fleet")
+        table.move_cursor(row=row)
+        await pilot.pause()
+        assert "settings: Keys" in str(quills.query_one("#admin-quill-detail-text", Static).visual.plain)
+        quills.fire("settings")
+        await settle(app, pilot)
+        assert not screen.admin_showing
+        pane = screen.query_one("#pane-fleet-keys", ViewPane)
+        assert pane.display and pane.failed == ""
+        texts = [w.visual.plain for w in pane.query(".view-text")]
+        assert any("for an administrator of" in t for t in texts), texts

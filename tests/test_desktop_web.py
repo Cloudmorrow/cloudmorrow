@@ -108,7 +108,7 @@ def test_a_quill_is_one_tab_with_its_screens_under_it() -> None:
     assert "label: one ? screens[0].label : quill.name," in quills
     assert "screens: one ? [] : screens," in quills
     assert "icon: pixelIcon(screen.icon)," in quills
-    assert "href: () => screenHash(quill, quill.screens[0])," in quills
+    assert "href: () => screenHash(quill, quill.screens.find((screen) => !screen.admin) || quill.screens[0])," in quills
     # core.js: the items only under an open tab, and the strip only for one.
     assert '(open ? t.screens.map(drawItem).join("") : "")' in core
     assert '<a class="tab sub${s.name === active ? " active" : ""}"' in core

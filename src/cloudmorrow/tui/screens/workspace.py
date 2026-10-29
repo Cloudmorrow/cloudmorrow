@@ -291,6 +291,10 @@ class WorkspaceScreen(QuillCards, Screen):
             card.display = on
             if on:
                 showing.append(key)
+        # A Quill's settings pane has no card; it is on show with its Quill.
+        for key, feature in getattr(self, "_hidden_panes", {}).items():
+            if feature in enabled:
+                showing.append(key)
         self._showing = showing
         # The items under a Quill's card are only there while you are in it.
         current = self.query_one("#panes", ContentSwitcher).current or ""

@@ -148,6 +148,11 @@
 .sheet-buttons .act-button { font-weight: 600; }
 /* Settings first: the switch, and whatever else a Quill comes to have. */
 .quill-sheet .group.quill-settings { margin-bottom: 4px; }
+/* A screen the Quill marked admin, drawn by the kit (kit_view.js) under its
+   own label: the view's boxes and buttons as on any of its screens, with
+   the room under it the version box has. */
+.quill-sheet .quill-admin-screen { margin: 0 0 16px; }
+.quill-sheet .quill-admin-screen[aria-busy="true"] { min-height: 32px; }
 .quill-sheet .quill-facts .quill-chip.new { margin-left: 0; }
 .quill-sheet .readme { margin-top: 22px; }
 .quill-sheet .readme summary { cursor: pointer; font-weight: 600; list-style-position: inside; }

@@ -62,6 +62,12 @@ assistant = false
 id = "reach-out"
 label = "Reach for something it did not ask for"
 
+# The server's settings for the Quill, with the Keys screen: an administrator's alone.
+[[actions]]
+id = "rotate-keys"
+label = "Rotate the keys"
+admin = true
+
 [[hooks]]
 on = "fleet.visit"
 when = "created"

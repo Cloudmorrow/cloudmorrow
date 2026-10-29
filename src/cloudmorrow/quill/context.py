@@ -352,6 +352,9 @@ class Context:
         self.approvals = Approvals(host)
         # Where it runs: "server", or "machine" in an agent.
         self.where: str = data.get("where", "server")
+        # What the cloud is called — the name on the rail — for an address or a
+        # greeting that says whose server this is; "" on a machine.
+        self.cloud: str = str(data.get("cloud", "") or "")
         self._folders: dict[str, str] = dict(data.get("folders", {}))
 
     def fetch(

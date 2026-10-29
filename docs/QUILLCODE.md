@@ -96,6 +96,9 @@ handler = "log_service"               # the id with _ for -, when left out
 confirm = "Log it?"                   # optional: asked first
 tone = "primary"                      # neutral, primary, danger
 assistant = true                      # false: not an assistant's tool
+# admin = true                        # an administrator's alone, like a screen marked admin: pressed
+                                      # from the Quill's settings on its sheet under Administration,
+                                      # on no bar or palette, and refused to anybody else
 [actions.fields]
 date = { kind = "date", required = true }
 km   = { kind = "int", required = true }
@@ -197,6 +200,7 @@ hook started by an assistant's change is the same.
 | --- | --- |
 | `ctx.user` | who it runs for: `.username`, `.name`, `.admin`, `.circles`, `.roles` |
 | `ctx.quill`, `ctx.where` | this Quill's id; `"server"` or `"machine"` |
+| `ctx.cloud` | what the cloud is called, the name on the rail — for an address, `sam@Bramcloud`; `""` on a machine |
 | `ctx.params` | a view's parameters, by name and as attributes; `.record` when opened on one |
 | `ctx.records` | `list(model, q=, last=, **where)`, `get`, `create(model, fields=None, scope=, members=, announce=, owner=, by=, **values)`, `patch(model, id, fields, rev=)`, `move(model, id, fields, index=)`, `delete`, `seen(model, id)` — the record API, through the gate. A space is made with its `scope` and, shared, its `members`; `seen` is the person having looked in one. A space's record says `.members`, `.unread` and `.last`. `owner=` delivers (below) |
 | `ctx.people(role=, circle=)` | who holds a role, as usernames ([FLOWS.md](FLOWS.md)); with no role, everybody on the server but the person it runs for |

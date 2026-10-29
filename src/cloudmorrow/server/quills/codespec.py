@@ -154,6 +154,8 @@ def parse_code(
                 raise CodeSpecError(f"{where}: {thing} {key} is words")
         if not isinstance(item.get("assistant", True), bool):
             raise CodeSpecError(f"{where}: {thing} assistant is true or false")
+        if not isinstance(item.get("admin", False), bool):
+            raise CodeSpecError(f"{where}: {thing} admin is true or false")
 
     hooks = _tables(data, "hooks", where)
     for i, item in enumerate(hooks):
