@@ -36,7 +36,7 @@
 
 import {
   SAVE_DELAY, api, app, back, baseName, esc, fileStem, folderOf, formatDate, go, icons, joinPath, mount, nav,
-  occupy, previousHash, recordsUrl, renderRoute, replace, seconds, setStatus, tabs, toast, vacate, wireShell,
+  litDone, occupy, previousHash, recordsUrl, renderRoute, replace, seconds, setStatus, tabs, toast, vacate, wireSaveKey, wireShell,
 } from "./core.js";
 import { mayWrite, sheetHash } from "./kit.js";
 import {
@@ -225,11 +225,13 @@ async function renderSheet(b, { record = null, isNew = false, folder = "", arg }
   const del = app.querySelector(".nav .delete");
   const openEl = app.querySelector(".nav .open");
   const exportEl = app.querySelector(".nav .export");
+  ed.doneEl = done;
   openEl.addEventListener("click", () => openOther(b));
   if (exportEl) exportEl.addEventListener("click", () => exportMenu(ed));
   // While the sheet is being typed in, the bar is Done's.
   const editing = (on) => {
     if (done) done.hidden = !on;
+    litDone(ed);
     openEl.hidden = on;
     if (del) del.hidden = on;
     if (exportEl) exportEl.hidden = on;
@@ -257,6 +259,8 @@ async function renderSheet(b, { record = null, isNew = false, folder = "", arg }
     if (ed.dirty) { clearTimeout(ed.timer); saveSheet(ed); }
   });
   done.addEventListener("click", () => { commit(ed); if (document.activeElement) document.activeElement.blur(); });
+  // The cell being typed in is taken first, so Ctrl+S saves it with the rest.
+  wireSaveKey(ed, box, (e) => { commit(e); e.wrap.focus(); saveSheet(e); });
   // The border buttons: the grid keeps the focus, so the keys go on working.
   ed.formatEl.addEventListener("mousedown", (event) => { if (event.target.closest("button")) event.preventDefault(); });
   ed.formatEl.addEventListener("click", (event) => {
