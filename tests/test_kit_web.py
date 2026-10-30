@@ -642,3 +642,13 @@ def test_a_views_pen_is_drawn_in_the_heading_like_a_lists_new():
     )
     assert 'if (pen && compose) pen.addEventListener("click", () => press(at.quill, compose, ' in view
     assert "if (v.at.screen.compose) pressed.add(v.at.screen.compose.action);" in view
+
+
+def test_a_button_whose_args_answer_every_field_runs_the_action_at_once():
+    """The form is for what is left to fill in; a view's button that carries every
+    field runs without one, as the terminal already did (run_action in quill_actions.py)."""
+    actions = (WEB / "actions.js").read_text(encoding="utf-8")
+    assert "const unanswered = fields.some((f) => args[f.name] === undefined || args[f.name] === null" in actions
+    assert "if (fields.length && unanswered) return openForm(quill, action, { record, args, here, after });" in actions
+    tui = (WEB.parents[1] / "tui" / "quill_actions.py").read_text(encoding="utf-8")
+    assert 'if any(field["name"] not in values for field in fields):' in tui
