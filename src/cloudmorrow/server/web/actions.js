@@ -477,7 +477,11 @@ export const linksFor = (quill, fields) => linkTitles(quill, fields.filter((f) =
     else — the view drawing itself again, the sheet showing what changed. */
 export async function press(quill, action, { record = "", args = {}, here = hereNow(), after = null } = {}) {
   if (!action) { toast("That is not something you can do here"); return; }
-  if (action.fields && action.fields.length) return openForm(quill, action, { record, args, here, after });
+  // The form opens for what is left to fill in; a button whose args answer
+  // every field of the action runs it at once, as the terminal does.
+  const fields = action.fields || [];
+  const unanswered = fields.some((f) => args[f.name] === undefined || args[f.name] === null || args[f.name] === "");
+  if (fields.length && unanswered) return openForm(quill, action, { record, args, here, after });
   if (action.confirm && !(await ask(action.confirm, { yes: action.label, tone: action.tone }))) return;
   await run(quill, action, { record, fields: args, here, after });
 }
