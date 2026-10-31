@@ -151,6 +151,12 @@ Button.view-button:focus {
     text-style: bold underline;
 }
 
+Button.view-button.-current {
+    border: tall $accent;
+    color: $accent;
+    text-style: bold;
+}
+
 Button.view-button.-primary {
     color: $action-ink;
     background: $action;

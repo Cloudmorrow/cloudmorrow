@@ -67,3 +67,18 @@ def test_a_split_and_the_current_card_are_said_as_text():
     assert ui.children(tree) == [tree["side"], tree["main"]]
     with pytest.raises(ui.TreeError, match="show is side or main"):
         ui.split(ui.text("a"), ui.text("b"), show="both")
+
+
+def test_a_current_button_and_a_splits_way_back_are_said():
+    from cloudmorrow.quill import text as _text
+    from cloudmorrow.quill import ui
+
+    tree = ui.split(
+        ui.row(ui.button("Inbox", go="mail", current=True), ui.button("Sent", go="mail")),
+        ui.text("open"),
+        show="main",
+        back={"folder": "inbox"},
+    )
+    checked = ui.check(tree, screens={"mail"})
+    assert checked["back"] == {"folder": "inbox"}
+    assert "[▸Inbox]   [Sent]" in _text.render(checked)

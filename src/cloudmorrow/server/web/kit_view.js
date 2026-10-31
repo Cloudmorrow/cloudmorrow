@@ -21,7 +21,7 @@
    back when the view is drawn again. */
 
 import {
-  api, apiRaw, app, esc, go, heading, icons, mount, nav, recordsUrl, tabs, toast, wireShell,
+  api, apiRaw, app, back, esc, go, heading, icons, mount, nav, recordsUrl, tabs, toast, wireShell,
 } from "./core.js";
 import { canDrag, fieldOf, mayWrite, read, segments, sheetHash, spoken, titleOf, widget } from "./kit.js";
 import {
@@ -88,7 +88,18 @@ export async function embedView(root, at, params = {}) {
     if (!handler) return;
     event.preventDefault();
     event.stopPropagation();
-    handler(el, event);
+    // A press that takes a while — an action that reaches out — shows it on
+    // the button itself until it is over: busy, and not to be pressed twice.
+    const outcome = handler(el, event);
+    if (outcome && typeof outcome.then === "function") {
+      el.setAttribute("aria-busy", "true");
+      if ("disabled" in el) el.disabled = true;
+      outcome.finally(() => {
+        if (!el.isConnected) return;
+        el.removeAttribute("aria-busy");
+        if ("disabled" in el) el.disabled = false;
+      });
+    }
   });
   // And one for the menu a row, card or tile has — a right-click on a
   // computer, a finger held on it on a phone — numbered the same way.
@@ -150,6 +161,7 @@ function paint(v) {
   const pressed = pressedIn(v.tree);
   if (v.at.screen.compose) pressed.add(v.at.screen.compose.action);
   hideFromBar(pressed);
+  if (!v.at.embedded) syncBack(v);
 }
 
 /** A handler for an element, as the attribute the element carries. */
@@ -260,6 +272,22 @@ async function fetchLinks(v, tree) {
 }
 
 /** The actions the view has a button, a form or an empty state's button for. */
+/** The way back a split names when it shows its main: the screen's back
+    button, put in the bar as a page of a document has one, or taken out. */
+function syncBack(v) {
+  const bar = app.querySelector("header.nav .left");
+  if (!bar) return;
+  const split = [...walk(v.tree)].find((n) => n.ui === "split" && n.show === "main" && n.back);
+  const had = bar.querySelector("[data-view-back]");
+  if (!split) { if (had) had.remove(); return; }
+  const hash = screenAt(v.at.quill.id, v.at.screen.id, split.back);
+  if (had && had.dataset.back === hash) return;
+  if (had) had.remove();
+  bar.insertAdjacentHTML("afterbegin",
+    `<button class="back" data-view-back data-back="${esc(hash)}">${icons.chevronLeft}${esc(v.at.screen.label)}</button>`);
+  bar.querySelector("[data-view-back]").addEventListener("click", () => back(hash));
+}
+
 function pressedIn(tree) {
   const ids = new Set();
   for (const n of walk(tree)) if (n.action) ids.add(n.action);
@@ -397,9 +425,10 @@ function pressable(v, n) {
 function drawButton(v, n) {
   const does = pressable(v, n);
   if (!does) return "";
-  const cls = `act-button ${toneClass(v, n.tone)}`.trim();
-  if (does.href && does.href !== location.hash) return `<a class="${cls}" href="${esc(does.href)}">${esc(n.label)}</a>`;
-  return `<button type="button" class="${cls}" ${doing(v, does.run)}>${esc(n.label)}</button>`;
+  const cls = `act-button ${toneClass(v, n.tone)}${n.current ? " current" : ""}`.trim();
+  const now = n.current ? ' aria-current="page"' : "";
+  if (does.href && does.href !== location.hash) return `<a class="${cls}"${now} href="${esc(does.href)}">${esc(n.label)}</a>`;
+  return `<button type="button" class="${cls}"${now} ${doing(v, does.run)}>${esc(n.label)}</button>`;
 }
 
 // -- a field -----------------------------------------------------------------------------------

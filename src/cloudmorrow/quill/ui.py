@@ -115,13 +115,15 @@ def columns(*children) -> dict:
     return _node("columns", children=_children(children))
 
 
-def split(side, main, *, show: str = "side") -> dict:
+def split(side, main, *, show: str = "side", back: dict | None = None) -> dict:
     """A list beside what is chosen in it: *side* narrow on the left, *main* wide
     on the right, on a wide screen. A phone has room for one: *show* says which,
-    "side" or "main" — the list until something is chosen, then that."""
+    "side" or "main" — the list until something is chosen, then that. *back*,
+    with "main" shown, is the way back to the list: this screen with those
+    parameters, drawn as the screen's back button, as a page of a document has."""
     if show not in ("side", "main"):
         raise TreeError("split: show is side or main")
-    return _node("split", side=side, main=main, show=show)
+    return _node("split", side=side, main=main, show=show, back=dict(back) if back is not None else None)
 
 
 def tabs(*pairs, **named) -> dict:
@@ -190,8 +192,10 @@ def button(
     go: str | None = None,
     params: dict | None = None,
     tone: str = "neutral",
+    current: bool = False,
 ) -> dict:
-    """Runs an action (with its form, when it has fields), opens a record, or goes to a screen."""
+    """Runs an action (with its form, when it has fields), opens a record, or goes to a screen.
+    *current* marks the one of a row that is where you are: the folder you are in."""
     if sum(x is not None for x in (action, open, go)) != 1:
         raise TreeError(f"button {label!r} does one thing: action=, open= or go=")
     return _node(
@@ -204,6 +208,7 @@ def button(
         go=go,
         params=dict(params) if params else None,
         tone=tone,
+        current=True if current else None,
     )
 
 
@@ -352,7 +357,7 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
     "stack": {"children": (list, True), "gap": (str, False)},
     "row": {"children": (list, True), "wrap": (bool, False)},
     "columns": {"children": (list, True)},
-    "split": {"side": (dict, True), "main": (dict, True), "show": (str, False)},
+    "split": {"side": (dict, True), "main": (dict, True), "show": (str, False), "back": (dict, False)},
     "tabs": {"tabs": (list, True)},
     "text": {"text": (str, True), "style": (str, False)},
     "markdown": {"text": (str, True)},
@@ -372,6 +377,7 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
         "go": (str, False),
         "params": (dict, False),
         "tone": (str, False),
+        "current": (bool, False),
     },
     "menu": {"label": (str, True), "items": (list, True)},
     "table": {

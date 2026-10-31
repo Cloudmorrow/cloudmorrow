@@ -716,7 +716,9 @@ def test_a_backup_from_before_the_store_is_still_listed_and_restored_whole(clien
     """Format 1: an archive per drive. Whole drives come back; there is nothing to browse."""
     a_drive_with_files(client, config)
     set_up(client, auth, store, parts=["drives"])
-    stamp = "20261001T030000Z"
+    # Three days ago, never a fixed date: a stamp older than the days kept is
+    # pruned, and a fixed one went stale the month after it was written.
+    stamp = (dt.datetime.now(dt.UTC) - dt.timedelta(days=3)).strftime("%Y%m%dT030000Z")
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
         tar.add(config.files_root("bram"), arcname="files")
