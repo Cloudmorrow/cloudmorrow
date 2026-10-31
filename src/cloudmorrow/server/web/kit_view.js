@@ -88,7 +88,18 @@ export async function embedView(root, at, params = {}) {
     if (!handler) return;
     event.preventDefault();
     event.stopPropagation();
-    handler(el, event);
+    // A press that takes a while — an action that reaches out — shows it on
+    // the button itself until it is over: busy, and not to be pressed twice.
+    const outcome = handler(el, event);
+    if (outcome && typeof outcome.then === "function") {
+      el.setAttribute("aria-busy", "true");
+      if ("disabled" in el) el.disabled = true;
+      outcome.finally(() => {
+        if (!el.isConnected) return;
+        el.removeAttribute("aria-busy");
+        if ("disabled" in el) el.disabled = false;
+      });
+    }
   });
   // And one for the menu a row, card or tile has — a right-click on a
   // computer, a finger held on it on a phone — numbered the same way.

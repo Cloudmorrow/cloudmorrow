@@ -652,3 +652,13 @@ def test_a_button_whose_args_answer_every_field_runs_the_action_at_once():
     assert "if (fields.length && unanswered) return openForm(quill, action, { record, args, here, after });" in actions
     tui = (WEB.parents[1] / "tui" / "quill_actions.py").read_text(encoding="utf-8")
     assert 'if any(field["name"] not in values for field in fields):' in tui
+
+
+def test_a_views_button_shows_it_is_busy_while_its_action_runs():
+    """An action that reaches out takes a while: the pressed button is marked
+    busy and disabled until it is over, and the stylesheet dims it."""
+    view = (WEB / "kit_view.js").read_text(encoding="utf-8")
+    assert 'if (outcome && typeof outcome.then === "function") {' in view
+    assert 'el.setAttribute("aria-busy", "true");' in view and 'el.removeAttribute("aria-busy");' in view
+    css = (WEB / "kit_view.css").read_text(encoding="utf-8")
+    assert '.quill-view .act-button[aria-busy="true"]' in css

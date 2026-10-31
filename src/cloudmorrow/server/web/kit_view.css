@@ -168,6 +168,8 @@
 
 /* -- menus and buttons in a row --------------------------------------------------- */
 .v-row > .act-button { flex: none; }
+/* A button whose action is still running: dimmed, the cursor says so. */
+.quill-view .act-button[aria-busy="true"], .quill-view .act-chip[aria-busy="true"] { opacity: .55; cursor: progress; }
 .v-menu svg { margin-left: 2px; color: var(--muted); }
 
 /* -- a table ---------------------------------------------------------------------- */
