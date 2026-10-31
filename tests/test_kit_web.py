@@ -660,3 +660,13 @@ def test_a_view_draws_a_splits_way_back_in_the_bar_and_marks_the_current_button(
     assert "data-view-back data-back=" in view and "if (!v.at.embedded) syncBack(v);" in view
     assert '${n.current ? " current" : ""}' in view
     assert ".quill-view .act-button.current {" in (WEB / "kit_view.css").read_text(encoding="utf-8")
+
+
+def test_a_views_button_shows_it_is_busy_while_its_action_runs():
+    """An action that reaches out takes a while: the pressed button is marked
+    busy and disabled until it is over, and the stylesheet dims it."""
+    view = (WEB / "kit_view.js").read_text(encoding="utf-8")
+    assert 'if (outcome && typeof outcome.then === "function") {' in view
+    assert 'el.setAttribute("aria-busy", "true");' in view and 'el.removeAttribute("aria-busy");' in view
+    css = (WEB / "kit_view.css").read_text(encoding="utf-8")
+    assert '.quill-view .act-button[aria-busy="true"]' in css
