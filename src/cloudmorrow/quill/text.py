@@ -84,8 +84,7 @@ def _lines(node: dict, actions: dict) -> list[str]:
     if kind == "form":
         return [f"[{node.get('submit') or actions.get(node['action'], node['action'])}…]"]
     if kind == "button":
-        target = node.get("action") and actions.get(node["action"], node["action"])
-        return [f"[{node['label']}]" if not target or target == node["label"] else f"[{node['label']}]"]
+        return [f"[▸{node['label']}]" if node.get("current") else f"[{node['label']}]"]
     if kind == "menu":
         return [f"{node['label']}: " + " ".join(line for item in node["items"] for line in _lines(item, actions))]
     if kind == "table":

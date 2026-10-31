@@ -168,6 +168,8 @@
 
 /* -- menus and buttons in a row --------------------------------------------------- */
 .v-row > .act-button { flex: none; }
+/* The one of a row of buttons that is where you are: the folder you are in. */
+.quill-view .act-button.current { border-color: var(--accent); color: var(--accent); background: var(--card-2); font-weight: 600; }
 .v-menu svg { margin-left: 2px; color: var(--muted); }
 
 /* -- a table ---------------------------------------------------------------------- */

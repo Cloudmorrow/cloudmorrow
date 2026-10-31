@@ -282,11 +282,11 @@ one:
 | primitive | what it is |
 | --- | --- |
 | `stack`, `row`, `columns`, `tabs` | layout; columns stack on a phone, rows wrap |
-| `split(side, main, show=)` | a list beside what is chosen in it: `side` narrow on the left, `main` wide on the right, on a computer; a phone draws only the one `show` names (`"side"` until something is chosen, then `"main"`) |
+| `split(side, main, show=, back=)` | a list beside what is chosen in it: `side` narrow on the left, `main` wide on the right, on a computer; a phone draws only the one `show` names (`"side"` until something is chosen, then `"main"`); `back`, with main shown, is the parameters of this screen that go back to the list, drawn as the screen's back button |
 | `text(style=)`, `markdown`, `image`, `badge`, `stat`, `empty`, `divider` | content |
 | `field(record, name, edit=)` | one field of a record, with its kind's widget; editable saves as it changes |
 | `form(action, values=, record=)` | an action's form, drawn in place |
-| `button(label, action= \| open= \| go=)`, `menu` | run an action, open a record, go to a screen |
+| `button(label, action= \| open= \| go=, current=)`, `menu` | run an action, open a record, go to a screen; `current` marks the one of a row that is where you are |
 | `table(records, columns=, actions=, go=, param=)`, `cards(records, title=, …, go=, param=, current=)` | records, a row or a card each; opening one shows its sheet — or, with `go`, a screen of the Quill's own, with the record's id as `param`; `current` is the id of the card that is open, lit as such |
 | `gallery(records, title=, subtitle=, badge=, stars=, rate=, actions=)` | records as tiles with their own picture (a file's thumbnail; a video's is a frame of it) and five stars; pressing a star runs `rate` with `stars=` |
 | `lanes(records, field=, title=)` | records in columns by an enum; dragging moves the record, as a board does |

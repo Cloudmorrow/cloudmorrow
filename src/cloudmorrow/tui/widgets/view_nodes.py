@@ -154,6 +154,8 @@ class ViewButton(Button):
         )
         self.node = node
         self.add_class("view-button")
+        if node.get("current"):
+            self.add_class("-current")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         event.stop()

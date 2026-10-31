@@ -652,3 +652,11 @@ def test_a_button_whose_args_answer_every_field_runs_the_action_at_once():
     assert "if (fields.length && unanswered) return openForm(quill, action, { record, args, here, after });" in actions
     tui = (WEB.parents[1] / "tui" / "quill_actions.py").read_text(encoding="utf-8")
     assert 'if any(field["name"] not in values for field in fields):' in tui
+
+
+def test_a_view_draws_a_splits_way_back_in_the_bar_and_marks_the_current_button():
+    view = (WEB / "kit_view.js").read_text(encoding="utf-8")
+    assert 'const split = [...walk(v.tree)].find((n) => n.ui === "split" && n.show === "main" && n.back);' in view
+    assert "data-view-back data-back=" in view and "if (!v.at.embedded) syncBack(v);" in view
+    assert '${n.current ? " current" : ""}' in view
+    assert ".quill-view .act-button.current {" in (WEB / "kit_view.css").read_text(encoding="utf-8")
