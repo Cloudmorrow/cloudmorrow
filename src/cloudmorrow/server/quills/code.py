@@ -230,7 +230,9 @@ class HostCalls:
         model = self._model(args)
         owner = str(args.get("owner") or "").strip()
         by = str(args.get("by") or "").strip()
-        if owner and owner != self.principal.username:
+        # A delivery from outside (by=) is one even to whoever the job runs as:
+        # the administrator's own mail comes in unread, from its sender, too.
+        if owner and (owner != self.principal.username or by):
             self._may_deliver(model, owner)
         elif by:
             raise sdk.Invalid("by= says who a delivery is from: it goes with owner=")

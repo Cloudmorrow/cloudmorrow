@@ -196,6 +196,17 @@ def test_a_delivery_into_somebodys_space_is_news_to_them_and_the_deliverer_sees_
     assert spaces("GET", "/api/records/message", who=spaces.guest) == []
 
 
+def test_a_delivery_to_the_postman_itself_is_news_to_them_too(spaces):
+    """Mail to the administrator the job runs as: theirs, from its sender, unread."""
+    store = spaces.client.app.state.cloudmorrow.records
+    postman = Principal("quill", "bram", quill="talk", models=frozenset({"channel", "message"}))
+    room = store.create(postman, "channel", {"name": "Bram's mail"}, scope="shared", owner="bram")
+    mail = store.create(postman, "message", {"channel": room.id, "body": "hi"}, owner="bram", by="ada@example.org")
+    assert mail.owner == "ada@example.org"
+    mine = next(c for c in spaces("GET", "/api/records/channel") if c["id"] == room.id)
+    assert mine["unread"] == 1
+
+
 def test_deleting_a_space_takes_everybodys_things_in_it(spaces):
     room = spaces("POST", "/api/records/channel", {"fields": {"name": "tmp"}, "scope": "public"}, expect=201)
     spaces(

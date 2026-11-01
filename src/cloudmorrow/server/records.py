@@ -1216,7 +1216,7 @@ class RecordStore:
         and is then that sender's rather than the owner's: unread to the
         owner until they look, theirs to read and not to change.
         """
-        delivered = bool(owner and owner != principal.username)
+        delivered = bool(owner and (owner != principal.username or by))
         if delivered:
             principal = dataclasses.replace(principal, username=owner)
         self._check(principal, "write", model_id)

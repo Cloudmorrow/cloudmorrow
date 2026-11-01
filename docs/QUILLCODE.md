@@ -226,7 +226,8 @@ delivery into a space tells everybody in it, Sam included, and marks
 nothing as looked at. A record delivered into one of Sam's spaces may say
 who it is `by=` — an outside address — and is then that sender's rather
 than Sam's: unread to Sam until they look, theirs to read and never to
-change. Only a job or a webhook may deliver, only a server Quill (never
+change. With `by=` it is a delivery even to the installer themself — their
+own mail comes in unread, from its sender, like anybody's. Only a job or a webhook may deliver, only a server Quill (never
 somebody's own), and only a datamodel the Quill itself introduced;
 anything else is refused. A view or an action, pressed by a person, writes
 as that person and nobody else.
