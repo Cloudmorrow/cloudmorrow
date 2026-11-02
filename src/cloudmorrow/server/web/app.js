@@ -15,6 +15,7 @@ import "./admin.js";
 import "./circlesadmin.js";
 import "./rolesadmin.js";
 import "./approvals.js";
+import "./notifications.js";
 import "./flows.js";
 import "./quillsadmin.js";
 import "./backupsadmin.js";

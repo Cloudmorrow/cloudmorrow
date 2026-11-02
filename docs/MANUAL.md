@@ -193,7 +193,7 @@ cm login
 | a Quill | its tab | its card (`f1`, `f2`, …) | `cm <quill> list`, `add`, `show`, … |
 | one record | tap its row: the sheet | `enter` on its row: the sheet | `cm <quill> show <id>` |
 | you, and your switches | **Me**, top right | **Settings**, `ctrl+g` | `cm whoami`, `cm config` |
-| what the machines did | not yet | the bell, `f8` | `cm agent list`, `cm agent jobs <id>` |
+| what the machines did | the bell, top right | the bell, `f8` | `cm agent list`, `cm agent jobs <id>` |
 | administration | **Administration** in the rail on a computer; **Me → Administration** on a phone | **Administration**, `f9` | `cm circle`, `cm role`, `cm quill`; accounts with `cloudmorrow-server user` on the box |
 | what waits for your yes, and your flows | **Me → Waiting for you**, **Me → Flows** | not yet | `cm approvals`, `cm approve`, `cm flow list` |
 
@@ -1478,7 +1478,8 @@ for permission the way any site does. A tab gets the banner while the
 browser is running; the count on the icon is the installed app's. Once it is
 on, **Send a test** pushes you, because everything between the server and
 the banner fails silently and otherwise the only test is asking somebody to
-message you.
+message you. Everything behind the bell is pushed too, not only messages,
+and the bell's list offers **Turn on** as well until it is on.
 
 Set `push_subject` in the server config to the `mailto:` or `https:` URL a
 push service should complain to. Left empty it is derived from `public_url`,
@@ -2452,11 +2453,20 @@ list and pointing the agent at the local port with `--url`.
 ### Notifications
 
 What happens to you elsewhere — a Quill shared with you, somebody asking
-an administrator for one — leaves a note on the server. The bell at the far right of the terminal app's top bar carries the
-count of the unread ones; ringing it (`f8`, or a click) opens the list, with
-one button to say you have read them. They are facts, not messages — nothing
-pushes them at you yet, which is what makes them the right thing to hang a
-live channel off later.
+an administrator for one, an approval asked, a machine's sync — leaves a note
+on the server. The bell carries the count of the unread ones, and is there
+whether anything is unread or not, so the last fifty are always one tap away:
+
+- **The web app:** in the top right corner of every tab's screen, beside Me.
+  A tap opens the list, newest first, and opening it reads them.
+- **The terminal app:** at the far right of the top bar; ringing it (`f8`, or
+  a click) opens the list, with one button to say you have read them.
+
+Each note is also pushed to every device that has notifications on, so a
+computer's browser pops it as a banner the way a phone does, and a click on
+the banner opens the list. To turn them on in Chrome (or any browser on a
+computer), open the bell, or **Me**, and press **Turn on**; the browser asks
+once. Chrome shows them while it is running, even with the tab closed.
 
 ```bash
 curl -s $CLOUDMORROW/api/notifications -H "Authorization: Bearer $TOKEN"

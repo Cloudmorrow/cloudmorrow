@@ -99,3 +99,22 @@ def test_another_user_cannot_read_them(client, auth):
 def test_they_need_a_credential_at_all(client):
     assert client.get("/api/notifications").status_code == 401
     assert client.post("/api/agent/notifications", json={"title": "hi"}).status_code == 401
+
+
+def test_a_new_one_is_handed_to_whatever_pushes_it_unless_told_not_to(config):
+    config.ensure_dirs()
+    store = NotificationStore(config.db_path)
+    heard = []
+    store.on_add.append(lambda note: heard.append(note.title))
+    store.on_add.insert(0, lambda note: 1 / 0)  # a broken hook is nobody's problem
+
+    store.add("bram", title="pushed")
+    store.add("bram", title="pushed by the caller itself", push=False)
+
+    assert heard == ["pushed"]
+    assert len(store.list("bram")) == 2
+
+
+def test_a_running_server_pushes_every_note(client):
+    # spacenotify hangs the push on the store, so a note reaches the browser too.
+    assert client.app.state.cloudmorrow.notifications.on_add

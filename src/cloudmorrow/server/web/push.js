@@ -17,7 +17,7 @@
    phone that reads its messages when it opens the app, which is what the app
    did before any of this. */
 
-import { api, esc, onSignOut, session, toast } from "./core.js";
+import { api, esc, onSignIn, onSignOut, session, setBellCount, toast } from "./core.js";
 
 // How often the badge is checked while the app is up. The push is what makes
 // it prompt; this is only so a count cleared on the laptop does not sit on
@@ -68,6 +68,7 @@ export async function refreshBadge() {
     return counts;   // offline: leave the icon saying what it last knew
   }
   await paint(counts.badge);
+  setBellCount(counts.notifications);
   for (const fn of badgeHooks) fn(counts);
   return counts;
 }
@@ -176,8 +177,8 @@ function words() {
     unsupported: ["Notifications", "This browser cannot show them."],
     "not-installed": ["Notifications", "Add Cloudmorrow to your Home Screen first, then turn them on here."],
     default: ["Notifications", app
-      ? "Get a banner and a count on the icon when somebody writes."
-      : "Get a banner from this browser when somebody writes."],
+      ? "Get a banner and a count on the icon when somebody writes or something happens."
+      : "Get a banner from this browser when somebody writes or something happens."],
     denied: ["Notifications", isIOS()
       ? "Turned off in Settings › Notifications › Cloudmorrow."
       : "Turned off for this site. Allow them in the browser's site settings — the icon beside the address."],
@@ -255,9 +256,17 @@ setInterval(() => {
   if (document.visibilityState === "visible") refreshBadge();
 }, EVERY);
 
+// Signing in on a page already open: the bell and the icon catch up at
+// once rather than on the next minute's look.
+onSignIn(() => {
+  worker().then(() => subscribe()).catch(() => {});
+  refreshBadge();
+});
+
 onSignOut(() => {
   counts = { messages: 0, notifications: 0, badge: 0 };
   paint(0);
+  setBellCount(0);
   // The device stays subscribed on purpose: signing out of the phone app and
   // back in is routine, and asking iOS for permission again each time is the
   // quickest way to have it refused for good. `disable()` is the way out.

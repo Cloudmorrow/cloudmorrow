@@ -123,7 +123,7 @@ def test_the_app_opens_on_today_and_me_is_in_the_corner_not_the_bar():
     # Me is a link in the bar's right corner on every top-level screen, and
     # no longer a tab; its own screen has a way back instead.
     assert 'class="button me-link" href="#/me"' in core
-    assert "if (backTo === undefined) right += meLink();" in core
+    assert "if (backTo === undefined) right += bellLink() + meLink();" in core
     assert "registerTab" not in me
     assert 'nav({ back, backLabel: "Back", title: "Me" })' in me
 
@@ -209,3 +209,16 @@ def test_the_page_does_not_zoom_under_a_double_tap_or_a_small_field():
     for path in sorted(WEB.glob("*.css")):
         for match in small.finditer(path.read_text()):
             assert float(match.group(2)) >= 16, f"{path.name}: {match.group(0)}"
+
+
+def test_the_bell_is_always_in_the_corner_and_leads_to_the_notifications():
+    core = (WEB / "core.js").read_text()
+    push = (WEB / "push.js").read_text()
+    notes = (WEB / "notifications.js").read_text()
+    # Drawn whether or not anything is unread; the count is only added to it.
+    assert 'href="#/notifications"' in core
+    assert "setBellCount(counts.notifications);" in push
+    assert 'registerScreen("notifications"' in notes
+    assert 'import "./notifications.js";' in (WEB / "app.js").read_text()
+    # A browser not yet asked is offered the banners there.
+    assert "pushCard()" in notes

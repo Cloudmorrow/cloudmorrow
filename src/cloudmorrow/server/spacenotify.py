@@ -5,6 +5,8 @@ it is news (`RecordStore.on_notify`), and *that* somebody was added to one
 (`on_member_added`). This module is what that means on a phone: a push with
 the space's name and the first line of what was said, and, for being added,
 a line behind the bell as well — the way chat and calendar always did it.
+And every other line behind the bell (`NotificationStore.on_add`) is pushed
+the same way, so a computer's browser pops it as a phone does.
 
 Pushes go out on a thread, after the write has answered: nobody waits on a
 phone's push service to hear that their message was sent. One thread, taking
@@ -162,7 +164,7 @@ def install(state: AppState) -> None:
         name = str(space.fields.get(model.title) if model else "") or space.id
         label = model.label.lower() if model else "space"
         said = f"{by} added you to the {label} {name}"
-        state.notifications.add(username, kind=f"{space.model}.added", title=said, body="")
+        state.notifications.add(username, kind=f"{space.model}.added", title=said, body="", push=False)
         quill, screen = _where(state, space.model)
         url = f"#/q/{quill}/{screen}/{space.id}" if quill else ""
         _later(
@@ -171,5 +173,16 @@ def install(state: AppState) -> None:
             )
         )
 
+    def noted(note) -> None:
+        # Everything else behind the bell — an approval asked, a flow's line,
+        # a Quill updated — reaches the phone and the computer's browser too,
+        # and a click on it opens the bell's list.
+        _later(
+            lambda: notify_message(
+                state, [note.owner], title=note.title, body=note.body, url="#/notifications", tag=f"note-{note.id}"
+            )
+        )
+
     state.records.on_notify.append(written)
     state.records.on_member_added.append(added)
+    state.notifications.on_add.append(noted)
