@@ -106,8 +106,11 @@ def test_most_used_quills_stand_under_today_on_the_rail_only() -> None:
     core = (WEB / "core.js").read_text(encoding="utf-8")
     desktop = (WEB / "desktop.css").read_text(encoding="utf-8")
     assert 'section("Most used", mostUsed(own.filter((t) => t.section)), drawUsed)' in core
-    assert core.index('own.filter((t) => !t.section).map(draw)') < core.index('section("Most used"') \
+    assert (
+        core.index("own.filter((t) => !t.section).map(draw)")
+        < core.index('section("Most used"')
         < core.index("shelves(own.filter")
+    )
     assert 'store.set("quills.used", JSON.stringify(uses));' in core
     assert ".tabs .tab.used { display: none; }" in desktop
     assert "  .tabs .tab.used { display: flex; }" in desktop
