@@ -222,6 +222,16 @@ const ICONS = {
     ".XXXXXX.",
     "XXXXXXXX",
   ],
+  bell: [
+    "...XX...",
+    "..XXXX..",
+    ".XXXXXX.",
+    ".XXXXXX.",
+    ".XXXXXX.",
+    "XXXXXXXX",
+    "........",
+    "...XX...",
+  ],
   today: [
     "...XX...",
     "........",

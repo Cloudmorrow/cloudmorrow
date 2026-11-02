@@ -5,18 +5,22 @@ one — and the only place all of them can leave a note is the server. So that
 is where the notes live, and the TUI reads them back.
 
 A notification is a fact, not a message: who it was about, what happened, and
-when. Nothing here delivers anything; a channel that pushes these out as they
-land can sit on top of the same rows later.
+when. Nothing here delivers anything: whatever wants to hear of one as it
+lands — the push to a phone or a browser (spacenotify.py) — hangs itself on
+`on_add` and is told after the row is written.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
 from cloudmorrow.server.database import Connection, Database
 from cloudmorrow.server.database import open as open_database
+
+log = logging.getLogger("cloudmorrow.notifications")
 
 # Anything longer is a log line, not a notification.
 MAX_BODY_CHARS = 2000
@@ -74,6 +78,9 @@ class NotificationStore:
     def __init__(self, db: Database | Path) -> None:
         self.db = open_database(db)
         self.db.connect().close()
+        # Told of each new one, after it is written: fn(note). A hook that
+        # fails is logged, never the writer's problem.
+        self.on_add: list = []
 
     def add(
         self,
@@ -83,7 +90,10 @@ class NotificationStore:
         kind: str = "info",
         machine: str = "",
         body: str = "",
+        push: bool = True,
     ) -> Notification:
+        """Leave a note behind *owner*'s bell. *push* False for a caller that
+        sends its own, better-worded push for the same thing."""
         title = title.strip()[:200] or "(untitled)"
         with self.db.connect() as conn:
             made = conn.insert(
@@ -105,7 +115,14 @@ class NotificationStore:
                 (owner, owner, KEEP),
             )
             row = conn.execute("SELECT * FROM notifications WHERE id = ?", (made,)).fetchone()
-        return _row(conn, row)
+            note = _row(conn, row)
+        if push:
+            for fn in self.on_add:
+                try:
+                    fn(note)
+                except Exception:
+                    log.exception("a notification hook failed")
+        return note
 
     def list(self, owner: str, *, limit: int = 50, unread_only: bool = False) -> list[Notification]:
         query = "SELECT * FROM notifications WHERE owner = ?"

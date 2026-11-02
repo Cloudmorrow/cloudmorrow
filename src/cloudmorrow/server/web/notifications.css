@@ -1,0 +1,18 @@
+/* Notifications, behind the bell. A line may run long: the body wraps
+   rather than being cut, and an unread one has the dot a thread's tab has. */
+.note-row { align-items: flex-start; }
+.note-row .title { white-space: normal; }
+.note-row .note-body { display: block; margin-top: 2px; color: var(--ink); opacity: .8; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.note-row.is-new { position: relative; }
+.note-row.is-new::after {
+  content: "";
+  position: absolute;
+  top: 18px;
+  right: 14px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.note-row.is-new .main { padding-right: 18px; }
+.notifications .push-card { margin-bottom: 8px; }

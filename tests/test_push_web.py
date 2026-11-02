@@ -41,7 +41,7 @@ def test_the_card_speaks_to_a_tab_and_to_an_installed_app_in_their_own_words():
     hears about the Home Screen."""
     card = PUSH_JS.split("function words()", 1)[1].split("export function pushCard", 1)[0]
     assert "Add Cloudmorrow to your Home Screen first" in card
-    assert "Get a banner from this browser when somebody writes." in card
+    assert "Get a banner from this browser when somebody writes or something happens." in card
     assert "This browser gets a banner while it is running." in card
     assert "Settings › Notifications › Cloudmorrow" in card and "browser's site settings" in card
     assert "isIOS()" in card and "installed()" in card

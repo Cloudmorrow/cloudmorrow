@@ -386,6 +386,17 @@ const PIXELS = {
     ".XXXXXX.",
     "XXXXXXXX",
   ],
+  // What happened while you were not looking, in the bar's corner.
+  bell: [
+    "...XX...",
+    "..XXXX..",
+    ".XXXXXX.",
+    ".XXXXXX.",
+    ".XXXXXX.",
+    "XXXXXXXX",
+    "........",
+    "...XX...",
+  ],
   // The sun coming up over a line: today, before it is anything else.
   today: [
     "...XX...",
@@ -794,7 +805,9 @@ export function nav({ back: backTo, backLabel, title, right = "" }) {
   // Who you are, in the top corner of every screen that is a tab: the one
   // place that is the same on all of them. A screen with a back button is
   // inside something, and its corner is that something's to use.
-  if (backTo === undefined) right += meLink();
+  // The bell beside it, on the same screens, whether or not anything is
+  // waiting: the last notifications are always one tap away.
+  if (backTo === undefined) right += bellLink() + meLink();
   // What the window is called, for a browser with twenty tabs open. A
   // phone has no use for it and no way to see it; it costs one line. An
   // app window (from a home screen, or Chrome's) is the cloud's already
@@ -810,6 +823,18 @@ export function nav({ back: backTo, backLabel, title, right = "" }) {
   return `<header class="nav"><div class="left">${left}</div>` +
     `<div class="center">${wordmark(CLOUD_NAME)}` +
     `<span class="text">${esc(title)}</span></div><div class="right">${right}</div></header>`;
+}
+
+/** The bell, in the bar's right corner: the notifications, with how many
+    are unread. push.js keeps the number (setBellCount). */
+let bellCount = 0;
+const bellLabel = (n) => (n ? `Notifications, ${n} unread` : "Notifications");
+export const bellLink = () =>
+  `<a class="button bell-link${bellCount ? " rung" : ""}" href="#/notifications" aria-label="${bellLabel(bellCount)}">` +
+  `${pixelIcon("bell")}<span class="bell-count">${bellCount > 99 ? "99+" : bellCount || ""}</span></a>`;
+export function setBellCount(n) {
+  bellCount = n || 0;
+  for (const link of document.querySelectorAll(".bell-link")) link.outerHTML = bellLink();
 }
 
 /** The way to Me, in the bar's right corner. */
