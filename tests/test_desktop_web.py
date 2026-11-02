@@ -15,7 +15,13 @@ from cloudmorrow.server.routes.web import WEB
 
 # The only selectors allowed to reach the phone: all are for elements that
 # did not exist before this file, and all only hide them.
-PHONE_SAFE = {".tabs .rail-head", ".aside-tabs .tabs, .aside-tabs .subtabs", ".tabs .rail-section", ".tabs .tab.admin"}
+PHONE_SAFE = {
+    ".tabs .rail-head",
+    ".aside-tabs .tabs, .aside-tabs .subtabs",
+    ".tabs .rail-section",
+    ".tabs .tab.admin",
+    ".tabs .tab.used",
+}
 
 
 def strip_comments(css: str) -> str:
@@ -92,6 +98,24 @@ def test_the_rail_shelves_the_quills_by_their_categories() -> None:
     assert core.index("shelves(own.filter") < core.index('section("Your cloud"')
     # The heading is the catalog's text, escaped on the way in.
     assert '<div class="rail-section">${esc(title)}</div>' in core
+
+
+def test_most_used_quills_stand_under_today_on_the_rail_only() -> None:
+    """The Quills opened most on this device are copied under Today, in a
+    Most used section of the rail; the phone's bar hides the copies."""
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    desktop = (WEB / "desktop.css").read_text(encoding="utf-8")
+    assert 'section("Most used", mostUsed(own.filter((t) => t.section)), drawUsed)' in core
+    assert (
+        core.index("own.filter((t) => !t.section).map(draw)")
+        < core.index('section("Most used"')
+        < core.index("shelves(own.filter")
+    )
+    assert 'store.set("quills.used", JSON.stringify(uses));' in core
+    assert ".tabs .tab.used { display: none; }" in desktop
+    assert "  .tabs .tab.used { display: flex; }" in desktop
+    # The copies never stand in for the tab itself on a phone.
+    assert 'app.querySelector(".tabs .tab.active:not(.used)")' in core
 
 
 def test_a_quill_is_one_tab_with_its_screens_under_it() -> None:

@@ -21,10 +21,12 @@
 .aside-tabs .tabs, .aside-tabs .subtabs { display: none; }
 /* The rail's sections (the Quills' categories, Your cloud, Administration)
    and the administration pages under the last. A phone's bar has no room
-   for a section: it runs the Quills and Data on after Today, and keeps
-   Administration behind a row in Me. */
+   for a section: it runs the Quills and Data on after Today, keeps
+   Administration behind a row in Me, and has no need of the Most used
+   copies of tabs it already shows. */
 .tabs .rail-section { display: none; }
 .tabs .tab.admin { display: none; }
+.tabs .tab.used { display: none; }
 
 @media (min-width: 900px) and (min-height: 600px) {
   :root {
@@ -137,6 +139,7 @@
     color: var(--bar-muted);
   }
   .tabs .tab.admin { display: flex; }
+  .tabs .tab.used { display: flex; }
   main.admin .seg { display: none; }
   .admin-group { display: none; }
 

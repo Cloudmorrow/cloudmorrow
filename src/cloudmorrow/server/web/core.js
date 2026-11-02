@@ -549,7 +549,7 @@ export function redrawTabs() {
   if (!bar) return;
   // The item lit under an open tab names the screen; the tab itself only
   // names the Quill.
-  const active = bar.querySelector(".tab.sub.active") || bar.querySelector(".tab.active");
+  const active = bar.querySelector(".tab.sub.active") || bar.querySelector(".tab.active:not(.used)");
   for (const strip of app.querySelectorAll(":scope > nav.subtabs")) strip.remove();
   bar.outerHTML = tabs(active ? active.dataset.tab : "");
 }
@@ -775,8 +775,13 @@ function placeTabs(newTabs) {
 // Until the screen is drawn: the tab named, and the tab it is an item of.
 function lightTab(name) {
   for (const t of app.querySelectorAll(":scope > nav > .tab")) {
-    const on = t.dataset.tab === name;
-    const open = !on && (t.dataset.screens || "").split(" ").includes(name);
+    let on = t.dataset.tab === name;
+    let open = !on && (t.dataset.screens || "").split(" ").includes(name);
+    // A Most used copy has no items under it: anywhere in its Quill lights it.
+    if (t.classList.contains("used")) {
+      t.classList.toggle("active", on || open);
+      continue;
+    }
     t.classList.toggle("active", on);
     t.classList.toggle("open", open);
     if (on) t.setAttribute("aria-current", "page");
@@ -884,6 +889,12 @@ export function heading(title, right = "") {
 // phone's bar runs all but the last together, keeps that one behind a row
 // in Me, and the stylesheet keeps the labels off it.
 //
+// Under Today, on the rail only, Most used: the Quills you open most on
+// this device, a short way to them that does not mean finding their shelf.
+// Each is a copy of the Quill's own tab, lit while you are anywhere in it,
+// with no items under it (those stay under the tab on its shelf); the
+// phone's bar has every Quill in one row already and hides the copies.
+//
 // A tab with items under it — a Quill with several screens — is one tab,
 // the Quill's, wherever it stands. Its items are drawn only while you are
 // in it: under the tab in the rail, where the rail has the height, and in
@@ -894,6 +905,8 @@ let lastTab = "";
 export function tabs(active) {
   if (active) lastTab = active;
   const itemOf = (t) => (t.screens || []).find((s) => s.name === active);
+  const shown = shownTabs();
+  countUse(shown.find((t) => t.section && (t.name === active || itemOf(t))));
   const drawItem = (s) =>
     `<a class="tab sub${s.name === active ? " active" : ""}" data-tab="${s.name}" href="${s.href()}"` +
     `${s.name === active ? ' aria-current="page"' : ""}>${s.icon || ""}<span>${s.label}</span></a>`;
@@ -905,17 +918,49 @@ export function tabs(active) {
       ` href="${t.href(on)}"${on ? ' aria-current="page"' : ""}>${typeof t.icon === "function" ? t.icon() : t.icon}` +
       `<span>${t.label}</span></a>` + (open ? t.screens.map(drawItem).join("") : "");
   };
-  const shown = shownTabs();
-  const section = (title, list) =>
-    list.length ? `<div class="rail-section">${esc(title)}</div>` + list.map(draw).join("") : "";
+  const drawUsed = (t) => {
+    const on = t.name === active || !!itemOf(t);
+    return `<a class="tab used${on ? " active" : ""}" data-tab="${t.name}"` +
+      `${t.screens && t.screens.length ? ` data-screens="${t.screens.map((s) => s.name).join(" ")}"` : ""}` +
+      ` href="${t.href(false)}">${typeof t.icon === "function" ? t.icon() : t.icon}<span>${t.label}</span></a>`;
+  };
+  const section = (title, list, how = draw) =>
+    list.length ? `<div class="rail-section">${esc(title)}</div>` + list.map(how).join("") : "";
   const own = shown.filter((t) => !t.admin && !t.cloud);
   const opened = shown.find(itemOf);
   return `<nav class="tabs"><div class="rail-head">${wordmark(CLOUD_NAME)}</div>` +
     own.filter((t) => !t.section).map(draw).join("") +
+    section("Most used", mostUsed(own.filter((t) => t.section)), drawUsed) +
     shelves(own.filter((t) => t.section)).map((s) => section(s.title, s.tabs)).join("") +
     section("Your cloud", shown.filter((t) => t.cloud)) +
     section("Administration", shown.filter((t) => t.admin)) +
     `</nav>` + (opened ? `<nav class="subtabs" aria-label="${esc(opened.label)}">${opened.screens.map(drawItem).join("")}</nav>` : "");
+}
+
+// How often each Quill's tab was opened here, and when last: going into a
+// Quill counts once, however many of its screens you walk through after.
+// Kept in local storage, per device, as the feature switches are.
+const MOST_USED = 5;
+let usedIn = "";
+function readUses() {
+  try { return JSON.parse(store.get("quills.used") || "{}") || {}; } catch { return {}; }
+}
+function countUse(tab) {
+  const name = tab ? tab.name : "";
+  if (name === usedIn) return;
+  usedIn = name;
+  if (!name) return;
+  const uses = readUses();
+  const [count] = uses[name] || [0];
+  uses[name] = [count + 1, Date.now()];
+  store.set("quills.used", JSON.stringify(uses));
+}
+/** The Quills opened most, most first (the latest on a tie), at most five. */
+function mostUsed(tabs) {
+  const uses = readUses();
+  return tabs.filter((t) => uses[t.name])
+    .sort((a, b) => uses[b.name][0] - uses[a.name][0] || uses[b.name][1] - uses[a.name][1])
+    .slice(0, MOST_USED);
 }
 
 /** The shelves the tabs with a `section` stand on, in rank order and then
@@ -951,7 +996,7 @@ export function wireShell() {
   if (!ownTabs && !app.querySelector(":scope > nav.tabs")) app.insertAdjacentHTML("beforeend", tabs(lastTab));
   app.classList.toggle("aside-tabs", !ownTabs);
   // Where the tabs scroll, the one you are on is in sight.
-  const active = app.querySelector(".tabs .tab.active");
+  const active = app.querySelector(".tabs .tab.active:not(.used)");
   if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest", inline: "nearest" });
   const header = app.querySelector(".nav");
   if (header && !app.querySelector("main h1")) header.classList.add("lined");
