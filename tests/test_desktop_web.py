@@ -15,7 +15,13 @@ from cloudmorrow.server.routes.web import WEB
 
 # The only selectors allowed to reach the phone: all are for elements that
 # did not exist before this file, and all only hide them.
-PHONE_SAFE = {".tabs .rail-head", ".aside-tabs .tabs, .aside-tabs .subtabs", ".tabs .rail-section", ".tabs .tab.admin", ".tabs .tab.used"}
+PHONE_SAFE = {
+    ".tabs .rail-head",
+    ".aside-tabs .tabs, .aside-tabs .subtabs",
+    ".tabs .rail-section",
+    ".tabs .tab.admin",
+    ".tabs .tab.used",
+}
 
 
 def strip_comments(css: str) -> str:
