@@ -106,7 +106,7 @@ def test_a_new_one_is_handed_to_whatever_pushes_it_unless_told_not_to(config):
     store = NotificationStore(config.db_path)
     heard = []
     store.on_add.append(lambda note: heard.append(note.title))
-    store.on_add.insert(0, lambda note: 1 / 0)   # a broken hook is nobody's problem
+    store.on_add.insert(0, lambda note: 1 / 0)  # a broken hook is nobody's problem
 
     store.add("bram", title="pushed")
     store.add("bram", title="pushed by the caller itself", push=False)
