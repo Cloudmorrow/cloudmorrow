@@ -118,7 +118,8 @@ export async function renderGroupedList(at, arg) {
   const hashFor = (values) => at.base + values.map((v) => "/" + encodeURIComponent(v)).join("");
   if (asked.length && asked.some((v, i) => v !== chosen[i])) replace(hashFor(chosen));
 
-  const chipRow = (f, i) => `<div class="chips${i ? " sub" : ""}" data-level="${i}">` +
+  const chipRow = (f, i) => `<p class="chips-label${i ? " sub" : ""}">${esc(f.label)}</p>` +
+    `<div class="chips${i ? " sub" : ""}" data-level="${i}">` +
     offered[i].map(([value, label]) => `<a class="chip${value === chosen[i] ? " active" : ""}" href="${
       esc(hashFor([...chosen.slice(0, i), value]))}">${esc(label)}</a>`).join("") +
     (namesGroups(f) ? `<button class="chip new-group" type="button" data-level="${i}">+ New ${esc(f.label.toLowerCase())}</button>` : "") +

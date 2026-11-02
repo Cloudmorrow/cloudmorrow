@@ -230,7 +230,7 @@ async function renderBoard(at, arg) {
   const name = group ? titleOf(groupModel, group) : screen.label;
   // The groups, and on the end of them the way to start another. The row
   // is there even with one group: that last chip is what it is for then.
-  const chips = !groupModel ? "" : `<div class="chips">${groups.map((g) =>
+  const chips = !groupModel ? "" : `<p class="chips-label">${esc(groupModel.label)}</p><div class="chips">${groups.map((g) =>
     `<a class="chip${g === group ? " active" : ""}" href="${at.base}/${encodeURIComponent(g.id)}">${esc(titleOf(groupModel, g))}</a>`).join("")}` +
     (mayWrite(groupModel) ? `<button class="chip new-group" type="button">+ New ${esc(groupModel.label.toLowerCase())}</button>` : "") + `</div>`;
   // The group's own sheet is where it is renamed and deleted: a board is a

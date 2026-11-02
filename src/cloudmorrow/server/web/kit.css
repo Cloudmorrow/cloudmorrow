@@ -3,6 +3,17 @@
 
    Every Quill is drawn with these, so nothing here is named for one. */
 
+/* What the row is a choice of — Board, Vault, Environment — said small
+   above it, so a row of names does not have to be guessed at. */
+.chips-label {
+  margin: 0 0 6px 2px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
 .chips {
   display: flex;
   gap: 8px;

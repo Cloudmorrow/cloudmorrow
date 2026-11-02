@@ -5,7 +5,8 @@
 
 /* The subgroup sits under the group, smaller, so the two rows read as a
    place and a place inside it rather than two choices of the same weight. */
-.chips.sub { margin-top: -6px; gap: 6px; }
+.chips-label.sub { margin-top: -4px; font-size: 11px; }
+.chips.sub { gap: 6px; }
 .chips.sub .chip { padding: 4px 10px; font-size: 14px; }
 .chips.sub .chip.active {
   background: color-mix(in srgb, var(--accent) 16%, var(--card));
