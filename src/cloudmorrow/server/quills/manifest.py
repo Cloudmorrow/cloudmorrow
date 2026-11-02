@@ -376,9 +376,21 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
             raise QuillError(f"{where}: screen {screen['id']!r} icon is a name from the icon library")
         if "admin" in screen and not isinstance(screen["admin"], bool):
             raise QuillError(f"{where}: screen {screen['id']!r} admin is true or false")
+        if "settings" in screen and not isinstance(screen["settings"], bool):
+            raise QuillError(f"{where}: screen {screen['id']!r} settings is true or false")
         kit = screen.get("kit")
         if kit not in KIT:
             raise QuillError(f"{where}: screen {screen['id']!r} kit is one of {', '.join(KIT)}")
+        if screen.get("settings"):
+            # The person's own settings for the Quill: a view, behind the gear
+            # beside the Quill's title, never a tab — and not the server's.
+            if kit != "view":
+                raise QuillError(f"{where}: screen {screen['id']!r} is settings, so it is a view")
+            if screen.get("admin"):
+                raise QuillError(
+                    f"{where}: screen {screen['id']!r} is settings or admin, not both: settings are"
+                    " everybody's own, admin is the server's"
+                )
         if kit not in KIT_READY:
             raise QuillError(
                 f"{where}: screen {screen['id']!r} is a {kit}, which the kit does not draw on every"

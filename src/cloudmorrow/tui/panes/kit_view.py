@@ -87,7 +87,7 @@ from cloudmorrow.tui.widgets.view_nodes import (
 class ViewPane(KitPane):
     """A screen a Quill's code draws: its tree, asked for again after everything done in it."""
 
-    BINDINGS = [("n", "fire('compose')", "New")]
+    BINDINGS = [("n", "fire('compose')", "New"), ("comma", "fire('settings')", "Settings")]
 
     def __init__(self, quill: dict, screen: dict, **kwargs: Any) -> None:
         # A view need not be about one datamodel; KitPane expects one.

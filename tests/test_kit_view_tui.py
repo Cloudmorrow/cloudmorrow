@@ -366,6 +366,29 @@ async def test_a_card_in_a_lane_moves_with_the_keys(fleet):
         assert vans(app)[0]["fields"]["fuel"] == "diesel"
 
 
+async def test_a_settings_screen_has_no_card_and_opens_with_a_comma(fleet):
+    """Tracker is marked settings: the person's own, so no card under Fleet, a
+    pane all the same, and `,` on any of Fleet's screens opens it."""
+    app = fleet
+    async with app.run_test(size=(120, 40)) as pilot:
+        screen = await start(app, pilot)
+        assert not screen.query("#nav-fleet-tracker"), "no card for the settings screen"
+        assert screen.query("#pane-fleet-tracker"), "the pane is there"
+        assert [s["id"] for s in screen.settings_screens("fleet")] == ["tracker"]
+        screen.action_show_pane("fleet-garage")
+        await settle(app, pilot)
+        garage = screen.query_one("#pane-fleet-garage", ViewPane)
+        assert garage.settings_screen()["id"] == "tracker"
+        garage.fire("settings")
+        await settle(app, pilot)
+        pane = screen.query_one("#pane-fleet-tracker", ViewPane)
+        assert pane.display and pane.failed == ""
+        texts = [w.visual.plain for w in pane.query(".view-text")]
+        assert any("your own settings" in t for t in texts), texts
+        # On the settings screen itself there is nothing further to open.
+        assert pane.settings_screen() is None
+
+
 async def test_an_admin_screen_has_no_card_and_opens_from_administration(fleet):
     """Keys is marked admin: not under Fleet's card for anybody, but a pane all
     the same, and `s` on Fleet under Administration › Quills opens it."""

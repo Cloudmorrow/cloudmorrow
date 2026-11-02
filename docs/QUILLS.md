@@ -213,6 +213,16 @@ settings. A `go` to the screen itself draws it again there. It is a
 Quill and refuses it from them, and no surface puts it on a bar or in the
 palette — the settings screen draws its buttons.
 
+A screen with `settings = true` is the person's own settings for the Quill
+— which folders Media shows them, say — as against the server's. It is a
+`view` too, and never a tab or an item under the Quill's tab: a gear at
+the right of the title on each of the Quill's screens opens it, as a page
+of its own with the way back to the Quill on its bar (in the terminal, `,`
+on any of the Quill's screens). Settings that were a section at the foot of
+a screen go here instead, so every screen is about its one thing and the
+settings are where people look for them. A screen is settings or admin,
+not both.
+
 A board's lanes are an enum's values, fixed by the datamodel — To Do,
 Doing, Done — or, when `lane` is a link, the records it links to, in their
 own order (`ordered_within`), which people add, rename, reorder and delete

@@ -56,6 +56,12 @@ let loaded = null;   // the one request in flight, so a burst of screens asks on
 const tabName = (quill, screen) => `${quill.id}.${screen.id}`;
 export const screenHash = (quill, screen) =>
   `#/q/${encodeURIComponent(quill.id)}/${encodeURIComponent(screen.id)}`;
+// The screens that are items under the Quill's tab: not one marked admin
+// (the server's settings, on the Quill's sheet under Administration) and
+// not one marked settings (the person's own, behind the gear beside the
+// Quill's title: kit.js draws the gear, this file says where it goes).
+const onTab = (screen) => !screen.admin && !screen.settings;
+const settingsOf = (quill) => quill.screens.find((screen) => screen.settings && screen.kit === "view") || null;
 
 // The server has fitted each Quill to you (docs/CIRCLES.md): the screens
 // over data you may not read are gone from it, and one with nothing left
@@ -66,7 +72,7 @@ function place(list) {
   quills = list.filter(yours);
   // Their actions go on every record's sheet, whichever Quill it is in.
   knowQuills(quills);
-  fillTabs(quills.filter((quill) => quill.screens.some((screen) => !screen.admin)).map((quill) => {
+  fillTabs(quills.filter((quill) => quill.screens.some(onTab)).map((quill) => {
     // The items under the tab: the Quill's screens, each with the icon it
     // names, so no two look alike. A Quill with one screen has no items:
     // its tab is that screen, by the screen's name, so a thread's pip
@@ -74,7 +80,7 @@ function place(list) {
     // A screen marked admin is the server's settings for the Quill: drawn
     // on its sheet under Administration › Quills (quillsadmin.js), never
     // as an item under its tab, for anybody.
-    const screens = quill.screens.filter((screen) => !screen.admin).map((screen) => ({
+    const screens = quill.screens.filter(onTab).map((screen) => ({
       name: tabName(quill, screen),
       label: screen.label || quill.name,
       icon: pixelIcon(screen.icon),
@@ -91,7 +97,7 @@ function place(list) {
       // Quill of somebody's own is switched by its key, `~alice.budget`.
       feature: quill.key || quill.id,
       // The tab opens the Quill on its first screen.
-      href: () => screenHash(quill, quill.screens.find((screen) => !screen.admin) || quill.screens[0]),
+      href: () => screenHash(quill, quill.screens.find(onTab) || quill.screens[0]),
       // Data is composed by the server for whoever asks rather than
       // installed (server/dataview.py): the rail sets its tab apart from
       // the Quills, under Your cloud, as the terminal app's sidebar does.
@@ -149,7 +155,20 @@ async function find(quillId, screenId) {
   await loadQuills();
   const quill = quills.find((q) => q.id === quillId);
   const screen = quill && quill.screens.find((s) => s.id === screenId);
-  if (screen) return { quill, screen, tab: tabName(quill, screen), base: screenHash(quill, screen) };
+  if (screen) {
+    const shown = quill.screens.filter(onTab);
+    const home = shown[0] || quill.screens[0];
+    const settings = settingsOf(quill);
+    // The settings screen is the Quill's tab lit, not an item of its own;
+    // and it knows the way back, to the Quill's first screen. Every other
+    // screen of a Quill with settings carries the gear that opens them.
+    const tab = screen.settings ? (shown.length === 1 ? tabName(quill, home) : quill.id) : tabName(quill, screen);
+    return {
+      quill, screen, tab, base: screenHash(quill, screen),
+      home: screenHash(quill, home),
+      settings: settings && settings !== screen ? { label: settings.label, href: screenHash(quill, settings) } : null,
+    };
+  }
   toast(quill ? "That screen is gone" : "That Quill is not installed");
   replace("#/");
   await renderRoute();

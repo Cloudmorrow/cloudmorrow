@@ -551,8 +551,8 @@ def test_an_admin_screen_is_on_the_quills_sheet_and_never_under_its_tab():
     Quill's sheet through kit_view.js's embedView, and a go to itself is drawn
     again there rather than leaving Administration."""
     quills = (WEB / "quills.js").read_text(encoding="utf-8")
-    assert "quill.screens.filter((screen) => !screen.admin)" in quills
-    assert "quill.screens.some((screen) => !screen.admin)" in quills
+    assert "const onTab = (screen) => !screen.admin && !screen.settings;" in quills
+    assert "quill.screens.filter(onTab)" in quills and "quill.screens.some(onTab)" in quills
     view = (WEB / "kit_view.js").read_text(encoding="utf-8")
     assert "export async function embedView(root, at, params = {})" in view
     assert "if (at.embedded) at.goHere = " in view
@@ -670,3 +670,35 @@ def test_a_views_button_shows_it_is_busy_while_its_action_runs():
     assert 'el.setAttribute("aria-busy", "true");' in view and 'el.removeAttribute("aria-busy");' in view
     css = (WEB / "kit_view.css").read_text(encoding="utf-8")
     assert '.quill-view .act-button[aria-busy="true"]' in css
+
+
+# -- a Quill's own settings, behind the gear ---------------------------------------
+def test_a_settings_screen_is_behind_a_gear_on_the_title_and_never_under_the_tab():
+    """A screen marked settings is the person's own settings for the Quill:
+    quills.js keeps it off the tab's items and says, for every other screen of
+    the Quill, where it is; kit.js hands that to core.js, whose heading draws the
+    gear at the right of the title — on the heading that is the screen's title
+    and no other — and kit_view.js draws the settings as a page with the way
+    back to the Quill. The link is forgotten on the way to any other route."""
+    quills = js_code((WEB / "quills.js").read_text(encoding="utf-8"))
+    assert "const onTab = (screen) => !screen.admin && !screen.settings;" in quills
+    assert "quill.screens.filter(onTab)" in quills and "quill.screens.some(onTab)" in quills
+    assert "screenHash(quill, quill.screens.find(onTab) || quill.screens[0])" in quills
+    where = "settings: settings && settings !== screen ? { label: settings.label, href: screenHash(quill, settings) }"
+    assert where + " : null," in quills
+    assert "home: screenHash(quill, home)," in quills
+    core = js_code((WEB / "core.js").read_text(encoding="utf-8"))
+    gear = _function(core, "placeGear")
+    assert "if (!screenSettings) return;" in gear
+    assert ".textContent.trim() === screenSettings.title)" in gear and "|| headings[0];" in gear
+    assert 'if (!head || head.querySelector(".settings")) return;' in gear, "never twice"
+    assert '<a class="button settings" href="${screenSettings.href}"' in gear
+    assert 'pixelIcon("settings")' in gear
+    assert "export function wireShell() {\n  placeGear();" in core, "on every page mounted"
+    route = _function(core, "renderRoute")
+    assert "screenSettings = null;" in route
+    kit = js_code(KIT_JS)
+    assert "setScreenSettings(at.settings ? { title: at.screen.label, ...at.settings } : null);" in kit
+    view = js_code((WEB / "kit_view.js").read_text(encoding="utf-8"))
+    assert "nav({ back: at.home, backLabel: at.quill.name, title: at.screen.label })" in view
+    assert ".heading a.button.settings .pixel-icon" in (WEB / "base.css").read_text(encoding="utf-8")

@@ -18,7 +18,8 @@
 
 import {
   SAVE_DELAY, api, app, back, esc, fitArea, formatDate, heading, icons, localMinute, mount, nav, occupy,
-  litDone, recordsUrl, renderRoute, replace, seconds, session, setStatus, store, tabs, toast, vacate, wireSaveKey,
+  litDone, recordsUrl, renderRoute, replace, seconds, session, setScreenSettings, setStatus, store, tabs, toast, vacate,
+  wireSaveKey,
   wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
@@ -158,6 +159,9 @@ const SHEETS = { calendar: calendarSheet, timeline: timelineSheet, data: dataShe
 
 export async function renderKitScreen(at, arg) {
   const { kit } = at.screen;
+  // A Quill with settings of its own has the gear on each screen's title
+  // (core.js's heading); quills.js said whether and where.
+  setScreenSettings(at.settings ? { title: at.screen.label, ...at.settings } : null);
   if (kit === "board") return renderBoard(at, arg);
   if (OWN[kit]) return OWN[kit](at, arg);
   if (kit === "editor") return renderEditor(at, arg);

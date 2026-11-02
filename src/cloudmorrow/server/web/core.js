@@ -618,6 +618,7 @@ export async function renderRoute() {
     occupant = null;
     await leaving.leave();
   }
+  screenSettings = null;
   const render = screens.get(name) || screens.get(home);
   return render(arg);
 }
@@ -871,6 +872,34 @@ export function heading(title, right = "") {
     (right ? `<div class="actions">${right}</div>` : "") + `</div>`;
 }
 
+// The Quill screen being drawn has settings of its own: `{ title, label,
+// href }`, the title being the screen's label. Set by kit.js for every
+// Quill screen, and gone again on the way to any other route; wireShell
+// puts the gear on the page each time one is mounted.
+let screenSettings = null;
+export function setScreenSettings(link) {
+  screenSettings = link || null;
+}
+
+/** The gear to the Quill's own settings, at the right of the screen's title:
+    the heading that says the screen's label, else the first on the page — a
+    board's is its group's name — and never twice. */
+function placeGear() {
+  if (!screenSettings) return;
+  const headings = [...app.querySelectorAll("main .heading")];
+  const head = headings.find((h) => h.querySelector("h1") && h.querySelector("h1").textContent.trim() === screenSettings.title)
+    || headings[0];
+  if (!head || head.querySelector(".settings")) return;
+  let actions = head.querySelector(":scope > .actions");
+  if (!actions) {
+    head.insertAdjacentHTML("beforeend", `<div class="actions"></div>`);
+    actions = head.querySelector(":scope > .actions");
+  }
+  actions.insertAdjacentHTML("beforeend",
+    `<a class="button settings" href="${screenSettings.href}" aria-label="${esc(screenSettings.label)}"` +
+    ` title="${esc(screenSettings.label)}">${pixelIcon("settings")}</a>`);
+}
+
 // The tabs along the bottom. Every top-level screen has them; an editor
 // does not, so the keyboard has the room. Tapping the tab you are on takes
 // you to the top of it, as on a phone.
@@ -987,6 +1016,7 @@ function onScroll() {
 addEventListener("scroll", onScroll, { passive: true });
 
 export function wireShell() {
+  placeGear();
   // A screen that draws no tabs — an editor, a thread — drew none because
   // a phone keyboard needs the room. A computer does not, and a rail that
   // comes and goes is worse than no rail at all, so the bar stays in (or

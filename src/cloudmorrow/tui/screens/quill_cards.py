@@ -147,15 +147,16 @@ class QuillCards:
         # Which screens are under one card: a Quill's, when it has several.
         screens_of: dict[str, list[str]] = {}
         for key, (quill, screen, _) in wanted.items():
-            if not screen.get("admin"):
+            if not (screen.get("admin") or screen.get("settings")):
                 screens_of.setdefault(str(quill["id"]), []).append(key)
         for key, (quill, screen, signature) in wanted.items():
             if key in self._quill_panes:
                 continue
             quill_id = str(quill["id"])
-            if screen.get("admin"):
-                # The Quill's settings: a pane with no card, opened from
-                # Administration › Quills.
+            if screen.get("admin") or screen.get("settings"):
+                # The Quill's settings: a pane with no card. The server's
+                # (admin) open from Administration › Quills; the person's
+                # own (settings) with `,` on any of the Quill's screens.
                 if await self._add_quill_pane(key, quill, screen, first=False, hidden=True):
                     self._quill_panes[key] = signature
                 continue
@@ -185,12 +186,21 @@ class QuillCards:
             [
                 (key, quill)
                 for key, (quill, screen, _) in wanted.items()
-                if not (quill.get("composed") or screen.get("admin"))
+                if not (quill.get("composed") or screen.get("admin") or screen.get("settings"))
             ]
         )
         current = self.query_one("#panes", ContentSwitcher).current or ""
         self.reveal_screens(current[len("pane-") :])
         self.show_sections()
+
+    def settings_screens(self, quill_id: str) -> list[dict]:
+        """The screens a Quill marked settings — the person's own — that have a pane here."""
+        quill = next((q for q in self.app.quills if q.get("id") == quill_id), None)
+        return [
+            s
+            for s in (quill or {}).get("screens") or []
+            if s.get("settings") and screen_key(quill, s) in self._hidden_panes
+        ]
 
     def admin_screens(self, quill_id: str) -> list[dict]:
         """The screens a Quill marked admin — its settings — that have a pane here."""

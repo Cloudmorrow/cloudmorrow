@@ -48,7 +48,12 @@ export async function renderView(at, arg) {
   // the heading as a list's New is, and left off the bar under it.
   const compose = at.screen.compose && findAction(at.quill.id, at.screen.compose.action);
   const penLabel = compose ? (at.screen.compose.label || compose.label) : "";
-  mount(nav({ title: at.screen.label }) + `
+  // The Quill's own settings are a page of their own, the way back to
+  // the Quill on its bar; the gear beside its title is what led here.
+  const bar = at.screen.settings
+    ? nav({ back: at.home, backLabel: at.quill.name, title: at.screen.label })
+    : nav({ title: at.screen.label });
+  mount(bar + `
     <main class="view-screen">
       ${heading(at.screen.label, compose
     ? `<button class="compose" aria-label="${esc(penLabel)}" title="${esc(penLabel)}">${icons.compose}</button>` : "")}
