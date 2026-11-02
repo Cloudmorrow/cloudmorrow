@@ -66,7 +66,7 @@ from cloudmorrow.tui.kitdata import (
     title_of,
 )
 from cloudmorrow.tui.panes.base import Pane
-from cloudmorrow.tui.quill_actions import run_action
+from cloudmorrow.tui.quill_actions import go_to, run_action
 from cloudmorrow.tui.screens.modals import ConfirmModal
 from cloudmorrow.tui.screens.record_sheet import RecordSheet
 from cloudmorrow.tui.theme import GOOD, MUTED
@@ -95,6 +95,7 @@ class KitPane(Pane):
     BINDINGS = [
         ("ctrl+n", "fire('new_record')", "New"),
         ("delete", "fire('delete_record')", "Delete"),
+        ("comma", "fire('settings')", "Settings"),
     ]
     # The actions that write the screen's own datamodel: not there for
     # somebody who may only read it.
@@ -171,10 +172,27 @@ class KitPane(Pane):
         super().fire(name)
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
-        """A refused action's key is not in the footer, and does nothing."""
+        """A refused action's key is not in the footer, and does nothing; nor is
+        Settings on a Quill without any, or on the settings screen itself."""
         if action == "fire" and parameters and parameters[0] in self.refused:
             return False
+        if action == "fire" and parameters and parameters[0] == "settings":
+            return self.settings_screen() is not None
         return True
+
+    def settings_screen(self) -> dict | None:
+        """The Quill's own settings screen (`settings = true`), when this is not it."""
+        screens = self.quill.get("screens") or []
+        found = next((s for s in screens if s.get("settings") and s.get("kit") == "view"), None)
+        if found is None or found.get("id") == self.spec.get("id"):
+            return None
+        return found
+
+    def act_settings(self) -> None:
+        """`,`: the Quill's own settings, the pane behind the gear on the web."""
+        found = self.settings_screen()
+        if found is not None:
+            go_to(self.app, str(self.quill["id"]), str(found["id"]), {})
 
     def on_show(self) -> None:
         self.reload()

@@ -339,6 +339,8 @@ h1.large {
   color: var(--accent);
   font-size: 16px;
 }
+/* The gear to a Quill's own settings, last on the title's line. */
+.heading a.button.settings .pixel-icon { width: 20px; height: 20px; }
 .group-label {
   margin: 22px 0 8px 4px;
   font-family: var(--display);

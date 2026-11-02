@@ -209,6 +209,14 @@ def _day(value):
     return str(value or "")[:10]
 
 
+@view("settings")
+def settings(ctx):
+    return ui.stack(
+        ui.text("Settings", style="title"),
+        ui.text("How CRM looks to you: nothing to choose yet."),
+    )
+
+
 @view("sales")
 def sales(ctx):
     now = ctx.now()

@@ -37,6 +37,13 @@ view = "keys"
 model = "vehicle"
 admin = true
 
+# The person's own settings: behind the gear beside Fleet's title, never a tab.
+[[screens]]
+id = "tracker"
+label = "Tracker"
+view = "tracker"
+settings = true
+
 [[actions]]
 id = "log-service"
 label = "Log a service"

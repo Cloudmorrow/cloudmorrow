@@ -37,6 +37,13 @@ model = "deal"
 
 # The pipeline: a book's deals across its stages. The stages are records,
 # so each book has its own, and the circle on a card wins it.
+# Your own settings for CRM: behind the gear beside its title, not a tab.
+[[screens]]
+id = "settings"
+label = "Settings"
+view = "settings"
+settings = true
+
 [[screens]]
 id = "pipeline"
 icon = "handshake"

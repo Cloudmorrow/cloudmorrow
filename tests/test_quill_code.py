@@ -60,7 +60,7 @@ def test_the_install_sheet_says_what_the_code_does_without_running_it(fleet):
     plan = client.post("/api/quills/plan", json={"source": str(FLEET)}, headers=admin).json()
     code = plan["quill_code"]
     assert code["sandboxed"] is True
-    assert code["views"] == ["Garage", "Keys"]
+    assert code["views"] == ["Garage", "Keys", "Tracker"]
     assert "Log a service" in code["actions"]
     assert code["hooks"] == ["when a fleet.visit is created"]
     assert code["fetch"] == [{"host": "api.example.com", "why": "to read each van's odometer from the tracker"}]
@@ -71,7 +71,7 @@ def test_the_install_sheet_says_what_the_code_does_without_running_it(fleet):
 def test_every_client_is_told_the_actions_and_the_view(fleet):
     client, admin, _ = fleet
     quill = next(q for q in client.get("/api/quills", headers=admin).json() if q["id"] == "fleet")
-    assert [s["kit"] for s in quill["screens"]] == ["view", "list", "view"]
+    assert [s["kit"] for s in quill["screens"]] == ["view", "list", "view", "view"]
     log_service = next(a for a in quill["actions"] if a["id"] == "log-service")
     assert log_service["on"] == "vehicle"
     assert [f["name"] for f in log_service["fields"]] == ["date", "km", "note"]
@@ -82,8 +82,8 @@ def test_an_admin_screen_is_the_administrators_alone(fleet):
     client, admin, guest = fleet
     for_admin = next(q for q in client.get("/api/quills", headers=admin).json() if q["id"] == "fleet")
     for_guest = next(q for q in client.get("/api/quills", headers=guest).json() if q["id"] == "fleet")
-    assert [s["id"] for s in for_admin["screens"]] == ["garage", "vans", "keys"]
-    assert [s["id"] for s in for_guest["screens"]] == ["garage", "vans"]
+    assert [s["id"] for s in for_admin["screens"]] == ["garage", "vans", "keys", "tracker"]
+    assert [s["id"] for s in for_guest["screens"]] == ["garage", "vans", "tracker"]
     drawn = client.get("/api/quills/fleet/views/keys", headers=admin)
     assert drawn.status_code == 200 and "for an administrator" in str(drawn.json()["tree"])
     # And the code knows what the cloud is called, for an address on it.
@@ -113,6 +113,31 @@ def test_a_job_delivers_a_record_of_its_own_to_somebody_and_an_action_may_not(fl
 def test_an_action_admin_flag_is_a_bool():
     with pytest.raises(QuillError, match="admin is true or false"):
         parse_manifest(_manifest('code = "quill.py"\n[[actions]]\nid = "a"\nlabel = "A"\nadmin = "yes"\n'))
+
+
+def test_a_settings_screen_is_everybodys_own_and_never_a_tab(fleet):
+    """Tracker is marked settings: the person's own settings for Fleet. Everybody
+    is told it and may draw it — it is theirs — and it is kept apart from the
+    server's (admin) screen, which the guest is not told at all."""
+    client, admin, guest = fleet
+    for_guest = next(q for q in client.get("/api/quills", headers=guest).json() if q["id"] == "fleet")
+    assert [s["id"] for s in for_guest["screens"]] == ["garage", "vans", "tracker"]
+    tracker = next(s for s in for_guest["screens"] if s["id"] == "tracker")
+    assert tracker["settings"] is True and tracker["kit"] == "view" and not tracker.get("admin")
+    drawn = client.get("/api/quills/fleet/views/tracker", headers=guest)
+    assert drawn.status_code == 200 and "your own settings" in str(drawn.json()["tree"])
+
+
+def test_a_settings_screen_is_a_view_and_not_the_servers():
+    with pytest.raises(QuillError, match="settings is true or false"):
+        screen = '[[screens]]\nid = "own"\nkit = "list"\nmodel = "vehicle"\ntitle = "name"\nsettings = "yes"\n'
+        parse_manifest(_manifest(screen))
+    with pytest.raises(QuillError, match="is settings, so it is a view"):
+        screen = '[[screens]]\nid = "own"\nkit = "list"\nmodel = "vehicle"\ntitle = "name"\nsettings = true\n'
+        parse_manifest(_manifest(screen))
+    with pytest.raises(QuillError, match="settings or admin, not both"):
+        screen = '[[screens]]\nid = "own"\nlabel = "Own"\nview = "own"\nsettings = true\nadmin = true\n'
+        parse_manifest(_manifest('code = "quill.py"\n' + screen))
 
 
 def test_a_screen_admin_flag_is_a_bool():

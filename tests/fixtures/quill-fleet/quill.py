@@ -61,6 +61,14 @@ def keys(ctx):
     )
 
 
+@view("tracker")
+def tracker(ctx):
+    return ui.stack(
+        ui.text("Tracker", style="title"),
+        ui.text(f"How the tracker shows its vans to {ctx.user.name}: your own settings."),
+    )
+
+
 @action("rotate_keys")
 def rotate_keys(ctx):
     return toast("Rotated")
