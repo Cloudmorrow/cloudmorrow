@@ -837,8 +837,8 @@ function paintPip(counts) {
 }
 export function markThreadTabs(names) {
   for (const name of names) {
-    const tab = document.querySelector(`.tabs .tab[data-tab="${CSS.escape(name)}"]`);
-    if (tab) tab.dataset.thread = "1";
+    // Every tab of that name: the one on its shelf and its Most used copy.
+    for (const tab of document.querySelectorAll(`.tabs .tab[data-tab="${CSS.escape(name)}"]`)) tab.dataset.thread = "1";
   }
   paintPip(lastCounts());
 }

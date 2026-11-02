@@ -775,7 +775,8 @@ window's edge, every row and tile says when the pointer is over it, and the
 sheet that slides up from under a thumb is a dialog in the middle. The rail
 stays put in an editor and in a thread, which on a phone drop the tab bar to
 give the keyboard the room. It has the sections the terminal app's sidebar
-has: Today, then the Quills on the shelves of their catalog categories —
+has: Today, then **Most used** — the Quills you open most on this device,
+up to five, most first, so the ones you live in are a click away — then the Quills on the shelves of their catalog categories —
 **Personal**, **Home**, **Business**, **Developer**, in the catalog's order —
 then **Your cloud** with Data under it, and for an administrator
 **Administration** at the foot, with Users, Circles, Roles, Quills and Server
