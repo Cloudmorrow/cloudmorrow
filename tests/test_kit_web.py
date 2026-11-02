@@ -442,6 +442,16 @@ def test_a_list_you_may_only_read_has_no_pen_and_no_ticking():
     assert 'namesGroups(f) ? `<button class="chip new-group"' in grouped
 
 
+def test_a_row_of_chips_says_what_it_picks():
+    """A board's groups and a list's vaults and environments are a row of names;
+    a small title over each row says what they are (Board, Vault, Environment)."""
+    board = js_code(_function(KIT_JS, "renderBoard"))
+    assert '<p class="chips-label">${esc(groupModel.label)}</p><div class="chips">' in board
+    grouped = js_code((WEB / "kit_grouped.js").read_text(encoding="utf-8"))
+    assert '<p class="chips-label${i ? " sub" : ""}">${esc(f.label)}</p>' in grouped
+    assert ".chips-label {" in (WEB / "kit.css").read_text(encoding="utf-8")
+
+
 def test_the_sheet_of_a_record_you_may_only_read_says_it():
     sheet = js_code(_function(KIT_JS, "renderRecordSheet"))
     assert "const looked = !mayWrite(model) || (model.space && !record.can_manage);" in sheet
