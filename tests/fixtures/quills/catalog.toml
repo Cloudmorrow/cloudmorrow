@@ -63,7 +63,7 @@ foundation = true
 [[quills]]
 id = "calendar"
 name = "Calendar"
-summary = "Your own calendar, the ones you share, and one for everybody."
+summary = "Your own calendar, the ones you share, one for everybody, and the ones you subscribe to from elsewhere."
 repo = "quill-calendar"
 category = "productivity"
 publisher = "Cloudmorrow"
