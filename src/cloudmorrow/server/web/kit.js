@@ -100,7 +100,12 @@ export function spoken(f, value, links = {}) {
       return Number.isNaN(day.getTime()) ? String(value)
         : day.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
     }
-    case "datetime": return seconds(value) ? formatDate(seconds(value), { long: true }) : String(value);
+    case "datetime": {
+      // A bare date in a datetime field is a whole day: said as the day, not
+      // as midnight somewhere else turned into one o'clock here.
+      if (String(value).length === 10) return spoken({ ...f, kind: "date" }, value, links);
+      return seconds(value) ? formatDate(seconds(value), { long: true }) : String(value);
+    }
     case "link": return links[value] || "";
     // An amount reads as one: 56,000 rather than 56000.0.
     case "decimal": return Number.isFinite(Number(value))
@@ -863,8 +868,10 @@ export async function renderRecordSheet(at, modelId, id, arg) {
   if (own && own.backLabel) backLabel = own.backLabel;
   // A space is its manager's to change; everybody in it reads the same sheet.
   // And a record of a datamodel you may only read is read: its fields said,
-  // not boxes to type in, and nothing to save or delete it with.
-  const looked = !mayWrite(model) || (model.space && !record.can_manage);
+  // not boxes to type in, and nothing to save or delete it with. A kit may
+  // have its own reason (`own.looked`): a thing on a subscribed calendar.
+  const looked = !mayWrite(model) || (model.space && !record.can_manage) ||
+    !!(own && own.looked && await own.looked(record));
   const deletable = !looked && !(model.space && record.scope === "personal");
   const people = model.space ? await spaceSection(model, record) : "";
 

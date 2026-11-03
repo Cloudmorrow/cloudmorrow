@@ -152,6 +152,73 @@ async def test_the_calendars_are_listed_with_your_own_at_the_top(app):
         assert pane.space_id == "r_mine"
 
 
+def with_subscription(app) -> None:
+    """A calendar subscribed from elsewhere: the screen says which field says so."""
+    quill = app.client.quill_list[-1]
+    quill["screens"][0]["subscribed"] = "calendar.url"
+    quill["models"]["calendar"]["fields"].append({"name": "calendar.url", "kind": "url", "label": "Subscribed from"})
+    feed = copy.deepcopy(app.client.record_store["calendar"][0])
+    feed.update(
+        id="r_feed", fields={"name": "Club", "colour": "amber", "calendar.url": "https://club.example/feed.ics"}
+    )
+    app.client.record_store["calendar"].append(feed)
+    match = copy.deepcopy(app.client.record_store["event"][0])
+    match["id"] = "r_match"
+    match["fields"] = {
+        **match["fields"],
+        "calendar": "r_feed",
+        "title": "Match",
+        "starts_at": f"{TODAY}T15:00",
+        "ends_at": f"{TODAY}T17:00",
+    }
+    app.client.record_store["event"].append(match)
+
+
+async def test_a_subscribed_calendar_is_listed_after_your_own_and_says_so(app):
+    with_calendar(app)
+    with_subscription(app)
+    async with app.run_test(size=(140, 40)) as pilot:
+        _, pane = await open_calendar(app, pilot)
+        table = pane.query_one("#calendar-table", DataTable)
+        assert [s["id"] for s in pane.spaces] == ["r_mine", "r_feed", "r_house", "r_all"]
+        assert "subscribed" in str(table.get_row_at(1)[1])
+        # Its things are on the day with everybody else's.
+        titles = [e["title"] for e in pane.day_events()]
+        assert "Match" in titles
+
+
+async def test_nothing_goes_on_a_subscribed_calendar_and_what_is_on_it_is_read(app):
+    with_calendar(app)
+    with_subscription(app)
+    async with app.run_test(size=(140, 40)) as pilot:
+        _, pane = await open_calendar(app, pilot)
+        pane.query_one("#calendar-table", DataTable).focus()
+        await pilot.press("down")
+        await settle(app, pilot)
+        assert pane.space_id == "r_feed"
+        pane.fire("new_record")
+        await modal_up(pilot)
+        assert not isinstance(app.screen, RecordSheet)
+        assert "subscribed" in pane.status_detail()
+        # The match opens on a sheet that cannot save; the dentist still can.
+        day = pane.query_one("#day-table", DataTable)
+        day.focus()
+        row = next(i for i, e in enumerate(pane.day_events()) if e["title"] == "Match")
+        day.move_cursor(row=row)
+        pane.fire("open_record")
+        await modal_up(pilot)
+        sheet = app.screen
+        assert isinstance(sheet, RecordSheet) and sheet.record["id"] == "r_match"
+        assert sheet.writes is False
+        sheet.action_cancel()
+        await settle(app, pilot)
+        day.move_cursor(row=row)
+        pane.fire("delete_record")
+        await modal_up(pilot)
+        assert not isinstance(app.screen, ConfirmModal)
+        assert any(r["id"] == "r_match" for r in app.client.record_store["event"])
+
+
 async def test_the_month_opens_on_this_one_and_the_day_on_today(app):
     with_calendar(app)
     async with app.run_test(size=(140, 40)) as pilot:

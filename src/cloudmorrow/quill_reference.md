@@ -99,7 +99,7 @@ touch goes through the gate, as the principal the table says:
 | `[[screens]] view = "garage"` | `@view("garage") def garage(ctx)` | the person looking | a tree of primitives |
 | `[[actions]]` | `@action("log_service") def log_service(ctx, [record,] **fields)` | the person pressing | effects |
 | `[[hooks]] on, when, handler` | `@hook def h(ctx, change)` | whoever made the change | nothing |
-| `[[jobs]] action = "call", handler, every` | `@job def j(ctx)` | the installing administrator | nothing |
+| `[[jobs]] action = "call", handler, every` | `@job def j(ctx)` | the installing administrator — or, with `as = "everybody"`, once as each person, over their own records | nothing |
 | `[[webhooks]] handler` | `@webhook def w(ctx, request)` | the installing administrator | `respond(...)` or a dict |
 | `[[apis]] handler, prefix` | `@api def a(ctx, request)` | the installing administrator | `respond(...)` or a dict |
 | `[[machine]]` | `@machine def m(ctx)` | the machine's owner, on their machine | JSON |
@@ -130,7 +130,7 @@ fields = ["km"]                    # optional: for changed, only these
 handler = "visit_logged"
 
 [[fetch]]                          # https hosts ctx.fetch may reach
-host = "api.example.com"
+host = "api.example.com"           # or *.example.com; or * for any host on the internet (never a private one)
 why = "…"
 
 [[secrets]]                        # keys ctx.secret may read from the person's vault
@@ -349,7 +349,7 @@ and has every surface draw it hidden until asked for.
 | list | model, title; optional subtitle, tick (bool), fields (the sheet's), group and subgroup (link, enum or indexed string); projects: vault (a string: the vault its secrets are in), repo (url) and env_files (json: which .env file each environment came from) | rows, a circle per row if tick; chips (phone, web) or a list and buttons (terminal) to pick the group and subgroup; a list of `secret` has Import .env and Export .env; a list of projects has their environments on the sheet, and init, update, clone in the terminal and on the command line |
 | board | model, lane (in ordered_within: an enum, or a link to the records that are the lanes — in their order, and on a board with a group only those linking to it), title; optional group (link: chips), subtitle (a field, or a list of them, under a card's title), body (markdown), done (a lane value; for record lanes what the lane has: `{ outcome = "won" }`) | lanes; cards dragged between them |
 | detail / form | model; optional fields = [...] | one record's fields, editable |
-| calendar | model, starts, ends (indexed datetime/date), space (a link to a space datamodel); optional all_day (bool), colour (a field of the space), subtitle | every space's things at once: a month, a week, the day's list; the spaces and their people |
+| calendar | model, starts, ends (indexed datetime/date), space (a link to a space datamodel); optional all_day (bool), colour (a field of the space), subtitle, subscribed (a url field of the space: filled, the space comes from elsewhere — drawn, listed apart, and nothing put on it or changed on it) | every space's things at once: a month, a week, the day's list; the spaces and their people |
 | editor | model, title, body (markdown); optional path (a string like folder/sub/title: the folders) | a tree of folders and records beside a page of Markdown; pictures where the backend keeps attachments |
 | sheet | model (the foundational `file`), title, cells (the text field a `.cell` file's text is in: one JSON object, `{"cells": {"A1": "Rent", "B4": "=SUM(B1:B3)"}}`), path, and where and suffix as an editor's (`where = { share = "my-files", within = "Documents" }`, `suffix = [".cell", ".xlsx"]`: an Excel file is read and written as the same text) | a spreadsheet over the .cell (and Excel) files in a folder of the drive: the sheets, then one as a grid with a formula bar; Excel's formulas (SUM, IF, ROUND, …), worked out the same on every surface; Open from anywhere on the cloud, Export as Excel, PDF or CSV (docs/CELLS.md) |
 | document | model (the foundational `file`), title, body (the text field a `.docs` file's text is in: one JSON object, `{"blocks": [{"kind": "heading", "level": 1, "runs": [{"text": "Hi"}]}]}`), path, and where and suffix as an editor's — suffix may be a list, `[".docs", ".docx"]`: a Word file is read and written as the same text | a page of words over the .docs (and Word) files in a folder of the drive: headings, paragraphs, lists, quotes, tables, bold/italic/underline/strike/links; the editor's list, a page with a bar of styles; Markdown in the terminal; Open from anywhere on the cloud, Export as Word, PDF or Markdown, import from Word (docs/DOCS.md) |

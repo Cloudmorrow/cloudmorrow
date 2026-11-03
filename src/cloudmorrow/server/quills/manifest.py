@@ -432,6 +432,11 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
                     raise QuillError(f"{where}: job {job['id']!r} {key}: {exc}") from exc
         if job["action"] == "expire" and not (job.get("model") and job.get("field") and job.get("after")):
             raise QuillError(f"{where}: an expire job names a model, a field and after")
+        if "as" in job and (job["action"] != "call" or job["as"] != "everybody"):
+            raise QuillError(
+                f'{where}: job {job["id"]!r} as: a call job may say as = "everybody" to run once as each person;'
+                " left out, it runs as the installing administrator"
+            )
 
     datasets = []
     raw_sets = _table_list(data, "datasets", where)

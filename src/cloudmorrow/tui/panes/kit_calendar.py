@@ -14,7 +14,9 @@ picks is where a new thing goes, and which space `p`, `s` and `l` are about.
 It is all read from the screen's bindings (docs/QUILLS.md, *Screens*):
 `starts` and `ends` are the two moments, `all_day` the optional bool,
 `space` the link to the spaces, `colour` the space's colour, `title` and
-`subtitle` what a line says. Times are the times on the wall: a moment
+`subtitle` what a line says, `subscribed` a field of the space that, filled,
+says it comes from elsewhere: drawn like the rest, listed after your own,
+and nothing put on it or changed on it here. Times are the times on the wall: a moment
 without a zone is drawn exactly as it is stored, and a bare date is a whole
 day whose end is the last day it is on.
 
@@ -159,18 +161,23 @@ def event_line(event: dict, *, me: str) -> str:
     return "  ".join(parts)
 
 
-def space_row(space: dict, model: dict, colour: str, *, me: str) -> tuple[str, str]:
-    """A space's two cells: what it is called, and who it is for."""
+def space_row(space: dict, model: dict, colour: str, *, me: str, subscribed: bool = False) -> tuple[str, str]:
+    """A space's two cells: what it is called, and who it is for — or that it
+    is subscribed, which says both: yours to see, nobody's here to write in."""
     dot = colour_for((space.get("fields") or {}).get(colour)) if colour else colour_for("")
     who = scope_said(space)
-    if space.get("scope") == "personal" and space.get("owner") != me:
+    if subscribed:
+        who = "subscribed"
+    elif space.get("scope") == "personal" and space.get("owner") != me:
         who = space.get("owner", "")
     return f"[{dot}]●[/] {escape(title_of(space, model))}", f"[{MUTED}]{who}[/]"
 
 
-def space_order(space: dict) -> tuple:
-    """Yours first, then the shared ones, then everybody's."""
-    return ({"personal": 0, "shared": 1, "public": 2}.get(space.get("scope"), 3),)
+def space_order(space: dict, *, subscribed: bool = False) -> tuple:
+    """Yours first, then the ones you subscribed to, the shared ones, everybody's."""
+    if subscribed:
+        return (1,)
+    return ({"personal": 0, "shared": 2, "public": 3}.get(space.get("scope"), 4),)
 
 
 def settle_times(b: dict, fields: dict, record: dict | None) -> dict:
@@ -293,6 +300,11 @@ class CalendarPane(KitPane):
         if space is None:
             return f"[{MUTED}]no {self.space_noun}s[/]"
         colour = colour_for((space.get("fields") or {}).get(self.b["colour"]))
+        if self.is_subscribed(space):
+            return (
+                f"[{colour}]{escape(title_of(space, self.space_model))}[/] is subscribed: read only  "
+                f"[{MUTED}]{len(self.events)} this month[/]"
+            )
         return (
             f"new go in [{colour}]{escape(title_of(space, self.space_model))}[/]  "
             f"[{MUTED}]{len(self.events)} this month[/]"
@@ -301,6 +313,14 @@ class CalendarPane(KitPane):
     @property
     def space(self) -> dict | None:
         return next((s for s in self.spaces if s["id"] == self.space_id), None)
+
+    def is_subscribed(self, space: dict | None) -> bool:
+        """Does this space come from elsewhere — a feed the person subscribed to?"""
+        return bool(space and self.b["subscribed"] and (space.get("fields") or {}).get(self.b["subscribed"]))
+
+    def space_of(self, record: dict) -> dict | None:
+        wanted = str((record.get("fields") or {}).get(self.b["space"]) or "")
+        return next((s for s in self.spaces if s["id"] == wanted), None)
 
     @property
     def selected(self) -> dict | None:
@@ -323,7 +343,7 @@ class CalendarPane(KitPane):
         except ApiError as exc:
             await self.went_wrong(exc)
             return
-        self.spaces = sorted(spaces, key=space_order)
+        self.spaces = sorted(spaces, key=lambda s: space_order(s, subscribed=self.is_subscribed(s)))
         if self.space is None:
             mine = next((s for s in self.spaces if s.get("scope") == "personal"), None)
             self.space_id = (mine or (self.spaces[0] if self.spaces else {})).get("id", "")
@@ -354,7 +374,9 @@ class CalendarPane(KitPane):
         table = self.query_one("#calendar-table", DataTable)
         table.clear()
         for space in self.spaces:
-            table.add_row(*space_row(space, self.space_model, self.b["colour"], me=self.me))
+            table.add_row(
+                *space_row(space, self.space_model, self.b["colour"], me=self.me, subscribed=self.is_subscribed(space))
+            )
         for row, space in enumerate(self.spaces):
             if space["id"] == self.space_id:
                 table.move_cursor(row=row)
@@ -468,7 +490,12 @@ class CalendarPane(KitPane):
 
     @work(group="ui")
     async def edit_record(self, record: dict) -> None:
-        result = await self.open_sheet(record)
+        models = None
+        if self.is_subscribed(self.space_of(record)):
+            # Somebody else's to change, and the next refresh would put it
+            # back: the same sheet, read.
+            models = {**self.models, self.model_id: {**self.model, "access": "read"}}
+        result = await self.open_sheet(record, models=models)
         if result is None:
             return
         self.status(f"Deleted {title_of(record, self.model)}." if result == "deleted" else "Changed.")
@@ -477,6 +504,13 @@ class CalendarPane(KitPane):
     def act_new_record(self) -> None:
         if self.space is None:
             self.status(f"No {self.space_noun} to put it in yet.", error=True)
+            return
+        if self.is_subscribed(self.space):
+            self.status(
+                f"{title_of(self.space, self.space_model)} is subscribed: nothing goes on it here. "
+                f"Pick another {self.space_noun} on the left.",
+                error=True,
+            )
             return
         self.new_record()
 
@@ -500,6 +534,12 @@ class CalendarPane(KitPane):
         record = self.selected
         if record is None:
             self.status("Nothing to delete on this day.", error=True)
+            return
+        if self.is_subscribed(self.space_of(record)):
+            self.status(
+                f"{title_of(record, self.model)} is on a subscribed {self.space_noun}: it is not yours to delete.",
+                error=True,
+            )
             return
         self.delete_record(record)
 

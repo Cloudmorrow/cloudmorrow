@@ -301,7 +301,7 @@ def test_a_call_job_runs_as_the_installer_and_is_not_run_again_before_its_time(f
     add_van(client, admin)
     state = state_of(client)
     started = state.code.run_due()
-    assert started == ["fleet/nightly", "fleet/deliver"]
+    assert started == ["fleet/nightly", "fleet/deliver", "fleet/each"]
     import time
 
     for _ in range(200):
@@ -312,6 +312,43 @@ def test_a_call_job_runs_as_the_installer_and_is_not_run_again_before_its_time(f
     assert state.code.run_due() == []
     status = state.code.jobs_status("fleet")[0]
     assert status["last_run"] and status["last_error"] == ""
+
+
+def test_a_job_as_everybody_runs_once_as_each_person_over_their_own_records(fleet):
+    client, admin, guest = fleet
+    state_of(client).code.run_job("fleet", "each")
+    for headers, who in ((admin, ADMIN[0]), (guest, GUEST[0])):
+        theirs = client.get("/api/records/fleet.notice", headers=headers).json()
+        assert [(r["fields"]["text"], r["owner"]) for r in theirs] == [(f"for {who}", who)]
+    plan = client.post("/api/quills/plan", json={"source": str(FLEET)}, headers=admin).json()
+    assert "each every 1d, as everybody" in plan["quill_code"]["jobs"]
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        '[[jobs]]\nid = "xx"\naction = "call"\nhandler = "xx"\nevery = "1h"\nas = "somebody"\n',
+        '[[jobs]]\nid = "xx"\naction = "expire"\nmodel = "m"\nfield = "f"\nafter = "1d"\nas = "everybody"\n',
+    ],
+)
+def test_a_job_runs_as_everybody_or_as_the_installer_and_nothing_else(extra):
+    with pytest.raises(QuillError, match="as = "):
+        parse_manifest(_manifest('code = "quill.py"\n' + extra))
+
+
+def test_a_quill_may_fetch_from_any_host_out_on_the_internet_and_no_private_one():
+    from cloudmorrow.server.quills.code import _host_allowed
+
+    anywhere = ({"host": "*", "why": "to read the feeds people paste"},)
+    assert _host_allowed("93.184.216.34", anywhere)
+    for inside in ("127.0.0.1", "10.0.0.1", "192.168.1.1", "100.100.1.1", "169.254.1.1", "::1", "localhost", ""):
+        assert not _host_allowed(inside, anywhere), inside
+    assert not _host_allowed("example.com", ({"host": "api.example.com", "why": "x"},))
+    # A test's double answers for any name, but never for an address inside.
+    assert _host_allowed("calendar.example", anywhere, resolve=False)
+    assert not _host_allowed("10.0.0.1", anywhere, resolve=False)
+    code = parse_manifest(_manifest('code = "quill.py"\n[[fetch]]\nhost = "*"\nwhy = "the feeds people paste"\n'))
+    assert code.fetch[0]["host"] == "*"
 
 
 def test_a_webhook_answered_by_code_needs_its_secret(fleet):

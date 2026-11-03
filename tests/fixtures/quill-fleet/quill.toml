@@ -94,6 +94,14 @@ action = "call"
 handler = "deliver"
 every = "1d"
 
+# Once as each person, over their own records: a notice each writes to themself.
+[[jobs]]
+id = "each"
+action = "call"
+handler = "each"
+every = "1d"
+as = "everybody"
+
 [[actions]]
 id = "hand-over"
 label = "Hand a notice to somebody"

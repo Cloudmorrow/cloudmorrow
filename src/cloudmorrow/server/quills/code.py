@@ -42,8 +42,10 @@ from __future__ import annotations
 
 import base64
 import datetime as dt
+import ipaddress
 import logging
 import queue
+import socket
 import threading
 import time
 import urllib.error
@@ -153,16 +155,44 @@ def _host_error(exc: Exception) -> sdk.HostError:
 STORE_ERRORS = (UnknownModelError, UnknownRecordError, Refused, RecordConflictError, RecordError)
 
 
-def _host_allowed(host: str, allowed: tuple[dict, ...]) -> bool:
+def _host_allowed(host: str, allowed: tuple[dict, ...], *, resolve: bool = True) -> bool:
     host = host.lower().rstrip(".")
     for item in allowed:
         pattern = item["host"]
-        if pattern.startswith("*."):
+        if pattern == "*":
+            if _out_there(host, resolve=resolve):
+                return True
+        elif pattern.startswith("*."):
             if host.endswith(pattern[1:]) and host != pattern[2:]:
                 return True
         elif host == pattern:
             return True
     return False
+
+
+def _out_there(host: str, *, resolve: bool = True) -> bool:
+    """Whether *host* is somewhere out on the internet. A Quill allowed any host
+    (`host = "*"`) is allowed no private one: an address a person pastes must
+    not reach this machine, its networks or its tailnet, however it is written.
+    A name is looked up to be sure — except with *resolve* off, in a test
+    whose answers come from a double rather than the network."""
+    if not host:
+        return False
+    try:
+        literal = ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        literal = None
+    if literal is not None:
+        return literal.is_global
+    if host == "localhost" or host.endswith((".localhost", ".local", ".internal", ".home.arpa")):
+        return False
+    if not resolve:
+        return True
+    try:
+        found = {ipaddress.ip_address(info[4][0]) for info in socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)}
+    except (OSError, ValueError):
+        return False
+    return bool(found) and all(address.is_global for address in found)
 
 
 class _Redirects(urllib.request.HTTPRedirectHandler):
@@ -361,7 +391,9 @@ class HostCalls:
         parts = urllib.parse.urlsplit(url)
         if parts.scheme != "https":
             raise sdk.Refused("ctx.fetch reaches https:// addresses only")
-        if not _host_allowed(parts.hostname or "", self.manifest.fetch):
+        if not _host_allowed(parts.hostname or "", self.manifest.fetch, resolve=self.code.fetcher is None):
+            if any(f["host"] == "*" for f in self.manifest.fetch):
+                raise sdk.Refused(f"{parts.hostname} is not out on the internet, or could not be found")
             raise sdk.Refused(f"{self.manifest.id} does not list {parts.hostname} in [[fetch]]")
         method = str(args.get("method", "GET")).upper()
         if method not in FETCH_METHODS:
@@ -850,8 +882,24 @@ class QuillCode:
             owner = self._runs_as(manifest)
             if not owner:
                 raise CodeError("refused", f"{manifest.name} runs as nobody: install it again")
-            principal = self.principal_for(manifest, owner, via="person")
-            self.run(manifest, "job", job["handler"], principal, timeout=JOB_TIMEOUT)
+            # `as = "everybody"`: once as each person on the server, over their
+            # own records — a feed each of them subscribed to, refreshed for
+            # each of them. A Quill of somebody's own runs as them alone.
+            people = [owner]
+            if job.get("as") == "everybody" and not manifest.personal:
+                people = sorted(u.username for u in self.state.users.list() if u.is_active)
+            trouble = []
+            for who in people:
+                principal = self.principal_for(manifest, who, via="person")
+                try:
+                    self.run(manifest, "job", job["handler"], principal, timeout=JOB_TIMEOUT)
+                except CodeError as exc:
+                    if len(people) == 1:
+                        raise
+                    # One person's trouble is not everybody's: the rest still run.
+                    trouble.append(f"{who}: {exc.message}")
+            if trouble:
+                raise CodeError("failed", "; ".join(trouble))
         except CodeError as exc:
             error = exc.message
             if raise_:
