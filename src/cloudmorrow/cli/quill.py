@@ -392,7 +392,8 @@ def print_plan(plan: dict) -> None:
     if code:
         console.print(f"[yellow]Its Python runs in a sandbox, as whoever uses it:[/] {escape(plan.get('code', ''))}")
         for item in code.get("fetch", []):
-            console.print(f"  reaches {escape(item['host'])} — {escape(item['why'])}")
+            host = "any address on the internet" if item["host"] == "*" else item["host"]
+            console.print(f"  reaches {escape(host)} — {escape(item['why'])}")
         for item in code.get("secrets", []):
             console.print(f"  reads your secret {escape(item['key'])} — {escape(item['why'])}")
     if plan.get("runtimes"):

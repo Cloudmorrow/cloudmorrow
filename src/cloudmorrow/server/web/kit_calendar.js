@@ -10,6 +10,10 @@
                     see is drawn at once, each in its own colour
      colour         optional: a field of the space naming its colour
      subtitle       optional: one more field, said under the title
+     subscribed     optional: a field of the space (a url) — filled, the
+                    space comes from elsewhere: drawn like the rest, listed
+                    apart, and nothing here puts anything on it or changes
+                    what is on it
 
    Every space you can see is drawn at once, because a calendar you have to
    switch between is a calendar that lets you double-book yourself. The list
@@ -174,7 +178,20 @@ export function bindingsOf(quill, screen) {
     starts: screen.starts,
     ends: screen.ends,
     allDay: screen.all_day || "",
+    subscribed: screen.subscribed || "",
   };
+}
+
+/** Does this space come from elsewhere — a feed the person subscribed to? */
+export const isSubscribed = (b, space) => !!(b.subscribed && space && space.fields[b.subscribed]);
+
+/** Where a subscribed space comes from, as a person would say it: its host. */
+export function subscribedFrom(b, space) {
+  try {
+    return new URL(String(space.fields[b.subscribed])).hostname;
+  } catch {
+    return String(space.fields[b.subscribed] || "");
+  }
 }
 
 /** One record as a thing on a calendar: its times on the wall, and its space. */
@@ -229,7 +246,10 @@ export async function renderCalendar(at, arg) {
   const b = bindingsOf(quill, screen);
   const dot = (space) => `<i class="dot c-${colourOf(b, space)}" aria-hidden="true"></i>`;
   if (arg === "spaces") {
-    return renderSpaceList(at, b.spaceModel, { dot, back: at.base, backLabel: screen.label });
+    const apart = b.subscribed
+      ? { label: "Subscribed", is: (s) => isSubscribed(b, s), said: (s) => `From ${subscribedFrom(b, s)}` }
+      : null;
+    return renderSpaceList(at, b.spaceModel, { dot, back: at.base, backLabel: screen.label, apart });
   }
   if (arg === "newspace") {
     return renderNewSpace(at, b.spaceModel, {
@@ -263,8 +283,10 @@ export async function renderCalendar(at, arg) {
   const href = (event) => sheetHash(at, b.model.id, event.id);
 
   // Where a new one goes: the space you last put something in, else your own.
-  let target = spaces.get(store.get(remembered + ".in")) ||
-    spaceList.find((s) => s.scope === "personal") || spaceList[0] || null;
+  // Never a subscribed one: what is on it is somebody else's to put there.
+  const writable = spaceList.filter((s) => !isSubscribed(b, s));
+  let target = writable.find((s) => s.id === store.get(remembered + ".in")) ||
+    writable.find((s) => s.scope === "personal") || writable[0] || null;
 
   const title = view === "week"
     ? `${shortDay(days[0])} – ${shortDay(days[6])}`
@@ -335,8 +357,8 @@ export async function renderCalendar(at, arg) {
       `<p class="act-description">On ${esc(longDay(picked))}. A time in front is when it starts — “10:00 Dentist” — and without one it is the whole day.</p>` +
       `<div class="group fields"><label class="row field kind-string"><span class="main">What</span>` +
       `<input type="text" data-field="what" aria-label="What" placeholder="10:00 Dentist" autocapitalize="sentences" enterkeyhint="done"></label>` +
-      (spaceList.length > 1 ? `<label class="row field kind-link"><span class="main">In</span><select class="kit-in" data-field="in" aria-label="In which ${esc(where)}">${
-        spaceList.map((s) => `<option value="${esc(s.id)}"${s === target ? " selected" : ""}>${
+      (writable.length > 1 ? `<label class="row field kind-link"><span class="main">In</span><select class="kit-in" data-field="in" aria-label="In which ${esc(where)}">${
+        writable.map((s) => `<option value="${esc(s.id)}"${s === target ? " selected" : ""}>${
           esc(String(s.fields[b.spaceModel.title] || ""))}</option>`).join("")}</select></label>` : "") +
       `</div><p class="act-error" role="alert" hidden></p>` +
       `<div class="act-buttons"><button type="button" class="act-button" data-cancel>Cancel</button>` +
@@ -513,6 +535,17 @@ export function calendarSheet(at, model) {
     parent: (record) => {
       const day = wall(record.fields[b.starts]).slice(0, 10);
       return day ? `${at.base}/${day}` : "";
+    },
+    /** A thing on a subscribed space is read: it is somebody else's to change,
+        and the next refresh would put it back anyway. */
+    looked: async (record) => {
+      const id = record.fields[b.spaceField];
+      if (!b.subscribed || !id) return false;
+      try {
+        return isSubscribed(b, await api("GET", `${recordsUrl(b.spaceModel.id)}/${encodeURIComponent(id)}`));
+      } catch {
+        return false;
+      }
     },
     widget(f, value) {
       // A whole day is a date, so its box is a date box.

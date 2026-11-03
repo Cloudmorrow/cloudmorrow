@@ -80,6 +80,11 @@ def deliver(ctx):
         ctx.records.create("fleet.notice", owner=who, text="delivered")
 
 
+@job
+def each(ctx):
+    ctx.records.create("fleet.notice", text=f"for {ctx.user.username}")
+
+
 @action("hand_over")
 def hand_over(ctx, who):
     ctx.records.create("fleet.notice", owner=who, text="handed over")

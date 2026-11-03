@@ -388,6 +388,8 @@ def _check_calendar(screen: dict, model: Datamodel, models: dict[str, Datamodel]
         need(space, thing + " colour", screen["colour"], ("string", "enum"))
     if screen.get("subtitle"):
         need(model, thing + " subtitle", screen["subtitle"])
+    if screen.get("subscribed"):
+        need(space, thing + " subscribed", screen["subscribed"], ("url", "string"))
 
 
 # A timeline's datamodels carry the kit's own field names (docs/TIMELINE.md):
@@ -479,7 +481,11 @@ def code_summary(manifest: Manifest) -> dict:
         "views": [s["label"] for s in manifest.screens if s["kit"] == "view"],
         "actions": [a["label"] for a in manifest.actions],
         "hooks": [f"when a {h['on']} is {' or '.join(h['when'])}" for h in manifest.hooks],
-        "jobs": [f"{j['id']} every {j['every']}" for j in manifest.jobs if j["action"] == "call"],
+        "jobs": [
+            f"{j['id']} every {j['every']}" + (", as everybody" if j.get("as") == "everybody" else "")
+            for j in manifest.jobs
+            if j["action"] == "call"
+        ],
         "fetch": [{"host": f["host"], "why": f["why"]} for f in manifest.fetch],
         "secrets": [{"key": s["key"], "why": s["why"]} for s in manifest.secrets],
         "machine": [

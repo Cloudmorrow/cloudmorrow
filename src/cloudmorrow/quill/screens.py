@@ -109,6 +109,9 @@ def calendar_fields(screen: dict, model: dict) -> dict[str, str]:
         "colour": screen.get("colour") or "",
         "title": screen.get("title") or model.get("title") or "title",
         "subtitle": screen.get("subtitle") or "",
+        # A field of the space: filled, the space is subscribed from elsewhere —
+        # drawn with the rest, and nothing put on it or changed on it here.
+        "subscribed": screen.get("subscribed") or "",
     }
 
 

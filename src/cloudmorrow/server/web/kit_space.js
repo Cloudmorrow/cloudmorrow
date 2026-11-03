@@ -94,23 +94,29 @@ const personLabel = (p) => p.display_name && p.display_name !== p.username
 // -- the list ------------------------------------------------------------------------
 /** Every space of *model* you can see: yours, the shared ones, everybody's.
     *dot* draws what goes before a name (a calendar's colour). */
-export async function renderSpaceList(at, model, { dot = () => "", back, backLabel } = {}) {
+/** Every space you can see, grouped by who can see it. *apart* takes some
+    out into a group of their own — `{label, is, said}`: the ones `is` picks,
+    under `label`, each with what `said` says of it instead of its scope. */
+export async function renderSpaceList(at, model, { dot = () => "", back, backLabel, apart = null } = {}) {
   const spaces = await api("GET", recordsUrl(model.id));
   const plural = `${model.label}s`;
+  const aside = (s) => (apart && apart.is(s) ? apart.said(s) : scopeSaid(s));
   const row = (s) => `<a class="row has-icon" href="${sheetHash(at, model.id, s.id)}">
       <span class="icon">${dot(s)}</span>
       <span class="main"><span class="title">${esc(spaceName(model, s, at.screen))}</span>
-        <span class="meta"><span class="preview">${esc(scopeSaid(s))}${
+        <span class="meta"><span class="preview">${esc(aside(s))}${
           s.owner !== session.user && s.scope !== "public" ? ` · ${esc(s.owner)}'s` : ""}</span></span></span>
       ${icons.chevronRight}</a>`;
   const group = (label, rows) => (rows.length
     ? `<p class="group-label">${label}</p><div class="group">${rows.map(row).join("")}</div>` : "");
+  const rest = apart ? spaces.filter((s) => !apart.is(s)) : spaces;
   mount(nav({ back, backLabel, title: plural }) + `
     <main>
       ${heading(plural, mayWrite(model) ? `<a class="button compose" href="${at.base}/newspace" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</a>` : "")}
-      ${group("Yours", spaces.filter((s) => s.scope === "personal"))}
-      ${group("Shared", spaces.filter((s) => s.scope === "shared"))}
-      ${group("Everybody's", spaces.filter((s) => s.scope === "public"))}
+      ${group("Yours", rest.filter((s) => s.scope === "personal"))}
+      ${apart ? group(apart.label, spaces.filter(apart.is)) : ""}
+      ${group("Shared", rest.filter((s) => s.scope === "shared"))}
+      ${group("Everybody's", rest.filter((s) => s.scope === "public"))}
       ${spaces.length ? "" : `<p class="empty mascot"><b>None yet</b>${mayWrite(model) ? "Make one with the pen above." : "When there is one, it will show up here."}</p>`}
     </main>` + tabs(at.tab));
   wireShell();

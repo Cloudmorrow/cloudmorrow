@@ -1,8 +1,8 @@
 [quill]
 id = "calendar"
 name = "Calendar"
-version = "1.1.0"
-summary = "Your own calendar, the ones you share, and one for everybody."
+version = "1.2.0"
+summary = "Your own calendar, the ones you share, one for everybody, and the ones you subscribe to from elsewhere."
 category = "productivity"
 icon = "calendar"
 publisher = "Cloudmorrow"
@@ -16,10 +16,28 @@ features = [
   "Times on the wall clock: ten o'clock is ten o'clock, in June and in October",
   "All-day events that run over as many days as they need",
   "Copy an event to the week after, at the same time on the same calendar",
+  "Subscribe to a calendar published elsewhere by its address (an .ics link, as Google and the rest give out): drawn with yours, refreshed every hour, read-only",
 ]
 
 [uses]
 datamodels = ["calendar", "event"]
+
+# A calendar subscribed from elsewhere is a calendar with an address: the
+# feed it is read from, when it was last read, and what went wrong if
+# anything did. Stored as calendar.url, calendar.refreshed and
+# calendar.trouble; on a calendar made here they stay empty.
+[[extends]]
+model = "calendar"
+[extends.fields]
+url = { kind = "url", label = "Subscribed from", description = "The address of an iCalendar feed (an .ics link). Filled, the calendar is read from there every hour and nothing is put on it here." }
+refreshed = { kind = "datetime", label = "Last refreshed" }
+trouble = { kind = "string", label = "Trouble", description = "What went wrong the last time the feed was read; empty when nothing did" }
+
+# What the feed calls an event, so a refresh finds it again: stored as calendar.uid.
+[[extends]]
+model = "event"
+[extends.fields]
+uid = { kind = "string", indexed = true, label = "Feed id" }
 
 # One tab: the month, and the day you are on under it. On a phone that is a
 # month of dots and the day's list; on a computer, a week or a month with
@@ -36,6 +54,7 @@ subtitle = "location"     # said under the title, in a list of the day
 starts = "starts_at"
 ends = "ends_at"
 all_day = "all_day"
+subscribed = "calendar.url"   # a calendar with an address comes from elsewhere: drawn, listed apart, read-only
 
 # Everybody has exactly one calendar of their own, made the first time they
 # look, named after them. It is personal: nobody else sees it.
@@ -62,3 +81,50 @@ id = "copy-to-next-week"
 label = "Copy to next week"
 on = "event"
 description = "A copy of the event seven days later, on the same calendar, at the same wall-clock time."
+
+# -- calendars from elsewhere ------------------------------------------------------
+# A feed somebody else publishes — a club's fixtures, the bins, a public
+# holiday calendar — read into a calendar of your own that nothing here
+# writes in. The code is quill.py: a reader of iCalendar, with recurrence.
+[[actions]]
+id = "subscribe"
+label = "Subscribe to a calendar"
+description = "A calendar published elsewhere, by its address: an .ics link, as Google Calendar, Outlook and the rest give out. It is drawn with yours in a colour of its own, read again every hour, and read-only: what is on it is theirs to change."
+[actions.fields]
+url = { kind = "url", required = true, label = "Address", description = "The feed's address, https://…ics" }
+name = { kind = "string", label = "Name", description = "What to call it here; the feed's own name if left empty" }
+
+[[actions]]
+id = "refresh"
+label = "Refresh now"
+on = "calendar"
+description = "Reads the feed again, now rather than within the hour. Only on a subscribed calendar."
+
+[[actions]]
+id = "unsubscribe"
+label = "Unsubscribe"
+on = "calendar"
+confirm = "Unsubscribe? The calendar and everything on it go; the feed itself is untouched."
+tone = "danger"
+description = "Takes a subscribed calendar away, with what was read into it. Only on a subscribed calendar."
+
+# Every hour, as each person, their own subscriptions are read again.
+[[jobs]]
+id = "refresh"
+action = "call"
+handler = "refresh_all"
+every = "1h"
+as = "everybody"
+
+# The address changed on a calendar's sheet: read the new feed, or, with the
+# address cleared, take the feed's events off and keep the calendar.
+[[hooks]]
+on = "calendar"
+when = ["changed"]
+fields = ["calendar.url"]
+handler = "url_changed"
+
+# The feeds people subscribe to are wherever they are published.
+[[fetch]]
+host = "*"
+why = "to read the calendars you subscribe to, wherever they are published"

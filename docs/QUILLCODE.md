@@ -120,6 +120,7 @@ id = "reminders"
 action = "call"                       # call a handler, every `every`
 handler = "remind"
 every = "1d"
+# as = "everybody"                    # once as each person, over their own records; left out, as the installer
 
 [[webhooks]]
 id = "tracker"
@@ -132,6 +133,7 @@ handler = "summary"                   # or service = …
 [[fetch]]
 host = "api.example-tracker.com"      # or *.example.com; the only hosts its code reaches
 why = "to read each van's odometer from the tracker"
+# host = "*"                          # any host on the internet, for addresses people give it — never a private one
 
 [[secrets]]
 key = "TRACKER_KEY"                   # a secret its code may read from the person's vault
@@ -211,7 +213,7 @@ hook started by an assistant's change is the same.
 | `ctx.records` | `list(model, q=, last=, **where)`, `get`, `create(model, fields=None, scope=, members=, announce=, owner=, by=, **values)`, `patch(model, id, fields, rev=)`, `move(model, id, fields, index=)`, `delete`, `seen(model, id)` — the record API, through the gate. A space is made with its `scope` and, shared, its `members`; `seen` is the person having looked in one. A space's record says `.members`, `.unread` and `.last`. `owner=` delivers (below) |
 | `ctx.people(role=, circle=)` | who holds a role, as usernames ([FLOWS.md](FLOWS.md)); with no role, everybody on the server but the person it runs for |
 | `ctx.approvals.ask(record, role=, question=)` | a yes or no asked of whoever holds the role; the answer comes back as a hook on `approval` |
-| `ctx.fetch(url, method=, headers=, json=, body=)` | https to a host in `[[fetch]]`, and there only after a redirect too; a `Response` (`.status`, `.ok`, `.json()`, `.text`) |
+| `ctx.fetch(url, method=, headers=, json=, body=)` | https to a host in `[[fetch]]`, and there only after a redirect too; a `Response` (`.status`, `.ok`, `.json()`, `.text`). A Quill that lists `host = "*"` reaches any host out on the internet, and none that resolves to this machine, a private network or the tailnet |
 | `ctx.secret(key)` | a key in `[[secrets]]`, from the person's own vault |
 | `ctx.now()`, `ctx.log(...)` | the time; a line in the Quill's log |
 | `ctx.folder(name)`, `ctx.run([...])` | on a machine: a folder the person picked; a program the manifest lists and the machine allows |

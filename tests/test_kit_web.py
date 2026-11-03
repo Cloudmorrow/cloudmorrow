@@ -318,6 +318,19 @@ def test_the_install_buttons_do_not_borrow_the_install_card():
 
 
 # -- the calendar, and spaces ----------------------------------------------------
+def test_a_subscribed_calendar_is_listed_apart_and_nothing_is_put_on_it():
+    calendar = (WEB / "kit_calendar.js").read_text(encoding="utf-8")
+    kit = (WEB / "kit.js").read_text(encoding="utf-8")
+    spaces = (WEB / "kit_space.js").read_text(encoding="utf-8")
+    # The binding, read once; the pen's "In" offers only the spaces that take things.
+    assert 'subscribed: screen.subscribed || ""' in calendar
+    assert "const writable = spaceList.filter((s) => !isSubscribed(b, s))" in calendar
+    assert "writable.map((s) =>" in calendar
+    # Listed apart, under their own heading; a thing on one opens read.
+    assert 'label: "Subscribed"' in calendar and "apart.is(s)" in spaces
+    assert "own.looked && await own.looked(record)" in kit
+
+
 def test_the_calendar_asks_the_record_api_for_a_window_of_days():
     """One call per window, a range on each of the screen's two moments."""
     calendar = (WEB / "kit_calendar.js").read_text(encoding="utf-8")
@@ -452,9 +465,15 @@ def test_a_row_of_chips_says_what_it_picks():
     assert ".chips-label {" in (WEB / "kit.css").read_text(encoding="utf-8")
 
 
+def test_a_whole_day_in_a_datetime_field_is_said_as_a_day():
+    kit = (WEB / "kit.js").read_text(encoding="utf-8")
+    spoken = _function(kit, "spoken")
+    assert 'if (String(value).length === 10) return spoken({ ...f, kind: "date" }, value, links);' in spoken
+
+
 def test_the_sheet_of_a_record_you_may_only_read_says_it():
     sheet = js_code(_function(KIT_JS, "renderRecordSheet"))
-    assert "const looked = !mayWrite(model) || (model.space && !record.can_manage);" in sheet
+    assert "const looked = !mayWrite(model) || (model.space && !record.can_manage) ||" in sheet
     # Said rather than typed, nothing to delete, and none of the saving wired.
     assert "looked && !f.secret ? sayWidget(" in sheet
     assert "const deletable = !looked &&" in sheet

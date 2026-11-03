@@ -38,6 +38,8 @@ SDK_MAJOR = "1"
 HANDLER_RE = re.compile(r"^[a-z_][a-z0-9_]{0,63}$")
 ACTION_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 # A host its code may fetch from: a name, or `*.` and a name for its subdomains.
+# `*` alone is any host on the internet, for code that reads addresses people
+# give it — a calendar feed, a web page — and never a private one (code.py).
 HOST_RE = re.compile(r"^(\*\.)?([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
 KEY_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
 FOLDER_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
@@ -192,8 +194,10 @@ def parse_code(
     fetch = _tables(data, "fetch", where)
     for item in fetch:
         host = str(item.get("host", "")).lower()
-        if not HOST_RE.match(host):
-            raise CodeSpecError(f"{where}: fetch host {host!r} is a name like api.example.com, or *.example.com")
+        if host != "*" and not HOST_RE.match(host):
+            raise CodeSpecError(
+                f"{where}: fetch host {host!r} is a name like api.example.com, *.example.com, or * for any host"
+            )
         if not str(item.get("why", "")).strip():
             raise CodeSpecError(f"{where}: fetch {host} says why; a person reads it")
         item["host"] = host
