@@ -166,6 +166,132 @@
 .v-form .group-label:first-child { margin-top: 0; }
 .v-form .act-buttons { padding: 0; }
 
+/* -- a toggle: a setting as a switch ------------------------------------------------ */
+.v-toggle { cursor: pointer; }
+.v-toggle .main { display: flex; flex-direction: column; gap: 2px; max-width: none; }
+.v-toggle-hint { font-size: 13px; color: var(--muted); font-weight: 400; }
+.v-toggle .switch:disabled { opacity: .5; cursor: progress; }
+
+/* -- a conversation: a chat, the box to write in on the floor --------------------------- */
+/* The one view that does not scroll the page: the window's height, the
+   lines scroll, the composer sits on the floor — as the thread kit does.
+   Every box between the page and the conversation gives it the height. */
+#app:has(.v-conversation) { height: 100dvh; min-height: 0; }
+/* The phone's bar is fixed over the foot of the page: the box stops above
+   it (and above the strip of the Quill's screens, when there is one); beside
+   the rail there is nothing under the box. */
+main.view-screen:has(.v-conversation) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: calc(50px + var(--bottom));
+  overflow: hidden;
+}
+#app:has(> nav.subtabs) main.view-screen:has(.v-conversation) { padding-bottom: calc(94px + var(--bottom)); }
+main.view-screen:has(.v-conversation) > .heading { flex: none; }
+.quill-view:has(.v-conversation) { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-bottom: 0; }
+.v-stack:has(.v-conversation), .v-column:has(.v-conversation), .v-split-main:has(.v-conversation),
+.v-tabs:has(.v-conversation), .v-tab-panel:has(.v-conversation) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Beside a list the columns are as tall as the window, whichever is shown,
+   and the list scrolls on its own; the wide screen's `align-items: start`
+   and `display: block` below give way to this. */
+.v-split:has(.v-conversation) { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+.v-split[data-show]:has(.v-conversation) > .v-split-side { min-height: 0; overflow-y: auto; }
+.v-split[data-show]:has(.v-conversation) > .v-split-main { display: flex; flex-direction: column; min-height: 0; }
+.v-split[data-show="main"]:has(.v-conversation) > .v-split-side, .v-split[data-show="side"]:has(.v-conversation) > .v-split-main { display: none; }
+.v-conversation { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.v-lines {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 0 16px;
+}
+/* What is said while there is nothing yet: in the middle, as a greeting. */
+.v-greeting { margin: auto; padding: 0 16px; max-width: 520px; text-align: center; color: var(--muted); font-size: 17px; line-height: 1.45; }
+.v-line { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.v-line.mine { align-items: flex-end; }
+.v-who { margin: 0 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+/* The other side's lines are a page, the person's a bubble: the page is
+   read, the bubble is what was said to it. */
+.v-bubble { max-width: 100%; min-width: 0; padding: 0 4px; line-height: 1.5; overflow-wrap: anywhere; }
+.v-line.mine .v-bubble {
+  max-width: 82%;
+  padding: 9px 14px;
+  border-radius: 18px;
+  border-bottom-right-radius: 6px;
+  background: var(--fill);
+  color: var(--fill-ink);
+  white-space: pre-wrap;
+}
+.v-line.failed .v-bubble { opacity: .7; }
+.v-under { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 4px; font-size: 12px; color: var(--muted); }
+/* The other side thinking: three dots, one after another. */
+.v-thinking { flex-direction: row; gap: 5px; padding: 10px 6px; }
+.v-thinking span { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); animation: v-think 1.2s infinite ease-in-out; }
+.v-thinking span:nth-child(2) { animation-delay: .2s; }
+.v-thinking span:nth-child(3) { animation-delay: .4s; }
+@keyframes v-think {
+  0%, 80%, 100% { opacity: .3; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-3px); }
+}
+/* The box, on the floor: the phone's bar is under it, so the inset is kept. */
+.v-composer {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.v-composer textarea {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  max-height: 140px;
+  padding: 11px 16px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.35;
+  resize: none;
+  outline: none;
+  overflow-y: hidden;
+  overflow-wrap: anywhere;
+  /* 16px or iOS zooms the page the moment it is focused. */
+  font-size: 16px;
+}
+.v-composer textarea::placeholder { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.v-composer textarea:focus { border-color: var(--accent); }
+.v-composer textarea:disabled { opacity: .6; }
+.v-composer button {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  /* Sending is what the box is for: its one amber. */
+  background: var(--action);
+  color: var(--action-ink);
+}
+.v-composer button:disabled { opacity: .4; }
+.v-composer-hint { flex: none; margin: 0; padding: 0 0 8px; text-align: center; font-size: 12px; color: var(--muted); }
+.v-composer + .v-composer-hint { margin-top: -4px; }
+
 /* -- menus and buttons in a row --------------------------------------------------- */
 .v-row > .act-button { flex: none; }
 /* The one of a row of buttons that is where you are: the folder you are in. */
@@ -341,6 +467,7 @@ button.v-star:focus-visible { outline: 2px solid var(--accent); outline-offset: 
 
 /* -- on a computer ------------------------------------------------------------------ */
 @media (min-width: 900px) and (min-height: 600px) {
+  main.view-screen:has(.v-conversation), #app:has(> nav.subtabs) main.view-screen:has(.v-conversation) { padding-bottom: 0; }
   .v-columns { grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 18px; align-items: start; }
   .v-split { grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 22px; align-items: start; }
   .v-split[data-show="main"] > .v-split-side, .v-split[data-show="side"] > .v-split-main { display: block; }

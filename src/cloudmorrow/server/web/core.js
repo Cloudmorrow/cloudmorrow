@@ -903,8 +903,7 @@ function placeGear() {
     actions = head.querySelector(":scope > .actions");
   }
   actions.insertAdjacentHTML("beforeend",
-    `<a class="button settings" href="${screenSettings.href}" aria-label="${esc(screenSettings.label)}"` +
-    ` title="${esc(screenSettings.label)}">${pixelIcon("settings")}</a>`);
+    `<a class="button settings" href="${screenSettings.href}" aria-label="Settings" title="Settings">${pixelIcon("settings")}</a>`);
 }
 
 // The tabs along the bottom. Every top-level screen has them; an editor

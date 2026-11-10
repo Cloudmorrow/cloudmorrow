@@ -624,8 +624,9 @@ def test_an_admin_screen_is_on_the_quills_sheet_and_never_under_its_tab():
     assert 'embedView(box, { quill: here, screen, tab: "", base: "", embedded: true }, {})' in admin
     actions = (WEB / "actions.js").read_text(encoding="utf-8")
     assert "if (here && here.goHere && effect.screen === here.screen.id)" in actions
-    # Its actions are not on the bar either: the settings screen draws their buttons.
-    assert "filter((a) => !a.on && !a.admin)" in actions
+    # Its actions are not on the bar either: the settings screen draws their
+    # buttons, as the person's own settings screen draws those marked settings.
+    assert "filter((a) => !a.on && !a.admin && !a.settings)" in actions
 
 
 # -- Done means there is something to be done ------------------------------------

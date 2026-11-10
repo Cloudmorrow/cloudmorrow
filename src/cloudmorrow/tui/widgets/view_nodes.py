@@ -35,6 +35,7 @@ from textual.widgets import (
     Rule,
     Select,
     Static,
+    Switch,
     TabbedContent,
     TabPane,
 )
@@ -84,6 +85,8 @@ RENDERERS: dict[str, str] = {
     "divider": "draw_divider",
     "field": "draw_field",
     "form": "draw_form",
+    "toggle": "draw_toggle",
+    "conversation": "draw_conversation",
     "button": "draw_button",
     "menu": "draw_menu",
     "table": "draw_table",
@@ -402,6 +405,131 @@ class FormNode(Vertical):
     def on_input_submitted(self, event: Input.Submitted) -> None:
         event.stop()
         self.screen.focus_next()
+
+
+class ToggleNode(Horizontal):
+    """`toggle`: a setting as a switch; flipping it runs the action at once with the new state."""
+
+    def __init__(self, node: dict, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.node = node
+        self.add_class("view-toggle")
+
+    def compose(self) -> ComposeResult:
+        label = Text(str(self.node.get("label") or ""))
+        if self.node.get("hint"):
+            label.append(f"\n{self.node['hint']}", style=MUTED)
+        yield Static(label, classes="view-toggle-label")
+        yield Switch(value=bool(self.node.get("on")), id=f"{self.id}-switch", classes="view-toggle-switch")
+
+    def on_switch_changed(self, event: Switch.Changed) -> None:
+        event.stop()
+        if event.value == bool(self.node.get("on")):
+            return  # drawn as it is, not flipped
+        args = {**(self.node.get("args") or {}), str(self.node.get("field") or "on"): event.value}
+        self.post_message(
+            ViewAct(
+                {
+                    "ui": "toggle",
+                    "label": self.node.get("label"),
+                    "action": self.node["action"],
+                    "record": self.node.get("record"),
+                    "args": args,
+                }
+            )
+        )
+
+
+class ConversationNode(Vertical):
+    """`conversation`: the lines, the newest last, and a box to write in under them.
+
+    Enter sends what is in the box: the pane runs the `ask` action with it,
+    and the view is drawn again with the answer. Meanwhile what was said is
+    shown with the other side thinking; what could not be sent goes back.
+    """
+
+    class Asked(Message):
+        def __init__(self, node: ConversationNode, text: str) -> None:
+            self.node = node
+            self.text = text
+            super().__init__()
+
+    def __init__(self, node: dict, action: dict | None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.node = node
+        self.action = action
+        self.field = next(
+            (f for f in (action or {}).get("fields") or [] if f.get("kind") in ("text", "markdown", "string")), None
+        )
+        self.add_class("view-conversation")
+
+    def compose(self) -> ComposeResult:
+        records = self.node.get("records") or []
+        with Vertical(classes="view-lines", id=f"{self.id}-lines"):
+            if not records and self.node.get("empty"):
+                yield Static(Text(str(self.node["empty"]), style=MUTED), classes="view-greeting")
+            for record in records:
+                yield from self._line(record)
+        yield Static("", classes="view-form-complaint")
+        if self.action and self.field:
+            yield Input(
+                placeholder=str(self.node.get("placeholder") or self.action.get("label") or "Say"),
+                id=f"{self.id}-input",
+                classes="view-composer",
+            )
+        if self.node.get("hint"):
+            yield Static(Text(str(self.node["hint"]), style=MUTED), classes="view-composer-hint")
+
+    def _line(self, record: dict) -> ComposeResult:
+        fields = record.get("fields") or {}
+        mine = bool(fields.get(str(self.node.get("mine") or "")))
+        side = " -mine" if mine else ""
+        head = Text("You" if mine else str(self.node.get("name") or ""), style=f"bold {MUTED if mine else ACCENT}")
+        at = value_text(record, str(self.node["at"])) if self.node.get("at") else ""
+        if at:
+            head.append(f"  {at}", style=MUTED)
+        if head.plain:
+            yield Static(head, classes=f"view-line-who{side}")
+        body = str(fields.get(str(self.node.get("body") or "")) or "")
+        if mine:
+            yield Static(Text(body), classes="view-line -mine")
+        else:
+            yield Markdown(body, classes="view-line view-markdown")
+        under = []
+        if self.node.get("failed") and fields.get(str(self.node["failed"])):
+            under.append("did not go through")
+        if self.node.get("note") and value_text(record, str(self.node["note"])):
+            under.append(value_text(record, str(self.node["note"])))
+        if under:
+            yield Static(Text(" · ".join(under), style=MUTED), classes=f"view-line-under{side}")
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        event.stop()
+        text = event.value.strip()
+        if not text:
+            return
+        event.input.value = ""
+        event.input.disabled = True
+        self.query_one(".view-lines", Vertical).mount(
+            Static(Text("You", style=f"bold {MUTED}"), classes="view-line-who -mine -sent"),
+            Static(Text(text), classes="view-line -mine -sent"),
+            Static(Text("…", style=MUTED), classes="view-line view-thinking -sent"),
+        )
+        self.say("")
+        self.post_message(self.Asked(self, text))
+
+    def say(self, message: str) -> None:
+        self.query_one(".view-form-complaint", Static).update(Text(message, style=BAD) if message else "")
+
+    def back(self, text: str, message: str) -> None:
+        """Not sent: the words go back into the box, with why."""
+        for widget in self.query(".-sent"):
+            widget.remove()
+        self.say(message)
+        box = self.query_one(".view-composer", Input)
+        box.disabled = False
+        box.value = text
+        box.focus()
 
 
 class TableNode(Vertical):
@@ -956,6 +1084,13 @@ class Drawer:
         if action is None:
             return Static(Text(f"No action {node.get('action')!r} here.", style=MUTED), id=path)
         return FormNode(node, action, self.pane.choices.get(path) or {}, id=path)
+
+    def draw_toggle(self, node: dict, path: str) -> Widget:
+        return ToggleNode(node, id=path)
+
+    def draw_conversation(self, node: dict, path: str) -> Widget:
+        action = find_action(self.pane.quill, str(node.get("ask") or "")) if node.get("ask") else None
+        return ConversationNode(node, action, id=path)
 
     def draw_button(self, node: dict, path: str) -> Widget:
         return ViewButton(node, id=path)

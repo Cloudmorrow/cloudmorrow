@@ -182,6 +182,50 @@ Button.view-button.-error {
     height: auto;
 }
 
+/* -- a toggle: a setting as a switch ----------------------------------------- */
+.view-toggle {
+    height: auto;
+}
+
+.view-toggle-label {
+    width: 1fr;
+    height: auto;
+    padding-top: 0;
+}
+
+.view-toggle Switch {
+    height: 1;
+    border: none;
+    padding: 0 1;
+}
+
+.view-toggle Switch:focus {
+    background: $panel;
+}
+
+/* -- a conversation: the lines, then the box --------------------------------- */
+.view-conversation, .view-lines, .view-line, .view-line-who, .view-line-under,
+.view-greeting, .view-composer-hint, .view-thinking {
+    height: auto;
+}
+
+.view-line-who {
+    margin-top: 1;
+}
+
+.view-line.-mine, .view-line-who.-mine, .view-line-under.-mine {
+    text-align: right;
+}
+
+.view-greeting {
+    padding: 1 2;
+    text-align: center;
+}
+
+.view-composer {
+    margin-top: 1;
+}
+
 .view-menu-item {
     width: 100%;
     margin-bottom: 1;

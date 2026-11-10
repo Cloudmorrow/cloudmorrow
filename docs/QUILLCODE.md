@@ -101,6 +101,9 @@ assistant = true                      # false: not an assistant's tool
 # admin = true                        # an administrator's alone, like a screen marked admin: pressed
                                       # from the Quill's settings on its sheet under Administration,
                                       # on no bar or palette, and refused to anybody else
+# settings = true                     # a person's own setting: pressed from the screen marked
+                                      # settings, behind the gear (a toggle, a form), and on no
+                                      # bar or palette; on no record
 [actions.fields]
 date = { kind = "date", required = true }
 km   = { kind = "int", required = true }
@@ -298,6 +301,8 @@ one:
 | `text(style=)`, `markdown`, `image`, `badge`, `stat`, `empty`, `divider` | content |
 | `field(record, name, edit=)` | one field of a record, with its kind's widget; editable saves as it changes |
 | `form(action, values=, record=)` | an action's form, drawn in place |
+| `toggle(label, action=, on=, field=, hint=)` | a setting as a switch: flipping it runs `action` at once with `field` set to the new state (and `args`), no form; a settings screen is toggles and forms, never a row of buttons with one lit |
+| `conversation(records, body=, mine=, ask=, record=, name=, at=, note=, failed=, empty=, placeholder=, hint=)` | a chat: the lines in order, the person's own (`mine`, a bool) on the right in a bubble, the other side's (`name`) on the left as a page; newest at the bottom, scrolled to, and the box to write in on the floor when `ask` names the action that takes the words (its first text field; on `record`), enter sends, and what was sent is shown with the other side thinking until the view is drawn again; `empty` is said in the middle while there is nothing |
 | `button(label, action= \| open= \| go=, current=)`, `menu` | run an action, open a record, go to a screen; `current` marks the one of a row that is where you are |
 | `table(records, columns=, actions=, go=, param=)`, `cards(records, title=, …, go=, param=, current=)` | records, a row or a card each; opening one shows its sheet — or, with `go`, a screen of the Quill's own, with the record's id as `param`; `current` is the id of the card that is open, lit as such |
 | `gallery(records, title=, subtitle=, badge=, stars=, rate=, actions=)` | records as tiles with their own picture (a file's thumbnail; a video's is a frame of it) and five stars; pressing a star runs `rate` with `stars=` |

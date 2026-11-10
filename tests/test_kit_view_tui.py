@@ -311,6 +311,8 @@ def every_primitive(van: dict) -> dict:
             ui.cards([van], title="name", subtitle="registration", badge="fuel"),
             ui.table([], columns=["name"], empty="No vans here."),
             ui.empty("Nothing else.", action="add-van"),
+            ui.toggle("Lit", action="peek", on=True, hint="A switch"),
+            ui.conversation([van], body="name", mine="name", ask="add-van", name="Fleet", hint="Say it"),
         )
     )
 
@@ -347,6 +349,46 @@ async def test_every_primitive_is_drawn_and_what_can_be_changed_is_saved(fleet):
         await pilot.press("enter")
         await settle(app, pilot)
         assert vans(app)[0]["fields"]["name"] == "Transit Custom"
+
+
+async def test_a_toggle_runs_its_action_with_the_new_state(fleet):
+    from textual.widgets import Switch
+
+    app = fleet
+    async with app.run_test(size=(120, 40)) as pilot:
+        pane = await open_garage(app, pilot)
+        pane.view_tree = ui.check(ui.toggle("Lit", action="lit", on=False, hint="The vans lit up"))
+        await pane.draw()
+        await settle(app, pilot)
+        switch = pane.query_one(Switch)
+        assert switch.value is False
+        await pilot.click(switch)
+        await until(pilot, lambda: "Lit" in toasts(app))
+        # Drawn again as the server has it: the tree here is the garage's own again.
+        await settle(app, pilot)
+        assert pane.query(".view-stat")
+
+
+async def test_a_conversation_sends_on_enter_and_is_drawn_again_with_the_answer(fleet):
+    app = fleet
+    async with app.run_test(size=(120, 40)) as pilot:
+        pane = await open_garage(app, pilot)
+        van = vans(app)[0]
+        pane.view_tree = ui.check(
+            ui.conversation([van], body="name", mine="name", ask="add-van", name="Fleet", placeholder="Say it")
+        )
+        await pane.draw()
+        await settle(app, pilot)
+        box = pane.query_one(".view-composer", Input)
+        assert box.placeholder == "Say it"
+        box.focus()
+        await pilot.press(*"Sprinter", "enter")
+        # add_van answers with a toast and opens the van it made.
+        await until(pilot, lambda: isinstance(app.screen, RecordSheet))
+        assert "Added Sprinter" in toasts(app)
+        app.screen.action_cancel()
+        await settle(app, pilot)
+        assert sorted(v["fields"]["name"] for v in vans(app)) == ["Sprinter", "Transit"]
 
 
 async def test_a_card_in_a_lane_moves_with_the_keys(fleet):

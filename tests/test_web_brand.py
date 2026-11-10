@@ -91,6 +91,7 @@ def test_the_amber_fills_are_the_actions():
         ".login .submit",
         ".row.primary",
         ".composer button",
+        ".v-composer button",
         # A Quill's action: the first primary one in a view, a form's submit.
         ".act-button.primary",
         ".act-button.primary:active",

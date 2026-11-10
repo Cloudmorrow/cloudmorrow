@@ -120,6 +120,7 @@ label = "Log a service"
 on = "vehicle"                     # optional: done to one record; the handler gets it first
 confirm = "Log it?"                # optional; tone = "primary" | "danger"; assistant = false
 # timeout = "2m"                   # up to 5m, for one that waits on something outside; else 15s
+# settings = true                  # a person's own setting: pressed from the settings screen alone
 [actions.fields]                   # its form, checked before the code runs
 date = { kind = "date", required = true }
 km = "int"
@@ -195,7 +196,12 @@ allows, or one of a runtime in `needs.runtimes`). A refusal raises `Refused`,
 Primitives (`ui.`): `stack`, `row`, `columns`, `tabs`, `text(style=)`,
 `markdown`, `image`, `badge`, `stat`, `empty`, `divider`, `field(record,
 name, edit=)`, `form(action)`, `button(label, action= | open= | go=)`,
-`menu`, `table(records, columns=, actions=, go=, param=)`, `cards(records,
+`menu`, `toggle(label, action=, on=, field=, hint=)` (a setting as a switch:
+flipping it runs the action at once with `field` set to the new state),
+`conversation(records, body=, mine=, ask=, record=, name=, at=, note=,
+failed=, empty=, placeholder=, hint=)` (a chat: the person's lines on the
+right, the other side's on the left, a box on the floor that runs `ask`
+with what is typed), `table(records, columns=, actions=, go=, param=)`, `cards(records,
 title=, …, go=, param=)` (a row or a card opens its sheet, or with `go` a
 screen of the Quill's own, the record's id as `param`),
 `gallery(records, title=, subtitle=, badge=, stars=, rate=, actions=)` (files

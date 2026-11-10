@@ -38,6 +38,7 @@ const glyphs = {
   right: '<svg width="11" height="18" viewBox="0 0 11 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 1.5 9 9l-6.5 7.5"/></svg>',
   more: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
   down: '<svg width="10" height="7" viewBox="0 0 10 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m1 1.5 4 4 4-4"/></svg>',
+  send: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3.2 11.1 20 3.4c.8-.4 1.6.4 1.2 1.2L13.5 21c-.4.8-1.5.7-1.8-.1l-2.1-6-6-2.1c-.8-.3-.9-1.4-.4-1.7Z"/></svg>',
 };
 
 // The same test the board uses: a phone has no way to drag anything.
@@ -79,7 +80,7 @@ export async function embedView(root, at, params = {}) {
   const v = {
     at, params, root, tree: null,
     open: new Map(), months: new Map(), revs: new Map(), thumbs: new Map(),
-    links: {}, formLinks: {}, handlers: [], menus: [], edits: [], forms: [], lanes: [], amber: false,
+    links: {}, formLinks: {}, handlers: [], menus: [], edits: [], forms: [], toggles: [], chats: [], lanes: [], amber: false,
   };
   v.draw = () => draw(v);
   v.paint = () => paint(v);
@@ -154,12 +155,16 @@ function paint(v) {
   v.menus = [];
   v.edits = [];
   v.forms = [];
+  v.toggles = [];
+  v.chats = [];
   v.lanes = [];
   v.amber = false;
   v.root.removeAttribute("aria-busy");
   v.root.innerHTML = node(v, v.tree, "0");
   wireEdits(v);
   wireForms(v);
+  wireToggles(v);
+  wireChats(v);
   wireLanes(v);
   loadThumbs(v);
   // What the view has its own button for is not in the bar as well.
@@ -295,7 +300,10 @@ function syncBack(v) {
 
 function pressedIn(tree) {
   const ids = new Set();
-  for (const n of walk(tree)) if (n.action) ids.add(n.action);
+  for (const n of walk(tree)) {
+    if (n.action) ids.add(n.action);
+    if (n.ask) ids.add(n.ask);
+  }
   return ids;
 }
 
@@ -340,6 +348,8 @@ const DRAW = {
   divider: () => `<hr class="v-divider">`,
   field: (v, n) => `<div class="group fields record v-fields">${fieldRow(v, n)}</div>`,
   form: drawForm,
+  toggle: drawToggle,
+  conversation: drawConversation,
   button: (v, n) => drawButton(v, n),
   menu: (v, n) => {
     const items = n.items.map((item) => pressable(v, item)).filter(Boolean);
@@ -364,7 +374,7 @@ function node(v, n, p) {
 }
 
 // Fields one after another are one box of rows, as on the sheet, rather
-// than a box each.
+// than a box each; toggles the same, so a settings screen is one box of switches.
 function children(v, list, p) {
   let out = "";
   let run = [];
@@ -374,6 +384,7 @@ function children(v, list, p) {
   };
   list.forEach((child, i) => {
     if (child && child.ui === "field") { run.push(fieldRow(v, child)); return; }
+    if (child && child.ui === "toggle") { run.push(toggleRow(v, child)); return; }
     flush();
     out += node(v, child, `${p}.${i}`);
   });
@@ -535,6 +546,138 @@ function wireForms(v) {
         here: v.at, after: v.draw, showError,
       });
       if (submit.isConnected) submit.disabled = false;
+    });
+  }
+}
+
+// -- a toggle ------------------------------------------------------------------------------------
+// A setting as a switch: flipping it runs the action at once with the new
+// state, and the view is drawn again. No form, no button lit or unlit.
+function drawToggle(v, n) {
+  const row = toggleRow(v, n);
+  return row ? `<div class="group fields record v-fields">${row}</div>` : "";
+}
+
+function toggleRow(v, n) {
+  const action = findAction(v.at.quill.id, n.action);
+  if (!action) return "";
+  v.toggles.push({ n, action });
+  return `<label class="row field v-toggle" data-toggle="${v.toggles.length - 1}"><span class="main">${esc(n.label)}` +
+    (n.hint ? `<span class="v-toggle-hint">${esc(n.hint)}</span>` : "") + `</span>` +
+    `<input type="checkbox" class="switch" aria-label="${esc(n.label)}"${n.on ? " checked" : ""}></label>`;
+}
+
+function wireToggles(v) {
+  for (const row of v.root.querySelectorAll("[data-toggle]")) {
+    const { n, action } = v.toggles[Number(row.dataset.toggle)];
+    const box = row.querySelector("input");
+    box.addEventListener("change", async () => {
+      const on = box.checked;
+      if (action.confirm && !(await ask(action.confirm, { yes: action.label, tone: action.tone }))) { box.checked = !on; return; }
+      box.disabled = true;
+      const failed = await run(v.at.quill, action, {
+        record: n.record ? n.record.id : "", fields: { ...(n.args || {}), [n.field]: on }, here: v.at, after: v.draw,
+      });
+      // Still on the page only when the action did not end in a redraw: put the switch back.
+      if (box.isConnected) { box.disabled = false; if (failed) box.checked = !on; }
+    });
+  }
+}
+
+// -- a conversation ------------------------------------------------------------------------------
+// A chat: the person's lines on the right in a filled bubble, the other
+// side's on the left as a page, the newest at the bottom, and the box to
+// write in on the floor. What is sent is shown at once, with the other
+// side thinking, until the action is done and the view drawn again; what
+// could not be sent goes back into the box.
+const askField = (action) => (action && (action.fields || []).find((f) => ["text", "markdown", "string"].includes(f.kind))) || null;
+
+function drawConversation(v, n) {
+  const action = n.ask ? findAction(v.at.quill.id, n.ask) : null;
+  const field = askField(action);
+  const lines = n.records.map((r) => chatLine(v, n, r)).join("");
+  let box = "";
+  if (action && field) {
+    v.chats.push({ n, action, field });
+    const words = n.placeholder || action.label;
+    box = `<form class="v-composer" data-chat="${v.chats.length - 1}">` +
+      `<textarea rows="1" placeholder="${esc(words)}" aria-label="${esc(words)}" enterkeyhint="send" autocapitalize="sentences"></textarea>` +
+      `<button type="submit" aria-label="${esc(action.label)}">${glyphs.send}</button></form>`;
+  }
+  return `<div class="v-conversation"><div class="v-lines" aria-live="polite">` +
+    (lines || (n.empty ? `<div class="v-greeting">${esc(n.empty)}</div>` : "")) + `</div>` + box +
+    (n.hint ? `<p class="v-composer-hint">${esc(n.hint)}</p>` : "") + `</div>`;
+}
+
+function chatLine(v, n, r) {
+  const fields = r.fields || {};
+  const mine = !!fields[n.mine];
+  const failed = !!(n.failed && fields[n.failed]);
+  const at = n.at ? say(v, r, n.at) : "";
+  const note = n.note ? say(v, r, n.note) : "";
+  const words = String(fields[n.body] ?? "");
+  const under = (failed ? `<span class="v-badge tone-bad">Did not go through</span>` : "") +
+    (note ? `<span>${esc(note)}</span>` : "") + (at ? `<span>${esc(at)}</span>` : "");
+  return `<div class="v-line${mine ? " mine" : ""}${failed ? " failed" : ""}">` +
+    (!mine && n.name ? `<span class="v-who">${esc(n.name)}</span>` : "") +
+    (mine ? `<div class="v-bubble">${esc(words)}</div>` : `<div class="v-bubble v-markdown">${markdown(words)}</div>`) +
+    (under ? `<span class="v-under">${under}</span>` : "") + `</div>`;
+}
+
+// A one-line box that grows to what is typed and stops before it eats the
+// screen; past that it scrolls inside itself.
+const MAX_BOX = 140;
+function growBox(box) {
+  box.style.height = "auto";
+  const wanted = box.scrollHeight;
+  box.style.height = Math.min(wanted, MAX_BOX) + "px";
+  box.style.overflowY = wanted > MAX_BOX ? "auto" : "hidden";
+}
+
+function wireChats(v) {
+  for (const form of v.root.querySelectorAll("form[data-chat]")) {
+    const { n, action, field } = v.chats[Number(form.dataset.chat)];
+    const box = form.querySelector("textarea");
+    const button = form.querySelector("button");
+    const lines = form.parentElement.querySelector(".v-lines");
+    const toBottom = () => { lines.scrollTop = lines.scrollHeight; };
+    toBottom();
+    growBox(box);
+    box.addEventListener("input", () => growBox(box));
+    // Enter sends on a keyboard, and the return key on a phone is the send
+    // key because `enterkeyhint` made it one. Shift+Enter is a new line.
+    box.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+        event.preventDefault();
+        form.requestSubmit();
+      }
+    });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const text = box.value.trim();
+      if (!text || box.disabled) return;
+      box.value = "";
+      growBox(box);
+      box.disabled = true;
+      button.disabled = true;
+      const greeting = lines.querySelector(".v-greeting");
+      if (greeting) greeting.remove();
+      lines.insertAdjacentHTML("beforeend",
+        `<div class="v-line mine v-sent"><div class="v-bubble">${esc(text)}</div></div>` +
+        `<div class="v-line v-thinking" role="status" aria-label="Waiting for an answer"><span></span><span></span><span></span></div>`);
+      toBottom();
+      const failed = await run(v.at.quill, action, {
+        record: n.record ? n.record.id : "", fields: { [field.name]: text }, here: v.at, after: v.draw,
+      });
+      // Not drawn again, so it ended in an error: the words go back rather than being lost.
+      if (failed && form.isConnected) {
+        for (const el of lines.querySelectorAll(".v-sent, .v-thinking")) el.remove();
+        box.value = text;
+        growBox(box);
+        box.disabled = false;
+        button.disabled = false;
+        box.focus();
+      }
     });
   }
 }

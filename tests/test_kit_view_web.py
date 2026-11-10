@@ -78,6 +78,23 @@ def test_every_effect_is_handled_in_one_place():
     assert "effect.effect" not in VIEW_JS
 
 
+def test_a_setting_is_a_switch_and_a_conversation_a_chat():
+    """A toggle runs its action at once with the new state, with no form; a
+    conversation's box runs `ask` on enter, shows what was sent while the
+    answer is waited for, and gives the words back when it failed. Neither
+    action is on the bar under the title: the screen already has them."""
+    code = js_code(VIEW_JS)
+    assert 'class="switch"' in code and "[n.field]: on" in code and "if (failed) box.checked = !on" in code
+    assert 'event.key === "Enter" && !event.shiftKey' in code and "[field.name]: text" in code
+    assert "v-thinking" in code and "box.value = text" in code
+    assert "if (n.ask) ids.add(n.ask)" in code
+    drawn = (".v-toggle", ".v-composer", ".v-lines", ".v-line.mine .v-bubble", ".v-thinking", ".v-conversation")
+    for cls in drawn:
+        assert cls in VIEW_CSS, cls
+    # An action marked settings is drawn by the settings screen alone, as an admin's is.
+    assert "!a.on && !a.admin && !a.settings" in ACTIONS_JS
+
+
 def test_every_way_to_press_goes_through_press():
     code = js_code(VIEW_JS)
     assert "press(quill, action," in code or "press(v.at.quill, action," in code

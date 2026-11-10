@@ -39,6 +39,11 @@ def reach_out(ctx):
     ctx.records.list("contact")
 
 
+@action
+def lit(ctx, on=False):
+    return toast("Lit" if on else "Unlit")
+
+
 @hook
 def visit_logged(ctx, change):
     visit = change.record
@@ -66,6 +71,7 @@ def tracker(ctx):
     return ui.stack(
         ui.text("Tracker", style="title"),
         ui.text(f"How the tracker shows its vans to {ctx.user.name}: your own settings."),
+        ui.toggle("Lit", action="lit", on=False, hint="The tracker's vans lit up"),
     )
 
 

@@ -221,7 +221,13 @@ of its own with the way back to the Quill on its bar (in the terminal, `,`
 on any of the Quill's screens). Settings that were a section at the foot of
 a screen go here instead, so every screen is about its one thing and the
 settings are where people look for them. A screen is settings or admin,
-not both.
+not both. What is on it is toggles (`ui.toggle`: a switch that runs its
+action at once with the new state) and forms, never a row of buttons with
+the chosen one lit: `current` on a button is for where you are, a folder,
+not for a setting. An action marked `settings = true` is pressed there
+alone — on no bar under a title and in no palette, as an admin action is
+drawn by the admin screen alone — so a setting is never a button on the
+Quill's screens.
 
 A board's lanes are an enum's values, fixed by the datamodel — To Do,
 Doing, Done — or, when `lane` is a link, the records it links to, in their
