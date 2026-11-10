@@ -70,6 +70,14 @@ assistant = false
 id = "reach-out"
 label = "Reach for something it did not ask for"
 
+# A person's own setting: pressed from the Tracker screen's switch, on no bar.
+[[actions]]
+id = "lit"
+label = "Lit"
+settings = true
+[actions.fields]
+on = "bool"
+
 # The server's settings for the Quill, with the Keys screen: an administrator's alone.
 [[actions]]
 id = "rotate-keys"

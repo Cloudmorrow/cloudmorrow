@@ -18,6 +18,9 @@ way the web app and the phone draw the same tree their own way:
                               kind's widget when `edit` — saved when you
                               leave it, or at once for a tick, a choice
     form                      an action's form, in place; its button runs it
+    toggle                    a setting as a switch: flipping it runs its action
+    conversation              a chat: the lines, newest last, and a box under
+                              them; enter sends to its `ask` action
     button menu               run an action, open a record, go to a screen
     table                     a row per record: enter opens it, and the row's
                               actions are buttons under it, on the row you are on
@@ -69,6 +72,7 @@ from cloudmorrow.tui.quill_actions import (
 from cloudmorrow.tui.theme import BAD, MUTED
 from cloudmorrow.tui.widgets.toolbar import Action
 from cloudmorrow.tui.widgets.view_nodes import (
+    ConversationNode,
     Drawer,
     FieldNode,
     FormNode,
@@ -179,7 +183,11 @@ class ViewPane(KitPane):
         if self.view_tree is None:
             return
         await body.mount(Drawer(self).draw(self.view_tree, "v"))
-        body.call_after_refresh(body.scroll_to, y=scrolled, animate=False)
+        # A conversation is read from its newest line; anything else from where you were.
+        if any(node.get("ui") == "conversation" for node, _ in walk(self.view_tree)):
+            body.call_after_refresh(body.scroll_end, animate=False)
+        else:
+            body.call_after_refresh(body.scroll_to, y=scrolled, animate=False)
         if keep:
             found = self.query(f"#{keep}")
             if found:
@@ -225,7 +233,9 @@ class ViewPane(KitPane):
             if record is None and action.get("on") and self.params.get("record"):
                 # A view opened on a record: its buttons are about that one.
                 record = {"id": self.params["record"], "model": action["on"]}
-            if await run_action(self.app, self.quill, action, record=record, values=node.get("args") or {}):
+            ran = await run_action(self.app, self.quill, action, record=record, values=node.get("args") or {})
+            # A toggle not run — its confirm said no — is drawn as it still is.
+            if ran or node.get("ui") == "toggle":
                 self.reload()
         elif node.get("open"):
             await self._open(node["open"])
@@ -244,6 +254,37 @@ class ViewPane(KitPane):
     def on_form_node_submitted(self, event: FormNode.Submitted) -> None:
         event.stop()
         self.submit(event.form)
+
+    def on_conversation_node_asked(self, event: ConversationNode.Asked) -> None:
+        event.stop()
+        self.say_in(event.node, event.text)
+
+    @work(group="ui")
+    async def say_in(self, node: ConversationNode, text: str) -> None:
+        """What was typed in a conversation: run its `ask` action with it, then draw the answer."""
+        if node.action is None or node.field is None:
+            return
+        record = node.node.get("record") or None
+        try:
+            effects = await press(
+                self.api,
+                str(self.quill["id"]),
+                str(node.action["id"]),
+                record=str((record or {}).get("id") or ""),
+                fields={str(node.field["name"]): text},
+            )
+        except AuthError as exc:
+            await self.went_wrong(exc)
+            return
+        except ApiError as exc:
+            node.back(text, str(exc))
+            return
+        said = failure(effects)
+        if said is not None:
+            node.back(text, said)
+            return
+        await apply_effects(self.app, self.quill, effects, record=record)
+        self.reload()
 
     @work(group="ui")
     async def submit(self, form: FormNode) -> None:

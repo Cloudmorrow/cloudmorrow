@@ -165,6 +165,12 @@ def parse_code(
             raise CodeSpecError(f"{where}: {thing} assistant is true or false")
         if not isinstance(item.get("admin", False), bool):
             raise CodeSpecError(f"{where}: {thing} admin is true or false")
+        if not isinstance(item.get("settings", False), bool):
+            raise CodeSpecError(f"{where}: {thing} settings is true or false")
+        if item.get("settings") and item.get("admin"):
+            raise CodeSpecError(f"{where}: {thing} is settings or admin, not both")
+        if item.get("settings") and item.get("on"):
+            raise CodeSpecError(f"{where}: {thing} is settings, so it is on no record")
         if "timeout" in item:
             try:
                 seconds = parse_duration(str(item["timeout"])).total_seconds()

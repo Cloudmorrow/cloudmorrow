@@ -33,6 +33,7 @@ __all__ = [
     "check",
     "children",
     "columns",
+    "conversation",
     "divider",
     "empty",
     "field",
@@ -49,6 +50,7 @@ __all__ = [
     "table",
     "tabs",
     "text",
+    "toggle",
 ]
 
 TONES = ("neutral", "info", "good", "warn", "bad", "primary", "danger")
@@ -209,6 +211,75 @@ def button(
         params=dict(params) if params else None,
         tone=tone,
         current=True if current else None,
+    )
+
+
+def toggle(
+    label: str,
+    *,
+    action: str,
+    on: bool,
+    field: str = "on",
+    record=None,
+    args: dict | None = None,
+    hint: str | None = None,
+) -> dict:
+    """A switch: *on* or off, and flipping it runs *action* at once, with
+    *field* set to the new state (and *args* besides). A setting — a person's
+    own, behind the gear — is a toggle, never a pair of buttons with one lit.
+    *hint* is a line under the label saying what it does."""
+    return _node(
+        "toggle",
+        label=str(label),
+        action=action,
+        on=bool(on),
+        field=str(field),
+        record=_record(record) if record is not None else None,
+        args=dict(args) if args else None,
+        hint=str(hint) if hint else None,
+    )
+
+
+def conversation(
+    records,
+    *,
+    body: str,
+    mine: str,
+    ask: str | None = None,
+    record=None,
+    name: str | None = None,
+    at: str | None = None,
+    note: str | None = None,
+    failed: str | None = None,
+    empty: str | None = None,
+    placeholder: str | None = None,
+    hint: str | None = None,
+) -> dict:
+    """A conversation, as a chat is drawn: *records* are its lines, in order,
+    each with its words in the *body* field (Markdown) and whether it is the
+    person's own in the *mine* field (a bool) — theirs on the right, the other
+    side's on the left under *name*. Newest at the bottom, scrolled to; the
+    box to write in pinned under the lines, when *ask* names the action that
+    takes what is written (its first text field; *record* when it is on one),
+    enter sends, and what was sent is shown at once while the answer is
+    waited for. *at* is a line's moment, *note* a small line under it (what was
+    looked at), *failed* a bool: a line that did not go through. *empty* is
+    said in the middle while there is nothing yet; *placeholder* is the box's
+    own words; *hint* a small line under the box."""
+    return _node(
+        "conversation",
+        records=_records(records),
+        body=str(body),
+        mine=str(mine),
+        ask=ask,
+        record=_record(record) if record is not None else None,
+        name=str(name) if name else None,
+        at=at,
+        note=note,
+        failed=failed,
+        empty=str(empty) if empty else None,
+        placeholder=str(placeholder) if placeholder else None,
+        hint=str(hint) if hint else None,
     )
 
 
@@ -379,6 +450,29 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
         "tone": (str, False),
         "current": (bool, False),
     },
+    "toggle": {
+        "label": (str, True),
+        "action": (str, True),
+        "on": (bool, True),
+        "field": (str, True),
+        "record": (dict, False),
+        "args": (dict, False),
+        "hint": (str, False),
+    },
+    "conversation": {
+        "records": (list, True),
+        "body": (str, True),
+        "mine": (str, True),
+        "ask": (str, False),
+        "record": (dict, False),
+        "name": (str, False),
+        "at": (str, False),
+        "note": (str, False),
+        "failed": (str, False),
+        "empty": (str, False),
+        "placeholder": (str, False),
+        "hint": (str, False),
+    },
     "menu": {"label": (str, True), "items": (list, True)},
     "table": {
         "records": (list, True),
@@ -494,7 +588,7 @@ def check(tree, *, actions=None, screens=None) -> dict:
             raise TreeError(f"{where}: an image's src is an https:// address")
         if kind == "gallery" and node.get("rate") and not node.get("stars"):
             raise TreeError(f"{where}: a gallery that rates says which field holds the stars: stars=")
-        for key in ("action", "rate"):
+        for key in ("action", "rate", "ask"):
             if node.get(key) and actions is not None and node[key] not in actions:
                 raise TreeError(f"{where}: {kind} runs {node[key]!r}, which the manifest does not declare")
         for key in ("actions",):

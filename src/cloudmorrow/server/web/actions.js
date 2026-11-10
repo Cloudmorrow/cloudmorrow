@@ -71,9 +71,10 @@ export const findAction = (quillId, actionId) => actionIn(quillById(quillId), ac
 export const actionsOn = (modelId) => quills.flatMap((quill) =>
   (quill.actions || []).filter((a) => a.on === modelId).map((action) => ({ quill, action })));
 /** A Quill's actions that are on nothing: pressed from its screens. */
-// On no record, and not an administrator's settings: those are drawn by the
-// Quill's admin screen on its sheet under Administration, nowhere else.
-export const loose = (quill) => (quill.actions || []).filter((a) => !a.on && !a.admin);
+// On no record, and not settings: an administrator's are drawn by the
+// Quill's admin screen on its sheet under Administration, and a person's own
+// (`settings = true`) by the screen behind the gear, nowhere else.
+export const loose = (quill) => (quill.actions || []).filter((a) => !a.on && !a.admin && !a.settings);
 
 // The words the server gave, rather than "request failed": its `detail`
 // is {kind, message} for anything a Quill's code refused or broke on.

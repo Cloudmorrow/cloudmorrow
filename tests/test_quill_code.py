@@ -115,6 +115,63 @@ def test_an_action_admin_flag_is_a_bool():
         parse_manifest(_manifest('code = "quill.py"\n[[actions]]\nid = "a"\nlabel = "A"\nadmin = "yes"\n'))
 
 
+def test_an_action_marked_settings_is_a_bool_on_no_record_and_not_admin():
+    """A person's own setting: drawn behind the gear, on no bar or palette."""
+    head = 'code = "quill.py"\n[[actions]]\nid = "a"\nlabel = "A"\n'
+    with pytest.raises(QuillError, match="settings is true or false"):
+        parse_manifest(_manifest(head + 'settings = "yes"\n'))
+    with pytest.raises(QuillError, match="settings or admin, not both"):
+        parse_manifest(_manifest(head + "settings = true\nadmin = true\n"))
+    with pytest.raises(QuillError, match="on no record"):
+        parse_manifest(_manifest(head + 'settings = true\non = "task"\n'))
+
+
+def test_a_toggle_and_a_conversation_are_primitives_every_surface_draws():
+    """A setting is a switch that runs its action with the new state; a chat is
+    its lines with a box under them that runs `ask`. Both are checked against
+    the manifest, and both are said as text."""
+    from cloudmorrow.quill import text as as_text
+    from cloudmorrow.quill import ui
+    from cloudmorrow.quill.ui import TreeError
+
+    lines = [
+        {"id": "m1", "model": "chat.line", "fields": {"body": "How many?", "mine": True, "at": "2026-11-10T09:00"}},
+        {"id": "m2", "model": "chat.line", "fields": {"body": "**Four**", "mine": False, "note": "Looked at: tasks"}},
+        {"id": "m3", "model": "chat.line", "fields": {"body": "Sure?", "mine": True, "failed": True}},
+    ]
+    tree = ui.stack(
+        ui.toggle("Morrow may change things", action="allow", on=True, field="changes", hint="Or only read"),
+        ui.conversation(
+            lines,
+            body="body",
+            mine="mine",
+            at="at",
+            note="note",
+            failed="failed",
+            ask="ask",
+            name="Morrow",
+            record={"id": "c1", "model": "chat.conversation"},
+            placeholder="Ask Morrow",
+            hint="Reads only",
+        ),
+    )
+    ui.check(tree, actions={"allow", "ask"}, screens=set())
+    toggle, chat = tree["children"]
+    assert toggle["on"] is True and toggle["field"] == "changes" and "args" not in toggle
+    assert chat["record"] == {"id": "c1", "model": "chat.conversation", "rev": None, "fields": {}}
+    with pytest.raises(TreeError, match="runs 'ask'"):
+        ui.check(tree, actions={"allow"}, screens=set())
+    with pytest.raises(TreeError, match="a conversation needs 'mine'"):
+        ui.check({"ui": "conversation", "records": [], "body": "body"})
+    said = as_text.render(tree, actions={"allow": "What Morrow may do", "ask": "Send"})
+    assert "[x] Morrow may change things" in said and "    Or only read" in said
+    assert "You:  2026-11-10T09:00\n  How many?\nMorrow:\n  **Four**\n  Looked at: tasks\n" in said
+    assert "You:\n  Sure?\n  (did not go through)" in said
+    assert said.rstrip().endswith("[Ask Morrow…]\nReads only")
+    empty = ui.conversation([], body="body", mine="mine", empty="Hello. Ask me anything.")
+    assert as_text.render(empty, actions={}).strip() == "(Hello. Ask me anything.)"
+
+
 def test_a_settings_screen_is_everybodys_own_and_never_a_tab(fleet):
     """Tracker is marked settings: the person's own settings for Fleet. Everybody
     is told it and may draw it — it is theirs — and it is kept apart from the

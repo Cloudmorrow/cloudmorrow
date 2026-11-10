@@ -85,6 +85,32 @@ def _lines(node: dict, actions: dict) -> list[str]:
         return [f"[{node.get('submit') or actions.get(node['action'], node['action'])}…]"]
     if kind == "button":
         return [f"[▸{node['label']}]" if node.get("current") else f"[{node['label']}]"]
+    if kind == "toggle":
+        out = [f"[{'x' if node.get('on') else ' '}] {node['label']}"]
+        if node.get("hint"):
+            out.append("    " + node["hint"])
+        return out
+    if kind == "conversation":
+        out = []
+        for record in node["records"]:
+            fields = record.get("fields", {})
+            who = "You" if fields.get(node["mine"]) else (node.get("name") or "Them")
+            head = f"{who}:"
+            if node.get("at") and value_text(record, node["at"]):
+                head += f"  {value_text(record, node['at'])}"
+            out.append(head)
+            out += ["  " + line for line in value_text(record, node["body"]).splitlines() or [""]]
+            if node.get("failed") and fields.get(node["failed"]):
+                out.append("  (did not go through)")
+            if node.get("note") and value_text(record, node["note"]):
+                out.append("  " + value_text(record, node["note"]))
+        if not out and node.get("empty"):
+            out.append(f"({node['empty']})")
+        if node.get("ask"):
+            out.append(f"[{node.get('placeholder') or actions.get(node['ask'], node['ask'])}…]")
+        if node.get("hint"):
+            out.append(node["hint"])
+        return out
     if kind == "menu":
         return [f"{node['label']}: " + " ".join(line for item in node["items"] for line in _lines(item, actions))]
     if kind == "table":
