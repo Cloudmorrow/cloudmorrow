@@ -152,6 +152,77 @@ export const circle = (state) => `<span class="check ${state}">${state === "done
 // screen is only something for a long press to catch on.
 export const canDrag = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
 
+/** Dragging a card along and between lanes, with the mouse. `root` holds
+    the lanes; `card`, `lane` and `group` are the selectors for a card, a
+    lane and the box in a lane the cards sit in; a lane says which it is
+    in `data-lane`. The pointer carries a picture of the card as it was,
+    and the card itself becomes a slot — its own size, dashed, nothing in
+    it (kit.css) — that moves through the lanes under the pointer, so where
+    the card would land is where the slot already is. Letting go on a lane
+    calls `drop(card, lane, index)`, the index being the slot's place among
+    the lane's cards; letting go anywhere else puts the card back where it
+    came from. Wired once per drawing: the cards are the ones on the page. */
+export function dragLanes(root, { card, lane, group, drop }) {
+  if (!canDrag()) return;
+  let held = null;
+  let from = null;
+  let dropped = false;
+  // The lane's other cards, in order, and the one the slot goes before:
+  // the first whose middle is below the pointer. None means last.
+  const place = (box, y) => {
+    const others = [...box.querySelectorAll(card)].filter((c) => c !== held);
+    const next = others.find((c) => {
+      const rect = c.getBoundingClientRect();
+      return y < rect.top + rect.height / 2;
+    }) || null;
+    return { next, index: next ? others.indexOf(next) : others.length };
+  };
+  for (const c of root.querySelectorAll(`${card}[draggable="true"]`)) {
+    c.addEventListener("dragstart", (event) => {
+      held = c;
+      from = { parent: c.parentNode, next: c.nextSibling };
+      dropped = false;
+      event.dataTransfer.effectAllowed = "move";
+      // Firefox starts no drag at all without something on the transfer.
+      event.dataTransfer.setData("text/plain", c.dataset.id);
+      // The picture under the pointer is the card, held where it was
+      // taken hold of. It is painted once this handler returns, so the
+      // card turns into the slot only after that.
+      const rect = c.getBoundingClientRect();
+      event.dataTransfer.setDragImage(c, event.clientX - rect.left, event.clientY - rect.top);
+      setTimeout(() => { if (held === c) c.classList.add("dragging"); }, 0);
+    });
+    c.addEventListener("dragend", () => {
+      c.classList.remove("dragging");
+      for (const l of root.querySelectorAll(".over")) l.classList.remove("over");
+      if (!dropped) from.parent.insertBefore(c, from.next);
+      held = null;
+    });
+  }
+  for (const l of root.querySelectorAll(lane)) {
+    const box = l.querySelector(group);
+    l.addEventListener("dragover", (event) => {
+      if (!held || !box) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      l.classList.add("over");
+      const { next, index } = place(box, event.clientY);
+      const now = held.parentNode === box ? [...box.querySelectorAll(card)].indexOf(held) : -1;
+      if (now !== index) box.insertBefore(held, next);
+    });
+    l.addEventListener("dragleave", (event) => {
+      if (!l.contains(event.relatedTarget)) l.classList.remove("over");
+    });
+    l.addEventListener("drop", (event) => {
+      if (!held || !box) return;
+      event.preventDefault();
+      dropped = true;
+      l.classList.remove("over");
+      drop(held, l.dataset.lane, [...box.querySelectorAll(card)].indexOf(held));
+    });
+  }
+}
+
 // The kit elements this file draws. The server refuses to install a screen
 // of any other kind until every surface draws it, and a test holds this
 // list to the server's; the check below is for a server newer than the page.
@@ -278,10 +349,13 @@ async function renderBoard(at, arg) {
       if (total) meta += `<span class="date">${done} of ${total}</span>`;
       if (preview) meta += `<span class="preview">${esc(preview)}</span>`;
     }
-    return `<div class="row card${state === "done" ? " is-done" : ""}" data-id="${esc(r.id)}"${writes && canDrag() ? ` draggable="true"` : ""}>
+    // The link in a card is not dragged on its own: a browser would carry
+    // it as a small box with the address in, rather than the card.
+    const drags = writes && canDrag();
+    return `<div class="row card${state === "done" ? " is-done" : ""}" data-id="${esc(r.id)}"${drags ? ` draggable="true"` : ""}>
       ${writes ? `<button class="tick" data-id="${esc(r.id)}" aria-label="${state === "done" ? "Not done" : "Done"}">${circle(state)}</button>`
         : stillTick(state, (lanes.find(([lane]) => lane === laneOf(r)) || [])[1] || "")}
-      <a class="main" href="${sheetHash(at, model.id, r.id)}">
+      <a class="main" href="${sheetHash(at, model.id, r.id)}"${drags ? ` draggable="false"` : ""}>
         <span class="title">${esc(titleOf(model, r, title))}</span>${meta ? `<span class="meta">${meta}</span>` : ""}</a></div>`;
   };
   const show = () => {
@@ -316,7 +390,7 @@ async function renderBoard(at, arg) {
           ? `<button type="button" class="lane-add" data-lane="${esc(lane)}" aria-label="New ${esc(noun)} in ${esc(label)}">${own.plus}</button>` : ""}</p>` +
         (rows.length
           ? `<div class="group">${rows.map(card).join("")}</div>`
-          : `<div class="group nothing">Nothing here</div>`) +
+          : `<div class="group nothing"><span>Nothing here</span></div>`) +
         `</div>`;
     }).join("") + `</div>`;
     for (const button of listing.querySelectorAll("button.tick")) {
@@ -356,21 +430,9 @@ async function renderBoard(at, arg) {
 
   // -- dragging a card ------------------------------------------------------
   // What the mouse has instead of the circle and the lane control, and the
-  // same move the TUI's own drag ends in. The whole board comes back after
-  // it rather than the one card: moving a card renumbers the lane it left
-  // and the lane it landed in.
-  let dragged = null;
-
-  // Where in the lane it would go: the number of the *other* cards whose
-  // middle is above the pointer. The server takes the card out before it
-  // puts it back, so the card being dragged is not one of them.
-  const indexAt = (lane, y) => [...lane.querySelectorAll(".row.card")]
-    .filter((row) => row.dataset.id !== dragged)
-    .filter((row) => {
-      const box = row.getBoundingClientRect();
-      return box.top + box.height / 2 < y;
-    }).length;
-
+  // same move the TUI's own drag ends in (dragLanes). The whole board comes
+  // back after it rather than the one card: moving a card renumbers the
+  // lane it left and the lane it landed in.
   const moveTo = async (id, lane, index) => {
     try {
       await api("POST", recordsUrl(model.id, id) + "/move", { fields: { [laneField.name]: lane }, index });
@@ -380,38 +442,10 @@ async function renderBoard(at, arg) {
   };
 
   function wireDragging() {
-    if (!canDrag()) return;
-    for (const row of listing.querySelectorAll(".row.card")) {
-      row.addEventListener("dragstart", (event) => {
-        dragged = row.dataset.id;
-        row.classList.add("dragging");
-        event.dataTransfer.effectAllowed = "move";
-        // Firefox starts no drag at all without something on the transfer.
-        event.dataTransfer.setData("text/plain", row.dataset.id);
-      });
-      row.addEventListener("dragend", () => {
-        dragged = null;
-        row.classList.remove("dragging");
-        for (const lane of listing.querySelectorAll(".over")) lane.classList.remove("over");
-      });
-    }
-    for (const lane of listing.querySelectorAll(".lane")) {
-      lane.addEventListener("dragover", (event) => {
-        if (dragged === null) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
-        lane.classList.add("over");
-      });
-      lane.addEventListener("dragleave", (event) => {
-        if (!lane.contains(event.relatedTarget)) lane.classList.remove("over");
-      });
-      lane.addEventListener("drop", (event) => {
-        if (dragged === null) return;
-        event.preventDefault();
-        lane.classList.remove("over");
-        moveTo(dragged, lane.dataset.lane, indexAt(lane, event.clientY));
-      });
-    }
+    dragLanes(listing, {
+      card: ".row.card", lane: ".lane", group: ".group",
+      drop: (card, lane, index) => moveTo(card.dataset.id, lane, index),
+    });
   }
 
   show();

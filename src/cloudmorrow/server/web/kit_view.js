@@ -23,7 +23,7 @@
 import {
   api, apiRaw, app, back, esc, go, heading, icons, mount, nav, recordsUrl, tabs, toast, wireShell,
 } from "./core.js";
-import { canDrag, fieldOf, mayWrite, read, segments, sheetHash, spoken, titleOf, widget } from "./kit.js";
+import { canDrag, dragLanes, fieldOf, mayWrite, read, segments, sheetHash, spoken, titleOf, widget } from "./kit.js";
 import {
   WEEKDAYS, addDays, addMonths, dateOf, longDay, monthOf, today, weeksOf,
 } from "./kit_calendar.js";
@@ -663,7 +663,7 @@ function drawLanes(v, n) {
         const text = `<span class="title">${esc(titled(v, r, n.title))}</span>` +
           (body ? `<span class="meta"><span class="preview">${esc(body)}</span></span>` : "");
         return `<div class="row v-lane-card" data-id="${esc(r.id)}" ${menuOn(v, r, hash)}${drags ? ' draggable="true"' : ""}>` +
-          (hash ? `<a class="main" href="${esc(hash)}">${text}</a>` : `<span class="main">${text}</span>`) + `</div>`;
+          (hash ? `<a class="main" href="${esc(hash)}"${drags ? ' draggable="false"' : ""}>${text}</a>` : `<span class="main">${text}</span>`) + `</div>`;
       }).join("") : `<div class="nothing">Nothing here</div>`) +
       `</div></div>`;
   }).join("") + `</div>`;
@@ -673,52 +673,17 @@ function wireLanes(v) {
   if (!canDrag()) return;
   for (const board of v.root.querySelectorAll("[data-lanes]")) {
     const { n, modelId } = v.lanes[Number(board.dataset.lanes)];
-    let dragged = null;
-    // Where in the lane it would go: the other cards whose middle is above the pointer.
-    const indexAt = (lane, y) => [...lane.querySelectorAll(".v-lane-card")]
-      .filter((card) => card !== dragged)
-      .filter((card) => { const box = card.getBoundingClientRect(); return box.top + box.height / 2 < y; }).length;
-    for (const card of board.querySelectorAll('.v-lane-card[draggable="true"]')) {
-      card.addEventListener("dragstart", (event) => {
-        dragged = card;
-        card.classList.add("dragging");
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("text/plain", card.dataset.id);
-      });
-      card.addEventListener("dragend", () => {
-        card.classList.remove("dragging");
-        dragged = null;
-        for (const lane of board.querySelectorAll(".over")) lane.classList.remove("over");
-      });
-    }
-    for (const lane of board.querySelectorAll(".v-lane")) {
-      lane.addEventListener("dragover", (event) => {
-        if (!dragged) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
-        lane.classList.add("over");
-      });
-      lane.addEventListener("dragleave", (event) => {
-        if (!lane.contains(event.relatedTarget)) lane.classList.remove("over");
-      });
-      lane.addEventListener("drop", async (event) => {
-        if (!dragged) return;
-        event.preventDefault();
-        lane.classList.remove("over");
-        const card = dragged;
-        const index = indexAt(lane, event.clientY);
-        // Moved on the page first, so the drop does not wait for the server.
-        const cards = lane.querySelector(".v-lane-cards");
-        const nothing = cards.querySelector(".nothing");
-        if (nothing) nothing.remove();
-        cards.insertBefore(card, [...cards.querySelectorAll(".v-lane-card")].filter((c) => c !== card)[index] || null);
+    dragLanes(board, {
+      card: ".v-lane-card", lane: ".v-lane", group: ".v-lane-cards",
+      // The card is already where it was let go; the server agrees, or
+      // the view is drawn again as it is.
+      drop: async (card, lane, index) => {
         try {
-          await api("POST", recordsUrl(modelId, card.dataset.id) + "/move",
-            { fields: { [n.field]: lane.dataset.lane }, index });
+          await api("POST", recordsUrl(modelId, card.dataset.id) + "/move", { fields: { [n.field]: lane }, index });
         } catch (err) { toast(said(err)); }
         v.draw();
-      });
-    }
+      },
+    });
   }
 }
 

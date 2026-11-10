@@ -158,12 +158,34 @@
   /* A lane is somewhere to drop a card, so it keeps a floor under the
      last one rather than ending where its cards do. */
   .lane { min-height: 120px; }
-  .row.card.dragging { opacity: .4; }
+  /* A card is something to take hold of, the link in it too. */
+  .board .row.card[draggable="true"], .board .row.card[draggable="true"] .main { cursor: grab; }
+  /* The picture the pointer carries is the card as it looks on the board,
+     not its words on nothing: the card has the box's colour itself. */
+  .board .row.card { background: var(--card); }
+  .board .row.card:active { background: var(--card-2); }
+  /* While held, the card is the slot it would land in: its own size, a
+     dashed line around nothing, moving through the lanes under the pointer. */
+  .row.card.dragging > * { visibility: hidden; }
+  .row.card.dragging::after {
+    content: "";
+    position: absolute;
+    inset: 5px 6px;
+    border: 2px dashed var(--accent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
   .lane.over .group {
     border-color: var(--accent);
     background: color-mix(in srgb, var(--accent) 7%, var(--card));
   }
-  .lane.over .group.nothing { border-style: dashed; }
+  /* A lane with nothing in it says so, until the slot is in it; the lane a
+     held card has left says so too, until it is back or the board is drawn again. */
+  .lane.over .group.nothing:not(:has(.row.card)) { border-style: dashed; }
+  .group.nothing:has(.row.card) { padding: 0; }
+  .group.nothing:has(.row.card) > span { display: none; }
+  .lane .group:empty { padding: 14px 16px; color: var(--muted); font-size: 14px; }
+  .lane .group:empty::before { content: "Nothing here"; }
 }
 
 /* -- the record sheet --------------------------------------------------------- */

@@ -403,8 +403,24 @@ button.v-star:focus-visible { outline: 2px solid var(--accent); outline-offset: 
   #app:has(.v-lanes) { --column: 1120px; }
   .v-lanes { display: grid; grid-template-columns: repeat(var(--lanes, 3), minmax(0, 1fr)); gap: 0 18px; align-items: start; }
   .v-lane { min-height: 120px; }
-  .v-lane-card.dragging { opacity: .4; }
+  /* Held cards as the board's (kit.css): something to take hold of, a
+     picture of the card under the pointer, and a dashed slot where it would land. */
+  .v-lane-card[draggable="true"], .v-lane-card[draggable="true"] .main { cursor: grab; }
+  .v-lane-card { background: var(--card); }
+  .v-lane-card:active { background: var(--card-2); }
+  .v-lane-card.dragging > * { visibility: hidden; }
+  .v-lane-card.dragging::after {
+    content: "";
+    position: absolute;
+    inset: 5px 6px;
+    border: 2px dashed var(--accent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
   .v-lane.over .v-lane-cards { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--card)); }
+  .v-lane-cards:has(.v-lane-card) > .nothing { display: none; }
+  .v-lane-cards:empty { padding: 14px 16px; color: var(--muted); font-size: 14px; }
+  .v-lane-cards:empty::before { content: "Nothing here"; }
 }
 
 @media (hover: hover) and (pointer: fine) and (min-width: 900px) and (min-height: 600px) {
