@@ -630,6 +630,7 @@ export function signIn(data) {
   store.set("token", session.token);
   store.set("user", session.user);
   setAdmin(data.user.is_admin);
+  adoptFavorites(data.user.favorites);
   for (const fn of signInHooks) fn(data);
   forgetHistory();
   replace(homeHash());
@@ -640,6 +641,9 @@ export function signOut(message) {
   session.token = null;
   store.set("token", null);
   setAdmin(false);
+  // The favorites were the person's, not the device's.
+  store.set("quills.favorites", null);
+  store.set("quills.favorites.kept", null);
   occupant = null;
   for (const fn of signOutHooks) fn();
   replace("#/login");
@@ -1021,8 +1025,11 @@ export function appList() {
 }
 
 // -- favorites ------------------------------------------------------------------------
-// The apps you marked, by tab name, in the order you marked them; per
-// device, in local storage, as Most used is.
+// The apps you marked, by tab name, in the order you marked them. They are
+// yours, not the device's: the server keeps them on you (PUT
+// /api/auth/favorites) and every phone and computer you sign in on draws the
+// same ones. Local storage holds the last list heard, so the first paint of
+// the bar is already right.
 function readFavorites() {
   try {
     const list = JSON.parse(store.get("quills.favorites") || "[]");
@@ -1031,12 +1038,41 @@ function readFavorites() {
 }
 const favoriteTabs = (apps) => readFavorites().map((n) => apps.find((t) => t.name === n)).filter(Boolean);
 export const isFavorite = (name) => readFavorites().includes(name);
-/** Mark an app a favorite, or not, and draw the bar again. */
-export function setFavorite(name, yes) {
+/** Mark an app a favorite, or not: drawn at once, and kept on you. */
+export async function setFavorite(name, yes) {
   const list = readFavorites().filter((n) => n !== name);
   if (yes) list.push(name);
+  keepFavorites(list);
+  try {
+    keepFavorites((await api("PUT", "/api/auth/favorites", { favorites: list })).favorites);
+  } catch { toast("Your favorites could not be saved."); }
+}
+/** The favorites the server has for you, as the bar's. A list from before
+    they were kept on you (on this device only) goes up the first time. */
+export function adoptFavorites(list) {
+  if (!Array.isArray(list)) return;
+  const here = readFavorites();
+  if (!list.length && here.length && !store.get("quills.favorites.kept")) {
+    store.set("quills.favorites.kept", "1");
+    api("PUT", "/api/auth/favorites", { favorites: here }).catch(() => {});
+    return;
+  }
+  store.set("quills.favorites.kept", "1");
+  if (JSON.stringify(list) !== JSON.stringify(here)) keepFavorites(list);
+}
+function keepFavorites(list) {
   store.set("quills.favorites", list.length ? JSON.stringify(list) : null);
   redrawTabs();
+}
+
+/** More has a dot when an app it holds has something unread: a pip on an
+    app's tab that is not one of the bar's own few. */
+export function pipMore() {
+  const more = app.querySelector(":scope > nav.tabs > .tab.more");
+  if (!more) return;
+  const quick = new Set([...app.querySelectorAll(":scope > nav.tabs > .tab.quick")].map((t) => t.dataset.tab));
+  more.classList.toggle("pipped",
+    [...app.querySelectorAll(":scope > nav.tabs > .tab.app.pipped")].some((t) => !quick.has(t.dataset.tab)));
 }
 
 // -- the rail folded -------------------------------------------------------------------

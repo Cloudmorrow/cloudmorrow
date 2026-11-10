@@ -259,8 +259,12 @@ def test_the_badge_counts_every_unread_line_plus_notifications(chat):
     say(chat, general, "one")
     say(chat, general, "two")
     channel(chat, "club", scope="shared", members=["guest"])
-    assert chat("GET", "/api/push/badge", who=chat.guest) == {"messages": 2, "notifications": 1, "badge": 3}
+    # The bell lists each line as well (so it can open the channel); the icon
+    # counts a line once.
+    assert chat("GET", "/api/push/badge", who=chat.guest) == {"messages": 2, "notifications": 3, "badge": 3}
     chat("POST", f"/api/records/channel/{general['id']}/seen", who=chat.guest, expect=204)
+    # Looking in the channel reads its lines behind the bell too.
+    assert chat("GET", "/api/push/badge", who=chat.guest) == {"messages": 0, "notifications": 1, "badge": 1}
     chat("POST", "/api/notifications/read", {}, who=chat.guest)
     assert chat("GET", "/api/push/badge", who=chat.guest)["badge"] == 0
 
@@ -421,3 +425,16 @@ def test_the_manifest_parses_on_its_own():
 
     data = tomllib.loads((QUILL_CATALOG / "quill-chat" / "quill.toml").read_text())
     assert parse_manifest(data).datasets[0]["seed"] == "once"
+
+
+def test_a_line_is_a_note_behind_the_bell_that_opens_the_channel(chat):
+    general = listed(chat)["general"]
+    say(chat, general, "hello there")
+    notes = chat("GET", "/api/notifications", who=chat.guest)
+    line = next(n for n in notes if n["kind"].endswith(".message"))
+    assert line["title"] == "bram in general"
+    assert line["body"] == "hello there"
+    assert line["url"].startswith("#/q/") and line["url"].endswith("/" + general["id"])
+    assert line["unread"]
+    # The writer has no note of their own line.
+    assert not [n for n in chat("GET", "/api/notifications") if n["kind"].endswith(".message")]

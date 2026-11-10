@@ -737,7 +737,9 @@ five of them and **More**, which opens every app in a sheet: the five are
 your **favorites** once you have any, and until then the ones you open
 most, in the order of the rail. Hold a finger on an app, in the bar or in
 More, for its menu: **Add to Favorites**, **Remove from Favorites**. Favorites
-are kept per device, as Most used is. Each app is drawn by the kit the way a
+are kept on you, on the server, so every phone and computer you sign in on
+has the same ones; Most used is per device. When an app that is not in the
+bar has something unread, **More** has the dot its tab would have. Each app is drawn by the kit the way a
 phone draws things: a list, then the thing you picked. Notes, say, is three
 screens, **Folders**, the notes in one, and the note, with the pen beside
 the title for a new one; Tasks is a board whose cards are dragged between
@@ -2468,19 +2470,24 @@ list and pointing the agent at the local port with `--url`.
 
 ### Notifications
 
-What happens to you elsewhere — a Quill shared with you, somebody asking
-an administrator for one, an approval asked, a machine's sync — leaves a note
-on the server. The bell carries the count of the unread ones, and is there
+What happens to you elsewhere — a line written in a channel you are in,
+a Quill shared with you, somebody asking an administrator for one, an
+approval asked, a machine's sync — leaves a note on the server. A note about
+something in a Quill opens that Quill: a channel's line opens the channel,
+and opening the channel, however you get there, reads its lines behind the
+bell as well. The bell carries the count of the unread ones, and is there
 whether anything is unread or not, so the last fifty are always one tap away:
 
 - **The web app:** in the top right corner of every tab's screen, beside Me.
-  A tap opens the list, newest first, and opening it reads them.
+  A tap opens the list, newest first. Tapping a note reads it (and opens its
+  Quill, when it has one); **Mark all as read**, beside the title, reads the
+  rest.
 - **The terminal app:** at the far right of the top bar; ringing it (`f8`, or
   a click) opens the list, with one button to say you have read them.
 
 Each note is also pushed to every device that has notifications on, so a
 computer's browser pops it as a banner the way a phone does, and a click on
-the banner opens the list. To turn them on in Chrome (or any browser on a
+the banner opens the Quill it is about, or else the list. To turn them on in Chrome (or any browser on a
 computer), open the bell, or **Me**, and press **Turn on**; the browser asks
 once. Chrome shows them while it is running, even with the tab closed.
 

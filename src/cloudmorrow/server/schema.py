@@ -261,6 +261,12 @@ ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     # What a person a Quill is shared with may do with each of its own
     # datamodels (quills/sharing.py); step 7 puts it on older databases.
     ("quill_shares", "rules", "TEXT NOT NULL DEFAULT ''"),
+    # The apps a person marked favorites, as a JSON list of tab names, so
+    # every device of theirs has the same ones; step 9.
+    ("users", "favorites", "TEXT NOT NULL DEFAULT ''"),
+    # Where a notification opens — a Quill's screen, `#/q/…` — or '' for the
+    # bell's own list; step 9.
+    ("notifications", "url", "TEXT NOT NULL DEFAULT ''"),
 )
 
 
@@ -419,6 +425,11 @@ def _roles(conn: Connection) -> None:
     conn.commit()
 
 
+def _favorites_and_note_links(conn: Connection) -> None:
+    """A person's favorite apps, and where a notification opens."""
+    _columns(conn)
+
+
 STEPS: tuple[Step, ...] = (
     Step(1, "the tables as they stood before they were versioned", _baseline),
     Step(2, "indexes for what an open screen and the retention sweep ask", _indexes_for_scale),
@@ -428,6 +439,7 @@ STEPS: tuple[Step, ...] = (
     Step(6, "snapshots' bundles, and the links guests are given to them", _snapshots),
     Step(7, "a Quill of somebody's own keeps its data as the Quill's, shared by rule", _quill_data_is_the_quills),
     Step(8, "the roles people hold, for approvals and flows", _roles),
+    Step(9, "favorite apps on the person, and where a notification opens", _favorites_and_note_links),
 )
 
 VERSION = STEPS[-1].version

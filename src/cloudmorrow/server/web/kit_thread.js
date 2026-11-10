@@ -43,7 +43,7 @@
 
 import {
   api, app, esc, formatDate, heading, icons, mount, nav, occupy, onShell, onSignOut, recordsUrl,
-  renderRoute, replace, seconds, session, store, tabs, toast, vacate, wireShell,
+  renderRoute, replace, seconds, session, store, tabs, toast, vacate, wireShell, pipMore,
 } from "./core.js";
 import { onPush, refreshBadge, onBadge, lastCounts } from "./push.js";
 import {
@@ -834,6 +834,7 @@ function paintPip(counts) {
   for (const tab of document.querySelectorAll(".tabs .tab[data-thread]")) {
     tab.classList.toggle("pipped", (counts.messages || 0) > 0);
   }
+  pipMore();
 }
 export function markThreadTabs(names) {
   for (const name of names) {

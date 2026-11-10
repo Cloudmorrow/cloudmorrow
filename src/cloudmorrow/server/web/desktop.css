@@ -192,10 +192,13 @@
   :root.rail-folded .tabs .rail-head { justify-content: center; padding-left: 0; }
   :root.rail-folded .tabs .rail-head > .wordmark,
   :root.rail-folded .tabs .rail-fold { display: none; }
+  /* Smaller than the head, so the face it turns to has room above it and
+     sits level with the bell and Me. */
   :root.rail-folded .tabs .rail-unfold {
     display: block;
-    width: 40px;
-    height: 40px;
+    width: 34px;
+    height: 34px;
+    margin-top: 2px;
     perspective: 240px;
     color: var(--bar-accent);
   }
@@ -216,9 +219,9 @@
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
   }
-  .rail-letter .wordmark { height: 21px; width: auto; }
+  .rail-letter .wordmark { height: 19px; width: auto; }
   .rail-open { transform: rotateY(180deg); background: color-mix(in srgb, var(--accent) 15%, transparent); }
-  .rail-open .pixel-icon { width: 18px; height: 18px; }
+  .rail-open .pixel-icon { width: 16px; height: 16px; }
   .rail-unfold:hover .rail-flip, .rail-unfold:focus-visible .rail-flip { transform: rotateY(180deg); }
   @media (prefers-reduced-motion: reduce) { .rail-flip { transition: none; } }
   :root.rail-folded .tabs .rail-section {

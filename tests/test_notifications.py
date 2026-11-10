@@ -118,3 +118,33 @@ def test_a_new_one_is_handed_to_whatever_pushes_it_unless_told_not_to(config):
 def test_a_running_server_pushes_every_note(client):
     # spacenotify hangs the push on the store, so a note reaches the browser too.
     assert client.app.state.cloudmorrow.notifications.on_add
+
+
+def test_a_note_can_say_where_it_opens_and_only_inside_the_app(config):
+    config.ensure_dirs()
+    store = NotificationStore(config.db_path)
+    store.add("bram", title="hi", kind="channel.message", url="#/q/chat/channels/c1")
+    store.add("bram", title="out", url="https://example.com")
+    opens, nowhere = store.list("bram")[::-1]
+    assert opens.url == "#/q/chat/channels/c1"
+    assert nowhere.url == ""
+
+
+def test_looking_in_a_space_reads_its_lines_and_only_those(config):
+    config.ensure_dirs()
+    store = NotificationStore(config.db_path)
+    store.add("bram", title="a", kind="channel.message", url="#/q/chat/channels/c1")
+    store.add("bram", title="b", kind="channel.message", url="#/q/chat/channels/c2")
+    store.add("bram", title="c", kind="quill.offered")
+    assert store.unread_count("bram", messages=False) == 1
+    assert store.read_space("bram", "channel", "c1") == 1
+    assert [n.title for n in store.list("bram", unread_only=True)] == ["c", "b"]
+
+
+def test_favorites_are_kept_on_the_person(client, auth):
+    assert client.get("/api/auth/me", headers=auth).json()["favorites"] == []
+    saved = client.put("/api/auth/favorites", json={"favorites": ["calendar.month", "crm", "crm"]}, headers=auth)
+    assert saved.json() == {"favorites": ["calendar.month", "crm"]}
+    assert client.get("/api/auth/me", headers=auth).json()["favorites"] == ["calendar.month", "crm"]
+    guest = {"Authorization": f"Bearer {token_for(client, *GUEST)}"}
+    assert client.get("/api/auth/me", headers=guest).json()["favorites"] == []

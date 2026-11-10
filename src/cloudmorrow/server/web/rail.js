@@ -7,7 +7,7 @@
    on a phone a finger held on it, in the bar or in More. The rail's head
    folds the rail to a strip of icons and unfolds it again. */
 
-import { app, appList, isFavorite, setFavorite, setRailFolded } from "./core.js";
+import { adoptFavorites, api, app, appList, isFavorite, session, setFavorite, setRailFolded } from "./core.js";
 import { contextMenus, menu } from "./actions.js";
 import { openSheet } from "./dialog.js";
 
@@ -45,6 +45,16 @@ app.addEventListener("click", (event) => {
     openAll();
   }
 }, true);
+
+// The favorites are kept on you: what the server has is the bar's, asked
+// when the page opens and whenever it comes back into view — marked on the
+// phone, they are on the computer the next time you look at it.
+function heardFavorites() {
+  if (!session.token) return;
+  api("GET", "/api/auth/me").then((me) => adoptFavorites(me.favorites)).catch(() => {});
+}
+heardFavorites();
+addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") heardFavorites(); });
 
 // -- More: every app, in a sheet -------------------------------------------------------
 function tiles() {

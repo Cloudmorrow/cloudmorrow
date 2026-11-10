@@ -33,11 +33,14 @@ def badge_for(state: AppState, username: str) -> dict:
     """Everything waiting for one person, as the icon would say it."""
     wanted = unread_models(state, username)
     messages = state.records.unread_total(Principal.person(username), models=wanted) if wanted else 0
+    # The bell lists a note for every message too, so it can open the Quill
+    # it was written in; the icon counts that message once, as a message.
     notifications = state.notifications.unread_count(username)
+    others = state.notifications.unread_count(username, messages=False)
     return {
         "messages": messages,
         "notifications": notifications,
-        "badge": messages + notifications,
+        "badge": messages + others,
     }
 
 
