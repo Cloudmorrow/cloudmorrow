@@ -838,7 +838,21 @@ class RecordStore:
         with self.db.connect() as conn:
             record = self._record(conn, model, self._row(conn, principal, model, record_id), principal)
         conn.close()
+        self._keep_secrets(model, record, principal)
         return record
+
+    @staticmethod
+    def _keep_secrets(model: Datamodel, record: Record, principal: Principal) -> None:
+        """A field marked `secret = "quill"` — an API key an administrator typed
+        in — is read by the code of the Quill that introduced the datamodel,
+        and by nobody else: to everybody else the one record says null there,
+        as a listing does. A field marked `secret = true` is the person's to
+        read on the one record, as ever."""
+        if principal.kind == "quill" and principal.quill == model.source:
+            return
+        for f in model.fields:
+            if f.secret == "quill":
+                record.fields[f.name] = None
 
     # -- what a datamodel can do besides the five calls ------------------------
     def capabilities(self, model_id: str) -> list[str]:

@@ -488,6 +488,9 @@ def code_summary(manifest: Manifest) -> dict:
         ],
         "fetch": [{"host": f["host"], "why": f["why"]} for f in manifest.fetch],
         "secrets": [{"key": s["key"], "why": s["why"]} for s in manifest.secrets],
+        # An assistant's tools, as the person: everything an assistant may
+        # read and do for them, through the gate (docs/QUILLCODE.md).
+        "assistant": dict(manifest.assistant),
         "machine": [
             {
                 "id": m["id"],

@@ -396,6 +396,12 @@ def print_plan(plan: dict) -> None:
             console.print(f"  reaches {escape(host)} — {escape(item['why'])}")
         for item in code.get("secrets", []):
             console.print(f"  reads your secret {escape(item['key'])} — {escape(item['why'])}")
+        if code.get("assistant"):
+            console.print(
+                "  has an assistant's tools, as you: everything an assistant may read and do for you"
+                f" — {escape(code['assistant']['why'])}"
+            )
+
     if plan.get("runtimes"):
         names = ", ".join(f"{r.get('label') or r['id']}" for r in plan["runtimes"])
         console.print(f"[yellow]Adds to the server:[/] {escape(names)} — fetched for it, checked, kept for its Quills")

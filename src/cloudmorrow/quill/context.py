@@ -9,6 +9,8 @@
     ctx.approvals       ask(record, role=, question=) a yes or no of whoever holds a role
     ctx.fetch(url)      HTTP, to a host the manifest lists in [[fetch]] only
     ctx.secret(key)     a secret the manifest lists in [[secrets]], from the person's vault
+    ctx.assistant       with `[assistant] tools = true`: an assistant's tools, as the person —
+                        tools() lists them, call(name, arguments) runs one
     ctx.now()           the time, as an aware datetime in UTC
     ctx.log(...)        a line in the Quill's log
     ctx.folder(name)    on a machine: a folder the person picked, as a Path
@@ -327,6 +329,29 @@ class Approvals:
         return Record(self._host("approvals.get", {"id": _plain(id)}))
 
 
+class Assistant:
+    """What an assistant of the person's has, given to the Quill's code: the record
+    tools over every datamodel their circles give them (never a secret), every
+    Quill's actions they may press, and the Quill-building tools — each run as
+    them, through the gate, as an assistant over MCP would. Only for a Quill whose
+    manifest says `[assistant] tools = true`, with why; a model the code talks to
+    is given `tools()` and asked to pick, and `call` does what it picked.
+    """
+
+    def __init__(self, host: Host) -> None:
+        self._host = host
+
+    def tools(self) -> list[dict]:
+        """Every tool, as a model wants one: `name`, `description`, `input_schema`."""
+        return [dict(t) for t in self._host("assistant.tools", {})]
+
+    def call(self, name: str, arguments: dict | None = None) -> dict:
+        """Run one: `{"ok": bool, "text": what it answered, "data": the same as an object, or None}`.
+        A tool that could not do its job answers with ok False and why, for the
+        model to read; a tool there is not raises NotFound."""
+        return dict(self._host("assistant.call", {"name": str(name), "arguments": _plain(dict(arguments or {}))}))
+
+
 class Params(dict):
     """A view's parameters, by name; `.record` is the record it was opened on, if any."""
 
@@ -350,6 +375,8 @@ class Context:
             self.params.record = Record(data["record"])
         self.records = Records(host)
         self.approvals = Approvals(host)
+        self.assistant = Assistant(host)
+
         # Where it runs: "server", or "machine" in an agent.
         self.where: str = data.get("where", "server")
         # What the cloud is called — the name on the rail — for an address or a

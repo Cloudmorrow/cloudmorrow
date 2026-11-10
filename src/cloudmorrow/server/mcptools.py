@@ -221,10 +221,11 @@ def _rev(args: dict[str, Any]) -> int | str | None:
 
 
 # -- building Quills: an administrator's for the server, anybody's for themselves --------
-def _builds_for(state: AppState, user: User) -> str:
+def _builds_for(state: AppState, user: User, *, mine: bool = False) -> str:
     """Whose the Quill an assistant builds will be: "" for the server's (an administrator's
-    assistant), the person's own name for one of their own (docs/SHARING.md), or refused."""
-    if user.is_admin:
+    assistant), the person's own name for one of their own (docs/SHARING.md), or refused.
+    *mine* is an administrator asking for one of their own rather than the server's."""
+    if user.is_admin and not mine:
         return ""
     policy = getattr(state, "policy", None)
     if policy is None or not policy.may_install(user.username):
@@ -264,8 +265,13 @@ def _write_draft(state: AppState, args: dict[str, Any], folder: Path) -> Path:
     extra = args.get("datamodels", {})
     if not isinstance(extra, dict) or not all(isinstance(v, str) for v in extra.values()):
         raise ToolError("datamodels is an object of file name to TOML text")
+    code = args.get("code", "")
+    if not isinstance(code, str):
+        raise ToolError("code is the text of quill.py")
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "quill.toml").write_text(manifest, encoding="utf-8")
+    if code:
+        (folder / "quill.py").write_text(code, encoding="utf-8")
     if extra:
         (folder / "datamodels").mkdir(exist_ok=True)
         for name, text in extra.items():
@@ -284,7 +290,7 @@ def _datamodels_for(state: AppState, tmp: Path) -> Path | None:
 
 
 def quill_check(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    owner = _builds_for(state, user)
+    owner = _builds_for(state, user, mine=_bool(args, "mine"))
     with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
         folder = _write_draft(state, args, Path(tmp) / "q")
         try:
@@ -297,7 +303,8 @@ def quill_check(state: AppState, user: User, args: dict[str, Any]) -> Any:
 
 
 def quill_dev_install(state: AppState, user: User, args: dict[str, Any]) -> Any:
-    owner = _builds_for(state, user)
+    owner = _builds_for(state, user, mine=_bool(args, "mine"))
+
     with tempfile.TemporaryDirectory(prefix="quill-") as tmp:
         folder = _write_draft(state, args, Path(tmp) / "q")
         try:
@@ -417,6 +424,17 @@ _DATAMODELS = {
     "type": "object",
     "description": "Datamodels the Quill introduces: file name to TOML text. Optional.",
 }
+_CODE = {
+    "type": "string",
+    "description": "The quill.py, as Python text, when the manifest names handlers. Optional.",
+}
+_MINE = {
+    "type": "boolean",
+    "description": (
+        "For an administrator: build a Quill of their own, on their shelf alone, rather than the server's. Optional."
+    ),
+}
+
 
 TOOLS: tuple[Tool, ...] = (
     Tool(
@@ -532,10 +550,11 @@ TOOLS: tuple[Tool, ...] = (
     Tool(
         "quill_check",
         "Check a Quill manifest (and any datamodels it introduces) without installing it, "
-        "and say everything it would add. For an administrator the Quill is the server's; for "
-        "anybody else it is their own: on their shelf alone, over their own data, with no fields "
-        "added to shared datamodels, no services, and personal-scope datamodels only.",
-        _schema({"manifest": _MANIFEST, "datamodels": _DATAMODELS}, ("manifest",)),
+        "and say everything it would add. For an administrator the Quill is the server's (their "
+        "own with mine); for anybody else it is their own: on their shelf alone, over their own "
+        "data, with no fields added to shared datamodels, no services, and personal-scope "
+        "datamodels only. Handlers the manifest names come as code: the quill.py.",
+        _schema({"manifest": _MANIFEST, "datamodels": _DATAMODELS, "code": _CODE, "mine": _MINE}, ("manifest",)),
         "",
         quill_check,
     ),
@@ -543,8 +562,9 @@ TOOLS: tuple[Tool, ...] = (
         "quill_dev_install",
         "Install a Quill from a manifest on this server, as a development Quill: it is on the "
         "phone, the web app and the terminal at once. Installing again replaces it. An "
-        "administrator's is the server's; anybody else's is a Quill of their own. Check it first.",
-        _schema({"manifest": _MANIFEST, "datamodels": _DATAMODELS}, ("manifest",)),
+        "administrator's is the server's (their own with mine); anybody else's is a Quill of "
+        "their own. Handlers the manifest names come as code: the quill.py. Check it first.",
+        _schema({"manifest": _MANIFEST, "datamodels": _DATAMODELS, "code": _CODE, "mine": _MINE}, ("manifest",)),
         "",
         quill_dev_install,
     ),

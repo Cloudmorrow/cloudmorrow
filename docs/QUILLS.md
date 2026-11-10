@@ -581,6 +581,17 @@ access = "read"
 why = "to show who a vehicle is assigned to"
 ```
 
+A Quill whose code talks to a model for the person — an assistant of their
+own — does not grant itself every datamodel one by one. It says
+`[assistant] tools = true`, with why, and its code is given what an
+assistant over MCP has: the record tools over every datamodel the person's
+circles give them (never `secret`), every Quill's actions they may press,
+and the Quill-building tools, each run as them, through the gate, bound by
+the server's policy. The install sheet says *has an assistant's tools, as
+you*, and that is what is said yes to ([QUILLCODE.md](QUILLCODE.md),
+`ctx.assistant`).
+
+
 ## The catalog
 
 ```toml

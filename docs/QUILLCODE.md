@@ -96,6 +96,8 @@ handler = "log_service"               # the id with _ for -, when left out
 confirm = "Log it?"                   # optional: asked first
 tone = "primary"                      # neutral, primary, danger
 assistant = true                      # false: not an assistant's tool
+# timeout = "2m"                      # how long it has, up to 5m, for one that waits on something
+                                      # outside — an answer from a model; left out, fifteen seconds
 # admin = true                        # an administrator's alone, like a screen marked admin: pressed
                                       # from the Quill's settings on its sheet under Administration,
                                       # on no bar or palette, and refused to anybody else
@@ -138,6 +140,11 @@ why = "to read each van's odometer from the tracker"
 [[secrets]]
 key = "TRACKER_KEY"                   # a secret its code may read from the person's vault
 why = "to sign in to the tracker"
+
+# [assistant]                         # its code is given an assistant's tools, as the person:
+# tools = true                        # the record tools over every datamodel their circles give
+# why = "to answer questions over your own data"   # them, every Quill's actions they may press, and
+                                      # the Quill-building tools (ctx.assistant, below)
 
 [[machine]]
 id = "import-exports"
@@ -215,6 +222,8 @@ hook started by an assistant's change is the same.
 | `ctx.approvals.ask(record, role=, question=)` | a yes or no asked of whoever holds the role; the answer comes back as a hook on `approval` |
 | `ctx.fetch(url, method=, headers=, json=, body=)` | https to a host in `[[fetch]]`, and there only after a redirect too; a `Response` (`.status`, `.ok`, `.json()`, `.text`). A Quill that lists `host = "*"` reaches any host out on the internet, and none that resolves to this machine, a private network or the tailnet |
 | `ctx.secret(key)` | a key in `[[secrets]]`, from the person's own vault |
+| `ctx.assistant.tools()`, `ctx.assistant.call(name, arguments)` | with `[assistant] tools = true`: what an assistant of the person's has, run as them. `tools()` is every tool as a model wants one (`name`, `description`, `input_schema`): the record tools over every datamodel their circles give them (never `secret`), every Quill's actions they may press, and the Quill-building tools, `quill_check` and `quill_dev_install` with `mine = true` making one of their own even for an administrator; `call` runs one and answers `{ok, text, data}`. The Quill declares no datamodel for it: the install sheet says *has an assistant's tools, as you*, and that is what is said yes to. Refused to code an assistant started |
+
 | `ctx.now()`, `ctx.log(...)` | the time; a line in the Quill's log |
 | `ctx.folder(name)`, `ctx.run([...])` | on a machine: a folder the person picked; a program the manifest lists and the machine allows |
 
@@ -333,8 +342,10 @@ with the people it was shared with. It sees the standard library at `/lib`, the 
 and the Quill at `/quill`, all read-only — and on a machine, the folders the
 person picked at `/folders/<name>`. It has no sockets, no processes and
 none of the host's environment, and at most 256 MB. A call has fifteen
-seconds (a job two minutes, a machine handler five); one that runs past its
-time is stopped with its process, and the next call starts a fresh one.
+seconds (a job two minutes, a machine handler five, an action as long as its
+`timeout` says, up to five minutes, and its `ctx.fetch` may wait as long);
+one that runs past its time is stopped with its process, and the next call
+starts a fresh one.
 
 The host and the interpreter speak JSON lines over its standard input and
 output (`cloudmorrow.quill.guest`): the core sends a call, and every
