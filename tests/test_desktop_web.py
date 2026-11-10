@@ -160,7 +160,7 @@ def test_the_rail_folds_to_its_icons() -> None:
     desktop = (WEB / "desktop.css").read_text(encoding="utf-8")
     assert "--rail: clamp(259px, 24vw, 340px);" in desktop
     assert ":root.rail-folded { --rail: 64px; }" in desktop
-    assert '.rail-unfold:hover .rail-flip' in desktop
+    assert ".rail-unfold:hover .rail-flip" in desktop
     assert 'store.set("rail.folded"' in core
     assert 'document.documentElement.classList.toggle("rail-folded"' in core
 
