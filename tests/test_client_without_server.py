@@ -12,7 +12,9 @@ import subprocess
 import sys
 import textwrap
 
-SERVER_ONLY = ["cryptography", "fastapi", "pydantic", "jwt", "argon2", "wsgidav", "a2wsgi", "PIL", "uvicorn"]
+# Not pydantic: typer brings it (since typer 0.29, which parses parameters
+# through it), so every client has it whether or not the server is there.
+SERVER_ONLY = ["cryptography", "fastapi", "jwt", "argon2", "wsgidav", "a2wsgi", "PIL", "uvicorn"]
 
 
 def without_server_packages(code: str) -> subprocess.CompletedProcess:
