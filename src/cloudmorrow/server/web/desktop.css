@@ -30,8 +30,10 @@
 
 @media (min-width: 900px) and (min-height: 600px) {
   :root {
-    /* The rail down the left, and the measure the page is set to. */
-    --rail: 232px;
+    /* The rail down the left — as wide as a fifth of the window, never
+       narrower than a label wants nor wider than a list does — and the
+       measure the page is set to. Folded (rail.js), a strip of icons. */
+    --rail: clamp(259px, 24vw, 340px);
     --column: 820px;
     /* The bar's own height, without the notch a computer does not have. */
     --bar-h: calc(44px + var(--bar-top));
@@ -44,6 +46,8 @@
   #app:has(main.thread) { --column: 880px; }
   #app:has(.month) { --column: 900px; }
   #app:has(.tiles) { --column: 960px; }
+
+  :root.rail-folded { --rail: 64px; }
 
   #app { padding-left: var(--rail); }
 
@@ -61,22 +65,60 @@
     flex-direction: column;
     justify-content: flex-start;
     gap: 2px;
-    padding: 8px 12px calc(12px + var(--bottom));
+    padding: 0 12px calc(12px + var(--bottom));
     border-right: 1px solid var(--line);
     overflow-x: hidden;
     overflow-y: auto;
   }
   /* The cloud's name, in the wordmark's dots, sits at the head of the
      rail, where a program on a computer puts its name. */
+  /* It stands in the bar's own height, so its middle is the middle of
+     the bell and Me across the top of the page. */
   .tabs .rail-head {
     display: flex;
+    flex: none;
     align-items: center;
+    gap: 8px;
     height: var(--bar-h);
-    padding: var(--bar-top) 12px 0;
+    padding: var(--bar-top) 0 0 12px;
     margin-bottom: 8px;
     color: var(--bar-accent);
   }
-  .tabs .rail-head .wordmark { height: 17px; width: auto; max-width: 100%; }
+  .tabs .rail-head > .wordmark { height: 17px; width: auto; min-width: 0; max-width: 100%; flex: 0 1 auto; }
+  /* The fold, at the end of the head: quiet until the pointer is on the rail. */
+  .tabs .rail-fold {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    margin-left: auto;
+    border-radius: 8px;
+    color: var(--bar-muted);
+    opacity: .45;
+    transition: opacity .12s, color .12s;
+  }
+  .tabs .rail-fold .pixel-icon { width: 16px; height: 16px; }
+  .tabs:hover .rail-fold, .tabs .rail-fold:focus-visible { opacity: 1; }
+  .tabs .tab.quick, .tabs .tab.more { display: none; }
+  .tabs .tab.app { display: flex; }
+
+  /* The dots at the end of an app's row: its menu, with Favorites in it
+     (rail.js). Only on the row the pointer is over, and over its pip. */
+  .tabs .tab.app, .tabs .tab.used { position: relative; }
+  .tabs .tab-menu {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    display: none;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    margin-top: -15px;
+    border-radius: 8px;
+    color: var(--bar-muted);
+  }
+  .tabs .tab-menu .pixel-icon { width: 16px; height: 16px; }
 
   .tab {
     flex: none;
@@ -140,6 +182,59 @@
   }
   .tabs .tab.admin { display: flex; }
   .tabs .tab.used { display: flex; }
+
+  /* -- the rail folded -------------------------------------------------------- */
+  /* A strip down the left with the icons alone: the shelves are a line
+     each, the copies under Today are gone (every app once, on its shelf),
+     and the head is the cloud's first letter, which turns over under the
+     pointer to the button that unfolds the rail again. */
+  :root.rail-folded .tabs { padding-left: 8px; padding-right: 8px; }
+  :root.rail-folded .tabs .rail-head { justify-content: center; padding-left: 0; }
+  :root.rail-folded .tabs .rail-head > .wordmark,
+  :root.rail-folded .tabs .rail-fold { display: none; }
+  :root.rail-folded .tabs .rail-unfold {
+    display: block;
+    width: 40px;
+    height: 40px;
+    perspective: 240px;
+    color: var(--bar-accent);
+  }
+  .rail-flip {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform .42s cubic-bezier(.3, 1.4, .5, 1);
+  }
+  .rail-face {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .rail-letter .wordmark { height: 21px; width: auto; }
+  .rail-open { transform: rotateY(180deg); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+  .rail-open .pixel-icon { width: 18px; height: 18px; }
+  .rail-unfold:hover .rail-flip, .rail-unfold:focus-visible .rail-flip { transform: rotateY(180deg); }
+  @media (prefers-reduced-motion: reduce) { .rail-flip { transition: none; } }
+  :root.rail-folded .tabs .rail-section {
+    height: 1px;
+    margin: 10px 6px;
+    padding: 0;
+    overflow: hidden;
+    background: var(--line);
+    color: transparent;
+  }
+  :root.rail-folded .tabs .tab.used,
+  :root.rail-folded .tabs .rail-section:has(+ .tab.used) { display: none; }
+  :root.rail-folded .tab { justify-content: center; min-width: 0; padding: 0; gap: 0; }
+  :root.rail-folded .tab > span, :root.rail-folded .tabs .tab-menu { display: none !important; }
+  :root.rail-folded .tabs .tab.sub { padding-left: 0; min-height: 30px; }
+  :root.rail-folded .tab.pipped::after { position: absolute; top: 7px; right: 9px; margin: 0; }
   main.admin .seg { display: none; }
   .admin-group { display: none; }
 
@@ -229,6 +324,8 @@
   /* The rows that are a filled colour already brighten instead. */
   .row.bad:hover, .sheet-row:hover { filter: brightness(1.12); }
   .tab:hover { background: var(--card); color: var(--bar-ink); }
+  .tabs .tab:hover > .tab-menu { display: grid; }
+  .tabs .tab-menu:hover, .tabs .rail-fold:hover { background: var(--card-2); color: var(--bar-ink); }
   .tab.active:hover { color: var(--bar-accent); }
   .nav button:not(.strong):hover, .nav a.button:hover, .nav .nav-link:hover,
   .heading button:hover, .heading a.button:hover { opacity: .72; }
