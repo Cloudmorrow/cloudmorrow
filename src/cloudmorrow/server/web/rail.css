@@ -6,8 +6,10 @@
 /* Today, five apps and More: seven to a bar a phone is wide, so a name
    that does not fit is cut rather than pushing the bar into a scroll. */
 .tabs .tab.app { display: none; }
-.tabs .tab.quick, .tabs .tab.more { flex: 1 1 0; min-width: 0; }
-.tabs .tab.quick span, .tabs .tab.more span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* Every tab in the bar is the same width, so Today stands as far from
+   the first app as each app from the next. */
+.tabs .tab { flex: 1 1 0; min-width: 0; }
+.tabs .tab span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .tabs .tab-menu { display: none; }
 .tabs .rail-fold, .tabs .rail-unfold { display: none; }
 
