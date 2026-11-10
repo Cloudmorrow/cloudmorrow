@@ -115,6 +115,18 @@ def _lines(node: dict, actions: dict) -> list[str]:
         return [f"{node['label']}: " + " ".join(line for item in node["items"] for line in _lines(item, actions))]
     if kind == "table":
         return _table(node, actions)
+    if kind == "rows":
+        if not node["records"]:
+            return [f"({node.get('empty') or 'nothing yet'})"]
+        out = []
+        for record in node["records"]:
+            head = value_text(record, node["title"])
+            if node.get("subtitle") and value_text(record, node["subtitle"]):
+                head += f" — {value_text(record, node['subtitle'])}"
+            if node.get("badge") and value_text(record, node["badge"]):
+                head += f" [{value_text(record, node['badge'])}]"
+            out.append(f"{'▶' if node.get('current') == record['id'] else '•'} {head}")
+        return out
     if kind == "cards":
         if not node["records"]:
             return [f"({node.get('empty') or 'nothing yet'})"]

@@ -167,6 +167,8 @@ def parse_code(
             raise CodeSpecError(f"{where}: {thing} admin is true or false")
         if not isinstance(item.get("settings", False), bool):
             raise CodeSpecError(f"{where}: {thing} settings is true or false")
+        if not isinstance(item.get("bar", True), bool):
+            raise CodeSpecError(f"{where}: {thing} bar is true or false")
         if item.get("settings") and item.get("admin"):
             raise CodeSpecError(f"{where}: {thing} is settings or admin, not both")
         if item.get("settings") and item.get("on"):

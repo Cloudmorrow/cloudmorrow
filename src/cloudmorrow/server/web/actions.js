@@ -607,7 +607,9 @@ const chip = (quill, action) =>
 /** The bar under a Quill's title: what it does that is on no record. quills.js
     puts it on every screen of the Quill, after the title. */
 export function placeActionBar(quill, main = app.querySelector("main")) {
-  const actions = loose(quill);
+  // One marked `bar = false` is run from a screen's own box or button, and
+  // only there: a conversation's first question, not a chip as well.
+  const actions = loose(quill).filter((a) => a.bar !== false);
   if (!actions.length || !main || main.querySelector(":scope > .act-bar")) return;
   const heading = main.querySelector(":scope > .heading");
   if (!heading) return;

@@ -91,6 +91,7 @@ RENDERERS: dict[str, str] = {
     "menu": "draw_menu",
     "table": "draw_table",
     "cards": "draw_cards",
+    "rows": "draw_rows",
     "gallery": "draw_gallery",
     "lanes": "draw_lanes",
     "month": "draw_month",
@@ -1119,6 +1120,22 @@ class Drawer:
             ),
             id=path,
             classes="view-cards",
+        )
+
+    def draw_rows(self, node: dict, path: str) -> Widget:
+        """The app's rows: the same card widget, one line each, drawn as a list."""
+        records = node.get("records") or []
+        if not records:
+            return Static(_text(node.get("empty") or "Nothing here."), id=path, classes="view-muted")
+        return Vertical(
+            *(
+                ViewCard(
+                    record, node, self.models.get(record.get("model", "")), id=f"{path}-row-{safe_id(record['id'])}"
+                )
+                for record in records
+            ),
+            id=path,
+            classes="view-cards view-rows",
         )
 
     def draw_gallery(self, node: dict, path: str) -> Widget:

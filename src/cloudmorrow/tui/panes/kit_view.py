@@ -25,6 +25,7 @@ way the web app and the phone draw the same tree their own way:
     table                     a row per record: enter opens it, and the row's
                               actions are buttons under it, on the row you are on
     cards                     a card per record: enter or a click opens it
+    rows                      a row per record, the open one lit: the same
     gallery                   a row per record with its stars, and the picture
                               of the row you are on beside it: 0–5 rate it
     lanes                     the board's lanes and cards: `[` `]` or a drag

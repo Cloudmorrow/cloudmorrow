@@ -312,6 +312,7 @@ def every_primitive(van: dict) -> dict:
             ui.table([], columns=["name"], empty="No vans here."),
             ui.empty("Nothing else.", action="add-van"),
             ui.toggle("Lit", action="peek", on=True, hint="A switch"),
+            ui.rows([van], title="name", subtitle="registration", go="vans", param="van", current=van["id"]),
             ui.conversation([van], body="name", mine="name", ask="add-van", name="Fleet", hint="Say it"),
         )
     )

@@ -202,9 +202,19 @@ main.view-screen:has(.v-conversation) > .heading { flex: none; }
    and `display: block` below give way to this. */
 .v-split:has(.v-conversation) { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
 .v-split[data-show]:has(.v-conversation) > .v-split-side { min-height: 0; overflow-y: auto; }
-.v-split[data-show]:has(.v-conversation) > .v-split-main { display: flex; flex-direction: column; min-height: 0; }
-.v-split[data-show="main"]:has(.v-conversation) > .v-split-side, .v-split[data-show="side"]:has(.v-conversation) > .v-split-main { display: none; }
-.v-conversation { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.v-split[data-show="main"]:has(.v-conversation) > .v-split-main { display: flex; flex-direction: column; min-height: 0; }
+.v-conversation { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+/* The hedgehog, faintly, behind the lines: where a screen would otherwise
+   be a dark field with a box at the foot. Never over the words. */
+.v-conversation.backdrop-mascot::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 90px;
+  background: url("./mascot-320.png") center / min(58%, 300px) no-repeat;
+  opacity: .07;
+  pointer-events: none;
+}
+.v-conversation > * { position: relative; }
 .v-lines {
   flex: 1;
   min-height: 0;
@@ -327,6 +337,15 @@ main.view-screen:has(.v-conversation) > .heading { flex: none; }
 .v-table td.v-row-actions { margin-left: auto; }
 .v-table td.v-row-actions::before { content: none; }
 .v-more { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 36px; color: var(--accent); border-radius: var(--radius-control); }
+
+/* -- rows: the app's own list rows, the open one lit -------------------------------- */
+.v-list { margin: 0; }
+.v-list .row { text-decoration: none; color: inherit; }
+.v-list .row .main { display: flex; flex-direction: column; gap: 2px; }
+.v-list .row .meta { display: block; }
+.v-list .row.current { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.v-list .row.current .title { color: var(--accent); }
+.v-list .row > .v-badge { flex: none; margin-left: auto; }
 
 /* -- cards ----------------------------------------------------------------------- */
 .v-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
@@ -471,6 +490,11 @@ button.v-star:focus-visible { outline: 2px solid var(--accent); outline-offset: 
   .v-columns { grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 18px; align-items: start; }
   .v-split { grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 22px; align-items: start; }
   .v-split[data-show="main"] > .v-split-side, .v-split[data-show="side"] > .v-split-main { display: block; }
+  /* A conversation beside its list has the whole width, as a thread has,
+     and both columns are there whichever the phone would show. */
+  #app:has(.v-conversation) { --column: 1120px; }
+  .v-split[data-show]:has(.v-conversation) > .v-split-side { display: block; }
+  .v-split[data-show]:has(.v-conversation) > .v-split-main { display: flex; flex-direction: column; min-height: 0; }
   .v-split-side .v-cards { grid-template-columns: minmax(0, 1fr); }
   /* A button is as wide as what it says; on a phone it is the thumb's width. */
   .v-stack > .act-button, .v-empty > .act-button { align-self: flex-start; }

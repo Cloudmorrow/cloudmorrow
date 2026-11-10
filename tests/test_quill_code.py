@@ -124,6 +124,10 @@ def test_an_action_marked_settings_is_a_bool_on_no_record_and_not_admin():
         parse_manifest(_manifest(head + "settings = true\nadmin = true\n"))
     with pytest.raises(QuillError, match="on no record"):
         parse_manifest(_manifest(head + 'settings = true\non = "task"\n'))
+    with pytest.raises(QuillError, match="bar is true or false"):
+        parse_manifest(_manifest(head + 'bar = "no"\n'))
+    (kept,) = parse_manifest(_manifest(head + "bar = false\n")).actions
+    assert kept["bar"] is False
 
 
 def test_a_toggle_and_a_conversation_are_primitives_every_surface_draws():
@@ -168,8 +172,16 @@ def test_a_toggle_and_a_conversation_are_primitives_every_surface_draws():
     assert "You:  2026-11-10T09:00\n  How many?\nMorrow:\n  **Four**\n  Looked at: tasks\n" in said
     assert "You:\n  Sure?\n  (did not go through)" in said
     assert said.rstrip().endswith("[Ask Morrow…]\nReads only")
-    empty = ui.conversation([], body="body", mine="mine", empty="Hello. Ask me anything.")
+    empty = ui.conversation([], body="body", mine="mine", empty="Hello. Ask me anything.", backdrop="mascot")
+    assert empty["backdrop"] == "mascot"
     assert as_text.render(empty, actions={}).strip() == "(Hello. Ask me anything.)"
+    with pytest.raises(TreeError, match="backdrop is one of"):
+        ui.conversation([], body="body", mine="mine", backdrop="dragon")
+    # Rows are the app's list rows: as cards, but a line each, the open one lit.
+    listed = ui.rows(lines, title="body", subtitle="note", go="chat", param="line", current="m2")
+    assert listed["param"] == "line" and listed["current"] == "m2" and "open" not in listed
+    ui.check(listed, actions=set(), screens={"chat"})
+    assert as_text.render(listed, actions={}).splitlines()[:2] == ["• How many?", "▶ **Four** — Looked at: tasks"]
 
 
 def test_a_settings_screen_is_everybodys_own_and_never_a_tab(fleet):

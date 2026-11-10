@@ -359,6 +359,7 @@ const DRAW = {
   },
   table: drawTable,
   cards: drawCards,
+  rows: drawRows,
   gallery: drawGallery,
   lanes: drawLanes,
   month: drawMonth,
@@ -604,7 +605,7 @@ function drawConversation(v, n) {
       `<textarea rows="1" placeholder="${esc(words)}" aria-label="${esc(words)}" enterkeyhint="send" autocapitalize="sentences"></textarea>` +
       `<button type="submit" aria-label="${esc(action.label)}">${glyphs.send}</button></form>`;
   }
-  return `<div class="v-conversation"><div class="v-lines" aria-live="polite">` +
+  return `<div class="v-conversation${n.backdrop ? " backdrop-" + esc(n.backdrop) : ""}"><div class="v-lines" aria-live="polite">` +
     (lines || (n.empty ? `<div class="v-greeting">${esc(n.empty)}</div>` : "")) + `</div>` + box +
     (n.hint ? `<p class="v-composer-hint">${esc(n.hint)}</p>` : "") + `</div>`;
 }
@@ -710,6 +711,24 @@ function drawTable(v, n) {
       (actions.length ? `<td class="v-row-actions">${buttons}</td>` : "") + `</tr>`;
   }).join("");
   return `<div class="v-table"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+// The app's own rows, as a list screen draws them: the title, a line under
+// it, a badge at the end; the one that is open lit, beside what it opened.
+function drawRows(v, n) {
+  if (!n.records.length) return none(n.empty);
+  return `<div class="group v-list">` + n.records.map((r) => {
+    const hash = rowGoes(v, n, r);
+    const badge = n.badge ? say(v, r, n.badge) : "";
+    const sub = n.subtitle ? say(v, r, n.subtitle) : "";
+    const inner = `<span class="main"><span class="title">${esc(titled(v, r, n.title))}</span>` +
+      (sub ? `<span class="meta"><span class="preview">${esc(sub)}</span></span>` : "") + `</span>` +
+      (badge ? `<span class="v-badge">${esc(badge)}</span>` : "");
+    const menu = menuOn(v, r, hash);
+    const cls = `row v-row-item${n.current && n.current === r.id ? " current" : ""}`;
+    return hash ? `<a class="${cls}" ${menu} href="${esc(hash)}"${n.current === r.id ? ' aria-current="true"' : ""}>${inner}</a>`
+      : `<div class="${cls}" ${menu}>${inner}</div>`;
+  }).join("") + `</div>`;
 }
 
 function drawCards(v, n) {
