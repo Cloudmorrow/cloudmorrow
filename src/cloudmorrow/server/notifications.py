@@ -26,6 +26,9 @@ log = logging.getLogger("cloudmorrow.notifications")
 MAX_BODY_CHARS = 2000
 # Per owner. Old ones are dropped as new ones arrive.
 KEEP = 200
+# The end of the kind of a note that says something was written in a space
+# (`channel.message`): the bell lists it, the badge counts the message itself.
+MESSAGE_KIND = ".message"
 
 
 def _now() -> str:
@@ -42,6 +45,8 @@ class Notification:
     body: str
     created_at: str
     read_at: str | None
+    # Where it opens: a Quill's screen, or '' for the bell's own list.
+    url: str = ""
 
     @property
     def unread(self) -> bool:
@@ -57,6 +62,7 @@ class Notification:
             "created_at": self.created_at,
             "read_at": self.read_at,
             "unread": self.unread,
+            "url": self.url,
         }
 
 
@@ -71,6 +77,7 @@ def _row(conn: Connection, row) -> Notification:
         body=conn.unseal("notifications", "body", scope, row["body"]),
         created_at=row["created_at"],
         read_at=row["read_at"],
+        url=row["url"] or "",
     )
 
 
@@ -90,6 +97,7 @@ class NotificationStore:
         kind: str = "info",
         machine: str = "",
         body: str = "",
+        url: str = "",
         push: bool = True,
     ) -> Notification:
         """Leave a note behind *owner*'s bell. *push* False for a caller that
@@ -97,13 +105,15 @@ class NotificationStore:
         title = title.strip()[:200] or "(untitled)"
         with self.db.connect() as conn:
             made = conn.insert(
-                "INSERT INTO notifications (owner, kind, machine, title, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO notifications (owner, kind, machine, title, body, url, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
                     owner,
                     kind.strip()[:64] or "info",
                     machine[:64],
                     conn.seal("notifications", "title", (owner,), title),
                     conn.seal("notifications", "body", (owner,), body[:MAX_BODY_CHARS]),
+                    url[:500] if url.startswith("#/") else "",
                     _now(),
                 ),
             )
@@ -133,14 +143,25 @@ class NotificationStore:
             rows = conn.execute(query, (owner, limit)).fetchall()
         return [_row(conn, row) for row in rows]
 
-    def unread_count(self, owner: str) -> int:
+    def unread_count(self, owner: str, *, messages: bool = True) -> int:
+        """How many are unread. *messages* False leaves out the notes that only
+        say a message was written (kind `….message`): the badge counts those
+        messages already, from the spaces themselves."""
+        query = "SELECT COUNT(*) AS n FROM notifications WHERE owner = ? AND read_at IS NULL"
+        if not messages:
+            query += " AND kind NOT LIKE ?"
+        args = (owner,) if messages else (owner, f"%{MESSAGE_KIND}")
         with self.db.connect() as conn:
-            return int(
-                conn.execute(
-                    "SELECT COUNT(*) AS n FROM notifications WHERE owner = ? AND read_at IS NULL",
-                    (owner,),
-                ).fetchone()["n"]
+            return int(conn.execute(query, args).fetchone()["n"])
+
+    def read_space(self, owner: str, model: str, space_id: str) -> int:
+        """The notes about messages in a space, read: you have looked in it."""
+        with self.db.connect() as conn:
+            cursor = conn.execute(
+                "UPDATE notifications SET read_at = ? WHERE owner = ? AND read_at IS NULL AND kind = ? AND url LIKE ?",
+                (_now(), owner, f"{model}{MESSAGE_KIND}", f"%/{space_id}"),
             )
+            return cursor.rowcount
 
     def mark_read(self, owner: str, ids: list[int] | None = None) -> int:
         """Mark some of them read, or all of them when *ids* is None."""

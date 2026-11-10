@@ -602,6 +602,8 @@ def seen(
         state.records.mark_seen(principal, model, record_id)
     except ERRORS as exc:
         raise http_error(exc) from exc
+    # The bell's notes about what was written in it are read with it.
+    state.notifications.read_space(principal.username, model, record_id)
 
 
 # -- who a space could be shared with ------------------------------------------------

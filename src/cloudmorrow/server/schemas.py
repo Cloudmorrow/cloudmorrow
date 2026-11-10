@@ -21,6 +21,14 @@ class UserOut(BaseModel):
     is_active: bool = True
     system_uid: int | None = None
     created_at: str = ""
+    # The apps this person marked favorites, by tab name, in order.
+    favorites: list[str] = []
+
+
+class Favorites(BaseModel):
+    """The apps a person marks favorites, by tab name, in the order marked."""
+
+    favorites: list[str] = Field(default_factory=list, max_length=50)
 
 
 class LoginRequest(BaseModel):
@@ -540,6 +548,8 @@ class NotificationOut(BaseModel):
     created_at: str = ""
     read_at: str | None = None
     unread: bool = True
+    # Where it opens: a Quill's screen (`#/q/…`), or '' for none.
+    url: str = ""
 
 
 class NotificationCreate(BaseModel):

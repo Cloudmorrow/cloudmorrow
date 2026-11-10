@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_current_user, get_state
-from cloudmorrow.server.schemas import LoginRequest, PasswordChange, TokenResponse, UserOut
+from cloudmorrow.server.schemas import Favorites, LoginRequest, PasswordChange, TokenResponse, UserOut
 from cloudmorrow.server.security import (
     create_access_token,
     hash_password,
@@ -27,6 +27,7 @@ def user_out(user: User) -> UserOut:
         is_active=user.is_active,
         system_uid=user.system_uid,
         created_at=user.created_at,
+        favorites=user.favorites,
     )
 
 
@@ -63,6 +64,18 @@ def login(payload: LoginRequest, request: Request, state: AppState = Depends(get
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)) -> UserOut:
     return user_out(user)
+
+
+@router.put("/favorites", response_model=Favorites)
+def set_favorites(
+    payload: Favorites,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> Favorites:
+    """The apps you marked favorites, on you rather than on a device: every
+    phone and computer you sign in on has the same ones."""
+    updated = state.users.update(user.username, favorites=payload.favorites)
+    return Favorites(favorites=updated.favorites)
 
 
 @router.post("/password", status_code=status.HTTP_204_NO_CONTENT)

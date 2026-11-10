@@ -8,14 +8,17 @@ easy to add system-user linkage later.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from cloudmorrow.server.database import Connection, Database, IntegrityError, Row
 from cloudmorrow.server.database import open as open_database
 
 USERNAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
+# More favorites than this is not a short list any more.
+MAX_FAVORITES = 50
 
 # What an account is allowed to do. The column is text rather than a flag
 # because the next role is always a matter of time.
@@ -67,6 +70,16 @@ class User:
     system_uid: int | None
     created_at: str
     updated_at: str
+    # The apps marked favorites, by tab name, in the order they were marked.
+    favorites: list[str] = field(default_factory=list)
+
+
+def _favorites(raw: str) -> list[str]:
+    try:
+        names = json.loads(raw or "[]")
+    except ValueError:
+        return []
+    return [n for n in names if isinstance(n, str)] if isinstance(names, list) else []
 
 
 def _row_to_user(row: Row) -> User:
@@ -82,6 +95,7 @@ def _row_to_user(row: Row) -> User:
         system_uid=row["system_uid"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        favorites=_favorites(row["favorites"]),
     )
 
 
@@ -195,6 +209,7 @@ class UserStore:
             "is_admin",
             "is_active",
             "system_uid",
+            "favorites",
         }
         updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
         if not updates:
@@ -207,6 +222,8 @@ class UserStore:
             updates["role"] = ROLE_ADMIN if updates["is_admin"] else ROLE_USER
         if "user_type" in updates:
             updates["user_type"] = validate_user_type(str(updates["user_type"]))
+        if "favorites" in updates:
+            updates["favorites"] = json.dumps(list(dict.fromkeys(str(n) for n in updates["favorites"]))[:MAX_FAVORITES])
         for flag in ("is_admin", "is_active"):
             if flag in updates:
                 updates[flag] = int(bool(updates[flag]))

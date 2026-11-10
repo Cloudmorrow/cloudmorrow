@@ -16,3 +16,7 @@
 }
 .note-row.is-new .main { padding-right: 18px; }
 .notifications .push-card { margin-bottom: 8px; }
+/* A line that happened in a Quill opens it: it is a row you can press. */
+.note-row.opens { cursor: pointer; }
+.notifications .heading .read-all { font-size: 15px; font-weight: 600; }
+.notifications .heading .read-all:disabled { opacity: .5; }

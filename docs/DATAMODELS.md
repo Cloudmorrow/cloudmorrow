@@ -332,6 +332,9 @@ push = true                       # and a push to their phones
 unread = true                     # counted until they open the space
 ```
 
+Every rule also leaves a line behind each person's bell, which opens the
+Quill's screen for that space and is read when they open it.
+
 ## Backends: data that lives somewhere else
 
 Most datamodels live in the record store. Three foundational ones live where

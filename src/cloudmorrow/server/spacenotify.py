@@ -23,6 +23,7 @@ import re
 import threading
 
 from cloudmorrow.server.badge import notify_message
+from cloudmorrow.server.notifications import MESSAGE_KIND
 from cloudmorrow.server.records import Principal, Record
 from cloudmorrow.server.state import AppState
 
@@ -121,7 +122,8 @@ def install(state: AppState) -> None:
     """Hang the telling on the record store of a running server."""
 
     def written(record: Record, rule: dict, people: list[str]) -> None:
-        if not rule.get("push") or not people:
+        # Every rule leaves a line behind the bell; `push` adds the push.
+        if not people:
             return
         if people == ["*"]:
             # Everybody is the people, not the agents and screens acting for them.
@@ -150,9 +152,23 @@ def install(state: AppState) -> None:
         # On a screen with mentions, @name in the line is for that person:
         # their push says so, and comes first.
         named = [p for p in mentioned(line) if p in people] if screen.get("mentions") else []
+        people = [p for p in people if p not in named]
+        said = f"{record.owner} mentioned you in {name}" if name else f"{record.owner} mentioned you"
+        # A line behind the bell for each of them as well, which opens the
+        # Quill it was written in; looking in the space reads it
+        # (NotificationStore.read_space). Its own push is the one below. On
+        # the thread too: a channel for everybody is a row for everybody.
+        kind = f"{space_model or record.model}{MESSAGE_KIND}"
+        lines = [(p, said) for p in named] + [(p, title) for p in people]
+
+        def note() -> None:
+            for who, heading in lines:
+                state.notifications.add(who, kind=kind, title=heading, body=line, url=url, push=False)
+
+        _later(note)
+        if not rule.get("push"):
+            return
         if named:
-            people = [p for p in people if p not in named]
-            said = f"{record.owner} mentioned you in {name}" if name else f"{record.owner} mentioned you"
             _later(lambda: notify_message(state, named, title=said, body=line, url=url, tag=tag))
         if people:
             _later(lambda: notify_message(state, people, title=title, body=line, url=url, tag=tag))
@@ -164,9 +180,9 @@ def install(state: AppState) -> None:
         name = str(space.fields.get(model.title) if model else "") or space.id
         label = model.label.lower() if model else "space"
         said = f"{by} added you to the {label} {name}"
-        state.notifications.add(username, kind=f"{space.model}.added", title=said, body="", push=False)
         quill, screen = _where(state, space.model)
         url = f"#/q/{quill}/{screen}/{space.id}" if quill else ""
+        state.notifications.add(username, kind=f"{space.model}.added", title=said, body="", url=url, push=False)
         _later(
             lambda: notify_message(
                 state, [username], title=name, body=said, url=url, tag=f"{space.model}-added-{space.id}"
@@ -179,7 +195,12 @@ def install(state: AppState) -> None:
         # and a click on it opens the bell's list.
         _later(
             lambda: notify_message(
-                state, [note.owner], title=note.title, body=note.body, url="#/notifications", tag=f"note-{note.id}"
+                state,
+                [note.owner],
+                title=note.title,
+                body=note.body,
+                url=note.url or "#/notifications",
+                tag=f"note-{note.id}",
             )
         )
 
