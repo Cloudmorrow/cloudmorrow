@@ -39,7 +39,9 @@ def test_the_font_spells_a_danish_name():
 
 def test_the_app_puts_the_clouds_name_at_the_head_of_the_rail():
     core = (WEB / "core.js").read_text(encoding="utf-8")
-    assert '<div class="rail-head">${wordmark(CLOUD_NAME)}</div>' in core
+    assert '<div class="rail-head">${wordmark(CLOUD_NAME)}' in core
+    # Folded, the head is the name's first letter in the same dots.
+    assert '<span class="rail-face rail-letter">${wordmark(first)}</span>' in core
     assert '<div class="center">${wordmark(CLOUD_NAME)}' in core
     # Any name: upper-cased, an accent dropped to its letter, a space narrower
     # than a letter, and a mark the font cannot spell left out, not left blank.

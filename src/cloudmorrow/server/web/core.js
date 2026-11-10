@@ -549,7 +549,7 @@ export function redrawTabs() {
   if (!bar) return;
   // The item lit under an open tab names the screen; the tab itself only
   // names the Quill.
-  const active = bar.querySelector(".tab.sub.active") || bar.querySelector(".tab.active:not(.used)");
+  const active = bar.querySelector(".tab.sub.active") || bar.querySelector(".tab.active:not(.copy)");
   for (const strip of app.querySelectorAll(":scope > nav.subtabs")) strip.remove();
   bar.outerHTML = tabs(active ? active.dataset.tab : "");
 }
@@ -765,7 +765,7 @@ function placeTabs(newTabs) {
   shown.forEach((t, i) => {
     t.classList.toggle("active", wanted[i].classList.contains("active"));
     t.classList.toggle("open", wanted[i].classList.contains("open"));
-    t.setAttribute("href", wanted[i].getAttribute("href"));
+    if (wanted[i].hasAttribute("href")) t.setAttribute("href", wanted[i].getAttribute("href"));
     if (wanted[i].hasAttribute("aria-current")) t.setAttribute("aria-current", "page");
     else t.removeAttribute("aria-current");
   });
@@ -778,8 +778,9 @@ function lightTab(name) {
   for (const t of app.querySelectorAll(":scope > nav > .tab")) {
     let on = t.dataset.tab === name;
     let open = !on && (t.dataset.screens || "").split(" ").includes(name);
-    // A Most used copy has no items under it: anywhere in its Quill lights it.
-    if (t.classList.contains("used")) {
+    // A copy — the rail's Favorites or Most used, the phone's own few — has
+    // no items under it: anywhere in its Quill lights it.
+    if (t.classList.contains("copy")) {
       t.classList.toggle("active", on || open);
       continue;
     }
@@ -793,6 +794,8 @@ function lightTab(name) {
 app.addEventListener("click", (event) => {
   const tab = event.target.closest("nav.tabs > .tab, nav.subtabs > .tab");
   if (!tab || tab.parentElement.parentElement !== app) return;
+  // The phone's More is a button that opens every app (rail.js), not a place.
+  if (tab.classList.contains("more")) return;
   if (event.defaultPrevented || event.metaKey || event.ctrlKey) return;
   // The tab you are on, tapped again, takes you to the top of it.
   if (tab.classList.contains("active") && tab.getAttribute("href") === location.hash) {
@@ -921,49 +924,131 @@ function placeGear() {
 // Under Today, on the rail only, Most used: the Quills you open most on
 // this device, a short way to them that does not mean finding their shelf.
 // Each is a copy of the Quill's own tab, lit while you are anywhere in it,
-// with no items under it (those stay under the tab on its shelf); the
-// phone's bar has every Quill in one row already and hides the copies.
+// with no items under it (those stay under the tab on its shelf). Once you
+// have marked any app a favorite, Favorites stands there instead, in the
+// order you marked them (rail.js holds the menu that marks them: the dots
+// at the end of a row the pointer is over, a right-click, a finger held).
+//
+// The phone's bar has no room for every Quill: it draws Today, then five
+// copies of its own — your favorites, or else the Quills you use most,
+// filled up from the shelves' order on a new device and kept in that order
+// so the bar does not shuffle under your thumb — and More, which opens all
+// of them in a sheet. The Quills' own tabs are the rail's alone.
 //
 // A tab with items under it — a Quill with several screens — is one tab,
 // the Quill's, wherever it stands. Its items are drawn only while you are
 // in it: under the tab in the rail, where the rail has the height, and in
 // a strip of their own above the phone's bar, where the bar has not. A tab
 // whose item is on show is `open`; the item is `active`.
+//
+// The rail folds to a strip of icons (rail.js keeps the switch); folded,
+// the head is the first letter of the cloud's name, which turns over to
+// the button that unfolds it, and every tab says its name when pointed at.
 // Which tab was last lit, for the screens that draw none of their own.
 let lastTab = "";
+const ON_PHONE = 5;
+const DOTS = ["........", "........", "........", "XX.XX.XX", "XX.XX.XX", "........", "........", "........"];
+const FOLD = ["........", "...X..X.", "..X..X..", ".X..X...", ".X..X...", "..X..X..", "...X..X.", "........"];
+const UNFOLD = ["........", ".X..X...", "..X..X..", "...X..X.", "...X..X.", "..X..X..", ".X..X...", "........"];
 export function tabs(active) {
   if (active) lastTab = active;
   const itemOf = (t) => (t.screens || []).find((s) => s.name === active);
   const shown = shownTabs();
-  countUse(shown.find((t) => t.section && (t.name === active || itemOf(t))));
+  const apps = appsOf(shown);
+  countUse(apps.find((t) => t.name === active || itemOf(t)));
+  const folded = railFolded();
+  const named = (t) => (folded ? ` title="${esc(t.label)}"` : "");
+  const iconOf = (t) => (typeof t.icon === "function" ? t.icon() : t.icon);
+  const dots = (t) => `<span class="tab-menu" aria-hidden="true" title="More for ${esc(t.label)}">${pixelArt(DOTS)}</span>`;
   const drawItem = (s) =>
-    `<a class="tab sub${s.name === active ? " active" : ""}" data-tab="${s.name}" href="${s.href()}"` +
+    `<a class="tab sub${s.name === active ? " active" : ""}" data-tab="${s.name}" href="${s.href()}"${named(s)}` +
     `${s.name === active ? ' aria-current="page"' : ""}>${s.icon || ""}<span>${s.label}</span></a>`;
   const draw = (t) => {
     const on = t.name === active;
     const open = !on && !!itemOf(t);
-    return `<a class="tab${t.admin ? " admin" : ""}${t.cloud ? " cloud" : ""}${on ? " active" : ""}${open ? " open" : ""}"` +
+    const app = apps.includes(t);
+    return `<a class="tab${app ? " app" : ""}${t.admin ? " admin" : ""}${t.cloud ? " cloud" : ""}${on ? " active" : ""}${open ? " open" : ""}"` +
       ` data-tab="${t.name}"${t.screens && t.screens.length ? ` data-screens="${t.screens.map((s) => s.name).join(" ")}"` : ""}` +
-      ` href="${t.href(on)}"${on ? ' aria-current="page"' : ""}>${typeof t.icon === "function" ? t.icon() : t.icon}` +
-      `<span>${t.label}</span></a>` + (open ? t.screens.map(drawItem).join("") : "");
+      ` href="${t.href(on)}"${on ? ' aria-current="page"' : ""}${named(t)}>${iconOf(t)}` +
+      `<span>${t.label}</span>${app ? dots(t) : ""}</a>` + (open ? t.screens.map(drawItem).join("") : "");
   };
-  const drawUsed = (t) => {
+  // A copy of a Quill's tab: `used` on the rail, `quick` on the phone's bar.
+  const copy = (kind) => (t) => {
     const on = t.name === active || !!itemOf(t);
-    return `<a class="tab used${on ? " active" : ""}" data-tab="${t.name}"` +
+    return `<a class="tab copy ${kind}${on ? " active" : ""}" data-tab="${t.name}"` +
       `${t.screens && t.screens.length ? ` data-screens="${t.screens.map((s) => s.name).join(" ")}"` : ""}` +
-      ` href="${t.href(false)}">${typeof t.icon === "function" ? t.icon() : t.icon}<span>${t.label}</span></a>`;
+      ` href="${t.href(false)}">${iconOf(t)}<span>${t.label}</span>${kind === "used" ? dots(t) : ""}</a>`;
   };
   const section = (title, list, how = draw) =>
     list.length ? `<div class="rail-section">${esc(title)}</div>` + list.map(how).join("") : "";
   const own = shown.filter((t) => !t.admin && !t.cloud);
   const opened = shown.find(itemOf);
-  return `<nav class="tabs"><div class="rail-head">${wordmark(CLOUD_NAME)}</div>` +
+  const favs = favoriteTabs(apps);
+  const quick = favs.length ? favs.slice(0, ON_PHONE) : phoneUsed(apps);
+  // More is lit while the app on show is not one of the phone's own few.
+  const elsewhere = apps.some((t) => (t.name === active || itemOf(t)) && !quick.includes(t));
+  const first = [...CLOUD_NAME.trim()].find((c) => c.trim()) || "C";
+  return `<nav class="tabs"><div class="rail-head">${wordmark(CLOUD_NAME)}` +
+    `<button type="button" class="rail-fold" aria-label="Fold the menu" title="Fold the menu">${pixelArt(FOLD)}</button>` +
+    `<button type="button" class="rail-unfold" aria-label="Unfold the menu" title="Unfold the menu">` +
+    `<span class="rail-flip"><span class="rail-face rail-letter">${wordmark(first)}</span>` +
+    `<span class="rail-face rail-open">${pixelArt(UNFOLD)}</span></span></button></div>` +
     own.filter((t) => !t.section).map(draw).join("") +
-    section("Most used", mostUsed(own.filter((t) => t.section)), drawUsed) +
+    quick.map(copy("quick")).join("") +
+    (apps.length ? `<button type="button" class="tab more${elsewhere ? " active" : ""}" data-tab="" aria-label="All apps">` +
+      `${pixelArt(DOTS)}<span>More</span></button>` : "") +
+    (favs.length
+      ? section("Favorites", favs, copy("used"))
+      : section("Most used", mostUsed(apps), copy("used"))) +
     shelves(own.filter((t) => t.section)).map((s) => section(s.title, s.tabs)).join("") +
     section("Your cloud", shown.filter((t) => t.cloud)) +
     section("Administration", shown.filter((t) => t.admin)) +
     `</nav>` + (opened ? `<nav class="subtabs" aria-label="${esc(opened.label)}">${opened.screens.map(drawItem).join("")}</nav>` : "");
+}
+
+/** The apps: every Quill's tab, on its shelf or under Your cloud — what
+    Most used counts, what can be a favorite, what the phone's More lists. */
+const appsOf = (shown) => shown.filter((t) => !t.admin && (t.section || t.cloud));
+
+/** The apps, as the phone's More sheet lists them — in the rail's order,
+    the shelves then Your cloud — and which of them are favorites. */
+export function appList() {
+  const apps = appsOf(shownTabs());
+  return {
+    apps: [...shelves(apps.filter((t) => t.section)).flatMap((s) => s.tabs), ...apps.filter((t) => t.cloud)],
+    favorites: favoriteTabs(apps).map((t) => t.name),
+  };
+}
+
+// -- favorites ------------------------------------------------------------------------
+// The apps you marked, by tab name, in the order you marked them; per
+// device, in local storage, as Most used is.
+function readFavorites() {
+  try {
+    const list = JSON.parse(store.get("quills.favorites") || "[]");
+    return Array.isArray(list) ? list.filter((n) => typeof n === "string") : [];
+  } catch { return []; }
+}
+const favoriteTabs = (apps) => readFavorites().map((n) => apps.find((t) => t.name === n)).filter(Boolean);
+export const isFavorite = (name) => readFavorites().includes(name);
+/** Mark an app a favorite, or not, and draw the bar again. */
+export function setFavorite(name, yes) {
+  const list = readFavorites().filter((n) => n !== name);
+  if (yes) list.push(name);
+  store.set("quills.favorites", list.length ? JSON.stringify(list) : null);
+  redrawTabs();
+}
+
+// -- the rail folded -------------------------------------------------------------------
+// On the root, so the rail's width is right before anything is drawn.
+const railFolded = () => store.get("rail.folded") === "1";
+document.documentElement.classList.toggle("rail-folded", railFolded());
+/** Fold the rail to its icons, or unfold it. The phone's bar never folds:
+    the class only means anything where the rail is (desktop.css). */
+export function setRailFolded(yes) {
+  store.set("rail.folded", yes ? "1" : null);
+  document.documentElement.classList.toggle("rail-folded", !!yes);
+  redrawTabs();
 }
 
 // How often each Quill's tab was opened here, and when last: going into a
@@ -990,6 +1075,14 @@ function mostUsed(tabs) {
   return tabs.filter((t) => uses[t.name])
     .sort((a, b) => uses[b.name][0] - uses[a.name][0] || uses[b.name][1] - uses[a.name][1])
     .slice(0, MOST_USED);
+}
+/** The phone's few: the most used, filled up from the shelves' order, in
+    the shelves' order — a bar that reorders itself is a bar you misreach. */
+function phoneUsed(apps) {
+  const ordered = appList().apps;
+  const picked = new Set(mostUsed(apps));
+  for (const t of ordered) { if (picked.size >= ON_PHONE) break; picked.add(t); }
+  return ordered.filter((t) => picked.has(t));
 }
 
 /** The shelves the tabs with a `section` stand on, in rank order and then
@@ -1026,7 +1119,7 @@ export function wireShell() {
   if (!ownTabs && !app.querySelector(":scope > nav.tabs")) app.insertAdjacentHTML("beforeend", tabs(lastTab));
   app.classList.toggle("aside-tabs", !ownTabs);
   // Where the tabs scroll, the one you are on is in sight.
-  const active = app.querySelector(".tabs .tab.active:not(.used)");
+  const active = app.querySelector(".tabs .tab.active:not(.copy)");
   if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest", inline: "nearest" });
   const header = app.querySelector(".nav");
   if (header && !app.querySelector("main h1")) header.classList.add("lined");

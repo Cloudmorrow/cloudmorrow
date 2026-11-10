@@ -731,8 +731,13 @@ the top-right corner of every tab rather than a tab of its own, which is
 where a phone keeps it. What a screen makes — a note, a task, an event, a
 file — is the button beside its title.
 
-Every installed Quill is a tab along the bottom — Notes, Tasks, Files,
-Calendar, Channels, Secrets on a fresh server — drawn by the kit the way a
+Every installed Quill is an app — Notes, Tasks, Files, Calendar, Channels,
+Secrets on a fresh server. The bar along the bottom of a phone has Today,
+five of them and **More**, which opens every app in a sheet: the five are
+your **favorites** once you have any, and until then the ones you open
+most, in the order of the rail. Hold a finger on an app, in the bar or in
+More, for its menu: **Add to Favorites**, **Remove from Favorites**. Favorites
+are kept per device, as Most used is. Each app is drawn by the kit the way a
 phone draws things: a list, then the thing you picked. Notes, say, is three
 screens, **Folders**, the notes in one, and the note, with the pen beside
 the title for a new one; Tasks is a board whose cards are dragged between
@@ -776,11 +781,21 @@ sheet that slides up from under a thumb is a dialog in the middle. The rail
 stays put in an editor and in a thread, which on a phone drop the tab bar to
 give the keyboard the room. It has the sections the terminal app's sidebar
 has: Today, then **Most used** — the Quills you open most on this device,
-up to five, most first, so the ones you live in are a click away — then the Quills on the shelves of their catalog categories —
+up to five, most first, so the ones you live in are a click away; once you
+have marked any, **Favorites** stands there instead — then the Quills on the shelves of their catalog categories —
 **Personal**, **Home**, **Business**, **Developer**, in the catalog's order —
 then **Your cloud** with Data under it, and for an administrator
 **Administration** at the foot, with Users, Circles, Roles, Quills and Server
-under it. The phone's bar runs the tabs together without the headings.
+under it. The phone's bar has Today, five apps and More instead.
+
+The rail is a fifth of the window wide, never less than 259 points nor more
+than 340. The pointer over an app's row shows three dots at its end, for its
+menu with **Add to Favorites** in it; a right-click opens the same. The
+button at the end of the rail's head folds the rail to a strip of icons:
+every app once, with a line between the shelves and its name when the
+pointer is on it, and at the head the first letter of your cloud's name,
+which turns over under the pointer to the button that unfolds it again. The
+rail stays folded on that device until you unfold it.
 
 The keys are the ones already on the screen: `Esc` is the back button (or the
 field you are in), `/` is the search box, `n` is the pen beside the title

@@ -8,6 +8,7 @@ import "./install.js";
 import "./login.js";
 import "./today.js";
 import "./quills.js";
+import "./rail.js";
 import "./format.js";
 import "./features.js";
 import "./me.js";

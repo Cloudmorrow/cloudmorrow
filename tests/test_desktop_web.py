@@ -102,20 +102,67 @@ def test_the_rail_shelves_the_quills_by_their_categories() -> None:
 
 def test_most_used_quills_stand_under_today_on_the_rail_only() -> None:
     """The Quills opened most on this device are copied under Today, in a
-    Most used section of the rail; the phone's bar hides the copies."""
+    Most used section of the rail — Favorites instead, once there are any;
+    the phone's bar hides the rail's copies."""
     core = (WEB / "core.js").read_text(encoding="utf-8")
     desktop = (WEB / "desktop.css").read_text(encoding="utf-8")
-    assert 'section("Most used", mostUsed(own.filter((t) => t.section)), drawUsed)' in core
+    assert 'section("Favorites", favs, copy("used"))' in core
+    assert 'section("Most used", mostUsed(apps), copy("used"))' in core
     assert (
         core.index("own.filter((t) => !t.section).map(draw)")
+        < core.index('section("Favorites"')
         < core.index('section("Most used"')
         < core.index("shelves(own.filter")
     )
     assert 'store.set("quills.used", JSON.stringify(uses));' in core
     assert ".tabs .tab.used { display: none; }" in desktop
     assert "  .tabs .tab.used { display: flex; }" in desktop
-    # The copies never stand in for the tab itself on a phone.
-    assert 'app.querySelector(".tabs .tab.active:not(.used)")' in core
+    # The copies never stand in for the tab itself.
+    assert 'app.querySelector(".tabs .tab.active:not(.copy)")' in core
+
+
+def test_the_phone_bar_is_today_five_apps_and_more() -> None:
+    """A phone's bar has no room for every Quill: Today, five copies —
+    the favorites, else the most used filled up in the shelves' order — and
+    More, which opens them all; the Quills' own tabs are the rail's."""
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    rail = (WEB / "rail.js").read_text(encoding="utf-8")
+    css = (WEB / "rail.css").read_text(encoding="utf-8")
+    desktop = (WEB / "desktop.css").read_text(encoding="utf-8")
+    assert "const ON_PHONE = 5;" in core
+    assert "favs.length ? favs.slice(0, ON_PHONE) : phoneUsed(apps)" in core
+    assert '<button type="button" class="tab more' in core
+    assert ".tabs .tab.app { display: none; }" in css
+    assert "  .tabs .tab.app { display: flex; }" in desktop
+    assert "  .tabs .tab.quick, .tabs .tab.more { display: none; }" in desktop
+    assert 'import "./rail.js";' in (WEB / "app.js").read_text()
+    assert '@import "./rail.css";' in (WEB / "app.css").read_text()
+    # More opens a sheet on the page, never a browser window.
+    assert "openSheet(" in rail
+
+
+def test_an_app_has_a_menu_with_favorites_in_it() -> None:
+    """The dots on a row of the rail, a right-click, a finger held — on the
+    bar or in More — all open the same menu, with the favorite switch."""
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    rail = (WEB / "rail.js").read_text(encoding="utf-8")
+    assert 'contextMenus(app, "nav.tabs > .tab.app, nav.tabs > .tab.copy", choicesFor)' in rail
+    assert 'contextMenus(list, ".app-tile"' in rail
+    assert '"Add to Favorites"' in rail and '"Remove from Favorites"' in rail
+    assert 'store.set("quills.favorites"' in core
+    assert '<span class="tab-menu"' in core
+
+
+def test_the_rail_folds_to_its_icons() -> None:
+    """Folded, the rail is a strip of icons and its head the cloud's first
+    letter, which turns over to the button that unfolds it."""
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    desktop = (WEB / "desktop.css").read_text(encoding="utf-8")
+    assert "--rail: clamp(259px, 24vw, 340px);" in desktop
+    assert ":root.rail-folded { --rail: 64px; }" in desktop
+    assert '.rail-unfold:hover .rail-flip' in desktop
+    assert 'store.set("rail.folded"' in core
+    assert 'document.documentElement.classList.toggle("rail-folded"' in core
 
 
 def test_a_quill_is_one_tab_with_its_screens_under_it() -> None:
