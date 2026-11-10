@@ -91,8 +91,10 @@ def test_a_setting_is_a_switch_and_a_conversation_a_chat():
     drawn = (".v-toggle", ".v-composer", ".v-lines", ".v-line.mine .v-bubble", ".v-thinking", ".v-conversation")
     for cls in drawn:
         assert cls in VIEW_CSS, cls
-    # An action marked settings is drawn by the settings screen alone, as an admin's is.
+    # An action marked settings is drawn by the settings screen alone, as an admin's is;
+    # one marked bar = false is a screen's own box's, not a chip as well.
     assert "!a.on && !a.admin && !a.settings" in ACTIONS_JS
+    assert "loose(quill).filter((a) => a.bar !== false)" in ACTIONS_JS
 
 
 def test_every_way_to_press_goes_through_press():

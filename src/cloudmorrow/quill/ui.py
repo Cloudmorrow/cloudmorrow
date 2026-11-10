@@ -45,6 +45,7 @@ __all__ = [
     "menu",
     "month",
     "row",
+    "rows",
     "stack",
     "stat",
     "table",
@@ -56,6 +57,7 @@ __all__ = [
 TONES = ("neutral", "info", "good", "warn", "bad", "primary", "danger")
 TEXT_STYLES = ("body", "title", "subtitle", "muted", "small", "mono")
 GAPS = ("none", "small", "normal", "large")
+BACKDROPS = ("mascot",)
 MAX_TEXT = 20_000
 MAX_NODES = 5_000
 MAX_DEPTH = 24
@@ -254,6 +256,7 @@ def conversation(
     empty: str | None = None,
     placeholder: str | None = None,
     hint: str | None = None,
+    backdrop: str | None = None,
 ) -> dict:
     """A conversation, as a chat is drawn: *records* are its lines, in order,
     each with its words in the *body* field (Markdown) and whether it is the
@@ -265,7 +268,10 @@ def conversation(
     waited for. *at* is a line's moment, *note* a small line under it (what was
     looked at), *failed* a bool: a line that did not go through. *empty* is
     said in the middle while there is nothing yet; *placeholder* is the box's
-    own words; *hint* a small line under the box."""
+    own words; *hint* a small line under the box; *backdrop* `"mascot"` puts
+    the hedgehog faintly behind the lines."""
+    if backdrop is not None and backdrop not in BACKDROPS:
+        raise TreeError(f"a conversation's backdrop is one of {', '.join(BACKDROPS)}")
     return _node(
         "conversation",
         records=_records(records),
@@ -280,6 +286,7 @@ def conversation(
         empty=str(empty) if empty else None,
         placeholder=str(placeholder) if placeholder else None,
         hint=str(hint) if hint else None,
+        backdrop=backdrop,
     )
 
 
@@ -361,6 +368,39 @@ def cards(
         go=go,
         param=param if go else None,
         params=dict(params) if go and params else None,
+        current=str(current) if current else None,
+    )
+
+
+def rows(
+    records,
+    *,
+    title: str,
+    subtitle: str | None = None,
+    badge: str | None = None,
+    open: bool = True,  # noqa: A002
+    empty: str | None = None,
+    go: str | None = None,
+    param: str | None = None,
+    params: dict | None = None,
+    current: str | None = None,
+) -> dict:
+    """Records as the rows of a list — the app's own rows, as a list screen
+    draws them: a title, a line under it, a badge at the end — rather than
+    cards. Opening one is as `cards`: its sheet, or with *go* a screen of the
+    Quill's own with the record's id as *param*; *current* is the id of the
+    one that is open, lit as such. The list beside what is open in it."""
+    return _node(
+        "rows",
+        records=_records(records),
+        title=title,
+        subtitle=subtitle,
+        badge=badge,
+        open=open if not open else None,
+        empty=empty,
+        go=go,
+        param=param if go else None,
+        params=dict(params) if params else None,
         current=str(current) if current else None,
     )
 
@@ -472,6 +512,7 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
         "empty": (str, False),
         "placeholder": (str, False),
         "hint": (str, False),
+        "backdrop": (str, False),
     },
     "menu": {"label": (str, True), "items": (list, True)},
     "table": {
@@ -489,6 +530,18 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
         "title": (str, True),
         "subtitle": (str, False),
         "body": (str, False),
+        "badge": (str, False),
+        "open": (bool, False),
+        "empty": (str, False),
+        "go": (str, False),
+        "param": (str, False),
+        "params": (dict, False),
+        "current": (str, False),
+    },
+    "rows": {
+        "records": (list, True),
+        "title": (str, True),
+        "subtitle": (str, False),
         "badge": (str, False),
         "open": (bool, False),
         "empty": (str, False),
