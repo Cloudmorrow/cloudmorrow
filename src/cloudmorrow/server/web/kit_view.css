@@ -177,7 +177,17 @@
    lines scroll, the composer sits on the floor — as the thread kit does.
    Every box between the page and the conversation gives it the height. */
 #app:has(.v-conversation) { height: 100dvh; min-height: 0; }
-main.view-screen:has(.v-conversation) { display: flex; flex-direction: column; min-height: 0; padding-bottom: 0; overflow: hidden; }
+/* The phone's bar is fixed over the foot of the page: the box stops above
+   it (and above the strip of the Quill's screens, when there is one); beside
+   the rail there is nothing under the box. */
+main.view-screen:has(.v-conversation) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: calc(50px + var(--bottom));
+  overflow: hidden;
+}
+#app:has(> nav.subtabs) main.view-screen:has(.v-conversation) { padding-bottom: calc(94px + var(--bottom)); }
 main.view-screen:has(.v-conversation) > .heading { flex: none; }
 .quill-view:has(.v-conversation) { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-bottom: 0; }
 .v-stack:has(.v-conversation), .v-column:has(.v-conversation), .v-split-main:has(.v-conversation),
@@ -187,8 +197,13 @@ main.view-screen:has(.v-conversation) > .heading { flex: none; }
   display: flex;
   flex-direction: column;
 }
-.v-split:has(.v-conversation) { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); }
-.v-split:has(.v-conversation) > .v-split-side { min-height: 0; overflow-y: auto; }
+/* Beside a list the columns are as tall as the window, whichever is shown,
+   and the list scrolls on its own; the wide screen's `align-items: start`
+   and `display: block` below give way to this. */
+.v-split:has(.v-conversation) { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+.v-split[data-show]:has(.v-conversation) > .v-split-side { min-height: 0; overflow-y: auto; }
+.v-split[data-show]:has(.v-conversation) > .v-split-main { display: flex; flex-direction: column; min-height: 0; }
+.v-split[data-show="main"]:has(.v-conversation) > .v-split-side, .v-split[data-show="side"]:has(.v-conversation) > .v-split-main { display: none; }
 .v-conversation { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .v-lines {
   flex: 1;
@@ -235,7 +250,7 @@ main.view-screen:has(.v-conversation) > .heading { flex: none; }
   display: flex;
   align-items: flex-end;
   gap: 10px;
-  padding: 10px 0 calc(10px + var(--bottom));
+  padding: 10px 0;
   border-top: 1px solid var(--line);
 }
 .v-composer textarea {
@@ -274,8 +289,8 @@ main.view-screen:has(.v-conversation) > .heading { flex: none; }
   color: var(--action-ink);
 }
 .v-composer button:disabled { opacity: .4; }
-.v-composer-hint { flex: none; margin: 0; padding: 0 0 6px; text-align: center; font-size: 12px; color: var(--muted); }
-.v-composer + .v-composer-hint { margin-top: calc(-4px - var(--bottom)); padding-bottom: calc(8px + var(--bottom)); }
+.v-composer-hint { flex: none; margin: 0; padding: 0 0 8px; text-align: center; font-size: 12px; color: var(--muted); }
+.v-composer + .v-composer-hint { margin-top: -4px; }
 
 /* -- menus and buttons in a row --------------------------------------------------- */
 .v-row > .act-button { flex: none; }
@@ -452,6 +467,7 @@ button.v-star:focus-visible { outline: 2px solid var(--accent); outline-offset: 
 
 /* -- on a computer ------------------------------------------------------------------ */
 @media (min-width: 900px) and (min-height: 600px) {
+  main.view-screen:has(.v-conversation), #app:has(> nav.subtabs) main.view-screen:has(.v-conversation) { padding-bottom: 0; }
   .v-columns { grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 18px; align-items: start; }
   .v-split { grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 22px; align-items: start; }
   .v-split[data-show="main"] > .v-split-side, .v-split[data-show="side"] > .v-split-main { display: block; }

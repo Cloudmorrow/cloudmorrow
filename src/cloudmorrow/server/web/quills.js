@@ -200,9 +200,12 @@ onShell(() => {
     .filter((screen) => screen.kit === "thread").map((screen) => tabName(quill, screen))));
   // A Quill's actions that are on no record sit under the title of each of
   // its screens, so they are there whichever of them is open.
+  // Not on the Quill's settings screen, which is about its settings alone.
   const { name, arg } = parseHash();
-  const quill = name === "q" && quills.find((q) => q.id === arg.split("/")[0]);
-  if (quill) placeActionBar(quill);
+  const [quillId, screenId] = arg.split("/");
+  const quill = name === "q" && quills.find((q) => q.id === quillId);
+  const screen = quill && quill.screens.find((s) => s.id === screenId);
+  if (quill && !(screen && screen.settings)) placeActionBar(quill);
 });
 onSignOut(() => {
   loaded = null;
