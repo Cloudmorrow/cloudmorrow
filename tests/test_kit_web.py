@@ -416,6 +416,39 @@ def test_a_board_you_may_only_read_is_one_you_look_at():
     assert 'class="tick still" role="img"' in KIT_JS
 
 
+def test_a_held_card_is_a_slot_that_moves_through_the_lanes():
+    """Dragging with the mouse: the card itself is carried, the link in it
+    is not dragged on its own, and while held the card is a dashed slot
+    that moves to where it would land; letting go elsewhere puts it back."""
+    helper = js_code(_function(KIT_JS, "dragLanes"))
+    board = js_code(_function(KIT_JS, "renderBoard"))
+    view = (WEB / "kit_view.js").read_text(encoding="utf-8")
+    # The board's cards and the view kit's lanes share the one helper.
+    assert 'card: ".row.card", lane: ".lane", group: ".group",' in board
+    assert 'card: ".v-lane-card", lane: ".v-lane", group: ".v-lane-cards",' in view
+    # The link inside a card is not what the browser drags: that would be
+    # a small box with the address in it, not the card.
+    assert "const drags = writes && canDrag();" in board
+    assert '<a class="main" href="${sheetHash(at, model.id, r.id)}"${drags ? ` draggable="false"` : ""}>' in board
+    assert """<a class="main" href="${esc(hash)}"${drags ? ' draggable="false"' : ""}>""" in view
+    # The picture under the pointer is the card, held where it was taken
+    # hold of; the card becomes the slot only once that picture is painted.
+    assert "event.dataTransfer.setDragImage(c, event.clientX - rect.left, event.clientY - rect.top);" in helper
+    assert 'setTimeout(() => { if (held === c) c.classList.add("dragging"); }, 0);' in helper
+    # The slot moves to the place under the pointer on every dragover, and
+    # the drop sends the slot's place among the lane's cards.
+    assert "if (now !== index) box.insertBefore(held, next);" in helper
+    assert "drop(held, l.dataset.lane, [...box.querySelectorAll(card)].indexOf(held));" in helper
+    assert "if (!dropped) from.parent.insertBefore(c, from.next);" in helper
+    # The slot is dashed and empty; a lane with nothing in it says so until
+    # the slot is in it, and a lane the card left says so too.
+    assert ".row.card.dragging > * { visibility: hidden; }" in KIT_CSS
+    assert "border: 2px dashed var(--accent);" in KIT_CSS
+    assert ".group.nothing:has(.row.card) > span { display: none; }" in KIT_CSS
+    assert '.lane .group:empty::before { content: "Nothing here"; }' in KIT_CSS
+    assert '.board .row.card[draggable="true"], .board .row.card[draggable="true"] .main { cursor: grab; }' in KIT_CSS
+
+
 def test_a_lane_has_a_plus_that_makes_a_card_in_it():
     """Under each lane's name a plus opens the pen's sheet with the card already in that lane."""
     board = js_code(_function(KIT_JS, "renderBoard"))

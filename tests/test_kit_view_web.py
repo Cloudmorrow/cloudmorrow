@@ -94,7 +94,7 @@ def test_the_calls_it_makes_are_the_servers():
     assert "/actions/${encodeURIComponent(action.id)}" in ACTIONS_JS
     # A lane is moved with the board's own call; a field saved with its rev.
     assert '+ "/move"' in VIEW_JS
-    assert "{ fields: { [n.field]: lane.dataset.lane }, index }" in VIEW_JS
+    assert "{ fields: { [n.field]: lane }, index }" in VIEW_JS
     assert "rev: v.revs.get(key) ?? record.rev" in VIEW_JS
     # A picture comes through the shell's apiRaw, with the token an <img>
     # cannot carry.
