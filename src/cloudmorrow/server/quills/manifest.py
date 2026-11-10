@@ -119,6 +119,9 @@ class Manifest:
     fetch: tuple[dict, ...] = ()
     secrets: tuple[dict, ...] = ()
     machine: tuple[dict, ...] = ()
+    # `[assistant] tools = true`, with why: its code has an assistant's tools
+    # (docs/QUILLCODE.md); {} when it does not.
+    assistant: dict = field(default_factory=dict)
     # Programs its services need on the server, fetched for it from the
     # catalog's runtimes at install (quills/runtimes.py): `[requires]`.
     runtimes: tuple[str, ...] = ()
@@ -209,6 +212,7 @@ class Manifest:
             "fetch": list(self.fetch),
             "secrets": list(self.secrets),
             "machine": list(self.machine),
+            "assistant": dict(self.assistant),
             "requires": {"runtimes": list(self.runtimes), "quills": list(self.quills)},
             "roles": list(self.roles),
             "origin": dict(self.origin),
@@ -516,6 +520,7 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
         fetch=code.fetch,
         secrets=code.secrets,
         machine=code.machine,
+        assistant=code.assistant,
         runtimes=runtimes,
         quills=required,
         roles=roles,

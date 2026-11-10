@@ -212,7 +212,16 @@ class _Redirects(urllib.request.HTTPRedirectHandler):
 class HostCalls:
     """Answers one handler's requests, as one principal. Raises the SDK's exceptions."""
 
-    def __init__(self, code: QuillCode, manifest: Manifest, principal: Principal, *, via: str, kind: str = "") -> None:
+    def __init__(
+        self,
+        code: QuillCode,
+        manifest: Manifest,
+        principal: Principal,
+        *,
+        via: str,
+        kind: str = "",
+        budget: float = CALL_TIMEOUT,
+    ) -> None:
         self.code = code
         self.state = code.state
         self.manifest = manifest
@@ -220,6 +229,9 @@ class HostCalls:
         self.via = via
         # Which kind of handler is asking: a job or a webhook may deliver.
         self.kind = kind
+        # How long the handler itself has: a fetch may wait as long as that,
+        # for an action that says `timeout` (an answer from a model takes a while).
+        self.budget = budget
 
     def __call__(self, op: str, args: dict) -> object:
         handler = getattr(self, "op_" + op.replace(".", "_"), None)
@@ -375,6 +387,48 @@ class HostCalls:
     def op_run(self, args: dict) -> None:
         raise sdk.Refused("ctx.run is for a machine handler, on a person's own machine")
 
+    # -- an assistant's tools, as the person ---------------------------------------------
+    # A Quill that says `[assistant] tools = true` is given what an assistant
+    # over MCP has: the record tools over every datamodel the person's circles
+    # give them (never `secret`), every Quill's actions they may press, and the
+    # Quill-building tools — each run as the person, through the gate, bound by
+    # the server's policy exactly as an assistant of theirs would be. The Quill
+    # declares nothing per datamodel for it: the install sheet says it acts as
+    # the person's assistant, and that is what is said yes to.
+    def _assistant(self):
+        from cloudmorrow.server import mcptools
+
+        if self.via == "assistant":
+            raise sdk.Refused("code an assistant started is given no assistant of its own")
+        if not self.manifest.assistant.get("tools"):
+            raise sdk.Refused(f"{self.manifest.id} does not say [assistant] tools = true")
+        user = self.state.users.get(self.principal.username)
+        if user is None or not user.is_active:
+            raise sdk.Refused(f"nobody here is called {self.principal.username}")
+        return mcptools, user
+
+    def op_assistant_tools(self, args: dict) -> list[dict]:
+        mcptools, user = self._assistant()
+        return [
+            {"name": t.name, "description": t.description, "input_schema": t.schema}
+            for t in mcptools.available(self.state, user)
+        ]
+
+    def op_assistant_call(self, args: dict) -> dict:
+        mcptools, user = self._assistant()
+        name = str(args.get("name", ""))
+        arguments = args.get("arguments")
+        if arguments is None:
+            arguments = {}
+        if not isinstance(arguments, dict):
+            raise sdk.Invalid("a tool's arguments are an object")
+        try:
+            answer = mcptools.call(self.state, user, name, dict(arguments))
+        except KeyError:
+            raise sdk.NotFound(f"there is no tool called {name}") from None
+        text = "\n".join(str(part.get("text", "")) for part in answer.get("content", []) if part.get("type") == "text")
+        return {"ok": not answer.get("isError", False), "text": text, "data": answer.get("structuredContent")}
+
     def op_secret(self, args: dict) -> str:
         key = str(args.get("key", ""))
         if self.via == "assistant":
@@ -407,7 +461,9 @@ class HostCalls:
         body = base64.b64decode(args.get("body") or "") or None
         if self.code.fetcher is not None:  # a test harness answers instead of the network
             return self.code.fetcher(method, url, headers, body or b"")
-        timeout = min(float(args.get("timeout") or FETCH_TIMEOUT), FETCH_TIMEOUT)
+        # As long as the handler has, when an action says `timeout`; thirty seconds otherwise.
+        longest = max(FETCH_TIMEOUT, float(self.budget))
+        timeout = min(float(args.get("timeout") or FETCH_TIMEOUT), longest)
         opener = urllib.request.build_opener(_Redirects(self.manifest.fetch))
         request = urllib.request.Request(url, data=body, headers=headers, method=method)
         try:
@@ -605,7 +661,7 @@ class QuillCode:
             "cloud": self.state.cloud_name(),
             **(ctx or {}),
         }
-        host = HostCalls(self, manifest, principal, via=via, kind=kind)
+        host = HostCalls(self, manifest, principal, via=via, kind=kind, budget=timeout)
         try:
             return self._guest(manifest, principal.username).call(kind, name, data, args or {}, host, timeout=timeout)
         except Failed as failure:
@@ -698,7 +754,17 @@ class QuillCode:
                 raise CodeError(_kind(exc), str(_host_error(exc))) from exc
         elif record:
             raise CodeError("invalid", f"{action['label']} is not done to a record")
-        effects = self.run(manifest, "action", action["handler"], principal, via=via, args=args)
+        # An action that waits on something outside says how long it has (`timeout`).
+        effects = self.run(
+            manifest,
+            "action",
+            action["handler"],
+            principal,
+            via=via,
+            args=args,
+            timeout=float(action.get("timeout") or CALL_TIMEOUT),
+        )
+
         # What its writes set off runs before the screen is drawn again, as
         # long as that is quick: a hook that keeps a total is part of the press.
         self.drain(timeout=ACTION_SETTLE)

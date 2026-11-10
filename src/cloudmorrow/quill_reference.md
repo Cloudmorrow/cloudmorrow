@@ -119,6 +119,7 @@ id = "log-service"                 # its button, `cm fleet log-service`, and an 
 label = "Log a service"
 on = "vehicle"                     # optional: done to one record; the handler gets it first
 confirm = "Log it?"                # optional; tone = "primary" | "danger"; assistant = false
+# timeout = "2m"                   # up to 5m, for one that waits on something outside; else 15s
 [actions.fields]                   # its form, checked before the code runs
 date = { kind = "date", required = true }
 km = "int"
@@ -136,6 +137,12 @@ why = "…"
 [[secrets]]                        # keys ctx.secret may read from the person's vault
 key = "TRACKER_KEY"
 why = "…"
+
+[assistant]                        # its code is given an assistant's tools, as the person
+tools = true                       # (ctx.assistant.tools(), .call(name, arguments)): the record
+why = "…"                          # tools over what their circles give, every Quill's actions,
+                                   # the Quill-building tools; the install sheet says so
+
 
 [[machine]]                        # runs on a person's machine, once they switch it on there
 id = "import"
@@ -171,7 +178,11 @@ def log_service(ctx, vehicle, date, km):
 (a view's; `.record` when opened on one), `ctx.records` (`list(model, q=,
 **where)`, `get`, `create(model, fields=None, **values)`, `patch(model, id,
 fields)`, `move`, `delete` — each a `Record`: fields by `record["name"]`,
-envelope as `.id`, `.rev`, `.model`), `ctx.fetch(url, method=, headers=,
+envelope as `.id`, `.rev`, `.model`), `ctx.assistant` (with `[assistant]
+tools = true`: `tools()` as a model wants them, `call(name, arguments)` →
+`{ok, text, data}`, each as the person — an assistant's own reach, including
+`quill_check` and `quill_dev_install` with `mine = true`), `ctx.fetch(url, method=, headers=,
+
 json=)`, `ctx.secret(key)`, `ctx.now()`, `ctx.log(...)`, and on a machine
 `ctx.records.create(..., scope=, members=)` makes a space, shared with its
 members; `ctx.records.seen(model, id)` is the person having looked in one;
@@ -340,7 +351,10 @@ whole day. Filter a list with `?field=value`, or a range with `__lt`,
 `__lte`, `__gt`, `__gte` on an indexed field.
 `stamp` sets a datetime when another field takes a value and clears it when it
 leaves. `secret = true` on a string or text field keeps it out of every listing
-and has every surface draw it hidden until asked for.
+and has every surface draw it hidden until asked for; `secret = "quill"` is
+that, and the one record gives it to the Quill's own code alone — an API key
+an administrator typed in, read by nobody through the record API.
+
 
 ## The kit
 

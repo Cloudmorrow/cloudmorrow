@@ -1,0 +1,12 @@
+[datamodel]
+id = "aide.settings"
+version = 1
+label = "Aide settings"
+description = "One record: the key an administrator typed in."
+scopes = ["public"]
+space = true
+title = "status"
+
+[fields]
+status = { kind = "string" }
+key = { kind = "string", secret = "quill", description = "Read by Aide's code alone" }

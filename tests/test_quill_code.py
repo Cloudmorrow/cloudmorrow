@@ -178,6 +178,10 @@ def test_a_handler_the_code_does_not_have_is_refused(tmp_path):
         ('[[actions]]\nid = "go"\nlabel = "Go"\n[actions.fields]\nx = "colour"\n', "kind"),
         ('[[hooks]]\non = "task"\nwhen = "renamed"\nhandler = "h"\n', "when is"),
         ('[[machine]]\nid = "m"\n', "why"),
+        ('[[actions]]\nid = "go"\nlabel = "Go"\ntimeout = "soon"\n', "duration"),
+        ('[[actions]]\nid = "go"\nlabel = "Go"\ntimeout = "10m"\n', "at most 5m"),
+        ("[assistant]\ntools = true\n", "says why"),
+        ('[assistant]\ntools = true\nwhy = "x"\nmodels = ["task"]\n', "knows tools and why"),
         ("[quill]\n", ""),
     ],
 )
@@ -690,3 +694,91 @@ def test_a_view_may_name_its_pen(fleet):
                 'compose = { action = "nope" }\n[[actions]]\nid = "send"\nlabel = "Send"\n'
             )
         )
+
+
+# -- an assistant's tools, as the person (fixtures/quill-aide) ----------------------------------
+AIDE = Path(__file__).parent / "fixtures" / "quill-aide"
+
+
+@pytest.fixture()
+def aide(config, users):
+    client = TestClient(_app(config, users, "trusted"))
+    admin = {"Authorization": "Bearer " + token_for(client, *ADMIN)}
+    answer = client.post("/api/quills", json={"source": str(AIDE)}, headers=admin)
+    assert answer.status_code == 201, answer.text
+    guest = {"Authorization": "Bearer " + token_for(client, *GUEST)}
+    return client, admin, guest
+
+
+def aide_press(client, headers, action, **fields):
+    return client.post(f"/api/quills/aide/actions/{action}", json={"fields": fields}, headers=headers)
+
+
+def test_the_install_sheet_says_the_code_has_an_assistants_tools_and_how_long_an_action_has(aide):
+    client, admin, _ = aide
+    plan = client.post("/api/quills/plan", json={"source": str(AIDE)}, headers=admin).json()
+    assert plan["quill_code"]["assistant"] == {"tools": True, "why": "to answer questions over the person's own data"}
+    # `timeout = "2m"` is kept as seconds; an action without one has a call's fifteen.
+    actions = {a["id"]: a for a in plan["actions"]}
+    assert actions["count"]["timeout"] == 120.0 and "timeout" not in actions["tools"]
+
+
+def test_a_quills_code_has_an_assistants_tools_as_the_person(aide):
+    client, admin, guest = aide
+    said = aide_press(client, admin, "tools").json()["effects"][0]["text"]
+    assert "list_records" in said and "quill_dev_install" in said and "get_record" in said
+    # As the person, through the gate: the administrator's public record is
+    # everybody's to count; a guest's own vehicle would not be the administrator's.
+    assert aide_press(client, admin, "connect", key="sk-ant-1").status_code == 200
+    counted = aide_press(client, guest, "count", model="aide.settings").json()["effects"][0]["text"]
+    assert counted == "1"
+    nowhere = aide_press(client, guest, "count", model="spaceship").json()["effects"][0]
+    assert nowhere["effect"] == "error" and "no datamodel" in nowhere["text"]
+
+
+def test_the_tools_are_refused_without_the_declaration_and_to_code_an_assistant_started(aide, fleet):
+    client, admin, _ = aide
+    state = state_of(client)
+    manifest = state.quills.quills["aide"]
+    started = HostCalls(state.code, manifest, Principal("quill", ADMIN[0], quill="aide"), via="assistant")
+    with pytest.raises(sdk.Refused, match="assistant"):
+        started("assistant.tools", {})
+    fleet_client, _, _ = fleet
+    fleet_state = state_of(fleet_client)
+    plain = HostCalls(
+        fleet_state.code, fleet_state.quills.quills["fleet"], Principal("quill", ADMIN[0], quill="fleet"), via="person"
+    )
+    with pytest.raises(sdk.Refused, match="does not say"):
+        plain("assistant.call", {"name": "list_datamodels"})
+    with pytest.raises(sdk.NotFound, match="no tool"):
+        HostCalls(state.code, manifest, Principal("quill", ADMIN[0], quill="aide"), via="person")(
+            "assistant.call", {"name": "launch_rockets"}
+        )
+
+
+def test_an_administrator_builds_a_quill_of_their_own_through_the_quills_code(aide):
+    client, admin, _ = aide
+    manifest = '[quill]\nid = "plants"\nname = "Plants"\nversion = "0.1.0"\nsummary = "x"\ncategory = "home"\n'
+    said = aide_press(client, admin, "build", manifest=manifest).json()["effects"][0]
+    assert said == {"effect": "toast", "text": ADMIN[0]}
+    mine = {q["id"]: q for q in client.get("/api/quills", headers=admin).json()}
+    assert mine["plants"]["key"] == f"~{ADMIN[0]}.plants"
+
+
+def test_a_secret_of_an_introduced_datamodel_is_the_quills_own_code_to_read(aide):
+    client, admin, guest = aide
+    assert aide_press(client, admin, "connect", key="sk-ant-1").status_code == 200
+    record = client.get("/api/records/aide.settings", headers=admin).json()[0]
+    # Through the record API the one record says null there — to the
+    # administrator who typed it, to anybody, to an assistant.
+    for headers in (admin, guest):
+        got = client.get(f"/api/records/aide.settings/{record['id']}", headers=headers).json()
+        assert got["fields"]["status"] == "set" and got["fields"]["key"] is None
+    state = state_of(client)
+    assert (
+        state.records.get(Principal.assistant(ADMIN[0], admin=True), "aide.settings", record["id"]).fields["key"]
+        is None
+    )
+    # The Quill's own code reads it, as whoever is using the Quill.
+    assert aide_press(client, guest, "peek").json()["effects"][0]["text"] == "sk-ant-1"
+    assert aide_press(client, admin, "peek").json()["effects"][0]["text"] == "sk-ant-1"

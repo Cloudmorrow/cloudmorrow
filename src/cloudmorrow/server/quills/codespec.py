@@ -9,6 +9,7 @@
     [[apis]] handler = …               an API answered by code
     [[fetch]]                          the hosts its code may reach
     [[secrets]]                        the secrets its code may read, by key
+    [assistant] tools = true           its code has an assistant's tools, as the person
     [[machine]]                        code that runs on a person's own machine
 
 Everything a Quill's code may do is here, so the install sheet, `cm quill
@@ -46,6 +47,9 @@ FOLDER_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 PROGRAM_RE = re.compile(r"^[A-Za-z0-9._+-]{1,64}$")
 # A runtime's id, as the catalog's [runtimes] table names it (cloudmorrow.runtimes).
 RUNTIME_RE = re.compile(r"^[a-z][a-z0-9_-]{1,31}$")
+# An action that waits on something outside — an answer from a model — may
+# say how long it has, up to this; left out, a call's fifteen seconds.
+ACTION_TIMEOUT_MAX = 300
 
 
 class CodeSpecError(ValueError):
@@ -61,6 +65,9 @@ class CodeSpec:
     fetch: tuple[dict, ...] = ()
     secrets: tuple[dict, ...] = ()
     machine: tuple[dict, ...] = ()
+    # `[assistant] tools = true`, with why: its code is given an assistant's
+    # tools, as the person it runs for (`ctx.assistant`); {} without.
+    assistant: dict = field(default_factory=dict)
     # Every handler the manifest names, by kind: what the code must have.
     needs: dict[str, set[str]] = field(default_factory=dict)
 
@@ -158,6 +165,14 @@ def parse_code(
             raise CodeSpecError(f"{where}: {thing} assistant is true or false")
         if not isinstance(item.get("admin", False), bool):
             raise CodeSpecError(f"{where}: {thing} admin is true or false")
+        if "timeout" in item:
+            try:
+                seconds = parse_duration(str(item["timeout"])).total_seconds()
+            except ValueError as exc:
+                raise CodeSpecError(f'{where}: {thing} timeout is a duration like "2m"') from exc
+            if not 0 < seconds <= ACTION_TIMEOUT_MAX:
+                raise CodeSpecError(f"{where}: {thing} timeout is at most {ACTION_TIMEOUT_MAX // 60}m")
+            item["timeout"] = seconds
 
     hooks = _tables(data, "hooks", where)
     for i, item in enumerate(hooks):
@@ -209,6 +224,23 @@ def parse_code(
             raise CodeSpecError(f"{where}: a secret's key is like TRACKER_API_KEY")
         if not str(item.get("why", "")).strip():
             raise CodeSpecError(f"{where}: the secret {key} says why; a person reads it")
+
+    assistant = data.get("assistant", {})
+    if not isinstance(assistant, dict):
+        raise CodeSpecError(f"{where}: [assistant] is a table: tools = true, and why")
+    if assistant:
+        unknown = sorted(set(assistant) - {"tools", "why"})
+        if unknown:
+            raise CodeSpecError(f"{where}: [assistant] knows tools and why, not {', '.join(unknown)}")
+        if not isinstance(assistant.get("tools", False), bool):
+            raise CodeSpecError(f"{where}: [assistant] tools is true or false")
+        if assistant.get("tools") and not str(assistant.get("why", "")).strip():
+            raise CodeSpecError(f"{where}: [assistant] says why its code has an assistant's tools; a person reads it")
+        if assistant.get("tools") and not code:
+            raise CodeSpecError(f'{where}: [assistant] tools are for code: [quill] says code = "quill.py"')
+        assistant = {"tools": bool(assistant.get("tools")), "why": str(assistant.get("why", "")).strip()}
+        if not assistant["tools"]:
+            assistant = {}
 
     machine = _tables(data, "machine", where)
     seen = set()
@@ -269,6 +301,7 @@ def parse_code(
         fetch=tuple(fetch),
         secrets=tuple(secrets),
         machine=tuple(machine),
+        assistant=assistant,
         needs=needs,
     )
 

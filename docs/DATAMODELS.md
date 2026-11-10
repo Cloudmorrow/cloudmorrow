@@ -126,6 +126,13 @@ listing — the record store and every backend send it as null there — and
 every surface draws it hidden until asked: dots and an eye on a row, a
 password box on the sheet, `--reveal` on the command line. Reading the one
 record is how its value is fetched. A secret field is never indexed.
+`secret = "quill"`, on a datamodel a Quill introduces, is that and more: the
+one record gives it to that Quill's own code alone — an API key an
+administrator typed in on the Quill's settings, read by the code that uses
+it and by nobody through the record API, an assistant included; to
+everybody else the record says null there, as a listing does.
+
+
 
 **Indexed** fields are kept plain so the server can filter and sort by them.
 Everything else is sealed at rest under the server's key, bound to the

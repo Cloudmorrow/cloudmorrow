@@ -99,7 +99,10 @@ class Field:
     added_by: str = ""
     # Hidden until asked for: never in a listing, drawn masked with a way to
     # reveal it on every surface. A string or text field.
-    secret: bool = False
+    # True: out of every listing, hidden until asked for. "quill": that, and
+    # the one record gives it to the code of the Quill that introduced the
+    # datamodel alone — an API key an administrator typed in (records.py).
+    secret: bool | str = False
     # Whoever manages the space the record is in may change this one field on
     # anybody's record — pinning a message in a channel they run. Only on a
     # datamodel that lives in a space.
@@ -139,7 +142,7 @@ class Field:
         if self.added_by:
             row["added_by"] = self.added_by
         if self.secret:
-            row["secret"] = True
+            row["secret"] = self.secret
         if self.managed:
             row["managed"] = True
         if self.suggest:
@@ -382,8 +385,9 @@ def _field(where: str, name: str, spec: object) -> Field:
     if stamp and (kind != "datetime" or set(stamp) != {"field", "value"}):
         raise DatamodelError(f"{where}: {name!r} stamp is {{ field, value }} on a datetime")
     secret = spec.get("secret", False)
-    if not isinstance(secret, bool):
-        raise DatamodelError(f"{where}: {name!r} secret is true or false")
+    if not isinstance(secret, bool) and secret != "quill":
+        raise DatamodelError(f'{where}: {name!r} secret is true, false, or "quill" (its own code reads it)')
+
     if secret and (kind not in ("string", "text") or spec.get("indexed")):
         raise DatamodelError(f"{where}: {name!r} is secret, so it is a string or text, never indexed")
     managed = spec.get("managed", False)
@@ -508,6 +512,9 @@ def parse_datamodel(data: dict, *, source: str = "foundation", where: str = "") 
         raise DatamodelError(f"{where}: backend is one of {', '.join(sorted(BACKENDS))}")
     if backend and source != "foundation":
         raise DatamodelError(f"{where}: only a foundational datamodel has a backend")
+    if source == "foundation" and any(f.secret == "quill" for f in fields):
+        raise DatamodelError(f'{where}: secret = "quill" is for a datamodel a Quill introduces')
+
     lock = _lock(head.get("locked", False), by_name, where)
     if lock is not None and backend:
         raise DatamodelError(f"{where}: a datamodel kept by a backend is not locked")

@@ -1,0 +1,50 @@
+# A test fixture: a Quill whose code has an assistant's tools, an action that
+# may take its time, and a datamodel with a secret only its own code reads.
+[quill]
+id = "aide"
+name = "Aide"
+version = "0.1.0"
+summary = "Asks an assistant's tools, as the person."
+category = "personal"
+code = "quill.py"
+
+[uses]
+datamodels = []
+
+[[screens]]
+id = "aide"
+label = "Aide"
+view = "aide"
+model = "aide.settings"
+
+[[actions]]
+id = "tools"
+label = "What tools are there"
+
+[[actions]]
+id = "count"
+label = "Count records"
+timeout = "2m"
+[actions.fields]
+model = { kind = "string", required = true }
+
+[[actions]]
+id = "build"
+label = "Build a Quill of my own"
+[actions.fields]
+manifest = { kind = "text", required = true }
+
+[[actions]]
+id = "connect"
+label = "Connect"
+admin = true
+[actions.fields]
+key = { kind = "string", required = true }
+
+[[actions]]
+id = "peek"
+label = "Peek at the key"
+
+[assistant]
+tools = true
+why = "to answer questions over the person's own data"

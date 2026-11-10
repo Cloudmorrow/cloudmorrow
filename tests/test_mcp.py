@@ -597,3 +597,29 @@ def test_a_quill_switched_off_takes_its_tools_away(notes_quill, auth):
     assert refused["isError"] is True
     client.patch("/api/server/features/notes", headers=auth, json={"enabled": True})
     assert call(client, token, "create_record", model="file", fields=page)["structuredContent"]["id"]
+
+
+def test_an_administrators_assistant_builds_one_of_their_own_with_code_when_asked(client, auth):
+    token = connect(client)["access_token"]
+    manifest = PLANTS.replace('category = "home"', 'category = "home"\ncode = "quill.py"') + (
+        '\n[[actions]]\nid = "water"\nlabel = "Water"\n'
+    )
+    code = "from cloudmorrow.quill import action, toast\n\n\n"
+    code += '@action("water")\ndef water(ctx):\n    return toast("watered")\n'
+
+    # Without the code the manifest names a handler nothing has.
+    broken = call(client, token, "quill_check", manifest=manifest, datamodels={"plant.toml": PLANT}, mine=True)
+    assert broken["isError"] is True and "no quill.py" in broken["content"][0]["text"]
+
+    checked = call(
+        client, token, "quill_check", manifest=manifest, datamodels={"plant.toml": PLANT}, code=code, mine=True
+    )
+    assert checked["structuredContent"]["ok"] is True and checked["structuredContent"]["whose"] == ADMIN[0]
+    installed = call(
+        client, token, "quill_dev_install", manifest=manifest, datamodels={"plant.toml": PLANT}, code=code, mine=True
+    )
+    assert installed["structuredContent"]["whose"] == ADMIN[0]
+    mine = {q["id"]: q for q in client.get("/api/quills", headers=auth).json()}
+    assert mine["plants"]["key"] == f"~{ADMIN[0]}.plants"
+    pressed = call(client, token, "plants_water")
+    assert pressed["structuredContent"]["said"] == ["watered"]

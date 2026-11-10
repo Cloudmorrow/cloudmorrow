@@ -170,6 +170,44 @@ if answer.ok:
 A secret comes from the person's own vault (`cm secret set TRACKER_KEY`),
 and never when an assistant pressed the action.
 
+A key the whole server shares — an administrator's API key for a model —
+is a `secret = "quill"` field on a datamodel the Quill introduces, set by an
+`admin = true` action from the Quill's settings: the one record gives it to
+the Quill's own code alone, and to nobody through the record API.
+
+
+## An assistant's tools
+
+A Quill whose code talks to a model for the person declares no datamodel
+one by one:
+
+```toml
+[assistant]
+tools = true
+why = "to answer questions over your own data"
+
+[[actions]]
+id = "ask"
+label = "Ask"
+timeout = "3m"                          # an answer from a model takes a while; up to 5m
+assistant = false                       # not a tool for another assistant
+[actions.fields]
+message = { kind = "text", required = true }
+```
+
+```python
+tools = ctx.assistant.tools()  # name, description, input_schema: the record tools over what
+answer = ctx.assistant.call("list_records", {"model": "task"})  # the person's circles give, every
+if answer["ok"]:  # Quill's actions they may press, the Quill-building tools
+    tasks = answer["data"]["records"]  # — each run as the person, through the gate
+```
+
+The install sheet says *has an assistant's tools, as you*, and that is what
+is said yes to. `quill_check` and `quill_dev_install` take `mine = true`
+(one of the person's own, even for an administrator) and `code` (the
+quill.py). Code an assistant started is refused it.
+
+
 ## Test it
 
 `q.run_job("nightly")`, `q.webhook("stripe", json={...})`, `q.api("summary")`,
