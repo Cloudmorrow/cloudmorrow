@@ -253,7 +253,7 @@ def with_suffix(name: str, source: Path) -> str:
 # What the cache is keyed by includes when the file changed, so a
 # re-uploaded picture gets a fresh one and the stale one is just never
 # asked for again.
-THUMB_SIZES = (128, 256, 512, 1024)
+THUMB_SIZES = (128, 256, 512, 1024, 2048)
 # What Pillow reads reliably. HEIC and SVG are not in it: a phone's HEIC
 # needs a plugin the server may not have, and a drawing has no pixels to
 # scale until it is drawn. Those show as their icon in the grid.

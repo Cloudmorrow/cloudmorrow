@@ -113,8 +113,14 @@ km   = { kind = "int", required = true }
 # people as it is typed, names with commas between; `outside = "…"` is the
 # warning shown while a name that is nobody here — an address — is in it.
 # A field with `extra = true` waits behind one link naming the extra fields
-# (Cc, Bcc) until it is pressed. All three are how a form is drawn; the
-# handler gets strings as ever.
+# (Cc, Bcc) until it is pressed. A string field may say `pick = "folder"`:
+# on the web it is picked from a sheet of the drive's folders — any share,
+# any folder in it — rather than typed, and holds the path within the
+# share; `share = "share"` names the field of the same form the share goes
+# to, which the form fills rather than asks for. An action whose form is
+# that folder and nothing else opens the picker itself, the action's name
+# on its button. In the terminal and on the command line both are typed.
+# All of these are how a form is drawn; the handler gets strings as ever.
 
 [[hooks]]
 on = "fleet.visit"
@@ -309,7 +315,7 @@ one:
 | `conversation(records, body=, mine=, ask=, record=, name=, at=, note=, failed=, empty=, placeholder=, hint=, backdrop=, close=)` | a chat: the lines in order, the person's own (`mine`, a bool) on the right in a bubble, the other side's (`name`) on the left as a page; newest at the bottom, scrolled to, and the box to write in on the floor when `ask` names the action that takes the words (its first text field; on `record`), enter sends, and what was sent is shown with the other side thinking until the view is drawn again; `empty` is said in the middle while there is nothing; `backdrop = "mascot"` puts the hedgehog faintly behind the lines; `close` names the action an X in the top right corner runs on `record` (deleting the conversation) — give it a `confirm`, and that is asked first |
 | `button(label, action= \| open= \| go=, current=)`, `menu` | run an action, open a record, go to a screen; `current` marks the one of a row that is where you are |
 | `table(records, columns=, actions=, go=, param=)`, `cards(records, title=, …, go=, param=, current=)` | records, a row or a card each; opening one shows its sheet — or, with `go`, a screen of the Quill's own, with the record's id as `param`; `current` is the id of the card that is open, lit as such |
-| `gallery(records, title=, subtitle=, badge=, stars=, rate=, actions=)` | records as tiles with their own picture (a file's thumbnail; a video's is a frame of it) and five stars; pressing a star runs `rate` with `stars=` |
+| `gallery(records, title=, subtitle=, badge=, stars=, rate=, actions=, put=)` | records as a wall of tiles, each its own picture at its own shape (a file's thumbnail; a video's is a frame of it), packed as a pinboard is, with five stars; pressing a star runs `rate` with `stars=`; pressing a picture opens the viewer — the photo, or the video playing, across the screen, the next and the one before an arrow away, a button for the whole screen, Details to the sheet; `put = {"image": ("my-files", "Photos"), "video": ("my-files", "Videos")}` says where a photo or a video dropped on the wall, pasted into it or chosen with its Add button goes, by kind, the folder made when it is not there |
 | `lanes(records, field=, title=)` | records in columns by an enum; dragging moves the record, as a board does |
 | `month(records, date=, title=)` | records on a month |
 

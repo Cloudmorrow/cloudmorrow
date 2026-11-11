@@ -115,6 +115,11 @@ class Field:
     suggest: str = ""
     outside: str = ""
     extra: bool = False
+    # `pick = "folder"`: the form offers the drive's folders, picked from a
+    # sheet of them rather than typed — the path within a share — and `share`
+    # names the field of the same form the share it is in goes to.
+    pick: str = ""
+    share: str = ""
 
     def label_for(self, value: str) -> str:
         """An enum value as a person reads it."""
@@ -151,6 +156,10 @@ class Field:
             row["outside"] = self.outside
         if self.extra:
             row["extra"] = True
+        if self.pick:
+            row["pick"] = self.pick
+        if self.share:
+            row["share"] = self.share
         return row
 
 
@@ -359,6 +368,8 @@ def _field(where: str, name: str, spec: object) -> Field:
         "suggest",
         "outside",
         "extra",
+        "pick",
+        "share",
     }
     unknown = set(spec) - known
     if unknown:
@@ -406,6 +417,16 @@ def _field(where: str, name: str, spec: object) -> Field:
     extra = spec.get("extra", False)
     if not isinstance(extra, bool):
         raise DatamodelError(f"{where}: {name!r} extra is true or false")
+    pick = str(spec.get("pick", "") or "")
+    if pick not in ("", "folder"):
+        raise DatamodelError(f'{where}: {name!r} pick is "folder"')
+    if pick and (kind != "string" or suggest):
+        raise DatamodelError(f"{where}: {name!r} picks a folder, so it is a plain string: the path within a share")
+    share = spec.get("share", "")
+    if not isinstance(share, str) or (share and not FIELD_RE.match(share)):
+        raise DatamodelError(f"{where}: {name!r} share names the field the share goes to")
+    if share and not pick:
+        raise DatamodelError(f"{where}: {name!r} share goes with pick")
     default = spec.get("default")
     if kind == "enum" and default is not None and str(default) not in values:
         raise DatamodelError(f"{where}: {name!r} default {default!r} is not one of its values")
@@ -427,6 +448,8 @@ def _field(where: str, name: str, spec: object) -> Field:
         suggest=suggest,
         outside=outside,
         extra=extra,
+        pick=pick,
+        share=share,
     )
 
 

@@ -189,6 +189,24 @@ def test_the_fleet_quill_is_what_the_page_reads(config, users):
     assert answer.status_code == 400 and answer.json()["detail"]["message"]
 
 
+def test_the_wall_packs_its_tiles_opens_a_viewer_and_takes_what_is_dropped():
+    """A gallery is a wall: each tile spans the rows it is tall, a picture
+    opens the viewer with arrows, keys, a swipe and the whole screen, and a
+    wall with `put` uploads what lands on it to the folder its kind goes to."""
+    assert "grid-auto-rows: 4px;" in VIEW_CSS and "aspect-ratio: var(--shape, 1);" in VIEW_CSS
+    assert "function fitTile(tile, gallery)" in VIEW_JS and "function shapeTile(el, img)" in VIEW_JS
+    assert 'pic.style.setProperty("--shape", ratio.toFixed(3));' in VIEW_JS
+    assert "function openViewer(v, n, index, from)" in VIEW_JS
+    for key in ("Escape", "ArrowLeft", "ArrowRight"):
+        assert f'event.key === "{key}"' in VIEW_JS
+    assert "box.requestFullscreen().catch" in VIEW_JS and 'stage.addEventListener("touchend"' in VIEW_JS
+    assert 'recordsUrl(r.model, r.id, "/media")' in VIEW_JS and "thumbURL(v, r.model, r.id, 2048)" in VIEW_JS
+    assert ".v-viewer {" in VIEW_CSS and "position: fixed;" in VIEW_CSS
+    assert "async function putFiles(v, n, files)" in VIEW_JS and 'recordsUrl(model) + "/upload" + query' in VIEW_JS
+    assert 'root.addEventListener("drop"' in VIEW_JS and 'addEventListener("paste"' in VIEW_JS
+    assert 'accept="image/*,video/*"' in VIEW_JS
+
+
 # -- on the brand ---------------------------------------------------------------------------------
 def test_no_colour_is_spelled_out():
     for name, css in (("kit_view.css", VIEW_CSS), ("actions.css", ACTIONS_CSS)):

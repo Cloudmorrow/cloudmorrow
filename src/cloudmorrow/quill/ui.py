@@ -444,14 +444,31 @@ def gallery(
     open: bool = True,  # noqa: A002
     actions=(),
     empty: str = "",
+    put=None,
 ) -> dict:
     """Records as tiles, each with its own picture (a file's thumbnail; a video's
-    is a frame of it) and *title*, *subtitle* and *badge* (field names) under it.
+    is a frame of it) and *title*, *subtitle* and *badge* (field names) under it:
+    a wall of pictures at their own shapes, the way a pinboard is laid. Pressing
+    a picture opens the viewer — the photo, or the video playing, across the
+    screen, with the next and the one before an arrow away and a button for
+    the whole screen; its Details go to the record's sheet.
 
     *stars* is a field holding 0 to 5, drawn as five stars. With *rate*,
     pressing a star runs that action on the record with `stars=` the number
     pressed — the one already lit, 0. *actions* are ids, per tile.
+
+    *put* says where a photo or a video dropped on the wall, pasted into it or
+    chosen with its Add button is uploaded, by the first half of its type:
+    `{"image": ("my-files", "Photos"), "video": ("my-files", "Videos")}` — a
+    share and a folder in it, made when it is not there. The records are
+    `file` records, so the upload is a file's. Left out, nothing is taken.
     """
+    places = None
+    if put:
+        places = [
+            {"kind": str(kind), "share": str(share), "folder": "/".join(p for p in str(folder).split("/") if p)}
+            for kind, (share, folder) in dict(put).items()
+        ]
     return _node(
         "gallery",
         records=_records(records),
@@ -463,6 +480,7 @@ def gallery(
         open=open,
         actions=list(actions),
         empty=empty,
+        put=places,
     )
 
 
@@ -598,6 +616,7 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
         "open": (bool, False),
         "actions": (list, False),
         "empty": (str, False),
+        "put": (list, False),
     },
     "lanes": {
         "records": (list, True),
@@ -679,6 +698,18 @@ def check(tree, *, actions=None, screens=None) -> dict:
             raise TreeError(f"{where}: an image's src is an https:// address")
         if kind == "gallery" and node.get("rate") and not node.get("stars"):
             raise TreeError(f"{where}: a gallery that rates says which field holds the stars: stars=")
+        if kind == "gallery" and node.get("put"):
+            for place in node["put"]:
+                if (
+                    not isinstance(place, dict)
+                    or place.get("kind") not in ("image", "video")
+                    or not place.get("share")
+                    or not isinstance(place.get("folder"), str)
+                ):
+                    raise TreeError(
+                        f"{where}: a gallery's put is where an image or a video goes: "
+                        '{"image": ("my-files", "Photos"), "video": ("my-files", "Videos")}'
+                    )
         for key in ("action", "rate", "ask", "close"):
             if node.get(key) and actions is not None and node[key] not in actions:
                 raise TreeError(f"{where}: {kind} runs {node[key]!r}, which the manifest does not declare")

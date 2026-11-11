@@ -155,6 +155,15 @@ def parse_code(
             except DatamodelError as exc:
                 raise CodeSpecError(str(exc)) from exc
         item["fields"] = parsed
+        for f in parsed:
+            # The share a picked folder is in goes to another string field of
+            # the same form, which the form then fills rather than asks for.
+            if f.get("share"):
+                other = next((o for o in parsed if o["name"] == f["share"]), None)
+                if other is None or other["kind"] != "string" or other is f:
+                    raise CodeSpecError(
+                        f"{where}: {thing} field {f['name']!r} share names another string field of the form"
+                    )
         tone = item.get("tone", "neutral")
         if tone not in TONES:
             raise CodeSpecError(f"{where}: {thing} tone is one of {', '.join(TONES)}")

@@ -140,3 +140,19 @@
 .people-note { margin: 6px 2px 0; font-size: 13px; color: var(--warn); }
 .fields-more { display: block; margin: -4px 0 12px; padding: 2px 0; font: inherit; font-size: 14px; color: var(--accent); }
 .fields-extra { display: contents; }
+
+/* A folder field: the one chosen, said as a path; pressed, the picker. */
+.kind-folder .pick-folder {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kind-folder .pick-folder.unset { color: var(--accent); }

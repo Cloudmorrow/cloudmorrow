@@ -785,7 +785,7 @@ const EXT_OF_TYPE = {
   "image/jpeg": "jpg", "image/svg+xml": "svg", "video/quicktime": "mov",
   "audio/mpeg": "mp3", "audio/mp4": "m4a", "application/pdf": "pdf",
 };
-function fileName(file) {
+export function fileName(file) {
   const name = file.name || "file";
   if (extOf(name)) return name;
   const [kind, subtype] = (file.type || "").split("/");

@@ -33,6 +33,7 @@ import {
   readFields, recordChoices, run, runStream, said, screenAt, wireFields,
 } from "./actions.js";
 import { ask } from "./dialog.js";
+import { fileName, kindOf } from "./kit_grid.js";
 
 const glyphs = {
   left: '<svg width="11" height="18" viewBox="0 0 11 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 1.5 2 9l6.5 7.5"/></svg>',
@@ -43,6 +44,8 @@ const glyphs = {
   close: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   // The list beside what is open: a panel with a pane at its left, to fold away and bring back.
   sidebar: '<svg width="18" height="16" viewBox="0 0 20 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="1.5" width="17" height="15" rx="2.5"/><path d="M7.5 1.5v15"/></svg>',
+  // The viewer across the whole screen, and back.
+  full: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
 };
 
 // The same test the board uses: a phone has no way to drag anything.
@@ -85,7 +88,7 @@ export async function embedView(root, at, params = {}) {
   const v = {
     at, params, root, tree: null,
     open: new Map(), months: new Map(), revs: new Map(), thumbs: new Map(),
-    links: {}, formLinks: {}, handlers: [], menus: [], edits: [], forms: [], toggles: [], chats: [], lanes: [], amber: false,
+    links: {}, formLinks: {}, handlers: [], menus: [], edits: [], forms: [], toggles: [], chats: [], lanes: [], walls: [], amber: false,
   };
   v.draw = () => draw(v);
   v.paint = () => paint(v);
@@ -163,6 +166,7 @@ function paint(v) {
   v.toggles = [];
   v.chats = [];
   v.lanes = [];
+  v.walls = [];
   v.amber = false;
   v.root.removeAttribute("aria-busy");
   v.root.innerHTML = node(v, v.tree, "0");
@@ -173,6 +177,7 @@ function paint(v) {
   wireRows(v);
   wireFolds(v);
   wireLanes(v);
+  wireWalls(v);
   loadThumbs(v);
   // What the view has its own button for is not in the bar as well.
   const pressed = pressedIn(v.tree);
@@ -857,31 +862,45 @@ function drawCards(v, n) {
   }).join("") + `</div>`;
 }
 
-// Tiles, each the record's own picture with its title under it: a photo
-// library's grid. The picture is the record's thumbnail, fetched when the
-// tile comes into sight; a video's is a frame of it. The stars run the
-// view's rating action at once, no form — the star already lit takes it
-// back to none — and are lit at once, before the view is drawn again.
+// Tiles, each the record's own picture with its title under it, laid as a
+// pinboard is: columns, each picture at its own shape, the next tile under
+// the shortest run. The picture is the record's thumbnail, fetched when the
+// tile comes into sight; a video's is a frame of it. Pressing a picture
+// opens the viewer (openViewer); the tile's menu still has Open, to the
+// sheet. The stars run the view's rating action at once, no form — the
+// star already lit takes it back to none — and are lit at once, before the
+// view is drawn again. With `put`, the wall takes photos and videos
+// dropped on it, pasted into it or chosen with its Add button, each to the
+// folder its kind goes to (putFiles).
 function drawGallery(v, n) {
-  if (!n.records.length) return none(n.empty);
   const rate = n.rate && findAction(v.at.quill.id, n.rate);
   const actions = (n.actions || []).map((id) => findAction(v.at.quill.id, id)).filter(Boolean);
-  return `<div class="v-gallery">` + n.records.map((r) => {
+  const puts = Array.isArray(n.put) && n.put.length;
+  v.walls.push(n);
+  const wall = v.walls.length - 1;
+  const add = !puts ? "" :
+    `<div class="v-wall-add"><button type="button" class="act-chip v-wall-pick" ${doing(v, (el) => {
+      const input = el.parentElement.querySelector(".v-wall-input");
+      if (input) input.click();
+    })}>Add photos and videos</button>` +
+    `<input type="file" class="v-wall-input" multiple accept="image/*,video/*" hidden aria-label="Photos and videos to add"></div>`;
+  if (!n.records.length) return `<div class="v-wall" data-wall="${wall}">${add}${none(n.empty)}</div>`;
+  const tiles = n.records.map((r, i) => {
     const hash = n.open !== false ? sheetOf(v, r) : "";
     const title = titled(v, r, n.title);
     const badge = n.badge ? say(v, r, n.badge) : "";
-    const pic = `<span class="v-thumb v-tile-thumb" role="img" aria-label="${esc(title)}" data-thumb-size="256"` +
+    const pic = `<span class="v-thumb v-tile-thumb" role="img" aria-label="${esc(title)}" data-thumb-size="512"` +
       ` data-thumb-model="${esc(r.model)}" data-thumb-id="${esc(r.id)}"></span>` +
       (badge ? `<span class="v-tile-badge">${esc(badge)}</span>` : "");
     const lit = n.stars ? Math.max(0, Math.min(5, Number(r.fields[n.stars]) || 0)) : 0;
     let stars = "";
     if (n.stars) {
-      const star = (i) => {
-        const on = i <= lit ? " on" : "";
-        const label = `${i} star${i === 1 ? "" : "s"}`;
+      const star = (k) => {
+        const on = k <= lit ? " on" : "";
+        const label = `${k} star${k === 1 ? "" : "s"}`;
         if (!rate) return `<span class="v-star${on}" aria-hidden="true">★</span>`;
-        return `<button type="button" class="v-star${on}" aria-label="${label}" aria-pressed="${i === lit}"` +
-          ` ${doing(v, (el) => rateTile(v, rate, r, i === lit ? 0 : i, el))}>★</button>`;
+        return `<button type="button" class="v-star${on}" aria-label="${label}" aria-pressed="${k === lit}"` +
+          ` ${doing(v, (el) => rateTile(v, rate, r, k === lit ? 0 : k, el))}>★</button>`;
       };
       stars = `<span class="v-stars" role="group" aria-label="${rate ? "Rate it" : `${lit} of 5 stars`}">` +
         [1, 2, 3, 4, 5].map(star).join("") + `</span>`;
@@ -892,13 +911,324 @@ function drawGallery(v, n) {
       : `<button type="button" class="v-more" aria-label="More" ${doing(v, () => choose(title,
         actions.map((a) => ({ label: a.label, tone: a.tone, run: runOn(a) }))))}>${glyphs.more}</button>`;
     const sub = n.subtitle ? say(v, r, n.subtitle) : "";
-    return `<div class="v-tile" ${menuOn(v, r, hash, actions)}>` +
-      (hash ? `<a class="v-tile-pic" href="${esc(hash)}">${pic}</a>` : `<span class="v-tile-pic">${pic}</span>`) +
+    const open = n.open !== false
+      ? `<button type="button" class="v-tile-pic" aria-label="${esc(`Open ${title}`)}" ${doing(v, (el) => openViewer(v, n, i, el))}>${pic}</button>`
+      : `<span class="v-tile-pic">${pic}</span>`;
+    return `<div class="v-tile" ${menuOn(v, r, hash, actions)}>` + open +
       `<span class="v-tile-text"><span class="title">${esc(title)}</span>` +
       (sub ? `<span class="v-tile-sub">${esc(sub)}</span>` : "") + `</span>` +
       (stars || more ? `<span class="v-tile-foot">${stars}${more}</span>` : "") +
       `</div>`;
-  }).join("") + `</div>`;
+  }).join("");
+  return `<div class="v-wall" data-wall="${wall}">${add}<div class="v-gallery">${tiles}</div></div>`;
+}
+
+// -- the wall's shape ---------------------------------------------------------------------
+// The wall is a grid of short rows; each tile spans as many as it is tall,
+// so the tiles pack under one another at their own heights. A tile is fitted
+// once drawn, again when its picture arrives with a shape of its own, and
+// all of them when the wall's width changes (the columns with it).
+function fitTile(tile, gallery) {
+  const style = getComputedStyle(gallery);
+  const unit = parseFloat(style.gridAutoRows) || 4;
+  const gap = parseFloat(style.rowGap) || 0;
+  tile.style.gridRowEnd = "auto";
+  const height = tile.getBoundingClientRect().height;
+  tile.style.gridRowEnd = `span ${Math.max(1, Math.ceil((height + gap) / (unit + gap)))}`;
+}
+
+function fitWall(gallery) {
+  for (const tile of gallery.children) fitTile(tile, gallery);
+}
+
+// A picture, arrived: the tile takes its shape — within reason, so a
+// panorama is a wide tile rather than a strip — and is fitted again.
+function shapeTile(el, img) {
+  const pic = el.closest(".v-tile-pic");
+  const gallery = el.closest(".v-gallery");
+  if (!pic || !gallery || !img.naturalWidth || !img.naturalHeight) return;
+  const ratio = Math.min(1.9, Math.max(0.55, img.naturalWidth / img.naturalHeight));
+  pic.style.setProperty("--shape", ratio.toFixed(3));
+  fitTile(el.closest(".v-tile"), gallery);
+}
+
+function wireWalls(v) {
+  if (v.wallWatch) v.wallWatch.disconnect();
+  v.wallWatch = "ResizeObserver" in window ? new ResizeObserver((seen) => {
+    for (const entry of seen) {
+      const gallery = entry.target;
+      const width = Math.round(entry.contentRect.width);
+      if (gallery.dataset.width === String(width)) continue;
+      gallery.dataset.width = String(width);
+      requestAnimationFrame(() => fitWall(gallery));
+    }
+  }) : null;
+  let takes = null;
+  for (const wallEl of v.root.querySelectorAll("[data-wall]")) {
+    const n = v.walls[Number(wallEl.dataset.wall)];
+    const gallery = wallEl.querySelector(".v-gallery");
+    if (gallery) {
+      fitWall(gallery);
+      if (v.wallWatch) v.wallWatch.observe(gallery);
+    }
+    const input = wallEl.querySelector(".v-wall-input");
+    if (input) {
+      input.addEventListener("change", async () => {
+        const picked = [...input.files];
+        input.value = "";
+        await putFiles(v, n, picked);
+      });
+      if (!takes) takes = n;
+    }
+  }
+  wireDrop(v, takes);
+}
+
+// -- putting pictures on the wall ----------------------------------------------------------
+// A computer drops files on the view or pastes them into it; both end where
+// the Add button ends. A phone has neither, and its picker is the button.
+// `dragenter` and `dragleave` fire for every child crossed, so they are
+// counted rather than believed.
+function wireDrop(v, n) {
+  const root = v.root;
+  if (root.dropWired) root.dropWired.n = n;
+  if (!n || root.dropWired) return;
+  const wired = { n };
+  root.dropWired = wired;
+  const carriesFiles = (event) =>
+    [...((event.dataTransfer && event.dataTransfer.types) || [])].includes("Files");
+  let over = 0;
+  root.addEventListener("dragenter", (event) => {
+    if (!wired.n || !carriesFiles(event)) return;
+    over += 1;
+    root.classList.add("dropping");
+  });
+  root.addEventListener("dragover", (event) => {
+    if (!wired.n || !carriesFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  });
+  root.addEventListener("dragleave", () => {
+    over = Math.max(0, over - 1);
+    if (!over) root.classList.remove("dropping");
+  });
+  root.addEventListener("drop", async (event) => {
+    if (!wired.n || !carriesFiles(event)) return;
+    event.preventDefault();
+    over = 0;
+    root.classList.remove("dropping");
+    const dropped = [...event.dataTransfer.files];
+    if (dropped.length) await putFiles(v, wired.n, dropped);
+  });
+  openWall = { v, root, wired };
+}
+
+// The wall on the screen, for a paste with nothing focused: the listener
+// checks it is still on the page, since `mount` leaves the old one detached.
+let openWall = null;
+addEventListener("paste", async (event) => {
+  if (!openWall || !openWall.wired.n || !app.contains(openWall.root)) return;
+  const pasted = [...((event.clipboardData && event.clipboardData.files) || [])];
+  if (!pasted.length) return;
+  event.preventDefault();
+  await putFiles(openWall.v, openWall.wired.n, pasted);
+});
+
+// Each file to the folder its kind goes to — a photo to the photos' one, a
+// video to the videos' — one after another, the bar saying which. The
+// folder is made when it is not there yet. What is neither is left out
+// and said so; a failure says why and stops, so what arrived is not lost
+// in a run of errors. The view is drawn again after.
+async function putFiles(v, n, files) {
+  const model = (n.records[0] && n.records[0].model) || "file";
+  const places = n.put || [];
+  const going = [];
+  let left = 0;
+  for (const file of files) {
+    const kind = kindOf({ mime: file.type, name: file.name });
+    const place = places.find((p) => p.kind === kind);
+    if (place) going.push([file, place]); else left += 1;
+  }
+  if (!going.length) {
+    toast(places.length === 1 ? `Only ${places[0].kind === "image" ? "photos" : "videos"} go here` : "Only photos and videos go here");
+    return;
+  }
+  const made = new Set();
+  let done = 0;
+  for (const [file, place] of going) {
+    const name = fileName(file);
+    toast(going.length > 1 ? `Uploading ${name} (${done + 1} of ${going.length})…` : `Uploading ${name}…`, 60000);
+    try {
+      if (!made.has(place.share + "/" + place.folder)) {
+        await makeFolder(model, place);
+        made.add(place.share + "/" + place.folder);
+      }
+      await putOne(model, place, file, name);
+    } catch (err) { toast(said(err)); break; }
+    done += 1;
+  }
+  if (done) {
+    toast((done === 1 ? "Added " + fileName(going[0][0]) : `Added ${done} files`) +
+      (left ? ` · ${left} left out: not a photo or a video` : ""));
+  }
+  if (done) await v.draw();
+}
+
+async function putOne(model, place, file, name) {
+  const query = "?" + new URLSearchParams({ share: place.share, folder: place.folder, name }).toString();
+  const res = await apiRaw("POST", recordsUrl(model) + "/upload" + query, {
+    body: file, type: file.type || "application/octet-stream", fail: "upload failed",
+  });
+  return res.json().catch(() => null);
+}
+
+// The folder a kind goes to, each level made when it is not there: an
+// upload wants its folder to be, and a fresh drive has no Videos yet. Each
+// level is looked for in the one above it, which is short; the folder
+// itself may hold thousands.
+async function makeFolder(model, place) {
+  let folder = "";
+  for (const name of place.folder.split("/").filter(Boolean)) {
+    const query = "?" + new URLSearchParams({ share: place.share, folder }).toString();
+    const entries = await api("GET", recordsUrl(model, "", query));
+    const there = entries.some((e) => e.fields.kind === "folder" && String(e.fields.name).toLowerCase() === name.toLowerCase());
+    if (!there) await api("POST", recordsUrl(model), { fields: { share: place.share, folder, name, kind: "folder" } });
+    folder = folder ? folder + "/" + name : name;
+  }
+}
+
+// -- the viewer ------------------------------------------------------------------------------
+// One of the wall's pictures across the screen: the photo, or the video
+// playing, with the one before and the next an arrow (or a swipe, or a key)
+// away, a button for the whole screen, and Details, which is the record's
+// sheet. Nothing is dimmed but the page behind.
+const isVideo = (r) => kindOf({ mime: r.fields.mime, name: r.fields.name }) === "video";
+
+function thumbURL(v, model, id, size) {
+  const key = `${model}/${id}/${size}`;
+  if (!v.thumbs.has(key)) {
+    const path = recordsUrl(model, id, "/thumb?size=" + size);
+    v.thumbs.set(key, apiRaw("GET", path, { fail: "no picture" }).then(async (res) => URL.createObjectURL(await res.blob())));
+  }
+  return v.thumbs.get(key);
+}
+
+function openViewer(v, n, index, from) {
+  const records = n.records;
+  const box = document.createElement("div");
+  box.className = "v-viewer";
+  box.setAttribute("role", "dialog");
+  box.setAttribute("aria-modal", "true");
+  box.innerHTML =
+    `<div class="v-viewer-top">` +
+    `<span class="v-viewer-said"><span class="v-viewer-title"></span><span class="v-viewer-sub"></span></span>` +
+    `<span class="v-viewer-count"></span>` +
+    `<button type="button" class="v-viewer-details act-chip">Details</button>` +
+    (box.requestFullscreen ? `<button type="button" class="v-viewer-full" aria-label="Whole screen" title="Whole screen">${glyphs.full}</button>` : "") +
+    `<button type="button" class="v-viewer-close" aria-label="Close" title="Close">${glyphs.close}</button></div>` +
+    `<button type="button" class="v-viewer-prev" aria-label="Previous">${glyphs.left}</button>` +
+    `<div class="v-viewer-stage" aria-busy="true"></div>` +
+    `<button type="button" class="v-viewer-next" aria-label="Next">${glyphs.right}</button>`;
+  const stage = box.querySelector(".v-viewer-stage");
+  const prev = box.querySelector(".v-viewer-prev");
+  const next = box.querySelector(".v-viewer-next");
+  let at = index;
+  let turn = 0;
+
+  const close = () => {
+    removeEventListener("keydown", onKey);
+    if (document.fullscreenElement === box) document.exitFullscreen().catch(() => {});
+    stage.replaceChildren();
+    box.remove();
+    document.body.classList.remove("viewing");
+    if (from && from.isConnected) from.focus();
+  };
+  const step = (by) => {
+    const to = at + by;
+    if (to < 0 || to >= records.length) return;
+    at = to;
+    show();
+  };
+  const onKey = (event) => {
+    if (event.key === "Escape") { event.preventDefault(); close(); }
+    else if (event.key === "ArrowLeft") { event.preventDefault(); step(-1); }
+    else if (event.key === "ArrowRight") { event.preventDefault(); step(1); }
+    else if (event.key === "f" || event.key === "F") { event.preventDefault(); whole(); }
+  };
+  const whole = () => {
+    if (!box.requestFullscreen) return;
+    if (document.fullscreenElement === box) document.exitFullscreen().catch(() => {});
+    else box.requestFullscreen().catch(() => toast("The whole screen is not on offer here"));
+  };
+
+  async function show() {
+    const r = records[at];
+    const mine = ++turn;
+    box.querySelector(".v-viewer-title").textContent = titled(v, r, n.title);
+    box.querySelector(".v-viewer-sub").textContent = n.subtitle ? say(v, r, n.subtitle) : "";
+    box.querySelector(".v-viewer-count").textContent = records.length > 1 ? `${at + 1} of ${records.length}` : "";
+    prev.hidden = at === 0;
+    next.hidden = at >= records.length - 1;
+    stage.setAttribute("aria-busy", "true");
+    stage.replaceChildren();
+    const name = String(r.fields.name || titled(v, r, n.title));
+    let media;
+    try {
+      if (isVideo(r)) {
+        const made = await api("POST", recordsUrl(r.model, r.id, "/media"));
+        if (mine !== turn) return;
+        media = document.createElement("video");
+        media.controls = true;
+        media.autoplay = true;
+        media.playsInline = true;
+        media.src = made.url;
+      } else {
+        const url = await thumbURL(v, r.model, r.id, 2048);
+        if (mine !== turn) return;
+        media = document.createElement("img");
+        media.alt = name;
+        media.src = url;
+      }
+    } catch {
+      if (mine !== turn) return;
+      stage.innerHTML = `<p class="v-viewer-none">${esc(name)}<br><span>No picture to show</span></p>`;
+      stage.removeAttribute("aria-busy");
+      return;
+    }
+    media.className = "v-viewer-media";
+    stage.replaceChildren(media);
+    stage.removeAttribute("aria-busy");
+    // The neighbours' pictures, asked for now so an arrow is at once.
+    for (const near of [records[at + 1], records[at - 1]]) {
+      if (near && !isVideo(near)) thumbURL(v, near.model, near.id, 2048).catch(() => {});
+    }
+  }
+
+  box.querySelector(".v-viewer-close").addEventListener("click", close);
+  box.querySelector(".v-viewer-details").addEventListener("click", () => {
+    const hash = sheetOf(v, records[at]);
+    close();
+    if (hash) go(hash);
+  });
+  const full = box.querySelector(".v-viewer-full");
+  if (full) full.addEventListener("click", whole);
+  prev.addEventListener("click", () => step(-1));
+  next.addEventListener("click", () => step(1));
+  // The dark around the picture closes it, as the picture's own lightbox does.
+  stage.addEventListener("click", (event) => { if (event.target === stage) close(); });
+  let touch = null;
+  stage.addEventListener("touchstart", (event) => { touch = event.changedTouches[0].clientX; }, { passive: true });
+  stage.addEventListener("touchend", (event) => {
+    if (touch === null) return;
+    const dx = event.changedTouches[0].clientX - touch;
+    touch = null;
+    if (Math.abs(dx) > 48) step(dx < 0 ? 1 : -1);
+  }, { passive: true });
+  addEventListener("keydown", onKey);
+  document.body.classList.add("viewing");
+  document.body.appendChild(box);
+  box.querySelector(".v-viewer-close").focus();
+  show();
 }
 
 async function rateTile(v, action, record, stars, el) {
@@ -1055,6 +1385,9 @@ async function fillThumb(v, el) {
     img.src = url;
     el.replaceChildren(img);
     el.classList.add("has-img");
+    if (el.classList.contains("v-tile-thumb")) {
+      (img.decode ? img.decode() : Promise.resolve()).catch(() => {}).then(() => { if (el.isConnected) shapeTile(el, img); });
+    }
   } catch {
     el.textContent = el.classList.contains("v-tile-thumb") ? "" : el.getAttribute("aria-label") || "No picture";
     el.classList.add("no-img");
