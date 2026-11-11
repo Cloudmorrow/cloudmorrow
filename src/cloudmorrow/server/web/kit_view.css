@@ -51,6 +51,23 @@
 .v-search input::placeholder { color: var(--muted); }
 .v-search input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
 .v-rows > .group-label:first-of-type { margin-top: 4px; }
+/* The little X at a row's end: faint until hovered. */
+.v-row-item .v-row-close {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin: 0 -4px 0 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.v-row-item .v-row-close svg { width: 14px; height: 14px; }
+.v-row-item .v-row-close:hover, .v-row-item .v-row-close:focus-visible { color: var(--ink); background: color-mix(in srgb, var(--ink) 10%, transparent); }
 .v-split[data-show="main"] > .v-split-side, .v-split[data-show="side"] > .v-split-main { display: none; }
 
 .v-tabs .v-tab-strip { margin: 0 0 12px; }

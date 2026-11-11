@@ -112,6 +112,12 @@ def test_rows_search_and_group_and_a_side_that_folds():
     assert 'type="search"' in code and "row.dataset.find.includes(needle)" in code
     assert "sectionOf(" in code and 'class="group-label"' in code
     assert "view.folded.${v.at.quill.id}/${v.at.screen.id}" in code and "store.set(split.dataset.fold" in code
+    # The X at a row's end runs `close` on that record through press (its confirm first).
+    assert 'class="v-row-close"' in code and "press(v.at.quill, closing, { record: r.id" in code
+    assert ".v-row-item .v-row-close" in VIEW_CSS
+    # The box of a conversation has the focus on a computer, drawn and drawn again.
+    assert 'matchMedia("(min-width: 900px) and (min-height: 600px)")' in code
+    assert "if (onComputer.matches && !v.root.contains(document.activeElement)) box.focus(" in code
     for cls in (".v-search input", ".v-split.folded", ".v-fold", ".v-hidden", ".v-side-head { display: none; }"):
         assert cls in VIEW_CSS, cls
     # An action marked settings is drawn by the settings screen alone, as an admin's is;

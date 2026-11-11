@@ -322,6 +322,7 @@ def every_primitive(van: dict) -> dict:
                 current=van["id"],
                 search="Find a van",
                 group="registration",
+                close="scrap",
             ),
             ui.conversation([van], body="name", mine="name", ask="add-van", name="Fleet", hint="Say it", close="scrap"),
         )
@@ -428,6 +429,25 @@ async def test_rows_narrow_to_what_is_typed_in_their_search_field(fleet):
         await settle(app, pilot)
         assert rows.query_one(ViewCard).display and rows.query_one(".view-group-label").display
         assert not rows.query_one(".view-nomatch").display
+
+
+async def test_x_on_a_row_runs_close_on_that_record_asked_first(fleet):
+    app = fleet
+    async with app.run_test(size=(120, 40)) as pilot:
+        pane = await open_garage(app, pilot)
+        van = vans(app)[0]
+        pane.view_tree = ui.check(ui.rows([van], title="name", close="scrap"))
+        await pane.draw()
+        await settle(app, pilot)
+        card = pane.query_one(ViewCard)
+        assert "✕" in str(card.render_card())
+        card.focus()
+        await pilot.press("x")
+        await until(pilot, lambda: isinstance(app.screen, ConfirmModal))
+        assert app.screen._title == "Scrap this van?"
+        await pilot.click("#confirm")
+        await until(pilot, lambda: not vans(app))
+        assert "Scrapped Transit" in toasts(app)
 
 
 async def test_the_x_on_a_conversation_asks_first_then_runs_close_on_its_record(fleet):

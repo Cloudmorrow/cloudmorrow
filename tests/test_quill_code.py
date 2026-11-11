@@ -194,8 +194,12 @@ def test_a_toggle_and_a_conversation_are_primitives_every_surface_draws():
         {"id": "d2", "model": "chat.conversation", "fields": {"title": "Older", "at": "2024-05-02T10:00:00"}},
         {"id": "d3", "model": "chat.conversation", "fields": {"title": "Undated"}},
     ]
-    grouped = ui.rows(dated, title="title", search="Search conversations", group="at")
-    assert grouped["search"] == "Search conversations" and grouped["group"] == "at"
+    grouped = ui.rows(dated, title="title", search="Search conversations", group="at", close="forget")
+    assert grouped["search"] == "Search conversations" and grouped["group"] == "at" and grouped["close"] == "forget"
+    with pytest.raises(TreeError, match="runs 'forget'"):
+        ui.check(grouped, actions=set(), screens=set())
+    assert "• Undated  [✕ Delete]" in as_text.render(grouped, actions={"forget": "Delete"})
+    grouped["close"] = None
     said = as_text.render(ui.split(grouped, ui.text("main"), fold=True), actions={})
     assert "[Search conversations…]\nToday:\n• Today's\n2024:\n• Older\n• Undated\n" in said
     assert ui.split(grouped, ui.text("main"), fold=True)["fold"] is True

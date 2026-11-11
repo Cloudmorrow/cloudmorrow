@@ -400,6 +400,7 @@ def rows(
     current: str | None = None,
     search: str | None = None,
     group: str | None = None,
+    close: str | None = None,
 ) -> dict:
     """Records as the rows of a list — the app's own rows, as a list screen
     draws them: a title, a line under it, a badge at the end — rather than
@@ -410,7 +411,10 @@ def rows(
     narrows them to the titles and subtitles matching what is typed. *group*
     names a datetime field: the rows, given newest first, fall under
     headings — Today, Yesterday, Last 7 Days, Last 30 Days, then each month
-    of this year and each earlier year — as a long list of documents does."""
+    of this year and each earlier year — as a long list of documents does.
+    *close* names an action on the rows' records: each row ends in a small X
+    that runs it on that record — deleting it, say; give the action a
+    `confirm` in the manifest, and it is asked first."""
     return _node(
         "rows",
         records=_records(records),
@@ -425,6 +429,7 @@ def rows(
         current=str(current) if current else None,
         search=str(search) if search else None,
         group=group,
+        close=close,
     )
 
 
@@ -581,6 +586,7 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
         "current": (str, False),
         "search": (str, False),
         "group": (str, False),
+        "close": (str, False),
     },
     "gallery": {
         "records": (list, True),

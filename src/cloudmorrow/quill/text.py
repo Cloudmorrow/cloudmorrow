@@ -158,6 +158,8 @@ def _lines(node: dict, actions: dict) -> list[str]:
                 head += f" — {value_text(record, node['subtitle'])}"
             if node.get("badge") and value_text(record, node["badge"]):
                 head += f" [{value_text(record, node['badge'])}]"
+            if node.get("close"):
+                head += f"  [✕ {actions.get(node['close'], node['close'])}]"
             out.append(f"{'▶' if node.get('current') == record['id'] else '•'} {head}")
         return out
     if kind == "cards":
