@@ -821,9 +821,14 @@ class RowsNode(Vertical):
 
 
 class ViewCard(Static, can_focus=True):
-    """One of `cards`: its title, subtitle, body and badge. Enter or a click opens it."""
+    """One of `cards`: its title, subtitle, body and badge. Enter or a click
+    opens it; on rows marked `close`, x runs that action on it (asked first)."""
 
-    BINDINGS = [("enter", "open", "Open")]
+    BINDINGS = [("enter", "open", "Open"), ("x", "close", "Close")]
+
+    def action_close(self) -> None:
+        if self.node.get("close"):
+            self.post_message(ViewAct({"action": self.node["close"], "record": self.record}))
 
     def __init__(self, record: dict, node: dict, model: dict | None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
@@ -844,6 +849,8 @@ class ViewCard(Static, can_focus=True):
             text.append("▶ ", style=ACCENT)
         title = fields.get(self.node["title"])
         text.append(str(title) if title not in (None, "") else "(untitled)", style=f"bold {TEXT}")
+        if self.node.get("close"):
+            text.append("  ✕", style=MUTED)
         if self.node.get("badge"):
             badge = fields.get(self.node["badge"])
             if badge not in (None, ""):

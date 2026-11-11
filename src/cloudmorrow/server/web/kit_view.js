@@ -46,6 +46,7 @@ const glyphs = {
 };
 
 // The same test the board uses: a phone has no way to drag anything.
+const onComputer = matchMedia("(min-width: 900px) and (min-height: 600px)");
 
 export async function renderView(at, arg) {
   const params = Object.fromEntries(new URLSearchParams(arg || ""));
@@ -309,7 +310,7 @@ function pressedIn(tree) {
   for (const n of walk(tree)) {
     if (n.action) ids.add(n.action);
     if (n.ask) ids.add(n.ask);
-    if (n.close) ids.add(n.close);
+    if (n.close) ids.add(n.close);   // a conversation's X, or the X on each row
   }
   return ids;
 }
@@ -702,6 +703,10 @@ function wireChats(v) {
     const toBottom = () => { lines.scrollTop = lines.scrollHeight; };
     toBottom();
     growBox(box);
+    // On a computer the box has the focus as soon as the conversation is
+    // drawn — on arriving, and again once the answer is in. A phone would
+    // raise its keyboard over the answer, so there the person taps first.
+    if (onComputer.matches && !v.root.contains(document.activeElement)) box.focus({ preventScroll: true });
     box.addEventListener("input", () => growBox(box));
     // Enter sends on a keyboard, and the return key on a phone is the send
     // key because `enterkeyhint` made it one. Shift+Enter is a new line.
@@ -775,14 +780,20 @@ function drawTable(v, n) {
 // it, a badge at the end; the one that is open lit, beside what it opened.
 function drawRows(v, n) {
   if (!n.records.length) return none(n.empty);
+  // The X at a row's end: the `close` action on that record, through press,
+  // so the manifest's confirm is asked first; the view's one click listener
+  // keeps the press from opening the row.
+  const closing = n.close ? findAction(v.at.quill.id, n.close) : null;
   const row = (r) => {
     const hash = rowGoes(v, n, r);
     const badge = n.badge ? say(v, r, n.badge) : "";
     const sub = n.subtitle ? say(v, r, n.subtitle) : "";
     const title = titled(v, r, n.title);
+    const x = !closing ? "" : `<button type="button" class="v-row-close" aria-label="${esc(closing.label)}: ${esc(title)}" title="${esc(closing.label)}" ` +
+      `${doing(v, () => press(v.at.quill, closing, { record: r.id, here: v.at, after: v.draw }))}>${glyphs.close}</button>`;
     const inner = `<span class="main"><span class="title">${esc(title)}</span>` +
       (sub ? `<span class="meta"><span class="preview">${esc(sub)}</span></span>` : "") + `</span>` +
-      (badge ? `<span class="v-badge">${esc(badge)}</span>` : "");
+      (badge ? `<span class="v-badge">${esc(badge)}</span>` : "") + x;
     const menu = menuOn(v, r, hash);
     const cls = `row v-row-item${n.current && n.current === r.id ? " current" : ""}`;
     const find = `data-find="${esc((title + " " + sub).toLowerCase())}"`;
