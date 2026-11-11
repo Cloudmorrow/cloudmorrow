@@ -145,3 +145,19 @@ def test_a_crop_is_four_numbers_kept_inside_the_picture():
 def test_pieces_fall_on_a_row_to_scale():
     rows = tl.spans([piece(start=0, length=2), piece(start=5, length=1), piece(start=100, length=1)], 0, 0.5, 20)
     assert [(a, b) for a, b, _ in rows] == [(0, 4), (10, 12)]
+
+
+# -- photos and places ------------------------------------------------------------------
+def test_a_photo_is_material_and_goes_on_a_video_track():
+    assert tl.media_kind("sun.JPG") == "image" and tl.media_kind("x", "image/heic") == "image"
+    assert tl.media_kind("clip.mov") == "video" and tl.media_kind("notes.md") is None
+    assert tl.track_kind_for("image") == "video" and tl.track_kind_for("audio") == "audio"
+    assert tl.first_track(TRACKS, "image")["id"] == "V1"
+    assert tl.IMAGE_LENGTH == 5.0
+
+
+def test_a_place_is_a_box_in_the_frame_or_nothing():
+    assert tl.place_of({}) is None and tl.place_of({"place": None}) is None
+    assert tl.place_of({"place": {"x": 0, "y": 0, "w": 100, "h": 100}}) is None
+    assert tl.place_of({"place": {"x": "62", "y": 62, "w": 34, "h": 34}}) == {"x": 62, "y": 62, "w": 34, "h": 34}
+    assert tl.place_of({"place": {"x": 90, "y": 90, "w": 50, "h": 50}}) == {"x": 50, "y": 50, "w": 50, "h": 50}

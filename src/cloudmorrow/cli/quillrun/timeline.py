@@ -223,6 +223,8 @@ async def _add(line: Timeline, project: dict, pieces: list[dict], rest: list[str
     length = timing.get("length")
     if length is None:
         length = tl.seconds((info or {}).get("duration")) or None
+    if not length and (file["kind"] == "image" or (info or {}).get("image")):
+        length = tl.IMAGE_LENGTH
     if not length:
         fail(f"how long is {file['fields'].get('name')}? There is no frames API to ask: --length <seconds>")
     tracks = tracks_of(project["fields"])

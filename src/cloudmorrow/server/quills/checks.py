@@ -413,6 +413,7 @@ TIMELINE_PIECE = (
     ("length", ("decimal",), True),
     ("volume", ("decimal",), False),
     ("muted", ("bool",), False),
+    ("place", ("json",), False),
 )
 TIMELINE_EFFECT = (
     ("kind", ("enum",), True),

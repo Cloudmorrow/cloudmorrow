@@ -701,11 +701,11 @@ class TimelinePane(KitPane):
         table.clear()
         for file in self.material:
             f = file.get("fields") or {}
-            glyph = "▶" if file["kind"] == "video" else "♪"
+            glyph = {"video": "▶", "image": "▣"}.get(file["kind"], "♪")
             folder = str(f.get("folder") or "")
             within = str(self.line.media.get("within") or "").strip("/")
             folder = folder.strip("/").removeprefix(within).strip("/")
-            name = Text(f"{glyph} ", style=SKY if glyph == "▶" else GOOD)
+            name = Text(f"{glyph} ", style=GOOD if glyph == "♪" else SKY)
             if folder:
                 name.append(f"{folder}/", style=MUTED)
             name.append(str(f.get("name") or ""))
@@ -716,7 +716,7 @@ class TimelinePane(KitPane):
             table.move_cursor(row=min(max(row, 0), len(self.material) - 1))
         else:
             where = " / ".join(str(v) for v in self.line.media.values()) or "the drive"
-            table.add_row(Text(f"No videos or sounds in {where}.", style=MUTED), "")
+            table.add_row(Text(f"No videos, photos or sounds in {where}.", style=MUTED), "")
 
     def draw_effects(self) -> None:
         piece = self.selected
@@ -1066,6 +1066,9 @@ class TimelinePane(KitPane):
             except ApiError:
                 info = None
         length = tl.seconds((info or {}).get("duration"))
+        # A photo stays a few seconds; it is trimmed longer or shorter like any piece.
+        if not length and (file["kind"] == "image" or (info or {}).get("image")):
+            length = tl.IMAGE_LENGTH
         if not length:
             asked = await self.app.push_screen_wait(
                 PromptModal(

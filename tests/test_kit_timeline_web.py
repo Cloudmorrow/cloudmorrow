@@ -250,6 +250,15 @@ def test_moves_snap_to_edges(tmp_path):
         ["snapMove", -3, 2, [], 0.2],
     )
     assert (by_start, by_end, free, never_before_zero) == (5, 3, 8, 0)
+    # Lengths that do not add back exactly (0.042 + 6 - 6 is not 0.042 to a
+    # computer) snapped nothing before: the start still goes onto the edge.
+    onto_zero, onto_end, third = run(
+        tmp_path,
+        ["snapMove", 0.042, 6, [0, 0], 0.105],
+        ["snapMove", 6.044, 4, [0, 0.042, 6.042], 0.105],
+        ["snapMove", 10.097, 6, [0, 0.042, 6.042, 6.044, 10.044], 0.105],
+    )
+    assert (onto_zero, onto_end, third) == (0, 6.042, 10.044)
 
 
 @node
@@ -291,6 +300,78 @@ def test_a_new_project_takes_a_size_or_the_first_clips(tmp_path):
     assert hd == {"width": 1920, "height": 1080} == tl.size_from("1920x1080")
     assert odd == {"width": 1002, "height": 16} == tl.size_from("1001 × 9")
     assert nonsense is None and tl.size_from("big") is None
+
+
+@node
+def test_photos_are_material_and_go_on_video_tracks(tmp_path):
+    photo, by_type, on_video, on_audio, first, length = run(
+        tmp_path,
+        ["mediaKind", "sun.JPG", ""],
+        ["mediaKind", "x", "image/heic"],
+        ["carries", {"id": "V1", "kind": "video"}, "image"],
+        ["carries", {"id": "A1", "kind": "audio"}, "image"],
+        ["trackFor", TRACKS4, "image", "A1"],
+        ["IMAGE_LENGTH"],
+    )
+    assert (photo, by_type) == ("image", "image")
+    assert on_video is True and on_audio is False
+    assert first["id"] == "V1", "a photo asked onto a sound track goes on Video 1 instead"
+    from cloudmorrow.quill import timeline as tl
+
+    assert length == tl.IMAGE_LENGTH == 5
+
+
+@node
+def test_a_piece_added_at_the_playhead_follows_what_is_on_the_track(tmp_path):
+    pieces = [piece("a", "V1", 0, 4), piece("b", "V1", 6, 2)]
+    free, inside, would_overlap, other_track = run(
+        tmp_path,
+        ["addAt", pieces, "V1", 4.5, 1],
+        ["addAt", pieces, "V1", 2, 5],
+        ["addAt", pieces, "V1", 5, 3],
+        ["addAt", pieces, "V2", 2, 5],
+    )
+    assert free == 4.5 and inside == 8 and would_overlap == 8 and other_track == 2
+
+
+@node
+def test_what_is_seen_is_the_filling_piece_and_the_small_ones_over_it(tmp_path):
+    small = {"x": 50, "y": 50, "w": 40, "h": 40}
+    low, high, over = piece("low", "V1", 0, 4), piece("high", "V2", 0, 4), piece("over", "V3", 0, 4, place=small)
+    tracks = [{"id": "V3", "kind": "video"}, {"id": "V2", "kind": "video"}, {"id": "V1", "kind": "video"}]
+    seen, alone, gap, none, whole, rect, fitted = run(
+        tmp_path,
+        ["layersAt", [low, high, over], tracks, 1],
+        ["layersAt", [low, over], tracks, 1],
+        ["layersAt", [over], tracks, 5],
+        ["placeOf", {"x": 0, "y": 0, "w": 100, "h": 100}],
+        ["placeOf", {"x": 90, "y": 90, "w": 50, "h": 50}],
+        ["placeRect", None, 100, 100, {"width": 1920, "height": 1080}],
+        ["placeRect", small, 100, 100, {"width": 1000, "height": 500}],
+    )
+    assert [p["id"] for p in seen] == ["high", "over"], "what is under a filling piece is not drawn"
+    assert [p["id"] for p in alone] == ["low", "over"] and gap == []
+    assert none is None and whole == {"x": 50, "y": 50, "w": 50, "h": 50}
+    # A square picture fitted and centred: in the whole frame, then in a wide box.
+    assert rect == {"x": 420, "y": 0, "w": 1080, "h": 1080}
+    assert fitted == {"x": 600, "y": 250, "w": 200, "h": 200}
+
+
+def test_media_are_tiles_dragged_onto_the_tracks_and_the_gear_opens_the_project():
+    code = js_code(TIMELINE_JS)
+    # The drives: the share records, chosen above the tiles; the screen's share first.
+    assert 'api("GET", recordsUrl("share"))' in code and "lastDrive.get(at.quill.id)" in code
+    assert 'class="tl-drive"' in code and "tl-target" not in code, "no track to choose: the drop says"
+    # A tile is a picture from the server's small copy, dragged, or tapped for the playhead.
+    assert "/thumb?size=${TILE}" in code and 'tile.addEventListener("dragstart"' in code
+    assert 'lanes.addEventListener("drop"' in code and 'snapMove(at, length, edgesBut(ed, ""), 10 / ed.zoom)' in code
+    assert "addAt(ed.pieces, track.id, ed.t, length)" in code
+    # The project's sheet is behind a gear, not three dots.
+    assert 'pixelIcon("settings")' in code and "glyphs.more" not in code
+    # A piece's place: a box on the viewer, and the panel's buttons.
+    assert 'what: "place"' in code and "tl-place-shrink" in code and "tl-place-fill" in code
+    assert "patch(ed.b.pieces.id, piece.id, { place: value })" in code
+    assert ".tl-tile" in TIMELINE_CSS and ".tl-ghost" in TIMELINE_CSS and ".tl-box.place" in TIMELINE_CSS
 
 
 def test_new_is_a_button_with_a_form_and_plus_on_the_tracks_adds_a_clip():

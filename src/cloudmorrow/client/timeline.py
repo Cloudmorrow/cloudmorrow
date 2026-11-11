@@ -61,7 +61,7 @@ class Timeline:
         return by_piece
 
     async def material(self) -> list[dict]:
-        """The videos and sounds under `media`, by folder and name, each with its `kind`."""
+        """The videos, photos and sounds under `media`, by folder and name, each with its `kind`."""
         found = await self.api.records("file", **self.media)
         material = []
         for record in found:
@@ -121,12 +121,14 @@ class Timeline:
         info: dict | None = None,
     ) -> dict:
         """*file* on the timeline at *at*, all *length* of it, on *track* or the first
-        track of its kind; the project gets its size and fps from *info* when it has none."""
+        track of its kind (a photo goes on a video track); the project gets its size
+        and fps from *info* when it has none, from a video."""
         tracks = tracks_of(project.get("fields") or {})
         if not track:
             first = tl.first_track(tracks, file.get("kind") or "video")
             if first is None:
-                raise ApiError(f"the project has no {file.get('kind')} track", status_code=400)
+                wanted = tl.track_kind_for(file.get("kind") or "video")
+                raise ApiError(f"the project has no {wanted} track", status_code=400)
             track = first["id"]
         elif track not in {t["id"] for t in tracks}:
             raise ApiError(f"the project has no track {track}: {', '.join(t['id'] for t in tracks)}", status_code=400)
@@ -145,8 +147,9 @@ class Timeline:
         return made
 
     async def sized(self, project: dict, info: dict | None) -> dict | None:
-        """The project's width, height and fps from *info*, where it has none yet."""
-        if not info:
+        """The project's width, height and fps from *info*, where it has none yet: a
+        video's, never a photo's."""
+        if not info or info.get("image"):
             return None
         have = project.get("fields") or {}
         changes = {}

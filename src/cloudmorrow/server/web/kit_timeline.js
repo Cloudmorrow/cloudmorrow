@@ -10,13 +10,18 @@
      #/q/<quill>/<screen>/<id>     one project in the editor
      #/q/<quill>/<screen>/project=<id>   the same, as a Quill's `go` says it
 
-   The editor is five things around one clock. The material, by folder,
-   with Add. The viewer: a canvas the top piece's picture is drawn on each
-   frame from a <video>, every blur drawn over it as a blurred copy of its
-   box, and the crop either shown (as a box to move, outside it dimmed) or
-   kept to. The tracks, a row each, with the pieces to scale, to choose,
-   drag, trim, split, mute and delete. The selected piece's effects, with
-   their keyframes. And the header's export, which says how it is going.
+   The editor is five things around one clock. The media: the videos,
+   photos and sounds of a drive (the screen's, or another chosen above
+   them), as thumbnails, each dragged onto a track where it should go, or
+   tapped to go at the playhead. The viewer: a canvas every piece seen at
+   the moment is drawn on, bottom track first, from a <video> or an <img>,
+   each in its place (the whole frame, or a box in it, so a photo or a clip
+   can sit small over another), every blur drawn over it as a blurred copy
+   of its box, and the crop either shown (as a box to move, outside it
+   dimmed) or kept to. The tracks, a row each, with the pieces to scale, to
+   choose, drag, trim, split, mute and delete. The selected piece's place and
+   effects, with their keyframes. And the header's export, which says how
+   it is going.
 
    Sound is every audible piece at the playhead, each through its own
    hidden element, kept within a sixth of a second of the clock. A <video>
@@ -31,16 +36,17 @@
    keyframes — is kit_timeline_rules.js, the same rules the terminal has. */
 
 import {
-  api, apiRaw, app, esc, formatDate, go, heading, icons, mount, nav, occupy, recordsUrl, replace,
+  api, apiRaw, app, esc, formatDate, go, heading, icons, mount, nav, occupy, pixelIcon, recordsUrl, replace,
   renderRoute, seconds, tabs, toast, vacate, wireShell,
 } from "./core.js";
 import { aOr, mayWrite, plural, sheetHash } from "./kit.js";
 import { press, said } from "./actions.js";
 import { openSheet } from "./dialog.js";
 import {
-  boxAt, clamp, clockOf, cropOf, dropKeyframe, effectOn, fitBox, framesPath, keyframesOf, lengthOf,
-  lengthOfCut, mediaKind, ms, partsOf, pictureAt, setKeyframe, shiftKeyframes, sizeFrom, SIZES, snapMove,
-  snapTo, soundsAt, splitKeyframes, splitPiece, trackFor, tracksOf, trimEnd, trimStart, wholeFrame,
+  addAt, boxAt, carries, clamp, clockOf, cropOf, dropKeyframe, effectOn, fitBox, framesPath, IMAGE_LENGTH,
+  keyframesOf, layersAt, lengthOf, lengthOfCut, mediaKind, ms, partsOf, pictureAt, placeOf, placeRect,
+  setKeyframe, shiftKeyframes, sizeFrom, SIZES, snapMove, snapTo, soundsAt, splitKeyframes, splitPiece,
+  trackFor, tracksOf, trimEnd, trimStart, wholeFrame,
 } from "./kit_timeline_rules.js";
 
 const glyphs = {
@@ -60,9 +66,12 @@ const glyphs = {
   sound: '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7h3l4-3.5v11l-4-3.5h-3z"/><path d="M12.5 6.5a3.5 3.5 0 0 1 0 5M14.5 4.5a6.5 6.5 0 0 1 0 9"/></svg>',
   video: '<svg width="20" height="18" viewBox="0 0 22 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="3" width="13" height="14" rx="2"/><path d="m14.5 8 6-3v10l-6-3z"/></svg>',
   audio: '<svg width="18" height="20" viewBox="0 0 20 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.5V5l10-2v11.5"/><circle cx="4.5" cy="16.5" r="2.5"/><circle cx="14.5" cy="14.5" r="2.5"/></svg>',
+  image: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="2" y="3" width="16" height="14" rx="2"/><circle cx="7" cy="8" r="1.6"/><path d="m2.5 15 4.5-4.5 3 3 3-3 4.5 4.5"/></svg>',
   close: '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m2.5 2.5 7 7M9.5 2.5l-7 7"/></svg>',
-  more: '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
+  shrink: '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="2.5" width="15" height="13" rx="1.5"/><rect x="8.5" y="8" width="6" height="5" rx="1" fill="currentColor" stroke="none"/></svg>',
 };
+// How big a tile's picture is asked for, in pixels on its long edge.
+const TILE = 256;
 
 // How a project's status is toned beside Export; anything else is said plainly.
 const TONES = { queued: "info", rendering: "info", done: "good", failed: "bad" };
@@ -116,6 +125,7 @@ const pieceOf = (record) => ({
   track: String(record.fields.track || ""),
   source: String(record.fields.source || ""),
   name: String(record.fields.name || ""),
+  place: placeOf(record.fields.place),
   ...partsOf(record.fields),
 });
 
@@ -266,15 +276,18 @@ async function renderEditorFor(at, b, id) {
     at, b, id,
     ...loaded,
     tracks: tracksOf(loaded.project.fields),
-    files: new Map(),            // the material: file id → {id, name, folder, kind, modified}
+    files: new Map(),            // the media: file id → {id, name, folder, kind, modified}
+    drives: [],                  // where media can come from: [{id, label}], the screen's first
+    drive: lastDrive.get(at.quill.id) || String(b.media.share || ""),
     info: new Map(),             // what is known of a source: file id → {duration, width, height}
     links: new Map(),            // media links: file id → {url, expires, asking}
-    pictures: new Map(),         // a muted <video> per file, for the picture
+    pictures: new Map(),         // a muted <video>, or an <img>, per file, for the picture
     sounds: new Map(),           // an element per piece, for its sound
-    thumbs: new Map(),           // with a frames API: a picture per piece's first frame
+    thumbs: new Map(),           // a picture per piece: its first frame, or the photo
+    tiles: new Map(),            // the media's pictures: file id → an object URL
     t: 0, playing: false, from: 0, since: 0,
     zoom: 0,                     // pixels a second on the tracks; 0 until they are measured
-    selected: "", effect: "", cropping: false, target: "",
+    selected: "", effect: "", cropping: false,
     dirty: true, alive: true, writing: Promise.resolve(),
     writes: mayWrite(b.pieces),
     writesEffects: !!b.effects && mayWrite(b.effects),
@@ -289,16 +302,16 @@ async function renderEditorFor(at, b, id) {
   const title = String(ed.project.fields[b.title] || "").trim() || "Untitled";
   mount(nav({ back: at.base, backLabel: at.screen.label, title }) + `
     <main class="kit-timeline">
-      ${heading(title, `<span class="tl-head-actions"></span><a class="button" href="${sheetHash(at, b.model.id, id)}" aria-label="${esc(b.model.label)}">${glyphs.more}</a>`)}
+      ${heading(title, `<span class="tl-head-actions"></span><a class="button tl-settings" href="${sheetHash(at, b.model.id, id)}" aria-label="${esc(b.model.label)} settings" title="${esc(b.model.label)} settings">${pixelIcon("settings")}</a>`)}
       <div class="tl-headbar" role="status"></div>
       <div class="tl-desk">
-        <section class="tl-material" aria-label="Material"></section>
+        <section class="tl-material" aria-label="Media"></section>
         <section class="tl-viewer">
           <div class="tl-stage-box"><div class="tl-stage">
             <canvas aria-label="The cut at the playhead"></canvas><div class="tl-over"></div>
           </div></div>
           <div class="tl-transport">
-            <button type="button" class="tl-material-open" aria-label="Material">${glyphs.material}</button>
+            <button type="button" class="tl-material-open" aria-label="Media">${glyphs.material}</button>
             <button type="button" data-go="first" aria-label="To the start">${glyphs.first}</button>
             <button type="button" data-go="back" aria-label="A frame back">${glyphs.back}</button>
             <button type="button" class="tl-play" aria-label="Play">${glyphs.play}</button>
@@ -362,14 +375,14 @@ async function fillBlanks(ed) {
   const blank = ed.pieces.filter((p) => !(p.length > 0) && p.source);
   if (!blank.length || !ed.writes) return;
   for (const piece of blank) {
-    const info = await lengthFor(ed, { id: piece.source, name: piece.name, kind: "video" });
-    if (!ed.alive || !info || !(info.duration > 0)) continue;
+    const info = await lengthFor(ed, { id: piece.source, name: piece.name, kind: mediaKind(piece.name) || "video" });
+    if (!ed.alive || !info || !(info.duration > 0 || info.image)) continue;
     know(ed, piece.source, info);
-    const length = ms(Math.max(0, info.duration - piece.offset));
+    const length = info.image ? IMAGE_LENGTH : ms(Math.max(0, info.duration - piece.offset));
     await write(ed, async () => {
       await patch(ed.b.pieces.id, piece.id, { length });
       piece.length = length;
-      const size = blanksFrom(ed, info);
+      const size = info.image ? null : blanksFrom(ed, info);
       if (size) {
         Object.assign(ed.project.fields, size);
         await patch(ed.b.model.id, ed.id, size);
@@ -405,12 +418,14 @@ function stopEditor(ed) {
   if (ed.resize) ed.resize.disconnect();
   if (ed.onKey) removeEventListener("keydown", ed.onKey);
   for (const el of [...ed.pictures.values(), ...ed.sounds.values()]) {
+    if (el.tagName === "IMG") { el.removeAttribute("src"); continue; }
     el.pause();
     el.removeAttribute("src");
     el.load();
   }
   if (ed.audio) ed.audio.close().catch(() => {});
-  for (const url of ed.thumbs.values()) if (url) URL.revokeObjectURL(url);
+  for (const url of [...ed.thumbs.values(), ...ed.tiles.values()]) if (url) URL.revokeObjectURL(url);
+  if (ed.watcher) ed.watcher.disconnect();
   closeMaterialSheet();
   if (live === ed) live = null;
 }
@@ -429,11 +444,23 @@ const frameSize = (ed) => {
 const crop = (ed) => cropOf(ed.project.fields.crop);
 /** The part of the frame the viewer shows: all of it while cropping, else the crop. */
 const viewOf = (ed) => (ed.cropping ? { x: 0, y: 0, w: 100, h: 100 } : crop(ed));
-/** Whether a source is a sound only: by the material's type, else by its name. */
-const soundOnly = (ed, piece) => {
+/** What a source is — "video", "audio" or "image" — by the media's type, else by its name. */
+const kindOf = (ed, piece) => {
   const file = ed.files.get(piece.source);
-  return (file ? file.kind : mediaKind(piece.name)) === "audio";
+  const info = ed.info.get(piece.source);
+  if (info && info.image) return "image";
+  return (file ? file.kind : mediaKind(piece.name)) || "video";
 };
+/** Whether a source is a sound only. */
+const soundOnly = (ed, piece) => kindOf(ed, piece) === "audio";
+const isImage = (ed, piece) => kindOf(ed, piece) === "image";
+/** The source's length, for a trim: a photo can be as long as you like. */
+const sourceLength = (ed, piece) => {
+  const info = ed.info.get(piece.source);
+  return info && info.duration > 0 && !info.image ? info.duration : Infinity;
+};
+/** The pieces that are seen, and where: on video tracks, with a picture. */
+const picturesOf = (ed) => ed.pieces.filter((p) => !soundOnly(ed, p) && (trackById(ed, p.track) || {}).kind === "video");
 const now = (ed) => (ed.playing ? ed.from + (performance.now() - ed.since) / 1000 : ed.t);
 
 // -- writing ----------------------------------------------------------------------------------------
@@ -508,9 +535,21 @@ function fed(ed, el, fileId) {
   return true;
 }
 
-function pictureOf(ed, fileId) {
+/** The picture of a file: a muted <video>, or an <img> for a photo. */
+function pictureOf(ed, fileId, kind = "video") {
   let el = ed.pictures.get(fileId);
   if (el) return el;
+  if (kind === "image") {
+    el = document.createElement("img");
+    el.decoding = "async";
+    el.addEventListener("load", () => {
+      know(ed, fileId, { duration: 0, width: el.naturalWidth, height: el.naturalHeight, image: true });
+      ed.dirty = true;
+    });
+    ed.root.querySelector(".tl-media").append(el);
+    ed.pictures.set(fileId, el);
+    return el;
+  }
   el = document.createElement("video");
   el.muted = true;
   el.playsInline = true;
@@ -541,27 +580,34 @@ function soundOf(ed, piece) {
 
 /** What a source is: its length and size, as the media element or the frames API said. */
 function know(ed, fileId, info) {
-  if (!Number.isFinite(info.duration) || info.duration <= 0) return;
+  if (!info.image && (!Number.isFinite(info.duration) || info.duration <= 0)) return;
   const had = ed.info.get(fileId) || {};
   ed.info.set(fileId, { ...had, ...info });
   known.set(fileId, { ...had, ...info });
 }
 
+/** Whether a picture's element has a frame to draw. */
+const ready = (el) => (el.tagName === "IMG" ? el.complete && el.naturalWidth > 0 : el.readyState >= 2);
+const sizeOfEl = (el) => (el.tagName === "IMG" ? { w: el.naturalWidth, h: el.naturalHeight } : { w: el.videoWidth, h: el.videoHeight });
+
 /** Get a piece's elements going, so its first frame is there before it is played. */
 function prepare(ed, piece) {
-  if (!soundOnly(ed, piece)) {
-    const el = pictureOf(ed, piece.source);
-    fed(ed, el, piece.source);
-  }
-  fed(ed, soundOf(ed, piece), piece.source);
-  if (ed.b.frames && !ed.thumbs.has(piece.id)) thumbFor(ed, piece);
+  const kind = kindOf(ed, piece);
+  if (kind !== "audio") fed(ed, pictureOf(ed, piece.source, kind), piece.source);
+  if (kind !== "image") fed(ed, soundOf(ed, piece), piece.source);
+  if (!ed.thumbs.has(piece.id)) thumbFor(ed, piece);
 }
 
-// With a frames API, a piece shows its first frame on the tracks.
+// A piece shows its picture on the tracks: its first frame, from the frames
+// API when there is one, else the server's small copy (a photo's always).
 async function thumbFor(ed, piece) {
   ed.thumbs.set(piece.id, "");
+  const kind = kindOf(ed, piece);
+  if (kind === "audio") return;
   try {
-    const res = await apiRaw("GET", `${ed.b.frames}/source?file=${encodeURIComponent(piece.source)}&t=${piece.offset}&w=160`);
+    const res = kind === "video" && ed.b.frames
+      ? await apiRaw("GET", `${ed.b.frames}/source?file=${encodeURIComponent(piece.source)}&t=${piece.offset}&w=160`)
+      : await apiRaw("GET", recordsUrl("file", piece.source) + "/thumb?size=160", { fail: "no thumbnail" });
     const url = URL.createObjectURL(await res.blob());
     if (!ed.alive) { URL.revokeObjectURL(url); return; }
     ed.thumbs.set(piece.id, url);
@@ -593,7 +639,7 @@ function pause(ed) {
   if (!ed.playing) return;
   ed.t = Math.min(now(ed), total(ed));
   ed.playing = false;
-  for (const el of [...ed.pictures.values(), ...ed.sounds.values()]) el.pause();
+  for (const el of [...ed.pictures.values(), ...ed.sounds.values()]) if (el.tagName !== "IMG") el.pause();
   ed.dirty = true;
   drawPlay(ed);
   placeOverlay(ed);
@@ -640,46 +686,49 @@ function tick(ed) {
   }
 }
 
-/** Put every element where the clock says: the picture's <video> at its
-    frame, each audible piece's sound at its moment, the rest stopped.
-    Answers the piece whose picture is shown, and its element. */
+/** Put every element where the clock says: each seen piece's <video> at
+    its frame, each audible piece's sound at its moment, the rest stopped.
+    Answers the pieces whose pictures are seen, bottom to top, each with its
+    element. */
 function drive(ed, t) {
-  const pictures = ed.pieces.filter((p) => !soundOnly(ed, p));
-  const top = pictureAt(pictures, ed.tracks, t);
-  let shown = null;
+  const pictures = picturesOf(ed);
+  const layers = layersAt(pictures, ed.tracks, t);
+  const top = layers.length ? layers[layers.length - 1] : null;
+  const playing = new Set(layers.map((p) => p.source));
   for (const [fileId, el] of ed.pictures) {
-    if (top && fileId === top.source) continue;
+    if (playing.has(fileId) || el.tagName === "IMG") continue;
     if (!el.paused) el.pause();
   }
-  if (top) {
-    const el = pictureOf(ed, top.source);
-    shown = { piece: top, el };
-    if (fed(ed, el, top.source)) {
-      const want = top.offset + (t - top.start);
-      if (ed.playing) {
-        // Waiting for the picture holds the clock rather than running ahead of it.
-        if (el.seeking || el.readyState < 3) { ed.from = t; ed.since = performance.now(); }
-        if (Math.abs(el.currentTime - want) > 0.3 && !el.seeking) el.currentTime = want;
-        if (el.paused) el.play().catch(() => {});
-      } else {
-        if (!el.paused) el.pause();
-        if (el.wanted !== want) { el.wanted = want; el.currentTime = want; }
-      }
-    }
-    // The next piece's picture, seeked ahead, so the cut to it is a cut.
+  const shown = [];
+  for (const piece of layers) {
+    const kind = kindOf(ed, piece);
+    const el = pictureOf(ed, piece.source, kind);
+    shown.push({ piece, el });
+    if (!fed(ed, el, piece.source) || kind === "image") continue;
+    const want = piece.offset + (t - piece.start);
     if (ed.playing) {
-      const next = pictureAt(pictures, ed.tracks, t + 0.6);
-      if (next && next.source !== top.source) {
-        const other = pictureOf(ed, next.source);
-        const at = next.offset + Math.max(0, t + 0.6 - next.start);
-        if (fed(ed, other, next.source) && other.paused && !other.seeking && Math.abs(other.currentTime - at) > 0.3) other.currentTime = at;
-      }
+      // Waiting for the top picture holds the clock rather than running ahead of it.
+      if (piece === top && (el.seeking || el.readyState < 3)) { ed.from = t; ed.since = performance.now(); }
+      if (Math.abs(el.currentTime - want) > 0.3 && !el.seeking) el.currentTime = want;
+      if (el.paused) el.play().catch(() => {});
+    } else {
+      if (!el.paused) el.pause();
+      if (el.wanted !== want) { el.wanted = want; el.currentTime = want; }
+    }
+  }
+  // The next piece's picture, seeked ahead, so the cut to it is a cut.
+  if (ed.playing) {
+    const next = pictureAt(pictures, ed.tracks, t + 0.6);
+    if (next && !playing.has(next.source) && kindOf(ed, next) === "video") {
+      const other = pictureOf(ed, next.source);
+      const at = next.offset + Math.max(0, t + 0.6 - next.start);
+      if (fed(ed, other, next.source) && other.paused && !other.seeking && Math.abs(other.currentTime - at) > 0.3) other.currentTime = at;
     }
   }
   const heard = ed.playing ? new Set(soundsAt(ed.pieces, ed.tracks, t).map((p) => p.id)) : new Set();
   for (const piece of ed.pieces) {
     const el = ed.sounds.get(piece.id);
-    if (!heard.has(piece.id)) {
+    if (!heard.has(piece.id) || isImage(ed, piece)) {
       if (el && !el.paused) el.pause();
       continue;
     }
@@ -739,7 +788,8 @@ function fitStage(ed) {
   ed.dirty = true;
 }
 
-/** One frame of the cut: the picture, its blurs, and the crop kept to. */
+/** One frame of the cut: every seen piece's picture in its place, bottom
+    to top, each with its blurs, and the crop kept to. */
 function paint(ed, shown, t) {
   const { ctx, canvas } = ed;
   const frame = frameSize(ed);
@@ -752,26 +802,24 @@ function paint(ed, shown, t) {
   ctx.filter = "none";
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  if (!shown || shown.el.readyState < 2) return;
-  const { el, piece } = shown;
-  // The source fitted inside the frame, as the export puts it.
-  const sw = el.videoWidth || frame.width;
-  const sh = el.videoHeight || frame.height;
-  const fit = Math.min(frame.width / sw, frame.height / sh);
-  const dw = sw * fit;
-  const dh = sh * fit;
-  ctx.setTransform(s, 0, 0, s, -ox * s, -oy * s);
-  ctx.drawImage(el, (frame.width - dw) / 2, (frame.height - dh) / 2, dw, dh);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  for (const effect of effectsOn(ed, piece)) {
-    if (effect.kind !== "blur" || !effectOn(effect.keyframes, t - piece.start)) continue;
-    const box = boxAt(effect.keyframes, t - piece.start);
-    const x = (box.x / 100 * frame.width - ox) * s;
-    const y = (box.y / 100 * frame.height - oy) * s;
-    const w = box.w / 100 * frame.width * s;
-    const h = box.h / 100 * frame.height * s;
-    const radius = Math.max(2, effect.strength / 100 * 0.15 * Math.min(frame.width, frame.height) * s);
-    blur(ctx, x, y, w, h, radius);
+  for (const { el, piece } of shown || []) {
+    if (!ready(el)) continue;
+    // The source fitted inside its place — the frame, or a box in it — as the export puts it.
+    const size = sizeOfEl(el);
+    const at = placeRect(piece.place, size.w || frame.width, size.h || frame.height, frame);
+    ctx.setTransform(s, 0, 0, s, -ox * s, -oy * s);
+    ctx.drawImage(el, at.x, at.y, at.w, at.h);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    for (const effect of effectsOn(ed, piece)) {
+      if (effect.kind !== "blur" || !effectOn(effect.keyframes, t - piece.start)) continue;
+      const box = boxAt(effect.keyframes, t - piece.start);
+      const x = (box.x / 100 * frame.width - ox) * s;
+      const y = (box.y / 100 * frame.height - oy) * s;
+      const w = box.w / 100 * frame.width * s;
+      const h = box.h / 100 * frame.height * s;
+      const radius = Math.max(2, effect.strength / 100 * 0.15 * Math.min(frame.width, frame.height) * s);
+      blur(ctx, x, y, w, h, radius);
+    }
   }
 }
 
@@ -817,17 +865,22 @@ function showTime(ed, t) {
 }
 
 // -- the box on the viewer: a blur's, or the crop --------------------------------------------------
-/** The box drawn over the picture, if any: the crop while cropping, else the
-    chosen blur of the chosen piece while the playhead is on that piece. */
+/** The box drawn over the picture, if any: the crop while cropping, else
+    the chosen blur of the chosen piece, else that piece's place when it has
+    one — while the playhead is on the piece. */
 function overlayBox(ed) {
   if (ed.cropping) return { what: "crop", box: crop(ed) };
   const piece = pieceById(ed, ed.selected);
-  const effect = ed.effects.find((e) => e.id === ed.effect && e.kind === "blur");
-  if (!piece || !effect || !effect.keyframes.length) return null;
+  if (!piece) return null;
   const t = now(ed);
   if (t < piece.start || t >= piece.start + piece.length) return null;
   const local = t - piece.start;
-  return { what: "blur", box: boxAt(effect.keyframes, local), on: effectOn(effect.keyframes, local), effect, piece };
+  const effect = ed.effects.find((e) => e.id === ed.effect && e.kind === "blur");
+  if (effect && effect.keyframes.length) {
+    return { what: "blur", box: boxAt(effect.keyframes, local), on: effectOn(effect.keyframes, local), effect, piece };
+  }
+  if (piece.place && picturesOf(ed).includes(piece)) return { what: "place", box: piece.place, piece };
+  return null;
 }
 
 const HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
@@ -843,7 +896,7 @@ function placeOverlay(ed) {
   const { box } = shown;
   let el = ed.over.querySelector(".tl-box");
   if (!el || el.dataset.what !== shown.what) {
-    const writes = shown.what === "crop" ? ed.writesProject : ed.writesEffects;
+    const writes = shown.what === "crop" ? ed.writesProject : shown.what === "place" ? ed.writes : ed.writesEffects;
     ed.over.innerHTML = `<div class="tl-box ${shown.what}" data-what="${shown.what}">` +
       (writes ? HANDLES.map((h) => `<i data-h="${h}"></i>`).join("") : "") + `</div>`;
     el = ed.over.firstChild;
@@ -860,7 +913,8 @@ function wireOverlay(ed) {
     const el = event.target.closest(".tl-box");
     if (!el || event.button > 0) return;
     const shown = overlayBox(ed);
-    if (!shown || (shown.what === "crop" ? !ed.writesProject : !ed.writesEffects)) return;
+    const may = { crop: ed.writesProject, place: ed.writes, blur: ed.writesEffects }[shown ? shown.what : ""];
+    if (!shown || !may) return;
     event.preventDefault();
     el.setPointerCapture(event.pointerId);
     const handle = event.target.dataset.h || "";
@@ -876,6 +930,9 @@ function wireOverlay(ed) {
       if (!moved) return;
       if (shown.what === "crop") {
         ed.project.fields.crop = moved;
+      } else if (shown.what === "place") {
+        const piece = pieceById(ed, shown.piece.id);
+        if (piece) piece.place = moved;
       } else {
         const piece = pieceById(ed, shown.piece.id);
         const effect = ed.effects.find((e) => e.id === shown.effect.id);
@@ -901,7 +958,7 @@ function wireOverlay(ed) {
       if (b.w < 0) { b.x += b.w; b.w = -b.w; }
       if (b.h < 0) { b.y += b.h; b.h = -b.h; }
       if (!handle) b = { ...b, x: clamp(b.x, 0, 100 - b.w), y: clamp(b.y, 0, 100 - b.h) };
-      drag.last = fitBox(b, shown.what === "crop" ? 5 : 2);
+      drag.last = fitBox(b, shown.what === "blur" ? 2 : 5);
       drag.box(drag.last);
     };
     const up = () => {
@@ -911,6 +968,9 @@ function wireOverlay(ed) {
       if (!drag.last) return;
       if (shown.what === "crop") {
         saveCrop(ed, drag.last);
+      } else if (shown.what === "place") {
+        const piece = pieceById(ed, shown.piece.id);
+        if (piece) savePlace(ed, piece, drag.last);
       } else {
         const effect = ed.effects.find((e) => e.id === shown.effect.id);
         if (effect) saveKeyframes(ed, effect);
@@ -926,6 +986,17 @@ function saveKeyframes(ed, effect) {
   drawTracks(ed);
   const keyframes = effect.keyframes.map((k) => ({ ...k }));
   write(ed, () => patch(ed.b.effects.id, effect.id, { keyframes }));
+}
+
+/** A piece's place in the frame: a box, or null for the whole frame. */
+function savePlace(ed, piece, box) {
+  const r = (n) => Math.round(n * 100) / 100;
+  const value = !box || wholeFrame(box) ? null : { x: r(box.x), y: r(box.y), w: r(box.w), h: r(box.h) };
+  piece.place = placeOf(value);
+  ed.dirty = true;
+  placeOverlay(ed);
+  drawSide(ed);
+  write(ed, () => patch(ed.b.pieces.id, piece.id, { place: value }));
 }
 
 function saveCrop(ed, box) {
@@ -957,7 +1028,7 @@ function wireTransport(ed) {
   ed.root.querySelector(".tl-crop-toggle").addEventListener("click", () => setCropping(ed, !ed.cropping));
   ed.root.querySelector(".tl-material-open").addEventListener("click", () => openMaterialSheet(ed));
   const addClip = ed.root.querySelector(".tl-add-clip");
-  if (addClip) addClip.addEventListener("click", () => openMaterialSheet(ed, "Add a clip at the playhead"));
+  if (addClip) addClip.addEventListener("click", () => openMaterialSheet(ed, "Add at the playhead"));
   ed.root.querySelector(".tl-split").addEventListener("click", () => split(ed));
   ed.root.querySelector(".tl-delete").addEventListener("click", () => remove(ed));
   for (const button of ed.root.querySelectorAll("[data-zoom]")) {
@@ -1080,27 +1151,45 @@ async function openOutput(ed, fileId) {
   }
 }
 
-// -- the material --------------------------------------------------------------------------------------
+// -- the media -----------------------------------------------------------------------------------------
 // What is known of a file across visits: its length and size, by id.
 const known = new Map();
+// The drive last chosen for a Quill's media, while the app is open.
+const lastDrive = new Map();
 
+/** The drives media can come from, then the files of the chosen one. */
 async function loadMaterial(ed) {
   const box = ed.root.querySelector(".tl-material");
-  box.innerHTML = `<p class="group-label">Material</p><p class="tl-quiet">Looking…</p>`;
+  box.innerHTML = `<p class="group-label">Media</p><p class="tl-quiet">Looking…</p>`;
   if (!ed.b.files) {
-    box.innerHTML = `<p class="group-label">Material</p><p class="tl-quiet">Your files are not shared with this screen.</p>`;
+    box.innerHTML = `<p class="group-label">Media</p><p class="tl-quiet">Your files are not shared with this screen.</p>`;
     return;
   }
+  if (!ed.drives.length) {
+    // The person's own drive, and every share they have.
+    try {
+      const shares = await api("GET", recordsUrl("share"));
+      if (!ed.alive) return;
+      ed.drives = shares.filter((s) => s.fields.browsable !== false)
+        .map((s) => ({ id: s.id, label: String(s.fields.label || s.id) }));
+    } catch { ed.drives = []; }
+    if (ed.drive && !ed.drives.some((d) => d.id === ed.drive)) ed.drives.unshift({ id: ed.drive, label: ed.drive });
+    if (!ed.drive && ed.drives.length) ed.drive = ed.drives[0].id;
+  }
+  const turn = (ed.mediaTurn = (ed.mediaTurn || 0) + 1);
   let records = [];
+  ed.materialProblem = "";
   try {
-    const query = new URLSearchParams(Object.entries(ed.b.media).map(([k, v]) => [k, String(v)])).toString();
+    const where = { ...ed.b.media, share: ed.drive };
+    const query = new URLSearchParams(Object.entries(where).map(([k, v]) => [k, String(v)])).toString();
     records = await api("GET", recordsUrl(ed.b.files.id) + (query ? `?${query}` : ""));
   } catch (err) {
     ed.materialProblem = said(err);
   }
-  if (!ed.alive) return;
+  if (!ed.alive || turn !== ed.mediaTurn) return;
   const title = ed.b.files.title || "name";
   const within = String(ed.b.media.within || "").replace(/^\/+|\/+$/g, "");
+  ed.listed = [];
   for (const r of records) {
     const f = r.fields;
     if (f.kind === "folder") continue;
@@ -1109,71 +1198,130 @@ async function loadMaterial(ed) {
     if (!kind) continue;
     let folder = String(f.folder || "");
     if (within && (folder === within || folder.startsWith(within + "/"))) folder = folder.slice(within.length + 1);
-    ed.files.set(r.id, { id: r.id, name, folder, kind, modified: String(f.modified || "") });
+    const file = { id: r.id, name, folder, kind, modified: String(f.modified || "") };
+    ed.files.set(r.id, file);
+    ed.listed.push(file);
   }
   drawMaterial(ed);
   // The pieces' own kinds are known now: a sound has no picture to wait for.
   ed.dirty = true;
-  for (const file of ed.files.values()) lengthFor(ed, file);
+  for (const file of ed.listed) lengthFor(ed, file);
 }
 
-function materialList(ed) {
-  const files = [...ed.files.values()];
+/** The drive chooser, and the files as tiles, by folder; in a sheet, a tap
+    is the only way, so nothing is said about dragging. */
+function materialList(ed, sheet = false) {
+  const drives = ed.drives.length > 1
+    ? `<label class="tl-drive"><span>From</span><select aria-label="Which drive the media is from">${ed.drives.map((d) =>
+      `<option value="${esc(d.id)}"${d.id === ed.drive ? " selected" : ""}>${esc(d.label)}</option>`).join("")}</select></label>`
+    : "";
+  const files = ed.listed || [];
   if (!files.length) {
     const where = [ed.b.media.within].filter(Boolean).join("");
-    return `<p class="tl-quiet">${esc(ed.materialProblem ||
-      `No videos or sounds${where ? ` in ${where}` : ""} yet. Put some there, and they are here.`)}</p>`;
+    return drives + `<p class="tl-quiet">${esc(ed.materialProblem ||
+      `No videos, photos or sounds${where ? ` in ${where}` : ""} here yet. Put some there, and they are here.`)}</p>`;
   }
   const folders = new Map();
   for (const file of files.sort((a, b) => a.name.localeCompare(b.name))) {
     if (!folders.has(file.folder)) folders.set(file.folder, []);
     folders.get(file.folder).push(file);
   }
-  const tracks = ed.tracks.map((t) => `<option value="${esc(t.id)}"${t.id === ed.target ? " selected" : ""}>${esc(t.name)}</option>`).join("");
-  return (ed.writes ? `<label class="tl-target">On<select aria-label="The track it goes on">` +
-      `<option value="">the first of its kind</option>${tracks}</select></label>` : "") +
+  const tile = (file) => {
+    const info = known.get(file.id);
+    const length = info && info.duration > 0 ? lengthOf(info.duration) : "";
+    return `<div class="tl-tile ${esc(file.kind)}" role="button" tabindex="0" data-file="${esc(file.id)}"` +
+      ` draggable="${ed.writes ? "true" : "false"}" title="${esc(file.name)}" aria-label="Add ${esc(file.name)}">` +
+      `<span class="tl-tile-pic" data-tile="${esc(file.id)}">${glyphs[file.kind]}</span>` +
+      (file.kind === "video" ? `<span class="tl-tile-kind">${glyphs.video}</span>` : "") +
+      `<span class="tl-tile-name">${esc(file.name)}</span>` +
+      `<span class="tl-length">${esc(length)}</span></div>`;
+  };
+  return drives + (ed.writes && !sheet ? `<p class="tl-quiet tl-media-hint">Drag onto a track, or tap for the playhead.</p>` : "") +
     [...folders.keys()].sort().map((folder) =>
       (folder ? `<p class="tl-folder">${esc(folder)}</p>` : "") +
-      `<div class="group">${folders.get(folder).map((file) => {
-        const info = known.get(file.id);
-        return `<div class="row tl-file" data-file="${esc(file.id)}">
-          <span class="icon">${glyphs[file.kind]}</span>
-          <span class="main"><span class="title">${esc(file.name)}</span>
-            <span class="meta"><span class="date tl-length">${esc(info ? lengthOf(info.duration) : "")}</span></span></span>
-          ${ed.writes ? `<button type="button" class="tl-add" data-add="${esc(file.id)}" aria-label="Add ${esc(file.name)}">${glyphs.plus}<span>Add</span></button>` : ""}
-        </div>`;
-      }).join("")}</div>`).join("");
+      `<div class="tl-tiles">${folders.get(folder).map(tile).join("")}</div>`).join("");
 }
 
 function wireMaterial(ed, root, done = () => {}) {
-  const select = root.querySelector(".tl-target select");
-  if (select) select.addEventListener("change", () => { ed.target = select.value; });
-  for (const button of root.querySelectorAll("[data-add]")) {
-    button.addEventListener("click", async () => {
-      button.disabled = true;
-      await addMaterial(ed, ed.files.get(button.dataset.add));
-      button.disabled = false;
-      done();
+  const select = root.querySelector(".tl-drive select");
+  if (select) {
+    select.addEventListener("change", () => {
+      ed.drive = select.value;
+      lastDrive.set(ed.at.quill.id, ed.drive);
+      loadMaterial(ed);
     });
+  }
+  for (const tile of root.querySelectorAll(".tl-tile")) {
+    const file = ed.files.get(tile.dataset.file);
+    const add = async () => {
+      if (!ed.writes || tile.classList.contains("busy")) return;
+      tile.classList.add("busy");
+      await addMaterial(ed, file);
+      tile.classList.remove("busy");
+      done();
+    };
+    tile.addEventListener("click", add);
+    tile.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); add(); } });
+    tile.addEventListener("dragstart", (event) => {
+      if (!ed.writes) { event.preventDefault(); return; }
+      ed.dragFile = file;
+      event.dataTransfer.effectAllowed = "copy";
+      event.dataTransfer.setData("text/plain", file.name);
+    });
+    tile.addEventListener("dragend", () => { ed.dragFile = null; clearGhost(ed); });
+  }
+  watchTiles(ed, root);
+}
+
+/** The tiles' pictures, fetched as they come into view: the server's small
+    copy of a photo, or a frame of a video; a sound keeps its icon. */
+function watchTiles(ed, root) {
+  if (!ed.watcher) {
+    ed.watcher = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        ed.watcher.unobserve(entry.target);
+        tileFor(ed, entry.target);
+      }
+    }, { rootMargin: "200px" });
+  }
+  for (const pic of root.querySelectorAll(".tl-tile:not(.audio) .tl-tile-pic")) ed.watcher.observe(pic);
+}
+
+async function tileFor(ed, pic) {
+  const id = pic.dataset.tile;
+  if (!ed.tiles.has(id)) {
+    ed.tiles.set(id, "");
+    try {
+      const res = await apiRaw("GET", recordsUrl("file", id) + `/thumb?size=${TILE}`, { fail: "no thumbnail" });
+      const url = URL.createObjectURL(await res.blob());
+      if (!ed.alive) { URL.revokeObjectURL(url); return; }
+      ed.tiles.set(id, url);
+    } catch { return; }
+  }
+  const url = ed.tiles.get(id);
+  if (!url) return;
+  for (const el of document.querySelectorAll(`.tl-tile-pic[data-tile="${CSS.escape(id)}"]`)) {
+    el.innerHTML = `<img src="${url}" alt="" draggable="false">`;
   }
 }
 
 function drawMaterial(ed) {
   const box = ed.root.querySelector(".tl-material");
-  box.innerHTML = `<p class="group-label">Material</p>` + materialList(ed);
+  box.innerHTML = `<p class="group-label">Media</p>` + materialList(ed);
   wireMaterial(ed, box);
   const sheet = document.querySelector(".tl-material-sheet .tl-sheet-list");
-  if (sheet) { sheet.innerHTML = materialList(ed); wireMaterial(ed, sheet, closeMaterialSheet); }
+  if (sheet) { sheet.innerHTML = materialList(ed, true); wireMaterial(ed, sheet, closeMaterialSheet); }
 }
 
-// A phone has no room beside the viewer: the material comes up as a sheet.
+// A phone has no room beside the viewer: the media comes up as a sheet.
 // Add clip on the tracks brings up the same sheet, on any screen.
-function openMaterialSheet(ed, title = "Material") {
+function openMaterialSheet(ed, title = "Media") {
   closeMaterialSheet();
   const backdrop = document.createElement("div");
   backdrop.className = "sheet-backdrop tl-sheet-backdrop";
-  backdrop.innerHTML = `<div class="sheet tl-material-sheet" role="dialog" aria-modal="true" aria-label="Material">
-    <p class="act-sheet-title">${esc(title)}</p><div class="tl-sheet-list">${materialList(ed)}</div>
+  backdrop.innerHTML = `<div class="sheet tl-material-sheet" role="dialog" aria-modal="true" aria-label="Media">
+    <p class="act-sheet-title">${esc(title)}</p><div class="tl-sheet-list">${materialList(ed, true)}</div>
     <button type="button" class="sheet-row cancel">Close</button></div>`;
   document.body.append(backdrop);
   wireMaterial(ed, backdrop, closeMaterialSheet);
@@ -1206,27 +1354,38 @@ function readNext() {
     probe(job.ed, job.file).then((info) => {
       if (info) {
         known.set(job.file.id, info);
-        const cell = document.querySelectorAll(`.tl-file[data-file="${CSS.escape(job.file.id)}"] .tl-length`);
-        for (const el of cell) el.textContent = lengthOf(info.duration);
+        const cell = document.querySelectorAll(`.tl-tile[data-file="${CSS.escape(job.file.id)}"] .tl-length`);
+        for (const el of cell) el.textContent = info.duration > 0 ? lengthOf(info.duration) : "";
       }
       job.resolve(info);
     }).finally(() => { reading -= 1; readNext(); });
   }
 }
 
-/** A source's length and size: the frames API's answer, else the media's own. */
+/** A source's length and size: the frames API's answer, else the media's own.
+    A photo has a size and no length. */
 async function probe(ed, file) {
   if (ed.b.frames) {
     try {
       const info = await api("GET", `${ed.b.frames}/info?file=${encodeURIComponent(file.id)}`);
-      if (Number(info.duration) > 0) {
-        return { duration: Number(info.duration), width: Number(info.width) || 0, height: Number(info.height) || 0, fps: Number(info.fps) || 0 };
+      if (Number(info.duration) > 0 || info.image) {
+        return {
+          duration: Number(info.duration) || 0, width: Number(info.width) || 0, height: Number(info.height) || 0,
+          fps: Number(info.fps) || 0, image: !!info.image,
+        };
       }
     } catch { /* read from the media below */ }
   }
   let made;
   try { made = await api("POST", recordsUrl("file", file.id, "/media")); } catch { return null; }
   return new Promise((resolve) => {
+    if (file.kind === "image") {
+      const img = new Image();
+      img.addEventListener("load", () => resolve({ duration: 0, width: img.naturalWidth, height: img.naturalHeight, fps: 0, image: true }));
+      img.addEventListener("error", () => resolve(null));
+      img.src = made.url;
+      return;
+    }
     const el = document.createElement(file.kind === "audio" ? "audio" : "video");
     el.preload = "metadata";
     el.muted = true;
@@ -1244,19 +1403,26 @@ async function probe(ed, file) {
   });
 }
 
-/** A source on the timeline, whole, at the playhead: on the chosen track,
-    or the first of its kind. The first picture gives the project its size. */
-async function addMaterial(ed, file) {
+/** A source on the timeline, whole: where it was dropped (*where*: a track
+    and a start), else at the playhead on the first track of its kind, after
+    whatever is there. The first video gives the project its size. */
+async function addMaterial(ed, file, where = null) {
   if (!file || !ed.writes) return;
-  const track = trackFor(ed.tracks, file.kind, ed.target);
-  if (!track) { toast(`This ${ed.b.model.label.toLowerCase()} has no ${file.kind} track`); return; }
+  const track = where ? trackById(ed, where.track) : trackFor(ed.tracks, file.kind, "");
+  if (!track || !carries(track, file.kind)) {
+    toast(`This ${ed.b.model.label.toLowerCase()} has no track for ${file.kind === "image" ? "a photo" : `a ${file.kind}`}`);
+    return;
+  }
   const info = await lengthFor(ed, file);
-  if (!info || !(info.duration > 0)) { toast(`Cannot read how long ${file.name} is`); return; }
-  know(ed, file.id, info);
+  const image = file.kind === "image" || !!(info && info.image);
+  if (!image && !(info && info.duration > 0)) { toast(`Cannot read how long ${file.name} is`); return; }
+  if (info) know(ed, file.id, info);
   pause(ed);
+  const length = image ? IMAGE_LENGTH : ms(info.duration);
+  const start = where ? ms(Math.max(0, where.start)) : addAt(ed.pieces, track.id, ed.t, length);
   const fields = {
     [ed.b.pieceProject]: ed.id, track: track.id, source: file.id, name: file.name,
-    start: ms(ed.t), offset: 0, length: ms(info.duration),
+    start, offset: 0, length,
   };
   await write(ed, async () => {
     const made = await api("POST", recordsUrl(ed.b.pieces.id), { fields });
@@ -1268,7 +1434,7 @@ async function addMaterial(ed, file) {
     if (grew) fitZoom(ed);
     ed.selected = piece.id;
     ed.effect = "";
-    const size = file.kind === "video" ? blanksFrom(ed, info) : null;
+    const size = file.kind === "video" && !image ? blanksFrom(ed, info) : null;
     if (size) {
       Object.assign(ed.project.fields, size);
       fitStage(ed);
@@ -1278,7 +1444,7 @@ async function addMaterial(ed, file) {
     drawSide(ed);
     showTime(ed, ed.t);
     ed.dirty = true;
-    toast(`${file.name} is on ${track.name}`);
+    toast(`${file.name} is on ${track.name} at ${clockOf(start)}`);
   });
 }
 
@@ -1308,10 +1474,11 @@ function drawTracks(ed) {
     const thumb = ed.thumbs.get(p.id);
     const marks = selectedEffect && selectedEffect.piece === p.id && selectedEffect.keyframes.length > 1
       ? selectedEffect.keyframes.map((k) => `<i class="tl-key" style="left:${k.t * ed.zoom}px"></i>`).join("") : "";
-    return `<div class="tl-piece ${kind}${soundOnly(ed, p) ? " sound" : ""}${p.id === ed.selected ? " on" : ""}${p.muted ? " muted" : ""}"` +
+    const what = kindOf(ed, p);
+    return `<div class="tl-piece ${kind}${what === "audio" ? " sound" : what === "image" ? " image" : ""}${p.id === ed.selected ? " on" : ""}${p.muted ? " muted" : ""}"` +
       ` data-id="${esc(p.id)}" style="left:${p.start * ed.zoom}px;width:${Math.max(2, p.length * ed.zoom)}px` +
       `${thumb ? `;background-image:url(&quot;${thumb}&quot;)` : ""}" title="${esc(p.name)}">` +
-      `<span class="tl-name">${p.muted ? glyphs.mute : ""}${esc(p.name)}</span>` +
+      `<span class="tl-name">${p.muted ? glyphs.mute : what === "image" ? glyphs.image : ""}${esc(p.name)}</span>` +
       (blurs ? `<span class="tl-badge">${blurs} blur${blurs === 1 ? "" : "s"}</span>` : "") + marks +
       (ed.writes ? `<i class="tl-edge left" data-edge="start"></i><i class="tl-edge right" data-edge="end"></i>` : "") +
       `</div>`;
@@ -1382,8 +1549,66 @@ function tapped(el, fn) {
   el.addEventListener("pointercancel", done);
 }
 
+/** Where a file dragged over the lanes would land: its track, when that
+    track can carry it, and its snapped start; null off the tracks. */
+function dropSpot(ed, event) {
+  const file = ed.dragFile;
+  if (!file) return null;
+  const row = [...ed.inner.querySelectorAll(".tl-row")].find((r) => {
+    const rect = r.getBoundingClientRect();
+    return event.clientY >= rect.top && event.clientY < rect.bottom;
+  });
+  const track = row && trackById(ed, row.dataset.track);
+  if (!track || !carries(track, file.kind)) return null;
+  const info = known.get(file.id);
+  const length = info && info.duration > 0 ? info.duration : IMAGE_LENGTH;
+  const rect = ed.inner.getBoundingClientRect();
+  const at = Math.max(0, (event.clientX - rect.left) / ed.zoom);
+  const start = snapMove(at, length, edgesBut(ed, ""), 10 / ed.zoom);
+  return { track: track.id, start: ms(start), length, row };
+}
+
+/** A faint piece where the dragged file would land. */
+function showGhost(ed, spot) {
+  let ghost = ed.inner.querySelector(".tl-ghost");
+  if (!ghost) {
+    ghost = document.createElement("div");
+    ghost.className = "tl-ghost";
+    ghost.innerHTML = `<span class="tl-name"></span>`;
+  }
+  if (ghost.parentElement !== spot.row) spot.row.append(ghost);
+  ghost.style.left = `${spot.start * ed.zoom}px`;
+  ghost.style.width = `${Math.max(2, spot.length * ed.zoom)}px`;
+  ghost.firstChild.textContent = ed.dragFile.name;
+}
+
+function clearGhost(ed) {
+  const ghost = ed.inner.querySelector(".tl-ghost");
+  if (ghost) ghost.remove();
+}
+
 function wireTracks(ed) {
   const lanes = ed.lanes;
+  // A file from the media, dragged onto a track: it lands where it is let go, snapped.
+  lanes.addEventListener("dragover", (event) => {
+    const spot = dropSpot(ed, event);
+    if (!spot) { clearGhost(ed); return; }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    showGhost(ed, spot);
+  });
+  lanes.addEventListener("dragleave", (event) => {
+    if (!lanes.contains(event.relatedTarget)) clearGhost(ed);
+  });
+  lanes.addEventListener("drop", (event) => {
+    const spot = dropSpot(ed, event);
+    const file = ed.dragFile;
+    clearGhost(ed);
+    ed.dragFile = null;
+    if (!spot) return;
+    event.preventDefault();
+    addMaterial(ed, file, spot);
+  });
   // A ctrl-wheel (or a pinch on a trackpad) zooms, around the pointer.
   lanes.addEventListener("wheel", (event) => {
     if (!event.ctrlKey) return;
@@ -1453,8 +1678,7 @@ function wireTracks(ed) {
       if (edge === "start") {
         next = trimStart(was, snapTo(was.start + dx, edges, reach));
       } else if (edge === "end") {
-        const info = ed.info.get(was.source);
-        next = trimEnd(was, snapTo(was.start + was.length + dx, edges, reach), info ? info.duration : Infinity);
+        next = trimEnd(was, snapTo(was.start + was.length + dx, edges, reach), sourceLength(ed, was));
       } else {
         // To another track of the same kind, if the pointer is over one.
         const over = rows.find((row) => {
@@ -1525,8 +1749,7 @@ function setPiece(ed, piece, fields) {
 function trimTo(ed, piece, end, t) {
   if (!ed.writes) return;
   const was = { ...piece };
-  const info = ed.info.get(piece.source);
-  const next = end === "start" ? trimStart(was, t) : trimEnd(was, t, info ? info.duration : Infinity);
+  const next = end === "start" ? trimStart(was, t) : trimEnd(was, t, sourceLength(ed, piece));
   Object.assign(piece, next);
   commitPiece(ed, piece, was, next);
 }
@@ -1619,15 +1842,16 @@ function drawSide(ed) {
       <div class="row"><span class="main"><span class="title">${esc(piece.name)}</span>
         <span class="meta"><span class="date">${esc(track ? track.name : piece.track)}</span>
         <span class="preview">${esc(clockOf(piece.start))} – ${esc(clockOf(piece.start + piece.length))} (${esc(lengthOf(piece.length))})</span></span></span></div>
-      <label class="row tl-volume"><span class="main">Volume</span>
+      ${isImage(ed, piece) ? "" : `<label class="row tl-volume"><span class="main">Volume</span>
         <input type="range" min="0" max="200" step="5" value="${volume}" aria-label="Volume"${ed.writes ? "" : " disabled"}>
         <output>${volume}%</output></label>
       <label class="row tl-mute"><span class="main">Muted</span>
-        <input type="checkbox" class="switch"${piece.muted ? " checked" : ""}${ed.writes ? "" : " disabled"}></label>
+        <input type="checkbox" class="switch"${piece.muted ? " checked" : ""}${ed.writes ? "" : " disabled"}></label>`}
     </div>`;
+    if (picturesOf(ed).includes(piece)) html += placePanel(ed, piece);
     if (ed.b.effects) html += effectsPanel(ed, piece);
   } else {
-    html += `<p class="tl-quiet tl-hint">Choose a piece on the tracks to set its volume, cut it, or blur something in it.</p>`;
+    html += `<p class="tl-quiet tl-hint">Choose a piece on the tracks to make it smaller, set its volume, cut it, or blur something in it.</p>`;
   }
   html += cropPanel(ed);
   side.innerHTML = html;
@@ -1666,6 +1890,19 @@ function effectsPanel(ed, piece) {
     ${ed.writesEffects ? `<button type="button" class="act-chip tl-add-blur">${glyphs.plus}<span>Add blur</span></button>` : ""}`;
 }
 
+/** Where the piece's picture goes in the frame: all of it, or a box to size. */
+function placePanel(ed, piece) {
+  const place = piece.place;
+  const number = (name, label) =>
+    `<label class="tl-field small"><span>${label}</span><input type="number" min="0" max="100" step="0.5" data-place="${name}" value="${Math.round(place[name] * 10) / 10}"${ed.writes ? "" : " disabled"}></label>`;
+  return `<p class="group-label">Size</p>
+    ${place ? `<div class="tl-crop-fields">${number("x", "Left")}${number("y", "Top")}${number("w", "Width")}${number("h", "Height")}</div>
+      <p class="tl-quiet">Percent of the picture. Drag the box on the viewer, or type.</p>
+      <div class="tl-row-buttons">${ed.writes ? `<button type="button" class="act-chip tl-place-fill">Fill the picture</button>` : ""}</div>`
+    : `<p class="tl-quiet">It fills the whole picture.</p>
+      <div class="tl-row-buttons">${ed.writes ? `<button type="button" class="act-chip tl-place-shrink">${glyphs.shrink}<span>Make smaller</span></button>` : ""}</div>`}`;
+}
+
 function cropPanel(ed) {
   const c = crop(ed);
   const number = (name, label) =>
@@ -1690,6 +1927,22 @@ function wireSide(ed, side, piece) {
     });
     on(".tl-volume input", "change", (event) => setPiece(ed, piece, { volume: Number(event.target.value) / 100 }));
     on(".tl-mute input", "change", (event) => setPiece(ed, piece, { muted: event.target.checked }));
+    // Smaller: a box in the lower right corner, a third of the picture across, where it is seen.
+    on(".tl-place-shrink", "click", () => {
+      pause(ed);
+      if (ed.t < piece.start || ed.t >= piece.start + piece.length) seek(ed, piece.start);
+      if (ed.cropping) setCropping(ed, false);
+      ed.effect = "";
+      savePlace(ed, piece, { x: 62, y: 62, w: 34, h: 34 });
+    });
+    on(".tl-place-fill", "click", () => savePlace(ed, piece, null));
+    for (const input of side.querySelectorAll("[data-place]")) {
+      input.addEventListener("change", () => {
+        const box = { ...(piece.place || { x: 0, y: 0, w: 100, h: 100 }), [input.dataset.place]: Number(input.value) || 0 };
+        input.blur();
+        savePlace(ed, piece, fitBox(box, 5));
+      });
+    }
   }
   on(".tl-add-blur", "click", () => addBlur(ed));
   for (const pick of side.querySelectorAll(".tl-effect-pick")) {

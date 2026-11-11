@@ -52,6 +52,9 @@ BOX = ("x", "y", "w", "h")
 # What a file is, by its extension when its type does not say.
 VIDEO_EXT = frozenset({"mp4", "m4v", "mov", "mkv", "webm", "avi", "wmv", "mpg", "mpeg", "3gp"})
 AUDIO_EXT = frozenset({"mp3", "m4a", "aac", "flac", "wav", "ogg", "opus", "aiff", "wma"})
+IMAGE_EXT = frozenset({"jpg", "jpeg", "png", "gif", "webp", "bmp", "tif", "tiff", "heic", "heif", "avif"})
+# How long a photo stays on the timeline when it is added, in seconds.
+IMAGE_LENGTH = 5.0
 
 
 # The sizes a new project can start at; "" leaves it to the first clip added,
@@ -117,12 +120,33 @@ def fps_of(project_fields: dict) -> float:
 
 # -- material -------------------------------------------------------------------------
 def media_kind(name: str, mime: str = "") -> str | None:
-    """ "video", "audio", or None for a file that is neither."""
-    for kind in ("video", "audio"):
+    """ "video", "audio", "image", or None for a file that is none of them."""
+    for kind in ("video", "audio", "image"):
         if mime.startswith(kind + "/"):
             return kind
     ext = name.rsplit(".", 1)[1].lower() if "." in name else ""
-    return "video" if ext in VIDEO_EXT else "audio" if ext in AUDIO_EXT else None
+    if ext in VIDEO_EXT:
+        return "video"
+    if ext in AUDIO_EXT:
+        return "audio"
+    return "image" if ext in IMAGE_EXT else None
+
+
+def track_kind_for(kind: str) -> str:
+    """The kind of track a file of *kind* goes on: a photo goes where a video does."""
+    return "video" if kind == "image" else kind
+
+
+def place_of(piece_fields: dict) -> dict | None:
+    """Where a piece's picture goes in the frame — `{x, y, w, h}` in percent — or
+    None when it fills the whole frame."""
+    place = piece_fields.get("place")
+    if not isinstance(place, dict):
+        return None
+    box = {k: seconds(place.get(k), WHOLE[k]) for k in BOX}
+    box["w"], box["h"] = min(max(box["w"], 2.0), 100.0), min(max(box["h"], 2.0), 100.0)
+    box["x"], box["y"] = min(max(box["x"], 0.0), 100.0 - box["w"]), min(max(box["y"], 0.0), 100.0 - box["h"])
+    return None if box == WHOLE else box
 
 
 # -- tracks ---------------------------------------------------------------------------
@@ -133,6 +157,7 @@ def first_track(tracks: list[dict], kind: str) -> dict | None:
     (A1 then A2), so Video 1 is the last video track in the list and Audio 1
     the first audio one: the track nearest the line between the two.
     """
+    kind = track_kind_for(kind)
     same = [t for t in tracks if t.get("kind") == kind]
     if not same:
         return None
@@ -392,6 +417,7 @@ def spans(pieces: list[dict], first: float, per_cell: float, width: int) -> list
 __all__ = [
     "BOX",
     "FPS",
+    "IMAGE_LENGTH",
     "MIDDLE",
     "SHORTEST",
     "WHOLE",
@@ -415,6 +441,7 @@ __all__ = [
     "parse_time",
     "piece_at",
     "pieces_at",
+    "place_of",
     "seconds",
     "seen_at",
     "set_keyframe",
@@ -424,6 +451,7 @@ __all__ = [
     "split",
     "split_keyframes",
     "timecode",
+    "track_kind_for",
     "trim_end",
     "trim_start",
 ]
