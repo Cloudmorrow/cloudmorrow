@@ -5,6 +5,27 @@
 [datamodels]
 repo = "datamodels"
 
+# A dictionary for the spellchecker (server/spelling.py): a few words of
+# English, enough for the tests to check and suggest with. Beside this file,
+# not fetched.
+[dictionaries.en]
+label = "English (test)"
+summary = "English"
+license = "MIT"
+homepage = "https://example.com/en"
+
+[[dictionaries.en.files]]
+name = "en.aff"
+url = "dictionaries/en.aff"
+sha256 = "97c360d87887a13b7822ca48ff62daac3b4c8e6102ab6c8227e13007b959d977"
+size = 84
+
+[[dictionaries.en.files]]
+name = "en.dic"
+url = "dictionaries/en.dic"
+sha256 = "100bda68a5acedbf30af05b81f80fe7a50d206e88593a00c76b32505e860a3d4"
+size = 33
+
 [[categories]]
 id = "personal"
 label = "Personal"

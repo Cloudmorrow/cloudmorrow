@@ -18,6 +18,21 @@ const TASK = /^(\s*)([-*+]\s+\[([ xX])\]\s+)(.*)$/;
 const BULLET = /^(\s*)([-*+]\s+)(.*)$/;
 const NUMBER = /^(\s*)(\d+[.)]\s+)(.*)$/;
 const TABLE = /^\s*\|.*\|\s*$/;
+// A part checked in another language: comment lines around it, which
+// anything that renders Markdown leaves out (quill/docs.py keeps a
+// document's parts the same way). The web app draws the line as the
+// mark at the part's edge (spelling.js), the comment itself shown only
+// on the line you are on.
+const LANG_START = /^\s*<!--\s*lang:\s*([A-Za-z]{2,3}(?:[-_][A-Za-z]{2})?)\s*-->\s*$/;
+const LANG_END = /^\s*<!--\s*\/lang\s*-->\s*$/;
+
+/** What a line says about the language of what follows: a code, "" for the
+    end of a part, or null when it is any other line. */
+export function langLine(raw) {
+  const m = LANG_START.exec(raw);
+  if (m) return m[1].toLowerCase().replace(/_/g, "-");
+  return LANG_END.test(raw) ? "" : null;
+}
 
 const INLINE = new RegExp([
   String.raw`(?<esc>\\[\\\x60*_{}\[\]()#+\-.!~>|])`,
@@ -83,6 +98,8 @@ export function renderLine(raw, code = false) {
   let m = HEADING.exec(raw);
   if (m) return { cls: `md-h${m[1].length}`, html: mark(m[1] + m[2]) + inline(m[3]) };
   if (RULE.test(raw)) return { cls: "md-rule", html: mark(raw) };
+  const lang = langLine(raw);
+  if (lang !== null) return { cls: lang ? "md-lang md-lang-start" : "md-lang md-lang-end", html: mark(raw) };
   m = QUOTE.exec(raw);
   if (m) return { cls: "md-quote", html: esc(m[1]) + mark(m[2]) + inline(m[3]) };
   m = TASK.exec(raw);

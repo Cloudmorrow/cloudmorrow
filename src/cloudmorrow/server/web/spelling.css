@@ -1,0 +1,80 @@
+/* Spelling (spelling.js): a marked word, the parts in another language at
+   the left edge of the page, and the settings screen. Drawn in every editor
+   that checks — a document's page, a note's boxes — so nothing here is
+   named for one. */
+
+/* A word the dictionary does not know: not the red wave the browser draws,
+   which this app has switched off, but the word itself tinted, with a bar
+   under it — a marker pen rather than a scribble. */
+.spell-miss {
+  background: color-mix(in srgb, var(--warn) 22%, transparent);
+  box-shadow: 0 2px 0 var(--warn);
+  border-radius: 3px 3px 0 0;
+  cursor: context-menu;
+}
+.spell-miss:hover { background: color-mix(in srgb, var(--warn) 34%, transparent); }
+
+/* Room at the left of the words for the parts' marks; the gutter runs the
+   editor's height, and the marks are set along it at their parts. */
+.editor.spelling-on { position: relative; }
+.editor.spelling-on .doc-body, .editor.spelling-on .blocks { padding-left: 28px; }
+.spell-gutter {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  pointer-events: none;
+}
+/* A part: a bar down its left, and at its top the language, with the ×
+   that takes the part back to the default language. */
+.spell-part {
+  position: absolute;
+  left: 8px;
+  width: 0;
+  border-left: 3px solid var(--second);
+  border-radius: 2px;
+  pointer-events: auto;
+}
+.spell-part-x {
+  position: absolute;
+  top: -2px;
+  left: -10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 22px;
+  padding: 1px 2px;
+  border: 1px solid var(--second);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--second);
+  font: 600 10px/12px var(--display);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.spell-part-x .x { font-size: 13px; line-height: 11px; font-weight: 700; }
+.spell-part-x:hover { background: var(--second); color: var(--action-ink); }
+.editor.read-only .spell-part-x { cursor: default; }
+.editor.read-only .spell-part-x .x { display: none; }
+
+/* In a note, the comment lines that bound a part are the part's edges: a
+   thin line each, the comment itself on show only when the caret is there. */
+.md .md-ln.md-lang:not(.md-on) { min-height: 10px; }
+
+/* The settings screen. */
+main.spelling .spelling-note { margin: 0 0 16px; font-size: 14px; color: var(--muted); }
+main.spelling .spelling-problem { margin: 0 0 16px; font-size: 14px; color: var(--bad); }
+main.spelling .row .value { margin-left: auto; color: var(--muted); }
+main.spelling .words .remove {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+}
+main.spelling .words .remove:hover { color: var(--bad); }
+main.spelling .words .empty { margin: 0; padding: 12px 14px; font-size: 14px; color: var(--muted); }

@@ -192,15 +192,25 @@ const LONG_PRESS = 500;
  * Menus on the things under *root* that match *selector*, and on the room
  * around them: a right-click on a computer, a long press on a phone.
  * `choicesFor(el, event)` answers the choices for a thing, `blank(event)`
- * for the room; nothing from either leaves the browser's own menu. The
- * press that became a menu is not also a tap on the thing.
+ * for the room — now, or as a promise of them; nothing from either leaves
+ * the browser's own menu. The press that became a menu is not also a tap
+ * on the thing.
  */
 export function contextMenus(root, selector, choicesFor, { blank = null } = {}) {
   const open = (event, el) => {
     const choices = el ? choicesFor(el, event) : (blank ? blank(event) : null);
-    if (!choices || !choices.length) return false;
+    if (!choices) return false;
+    const at = { x: event.clientX, y: event.clientY };
+    // Choices that take a moment — suggestions asked of the server — open
+    // the menu when they come; the browser's own menu is given up now.
+    if (typeof choices.then === "function") {
+      event.preventDefault();
+      choices.then((list) => { if (list && list.length) menu(list, at); });
+      return true;
+    }
+    if (!choices.length) return false;
     event.preventDefault();
-    menu(choices, { x: event.clientX, y: event.clientY });
+    menu(choices, at);
     return true;
   };
   let pressed = null;   // the press under way: where it began, and its timer

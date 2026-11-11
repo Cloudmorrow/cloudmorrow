@@ -626,6 +626,18 @@ sha256 = "c1e6caf4…"       # the download is refused when it differs
 size = 119007364           # bytes, for the install sheet
 programs = ["ffmpeg", "ffprobe"]   # found by name in what unpacks, linked into bin/
 
+[dictionaries.da]          # a language the web app checks spelling in (docs/DOCS.md, *Spelling*)
+label = "Dansk"
+summary = "Danish"
+license = "GPL-2.0-or-later OR LGPL-2.1-or-later OR MPL-1.1"
+homepage = "https://stavekontrolden.dk"
+
+[[dictionaries.da.files]]  # its .aff and its .dic, fetched the first time somebody writes in it
+name = "da.aff"
+url = "https://raw.githubusercontent.com/LibreOffice/dictionaries/…/da_DK/da_DK.aff"
+sha256 = "ee4fe193…"
+size = 82864
+
 [[quills]]
 id = "tasks"
 repo = "https://github.com/Cloudmorrow/quill-tasks"

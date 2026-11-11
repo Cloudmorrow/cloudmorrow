@@ -28,7 +28,7 @@ from cloudmorrow.server.features import Feature, FeatureStore
 from cloudmorrow.server.flows import FlowRunner
 from cloudmorrow.server.mcp import MCPStore
 from cloudmorrow.server.notifications import NotificationStore
-from cloudmorrow.server.quills import QuillRegistry, RuntimeStore
+from cloudmorrow.server.quills import QuillRegistry, RuntimeStore, load_catalog
 from cloudmorrow.server.quills.code import QuillCode
 from cloudmorrow.server.quills.jobs import Clock
 from cloudmorrow.server.quills.services import Supervisor
@@ -60,6 +60,7 @@ from cloudmorrow.server.routes import (
     sharefiles,
     shares,
     snapshots,
+    spelling,
     today,
     users,
     web,
@@ -73,6 +74,7 @@ from cloudmorrow.server.settings import SettingsStore
 from cloudmorrow.server.shares import Protected, ShareStore
 from cloudmorrow.server.signin_limits import SigninLimits
 from cloudmorrow.server.snapshots import SnapshotStore, install_datamodels
+from cloudmorrow.server.spelling import DictionaryStore, Speller
 from cloudmorrow.server.state import AppState
 from cloudmorrow.server.syncs import SyncStore
 from cloudmorrow.server.today import Weather
@@ -175,6 +177,12 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
         settings=settings_store,
         quills=quill_registry,
         records=record_store,
+        # The languages the editors check spelling in: the catalog says
+        # where each dictionary is; a language is fetched when first written in.
+        spelling=Speller(
+            DictionaryStore(config.dictionaries_dir),
+            lambda: (lambda c: (c.dictionaries, c.base))(load_catalog(config.quill_catalog)),
+        ),
         circles=circle_store,
         roles=role_store,
         sharing=sharing_store,
@@ -280,6 +288,7 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     in_files = [Depends(features.require_feature("files"))]
 
     app.include_router(auth.router)
+    app.include_router(spelling.router)
     app.include_router(users.router)
     app.include_router(circles.router)
     app.include_router(circles.mine_router)

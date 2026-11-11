@@ -21,7 +21,8 @@ export function markdownArea(text, onChange) {
   const el = document.createElement("div");
   el.className = "body md";
   el.contentEditable = "true";
-  el.spellcheck = true;
+  // The browser's own checker is off: spelling.js checks, once switched on.
+  el.spellcheck = false;
   el.setAttribute("role", "textbox");
   el.setAttribute("aria-multiline", "true");
 
@@ -118,8 +119,8 @@ export function markdownArea(text, onChange) {
     const lines = value.split("\n");
     const drawn = renderLines(lines);
     const have = [...el.childNodes];
-    // Only the lines that changed are drawn again, so the browser's
-    // spelling marks stay on the rest. An IME's word in progress is never
+    // Only the lines that changed are drawn again, so the spelling marks
+    // (spelling.js) stay on the rest. An IME's word in progress is never
     // drawn over: nothing is read back until it is done (compositionend).
     const fresh = drawn.map((d, i) => {
       const old = have[i];
@@ -319,6 +320,9 @@ export function markdownArea(text, onChange) {
     },
   });
   el.setSelectionRange = (start, end = start) => select(start, end);
+  // A change made from outside — a word put right, a line added — that
+  // keeps the undo history, as typing would (spelling.js).
+  el.replaceText = (start, end, insert, caretAt) => edit(start, end, insert, caretAt);
 
   el.value = text;
   return el;

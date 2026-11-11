@@ -27,6 +27,7 @@ import "./desktop.js";
 import "./desktopbridge.js";
 import "./shares.js";
 import "./localbackups.js";
+import "./spelling.js";
 import "./fresh.js";
 import { start } from "./core.js";
 

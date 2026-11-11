@@ -23,12 +23,25 @@ class UserOut(BaseModel):
     created_at: str = ""
     # The apps this person marked favorites, by tab name, in order.
     favorites: list[str] = []
+    # How their spelling is checked: {check, language, words}.
+    spelling: dict = {}
 
 
 class Favorites(BaseModel):
     """The apps a person marks favorites, by tab name, in the order marked."""
 
     favorites: list[str] = Field(default_factory=list, max_length=50)
+
+
+class Spelling(BaseModel):
+    """How a person's spelling is checked, in the web app's editors: whether
+    Cloudmorrow checks it (the browser's own checker is off either way),
+    the language a document or note is checked in unless a part of it says
+    otherwise, and the words they added to their dictionary."""
+
+    check: bool = False
+    language: str = Field(default="", max_length=8)
+    words: list[str] = Field(default_factory=list, max_length=2000)
 
 
 class LoginRequest(BaseModel):

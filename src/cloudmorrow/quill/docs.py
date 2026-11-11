@@ -13,10 +13,12 @@ A document is a `.docs` file: a text file in a folder of somebody's drive —
 A block is a paragraph, a heading (level 1 to 3), a bullet or a numbered
 list item (with a level, 0 at the margin), a quote, or a table (rows of
 cells, each a run of text); a paragraph, heading, item or quote may say
-how it is aligned (`center`, `right`, `justify`; nothing means left). A
-run is text and what is true of it: `bold`, `italic`, `underline`,
-`strike`, or a `link`. Nothing else is kept — not fonts, not sizes, not
-pictures — which is what makes a document the same on every surface.
+how it is aligned (`center`, `right`, `justify`; nothing means left), and
+any block may say which language its spelling is checked in (`lang`, a
+code like `da` or `en-gb`; nothing means the writer's own). A run is text
+and what is true of it: `bold`, `italic`, `underline`, `strike`, or a
+`link`. Nothing else is kept — not fonts, not sizes, not pictures — which
+is what makes a document the same on every surface.
 
 The web app draws a document from the same rules in kit_docs_rules.js;
 the terminal and the command line edit it as Markdown through
@@ -33,6 +35,14 @@ from typing import Any
 KINDS = ("paragraph", "heading", "bullet", "numbered", "quote", "table")
 FLAGS = ("bold", "italic", "underline", "strike")
 ALIGNS = ("center", "right", "justify")
+# A language a block is checked in: a code, with a region when it matters (en-gb).
+_LANG = re.compile(r"^[a-z]{2,3}(-[a-z]{2})?$")
+
+
+def lang_of(value: object) -> str:
+    """A language code as a block keeps it, or '' for anything else."""
+    text = str(value or "").strip().lower().replace("_", "-")
+    return text if _LANG.match(text) else ""
 
 
 # -- runs ---------------------------------------------------------------------------------
@@ -81,8 +91,16 @@ def runs_text(runs: list) -> str:
 
 
 # -- blocks -------------------------------------------------------------------------------
-def block(kind: str, runs: list | None = None, *, level: int = 0, align: str = "", rows: list | None = None) -> dict:
-    """One block, in a fixed order of keys: kind, level, align, then runs or rows."""
+def block(
+    kind: str,
+    runs: list | None = None,
+    *,
+    level: int = 0,
+    align: str = "",
+    rows: list | None = None,
+    lang: str = "",
+) -> dict:
+    """One block, in a fixed order of keys: kind, level, align, lang, then runs or rows."""
     out: dict = {"kind": kind}
     if kind == "heading":
         out["level"] = min(3, max(1, int(level or 1)))
@@ -90,6 +108,8 @@ def block(kind: str, runs: list | None = None, *, level: int = 0, align: str = "
         out["level"] = max(0, int(level))
     if align in ALIGNS and kind != "table":
         out["align"] = align
+    if lang_of(lang):
+        out["lang"] = lang_of(lang)
     if kind == "table":
         out["rows"] = [
             [{"runs": merge_runs(cell.get("runs") if isinstance(cell, dict) else cell)} for cell in row]
@@ -112,13 +132,13 @@ def _clean_block(value: Any) -> dict | None:
             return None
         width = max(len(row) for row in rows)
         rows = [row + [{"runs": []}] * (width - len(row)) for row in rows]
-        return block("table", rows=rows)
+        return block("table", rows=rows, lang=lang_of(value.get("lang")))
     level = value.get("level") or 0
     if not isinstance(level, int) or isinstance(level, bool):
         level = 0
     align = value.get("align") if isinstance(value.get("align"), str) else ""
     runs = value.get("runs") if isinstance(value.get("runs"), list) else []
-    return block(kind, runs, level=level, align=align)
+    return block(kind, runs, level=level, align=align, lang=lang_of(value.get("lang")))
 
 
 def block_text(one: dict) -> str:
@@ -217,16 +237,43 @@ def runs_markdown(runs: list) -> str:
     return "".join(out)
 
 
+# A part checked in another language, in Markdown: comment lines around it,
+# which anything that renders Markdown leaves out. The web app's notes keep
+# their parts the same way (web/markdown_rules.js), so a note and a document
+# exported as Markdown say it alike.
+LANG_START = re.compile(r"^\s*<!--\s*lang:\s*([A-Za-z]{2,3}(?:[-_][A-Za-z]{2})?)\s*-->\s*$")
+LANG_END = re.compile(r"^\s*<!--\s*/lang\s*-->\s*$")
+
+
+def lang_line(lang: str) -> str:
+    """The line that starts a part checked in *lang*, or ends one when it is ''."""
+    return f"<!-- lang: {lang} -->" if lang else "<!-- /lang -->"
+
+
 def to_markdown(doc: Doc) -> str:
     lines: list[str] = []
     number = 0
     blocks = doc.blocks
+    current = ""
     for i, b in enumerate(blocks):
         kind = b["kind"]
         if kind != "numbered":
             number = 0
+        lang = b.get("lang", "")
+        if lang != current:
+            # The part before ends, and one in another language starts.
+            if lines:
+                lines.append("")
+            if current:
+                lines.append(lang_line(""))
+                if lang:
+                    lines.append("")
+            if lang:
+                lines.append(lang_line(lang))
+            current = lang
+            lines.append("")
         # A list's items stand together; a blank line parts everything else.
-        if lines and not (kind in ("bullet", "numbered") and blocks[i - 1]["kind"] == kind):
+        elif lines and not (kind in ("bullet", "numbered") and blocks[i - 1]["kind"] == kind):
             lines.append("")
         if kind == "heading":
             lines.append("#" * b["level"] + " " + runs_markdown(b["runs"]))
@@ -244,6 +291,8 @@ def to_markdown(doc: Doc) -> str:
                     lines.append("|" + " --- |" * len(row))
         else:
             lines.append(runs_markdown(b["runs"]))
+    if current:
+        lines.extend(["", lang_line("")])
     return "\n".join(lines) + ("\n" if lines else "")
 
 
@@ -318,15 +367,17 @@ def from_markdown(text: str) -> Doc:
     paragraph: list[str] = []
     table: list[list[dict]] = []
     quoting = False
+    # The language the blocks being read are checked in: '' until a part says.
+    lang = ""
 
     def end_paragraph() -> None:
         if paragraph:
-            blocks.append(block("paragraph", parse_runs("\n".join(paragraph))))
+            blocks.append(block("paragraph", parse_runs("\n".join(paragraph)), lang=lang))
             paragraph.clear()
 
     def end_table() -> None:
         if table:
-            blocks.append(block("table", rows=[[{"runs": c} for c in row] for row in table]))
+            blocks.append(block("table", rows=[[{"runs": c} for c in row] for row in table], lang=lang))
             table.clear()
 
     for raw in text.splitlines():
@@ -335,6 +386,12 @@ def from_markdown(text: str) -> Doc:
             end_paragraph()
             end_table()
             quoting = False
+            continue
+        if (m := LANG_START.match(line)) is not None or LANG_END.match(line) is not None:
+            end_paragraph()
+            end_table()
+            quoting = False
+            lang = lang_of(m.group(1)) if m is not None else ""
             continue
         if line.lstrip().startswith("|") and line.endswith("|"):
             end_paragraph()
@@ -347,21 +404,21 @@ def from_markdown(text: str) -> Doc:
         end_table()
         if (m := _HEADING.match(line)) is not None:
             end_paragraph()
-            blocks.append(block("heading", parse_runs(m.group(2)), level=len(m.group(1))))
+            blocks.append(block("heading", parse_runs(m.group(2)), level=len(m.group(1)), lang=lang))
         elif (m := _BULLET.match(line)) is not None:
             end_paragraph()
-            blocks.append(block("bullet", parse_runs(m.group(2)), level=len(m.group(1)) // 2))
+            blocks.append(block("bullet", parse_runs(m.group(2)), level=len(m.group(1)) // 2, lang=lang))
         elif (m := _NUMBERED.match(line)) is not None:
             end_paragraph()
-            blocks.append(block("numbered", parse_runs(m.group(2)), level=len(m.group(1)) // 2))
+            blocks.append(block("numbered", parse_runs(m.group(2)), level=len(m.group(1)) // 2, lang=lang))
         elif line.startswith(">"):
             end_paragraph()
             said = parse_runs(line[1:].lstrip())
             if quoting:
                 # The quote goes on: another line of the same.
-                blocks[-1] = block("quote", blocks[-1]["runs"] + [run("\n")] + said)
+                blocks[-1] = block("quote", blocks[-1]["runs"] + [run("\n")] + said, lang=lang)
             else:
-                blocks.append(block("quote", said))
+                blocks.append(block("quote", said, lang=lang))
             quoting = True
             continue
         else:

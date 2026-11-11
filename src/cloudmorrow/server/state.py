@@ -30,6 +30,7 @@ from cloudmorrow.server.sealed import Sealer
 from cloudmorrow.server.secrets import SecretStore
 from cloudmorrow.server.settings import SettingsStore
 from cloudmorrow.server.shares import ShareStore
+from cloudmorrow.server.spelling import Speller
 from cloudmorrow.server.syncs import SyncStore
 from cloudmorrow.server.today import Weather
 from cloudmorrow.server.webpush import PushStore
@@ -74,6 +75,8 @@ class AppState:
     # The installed Quills and datamodels, and the records of every one.
     quills: QuillRegistry
     records: RecordStore
+    # The dictionaries, and whether a word is in one (spelling.py).
+    spelling: Speller
     # A Quill's credentials, and what runs its code (quills.tokens, quills.services).
     quill_tokens: QuillTokenStore | None = None
     services: Supervisor | None = None

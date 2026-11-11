@@ -39,6 +39,7 @@ import { mayWrite } from "./kit.js";
 import { bodyMarkup, bodyText, focusBody, mountBody, photoButton, setBody } from "./pictures.js";
 import { ask, askText } from "./dialog.js";
 import { folderInFiles } from "./actions.js";
+import { attachMarkdown } from "./spelling.js";
 
 const own = {
   folder: '<svg width="22" height="18" viewBox="0 0 22 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h5l2 2.5h9a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H3a1.5 1.5 0 0 1-1.5-1.5z"/></svg>',
@@ -562,6 +563,11 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
   if (!b.writes) ed.changed = () => {};
   mountBody(ed, box, ed.body);
   addEventListener("resize", ed.grow);
+  // The words checked, once the person switched it on (spelling.js); the
+  // browser's own checker is off in every box (markdown.js) either way.
+  ed.spelling = attachMarkdown({
+    box, blocks: ed.blocksEl, editable: b.writes, changed: () => ed.changed(), status: (text) => setStatus(ed, text),
+  });
   if (!b.writes) {
     // Read-only: the words and the pictures, and nothing that changes them.
     // pictures.js hears a paste, a drop and a backspace on the page; here
@@ -710,6 +716,7 @@ async function leaveEditor(ed) {
   if (editor === ed) editor = null;
   clearTimeout(ed.timer);
   removeEventListener("resize", ed.grow);
+  if (ed.spelling) ed.spelling.detach();
   if (ed.dirty) await saveEditor(ed);
   while (ed.saving) await new Promise((r) => setTimeout(r, 50));
   if (ed.created && !fileStem(ed.titleEl.value) && !bodyText(ed).trim()) {
