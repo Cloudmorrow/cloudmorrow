@@ -741,8 +741,9 @@ are kept on you, on the server, so every phone and computer you sign in on
 has the same ones; Most used is per device. When an app that is not in the
 bar has something unread, **More** has the dot its tab would have. Each app is drawn by the kit the way a
 phone draws things: a list, then the thing you picked. Notes, say, is three
-screens, **Folders**, the notes in one, and the note, with the pen beside
-the title for a new one; Tasks is a board whose cards are dragged between
+screens, **Folders** (whose first row is the drive they are on: tap it to
+look at a fileshare instead), the notes in one, and the note, with the pen
+beside the title for a new one; Tasks is a board whose cards are dragged between
 lanes; Files is folders and tiles. Each Quill's own guide is on its page in
 the [catalog](https://cloudmorrow.com/quills). Every row opens the record's
 sheet: every field, editable, with delete. Every row, card and tile also

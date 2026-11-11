@@ -213,14 +213,16 @@ range, a click on a cell points the same way, and Enter keeps the name and
 typing goes on. Numbers stand to the right, errors are red.
 The sheet saves as you type; changing the title renames the file, and an
 Excel file stays an Excel file. One changed elsewhere since it was opened
-is not written over. **Open** (the folder in the bar) picks a sheet from
-anywhere on the cloud — another folder of your drive, a fileshare —
-through the picker every file screen shares (`filepick.js`: the shares,
-then the folders, then the files that are sheets); it opens by its record,
-the file staying where it is, and the stamp says where. **Export** offers
-Excel, PDF and CSV, and hands the file over to save. On a computer the
-list and the sheet are side by side, and the list folds away. Read-only,
-the grid shows and nothing types into it; Open and Export are still there.
+is not written over. Under **Folders** the first row is the drive the
+screen looks at, My Files as a rule; tapping it offers the others — the
+fileshares you are in — and the screen looks at the one chosen from
+then on, whole, until it is pointed home again (the editor kit's drive
+row, kept in this browser per screen). A sheet there opens by its
+record, the file staying where it is, and the line under the grid says
+where. **Export** offers Excel, PDF and CSV, and hands the file over to
+save. On a computer the list and the sheet are side by side, and the
+list folds away. Read-only, the grid shows and nothing types into it;
+Export is still there.
 
 **Terminal** (`tui/panes/kit_cells.py`): the sheets down the left, the
 grid on the right with the cell's name and what is typed in it over it.

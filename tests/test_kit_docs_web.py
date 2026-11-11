@@ -46,7 +46,7 @@ def test_nothing_in_the_document_is_named_for_one_quill():
 
 def test_it_reads_the_bindings_and_writes_only_where_it_may():
     code = js_code(DOCS_JS)
-    for binding in ("screen.title", "screen.body", "screen.path", "screen.where", "suffixesOf(screen)"):
+    for binding in ("screen.title", "screen.body", "screen.path", "whereOf(at)", "suffixesOf(screen)"):
         assert binding in code, binding
     assert "writes: mayWrite(model)" in code
     assert ".access" not in code
@@ -64,8 +64,8 @@ def test_it_never_opens_a_browser_window():
 
 
 def test_the_picker_is_generic_and_asks_in_the_sheet():
-    """filepick.js opens a file from anywhere: the shares, then folders, then
-    files of the suffixes wanted — in dialog.js's sheet, named for no Quill."""
+    """filepick.js picks a folder from anywhere: the shares, then the folders
+    in one — in dialog.js's sheet, named for no Quill."""
     code = js_code(PICK_JS)
     assert 'from "./dialog.js"' in PICK_JS and "openSheet(" in code
     assert not re.search(r"(?<![.\w])(confirm|prompt|alert)\(", code)
@@ -83,9 +83,10 @@ def test_the_calls_it_makes_are_the_record_apis():
     assert "err.status === 409 && err.detail && err.detail.current" in code
     assert 'api("POST", recordsUrl(b.model.id), { fields })' in code
     assert 'api("DELETE", recordsUrl(b.model.id, ed.id))' in code
-    # Export is the record API's /export, through the editor kit's download; Open is the picker's.
+    # Export is the record API's /export, through the editor kit's download.
     assert "download(ed.b, ed.id, suffix, ed.stem + suffix)" in code
-    assert 'from "./filepick.js"' in code and "pickFile({ suffixes: b.suffixes" in code
+    # Nothing opens from anywhere any more: the drive under Folders is the editor kit's.
+    assert 'from "./filepick.js"' not in code and "const { where, home } = whereOf(at);" in code
     assert '"/export?as=" + encodeURIComponent(suffix' in js_code(EDITOR_JS)
     # The list is the editor's, over these files.
     assert "listView(b, await load(b), key)" in code

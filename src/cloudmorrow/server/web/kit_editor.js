@@ -12,6 +12,12 @@
    when a listing answers `?q=`. Nothing here knows what a note is: a note is
    a Markdown file in the Notes folder of a drive.
 
+   Under Folders the screen may be pointed at another drive — a fileshare
+   — for a while: the same tree and the same pages, over the whole of
+   that drive, since a fileshare has no Notes folder of its own. The
+   choice is kept in this browser, per screen; the screen's own share is
+   home, and the way back.
+
    On a phone it is the tree, then a list, then the page, one screen at a
    time. On a computer the list and the page are side by side, and the list
    folds away to give the page the whole width (it stays folded, in this
@@ -38,7 +44,7 @@ import { installCard } from "./install.js";
 import { mayWrite } from "./kit.js";
 import { bodyMarkup, bodyText, focusBody, mountBody, photoButton, setBody } from "./pictures.js";
 import { ask, askText } from "./dialog.js";
-import { folderInFiles } from "./actions.js";
+import { choose, folderInFiles } from "./actions.js";
 import { attachMarkdown } from "./spelling.js";
 
 const own = {
@@ -48,16 +54,12 @@ const own = {
   newFolder: '<svg width="22" height="18" viewBox="0 0 22 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h5l2 2.5h9a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H3a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M11 7.5v6M8 10.5h6"/></svg>',
   // The list beside a page: a panel with a pane at its left, to fold away and bring back.
   sidebar: '<svg width="18" height="16" viewBox="0 0 20 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="1.5" width="17" height="15" rx="2.5"/><path d="M7.5 1.5v15"/></svg>',
-  // Open from anywhere: a folder with a way out of it; Export: a way down to a line.
-  open: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10.5v6M9.5 13l2.5-2.5 2.5 2.5"/></svg>',
+  // The drive under Folders: a drive, its light on. Export: a way down to a line.
+  drive: '<svg width="22" height="18" viewBox="0 0 22 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="5" width="19" height="8" rx="2"/><circle cx="16.5" cy="9" r="1.2" fill="currentColor" stroke="none"/></svg>',
   export: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>',
 };
 // The icons the kits over files share (kit_docs.js, kit_cells.js).
 export const ownIcons = own;
-
-/** The Open button a bar over files has: a file from anywhere on the cloud (filepick.js). */
-export const openButton = (b) =>
-  `<button class="open" aria-label="Open ${esc(aOr(b.noun))} from anywhere" title="Open from anywhere">${own.open}</button>`;
 
 /**
  * Where a record's file is, when that is not under the screen's own root:
@@ -151,13 +153,50 @@ export const FOLDERS = "~folders";
 export const TOP = "~top";
 export const NEW = "~new";
 
+// -- the drive the screen looks at --------------------------------------------------
+// A screen over files names the share its files are in (`where.share`,
+// my-files as a rule) and the folder under it (`within`). Under Folders
+// the person may point it at another drive for a while; that is kept in
+// this browser, per screen, and the screen then looks at the whole of
+// that drive — `within` names a folder of the screen's own share, which
+// another need not have. Shared with the document and the sheet
+// (kit_docs.js, kit_cells.js), whose bindings are made the same way.
+const driveKey = (at) => `drive.${at.quill.id}.${at.screen.id}`;
+/** The share chosen under Folders, or "" for the screen's own. */
+export const driveOf = (at) => ((at.screen.where || {}).share ? store.get(driveKey(at)) || "" : "");
+/** Look at *share* from now on; the screen's own share is home, and forgets the choice. */
+export function setDrive(at, share) {
+  store.set(driveKey(at), share && share !== String((at.screen.where || {}).share) ? share : null);
+}
+/** The screen's `where`, as strings, with the drive chosen put in: `{where, home}`. */
+export function whereOf(at) {
+  const where = Object.fromEntries(Object.entries(at.screen.where || {}).map(([k, v]) => [k, String(v)]));
+  const drive = driveOf(at);
+  if (!drive || drive === where.share) return { where, home: true };
+  // The whole of the other drive: `within` empty walks it from its top.
+  return { where: { ...where, share: drive, within: "" }, home: false };
+}
+
+// The drives on offer: My Files and the fileshares, as the share
+// datamodel lists them, in the sheet every choice is made in. Choosing
+// one redraws the screen over it.
+async function chooseDrive(b) {
+  let shares;
+  try { shares = await api("GET", recordsUrl("share")); }
+  catch (err) { toast(err.message); return; }
+  const choices = shares.filter((s) => s.fields.browsable !== false).map((s) => ({
+    label: String(s.fields.label || s.id) + (s.id === b.where.share ? " ✓" : ""),
+    run: () => { if (s.id === b.where.share) return; setDrive(b.at, s.id); renderRoute(); },
+  }));
+  choose("Which drive?", choices);
+}
 
 // -- the screen's bindings ---------------------------------------------------------
 function bind(at) {
   const { quill, screen } = at;
   const model = quill.models[screen.model];
   const can = new Set(model.can || []);
-  const where = Object.fromEntries(Object.entries(screen.where || {}).map(([k, v]) => [k, String(v)]));
+  const { where, home } = whereOf(at);
   const suffixes = suffixesOf(screen);
   const filters = suffixes.length ? { ...where, suffix: suffixes.join(",") } : where;
   return {
@@ -167,6 +206,7 @@ function bind(at) {
     body: screen.body,
     path: screen.path || "",
     where,
+    home,
     suffix: suffixes[0] || "",
     suffixes,
     root: trimSlashes(where.within || ""),
@@ -219,8 +259,9 @@ const pageHash = (b, id) =>
   `#/r/${encodeURIComponent(b.at.quill.id)}/${encodeURIComponent(b.at.screen.id)}/${encodeURIComponent(b.model.id)}/${encodeURIComponent(id)}`;
 
 // -- the pages and the folders ---------------------------------------------------------
-// [{id, path, title, folder, place, modified, preview}], and the folders in
-// tree order: [{path, name, depth, count}], the top first.
+// [{id, path, title, folder, place, modified, preview}], the folders in
+// tree order: [{path, name, depth, count}], the top first, and the drive
+// they are on: {id, label, home}.
 export async function load(b) {
   const [rows, names] = await Promise.all([
     api("GET", recordsUrl(b.model.id, "", withQuery(b, "?previews=true"))), shareLabels(),
@@ -262,7 +303,9 @@ export async function load(b) {
     [...known].sort(byPath).map((path) => ({
       path, name: baseName(path), depth: path.split("/").length, count: count(path),
     })));
-  return { pages, folders };
+  const share = b.where.share || "";
+  const drive = { id: share, label: (share && names.get(share)) || share, home: b.home !== false };
+  return { pages, folders, drive };
 }
 
 const byNewest = (a, c) => c.modified - a.modified;
@@ -284,10 +327,19 @@ export function listView(b, data, key, openId = "") {
         <span class="count">${f.count}</span><span class="chevron">${icons.chevronRight}</span></a>`;
     }).join("");
     const make = b.keepsFolders && b.writes ? `<button class="new-folder" aria-label="New folder">${own.newFolder}</button>` : "";
+    // The drive the folders are on, and the way to another: a row of its own.
+    const drive = !data.drive || !data.drive.id ? "" : `<div class="group">
+          <button type="button" class="row has-icon drive" aria-label="Look at another drive">
+            <span class="icon">${own.drive}</span>
+            <span class="main"><span class="title">${esc(data.drive.label)}</span>` +
+            `<span class="path"><bdi>${data.drive.home ? "Drive" : "Another drive"}</bdi></span></span>
+            <span class="chevron">${icons.chevronRight}</span></button>
+        </div>`;
     return {
       title: "Folders",
       html: `${heading("Folders", make)}
         <div class="install-slot">${installCard()}</div>
+        ${drive}
         <div class="group">
           <a class="row has-icon" href="${listHash(b, "")}">
             <span class="icon">${own.pages}</span>
@@ -298,6 +350,8 @@ export function listView(b, data, key, openId = "") {
       wire(root) {
         const button = root.querySelector(".new-folder");
         if (button) button.addEventListener("click", () => newFolder(b, ""));
+        const drive = root.querySelector(".row.drive");
+        if (drive) drive.addEventListener("click", () => chooseDrive(b));
       },
     };
   }
