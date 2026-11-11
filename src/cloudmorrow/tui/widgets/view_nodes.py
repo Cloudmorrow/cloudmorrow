@@ -455,10 +455,11 @@ class ConversationNode(Vertical):
             self.text = text
             super().__init__()
 
-    def __init__(self, node: dict, action: dict | None, **kwargs: Any) -> None:
+    def __init__(self, node: dict, action: dict | None, close: dict | None = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.node = node
         self.action = action
+        self.close = close
         self.field = next(
             (f for f in (action or {}).get("fields") or [] if f.get("kind") in ("text", "markdown", "string")), None
         )
@@ -466,6 +467,21 @@ class ConversationNode(Vertical):
 
     def compose(self) -> ComposeResult:
         records = self.node.get("records") or []
+        if self.close:
+            # The X in the corner: the `close` action on the conversation's
+            # record, asked first when the manifest says confirm.
+            with Horizontal(classes="view-conversation-head"):
+                yield ViewButton(
+                    {
+                        "ui": "button",
+                        "label": f"✕ {self.close.get('label') or 'Close'}",
+                        "action": self.close["id"],
+                        "record": self.node.get("record"),
+                        "tone": self.close.get("tone"),
+                    },
+                    id=f"{self.id}-close",
+                    classes="view-close",
+                )
         with Vertical(classes="view-lines", id=f"{self.id}-lines"):
             if not records and self.node.get("empty"):
                 yield Static(Text(str(self.node["empty"]), style=MUTED), classes="view-greeting")
@@ -1091,7 +1107,8 @@ class Drawer:
 
     def draw_conversation(self, node: dict, path: str) -> Widget:
         action = find_action(self.pane.quill, str(node.get("ask") or "")) if node.get("ask") else None
-        return ConversationNode(node, action, id=path)
+        close = find_action(self.pane.quill, str(node.get("close") or "")) if node.get("close") else None
+        return ConversationNode(node, action, close, id=path)
 
     def draw_button(self, node: dict, path: str) -> Widget:
         return ViewButton(node, id=path)

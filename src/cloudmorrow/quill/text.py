@@ -92,6 +92,8 @@ def _lines(node: dict, actions: dict) -> list[str]:
         return out
     if kind == "conversation":
         out = []
+        if node.get("close"):
+            out.append(f"[✕ {actions.get(node['close'], node['close'])}]")
         for record in node["records"]:
             fields = record.get("fields", {})
             who = "You" if fields.get(node["mine"]) else (node.get("name") or "Them")

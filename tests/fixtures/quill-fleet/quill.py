@@ -30,6 +30,12 @@ def add_van(ctx, name, registration=None):
 
 
 @action
+def scrap(ctx, vehicle):
+    ctx.records.delete("vehicle", vehicle.id)
+    return toast(f"Scrapped {vehicle['name']}")
+
+
+@action
 def peek(ctx):
     return toast(ctx.secret("TRACKER_KEY")[:3] + "…")
 

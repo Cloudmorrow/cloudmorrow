@@ -54,6 +54,13 @@ km = { kind = "int", required = true }
 note = "text"
 
 [[actions]]
+id = "scrap"
+label = "Scrap it"
+on = "vehicle"
+confirm = "Scrap this van?"
+tone = "danger"
+
+[[actions]]
 id = "add-van"
 label = "Add a van"
 tone = "primary"

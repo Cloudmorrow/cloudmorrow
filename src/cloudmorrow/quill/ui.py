@@ -257,6 +257,7 @@ def conversation(
     placeholder: str | None = None,
     hint: str | None = None,
     backdrop: str | None = None,
+    close: str | None = None,
 ) -> dict:
     """A conversation, as a chat is drawn: *records* are its lines, in order,
     each with its words in the *body* field (Markdown) and whether it is the
@@ -269,7 +270,9 @@ def conversation(
     looked at), *failed* a bool: a line that did not go through. *empty* is
     said in the middle while there is nothing yet; *placeholder* is the box's
     own words; *hint* a small line under the box; *backdrop* `"mascot"` puts
-    the hedgehog faintly behind the lines."""
+    the hedgehog faintly behind the lines. *close* names the action an X in
+    the top right corner runs on *record* — deleting the conversation, say;
+    give that action a `confirm` in the manifest, and it is asked first."""
     if backdrop is not None and backdrop not in BACKDROPS:
         raise TreeError(f"a conversation's backdrop is one of {', '.join(BACKDROPS)}")
     return _node(
@@ -287,6 +290,7 @@ def conversation(
         placeholder=str(placeholder) if placeholder else None,
         hint=str(hint) if hint else None,
         backdrop=backdrop,
+        close=close,
     )
 
 
@@ -513,6 +517,7 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
         "placeholder": (str, False),
         "hint": (str, False),
         "backdrop": (str, False),
+        "close": (str, False),
     },
     "menu": {"label": (str, True), "items": (list, True)},
     "table": {
@@ -641,7 +646,7 @@ def check(tree, *, actions=None, screens=None) -> dict:
             raise TreeError(f"{where}: an image's src is an https:// address")
         if kind == "gallery" and node.get("rate") and not node.get("stars"):
             raise TreeError(f"{where}: a gallery that rates says which field holds the stars: stars=")
-        for key in ("action", "rate", "ask"):
+        for key in ("action", "rate", "ask", "close"):
             if node.get(key) and actions is not None and node[key] not in actions:
                 raise TreeError(f"{where}: {kind} runs {node[key]!r}, which the manifest does not declare")
         for key in ("actions",):

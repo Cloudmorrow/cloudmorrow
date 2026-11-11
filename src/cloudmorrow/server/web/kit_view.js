@@ -39,6 +39,7 @@ const glyphs = {
   more: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
   down: '<svg width="10" height="7" viewBox="0 0 10 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m1 1.5 4 4 4-4"/></svg>',
   send: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3.2 11.1 20 3.4c.8-.4 1.6.4 1.2 1.2L13.5 21c-.4.8-1.5.7-1.8-.1l-2.1-6-6-2.1c-.8-.3-.9-1.4-.4-1.7Z"/></svg>',
+  close: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
 };
 
 // The same test the board uses: a phone has no way to drag anything.
@@ -303,6 +304,7 @@ function pressedIn(tree) {
   for (const n of walk(tree)) {
     if (n.action) ids.add(n.action);
     if (n.ask) ids.add(n.ask);
+    if (n.close) ids.add(n.close);
   }
   return ids;
 }
@@ -605,7 +607,13 @@ function drawConversation(v, n) {
       `<textarea rows="1" placeholder="${esc(words)}" aria-label="${esc(words)}" enterkeyhint="send" autocapitalize="sentences"></textarea>` +
       `<button type="submit" aria-label="${esc(action.label)}">${glyphs.send}</button></form>`;
   }
-  return `<div class="v-conversation${n.backdrop ? " backdrop-" + esc(n.backdrop) : ""}"><div class="v-lines" aria-live="polite">` +
+  // The X in the corner: the `close` action on the conversation's record,
+  // through press, so the manifest's confirm is asked first.
+  const closing = n.close ? findAction(v.at.quill.id, n.close) : null;
+  const x = !closing ? "" :
+    `<button type="button" class="v-close" aria-label="${esc(closing.label)}" title="${esc(closing.label)}" ` +
+    `${doing(v, () => press(v.at.quill, closing, { record: n.record ? n.record.id : "", here: v.at, after: v.draw }))}>${glyphs.close}</button>`;
+  return `<div class="v-conversation${n.backdrop ? " backdrop-" + esc(n.backdrop) : ""}">` + x + `<div class="v-lines" aria-live="polite">` +
     (lines || (n.empty ? `<div class="v-greeting">${esc(n.empty)}</div>` : "")) + `</div>` + box +
     (n.hint ? `<p class="v-composer-hint">${esc(n.hint)}</p>` : "") + `</div>`;
 }

@@ -215,6 +215,11 @@ Button.view-button.-error {
     margin-top: 1;
 }
 
+.view-conversation-head {
+    height: auto;
+    align-horizontal: right;
+}
+
 .view-line.-mine, .view-line-who.-mine, .view-line-under.-mine {
     text-align: right;
 }
