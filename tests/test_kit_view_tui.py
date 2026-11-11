@@ -26,8 +26,9 @@ from cloudmorrow.server.app import create_app
 from cloudmorrow.tui.panes.kit import pane_for
 from cloudmorrow.tui.panes.kit_view import ViewPane
 from cloudmorrow.tui.quill_actions import ActionModal
+from cloudmorrow.tui.screens.modals import ConfirmModal
 from cloudmorrow.tui.screens.record_sheet import RecordSheet
-from cloudmorrow.tui.widgets.view_nodes import RENDERERS, Drawer, TableNode
+from cloudmorrow.tui.widgets.view_nodes import RENDERERS, Drawer, TableNode, ViewButton
 from tests.conftest import ADMIN, token_for
 from tests.tui_harness import PRESS_ANIMATION, settle, start
 
@@ -208,7 +209,7 @@ async def test_the_record_sheet_lists_the_actions_on_its_datamodel(fleet):
         assert isinstance(sheet, RecordSheet)
         buttons = [str(b.label) for b in sheet.query_one("#sheet-actions").query(Button)]
         # `on = "vehicle"` only: Add a van is on no record, so it is not here.
-        assert buttons == ["Log a service"]
+        assert buttons == ["Log a service", "Scrap it"]
 
         await pilot.click("#sheet-act-0")
         await breathe(pilot)
@@ -313,7 +314,7 @@ def every_primitive(van: dict) -> dict:
             ui.empty("Nothing else.", action="add-van"),
             ui.toggle("Lit", action="peek", on=True, hint="A switch"),
             ui.rows([van], title="name", subtitle="registration", go="vans", param="van", current=van["id"]),
-            ui.conversation([van], body="name", mine="name", ask="add-van", name="Fleet", hint="Say it"),
+            ui.conversation([van], body="name", mine="name", ask="add-van", name="Fleet", hint="Say it", close="scrap"),
         )
     )
 
@@ -390,6 +391,34 @@ async def test_a_conversation_sends_on_enter_and_is_drawn_again_with_the_answer(
         app.screen.action_cancel()
         await settle(app, pilot)
         assert sorted(v["fields"]["name"] for v in vans(app)) == ["Sprinter", "Transit"]
+
+
+async def test_the_x_on_a_conversation_asks_first_then_runs_close_on_its_record(fleet):
+    """`close` is the X in the corner: pressed, the manifest's confirm is
+    asked; on yes the action runs on the conversation's record and the
+    view is drawn again. On no, nothing."""
+    app = fleet
+    async with app.run_test(size=(120, 40)) as pilot:
+        pane = await open_garage(app, pilot)
+        van = vans(app)[0]
+        pane.view_tree = ui.check(
+            ui.conversation([van], body="name", mine="name", ask="add-van", record=van, close="scrap")
+        )
+        await pane.draw()
+        await settle(app, pilot)
+        x = pane.query_one(".view-close", ViewButton)
+        assert x.label.plain == "✕ Scrap it"
+        x.press()
+        await until(pilot, lambda: isinstance(app.screen, ConfirmModal))
+        assert app.screen._title == "Scrap this van?"
+        app.screen.action_cancel()
+        await settle(app, pilot)
+        assert [v["fields"]["name"] for v in vans(app)] == ["Transit"]
+        pane.query_one(".view-close", ViewButton).press()
+        await until(pilot, lambda: isinstance(app.screen, ConfirmModal))
+        await pilot.click("#confirm")
+        await until(pilot, lambda: not vans(app))
+        assert "Scrapped Transit" in toasts(app)
 
 
 async def test_a_card_in_a_lane_moves_with_the_keys(fleet):

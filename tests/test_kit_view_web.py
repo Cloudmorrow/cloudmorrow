@@ -87,8 +87,18 @@ def test_a_setting_is_a_switch_and_a_conversation_a_chat():
     assert 'class="switch"' in code and "[n.field]: on" in code and "if (failed) box.checked = !on" in code
     assert 'event.key === "Enter" && !event.shiftKey' in code and "[field.name]: text" in code
     assert "v-thinking" in code and "box.value = text" in code
-    assert "if (n.ask) ids.add(n.ask)" in code
-    drawn = (".v-toggle", ".v-composer", ".v-lines", ".v-line.mine .v-bubble", ".v-thinking", ".v-conversation")
+    assert "if (n.ask) ids.add(n.ask)" in code and "if (n.close) ids.add(n.close)" in code
+    # The X in the corner goes through press, so the action's confirm is asked first.
+    assert 'class="v-close"' in code and "press(v.at.quill, closing, { record: n.record ? n.record.id" in code
+    drawn = (
+        ".v-toggle",
+        ".v-composer",
+        ".v-lines",
+        ".v-line.mine .v-bubble",
+        ".v-thinking",
+        ".v-conversation",
+        ".v-conversation > .v-close",
+    )
     for cls in drawn:
         assert cls in VIEW_CSS, cls
     # An action marked settings is drawn by the settings screen alone, as an admin's is;

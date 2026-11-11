@@ -157,18 +157,23 @@ def test_a_toggle_and_a_conversation_are_primitives_every_surface_draws():
             record={"id": "c1", "model": "chat.conversation"},
             placeholder="Ask Morrow",
             hint="Reads only",
+            close="forget",
         ),
     )
-    ui.check(tree, actions={"allow", "ask"}, screens=set())
+    ui.check(tree, actions={"allow", "ask", "forget"}, screens=set())
+    # The X in the corner runs `close`, an action the manifest must declare too.
+    with pytest.raises(TreeError, match="runs 'forget'"):
+        ui.check(tree, actions={"allow", "ask"}, screens=set())
     toggle, chat = tree["children"]
     assert toggle["on"] is True and toggle["field"] == "changes" and "args" not in toggle
     assert chat["record"] == {"id": "c1", "model": "chat.conversation", "rev": None, "fields": {}}
     with pytest.raises(TreeError, match="runs 'ask'"):
-        ui.check(tree, actions={"allow"}, screens=set())
+        ui.check(tree, actions={"allow", "forget"}, screens=set())
     with pytest.raises(TreeError, match="a conversation needs 'mine'"):
         ui.check({"ui": "conversation", "records": [], "body": "body"})
-    said = as_text.render(tree, actions={"allow": "What Morrow may do", "ask": "Send"})
+    said = as_text.render(tree, actions={"allow": "What Morrow may do", "ask": "Send", "forget": "Delete"})
     assert "[x] Morrow may change things" in said and "    Or only read" in said
+    assert "[✕ Delete]\nYou:" in said
     assert "You:  2026-11-10T09:00\n  How many?\nMorrow:\n  **Four**\n  Looked at: tasks\n" in said
     assert "You:\n  Sure?\n  (did not go through)" in said
     assert said.rstrip().endswith("[Ask Morrow…]\nReads only")

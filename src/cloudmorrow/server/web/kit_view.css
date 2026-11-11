@@ -215,6 +215,25 @@ main.view-screen:has(.v-conversation) > .heading { flex: none; }
   pointer-events: none;
 }
 .v-conversation > * { position: relative; }
+/* The X in the corner: what closes the conversation (deletes it), asked first. */
+.v-conversation > .v-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 0;
+  background: var(--bg);
+  color: var(--muted);
+  cursor: pointer;
+}
+.v-conversation > .v-close:hover, .v-conversation > .v-close:focus-visible { color: var(--ink); }
+.v-conversation:has(> .v-close) > .v-lines { padding-top: 40px; }
 .v-lines {
   flex: 1;
   min-height: 0;
