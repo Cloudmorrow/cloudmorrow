@@ -101,6 +101,19 @@ def test_a_setting_is_a_switch_and_a_conversation_a_chat():
     )
     for cls in drawn:
         assert cls in VIEW_CSS, cls
+
+
+def test_rows_search_and_group_and_a_side_that_folds():
+    """Rows under a search field narrow to the titles and subtitles typed, under
+    the headings a document list has (sectionOf, the one shared with it);
+    a split marked fold has the document list's fold button on a computer,
+    its choice kept per screen."""
+    code = js_code(VIEW_JS)
+    assert 'type="search"' in code and "row.dataset.find.includes(needle)" in code
+    assert "sectionOf(" in code and 'class="group-label"' in code
+    assert "view.folded.${v.at.quill.id}/${v.at.screen.id}" in code and "store.set(split.dataset.fold" in code
+    for cls in (".v-search input", ".v-split.folded", ".v-fold", ".v-hidden", ".v-side-head { display: none; }"):
+        assert cls in VIEW_CSS, cls
     # An action marked settings is drawn by the settings screen alone, as an admin's is;
     # one marked bar = false is a screen's own box's, not a chip as well.
     assert "!a.on && !a.admin && !a.settings" in ACTIONS_JS

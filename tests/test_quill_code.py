@@ -185,6 +185,30 @@ def test_a_toggle_and_a_conversation_are_primitives_every_surface_draws():
     # Rows are the app's list rows: as cards, but a line each, the open one lit.
     listed = ui.rows(lines, title="body", subtitle="note", go="chat", param="line", current="m2")
     assert listed["param"] == "line" and listed["current"] == "m2" and "open" not in listed
+    # A search field over them, and headings by when, newest first; a side that folds.
+    import datetime as dt
+
+    now = dt.datetime.now().replace(microsecond=0)
+    dated = [
+        {"id": "d1", "model": "chat.conversation", "fields": {"title": "Today's", "at": now.isoformat()}},
+        {"id": "d2", "model": "chat.conversation", "fields": {"title": "Older", "at": "2024-05-02T10:00:00"}},
+        {"id": "d3", "model": "chat.conversation", "fields": {"title": "Undated"}},
+    ]
+    grouped = ui.rows(dated, title="title", search="Search conversations", group="at")
+    assert grouped["search"] == "Search conversations" and grouped["group"] == "at"
+    said = as_text.render(ui.split(grouped, ui.text("main"), fold=True), actions={})
+    assert "[Search conversations…]\nToday:\n• Today's\n2024:\n• Older\n• Undated\n" in said
+    assert ui.split(grouped, ui.text("main"), fold=True)["fold"] is True
+    assert "fold" not in ui.split(grouped, ui.text("main"))
+    assert as_text.section_of("x") == "" and as_text.section_of(now.isoformat()) == "Today"
+    today = dt.date(2026, 11, 11)
+    assert [as_text.section_of(f"2026-11-{d:02d}", today) for d in (11, 10, 5, 1)] == [
+        "Today",
+        "Yesterday",
+        "Last 7 Days",
+        "Last 30 Days",
+    ]
+    assert as_text.section_of("2026-03-04", today) == "March" and as_text.section_of("2025-12-31", today) == "2025"
     ui.check(listed, actions=set(), screens={"chat"})
     assert as_text.render(listed, actions={}).splitlines()[:2] == ["• How many?", "▶ **Four** — Looked at: tasks"]
 

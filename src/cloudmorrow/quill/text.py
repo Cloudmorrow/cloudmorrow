@@ -9,6 +9,8 @@ piped, previewed, or asserted on (`Harness.view(...).text()`).
 
 from __future__ import annotations
 
+import datetime as dt
+
 RULE = "─"
 
 
@@ -20,6 +22,29 @@ def value_text(record: dict, name: str) -> str:
     if isinstance(value, bool):
         return "yes" if value else "no"
     return str(value)
+
+
+def section_of(stamp: str, today: dt.date | None = None) -> str:
+    """Which stretch of time *stamp* (ISO) falls in, for the headings over a
+    long list, newest first: Today, Yesterday, Last 7 Days, Last 30 Days, a
+    month of this year by name, an earlier year by number; "" for no date."""
+    try:
+        when = dt.datetime.fromisoformat(str(stamp or "")).date()
+    except ValueError:
+        return ""
+    today = today or dt.date.today()
+    days = (today - when).days
+    if days <= 0:
+        return "Today"
+    if days == 1:
+        return "Yesterday"
+    if days < 7:
+        return "Last 7 Days"
+    if days < 30:
+        return "Last 30 Days"
+    if when.year == today.year:
+        return when.strftime("%B")
+    return str(when.year)
 
 
 def _label(name: str) -> str:
@@ -120,8 +145,14 @@ def _lines(node: dict, actions: dict) -> list[str]:
     if kind == "rows":
         if not node["records"]:
             return [f"({node.get('empty') or 'nothing yet'})"]
-        out = []
+        out = [f"[{node['search']}…]"] if node.get("search") else []
+        heading = None
         for record in node["records"]:
+            if node.get("group"):
+                label = section_of(value_text(record, node["group"]))
+                if label and label != heading:
+                    out.append(f"{label}:")
+                    heading = label
             head = value_text(record, node["title"])
             if node.get("subtitle") and value_text(record, node["subtitle"]):
                 head += f" — {value_text(record, node['subtitle'])}"

@@ -21,7 +21,8 @@
    back when the view is drawn again. */
 
 import {
-  api, apiRaw, app, back, esc, go, heading, icons, mount, nav, recordsUrl, tabs, toast, wireShell,
+  api, apiRaw, app, back, esc, go, heading, icons, mount, nav, recordsUrl, seconds, sectionOf, store, tabs, toast,
+  wireShell,
 } from "./core.js";
 import { canDrag, dragLanes, fieldOf, mayWrite, read, segments, sheetHash, spoken, titleOf, widget } from "./kit.js";
 import {
@@ -40,6 +41,8 @@ const glyphs = {
   down: '<svg width="10" height="7" viewBox="0 0 10 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m1 1.5 4 4 4-4"/></svg>',
   send: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3.2 11.1 20 3.4c.8-.4 1.6.4 1.2 1.2L13.5 21c-.4.8-1.5.7-1.8-.1l-2.1-6-6-2.1c-.8-.3-.9-1.4-.4-1.7Z"/></svg>',
   close: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  // The list beside what is open: a panel with a pane at its left, to fold away and bring back.
+  sidebar: '<svg width="18" height="16" viewBox="0 0 20 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="1.5" width="17" height="15" rx="2.5"/><path d="M7.5 1.5v15"/></svg>',
 };
 
 // The same test the board uses: a phone has no way to drag anything.
@@ -166,6 +169,8 @@ function paint(v) {
   wireForms(v);
   wireToggles(v);
   wireChats(v);
+  wireRows(v);
+  wireFolds(v);
   wireLanes(v);
   loadThumbs(v);
   // What the view has its own button for is not in the bar as well.
@@ -321,10 +326,17 @@ const DRAW = {
     n.children.map((c, i) => `<div class="v-column">${node(v, c, `${p}.${i}`)}</div>`).join("") + `</div>`,
   // A list beside what is chosen in it. On a phone only one of the two has
   // room: `show` says which, and the stylesheet hides the other there.
-  split: (v, n, p) =>
-    `<div class="v-split" data-show="${esc(n.show === "main" ? "main" : "side")}">` +
-    `<div class="v-split-side">${node(v, n.side, `${p}.0`)}</div>` +
-    `<div class="v-split-main">${node(v, n.main, `${p}.1`)}</div></div>`,
+  split: (v, n, p) => {
+    // A side that folds: a line over it with the button at its right end, on
+    // a computer; folded, the strip alone. The choice is kept per screen.
+    const key = n.fold ? foldKey(v) : "";
+    const folded = !!key && store.get(key) === "1";
+    const head = !key ? "" : `<div class="v-side-head"><button type="button" class="v-fold" aria-label="${folded ? "Show the list" : "Hide the list"}" ` +
+      `title="${folded ? "Show the list" : "Hide the list"}">${glyphs.sidebar}</button></div>`;
+    return `<div class="v-split${folded ? " folded" : ""}" data-show="${esc(n.show === "main" ? "main" : "side")}"${key ? ` data-fold="${esc(key)}"` : ""}>` +
+      `<div class="v-split-side">${head}${node(v, n.side, `${p}.0`)}</div>` +
+      `<div class="v-split-main">${node(v, n.main, `${p}.1`)}</div></div>`;
+  },
   tabs: drawTabs,
   text: (v, n) => {
     const style = n.style || "body";
@@ -570,6 +582,44 @@ function toggleRow(v, n) {
     `<input type="checkbox" class="switch" aria-label="${esc(n.label)}"${n.on ? " checked" : ""}></label>`;
 }
 
+const foldKey = (v) => `view.folded.${v.at.quill.id}/${v.at.screen.id}`;
+function wireFolds(v) {
+  for (const button of v.root.querySelectorAll(".v-split[data-fold] > .v-split-side > .v-side-head > .v-fold")) {
+    const split = button.closest(".v-split");
+    button.addEventListener("click", () => {
+      const now = !split.classList.contains("folded");
+      split.classList.toggle("folded", now);
+      store.set(split.dataset.fold, now ? "1" : null);
+      button.setAttribute("aria-label", now ? "Show the list" : "Hide the list");
+      button.title = button.getAttribute("aria-label");
+    });
+  }
+}
+
+// The search field over rows: what is typed narrows them to the titles and
+// subtitles holding it, a heading going with its last row.
+function wireRows(v) {
+  for (const box of v.root.querySelectorAll(".v-rows > .v-search > input")) {
+    const rows = box.closest(".v-rows");
+    box.addEventListener("input", () => {
+      const needle = box.value.trim().toLowerCase();
+      let shown = 0;
+      for (const row of rows.querySelectorAll(".v-row-item")) {
+        const hit = !needle || row.dataset.find.includes(needle);
+        row.classList.toggle("v-hidden", !hit);
+        shown += hit ? 1 : 0;
+      }
+      for (const group of rows.querySelectorAll(".v-list")) {
+        const empty = !group.querySelector(".v-row-item:not(.v-hidden)");
+        group.classList.toggle("v-hidden", empty);
+        const label = group.previousElementSibling;
+        if (label && label.classList.contains("group-label")) label.classList.toggle("v-hidden", empty);
+      }
+      rows.querySelector(".v-nomatch").hidden = shown > 0;
+    });
+  }
+}
+
 function wireToggles(v) {
   for (const row of v.root.querySelectorAll("[data-toggle]")) {
     const { n, action } = v.toggles[Number(row.dataset.toggle)];
@@ -725,18 +775,40 @@ function drawTable(v, n) {
 // it, a badge at the end; the one that is open lit, beside what it opened.
 function drawRows(v, n) {
   if (!n.records.length) return none(n.empty);
-  return `<div class="group v-list">` + n.records.map((r) => {
+  const row = (r) => {
     const hash = rowGoes(v, n, r);
     const badge = n.badge ? say(v, r, n.badge) : "";
     const sub = n.subtitle ? say(v, r, n.subtitle) : "";
-    const inner = `<span class="main"><span class="title">${esc(titled(v, r, n.title))}</span>` +
+    const title = titled(v, r, n.title);
+    const inner = `<span class="main"><span class="title">${esc(title)}</span>` +
       (sub ? `<span class="meta"><span class="preview">${esc(sub)}</span></span>` : "") + `</span>` +
       (badge ? `<span class="v-badge">${esc(badge)}</span>` : "");
     const menu = menuOn(v, r, hash);
     const cls = `row v-row-item${n.current && n.current === r.id ? " current" : ""}`;
-    return hash ? `<a class="${cls}" ${menu} href="${esc(hash)}"${n.current === r.id ? ' aria-current="true"' : ""}>${inner}</a>`
-      : `<div class="${cls}" ${menu}>${inner}</div>`;
-  }).join("") + `</div>`;
+    const find = `data-find="${esc((title + " " + sub).toLowerCase())}"`;
+    return hash ? `<a class="${cls}" ${menu} ${find} href="${esc(hash)}"${n.current === r.id ? ' aria-current="true"' : ""}>${inner}</a>`
+      : `<div class="${cls}" ${menu} ${find}>${inner}</div>`;
+  };
+  let groups;
+  if (n.group) {
+    // Given newest first, so the headings fall out in order: Today,
+    // Yesterday, Last 7 Days, Last 30 Days, each month, each year.
+    const sections = new Map();
+    for (const r of n.records) {
+      const at = seconds(r.fields[n.group]);
+      const label = at === null ? "" : sectionOf(at);
+      if (!sections.has(label)) sections.set(label, []);
+      sections.get(label).push(r);
+    }
+    groups = [...sections].map(([label, rs]) =>
+      (label ? `<p class="group-label">${esc(label)}</p>` : "") + `<div class="group v-list">${rs.map(row).join("")}</div>`).join("");
+  } else {
+    groups = `<div class="group v-list">${n.records.map(row).join("")}</div>`;
+  }
+  if (!n.search) return groups;
+  return `<div class="v-rows"><div class="v-search">${icons.search}<input type="search" placeholder="${esc(n.search)}" ` +
+    `aria-label="${esc(n.search)}" autocapitalize="none" autocorrect="off"></div>${groups}` +
+    `<p class="v-none v-nomatch" hidden>Nothing matches.</p></div>`;
 }
 
 function drawCards(v, n) {
