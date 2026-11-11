@@ -411,6 +411,8 @@ export function attachSpelling(host) {
   const onResize = () => { if (state.on) drawParts(resolved()); };
 
   async function start() {
+    // A page only read is somebody else's words: not marked.
+    if (!host.editable) return;
     let s;
     try { s = await spellingSetting(); } catch { return; }
     if (state.gone || !s.check) return;
