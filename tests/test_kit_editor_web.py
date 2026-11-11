@@ -56,6 +56,29 @@ def test_it_reads_the_bindings_and_what_the_model_can_do():
         assert capability in EDITOR_JS, capability
 
 
+def test_folders_can_look_at_another_drive():
+    """Under Folders the first row is the drive the screen looks at; it offers
+    the others in the sheet, and the choice is kept in this browser, per
+    screen. Another drive is looked at whole: `within` names a folder of the
+    screen's own share. The kits over files share it, and no bar has an Open
+    button any more."""
+    code = js_code(EDITOR_JS)
+    assert "const driveKey = (at) => `drive.${at.quill.id}.${at.screen.id}`;" in code
+    where = code.split("export function whereOf", 1)[1].split("\n}", 1)[0]
+    assert 'return { where: { ...where, share: drive, within: "" }, home: false };' in where
+    assert "const { where, home } = whereOf(at);" in code
+    assert 'class="row has-icon drive"' in code
+    assert 'choose("Which drive?", choices)' in code and "s.fields.browsable !== false" in code
+    assert "setDrive(b.at, s.id); renderRoute();" in code
+    assert "openButton" not in code and "from anywhere" not in code
+    for name in ("kit_docs.js", "kit_cells.js"):
+        other = js_code((WEB / name).read_text(encoding="utf-8"))
+        assert "const { where, home } = whereOf(at);" in other, name
+        for gone in ("openButton", "pickFile", '".nav .open"', "from anywhere"):
+            assert gone not in other, (name, gone)
+    assert "pickFile" not in (WEB / "filepick.js").read_text(encoding="utf-8")
+
+
 def test_the_calls_it_makes_are_the_record_apis():
     code = js_code(EDITOR_JS)
     assert '"?previews=true"' in code

@@ -42,7 +42,7 @@ def test_nothing_in_the_sheet_is_named_for_one_quill():
 
 def test_it_reads_the_bindings_and_writes_only_where_it_may():
     code = js_code(CELLS_JS)
-    for binding in ("screen.title", "screen.cells", "screen.path", "screen.where", "suffixesOf(screen)"):
+    for binding in ("screen.title", "screen.cells", "screen.path", "whereOf(at)", "suffixesOf(screen)"):
         assert binding in code, binding
     assert "writes: mayWrite(model)" in code
     assert ".access" not in code

@@ -6,10 +6,9 @@
    are (a share, and the folder under it: `within`) and their `suffix`:
    `.cell`, and Excel's `.xlsx`, which the server reads and writes as the
    same text. The sheets are listed newest first, by their path under
-   that folder; Open picks one from anywhere on the cloud (filepick.js),
-   and Export hands the open one over as Excel, PDF or CSV, made by the
-   server (the record API's /export).
-   one opens as a grid with a formula bar over it, worked out by
+   that folder, or under another drive when Folders is pointed at one;
+   Export hands the open one over as Excel, PDF or CSV, made by the
+   server (the record API's /export). One opens as a grid with a formula bar over it, worked out by
    kit_cells_rules.js, the same rules the terminal and the command line
    follow in quill/cells.py. Nothing here knows what a budget is.
 
@@ -35,19 +34,18 @@
      #/r/<quill>/<screen>/<model>/<id>   a sheet */
 
 import {
-  SAVE_DELAY, api, app, back, baseName, esc, fileStem, folderOf, formatDate, go, icons, joinPath, mount, nav,
+  SAVE_DELAY, api, app, back, baseName, esc, fileStem, folderOf, formatDate, icons, joinPath, mount, nav,
   litDone, occupy, previousHash, recordsUrl, renderRoute, replace, seconds, setStatus, tabs, toast, vacate, wireSaveKey, wireShell,
 } from "./core.js";
 import { mayWrite, sheetHash } from "./kit.js";
 import {
-  NEW, TOP, aOr, download, fixedFields, folded, lastList, listHash, listView, load, openButton, ownIcons,
+  NEW, TOP, download, fixedFields, folded, lastList, listHash, listView, load, ownIcons,
   placeOf as placeOfFile, shareLabels, showWhereabouts, sideHead, suffixesOf, trimSlashes, underRoot, whereIs,
-  whereNew, whereabouts, wholePath, wide, wireFold, withSuffix, withoutSuffix,
+  whereNew, whereOf, whereabouts, wholePath, wide, wireFold, withSuffix, withoutSuffix,
 } from "./kit_editor.js";
 import { CellError, SIDES, Sheet, colName, extent, isFormula, parseRef, rangeName, refName, wantsRef } from "./kit_cells_rules.js";
 import { ask } from "./dialog.js";
 import { choose, menu } from "./actions.js";
-import { pickFile } from "./filepick.js";
 
 const EXCEL = ".xlsx";
 // What a sheet goes out as, by suffix: what the server's /export makes.
@@ -58,7 +56,7 @@ function bind(at) {
   const { quill, screen } = at;
   const model = quill.models[screen.model];
   const can = new Set(model.can || []);
-  const where = Object.fromEntries(Object.entries(screen.where || {}).map(([k, v]) => [k, String(v)]));
+  const { where, home } = whereOf(at);
   const suffixes = suffixesOf(screen);
   const filters = suffixes.length ? { ...where, suffix: suffixes.join(",") } : where;
   return {
@@ -68,6 +66,7 @@ function bind(at) {
     cells: screen.cells || "text",
     path: screen.path || "",
     where,
+    home,
     suffix: suffixes[0] || "",
     suffixes,
     root: trimSlashes(where.within || ""),
@@ -104,29 +103,19 @@ export async function renderCells(at, arg) {
   const key = b.path ? arg : "";
   lastList.set(at.tab, key);
   const view = listView(b, await load(b), key);
-  const right = openButton(b);
   if (wide()) {
-    mount(nav({ title: view.title, right }) + `
+    mount(nav({ title: view.title }) + `
       <main class="split">
         <section class="side">${sideHead(view, { fold: false })}${view.html}</section>
         <section class="page"><p class="empty mascot"><b>Nothing open</b>Choose a ${esc(b.noun)} on the left${
-          b.writes ? ", or start one with the pen" : ""}, or open one from anywhere with the folder.</p></section>
+          b.writes ? ", or start one with the pen" : ""}.</p></section>
       </main>` + tabs(at.tab));
   } else {
-    mount(nav({ back: view.backTo, backLabel: view.backLabel, title: view.title, right }) +
+    mount(nav({ back: view.backTo, backLabel: view.backLabel, title: view.title }) +
       `<main>${view.html}</main>` + tabs(at.tab));
   }
   wireShell();
   view.wire(app.querySelector("main"));
-  app.querySelector(".nav .open").addEventListener("click", () => openOther(b));
-}
-
-// -- opening from anywhere ------------------------------------------------------------
-// A sheet picked from any share and folder opens by its record: the grid
-// is the same, and the file stays where it is.
-async function openOther(b) {
-  const picked = await pickFile({ suffixes: b.suffixes, title: `Open ${aOr(b.noun)}`, model: b.model.id });
-  if (picked) go(openHash(b, picked.id));
 }
 
 /** One sheet: the kit's own page, in place of the record sheet. */
@@ -182,7 +171,7 @@ async function renderSheet(b, { record = null, isNew = false, folder = "", arg }
     ? listHash(b, ed.folder || (previousHash() === listHash(b, TOP) ? TOP : listKey))
     : listHash(b, "");
   const parentLabel = ed.folder ? baseName(ed.folder) : b.label;
-  const actions = (b.writes ? `<button class="done strong" hidden>Done</button>` : "") + openButton(b) +
+  const actions = (b.writes ? `<button class="done strong" hidden>Done</button>` : "") +
     (ed.isNew ? "" : `<button class="export" aria-label="Export" title="Export">${ownIcons.export}</button>`) +
     (b.writes ? `<button class="delete" aria-label="Delete ${esc(b.noun)}">${icons.trash}</button>` : "");
   const names = await shareLabels();
@@ -223,16 +212,13 @@ async function renderSheet(b, { record = null, isNew = false, folder = "", arg }
   ed.table = box.querySelector(".grid");
   const done = app.querySelector(".nav .done");
   const del = app.querySelector(".nav .delete");
-  const openEl = app.querySelector(".nav .open");
   const exportEl = app.querySelector(".nav .export");
   ed.doneEl = done;
-  openEl.addEventListener("click", () => openOther(b));
   if (exportEl) exportEl.addEventListener("click", () => exportMenu(ed));
   // While the sheet is being typed in, the bar is Done's.
   const editing = (on) => {
     if (done) done.hidden = !on;
     litDone(ed);
-    openEl.hidden = on;
     if (del) del.hidden = on;
     if (exportEl) exportEl.hidden = on;
   };

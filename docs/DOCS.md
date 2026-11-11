@@ -121,11 +121,13 @@ switches it on (`spelling.js`, the gear on the screen's title; see
 It saves as you type, as blocks and runs — nothing of the browser's own
 markup; changing the title renames the file, and a Word file stays a
 Word file. One changed elsewhere since it was opened is not written over.
-**Open** (the folder in the bar) picks a document from anywhere on the
-cloud — another folder of your drive, a fileshare — through the picker
-every file screen shares (`filepick.js`: the shares, then the folders,
-then the files that are documents); it opens by its record, the file
-staying where it is, and the stamp says where. **Export** offers Word,
+Under **Folders** the first row is the drive the screen looks at, My
+Files as a rule; tapping it offers the others — the fileshares you are
+in — and the screen looks at the one chosen from then on, whole, there
+being no Documents folder on a fileshare, until it is pointed home
+again (the editor kit's drive row, kept in this browser per screen). A
+document there opens by its record, the file staying where it is, and
+the line under the page says where. **Export** offers Word,
 PDF and Markdown, and hands the file over to save — through the record
 API's `GET /api/records/file/<id>/export?as=docx`, which makes Word's
 package, a PDF (`quill/pdf.py`: Helvetica on A4, headings larger,

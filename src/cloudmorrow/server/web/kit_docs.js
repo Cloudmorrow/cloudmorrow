@@ -12,10 +12,9 @@
    of the browser's own markup is saved.
 
    The page saves as you type; changing the title renames the file; one
-   changed elsewhere since it was opened is not written over. Open picks a
-   document from anywhere on the cloud — another folder, a fileshare —
-   through filepick.js, and it opens here by its record, wherever it is.
-   Export hands the document over to save as Word, PDF or Markdown, made
+   changed elsewhere since it was opened is not written over. Under Folders
+   the screen looks at another drive when asked to (the editor's drive
+   row); a document opens by its record, wherever it is. Export hands the document over to save as Word, PDF or Markdown, made
    by the server from the same blocks (the record API's /export).
 
    The addresses, under the screen's own (quills.js):
@@ -24,19 +23,18 @@
      #/r/<quill>/<screen>/<model>/<id>   a document */
 
 import {
-  SAVE_DELAY, api, app, back, baseName, esc, fileStem, folderOf, formatDate, go, icons, joinPath, mount,
+  SAVE_DELAY, api, app, back, baseName, esc, fileStem, folderOf, formatDate, icons, joinPath, mount,
   litDone, nav, occupy, previousHash, recordsUrl, renderRoute, replace, seconds, setStatus, tabs, toast, vacate, wireSaveKey, wireShell,
 } from "./core.js";
 import { mayWrite } from "./kit.js";
 import {
-  NEW, TOP, aOr, download, fixedFields, folded, lastList, listHash, listView, load, openButton,
+  NEW, TOP, aOr, download, fixedFields, folded, lastList, listHash, listView, load,
   ownIcons, placeOf, shareLabels, showWhereabouts, sideHead, suffixesOf, trimSlashes, underRoot, whereIs, whereNew,
-  whereabouts, wholePath, wide, wireFold, withSuffix, withoutSuffix,
+  whereOf, whereabouts, wholePath, wide, wireFold, withSuffix, withoutSuffix,
 } from "./kit_editor.js";
 import { Doc, block, langOf, run } from "./kit_docs_rules.js";
 import { ask, askText } from "./dialog.js";
 import { choose } from "./actions.js";
-import { pickFile } from "./filepick.js";
 import { attachDocument } from "./spelling.js";
 
 const WORD = ".docx";
@@ -48,7 +46,7 @@ function bind(at) {
   const { quill, screen } = at;
   const model = quill.models[screen.model];
   const can = new Set(model.can || []);
-  const where = Object.fromEntries(Object.entries(screen.where || {}).map(([k, v]) => [k, String(v)]));
+  const { where, home } = whereOf(at);
   const suffixes = suffixesOf(screen);
   const filters = suffixes.length ? { ...where, suffix: suffixes.join(",") } : where;
   return {
@@ -58,6 +56,7 @@ function bind(at) {
     body: screen.body || "text",
     path: screen.path || "",
     where,
+    home,
     suffix: suffixes[0] || "",
     suffixes,
     root: trimSlashes(where.within || ""),
@@ -90,29 +89,19 @@ export async function renderDocs(at, arg) {
   const key = b.path ? arg : "";
   lastList.set(at.tab, key);
   const view = listView(b, await load(b), key);
-  const right = openButton(b);
   if (wide()) {
-    mount(nav({ title: view.title, right }) + `
+    mount(nav({ title: view.title }) + `
       <main class="split">
         <section class="side">${sideHead(view, { fold: false })}${view.html}</section>
         <section class="page"><p class="empty mascot"><b>Nothing open</b>Choose ${esc(aOr(b.noun))} on the left${
-          b.writes ? ", or start one with the pen" : ""}, or open one from anywhere with the folder.</p></section>
+          b.writes ? ", or start one with the pen" : ""}.</p></section>
       </main>` + tabs(at.tab));
   } else {
-    mount(nav({ back: view.backTo, backLabel: view.backLabel, title: view.title, right }) +
+    mount(nav({ back: view.backTo, backLabel: view.backLabel, title: view.title }) +
       `<main>${view.html}</main>` + tabs(at.tab));
   }
   wireShell();
   view.wire(app.querySelector("main"));
-  app.querySelector(".nav .open").addEventListener("click", () => openOther(b));
-}
-
-// -- opening from anywhere ------------------------------------------------------------
-// A document picked from any share and folder opens by its record: the
-// page is the same, and the file stays where it is.
-async function openOther(b) {
-  const picked = await pickFile({ suffixes: b.suffixes, title: `Open ${aOr(b.noun)}`, model: b.model.id });
-  if (picked) go(pageHash(b, picked.id));
 }
 
 /** One document: the kit's own page, in place of the record sheet. */
@@ -327,7 +316,7 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
     ? listHash(b, ed.folder || (previousHash() === listHash(b, TOP) ? TOP : listKey))
     : listHash(b, "");
   const parentLabel = ed.folder ? baseName(ed.folder) : b.label;
-  const actions = `<button class="done strong" hidden>Done</button>` + openButton(b) +
+  const actions = `<button class="done strong" hidden>Done</button>` +
     (ed.isNew ? "" : `<button class="export" aria-label="Export" title="Export">${ownIcons.export}</button>`) +
     (b.writes ? `<button class="delete" aria-label="Delete ${esc(b.noun)}">${icons.trash}</button>` : "");
   const names = await shareLabels();
@@ -362,16 +351,13 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
   ed.bodyEl = box.querySelector(".doc-body");
   const done = app.querySelector(".nav .done");
   const del = app.querySelector(".nav .delete");
-  const openEl = app.querySelector(".nav .open");
   const exportEl = app.querySelector(".nav .export");
   ed.doneEl = done;
-  openEl.addEventListener("click", () => openOther(b));
   if (exportEl) exportEl.addEventListener("click", () => exportMenu(ed));
   // While the page is being typed in, the bar is Done's.
   const editing = (on) => {
     done.hidden = !on;
     litDone(ed);
-    openEl.hidden = on;
     if (del) del.hidden = on;
     if (exportEl) exportEl.hidden = on;
   };

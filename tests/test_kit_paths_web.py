@@ -70,7 +70,7 @@ def test_an_open_page_says_where_its_file_is_whole():
 def test_the_whole_path_is_a_way_to_its_folder_in_files():
     """A link to the folder in the first installed screen that shows files by
     share — the grid's own address — and plain words when nothing here does."""
-    assert 'import { folderInFiles } from "./actions.js";' in EDITOR_JS
+    assert 'import { choose, folderInFiles } from "./actions.js";' in EDITOR_JS
     link = EDITOR_JS.split("const placeLink = (where) =>", 1)[1].split("\n};", 1)[0]
     assert 'where.share ? folderInFiles(where.share, where.folder) : ""' in link
     assert 'title="Open the folder in Files"' in link
