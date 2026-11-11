@@ -29,6 +29,28 @@
 /* A list beside what is chosen in it: on a phone, only the one `show` names. */
 .v-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .v-split-side, .v-split-main { min-width: 0; }
+/* The line over a side that folds, and its button: a computer's alone. */
+.v-side-head { display: none; }
+.v-hidden { display: none !important; }
+/* The search field over rows, as the one over a document list. */
+.v-search { position: relative; margin: 0 0 14px; }
+.v-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.v-search input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px 0 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--field);
+  color: var(--ink);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.v-search input:focus { border-color: var(--accent); }
+.v-search input::placeholder { color: var(--muted); }
+.v-search input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.v-rows > .group-label:first-of-type { margin-top: 4px; }
 .v-split[data-show="main"] > .v-split-side, .v-split[data-show="side"] > .v-split-main { display: none; }
 
 .v-tabs .v-tab-strip { margin: 0 0 12px; }
@@ -509,6 +531,34 @@ button.v-star:focus-visible { outline: 2px solid var(--accent); outline-offset: 
   .v-columns { grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 18px; align-items: start; }
   .v-split { grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 22px; align-items: start; }
   .v-split[data-show="main"] > .v-split-side, .v-split[data-show="side"] > .v-split-main { display: block; }
+  .v-split[data-fold] > .v-split-side > .v-side-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 4px 0 2px;
+    background: var(--bg);
+  }
+  .v-fold {
+    margin-left: auto;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .v-fold:hover, .v-fold:focus-visible { color: var(--accent); }
+  /* Folded, the side is its top line alone — the button on it brings the
+     list back — and the main has the rest of the width. */
+  .v-split.folded { grid-template-columns: auto minmax(0, 1fr); }
+  .v-split.folded > .v-split-side > :not(.v-side-head) { display: none; }
   /* A conversation beside its list has the whole width, as a thread has,
      and both columns are there whichever the phone would show. */
   #app:has(.v-conversation) { --column: 1120px; }

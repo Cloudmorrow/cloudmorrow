@@ -119,15 +119,25 @@ def columns(*children) -> dict:
     return _node("columns", children=_children(children))
 
 
-def split(side, main, *, show: str = "side", back: dict | None = None) -> dict:
+def split(side, main, *, show: str = "side", back: dict | None = None, fold: bool = False) -> dict:
     """A list beside what is chosen in it: *side* narrow on the left, *main* wide
     on the right, on a wide screen. A phone has room for one: *show* says which,
     "side" or "main" — the list until something is chosen, then that. *back*,
     with "main" shown, is the way back to the list: this screen with those
-    parameters, drawn as the screen's back button, as a page of a document has."""
+    parameters, drawn as the screen's back button, as a page of a document has.
+    *fold* gives the side a button on a computer that folds it away to a
+    strip, as the list beside a document folds, and brings it back; the
+    choice is kept per screen on that computer."""
     if show not in ("side", "main"):
         raise TreeError("split: show is side or main")
-    return _node("split", side=side, main=main, show=show, back=dict(back) if back is not None else None)
+    return _node(
+        "split",
+        side=side,
+        main=main,
+        show=show,
+        back=dict(back) if back is not None else None,
+        fold=True if fold else None,
+    )
 
 
 def tabs(*pairs, **named) -> dict:
@@ -388,12 +398,19 @@ def rows(
     param: str | None = None,
     params: dict | None = None,
     current: str | None = None,
+    search: str | None = None,
+    group: str | None = None,
 ) -> dict:
     """Records as the rows of a list — the app's own rows, as a list screen
     draws them: a title, a line under it, a badge at the end — rather than
     cards. Opening one is as `cards`: its sheet, or with *go* a screen of the
     Quill's own with the record's id as *param*; *current* is the id of the
-    one that is open, lit as such. The list beside what is open in it."""
+    one that is open, lit as such. The list beside what is open in it.
+    *search* puts a search field over the rows, with those words in it, that
+    narrows them to the titles and subtitles matching what is typed. *group*
+    names a datetime field: the rows, given newest first, fall under
+    headings — Today, Yesterday, Last 7 Days, Last 30 Days, then each month
+    of this year and each earlier year — as a long list of documents does."""
     return _node(
         "rows",
         records=_records(records),
@@ -406,6 +423,8 @@ def rows(
         param=param if go else None,
         params=dict(params) if params else None,
         current=str(current) if current else None,
+        search=str(search) if search else None,
+        group=group,
     )
 
 
@@ -472,7 +491,13 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
     "stack": {"children": (list, True), "gap": (str, False)},
     "row": {"children": (list, True), "wrap": (bool, False)},
     "columns": {"children": (list, True)},
-    "split": {"side": (dict, True), "main": (dict, True), "show": (str, False), "back": (dict, False)},
+    "split": {
+        "side": (dict, True),
+        "main": (dict, True),
+        "show": (str, False),
+        "back": (dict, False),
+        "fold": (bool, False),
+    },
     "tabs": {"tabs": (list, True)},
     "text": {"text": (str, True), "style": (str, False)},
     "markdown": {"text": (str, True)},
@@ -554,6 +579,8 @@ PRIMITIVES: dict[str, dict[str, tuple]] = {
         "param": (str, False),
         "params": (dict, False),
         "current": (str, False),
+        "search": (str, False),
+        "group": (str, False),
     },
     "gallery": {
         "records": (list, True),

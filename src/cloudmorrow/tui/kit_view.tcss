@@ -39,6 +39,9 @@
 .view-split .view-cards { grid-size: 1; }
 .view-card.-current { border-left: wide $accent; }
 .view-rows .view-card { border: none; padding: 0 1; margin-bottom: 0; }
+.view-rows .view-search { margin-bottom: 1; }
+.view-rows .view-group-label { margin-top: 1; padding: 0 1; }
+.view-rows .view-nomatch { padding: 0 1; }
 .view-rows .view-card.-current { border-left: wide $accent; }
 
 .view-row > * {

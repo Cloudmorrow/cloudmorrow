@@ -40,7 +40,7 @@ from textual.widgets import (
     TabPane,
 )
 
-from cloudmorrow.quill.text import stars_text, value_text
+from cloudmorrow.quill.text import section_of, stars_text, value_text
 from cloudmorrow.quill.ui import GAPS, TONES, children
 from cloudmorrow.tui.dates import month_start, shift_month, span, weeks_of
 from cloudmorrow.tui.kitdata import (
@@ -769,6 +769,57 @@ class GalleryNode(Horizontal):
         await frame.mount(TerminalImage(opened, classes="view-picture"))
 
 
+class RowsNode(Vertical):
+    """`rows`: the app's rows, one line each — under a search field that
+    narrows them to what is typed (`search`), and under the headings of the
+    stretch of time each falls in (`group`: Today, Yesterday, …)."""
+
+    def __init__(self, node: dict, models: dict, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.node = node
+        self.models = models
+        self.add_class("view-cards")
+        self.add_class("view-rows")
+
+    def compose(self) -> ComposeResult:
+        node = self.node
+        if node.get("search"):
+            yield Input(placeholder=str(node["search"]), id=f"{self.id}-search", classes="view-search")
+        heading = None
+        for record in node.get("records") or []:
+            if node.get("group"):
+                label = section_of(value_text(record, str(node["group"])))
+                if label and label != heading:
+                    yield Static(Text(label, style=f"bold {MUTED}"), classes="view-group-label")
+                    heading = label
+            yield ViewCard(
+                record, node, self.models.get(record.get("model", "")), id=f"{self.id}-row-{safe_id(record['id'])}"
+            )
+        nothing = Static(_text("Nothing matches."), classes="view-muted view-nomatch")
+        nothing.display = False
+        yield nothing
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        event.stop()
+        needle = event.value.strip().lower()
+        shown = 0
+        label: Static | None = None
+        for child in self.children:
+            if isinstance(child, ViewCard):
+                title = value_text(child.record, str(self.node["title"]))
+                sub = value_text(child.record, str(self.node.get("subtitle") or ""))
+                words = f"{title} {sub}"
+                hit = not needle or needle in words.lower()
+                child.display = hit
+                shown += int(hit)
+                if hit and label is not None:
+                    label.display = True
+            elif child.has_class("view-group-label"):
+                label = child
+                child.display = False
+        self.query_one(".view-nomatch", Static).display = shown == 0
+
+
 class ViewCard(Static, can_focus=True):
     """One of `cards`: its title, subtitle, body and badge. Enter or a click opens it."""
 
@@ -1141,19 +1192,9 @@ class Drawer:
 
     def draw_rows(self, node: dict, path: str) -> Widget:
         """The app's rows: the same card widget, one line each, drawn as a list."""
-        records = node.get("records") or []
-        if not records:
+        if not node.get("records"):
             return Static(_text(node.get("empty") or "Nothing here."), id=path, classes="view-muted")
-        return Vertical(
-            *(
-                ViewCard(
-                    record, node, self.models.get(record.get("model", "")), id=f"{path}-row-{safe_id(record['id'])}"
-                )
-                for record in records
-            ),
-            id=path,
-            classes="view-cards view-rows",
-        )
+        return RowsNode(node, self.models, id=path)
 
     def draw_gallery(self, node: dict, path: str) -> Widget:
         actions = [

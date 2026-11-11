@@ -28,7 +28,7 @@ from cloudmorrow.tui.panes.kit_view import ViewPane
 from cloudmorrow.tui.quill_actions import ActionModal
 from cloudmorrow.tui.screens.modals import ConfirmModal
 from cloudmorrow.tui.screens.record_sheet import RecordSheet
-from cloudmorrow.tui.widgets.view_nodes import RENDERERS, Drawer, TableNode, ViewButton
+from cloudmorrow.tui.widgets.view_nodes import RENDERERS, Drawer, RowsNode, TableNode, ViewButton, ViewCard
 from tests.conftest import ADMIN, token_for
 from tests.tui_harness import PRESS_ANIMATION, settle, start
 
@@ -313,7 +313,16 @@ def every_primitive(van: dict) -> dict:
             ui.table([], columns=["name"], empty="No vans here."),
             ui.empty("Nothing else.", action="add-van"),
             ui.toggle("Lit", action="peek", on=True, hint="A switch"),
-            ui.rows([van], title="name", subtitle="registration", go="vans", param="van", current=van["id"]),
+            ui.rows(
+                [van],
+                title="name",
+                subtitle="registration",
+                go="vans",
+                param="van",
+                current=van["id"],
+                search="Find a van",
+                group="registration",
+            ),
             ui.conversation([van], body="name", mine="name", ask="add-van", name="Fleet", hint="Say it", close="scrap"),
         )
     )
@@ -391,6 +400,34 @@ async def test_a_conversation_sends_on_enter_and_is_drawn_again_with_the_answer(
         app.screen.action_cancel()
         await settle(app, pilot)
         assert sorted(v["fields"]["name"] for v in vans(app)) == ["Sprinter", "Transit"]
+
+
+async def test_rows_narrow_to_what_is_typed_in_their_search_field(fleet):
+    """`search` on rows: what is typed keeps the rows whose title or subtitle
+    holds it, with their heading; nothing left says so."""
+    app = fleet
+    async with app.run_test(size=(120, 40)) as pilot:
+        pane = await open_garage(app, pilot)
+        van = vans(app)[0]
+        van["fields"]["registration"] = "2024-05-02"
+        pane.view_tree = ui.check(
+            ui.rows([van], title="name", subtitle="registration", search="Find", group="registration")
+        )
+        await pane.draw()
+        await settle(app, pilot)
+        rows = pane.query_one(RowsNode)
+        assert [str(s.content) for s in rows.query(".view-group-label")] == ["2024"]
+        box = rows.query_one(Input)
+        assert box.placeholder == "Find"
+        box.focus()
+        await pilot.press(*"zzz")
+        await settle(app, pilot)
+        assert not rows.query_one(ViewCard).display and not rows.query_one(".view-group-label").display
+        assert rows.query_one(".view-nomatch").display
+        await pilot.press("backspace", "backspace", "backspace", *"tran")
+        await settle(app, pilot)
+        assert rows.query_one(ViewCard).display and rows.query_one(".view-group-label").display
+        assert not rows.query_one(".view-nomatch").display
 
 
 async def test_the_x_on_a_conversation_asks_first_then_runs_close_on_its_record(fleet):
