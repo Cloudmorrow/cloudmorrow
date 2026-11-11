@@ -127,6 +127,7 @@ def test_a_conversation_hears_the_answer_as_it_is_said():
     assert "runStream(v.at.quill, action, {" in code and "onProgress: saying" in code
     assert 'line.classList.add("v-saying")' in code and "v-caret" in code
     assert "/stream`" in ACTIONS_JS and 'Accept: "text/event-stream"' in ACTIONS_JS
+    assert "route, send, toast } from" in ACTIONS_JS, "the request helper the stream needs is imported"
     assert 'name === "progress" && onProgress' in ACTIONS_JS and 'ended.name === "failed"' in ACTIONS_JS
     assert ".v-line.v-saying .v-caret" in VIEW_CSS
     for cls in (".v-search input", ".v-split.folded", ".v-fold", ".v-hidden", ".v-side-head { display: none; }"):

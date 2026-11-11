@@ -644,6 +644,7 @@ function wireToggles(v) {
 // write in on the floor. What is sent is shown at once, with the other
 // side thinking, until the action is done and the view drawn again; what
 // could not be sent goes back into the box.
+const BLOCKS = new Set(["P", "LI", "UL", "OL", "H1", "H2", "H3", "H4", "BLOCKQUOTE", "PRE"]);
 const askField = (action) => (action && (action.fields || []).find((f) => ["text", "markdown", "string"].includes(f.kind))) || null;
 
 function drawConversation(v, n) {
@@ -740,6 +741,12 @@ function wireChats(v) {
         line.classList.add("v-saying");
         line.innerHTML = (n.name ? `<span class="v-who">${esc(n.name)}</span>` : "") +
           `<div class="v-bubble v-markdown">${markdown(words)}<span class="v-caret"></span></div>`;
+        // The caret ends the last line of words rather than starting one of its own.
+        const bubble = line.querySelector(".v-bubble");
+        const caret = bubble.lastElementChild;
+        let tail = bubble;
+        while (tail.lastElementChild && tail.lastElementChild !== caret && BLOCKS.has(tail.lastElementChild.tagName)) tail = tail.lastElementChild;
+        if (tail !== bubble) tail.appendChild(caret);
         if (near) toBottom();
       };
       const failed = await runStream(v.at.quill, action, {

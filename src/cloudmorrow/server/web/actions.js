@@ -26,7 +26,7 @@
    edit a file of a given name (`editorsFor`), read off the screens the
    manifests declare. */
 
-import { ApiError, api, app, encodePath, esc, go, parseHash, route, toast } from "./core.js";
+import { ApiError, api, app, encodePath, esc, go, parseHash, route, send, toast } from "./core.js";
 import { ask, openSheet } from "./dialog.js";
 import { linkTitles, read, segments, widget } from "./kit.js";
 

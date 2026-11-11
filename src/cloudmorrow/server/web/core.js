@@ -55,7 +55,7 @@ const authHeaders = () => (session.token ? { Authorization: "Bearer " + session.
 // ApiError like any other, and a 401 while signed in means the session is
 // over: everything that asks the server goes through here, so each screen
 // need not know that.
-async function send(path, init) {
+export async function send(path, init) {
   let res;
   try {
     res = await fetch(path, { ...init, headers: { ...authHeaders(), ...init.headers } });
