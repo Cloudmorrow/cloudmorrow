@@ -16,12 +16,15 @@ it. A Quill with no screens left comes `available: false`, and is not on.
 
 from __future__ import annotations
 
+import asyncio
 import io
+import json
 import tarfile
 import tempfile
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from cloudmorrow.server.circles import NONE, Access
@@ -478,3 +481,58 @@ def press(
     except CodeError as exc:
         raise _failed(exc) from exc
     return {"effects": effects}
+
+
+@router.post("/{quill_id}/actions/{action_id}/stream")
+async def press_streaming(
+    quill_id: str,
+    action_id: str,
+    payload: ActionIn,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> StreamingResponse:
+    """The same press, heard as it runs: a server-sent stream of what the
+    handler says with `ctx.progress` (`event: progress`, the text so far),
+    then its effects (`event: done`) or why it failed (`event: failed`, what
+    the plain route would answer as its detail). A conversation draws the
+    answer as it is said."""
+    code = _code(state)
+    loop = asyncio.get_running_loop()
+    told: asyncio.Queue = asyncio.Queue()
+
+    def progress(text: str) -> None:
+        loop.call_soon_threadsafe(told.put_nowait, ("progress", text))
+
+    async def work() -> None:
+        try:
+            effects = await asyncio.to_thread(
+                code.action,
+                user.username,
+                quill_id,
+                action_id,
+                record=payload.record,
+                fields=payload.fields,
+                progress=progress,
+            )
+            told.put_nowait(("done", {"effects": effects}))
+        except CodeError as exc:
+            told.put_nowait(("failed", exc.to_dict()))
+        except Exception as exc:  # noqa: BLE001 — said to the listener rather than lost
+            told.put_nowait(("failed", {"kind": "error", "message": str(exc)}))
+
+    async def events():
+        # The action runs on to its end even when the listener leaves early.
+        asyncio.create_task(work())
+        while True:
+            try:
+                name, data = await asyncio.wait_for(told.get(), timeout=15)
+            except TimeoutError:
+                yield ": ping\n\n"
+                continue
+            yield f"event: {name}\ndata: {json.dumps(data)}\n\n"
+            if name in ("done", "failed"):
+                return
+
+    return StreamingResponse(
+        events(), media_type="text/event-stream", headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"}
+    )

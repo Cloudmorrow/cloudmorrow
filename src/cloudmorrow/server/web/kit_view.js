@@ -30,7 +30,7 @@ import {
 } from "./kit_calendar.js";
 import {
   choose, contextMenus, findAction, formFields, hideFromBar, linksFor, onRedrawHere, peopleList, press,
-  readFields, recordChoices, run, said, screenAt, wireFields,
+  readFields, recordChoices, run, runStream, said, screenAt, wireFields,
 } from "./actions.js";
 import { ask } from "./dialog.js";
 
@@ -730,8 +730,20 @@ function wireChats(v) {
         `<div class="v-line mine v-sent"><div class="v-bubble">${esc(text)}</div></div>` +
         `<div class="v-line v-thinking" role="status" aria-label="Waiting for an answer"><span></span><span></span><span></span></div>`);
       toBottom();
-      const failed = await run(v.at.quill, action, {
-        record: n.record ? n.record.id : "", fields: { [field.name]: text }, here: v.at, after: v.draw,
+      // The answer as it is said: the action's progress drawn in the other
+      // side's line, the dots giving way to the words, until the view is
+      // drawn again with the answer written down.
+      const saying = (words) => {
+        const line = lines.querySelector(".v-thinking");
+        if (!line) return;
+        const near = lines.scrollHeight - lines.scrollTop - lines.clientHeight < 80;
+        line.classList.add("v-saying");
+        line.innerHTML = (n.name ? `<span class="v-who">${esc(n.name)}</span>` : "") +
+          `<div class="v-bubble v-markdown">${markdown(words)}<span class="v-caret"></span></div>`;
+        if (near) toBottom();
+      };
+      const failed = await runStream(v.at.quill, action, {
+        record: n.record ? n.record.id : "", fields: { [field.name]: text }, here: v.at, after: v.draw, onProgress: saying,
       });
       // Not drawn again, so it ended in an error: the words go back rather than being lost.
       if (failed && form.isConnected) {

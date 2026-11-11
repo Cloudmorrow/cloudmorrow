@@ -254,6 +254,18 @@ main.view-screen:has(.v-conversation) > .heading { flex: none; }
   pointer-events: none;
 }
 .v-conversation > * { position: relative; }
+/* The answer as it is said: the thinking line become words, a caret at the end. */
+.v-line.v-saying { align-items: flex-start; }
+.v-line.v-saying .v-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  animation: v-blink 1s steps(2, start) infinite;
+}
+@keyframes v-blink { to { visibility: hidden; } }
 /* The X in the corner: what closes the conversation (deletes it), asked first. */
 .v-conversation > .v-close {
   position: absolute;

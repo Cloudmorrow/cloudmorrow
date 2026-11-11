@@ -513,6 +513,60 @@ export async function run(quill, action, { record = "", fields = {}, here = null
   return applyEffects(effects || [], { quill, record, here, after, showError });
 }
 
+/** The same, heard as it runs: the action's stream route says what the
+    handler reports with `ctx.progress` (`onProgress(text)`, the text so far)
+    before its effects, which are done as `run` does them. A conversation
+    draws the answer as it is said. Resolves as `run` does. */
+export async function runStream(quill, action, { record = "", fields = {}, here = null, after = null, showError = null, onProgress = null } = {}) {
+  const body = { fields };
+  if (action.on && record) body.record = record;
+  const path = `/api/quills/${encodeURIComponent(quill.id)}/actions/${encodeURIComponent(action.id)}/stream`;
+  const failed = (text) => { if (showError) showError(text); else toast(text); return text; };
+  let res;
+  try {
+    res = await send(path, {
+      method: "POST", headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify(body),
+    });
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) return "signed out";
+    return failed(said(err));
+  }
+  if (!res.ok || !res.body) {
+    const data = await res.json().catch(() => null);
+    return failed(said(new ApiError(res.status, data && data.detail !== undefined ? data.detail : null)));
+  }
+  let ended = null;
+  const heard = (block) => {
+    let name = "message", data = "";
+    for (const line of block.split("\n")) {
+      if (line.startsWith("event:")) name = line.slice(6).trim();
+      else if (line.startsWith("data:")) data += line.startsWith("data: ") ? line.slice(6) : line.slice(5);
+    }
+    if (!data) return;
+    let value;
+    try { value = JSON.parse(data); } catch { return; }
+    if (name === "progress" && onProgress) onProgress(String(value));
+    else if (name === "done" || name === "failed") ended = { name, value };
+  };
+  try {
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let rest = "";
+    while (!ended) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      rest += value;
+      let at;
+      while (!ended && (at = rest.indexOf("\n\n")) >= 0) { heard(rest.slice(0, at)); rest = rest.slice(at + 2); }
+    }
+    reader.cancel().catch(() => {});
+  } catch {
+    return failed("The connection dropped before the answer came");
+  }
+  if (!ended) return failed("The server stopped before the answer came");
+  if (ended.name === "failed") return failed(said(new ApiError(0, ended.value)));
+  return applyEffects(ended.value.effects || [], { quill, record, here, after, showError });
+}
+
 /** Every effect, in the order the handler gave them. The one place they are done. */
 export async function applyEffects(effects, { quill, record = "", here = null, after = null, showError = null }) {
   let error = "";

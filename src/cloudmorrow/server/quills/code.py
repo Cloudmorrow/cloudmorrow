@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import base64
 import datetime as dt
+import io
 import ipaddress
 import logging
 import queue
@@ -51,6 +52,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
@@ -91,6 +93,7 @@ JOB_TIMEOUT = 120.0
 HOOK_DEPTH = 3
 FETCH_TIMEOUT = 30.0
 FETCH_MAX = 10 * 1024 * 1024
+FETCH_CHUNK = 64 * 1024
 FETCH_METHODS = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"})
 
 # Made by schema.py, step 1. A change to it is a new step there.
@@ -221,6 +224,7 @@ class HostCalls:
         via: str,
         kind: str = "",
         budget: float = CALL_TIMEOUT,
+        progress: Callable[[str], None] | None = None,
     ) -> None:
         self.code = code
         self.state = code.state
@@ -232,6 +236,16 @@ class HostCalls:
         # How long the handler itself has: a fetch may wait as long as that,
         # for an action that says `timeout` (an answer from a model takes a while).
         self.budget = budget
+        # Where `ctx.progress` goes: the surface that pressed, when it listens.
+        self.progress = progress
+        # The fetches being read as they come (`ctx.fetch(stream=True)`), by handle.
+        self._streams: dict[int, _OpenFetch] = {}
+
+    def close(self) -> None:
+        """The handler is over: nothing it was reading stays open."""
+        for stream in list(self._streams.values()):
+            stream.close()
+        self._streams.clear()
 
     def __call__(self, op: str, args: dict) -> object:
         handler = getattr(self, "op_" + op.replace(".", "_"), None)
@@ -440,7 +454,8 @@ class HostCalls:
             raise sdk.NotFound(f"{key} is not in {self.principal.username}'s vault; add it with `cm secret set {key}`")
         return secret.value
 
-    def op_fetch(self, args: dict) -> dict:
+    def _fetch_request(self, args: dict) -> tuple:
+        """What a fetch is, checked: (hostname, method, url, headers, body, timeout)."""
         url = str(args.get("url", ""))
         parts = urllib.parse.urlsplit(url)
         if parts.scheme != "https":
@@ -459,11 +474,15 @@ class HostCalls:
         }
         headers.setdefault("User-Agent", f"cloudmorrow-quill/{self.manifest.id}")
         body = base64.b64decode(args.get("body") or "") or None
-        if self.code.fetcher is not None:  # a test harness answers instead of the network
-            return self.code.fetcher(method, url, headers, body or b"")
         # As long as the handler has, when an action says `timeout`; thirty seconds otherwise.
         longest = max(FETCH_TIMEOUT, float(self.budget))
         timeout = min(float(args.get("timeout") or FETCH_TIMEOUT), longest)
+        return parts.hostname or "", method, url, headers, body, timeout
+
+    def op_fetch(self, args: dict) -> dict:
+        hostname, method, url, headers, body, timeout = self._fetch_request(args)
+        if self.code.fetcher is not None:  # a test harness answers instead of the network
+            return self.code.fetcher(method, url, headers, body or b"")
         opener = urllib.request.build_opener(_Redirects(self.manifest.fetch))
         request = urllib.request.Request(url, data=body, headers=headers, method=method)
         try:
@@ -474,10 +493,90 @@ class HostCalls:
         except sdk.HostError:
             raise
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            raise sdk.Invalid(f"could not reach {parts.hostname}: {getattr(exc, 'reason', exc)}") from exc
+            raise sdk.Invalid(f"could not reach {hostname}: {getattr(exc, 'reason', exc)}") from exc
         if len(data) > FETCH_MAX:
-            raise sdk.Invalid(f"{parts.hostname} sent more than {FETCH_MAX // (1024 * 1024)} MB")
+            raise sdk.Invalid(f"{hostname} sent more than {FETCH_MAX // (1024 * 1024)} MB")
         return {"status": status, "headers": head, "body": base64.b64encode(data).decode("ascii")}
+
+    # A fetch read as it comes: opened, read a chunk at a time, closed. The
+    # same checks and limits as one read whole; the handle is this handler's.
+    def op_fetch_open(self, args: dict) -> dict:
+        hostname, method, url, headers, body, timeout = self._fetch_request(args)
+        if self.code.fetcher is not None:
+            got = self.code.fetcher(method, url, headers, body or b"")
+            reader = io.BytesIO(base64.b64decode(got.get("body") or ""))
+            opened = _OpenFetch(hostname, int(got["status"]), dict(got.get("headers") or {}), reader)
+        else:
+            opener = urllib.request.build_opener(_Redirects(self.manifest.fetch))
+            request = urllib.request.Request(url, data=body, headers=headers, method=method)
+            try:
+                response = opener.open(request, timeout=timeout)
+            except urllib.error.HTTPError as exc:
+                response = exc
+            except sdk.HostError:
+                raise
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                raise sdk.Invalid(f"could not reach {hostname}: {getattr(exc, 'reason', exc)}") from exc
+            status = int(getattr(response, "status", None) or response.code)
+            opened = _OpenFetch(hostname, status, dict(response.headers or {}), response)
+        handle = max(self._streams, default=0) + 1
+        self._streams[handle] = opened
+        return {"handle": handle, "status": opened.status, "headers": opened.headers}
+
+    def _drop(self, opened: _OpenFetch) -> None:
+        opened.close()
+        self._streams = {k: v for k, v in self._streams.items() if v is not opened}
+
+    def op_fetch_read(self, args: dict) -> dict:
+        opened = self._streams.get(int(args.get("handle") or 0))
+        if opened is None:
+            raise sdk.Invalid("that fetch is not open")
+        try:
+            chunk = opened.read(FETCH_CHUNK)
+        except (TimeoutError, OSError) as exc:
+            self._drop(opened)
+            raise sdk.Invalid(f"{opened.hostname} stopped answering: {exc}") from exc
+        if opened.total > FETCH_MAX:
+            self._drop(opened)
+            raise sdk.Invalid(f"{opened.hostname} sent more than {FETCH_MAX // (1024 * 1024)} MB")
+        done = not chunk
+        if done:
+            self._drop(opened)
+        return {"chunk": base64.b64encode(chunk).decode("ascii"), "done": done}
+
+    def op_fetch_close(self, args: dict) -> None:
+        opened = self._streams.pop(int(args.get("handle") or 0), None)
+        if opened is not None:
+            opened.close()
+
+    def op_progress(self, args: dict) -> None:
+        if self.progress is not None:
+            self.progress(str(args.get("text", "")))
+
+
+class _OpenFetch:
+    """A fetch being read as it comes: what it answered, and the rest of it."""
+
+    def __init__(self, hostname: str, status: int, headers: dict, reader) -> None:
+        self.hostname = hostname
+        self.status = status
+        self.headers = headers
+        self._reader = reader
+        self.total = 0
+
+    def read(self, size: int) -> bytes:
+        # read1 hands over what is there as soon as any is, which is what a
+        # stream wants; read waits for the whole size.
+        read = getattr(self._reader, "read1", None) or self._reader.read
+        chunk = read(size) or b""
+        self.total += len(chunk)
+        return chunk
+
+    def close(self) -> None:
+        try:
+            self._reader.close()
+        except Exception:  # noqa: BLE001 — closing is best effort
+            pass
 
 
 def plain_record(manifest: Manifest, record: dict) -> dict:
@@ -652,8 +751,10 @@ class QuillCode:
         ctx: dict | None = None,
         args: dict | None = None,
         timeout: float = CALL_TIMEOUT,
+        progress: Callable[[str], None] | None = None,
     ) -> object:
-        """Run one handler as *principal*; its result, or CodeError."""
+        """Run one handler as *principal*; its result, or CodeError. *progress*
+        hears what the handler says with `ctx.progress` while it runs."""
         data = {
             "quill": manifest.id,
             "user": self._user(principal.username),
@@ -661,7 +762,7 @@ class QuillCode:
             "cloud": self.state.cloud_name(),
             **(ctx or {}),
         }
-        host = HostCalls(self, manifest, principal, via=via, kind=kind, budget=timeout)
+        host = HostCalls(self, manifest, principal, via=via, kind=kind, budget=timeout, progress=progress)
         try:
             return self._guest(manifest, principal.username).call(kind, name, data, args or {}, host, timeout=timeout)
         except Failed as failure:
@@ -673,6 +774,8 @@ class QuillCode:
         except SandboxError as exc:
             self.log(manifest.key).note(str(exc))
             raise CodeError("unavailable", str(exc)) from exc
+        finally:
+            host.close()
 
     # -- views and actions ---------------------------------------------------------------------
     def view(self, username: str, quill_id: str, screen_id: str, params: dict, *, record: str = "") -> dict:
@@ -730,8 +833,10 @@ class QuillCode:
         record: str = "",
         fields: dict | None = None,
         via: str = "person",
+        progress: Callable[[str], None] | None = None,
     ) -> list[dict]:
-        """Press an action: its form checked, its record found as the person, its effects."""
+        """Press an action: its form checked, its record found as the person, its
+        effects. *progress*, when the surface listens, hears `ctx.progress`."""
         manifest = self.installed(quill_id, username)
         action = next((a for a in manifest.actions if a["id"] == action_id), None)
         if action is None:
@@ -763,6 +868,7 @@ class QuillCode:
             via=via,
             args=args,
             timeout=float(action.get("timeout") or CALL_TIMEOUT),
+            progress=progress,
         )
 
         # What its writes set off runs before the screen is drawn again, as

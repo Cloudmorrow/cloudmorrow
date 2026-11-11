@@ -81,10 +81,14 @@ def datamodels_folder() -> Path | None:
 class Result:
     """What pressing an action did: its effects, or why it was refused."""
 
-    def __init__(self, effects: list[dict] | None = None, *, kind: str = "", message: str = "") -> None:
+    def __init__(
+        self, effects: list[dict] | None = None, *, kind: str = "", message: str = "", progress: list[str] | None = None
+    ) -> None:
         self.effects = list(effects or [])
         self.kind = kind
         self.message = message
+        # What the handler said with `ctx.progress` while it ran, in order.
+        self.progress = list(progress or [])
 
     @property
     def ok(self) -> bool:
@@ -307,14 +311,17 @@ class Harness:
         from cloudmorrow.server.quills.code import CodeError
 
         record_id = getattr(record, "id", record) or ""
+        told: list[str] = []
         try:
-            effects = self.state.code.action(self.user, self.quill, action, record=record_id, fields=fields, via=via)
+            effects = self.state.code.action(
+                self.user, self.quill, action, record=record_id, fields=fields, via=via, progress=told.append
+            )
         except CodeError as exc:
             self._raise_for(exc)
-            return Result(kind=exc.kind, message=exc.message)
+            return Result(kind=exc.kind, message=exc.message, progress=told)
         finally:
             self.state.code.drain()
-        return Result(effects)
+        return Result(effects, progress=told)
 
     def view(self, screen: str, record=None, **params) -> View:
         from cloudmorrow.server.quills.code import CodeError
