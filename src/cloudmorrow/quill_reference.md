@@ -125,6 +125,8 @@ confirm = "Log it?"                # optional; tone = "primary" | "danger"; assi
 [actions.fields]                   # its form, checked before the code runs
 date = { kind = "date", required = true }
 km = "int"
+# folder = { kind = "string", pick = "folder", share = "share" }  # picked from the drive's folders on the web
+# share = "string"                                                 # the share it is in, filled by the picker
 
 [[hooks]]
 on = "fleet.visit"
@@ -213,8 +215,11 @@ own list rows, the open one lit, `search` a search field over them, `group` a
 datetime field for the headings Today, Yesterday, Last 7 Days, Last 30 Days,
 month, year, the rows given newest first, `close` an action a little X at each
 row's end runs on that record, its `confirm` asked first),
-`gallery(records, title=, subtitle=, badge=, stars=, rate=, actions=)` (files
-as picture tiles with five stars; a star runs `rate` with `stars=`),
+`gallery(records, title=, subtitle=, badge=, stars=, rate=, actions=, put=)`
+(files as a wall of picture tiles, each at its own shape, with five stars; a
+star runs `rate` with `stars=`; a picture opens the viewer, across the screen,
+with arrows and the whole screen; `put = {"image": ("my-files", "Photos"),
+"video": ("my-files", "Videos")}` is where what is dropped on the wall goes),
 `lanes(records, field=, title=)`, `month(records, date=, title=)`. Every
 button runs a declared action, opens a record, or goes to a declared screen.
 

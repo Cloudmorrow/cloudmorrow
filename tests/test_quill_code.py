@@ -826,6 +826,33 @@ def test_a_form_field_may_suggest_people_warn_of_outsiders_and_wait_behind_more(
         )
 
 
+def test_a_form_field_may_pick_a_folder_and_name_where_its_share_goes():
+    """`pick = "folder"` and `share` reach the client on the field, and are checked."""
+    manifest = parse_manifest(
+        _manifest(
+            'code = "quill.py"\n[[actions]]\nid = "watch"\nlabel = "Watch a folder"\n[actions.fields]\n'
+            'path = { kind = "string", required = true, pick = "folder", share = "share" }\n'
+            'share = "string"\n'
+        )
+    )
+    (action,) = manifest.actions
+    path, share = action["fields"]
+    assert path["pick"] == "folder" and path["share"] == "share"
+    assert "pick" not in share and "share" not in share
+    head = 'code = "quill.py"\n[[actions]]\nid = "a"\nlabel = "A"\n[actions.fields]\n'
+    with pytest.raises(QuillError, match='pick is "folder"'):
+        parse_manifest(_manifest(head + 'path = { kind = "string", pick = "file" }\n'))
+    with pytest.raises(QuillError, match="plain string"):
+        parse_manifest(_manifest(head + 'path = { kind = "text", pick = "folder" }\n'))
+    with pytest.raises(QuillError, match="share goes with pick"):
+        parse_manifest(_manifest(head + 'path = { kind = "string", share = "share" }\nshare = "string"\n'))
+    with pytest.raises(QuillError, match="another string field of the form"):
+        parse_manifest(_manifest(head + 'path = { kind = "string", pick = "folder", share = "share" }\n'))
+    with pytest.raises(QuillError, match="another string field of the form"):
+        both = 'path = { kind = "string", pick = "folder", share = "share" }\nshare = "int"\n'
+        parse_manifest(_manifest(head + both))
+
+
 def test_a_view_may_name_its_pen(fleet):
     """`compose` on a view is one of the Quill's actions, told to the client with the screen."""
     client, admin, _ = fleet

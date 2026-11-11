@@ -711,8 +711,12 @@ def test_a_button_whose_args_answer_every_field_runs_the_action_at_once():
     """The form is for what is left to fill in; a view's button that carries every
     field runs without one, as the terminal already did (run_action in quill_actions.py)."""
     actions = (WEB / "actions.js").read_text(encoding="utf-8")
-    assert "const unanswered = fields.some((f) => args[f.name] === undefined || args[f.name] === null" in actions
+    assert "const blank = (f) => args[f.name] === undefined || args[f.name] === null || args[f.name] === " in actions
+    assert "const unanswered = fields.some(blank);" in actions
     assert "if (fields.length && unanswered) return openForm(quill, action, { record, args, here, after });" in actions
+    # An action that asks for a folder and nothing else opens the picker itself.
+    assert 'const folder = fields.find((f) => f.pick === "folder");' in actions
+    assert "const to = await pickFolder({ title: action.label, button: action.label });" in actions
     tui = (WEB.parents[1] / "tui" / "quill_actions.py").read_text(encoding="utf-8")
     assert 'if any(field["name"] not in values for field in fields):' in tui
 

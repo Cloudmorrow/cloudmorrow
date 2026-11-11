@@ -28,6 +28,7 @@
 
 import { ApiError, api, app, encodePath, esc, go, parseHash, route, send, toast } from "./core.js";
 import { ask, openSheet } from "./dialog.js";
+import { pickFolder } from "./filepick.js";
 import { linkTitles, read, segments, widget } from "./kit.js";
 
 // Every installed Quill as the server fitted it to you; quills.js keeps it.
@@ -295,7 +296,10 @@ export function formFields(fields, values = {}, links = {}, people = []) {
   // where the first of them would be, until it is pressed.
   const extra = fields.filter((f) => f.extra);
   let extraOpen = false;
+  // The share a picked folder is in is filled by the picker, never typed.
+  const filled = new Set(fields.map((f) => f.pick === "folder" && f.share).filter(Boolean));
   for (const f of fields) {
+    if (filled.has(f.name)) continue;
     const value = values[f.name] !== undefined ? values[f.name] : f.default;
     if (f.extra && !extraOpen) {
       flush();
@@ -310,6 +314,8 @@ export function formFields(fields, values = {}, links = {}, people = []) {
     if (f.suggest === "people") {
       flush();
       out += `<p class="group-label">${esc(f.label)}${needed(f)}</p>` + peopleWidget(f, value);
+    } else if (f.pick === "folder") {
+      run.push(folderWidget(f, value, f.share ? values[f.share] : ""));
     } else if (f.kind === "enum") {
       flush();
       out += `<p class="group-label">${esc(f.label)}${needed(f)}</p>` + segments(f, value);
@@ -325,6 +331,36 @@ export function formFields(fields, values = {}, links = {}, people = []) {
   flush();
   if (extraOpen) out += `</div>`;
   return out;
+}
+
+// -- a folder ----------------------------------------------------------------------------------
+// A field that is a folder on the drive (`pick = "folder"`): a row that says
+// the one chosen and opens the picker (filepick.js) when pressed; the path
+// goes to the field, the share to the one its `share` names.
+const folderSaid = (share, path) => {
+  const top = !share || share === "my-files" ? "My Files" : share;
+  return path ? top + " › " + String(path).replace(/\//g, " › ") : share ? top : "";
+};
+
+function folderWidget(f, value, share) {
+  const said = folderSaid(share, value);
+  return `<div class="row field kind-folder"><span class="main">${esc(f.label)}${needed(f)}</span>` +
+    `<button type="button" class="pick-folder${said ? "" : " unset"}" data-pick="${esc(f.name)}" aria-label="${esc(f.label)}">${esc(said || "Choose…")}</button>` +
+    `<input type="hidden" data-field="${esc(f.name)}" value="${esc(value ?? "")}">` +
+    (f.share ? `<input type="hidden" data-field="${esc(f.share)}" value="${esc(share ?? "")}">` : "") + `</div>`;
+}
+
+function wireFolder(button) {
+  button.addEventListener("click", async () => {
+    const to = await pickFolder({ title: button.getAttribute("aria-label") || "Choose a folder", button: "Choose this folder" });
+    if (!to) return;
+    const row = button.closest(".kind-folder");
+    const inputs = row.querySelectorAll("input[type=hidden]");
+    inputs[0].value = to.folder;
+    if (inputs[1]) inputs[1].value = to.group;
+    button.textContent = folderSaid(to.group, to.folder) || to.label;
+    button.classList.remove("unset");
+  });
 }
 
 // -- people ---------------------------------------------------------------------------------
@@ -439,6 +475,7 @@ async function wirePeople(field) {
 /** Choosing a lane of an enum: one lit at a time, as on the sheet. */
 export function wireFields(root) {
   for (const field of root.querySelectorAll(".people-field")) wirePeople(field);
+  for (const button of root.querySelectorAll(".pick-folder")) wireFolder(button);
   for (const more of root.querySelectorAll(".fields-more")) {
     more.addEventListener("click", () => {
       const hidden = more.nextElementSibling;
@@ -491,7 +528,21 @@ export async function press(quill, action, { record = "", args = {}, here = here
   // The form opens for what is left to fill in; a button whose args answer
   // every field of the action runs it at once, as the terminal does.
   const fields = action.fields || [];
-  const unanswered = fields.some((f) => args[f.name] === undefined || args[f.name] === null || args[f.name] === "");
+  const blank = (f) => args[f.name] === undefined || args[f.name] === null || args[f.name] === "";
+  const unanswered = fields.some(blank);
+  // An action that asks for a folder and nothing else opens the picker
+  // itself, with the action's name on the button that takes the one open.
+  const folder = fields.find((f) => f.pick === "folder");
+  if (folder && unanswered && fields.every((f) => f === folder || f.name === folder.share || !blank(f))) {
+    const to = await pickFolder({ title: action.label, button: action.label });
+    if (!to) return;
+    if (folder.required && !to.folder) { toast(`Pick a folder in ${to.label}, not the whole of it`); return; }
+    args = { ...args, [folder.name]: to.folder };
+    if (folder.share) args[folder.share] = to.group;
+    if (action.confirm && !(await ask(action.confirm, { yes: action.label, tone: action.tone }))) return;
+    await run(quill, action, { record, fields: args, here, after });
+    return;
+  }
   if (fields.length && unanswered) return openForm(quill, action, { record, args, here, after });
   if (action.confirm && !(await ask(action.confirm, { yes: action.label, tone: action.tone }))) return;
   await run(quill, action, { record, fields: args, here, after });

@@ -26,6 +26,20 @@ def test_a_gallery_is_checked_like_the_rest():
         ui.check(ui.gallery([PHOTO], title="name", actions=["edit"]), actions={"rate"})
 
 
+def test_a_gallery_may_say_where_what_is_dropped_on_it_goes():
+    """`put` is a folder per kind, image or video, in a share; checked as such."""
+    tree = ui.gallery([PHOTO], title="name", put={"image": ("my-files", "Photos"), "video": ("my-files", "/Videos/")})
+    assert ui.check(tree)["put"] == [
+        {"kind": "image", "share": "my-files", "folder": "Photos"},
+        {"kind": "video", "share": "my-files", "folder": "Videos"},
+    ]
+    assert "put" not in ui.gallery([PHOTO], title="name")
+    with pytest.raises(TreeError, match="where an image or a video goes"):
+        ui.check(ui.gallery([PHOTO], title="name", put={"audio": ("my-files", "Music")}))
+    with pytest.raises(TreeError, match="where an image or a video goes"):
+        ui.check(ui.gallery([PHOTO], title="name", put={"image": ("", "Photos")}))
+
+
 def test_a_gallery_as_text_says_each_tile_with_its_stars():
     text = render(ui.gallery([PHOTO, CLIP], title="name", subtitle="where", badge="length", stars="stars"))
     assert "▣ ★★★☆☆  sunset.jpg — Photos" in text
