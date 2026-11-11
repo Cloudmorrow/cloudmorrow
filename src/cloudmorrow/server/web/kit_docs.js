@@ -33,10 +33,11 @@ import {
   ownIcons, placeOf, shareLabels, showWhereabouts, sideHead, suffixesOf, trimSlashes, underRoot, whereIs, whereNew,
   whereabouts, wholePath, wide, wireFold, withSuffix, withoutSuffix,
 } from "./kit_editor.js";
-import { Doc, block, run } from "./kit_docs_rules.js";
+import { Doc, block, langOf, run } from "./kit_docs_rules.js";
 import { ask, askText } from "./dialog.js";
 import { choose } from "./actions.js";
 import { pickFile } from "./filepick.js";
+import { attachDocument } from "./spelling.js";
 
 const WORD = ".docx";
 // What a document goes out as, by suffix: what the server's /export makes.
@@ -142,7 +143,7 @@ function runsHtml(runs) {
   }).join("") || "<br>";
 }
 
-const alignAttr = (b) => (b.align ? ` style="text-align:${b.align}"` : "");
+const alignAttr = (b) => (b.align ? ` style="text-align:${b.align}"` : "") + (b.lang ? ` lang="${esc(b.lang)}"` : "");
 
 export function blocksHtml(blocks) {
   const out = [];
@@ -171,7 +172,7 @@ export function blocksHtml(blocks) {
     if (b.kind === "heading") out.push(`<h${b.level}${alignAttr(b)}>${runsHtml(b.runs)}</h${b.level}>`);
     else if (b.kind === "quote") out.push(`<blockquote${alignAttr(b)}><p>${runsHtml(b.runs)}</p></blockquote>`);
     else if (b.kind === "table") {
-      out.push(`<table><tbody>${b.rows.map((row) =>
+      out.push(`<table${alignAttr(b)}><tbody>${b.rows.map((row) =>
         `<tr>${row.map((c) => `<td>${runsHtml(c.runs)}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
     } else out.push(`<p${alignAttr(b)}>${runsHtml(b.runs)}</p>`);
   }
@@ -218,6 +219,8 @@ const alignOf = (el) => {
   const a = (el.style && el.style.textAlign) || el.getAttribute("align") || "";
   return ["center", "right", "justify"].includes(a) ? a : "";
 };
+// The language a block is checked in, when it says: the element's own lang attribute.
+const langAt = (el) => langOf(el.getAttribute("lang") || "");
 
 function listBlocks(list, level, out) {
   const kind = list.tagName === "OL" ? "numbered" : "bullet";
@@ -226,7 +229,7 @@ function listBlocks(list, level, out) {
     const own = li.cloneNode(true);
     const nested = [...own.children].filter((c) => c.tagName === "UL" || c.tagName === "OL");
     for (const n of nested) own.removeChild(n);
-    out.push(block(kind, runsOf(own), { level, align: alignOf(li) }));
+    out.push(block(kind, runsOf(own), { level, align: alignOf(li), lang: langAt(li) }));
     for (const n of li.children) if (n.tagName === "UL" || n.tagName === "OL") listBlocks(n, level + 1, out);
   }
 }
@@ -247,20 +250,20 @@ export function blocksOf(root) {
     if (!BLOCK_TAGS.has(tag) && tag !== "BR") { loose.push(...runsOf(node)); continue; }
     flush();
     if (tag === "BR") continue;
-    if (/^H[1-6]$/.test(tag)) out.push(block("heading", runsOf(node), { level: Math.min(3, +tag[1]), align: alignOf(node) }));
+    if (/^H[1-6]$/.test(tag)) out.push(block("heading", runsOf(node), { level: Math.min(3, +tag[1]), align: alignOf(node), lang: langAt(node) }));
     else if (tag === "UL" || tag === "OL") listBlocks(node, 0, out);
     else if (tag === "BLOCKQUOTE") {
       const inner = [...node.children].filter((c) => BLOCK_TAGS.has(c.tagName));
       const runs = inner.length
         ? inner.flatMap((c, i) => (i ? [run("\n"), ...runsOf(c)] : runsOf(c)))
         : runsOf(node);
-      out.push(block("quote", runs, { align: alignOf(node) }));
+      out.push(block("quote", runs, { align: alignOf(node), lang: langAt(node) }));
     } else if (tag === "TABLE") {
       const rows = [...node.querySelectorAll("tr")].map((tr) => [...tr.children].map((td) => ({ runs: runsOf(td) })));
-      if (rows.length) out.push(block("table", [], { rows }));
+      if (rows.length) out.push(block("table", [], { rows, lang: langAt(node) }));
     } else if (tag === "DIV" && [...node.children].some((c) => BLOCK_TAGS.has(c.tagName))) {
       out.push(...blocksOf(node));
-    } else out.push(block("paragraph", runsOf(node), { align: alignOf(node) }));
+    } else out.push(block("paragraph", runsOf(node), { align: alignOf(node), lang: langAt(node) }));
   }
   flush();
   // A trailing newline a <br> left at the end of a line is not a word.
@@ -335,7 +338,7 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
           ed.word ? `<span class="badge">Word</span>` : ""}${
           ed.where ? `<span class="badge where">${esc(ed.where)}</span>` : ""}<span class="status"></span></p>
         ${b.writes ? toolbar() : ""}
-        <div class="doc-body" ${b.writes ? 'contenteditable="true"' : ""} spellcheck="true">${blocksHtml(ed.doc.blocks)}</div>
+        <div class="doc-body" ${b.writes ? 'contenteditable="true"' : ""} spellcheck="false">${blocksHtml(ed.doc.blocks)}</div>
         ${whereabouts(ed.isNew ? whereNew(b, ed.folder, names) : whereIs(b, record, names))}
       </div>`;
   let view = null;
@@ -379,6 +382,11 @@ async function renderPage(b, { record = null, isNew = false, folder = "", arg })
     clearTimeout(ed.timer);
     ed.timer = setTimeout(() => savePage(ed), SAVE_DELAY);
   };
+  // The words checked, once the person switched it on (spelling.js); the
+  // browser's own checker is off above either way.
+  ed.spelling = attachDocument({
+    box, body: ed.bodyEl, editable: b.writes, changed: () => ed.changed(), status: (text) => setStatus(ed, text),
+  });
   if (!b.writes) return;
 
   ed.titleEl.addEventListener("input", ed.changed);
@@ -554,6 +562,7 @@ async function exportAs(ed, suffix) {
 async function leavePage(ed) {
   if (open === ed) open = null;
   clearTimeout(ed.timer);
+  if (ed.spelling) ed.spelling.detach();
   if (ed.dirty) await savePage(ed);
   while (ed.saving) await new Promise((r) => setTimeout(r, 50));
   if (ed.created && !fileStem(ed.titleEl.value) && !bodyDoc(ed).text.trim()) {

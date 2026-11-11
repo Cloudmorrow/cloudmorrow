@@ -761,7 +761,11 @@ def test_a_settings_screen_is_behind_a_gear_on_the_title_and_never_under_the_tab
     route = _function(core, "renderRoute")
     assert "screenSettings = null;" in route
     kit = js_code(KIT_JS)
-    assert "setScreenSettings(at.settings ? { title: at.screen.label, ...at.settings } : null);" in kit
+    # The gear is the Quill's own settings; a screen that writes words with
+    # no such settings gets the spelling settings behind it (spelling.js).
+    assert "setScreenSettings(gearFor(at));" in kit
+    assert "if (at.settings) return { title: at.screen.label, ...at.settings };" in kit
+    assert 'return WRITES_WORDS.has(at.screen.kit) ? { title: at.screen.label, ...spellingLink() } : null;' in kit
     view = js_code((WEB / "kit_view.js").read_text(encoding="utf-8"))
     assert "nav({ back: at.home, backLabel: at.quill.name, title: at.screen.label })" in view
     assert ".heading a.button.settings .pixel-icon" in (WEB / "base.css").read_text(encoding="utf-8")

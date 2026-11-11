@@ -4,13 +4,22 @@
 
    A document is a `.docs` file: one JSON object with `blocks` in it. A
    block is a paragraph, a heading (level 1 to 3), a bullet or numbered
-   item (with a level), a quote, or a table (rows of cells of runs); a run
-   is text and what is true of it: bold, italic, underline, strike, a
-   link. Nothing else is kept. */
+   item (with a level), a quote, or a table (rows of cells of runs), and
+   may say which language its spelling is checked in (`lang`); a run is
+   text and what is true of it: bold, italic, underline, strike, a link.
+   Nothing else is kept. */
 
 export const KINDS = ["paragraph", "heading", "bullet", "numbered", "quote", "table"];
 export const FLAGS = ["bold", "italic", "underline", "strike"];
 export const ALIGNS = ["center", "right", "justify"];
+// A language a block is checked in: a code, with a region when it matters (en-gb).
+const LANG = /^[a-z]{2,3}(-[a-z]{2})?$/;
+
+/** A language code as a block keeps it, or "" for anything else. */
+export const langOf = (value) => {
+  const text = String(value || "").trim().toLowerCase().replace(/_/g, "-");
+  return LANG.test(text) ? text : "";
+};
 
 const isObject = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 
@@ -46,12 +55,13 @@ export function mergeRuns(runs) {
 export const runsText = (runs) => (runs || []).map((r) => r.text || "").join("");
 
 // -- blocks ----------------------------------------------------------------------------
-/** One block, in a fixed order of keys: kind, level, align, then runs or rows. */
-export function block(kind, runs = [], { level = 0, align = "", rows = [] } = {}) {
+/** One block, in a fixed order of keys: kind, level, align, lang, then runs or rows. */
+export function block(kind, runs = [], { level = 0, align = "", rows = [], lang = "" } = {}) {
   const out = { kind };
   if (kind === "heading") out.level = Math.min(3, Math.max(1, Math.trunc(level) || 1));
   else if ((kind === "bullet" || kind === "numbered") && level) out.level = Math.max(0, Math.trunc(level));
   if (ALIGNS.includes(align) && kind !== "table") out.align = align;
+  if (langOf(lang)) out.lang = langOf(lang);
   if (kind === "table") {
     out.rows = rows.map((row) => row.map((cell) => ({ runs: mergeRuns(isObject(cell) ? cell.runs : cell) })));
   } else {
@@ -67,11 +77,11 @@ function cleanBlock(value) {
     if (!rows.length) return null;
     const width = Math.max(...rows.map((r) => r.length));
     rows = rows.map((row) => row.concat(Array.from({ length: width - row.length }, () => ({ runs: [] }))));
-    return block("table", [], { rows });
+    return block("table", [], { rows, lang: langOf(value.lang) });
   }
   const level = Number.isInteger(value.level) ? value.level : 0;
   const align = typeof value.align === "string" ? value.align : "";
-  return block(value.kind, Array.isArray(value.runs) ? value.runs : [], { level, align });
+  return block(value.kind, Array.isArray(value.runs) ? value.runs : [], { level, align, lang: langOf(value.lang) });
 }
 
 /** A block's words alone; a table's cells by tabs, its rows by lines. */

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_current_user, get_state
-from cloudmorrow.server.schemas import Favorites, LoginRequest, PasswordChange, TokenResponse, UserOut
+from cloudmorrow.server.schemas import Favorites, LoginRequest, PasswordChange, Spelling, TokenResponse, UserOut
 from cloudmorrow.server.security import (
     create_access_token,
     hash_password,
@@ -28,6 +28,7 @@ def user_out(user: User) -> UserOut:
         system_uid=user.system_uid,
         created_at=user.created_at,
         favorites=user.favorites,
+        spelling=user.spelling,
     )
 
 
@@ -76,6 +77,25 @@ def set_favorites(
     phone and computer you sign in on has the same ones."""
     updated = state.users.update(user.username, favorites=payload.favorites)
     return Favorites(favorites=updated.favorites)
+
+
+@router.get("/spelling", response_model=Spelling)
+def spelling(user: User = Depends(get_current_user)) -> Spelling:
+    """How this person's spelling is checked."""
+    return Spelling(**user.spelling)
+
+
+@router.put("/spelling", response_model=Spelling)
+def set_spelling(
+    payload: Spelling,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> Spelling:
+    """How this person's spelling is checked, on them rather than on a
+    device: the same language and the same added words everywhere they
+    sign in."""
+    updated = state.users.update(user.username, spelling=payload.model_dump())
+    return Spelling(**updated.spelling)
 
 
 @router.post("/password", status_code=status.HTTP_204_NO_CONTENT)

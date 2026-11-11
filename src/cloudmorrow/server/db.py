@@ -19,6 +19,8 @@ from cloudmorrow.server.database import open as open_database
 USERNAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 # More favorites than this is not a short list any more.
 MAX_FAVORITES = 50
+# The words a person adds to their dictionary: names, jargon. Enough for anyone's.
+MAX_OWN_WORDS = 2000
 
 # What an account is allowed to do. The column is text rather than a flag
 # because the next role is always a matter of time.
@@ -72,6 +74,8 @@ class User:
     updated_at: str
     # The apps marked favorites, by tab name, in the order they were marked.
     favorites: list[str] = field(default_factory=list)
+    # How their spelling is checked (spelling.py): {check, language, words}.
+    spelling: dict = field(default_factory=dict)
 
 
 def _favorites(raw: str) -> list[str]:
@@ -80,6 +84,27 @@ def _favorites(raw: str) -> list[str]:
     except ValueError:
         return []
     return [n for n in names if isinstance(n, str)] if isinstance(names, list) else []
+
+
+def spelling_setting(value: object) -> dict:
+    """A person's spelling setting, cleaned: whether the editors check, in
+    which language by default, and the words they added — once each, in
+    the order added, and not more than MAX_OWN_WORDS of them."""
+    data = value if isinstance(value, dict) else {}
+    words = data.get("words") if isinstance(data.get("words"), list) else []
+    words = [str(w).strip() for w in words if isinstance(w, str) and str(w).strip()]
+    return {
+        "check": bool(data.get("check")),
+        "language": str(data.get("language") or "").strip().lower(),
+        "words": list(dict.fromkeys(words))[:MAX_OWN_WORDS],
+    }
+
+
+def _spelling(raw: str) -> dict:
+    try:
+        return spelling_setting(json.loads(raw or "{}"))
+    except ValueError:
+        return spelling_setting({})
 
 
 def _row_to_user(row: Row) -> User:
@@ -96,6 +121,7 @@ def _row_to_user(row: Row) -> User:
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         favorites=_favorites(row["favorites"]),
+        spelling=_spelling(row["spelling"]),
     )
 
 
@@ -210,6 +236,7 @@ class UserStore:
             "is_active",
             "system_uid",
             "favorites",
+            "spelling",
         }
         updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
         if not updates:
@@ -224,6 +251,8 @@ class UserStore:
             updates["user_type"] = validate_user_type(str(updates["user_type"]))
         if "favorites" in updates:
             updates["favorites"] = json.dumps(list(dict.fromkeys(str(n) for n in updates["favorites"]))[:MAX_FAVORITES])
+        if "spelling" in updates:
+            updates["spelling"] = json.dumps(spelling_setting(updates["spelling"]))
         for flag in ("is_admin", "is_active"):
             if flag in updates:
                 updates[flag] = int(bool(updates[flag]))

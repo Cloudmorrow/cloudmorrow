@@ -64,9 +64,11 @@ A block has a `kind`: `paragraph`, `heading` (with `level` 1 to 3),
 items in a row are one list), `quote`, or `table` (`rows` of cells, each
 with `runs`). A paragraph, heading, item or quote may say how it is
 aligned: `align` is `center`, `right` or `justify`; nothing means left.
-A run is `text` and what is true of it: `bold`, `italic`, `underline`,
-`strike` (written only when true), and a `link`. A line break inside a
-block is `\n` in the text.
+Any block may say which language its spelling is checked in: `lang` is a
+code like `da` or `en-gb` (see *Spelling* below); nothing means the
+writer's own. A run is `text` and what is true of it: `bold`, `italic`,
+`underline`, `strike` (written only when true), and a `link`. A line
+break inside a block is `\n` in the text.
 
 Nothing else is kept: not fonts, not sizes, not colours, not pictures,
 not margins. That is what makes a document the same on the phone, the
@@ -112,7 +114,10 @@ title (the file's name), a bar of styles (paragraph, heading 1 to 3, bold,
 italic, underline, strike, bullets, numbers, quote, link, left, centre,
 right) and the page, edited in place, with where the file is, whole, under
 it — a link to its folder in Files; Ctrl+B, Ctrl+I and Ctrl+U work as
-everywhere; plain text pasted comes in as paragraphs.
+everywhere; plain text pasted comes in as paragraphs. The browser's own
+spellchecker is off on the page; the cloud's is on it once the person
+switches it on (`spelling.js`, the gear on the screen's title; see
+*Spelling* below).
 It saves as you type, as blocks and runs — nothing of the browser's own
 markup; changing the title renames the file, and a Word file stays a
 Word file. One changed elsewhere since it was opened is not written over.
@@ -136,7 +141,9 @@ editor, the document shown and edited as Markdown — `# ` a heading, `- `
 a bullet (two spaces in, a level), `1. ` a numbered item, `> ` a quote,
 `| a | b |` a table with a `| --- |` line after its first row, and
 `**bold**`, `*italic*`, `__underline__`, `~~strike~~`, `[text](url)` in
-a line. What is typed is kept as the document's file, never as Markdown;
+a line; a part checked in another language stands between
+`<!-- lang: de -->` and `<!-- /lang -->` lines, which a note keeps the
+same way. What is typed is kept as the document's file, never as Markdown;
 how a paragraph is aligned has no Markdown and is lost on the way
 through. `f6` imports a Word, `.docs` or Markdown file on this machine as
 a document; `f7` exports the open one by the name given (`.docx`, `.pdf`,
@@ -162,3 +169,38 @@ cm docs delete Letter
 **An assistant** reads and writes the file's `text` through the record
 tools, like any text file's: the JSON above, for a `.docs` and a `.docx`
 alike.
+
+## Spelling
+
+The web app checks the spelling of a document, and of a note, with the
+cloud's own dictionaries rather than the browser's: the browser's checker
+is off on both pages, and the person switches the cloud's on under
+**Spelling** — the gear on the screen's title, or `#/spelling` — where
+they also choose the language a page is checked in unless a part of it
+says otherwise, and see the words they added. The setting is kept on the
+person (`PUT /api/auth/spelling`), so every phone and computer they sign
+in on marks the same words.
+
+The server holds the dictionaries (`server/spelling.py`): Hunspell, the
+checker every office suite uses, as a wheel with the library inside
+(`chunspell`), and the dictionaries LibreOffice ships, which the catalog
+pins by URL and SHA-256 under `[dictionaries]` (docs/QUILLS.md, *The
+catalog*). A language is fetched the first time somebody writes in it,
+kept under `<data_dir>/dictionaries/<id>/`, and loaded once; nothing is
+installed on the system. The page asks `POST /api/spelling/check` for a
+screenful of words at a time, the ones it has not asked about before, and
+`POST /api/spelling/suggest` for one word when it is right-clicked;
+`GET /api/spelling/languages` lists what can be chosen. Only words are
+sent, never the page.
+
+On the page (`web/spelling.js`), a word the dictionary does not know is
+tinted with a bar under it — not the red wave. A right-click on it, or a
+finger held on it, brings its suggestions, **Add to dictionary** (kept on
+the person) and **Ignore** (this session). Select some lines and do the
+same, and **Check spelling in…** marks them as a part in another language:
+a bar down the left of the part with the language at its top and an ×
+that takes the part back to the default. In a document the part is `lang`
+on its blocks; in a note it is the comment lines above, which anything
+that renders Markdown leaves out. A word being typed is not marked until
+the caret leaves it; a word of capitals, an address and a mail are never
+words to check. The terminal does not check spelling yet.

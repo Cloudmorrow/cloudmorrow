@@ -45,6 +45,7 @@ import {
   contextMenus, formFields, linksFor, readFields, recordChoices, sheetSection, wireFields, wireSheetSection,
 } from "./actions.js";
 import { ask, askText, openSheet } from "./dialog.js";
+import { spellingLink } from "./spelling.js";
 
 const own = {
   // The plus on a lane: a card straight into it.
@@ -233,11 +234,19 @@ const OWN = { calendar: renderCalendar, thread: renderThread, timeline: renderTi
 // And what it changes on the record sheet, if anything: kit_<kit>.js again.
 const SHEETS = { calendar: calendarSheet, timeline: timelineSheet, data: dataSheet, list: projectsSheet };
 
+// A screen that writes words — an editor, a document — has the gear too,
+// to the spelling settings (spelling.js), when its Quill has none of its own.
+const WRITES_WORDS = new Set(["editor", "document"]);
+const gearFor = (at) => {
+  if (at.settings) return { title: at.screen.label, ...at.settings };
+  return WRITES_WORDS.has(at.screen.kit) ? { title: at.screen.label, ...spellingLink() } : null;
+};
+
 export async function renderKitScreen(at, arg) {
   const { kit } = at.screen;
   // A Quill with settings of its own has the gear on each screen's title
   // (core.js's heading); quills.js said whether and where.
-  setScreenSettings(at.settings ? { title: at.screen.label, ...at.settings } : null);
+  setScreenSettings(gearFor(at));
   if (kit === "board") return renderBoard(at, arg);
   if (OWN[kit]) return OWN[kit](at, arg);
   if (kit === "editor") return renderEditor(at, arg);
@@ -844,7 +853,9 @@ async function showPreview(slot, model, record) {
 
 export async function renderRecordSheet(at, modelId, id, arg) {
   const { quill, screen } = at;
-  // An editor's own records open on its page, not on the sheet.
+  // An editor's own records open on its page, not on the sheet — beside
+  // the list on a computer, whose title carries the gear as the list's does.
+  if (WRITES_WORDS.has(screen.kit) && modelId === screen.model) setScreenSettings(gearFor(at));
   if (screen.kit === "editor" && modelId === screen.model) return renderEditorPage(at, id, arg);
   if (screen.kit === "sheet" && modelId === screen.model) return renderCellsPage(at, id, arg);
   if (screen.kit === "document" && modelId === screen.model) return renderDocsPage(at, id, arg);

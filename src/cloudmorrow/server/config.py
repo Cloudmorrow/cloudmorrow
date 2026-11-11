@@ -193,6 +193,11 @@ class ServerConfig:
         return self.data_dir / "runtimes"
 
     @property
+    def dictionaries_dir(self) -> Path:
+        """The languages fetched for the spellchecker, one folder each (spelling.py)."""
+        return self.data_dir / "dictionaries"
+
+    @property
     def dist_dir(self) -> Path:
         """Where `cloudmorrow-server publish` puts wheels for the install script."""
         return self.data_dir / "dist"

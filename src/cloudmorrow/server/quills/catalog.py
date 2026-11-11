@@ -20,6 +20,7 @@ from pathlib import Path
 
 from cloudmorrow.server.quills.manifest import QuillError
 from cloudmorrow.server.quills.runtimes import check_runtime
+from cloudmorrow.server.spelling import check_dictionary
 
 FETCH_TIMEOUT = 30
 MAX_DOWNLOAD = 50 * 1024 * 1024
@@ -85,6 +86,9 @@ class Catalog:
     # Programs a Quill may require, by id: where a build is for each OS and
     # architecture, and its checksum (quills/runtimes.py).
     runtimes: dict = field(default_factory=dict)
+    # The languages the web app checks spelling in, by id: where each
+    # dictionary's files are, and their checksums (server/spelling.py).
+    dictionaries: dict = field(default_factory=dict)
     # The folder relative paths in it are relative to, when it is local.
     base: Path | None = None
 
@@ -105,11 +109,17 @@ def parse_catalog(data: dict, base: Path | None = None) -> Catalog:
         raise QuillError("the catalog's [runtimes] is a table, one sub-table per runtime")
     for runtime_id, spec in runtimes.items():
         check_runtime(str(runtime_id), spec)
+    dictionaries = data.get("dictionaries", {})
+    if not isinstance(dictionaries, dict):
+        raise QuillError("the catalog's [dictionaries] is a table, one sub-table per language")
+    for dictionary_id, spec in dictionaries.items():
+        check_dictionary(str(dictionary_id), spec)
     return Catalog(
         categories=list(data.get("categories", [])),
         quills=list(quills),
         datamodels=dict(data.get("datamodels", {})),
         runtimes=dict(runtimes),
+        dictionaries=dict(dictionaries),
         base=base,
     )
 

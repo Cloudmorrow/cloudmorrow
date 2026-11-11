@@ -72,6 +72,10 @@ server = [
     # The box announces itself on the home network as <name>.local and
     # _cloudmorrow._tcp (access_lan). Pure Python; no Avahi needed.
     "zeroconf>=0.131",
+    # Spelling (server/spelling.py): Hunspell, which every office suite
+    # checks with, as a wheel with the library inside — nothing from the
+    # system. The dictionaries come from the catalog, fetched when first used.
+    "chunspell>=2.0",
 ]
 # PostgreSQL as the database, chosen at install (docs/HOSTING.md, *The
 # database*). The driver carries its own libpq, so nothing is needed from

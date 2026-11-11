@@ -811,6 +811,32 @@ rules outside it hide the parts that are only ever for the rail.
 `tests/test_desktop_web.py` is that promise, kept by a test rather than by
 hand.
 
+### Spelling
+
+Where you write words — a document in Docs, a note in Notes — the
+browser's own spellchecker is off, and your cloud's own is there instead,
+once you switch it on: the gear on the screen's title opens **Spelling**,
+with the switch, the language your pages are checked in, and the words
+you have added. It is kept on you, so every phone and computer you sign
+in on checks the same way. The dictionaries are the ones LibreOffice
+checks with — Danish, Swedish, Norwegian (Bokmål and Nynorsk), German
+(and Austrian and Swiss), English (British and American), French,
+Spanish, Italian, Dutch, Portuguese (Portugal and Brazil), Polish and
+Icelandic, as the [catalog](https://github.com/Cloudmorrow/quill-catalog)
+pins them — and the server fetches a language the first time you write in
+it, checked against the catalog's hash; nothing is installed on the box.
+
+A word the dictionary does not know is tinted, with a bar under it. Right-
+click it on a computer, or hold a finger on it on a phone, and its
+suggestions come up, with **Add to dictionary** and **Ignore**. Select
+some lines and do the same, and **Check spelling in…** checks those lines
+in another language: the part is marked at its left edge with the
+language and an ×, which takes it back to your default. A document keeps
+the part in its file as the blocks' `lang`; a note keeps it as two
+comment lines, `<!-- lang: de -->` and `<!-- /lang -->`, which anything
+that renders Markdown leaves out. The terminal app does not check
+spelling yet.
+
 ### Administration, in the browser
 
 The server's own panel is here too, so a new account does not mean walking
