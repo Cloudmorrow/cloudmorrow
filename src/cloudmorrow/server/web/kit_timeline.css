@@ -2,7 +2,8 @@
 
    A phone has it in one column — the picture on top, the buttons under it,
    the tracks scrolling sideways, and the chosen piece below — with the
-   material as a sheet. A computer has the material on the left and the
+   media as a sheet. A computer has the media on the left (tiles of the
+   drive's videos, photos and sounds, dragged onto the tracks) and the
    chosen piece on the right of the picture, and the tracks the width of
    all three under them. The one amber fill is Export; amber lines are what
    you are moving — the chosen piece, a blur's box — and the playhead is
@@ -11,6 +12,7 @@
 :root {
   --tl-video: #5aa6e0;
   --tl-audio: var(--good);
+  --tl-image: #c58ae0;
   --tl-row-video: 56px;
   --tl-row-audio: 40px;
   --tl-ruler: 26px;
@@ -56,6 +58,8 @@
 /* Export is a Quill's action, drawn as one: its button is the form's. */
 .heading .act-button { min-height: 38px; padding: 0 18px; }
 .heading .tl-open { min-height: 36px; font-family: var(--display); font-weight: 600; }
+/* The gear at the right of the title opens the project's own sheet. */
+.heading a.button.tl-settings .pixel-icon { width: 20px; height: 20px; }
 
 /* -- the desk: material, viewer, the chosen piece ---------------------------- */
 .tl-material { display: none; }
@@ -83,6 +87,7 @@
   touch-action: none;
 }
 .tl-box.off { border-style: dashed; opacity: .6; }
+.tl-box.place { border-style: dashed; }
 .tl-box.crop { border-color: #fff; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .58); }
 /* The handles sit inside the box's edges, so a box at the frame's edge —
    the crop, at first — still has all eight to hold. */
@@ -243,6 +248,19 @@
   -webkit-user-select: none;
 }
 .tl-piece.audio, .tl-piece.sound { --c: var(--tl-audio); }
+.tl-piece.image { --c: var(--tl-image); }
+/* Where a dragged file would land: a piece-shaped shadow in the row. */
+.tl-ghost {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  min-width: 2px;
+  border: 2px dashed var(--action);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--action) 18%, transparent);
+  pointer-events: none;
+  z-index: 3;
+}
 .tl-piece.muted { opacity: .55; }
 .tl-piece.on { border-color: var(--action); box-shadow: 0 0 0 1px var(--action); z-index: 2; touch-action: none; }
 .tl-piece.dragging { cursor: grabbing; opacity: .85; z-index: 3; }
@@ -393,20 +411,21 @@
 }
 .tl-drop-effect svg { width: 18px; height: 18px; }
 .tl-add-blur, .tl-row-buttons .act-chip { gap: 6px; }
-.tl-crop-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.tl-crop-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; }
+.tl-crop-fields input[type="number"] { width: 100%; }
 .tl-field.small > span { min-width: 3.4em; }
 .tl-row-buttons { display: flex; gap: 8px; margin: 0 0 12px; }
 
-/* -- the material ------------------------------------------------------------------ */
-.tl-target {
+/* -- the media: the drive, and its files as tiles ------------------------------ */
+.tl-drive {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 4px 10px;
+  margin: 0 4px 8px;
   color: var(--muted);
   font-size: 14px;
 }
-.tl-target select {
+.tl-drive select {
   flex: 1;
   min-width: 0;
   height: 34px;
@@ -417,28 +436,81 @@
   border-radius: var(--radius-control);
   font: inherit;
 }
+.tl-media-hint { margin: 0 4px 8px; font-size: 12.5px; }
 .tl-folder { margin: 12px 4px 6px; color: var(--muted); font-size: 13px; font-weight: 600; }
-.tl-file { min-height: 50px; gap: 10px; padding: 6px 8px 6px 12px; }
-.tl-file .icon { width: 22px; }
-.tl-file .title { font-size: 15px; }
-.tl-add {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-control);
-  color: var(--accent);
-  font-family: var(--display);
-  font-size: 14px;
-  font-weight: 600;
+.tl-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  gap: 8px 6px;
+  margin: 0 0 6px;
 }
-.tl-add:disabled { opacity: .5; }
+.tl-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  border-radius: 8px;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+}
+.tl-tile:focus-visible .tl-tile-pic { box-shadow: 0 0 0 2px var(--accent); }
+.tl-tile.busy { opacity: .5; }
+.tl-tile-pic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  width: 100%;
+  overflow: hidden;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+}
+.tl-tile-pic svg { width: 24px; height: 24px; }
+.tl-tile-pic img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.tl-tile.audio .tl-tile-pic { color: var(--tl-audio); }
+.tl-tile-kind {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, .62);
+  color: #fff;
+  pointer-events: none;
+}
+.tl-tile-kind svg { width: 15px; height: 14px; }
+.tl-tile-name {
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tl-tile .tl-length {
+  position: absolute;
+  right: 4px;
+  bottom: 22px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, .62);
+  color: #fff;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.tl-tile .tl-length:empty { display: none; }
 .tl-material-sheet { max-height: 80dvh; display: flex; flex-direction: column; }
 .tl-sheet-list { overflow-y: auto; padding: 0 12px 8px; }
-.tl-material-sheet .group { margin-bottom: 8px; }
+.tl-sheet-list .tl-tiles { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px 8px; }
 
 /* A new project: its name, and the size of its picture, one of a list. */
 .tl-new .group-label { margin-top: 14px; }
@@ -468,7 +540,7 @@
   }
   /* As tall as the viewer and no taller, so the tracks stay where they are
      whatever is chosen: the two sides scroll inside themselves. */
-  .tl-material, .tl-side { height: 0; min-height: 100%; overflow-y: auto; }
+  .tl-material, .tl-side { height: 0; min-height: 100%; overflow-y: auto; padding-right: 2px; }
   .tl-material { display: block; }
   .tl-material .group-label:first-child { margin-top: 4px; }
   .tl-material-open { display: none !important; }
@@ -476,8 +548,9 @@
   .tl-crop-toggle { padding: 0 10px; }
 }
 @media (hover: hover) and (pointer: fine) {
-  .tl-transport button:not(.tl-play):hover, .tl-tools button:not(:disabled):hover, .tl-add:hover,
+  .tl-transport button:not(.tl-play):hover, .tl-tools button:not(:disabled):hover,
   .tl-keyframe button:hover, .tl-effect-pick:hover { background: var(--card-2); }
+  .tl-tile:hover .tl-tile-pic { border-color: var(--accent); }
   .tl-transport .tl-play:hover { background: var(--fill-hover); }
   .tl-piece:hover { filter: brightness(1.12); }
 }

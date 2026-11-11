@@ -15,3 +15,4 @@ offset = { kind = "decimal", default = 0 }
 length = { kind = "decimal", required = true }
 volume = { kind = "decimal" }
 muted = { kind = "bool", default = false }
+place = { kind = "json", description = "Where its picture goes in the frame, in percent: {x, y, w, h}; blank is all of it" }

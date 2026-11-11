@@ -88,16 +88,24 @@ export function lengthOf(t) {
 // -- what the material is -------------------------------------------------------------
 const VIDEO = ["mp4", "m4v", "mov", "mkv", "webm", "avi", "ogv"];
 const AUDIO = ["mp3", "m4a", "aac", "flac", "wav", "ogg", "oga", "opus", "weba"];
+const IMAGE = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "tif", "tiff", "heic", "heif", "avif"];
+/** How long a photo stays on the timeline when it is added, in seconds. */
+export const IMAGE_LENGTH = 5;
 
-/** "video", "audio" or "": by the file's type, else by its name's ending. */
+/** "video", "audio", "image" or "": by the file's type, else by its name's ending. */
 export function mediaKind(name, mime = "") {
   if (/^video\//.test(mime)) return "video";
   if (/^audio\//.test(mime)) return "audio";
+  if (/^image\//.test(mime)) return "image";
   const ext = String(name).includes(".") ? String(name).split(".").pop().toLowerCase() : "";
   if (VIDEO.includes(ext)) return "video";
   if (AUDIO.includes(ext)) return "audio";
+  if (IMAGE.includes(ext)) return "image";
   return "";
 }
+
+/** The kind of track a file of *kind* goes on: a photo goes where a video does. */
+export const trackKindFor = (kind) => (kind === "image" ? "video" : kind);
 
 /** The track a new piece of *kind* goes on: the one chosen when it can carry
     it (a video goes on any track, an audio track playing only its sound; a
@@ -107,10 +115,30 @@ export function mediaKind(name, mime = "") {
     terminal's quill/timeline.py `first_track`). */
 export function trackFor(tracks, kind, chosen = "") {
   const picked = tracks.find((t) => t.id === chosen);
-  if (picked && (kind === "video" || picked.kind === "audio")) return picked;
-  const same = tracks.filter((t) => t.kind === kind);
+  if (picked && carries(picked, kind)) return picked;
+  const wanted = trackKindFor(kind);
+  const same = tracks.filter((t) => t.kind === wanted);
   if (!same.length) return null;
-  return kind === "video" ? same[same.length - 1] : same[0];
+  return wanted === "video" ? same[same.length - 1] : same[0];
+}
+
+/** Whether a track can take a file of *kind*: a video goes anywhere, a sound
+    on an audio track, a photo on a video track. */
+export function carries(track, kind) {
+  if (kind === "video") return true;
+  if (kind === "audio") return track.kind === "audio";
+  if (kind === "image") return track.kind === "video";
+  return false;
+}
+
+/** Where a piece *length* long added on *trackId* at the playhead *t* begins:
+    at *t* when nothing on the track is there, else after the track's last
+    piece, so clips added one after another follow each other. */
+export function addAt(pieces, trackId, t, length) {
+  const here = pieces.filter((p) => p.track === trackId);
+  const taken = here.some((p) => covers(p, t) || (t < p.start && t + length > p.start));
+  if (!taken) return ms(Math.max(0, t));
+  return ms(here.reduce((end, p) => Math.max(end, p.start + p.length), 0));
 }
 
 // -- what is on at a moment -------------------------------------------------------------
@@ -126,6 +154,43 @@ export function pictureAt(pieces, tracks, t) {
     if (here.length) return here.reduce((a, b) => (b.start >= a.start ? b : a));
   }
   return null;
+}
+
+/** Every piece whose picture is seen at *t*, bottom to top: on video tracks,
+    from the lowest one that fills the whole frame (has no place) up — what
+    is under it cannot be seen. The highest track is last. */
+export function layersAt(pieces, tracks, t) {
+  const seen = [];
+  for (const track of tracks) {
+    if (track.kind !== "video") continue;
+    const here = pieces.filter((p) => p.track === track.id && covers(p, t));
+    if (here.length) seen.push(here.reduce((a, b) => (b.start >= a.start ? b : a)));
+  }
+  seen.reverse();
+  let from = 0;
+  seen.forEach((p, i) => { if (!p.place) from = i; });
+  return seen.slice(from);
+}
+
+/** A piece's place in the frame — {x, y, w, h} in percent, at least *least*
+    across — or null when it fills the whole frame. */
+export function placeOf(value, least = 2) {
+  if (!value || typeof value !== "object") return null;
+  const box = fitBox({ x: num(value.x), y: num(value.y), w: num(value.w, 100), h: num(value.h, 100) }, least);
+  return wholeFrame(box) ? null : box;
+}
+
+/** Where a picture *sw* by *sh* lands in a frame: fitted whole and centred
+    inside its place (or the whole frame), in the frame's pixels. */
+export function placeRect(place, sw, sh, frame) {
+  const box = place
+    ? { x: place.x / 100 * frame.width, y: place.y / 100 * frame.height, w: place.w / 100 * frame.width, h: place.h / 100 * frame.height }
+    : { x: 0, y: 0, w: frame.width, h: frame.height };
+  if (!(sw > 0 && sh > 0)) return box;
+  const fit = Math.min(box.w / sw, box.h / sh);
+  const w = sw * fit;
+  const h = sh * fit;
+  return { x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w, h };
 }
 
 /** Every piece heard at *t*: on a video or an audio track, not muted, not silent. */
@@ -271,16 +336,20 @@ export function snapTo(t, edges, reach) {
 }
 
 /** Where a piece of *length* dragged to *start* lands: its start or its end
-    snapped, whichever is nearer an edge, and never before 0. */
+    snapped, whichever is nearer an edge, and never before 0. The candidates
+    are compared by how far they move the piece, never by whether a sum
+    comes back to the same number: start + length - length is not always
+    start, and that is what left pieces unsnapped. */
 export function snapMove(start, length, edges, reach) {
-  const byStart = snapTo(start, edges, reach);
-  const byEnd = snapTo(start + length, edges, reach) - length;
-  const dStart = Math.abs(byStart - start);
-  const dEnd = Math.abs(byEnd - start);
-  let out = start;
-  if (byStart !== start && (byEnd === start || dStart <= dEnd)) out = byStart;
-  else if (byEnd !== start) out = byEnd;
-  return Math.max(0, out);
+  let best = start;
+  let gap = reach;
+  for (const edge of edges) {
+    for (const candidate of [edge, edge - length]) {
+      const d = Math.abs(candidate - start);
+      if (d < gap && candidate >= 0) { best = candidate; gap = d; }
+    }
+  }
+  return Math.max(0, best);
 }
 
 // -- the crop -------------------------------------------------------------------------------

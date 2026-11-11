@@ -1,8 +1,10 @@
 # The timeline kit
 
-`kit = "timeline"` is a video editor: material from the drive laid on video
-and audio tracks, cut, trimmed and moved, with effects that change over time
-by keyframes, a crop of the whole picture, and an export. Cloudmorrow draws
+`kit = "timeline"` is a video editor: videos, photos and sounds from the
+drive laid on video and audio tracks, cut, trimmed and moved, each as big
+as the picture or smaller in a place of its own over what is under it, with
+effects that change over time by keyframes, a crop of the whole picture,
+and an export. Cloudmorrow draws
 it on the web and the phone (live video with sound), in the terminal (real
 frames where the terminal can show pictures, played a few a second, no
 sound) and on the command line (`cm <quill> …`). A Quill declares it in TOML;
@@ -20,7 +22,7 @@ model = "vidmorrow.project"       # a timeline: one record per edit
 title = "name"
 pieces = "vidmorrow.piece"        # what lies on the tracks
 effects = "vidmorrow.effect"      # optional: what is done to a piece, by keyframes
-media = { share = "my-files", within = "Videos" }   # where the material is: file records
+media = { share = "my-files", within = "Videos" }   # where the media is first: file records
 frames = "frames"                 # optional: the id of an [[apis]] that draws frames
 export = "export"                 # optional: an action on the project, the Export button
 ```
@@ -44,9 +46,11 @@ these kinds, or `cm quill check` says which is missing.
 A piece's picture is fitted into the project's frame (`width` × `height`)
 whole and centred, with black bars where the shapes differ; a higher video
 track covers a lower one where both have a piece, bars included, and where
-no piece is there the frame is black. Effect boxes and the crop are in
-percent of that frame. Every
-piece's sound plays, mixed, unless it is muted.
+no piece is there the frame is black. A piece with a `place` is fitted into
+that box instead, with nothing around it, so what is on the tracks under it
+shows through: a photo or a clip in a corner of another. Effect boxes, the
+crop and places are in percent of that frame. Every piece's sound plays,
+mixed, unless it is muted.
 
 ### A piece (`pieces`)
 
@@ -61,9 +65,13 @@ piece's sound plays, mixed, unless it is muted.
 | `length` | decimal | how long it lasts, in seconds |
 | `volume` | decimal, optional | 0 to 2, 1 as recorded |
 | `muted` | bool, optional | its sound is not heard |
+| `place` | json, optional | where its picture goes in the frame, in percent: `{"x": 62, "y": 62, "w": 34, "h": 34}`; blank is the whole frame |
 
 A piece on a video track shows its picture and plays its sound; a piece on
-an audio track only plays its sound (a video file there gives its sound).
+an audio track only plays its sound (a video file there gives its sound). A
+photo is a piece like any other: it shows for its `length` (five seconds
+when added, trimmed to whatever is wanted), from a source with no length
+and no sound; `offset` means nothing on it.
 
 ### An effect (`effects`)
 
@@ -88,9 +96,9 @@ An `[[apis]]` of the Quill (normally served by its service), answering:
 
 | request | answer |
 | --- | --- |
-| `GET <base>/info?file=<id>` | `{"duration": 12.4, "width": 1920, "height": 1080, "fps": 29.97, "audio": true, "video": true}` |
-| `GET <base>/source?file=<id>&t=<s>&w=<px>` | `image/jpeg`: the source's frame at `t`, `w` pixels wide |
-| `GET <base>/frame?project=<id>&t=<s>&w=<px>` | `image/jpeg`: the cut at `t` — tracks covered, effects drawn, cropped — `w` pixels wide |
+| `GET <base>/info?file=<id>` | `{"duration": 12.4, "width": 1920, "height": 1080, "fps": 29.97, "audio": true, "video": true}`; a photo answers `"image": true` with a size and no duration |
+| `GET <base>/source?file=<id>&t=<s>&w=<px>` | `image/jpeg`: the source's frame at `t`, `w` pixels wide (a photo as it is) |
+| `GET <base>/frame?project=<id>&t=<s>&w=<px>` | `image/jpeg`: the cut at `t` — every piece seen, each in its place, effects drawn, cropped — `w` pixels wide |
 
 `<base>` is `/api/q/<quill>/<prefix>`, the api's `prefix` (`/api/q/<quill>` without one):
 
@@ -101,10 +109,10 @@ service = "render"
 prefix = "frames"
 ```
 
- Without `frames`, the web app still plays and
+Without `frames`, the web app still plays and
 edits (it reads sizes from the video itself and draws effects itself); the
-terminal shows the timeline without pictures, and adding material asks for
-its length.
+terminal shows the timeline without pictures, and adding a video or a sound
+asks for its length.
 
 ### Media
 
@@ -127,20 +135,31 @@ parameter (`go("editor", project=<id>)` from an action or a view), it opens
 that project's editor straight away.
 
 **The editor.**
-- *Material*: the videos and sounds under `media`, by folder, with their
-  length; Add puts the chosen one on the chosen track at the playhead (the
-  first video track for a video, the first audio track for a sound), as one
-  piece of its whole length, and gives the project its size and fps if it has
-  none.
+- *Media*: the videos, photos and sounds of a drive, as tiles with their
+  pictures (a video's first frame, a photo itself) and lengths, by folder.
+  The drive is `media`'s share at first; a chooser above the tiles offers
+  the person's own drive and every share they have, and `within` is kept.
+  On the web a tile is dragged onto a track where the piece should begin
+  (snapped to the pieces there and the playhead), or tapped to go at the
+  playhead on the first track of its kind — after whatever is on that track
+  when the playhead is inside a piece. A video goes on any track (its sound
+  alone on an audio track), a sound on an audio track, a photo on a video
+  track. A new piece is its source's whole length — a photo five seconds —
+  and the first video gives the project its size and fps if it has none.
 - *Viewer*: the picture at the playhead with effects and crop drawn; play and
   pause, step a frame, jump to start and end, the time and the total.
 - *Tracks*: one row per track, pieces drawn to scale, a playhead, zoom
   (magnifiers on the web, + and − in the terminal). Add clip, above them,
-  brings up the material to put one at the playhead. A
+  brings up the media to put one at the playhead. A
   piece is selected by choosing it; selected, it can be moved (to a time, to
   another track of the same kind), trimmed at either end, split at the
   playhead, muted, its volume set, or deleted. Moves snap to other pieces'
   edges and to the playhead.
+- *Size*: the selected picture's place. Make smaller puts it in a box in
+  the lower right corner, a third of the frame across; the box is dragged
+  and resized on the viewer or typed as numbers, and Fill the picture makes
+  it whole again. The box is shown whenever the piece is selected and no
+  blur of its is, while the playhead is on it.
 - *Effects*: the selected piece's effects; Add blur puts one at the playhead
   with a box in the middle. On the viewer the box is dragged and resized;
   every change sets the keyframe at the playhead (made when there is none
@@ -152,11 +171,13 @@ that project's editor straight away.
   header says the status and message as they change; when `output` is set,
   Open shows the file.
 
-**Web and phone.** Live playback in the browser: the top piece's picture in
-a `<video>` at the playhead, every audible piece's sound beside it, kept in
-step; effects drawn over the picture on a canvas (a blurred copy of the box);
-pieces dragged and trimmed with the mouse or finger. On a phone the material
-is a sheet and the tracks scroll sideways.
+**Web and phone.** Live playback in the browser: every piece seen at the
+playhead — a `<video>` each, an `<img>` for a photo — drawn on a canvas
+bottom track first, each in its place, every audible piece's sound beside
+it, kept in step; effects drawn over the picture (a blurred copy of the
+box); pieces dragged and trimmed with the mouse or finger. The gear at the
+right of the title opens the project's sheet. On a phone the media is a
+sheet and the tracks scroll sideways.
 
 **Terminal.** The viewer is the `frames` API's `frame` at the playhead,
 drawn with textual-image (Kitty, Sixel, or half-cells); play steps the
@@ -170,7 +191,7 @@ material, tracks and effects.
 **Command line.** `cm <quill> list` lists the projects; `add <name>
 [size=1920x1080]` makes one; `show <project>`
 prints the tracks and pieces with times; `add <project> <file> [--track V1]
-[--at 0]`, `cut <project> <piece> <at>`, `trim <project> <piece> --start/--end <s>`,
+[--at 0] [--length 5]` (a photo is five seconds long unless `--length` says), `cut <project> <piece> <at>`, `trim <project> <piece> --start/--end <s>`,
 `move <project> <piece> --at <s> [--track]`, `rm <project> <piece>`;
 `frame <project> --at <s> [-o frame.jpg]`; `export <project>` runs the
 action.
