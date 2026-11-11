@@ -8,9 +8,10 @@
    with the words they added kept on them rather than in one browser.
 
    A marked word is not the usual red wave: a tinted word with a bar
-   under it (spelling.css). Right-click it, or hold a finger on it, and
-   the suggestions come up, with Add to dictionary and Ignore. Select
-   some lines and do the same, and the lines can be checked in another
+   under it (spelling.css). Click it, or tap it, and the suggestions
+   come up, with Add to dictionary and Ignore; a right-click on it is the
+   browser's own menu, as anywhere. Select some lines and right-click, or
+   hold a finger on them, and the lines can be checked in another
    language: the part is marked at its left edge with the language and
    an ×, which takes the part back to the default language. A document
    keeps a part as `lang` on its blocks; a note keeps it as comment lines,
@@ -25,7 +26,7 @@
    never a page. */
 
 import { api, app, esc, mount, nav, onSignOut, previousHash, homeHash, registerScreen, toast, wireShell } from "./core.js";
-import { choose, contextMenus } from "./actions.js";
+import { choose, contextMenus, menu } from "./actions.js";
 import { langLine } from "./markdown_rules.js";
 
 const PASS_DELAY = 700;      // after the last change, before the words are checked
@@ -432,7 +433,19 @@ export function attachSpelling(host) {
     addEventListener("resize", onResize);
     host.root.addEventListener("compositionstart", () => { state.composing = true; });
     host.root.addEventListener("compositionend", () => { state.composing = false; schedule(); });
-    contextMenus(host.root, "." + MARK, (span) => wordChoices(span), { blank: selectionChoices });
+    // A marked word: a plain click or tap brings its suggestions. Not when
+    // the click ended a selection being dragged over it.
+    host.root.addEventListener("click", (event) => {
+      if (event.button !== 0 || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return;
+      const span = event.target.closest("." + MARK);
+      if (!span || !host.root.contains(span)) return;
+      const sel = getSelection();
+      if (sel && !sel.isCollapsed) return;
+      const at = { x: event.clientX, y: event.clientY };
+      wordChoices(span).then((list) => { if (span.isConnected && list.length) menu(list, at); });
+    });
+    // Lines selected: their menu, on a right-click or a held finger.
+    contextMenus(host.root, null, null, { blank: selectionChoices });
     pass();
   }
   start();
@@ -648,7 +661,7 @@ async function renderSpelling() {
       <p class="group-label">Words you added</p>
       <div class="group words">${words.length ? words.map((w) => `<div class="row"><span class="main">${esc(w)}</span>
           <button type="button" class="remove" data-word="${esc(w)}" aria-label="Remove ${esc(w)}">×</button></div>`).join("")
-        : `<p class="empty">None yet. Right-click a marked word, or hold a finger on it, and choose Add to dictionary.</p>`}</div>
+        : `<p class="empty">None yet. Click or tap a marked word and choose Add to dictionary.</p>`}</div>
       <p class="spelling-note">Select some lines, right-click or hold, and they can be checked in another language;
         the part is marked at its left edge, with an × that takes it back.</p>
     </main>`);

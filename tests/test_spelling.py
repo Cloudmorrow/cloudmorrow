@@ -214,3 +214,14 @@ def test_the_web_app_has_the_spellchecker_and_the_browsers_is_off(client):
     rules = js_code((WEB / "markdown_rules.js").read_text(encoding="utf-8"))
     assert "export function langLine(raw)" in rules and "md-lang-start" in rules
     assert (WEB / "spelling.css").read_text(encoding="utf-8").count("spell-miss") >= 1
+
+
+def test_a_marked_word_gives_its_suggestions_to_a_click_not_a_right_click():
+    from pathlib import Path
+
+    js = (Path(__file__).parent.parent / "src/cloudmorrow/server/web/spelling.js").read_text()
+    # A plain click or tap on the mark opens them…
+    assert 'host.root.addEventListener("click"' in js
+    assert "wordChoices(span).then" in js
+    # …and the right-click / held finger is left to selected lines alone.
+    assert "contextMenus(host.root, null, null, { blank: selectionChoices })" in js

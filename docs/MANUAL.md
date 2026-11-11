@@ -826,10 +826,11 @@ Icelandic, as the [catalog](https://github.com/Cloudmorrow/quill-catalog)
 pins them — and the server fetches a language the first time you write in
 it, checked against the catalog's hash; nothing is installed on the box.
 
-A word the dictionary does not know is tinted, with a bar under it. Right-
-click it on a computer, or hold a finger on it on a phone, and its
-suggestions come up, with **Add to dictionary** and **Ignore**. Select
-some lines and do the same, and **Check spelling in…** checks those lines
+A word the dictionary does not know is tinted, with a bar under it. Click
+it on a computer, or tap it on a phone, and its suggestions come up, with
+**Add to dictionary** and **Ignore**; a right-click on it is the browser's
+own menu. Select some lines and right-click them, or hold a finger on
+them, and **Check spelling in…** checks those lines
 in another language: the part is marked at its left edge with the
 language and an ×, which takes it back to your default. A document keeps
 the part in its file as the blocks' `lang`; a note keeps it as two

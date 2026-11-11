@@ -194,7 +194,7 @@ const LONG_PRESS = 500;
  * `choicesFor(el, event)` answers the choices for a thing, `blank(event)`
  * for the room — now, or as a promise of them; nothing from either leaves
  * the browser's own menu. The press that became a menu is not also a tap
- * on the thing.
+ * on the thing. A null *selector* is the room alone.
  */
 export function contextMenus(root, selector, choicesFor, { blank = null } = {}) {
   const open = (event, el) => {
@@ -218,13 +218,13 @@ export function contextMenus(root, selector, choicesFor, { blank = null } = {}) 
   root.addEventListener("contextmenu", (event) => {
     end();
     if (held()) { event.preventDefault(); return; }
-    const el = event.target.closest(selector);
+    const el = selector ? event.target.closest(selector) : null;
     open(event, el && root.contains(el) ? el : null);
   });
   root.addEventListener("pointerdown", (event) => {
     end();
     if (event.pointerType === "mouse" || event.button !== 0) return;
-    const el = event.target.closest(selector);
+    const el = selector ? event.target.closest(selector) : null;
     const { clientX, clientY, target } = event;
     pressed = { x: clientX, y: clientY, timer: setTimeout(() => {
       pressed = null;

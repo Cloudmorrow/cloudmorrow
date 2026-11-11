@@ -189,15 +189,15 @@ catalog*). A language is fetched the first time somebody writes in it,
 kept under `<data_dir>/dictionaries/<id>/`, and loaded once; nothing is
 installed on the system. The page asks `POST /api/spelling/check` for a
 screenful of words at a time, the ones it has not asked about before, and
-`POST /api/spelling/suggest` for one word when it is right-clicked;
+`POST /api/spelling/suggest` for one word when it is clicked or tapped;
 `GET /api/spelling/languages` lists what can be chosen. Only words are
 sent, never the page.
 
 On the page (`web/spelling.js`), a word the dictionary does not know is
-tinted with a bar under it — not the red wave. A right-click on it, or a
-finger held on it, brings its suggestions, **Add to dictionary** (kept on
-the person) and **Ignore** (this session). Select some lines and do the
-same, and **Check spelling in…** marks them as a part in another language:
+tinted with a bar under it — not the red wave. A click or a tap on it
+brings its suggestions, **Add to dictionary** (kept on the person) and
+**Ignore** (this session). Select some lines and right-click them, or hold
+a finger on them, and **Check spelling in…** marks them as a part in another language:
 a bar down the left of the part with the language at its top and an ×
 that takes the part back to the default. In a document the part is `lang`
 on its blocks; in a note it is the comment lines above, which anything
