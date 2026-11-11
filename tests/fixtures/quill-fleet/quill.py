@@ -30,6 +30,22 @@ def add_van(ctx, name, registration=None):
 
 
 @action
+def narrate(ctx):
+    ctx.progress("one")
+    ctx.progress("one two")
+    return toast("told")
+
+
+@action
+def relay(ctx):
+    with ctx.fetch("https://api.example.com/feed", stream=True) as feed:
+        if not feed.ok:
+            return toast(f"feed {feed.status}")
+        heard = [f"{e['event']}:{e['data']}" for e in feed.events()]
+    return toast(" ".join(heard))
+
+
+@action
 def scrap(ctx, vehicle):
     ctx.records.delete("vehicle", vehicle.id)
     return toast(f"Scrapped {vehicle['name']}")

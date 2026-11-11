@@ -368,6 +368,53 @@ def test_a_view_that_is_not_a_view_is_not_found(fleet):
     assert client.get("/api/quills/fleet/views/nope", headers=admin).status_code == 404
 
 
+# -- heard as it runs -----------------------------------------------------------------------------
+def test_an_action_pressed_on_the_stream_route_is_heard_as_it_runs(fleet):
+    """The stream route says each `ctx.progress` as an event, then the effects;
+    a failure is its own event with what the plain route would answer."""
+    client, admin, _ = fleet
+    with client.stream("POST", "/api/quills/fleet/actions/narrate/stream", json={}, headers=admin) as answer:
+        assert answer.status_code == 200 and answer.headers["content-type"].startswith("text/event-stream")
+        heard = "".join(answer.iter_text())
+    assert 'event: progress\ndata: "one"\n\nevent: progress\ndata: "one two"\n\nevent: done\ndata: ' in heard
+    assert '"effect": "toast", "text": "told"' in heard
+    with client.stream("POST", "/api/quills/fleet/actions/log-service/stream", json={}, headers=admin) as answer:
+        heard = "".join(answer.iter_text())
+    assert "event: failed\ndata: " in heard and '"kind": "invalid"' in heard
+    # The plain route is as it was.
+    assert press(client, admin, "narrate").json()["effects"] == [{"effect": "toast", "text": "told"}]
+
+
+def test_a_stream_reads_what_the_host_hands_over_chunk_by_chunk():
+    """The SDK's Stream: lines across chunk ends and CRLF, events with several
+    data lines, closed once at the end or by the with block."""
+    import base64
+
+    asked = []
+    chunks = [b"event: a\r\ndata: on", b"e\n\ndata: x\ndata: y\n\n", b": hush\n\ndata: last"]
+
+    def host(op, args):
+        asked.append(op)
+        if op == "fetch.read":
+            return {"chunk": base64.b64encode(chunks.pop(0)).decode(), "done": not chunks}
+        return None
+
+    stream = sdk.Stream(host, {"handle": 7, "status": 200, "headers": {"Content-Type": "text/event-stream"}})
+    assert stream.ok and repr(stream) == "Stream(200)"
+    events = list(stream.events())
+    assert events == [
+        {"event": "a", "data": "one"},
+        {"event": "message", "data": "x\ny"},
+        {"event": "message", "data": "last"},
+    ]
+    stream.close()
+    assert asked == ["fetch.read", "fetch.read", "fetch.read"], "read to the end closes it: no close call"
+    opened = sdk.Stream(lambda op, args: asked.append(op) or {"chunk": "", "done": False}, {"handle": 1, "status": 500})
+    with opened as it:
+        assert not it.ok
+    assert asked[-1] == "fetch.close"
+
+
 # -- secrets, fetch ------------------------------------------------------------------------------
 def test_a_secret_is_the_persons_own_and_named_in_the_manifest(fleet):
     client, admin, _ = fleet

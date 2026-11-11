@@ -54,6 +54,16 @@ km = { kind = "int", required = true }
 note = "text"
 
 [[actions]]
+id = "narrate"
+label = "Say it as it comes"
+assistant = false
+
+[[actions]]
+id = "relay"
+label = "Relay the tracker's feed"
+assistant = false
+
+[[actions]]
 id = "scrap"
 label = "Scrap it"
 on = "vehicle"

@@ -30,7 +30,7 @@ import {
 } from "./kit_calendar.js";
 import {
   choose, contextMenus, findAction, formFields, hideFromBar, linksFor, onRedrawHere, peopleList, press,
-  readFields, recordChoices, run, said, screenAt, wireFields,
+  readFields, recordChoices, run, runStream, said, screenAt, wireFields,
 } from "./actions.js";
 import { ask } from "./dialog.js";
 
@@ -644,6 +644,7 @@ function wireToggles(v) {
 // write in on the floor. What is sent is shown at once, with the other
 // side thinking, until the action is done and the view drawn again; what
 // could not be sent goes back into the box.
+const BLOCKS = new Set(["P", "LI", "UL", "OL", "H1", "H2", "H3", "H4", "BLOCKQUOTE", "PRE"]);
 const askField = (action) => (action && (action.fields || []).find((f) => ["text", "markdown", "string"].includes(f.kind))) || null;
 
 function drawConversation(v, n) {
@@ -730,8 +731,26 @@ function wireChats(v) {
         `<div class="v-line mine v-sent"><div class="v-bubble">${esc(text)}</div></div>` +
         `<div class="v-line v-thinking" role="status" aria-label="Waiting for an answer"><span></span><span></span><span></span></div>`);
       toBottom();
-      const failed = await run(v.at.quill, action, {
-        record: n.record ? n.record.id : "", fields: { [field.name]: text }, here: v.at, after: v.draw,
+      // The answer as it is said: the action's progress drawn in the other
+      // side's line, the dots giving way to the words, until the view is
+      // drawn again with the answer written down.
+      const saying = (words) => {
+        const line = lines.querySelector(".v-thinking");
+        if (!line) return;
+        const near = lines.scrollHeight - lines.scrollTop - lines.clientHeight < 80;
+        line.classList.add("v-saying");
+        line.innerHTML = (n.name ? `<span class="v-who">${esc(n.name)}</span>` : "") +
+          `<div class="v-bubble v-markdown">${markdown(words)}<span class="v-caret"></span></div>`;
+        // The caret ends the last line of words rather than starting one of its own.
+        const bubble = line.querySelector(".v-bubble");
+        const caret = bubble.lastElementChild;
+        let tail = bubble;
+        while (tail.lastElementChild && tail.lastElementChild !== caret && BLOCKS.has(tail.lastElementChild.tagName)) tail = tail.lastElementChild;
+        if (tail !== bubble) tail.appendChild(caret);
+        if (near) toBottom();
+      };
+      const failed = await runStream(v.at.quill, action, {
+        record: n.record ? n.record.id : "", fields: { [field.name]: text }, here: v.at, after: v.draw, onProgress: saying,
       });
       // Not drawn again, so it ended in an error: the words go back rather than being lost.
       if (failed && form.isConnected) {

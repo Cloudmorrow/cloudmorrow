@@ -118,6 +118,18 @@ def test_rows_search_and_group_and_a_side_that_folds():
     # The box of a conversation has the focus on a computer, drawn and drawn again.
     assert 'matchMedia("(min-width: 900px) and (min-height: 600px)")' in code
     assert "if (onComputer.matches && !v.root.contains(document.activeElement)) box.focus(" in code
+
+
+def test_a_conversation_hears_the_answer_as_it_is_said():
+    """The box runs its action on the stream route and draws each progress
+    event in the thinking line, the dots giving way to the words."""
+    code = js_code(VIEW_JS)
+    assert "runStream(v.at.quill, action, {" in code and "onProgress: saying" in code
+    assert 'line.classList.add("v-saying")' in code and "v-caret" in code
+    assert "/stream`" in ACTIONS_JS and 'Accept: "text/event-stream"' in ACTIONS_JS
+    assert "route, send, toast } from" in ACTIONS_JS, "the request helper the stream needs is imported"
+    assert 'name === "progress" && onProgress' in ACTIONS_JS and 'ended.name === "failed"' in ACTIONS_JS
+    assert ".v-line.v-saying .v-caret" in VIEW_CSS
     for cls in (".v-search input", ".v-split.folded", ".v-fold", ".v-hidden", ".v-side-head { display: none; }"):
         assert cls in VIEW_CSS, cls
     # An action marked settings is drawn by the settings screen alone, as an admin's is;

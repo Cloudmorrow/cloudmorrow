@@ -24,6 +24,19 @@ def q():
         yield harness
 
 
+def test_progress_is_heard_and_a_fetch_is_read_as_it_comes(q):
+    """`ctx.progress` reaches the surface that pressed, in order; a fetch with
+    `stream=True` is read as it comes, its server-sent events one by one."""
+    told = q.act("narrate")
+    assert told.toast == "told" and told.progress == ["one", "one two"]
+    q.fetch.add(
+        "https://api.example.com/feed", text='event: hello\ndata: {"a": 1}\n\n: a comment\n\ndata: plain\ndata: two\n\n'
+    )
+    assert q.act("relay").toast == 'hello:{"a": 1} message:plain\ntwo'
+    q.fetch.add("https://api.example.com/feed", text="no", status=503)
+    assert q.act("relay").toast == "feed 503"
+
+
 def test_logging_a_service_moves_the_odometer(q):
     van = q.seed("vehicle", name="Van", **{"fleet.odometer": 1000})
     done = q.act("log-service", van, date="2026-09-28", km=1200)

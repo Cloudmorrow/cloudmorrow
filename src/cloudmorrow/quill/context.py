@@ -258,6 +258,85 @@ class Response:
         return f"Response({self.status})"
 
 
+class Stream:
+    """What `ctx.fetch(stream=True)` got back: the status and headers at once,
+    and the body as it comes — chunk by chunk, line by line, or as the events
+    of a server-sent stream — so a long answer can be passed on as it is
+    said (`ctx.progress`). Closed when read to the end, or by `close()`; a
+    `with` block closes it."""
+
+    def __init__(self, host: Host, data: dict) -> None:
+        self._host = host
+        self._handle = int(data["handle"])
+        self.status: int = int(data["status"])
+        self.headers: dict[str, str] = dict(data.get("headers", {}))
+        self._done = False
+
+    @property
+    def ok(self) -> bool:
+        return 200 <= self.status < 300
+
+    def chunks(self) -> Iterator[bytes]:
+        """The body's bytes as they arrive, until the end."""
+        while not self._done:
+            got = self._host("fetch.read", {"handle": self._handle})
+            self._done = bool(got.get("done"))
+            chunk = base64.b64decode(got.get("chunk", ""))
+            if chunk:
+                yield chunk
+
+    def lines(self) -> Iterator[str]:
+        """The body's lines as they arrive, without their line ends."""
+        rest = b""
+        for chunk in self.chunks():
+            rest += chunk
+            while b"\n" in rest:
+                line, rest = rest.split(b"\n", 1)
+                yield line.decode("utf-8", errors="replace").rstrip("\r")
+        if rest:
+            yield rest.decode("utf-8", errors="replace").rstrip("\r")
+
+    def events(self) -> Iterator[dict]:
+        """A server-sent stream's events as they arrive: `{"event": name, "data": text}`
+        each, `name` "message" when the event says none, comments skipped."""
+        name, data = "message", []
+        for line in self.lines():
+            if not line:
+                if data:
+                    yield {"event": name, "data": "\n".join(data)}
+                name, data = "message", []
+            elif line.startswith(":"):
+                continue
+            elif line.startswith("event:"):
+                name = line[6:].strip()
+            elif line.startswith("data:"):
+                data.append(line[6:] if line.startswith("data: ") else line[5:])
+        if data:
+            yield {"event": name, "data": "\n".join(data)}
+
+    @property
+    def text(self) -> str:
+        """The rest of the body, read to the end."""
+        return b"".join(self.chunks()).decode("utf-8", errors="replace")
+
+    def json(self):
+        return json.loads(self.text or "null")
+
+    def close(self) -> None:
+        if not self._done:
+            self._done = True
+            self._host("fetch.close", {"handle": self._handle})
+
+    def __enter__(self) -> Stream:
+        return self
+
+    def __exit__(self, *_exc) -> None:
+        self.close()
+
+    def __repr__(self) -> str:
+        return f"Stream({self.status})"
+
+
 class Request:
     """What a webhook or an API handler is given: the request someone sent."""
 
@@ -393,8 +472,11 @@ class Context:
         body: bytes | str | None = None,
         json: object = None,  # noqa: A002
         timeout: float = 20.0,
-    ) -> Response:
-        """An HTTP request, to a host the manifest lists in [[fetch]]; anything else is Refused."""
+        stream: bool = False,
+    ) -> Response | Stream:
+        """An HTTP request, to a host the manifest lists in [[fetch]]; anything else is Refused.
+        With *stream*, a `Stream`: the status and headers at once and the body as it
+        comes (`.chunks()`, `.lines()`, `.events()`), for an answer said over time."""
         head = dict(headers or {})
         if json is not None:
             import json as _json
@@ -403,18 +485,22 @@ class Context:
             head.setdefault("Content-Type", "application/json")
         if isinstance(body, str):
             body = body.encode("utf-8")
-        return Response(
-            self._host(
-                "fetch",
-                {
-                    "url": url,
-                    "method": method.upper(),
-                    "headers": head,
-                    "body": base64.b64encode(body or b"").decode("ascii"),
-                    "timeout": float(timeout),
-                },
-            )
-        )
+        args = {
+            "url": url,
+            "method": method.upper(),
+            "headers": head,
+            "body": base64.b64encode(body or b"").decode("ascii"),
+            "timeout": float(timeout),
+        }
+        if stream:
+            return Stream(self._host, self._host("fetch.open", args))
+        return Response(self._host("fetch", args))
+
+    def progress(self, text: str) -> None:
+        """What a long action has to show so far — an answer as it is said — drawn
+        where it was pressed while it runs: in a conversation, the other side's
+        line growing. Each call replaces the last; the action's result follows."""
+        self._host("progress", {"text": str(text)})
 
     def people(self, *, role: str = "", circle: str = "") -> list[str]:
         """Usernames. With *role*, who holds it: everywhere, and in *circle* when
