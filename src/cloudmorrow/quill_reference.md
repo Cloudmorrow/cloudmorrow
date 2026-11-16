@@ -270,6 +270,10 @@ runtimes = ["ffmpeg"]              # an id from the catalog's [runtimes]; the in
                                    # a checked static build and puts it first on the services' PATH
 quills = ["media"]                 # other Quills it works with: installed first, from the catalog,
                                    # and kept while this one is here
+
+[[screenshots]]                    # optional: a caption for screenshots/<id>-desktop.webp,
+id = "wall"                        # <id>-phone.webp and <id>-tui.webp, which the catalog's page
+caption = "The wall, newest first" # shows at the release it pins (no caption: the file name is one)
 ```
 
 A runtime is for the services (and ffmpeg also gives every video file a

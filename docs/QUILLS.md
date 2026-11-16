@@ -599,6 +599,34 @@ you*, and that is what is said yes to ([QUILLCODE.md](QUILLCODE.md),
 `ctx.assistant`).
 
 
+### Screenshots
+
+A Quill may carry pictures of its screens, and the catalog's page for it
+(cloudmorrow.com/quills/<id>) shows them above everything else, at the
+release the catalog pins. They live in `screenshots/` at the top of the
+repository, one picture per screen and surface:
+
+```
+screenshots/wall-desktop.webp     # a browser, 1600×1000
+screenshots/wall-phone.webp       # a phone, 780×1688
+screenshots/wall-tui.webp         # the terminal, 1600×930
+```
+
+Any of the three may be left out; `.png` and `.jpg` do as well. A line in
+the manifest captions each `<id>`, and sets the order:
+
+```toml
+[[screenshots]]
+id = "wall"
+caption = "The wall: every photo at its own shape, newest first"
+```
+
+Without a `[[screenshots]]` table the files alone are shown, in their
+order, captioned by their name. None of this is required: a Quill with no
+`screenshots/` folder has a page without pictures. Cloudmorrow's own Quills
+show every screen on all three surfaces, taken from a throwaway cloud with
+made-up data, never anybody's own; take as many or as few as you like.
+
 ## The catalog
 
 ```toml

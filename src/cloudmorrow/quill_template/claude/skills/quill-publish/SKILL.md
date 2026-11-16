@@ -7,6 +7,10 @@ description: Release a Quill and put it in the Quill Catalog — versions, tags,
 
 1. Everything passes: `cm quill check`, `cm quill test`, `cm quill test --sandbox`.
 2. README.md's "What it adds" table is true (`cm quill check` prints what it adds).
+   Pictures of its screens, if you want them on its catalog page, go in
+   `screenshots/<id>-desktop.webp`, `<id>-phone.webp`, `<id>-tui.webp`, with
+   an optional `[[screenshots]]` caption per `<id>` in quill.toml (QUILLS.md,
+   *Screenshots*). Take them from a throwaway cloud with made-up data.
 3. Bump `version` in quill.toml (major.minor.patch): a new field or action is
    minor; a change that breaks old records or removes something is major.
 4. Commit, tag and push: `git tag v1.2.0 && git push --tags`. The release
