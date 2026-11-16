@@ -21,11 +21,13 @@ async def test_selecting_text_with_the_mouse_copies_it(app):
         screen = await start(app, pilot)
         await pilot.click("#nav-files")
         await settle(app, pilot)
-        crumb = screen.query_one("#grid-crumb", Static)
-        assert crumb.text_selection is None
-        # Offsets are on the widget, whose padding is 0 3, and the cell under
-        # the pointer when the button comes up is part of the selection.
-        await sweep(pilot, "#grid-crumb", (3, 0), (8, 0))
+        head = screen.active_pane.query_one(".pane-name", Static)
+        assert head.text_selection is None
+        # Offsets are on the widget — "Files  Shares", no padding — and the
+        # cell under the pointer when the button comes up is part of the
+        # selection.
+        start_at = head.visual.plain.index("Shares")
+        await sweep(pilot, head, (start_at, 0), (start_at + 5, 0))
         assert screen.get_selected_text() == "Shares"
         assert app._clipboard == "Shares"
         # And the status bar says so — nothing else needs pressing, and
@@ -54,6 +56,6 @@ async def test_a_click_alone_copies_nothing(app):
         await start(app, pilot)
         await pilot.click("#nav-files")
         await settle(app, pilot)
-        await sweep(pilot, "#grid-crumb", (3, 0), (3, 0))
+        await sweep(pilot, app.screen.active_pane.query_one(".pane-name", Static), (7, 0), (7, 0))
         assert app._clipboard == ""
         assert "Copied" not in said(app.screen)

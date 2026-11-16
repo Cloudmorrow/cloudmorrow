@@ -40,6 +40,7 @@ from io import BytesIO
 from pathlib import Path
 
 from rich.markup import escape
+from rich.style import Style
 from rich.text import Text
 from textual import events, work
 from textual.app import ComposeResult
@@ -53,7 +54,7 @@ from cloudmorrow.quill.screens import grid_fields
 from cloudmorrow.tui.kitdata import can_write, field_of
 from cloudmorrow.tui.panes.kit import KitPane
 from cloudmorrow.tui.screens.modals import ConfirmModal, PromptModal
-from cloudmorrow.tui.theme import MUTED
+from cloudmorrow.tui.theme import FAINT, MUTED, SKY
 from cloudmorrow.tui.widgets.picture import Picture, TerminalImage
 from cloudmorrow.tui.widgets.toolbar import Action
 from cloudmorrow.tui.words import plural
@@ -369,10 +370,12 @@ class GridPane(KitPane):
     ]
     # Getting a file is reading it; everything else in a folder is writing.
     WRITING = KitPane.WRITING | {"put", "rename", "move", "restore"}
+    # The header's left is the path here, and the way back: it is kept whole
+    # before the right-hand "read at".
+    HEAD_LEFT_FIRST = True
 
     DEFAULT_CSS = """
     GridPane {
-        #grid-crumb { height: 1; padding: 0 3; color: $muted; }
         #grid-row { height: 1fr; }
         #grid-views { height: 1fr; width: 1fr; padding: 1 2; }
         #grid-tiles {
@@ -490,7 +493,6 @@ class GridPane(KitPane):
         self._pictures: dict[tuple[str, str], bytes] = {}
 
     def content(self) -> ComposeResult:
-        yield Static("", id="grid-crumb")
         with Horizontal(id="grid-row"):
             with ContentSwitcher(id="grid-views", initial="grid-table"):
                 yield DataTable(id="grid-table", cursor_type="row")
@@ -532,6 +534,63 @@ class GridPane(KitPane):
     @property
     def current_group(self) -> dict | None:
         return next((g for g in self.groups if g["id"] == self.group), None)
+
+    def trail(self) -> list[tuple[str, str | None, str]]:
+        """The steps to where we stand, (label, group, folder) each: the groups
+        at the top, then the group, then every folder down to this one."""
+        noun = str(self.group_model.get("label") or "group")
+        steps: list[tuple[str, str | None, str]] = [(f"{noun}s", None, "")]
+        if self.at_top:
+            return steps
+        steps.append((self.group_label(self.current_group), self.group, ""))
+        path = ""
+        for part in self.folder.split("/") if self.folder else []:
+            path = f"{path}/{part}" if path else part
+            steps.append((part, self.group, path))
+        return steps
+
+    def _head_left(self, room: int | None = None) -> Text:
+        """The name, then the path here: every step before this one is a link
+        back to it. A path too long for the room loses steps from just after
+        the first, behind a "…" that is the nearest of them, so where you are
+        and the way to the top stay."""
+        text = Text(no_wrap=True)
+        text.append(self.TAB_LABEL, style=f"bold {SKY}")
+        text.append("  ")
+        steps = self.trail()
+        shown = list(range(len(steps)))
+
+        def width() -> int:
+            cut = 4 if len(shown) < len(steps) else 0
+            return sum(len(steps[i][0]) for i in shown) + 3 * (len(shown) - 1) + cut
+
+        if room is not None:
+            space = room - len(self.TAB_LABEL) - 2
+            while len(shown) > 2 and width() > space:
+                del shown[1]
+        for n, i in enumerate(shown):
+            if n:
+                text.append(" › ", style=FAINT)
+            if n == 1 and len(shown) < len(steps):
+                text.append("…", style=Style(color=SKY, meta={"@click": f"jump({i - 1})"}))
+                text.append(" › ", style=FAINT)
+            label = steps[i][0]
+            if i == len(steps) - 1:
+                text.append(label, style="bold")
+            else:
+                text.append(label, style=Style(color=SKY, meta={"@click": f"jump({i})"}))
+        return text
+
+    def head_jump(self, index: int) -> None:
+        steps = self.trail()
+        if not 0 <= index < len(steps) - 1:
+            return
+        _label, group, folder = steps[index]
+        if group is None:
+            self.group, self.folder = None, ""
+        else:
+            self.go_to(group, folder)
+        self.reload()
 
     def go_to(self, group: str, folder: str = "") -> None:
         """Stand in *folder* of *group*; the next reload lists it."""
@@ -619,15 +678,7 @@ class GridPane(KitPane):
             table.add_columns("NAME", "MODIFIED", "SIZE", "TYPE")
 
     def draw(self) -> None:
-        crumb = self.query_one("#grid-crumb", Static)
-        noun = str(self.group_model.get("label") or "group")
-        if self.at_top:
-            crumb.update(f"[{MUTED}]{escape(noun)}s[/]")
-        else:
-            trail = self.group_label(self.current_group)
-            if self.folder:
-                trail += " / " + self.folder.replace("/", " / ")
-            crumb.update(f"[b]{escape(trail)}[/]")
+        self.refresh_head()
         for button in self.query(".toolbar Button"):
             action = (button.id or "")[len("do-") :]
             button.display = action in (self.top_actions if self.at_top else IN_FOLDER) and not (

@@ -33,6 +33,12 @@ def names(screen) -> list[str]:
     return [str(table.get_row_at(index)[0]) for index in range(table.row_count)]
 
 
+def where(screen) -> str:
+    """The path in the pane's header, after its name: where you stand."""
+    head = screen.active_pane.query_one(".pane-name", Static).visual.plain
+    return head.split("  ", 1)[1]
+
+
 def status(screen) -> str:
     """The bottom line, and the right of the panel's header, where the pane
     says what the row you are on is."""
@@ -104,7 +110,7 @@ async def test_files_starts_at_the_shares_and_enter_opens_one(app):
         # Files is a Quill card now, with the key it always had.
         assert screen.active_pane.TAB_KEY == "f5"
         assert names(screen) == ["media", "photos"]
-        assert "Shares" in screen.query_one("#grid-crumb", Static).visual.plain
+        assert where(screen) == "Shares"
         # Enter on a share is its top folder: folders first, then the files
         # by name, each with when, how big and what it is.
         await pilot.press("enter")
@@ -116,7 +122,7 @@ async def test_files_starts_at_the_shares_and_enter_opens_one(app):
             ["readme.txt", format_date(1_756_700_000), "5 B", "TXT"],
             ["song.mp3", format_date(1_756_600_000), "4.0 MB", "MP3"],
         ]
-        assert screen.query_one("#grid-crumb", Static).visual.plain == "media"
+        assert where(screen) == "Shares › media"
 
 
 async def test_into_a_folder_and_back_up_to_the_shares(app):
@@ -128,7 +134,7 @@ async def test_into_a_folder_and_back_up_to_the_shares(app):
         await settle(app, pilot)
         assert app.client.listing_calls[-1] == ("media", "Holiday")
         assert names(screen) == ["beach.jpg", "dunes.png", "where.txt"]
-        assert screen.query_one("#grid-crumb", Static).visual.plain == "media / Holiday"
+        assert where(screen) == "Shares › media › Holiday"
         # The status bar says what the cursor is on.
         assert "beach.jpg" in status(screen) and "1.2 MB" in status(screen)
         await pilot.press("backspace")
@@ -234,6 +240,35 @@ async def test_s_sorts_by_the_next_thing_and_shift_s_turns_it_around(app):
         assert "Sort: Type" in screen.query_one("#do-sort").label.plain
 
 
+async def test_the_path_in_the_header_is_the_way_back(app):
+    async with app.run_test(size=(120, 34)) as pilot:
+        screen = await open_browse(app, pilot)
+        await pilot.press("enter")
+        await settle(app, pilot)
+        await pilot.press("enter")  # Holiday
+        await settle(app, pilot)
+        assert where(screen) == "Shares › media › Holiday"
+        # Every step before this one is a link: the share's name lists its top
+        # folder, and "Shares" the shares — so there is always a way back,
+        # with the mouse, from wherever you are.
+        head = screen.active_pane.query_one(".pane-name", Static)
+        plain = head.visual.plain
+        await pilot.click(head, offset=(plain.index("media"), 0))
+        await settle(app, pilot)
+        assert names(screen) == ["Holiday/", "readme.txt", "song.mp3"]
+        assert where(screen) == "Shares › media"
+        await pilot.click(head, offset=(plain.index("Shares"), 0))
+        await settle(app, pilot)
+        assert names(screen) == ["media", "photos"]
+        assert where(screen) == "Shares"
+        # Where you are is not a link: clicking it changes nothing.
+        calls = list(app.client.listing_calls)
+        await pilot.click(head, offset=(plain.index("Shares"), 0))
+        await settle(app, pilot)
+        assert app.client.listing_calls == calls
+        assert names(screen) == ["media", "photos"]
+
+
 async def test_an_empty_share_opens_empty(app):
     async with app.run_test(size=(120, 34)) as pilot:
         screen = await open_browse(app, pilot)
@@ -241,7 +276,7 @@ async def test_an_empty_share_opens_empty(app):
         await pilot.press("enter")
         await settle(app, pilot)
         assert set(app.client.listing_calls) == {("photos", "")}
-        assert screen.query_one("#grid-crumb", Static).visual.plain == "photos"
+        assert where(screen) == "Shares › photos"
         assert "Nothing" not in status(screen)
         assert names(screen) == []
 
