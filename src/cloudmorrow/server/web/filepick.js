@@ -33,11 +33,12 @@ const rowHtml = (icon, title, subtitle, attrs, kind = "") =>
  * A folder picked from anywhere, to put something in: resolves
  * `{group, folder, label}` — the share, the folder in it ("" for its top)
  * and the share's name — or null for no. `within` keeps it to one share,
- * for what cannot leave the one it is in; `button` is what the button
- * that takes the open folder says; `not` names folders at a share's top
- * that are not on offer (the Trash).
+ * for what cannot leave the one it is in, and `start` the folder in it
+ * to open on; `button` is what the button that takes the open folder
+ * says; `not` names folders at a share's top that are not on offer (the
+ * Trash).
  */
-export function pickFolder({ title = "Choose a folder", model = "file", within = "", button = "Put it here", not = [] } = {}) {
+export function pickFolder({ title = "Choose a folder", model = "file", within = "", start = "", button = "Put it here", not = [] } = {}) {
   return new Promise((resolve) => {
     const { backdrop, sheet, close } = openSheet(
       `<p class="act-sheet-title">${esc(title)}</p><p class="pick-where"></p>` +
@@ -50,7 +51,7 @@ export function pickFolder({ title = "Choose a folder", model = "file", within =
     const hereEl = sheet.querySelector(".pick-here");
     // Where it starts: the share it is kept to, else where it was last,
     // else the shares.
-    let at = within ? { share: within, folder: "", label: "" }
+    let at = within ? { share: within, folder: start, label: "" }
       : remembered && remembered.share ? { ...remembered } : null;
     let shown = 0;
 

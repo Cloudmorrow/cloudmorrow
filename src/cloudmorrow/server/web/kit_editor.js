@@ -23,6 +23,12 @@
    folds away to give the page the whole width (it stays folded, in this
    browser, until it is opened again).
 
+   Every row of the list has the menu a file has in Files — a right-click
+   on a computer, a finger held on it on a phone: Open, Rename, Duplicate,
+   Move to another folder, Open folder in Files, Delete. Select beside the
+   pen (or Shift or Ctrl with a click) picks several, for Move to or Delete
+   at once. The kits over files draw the same list, menu and all.
+
    Pages of a datamodel you may only read (docs/CIRCLES.md) open read-only:
    the same page, its words there to read and not to type into, and no pen,
    no new folder, no photo and no delete.
@@ -37,14 +43,15 @@
 
 import {
   SAVE_DELAY, SEARCH_DELAY, api, apiRaw, app, back, baseName, encodePath, esc, fileStem, folderOf,
-  formatDate, heading, icons, joinPath, mount, nav, occupy, previousHash, recordsUrl, renderRoute,
+  formatDate, go, heading, icons, joinPath, mount, nav, occupy, previousHash, recordsUrl, renderRoute,
   litDone, replace, seconds, sectionOf, setStatus, store, tabs, toast, vacate, wireSaveKey, wireShell,
 } from "./core.js";
 import { installCard } from "./install.js";
 import { mayWrite } from "./kit.js";
 import { bodyMarkup, bodyText, focusBody, mountBody, photoButton, setBody } from "./pictures.js";
 import { ask, askText } from "./dialog.js";
-import { choose, folderInFiles } from "./actions.js";
+import { choose, contextMenus, filesScreen, folderInFiles } from "./actions.js";
+import { pickFolder } from "./filepick.js";
 import { attachMarkdown } from "./spelling.js";
 
 const own = {
@@ -259,8 +266,9 @@ const pageHash = (b, id) =>
   `#/r/${encodeURIComponent(b.at.quill.id)}/${encodeURIComponent(b.at.screen.id)}/${encodeURIComponent(b.model.id)}/${encodeURIComponent(id)}`;
 
 // -- the pages and the folders ---------------------------------------------------------
-// [{id, path, title, folder, place, modified, preview}], the folders in
-// tree order: [{path, name, depth, count}], the top first, and the drive
+// [{id, name, path, title, kind, folder, place, share, within, modified,
+// preview}] — name the file's whole, share and within where it is in the
+// store, for the menu on its row — the folders in tree order: [{path, name, depth, count}], the top first, and the drive
 // they are on: {id, label, home}.
 export async function load(b) {
   const [rows, names] = await Promise.all([
@@ -271,14 +279,18 @@ export async function load(b) {
     const path = withoutSuffix(b, underRoot(b, r.fields[b.path || b.title]));
     // A file of a suffix other than the first says so, when there are several.
     const kind = (b.suffixes || []).slice(1).find((x) => name.toLowerCase().endsWith(x.toLowerCase())) || "";
+    // Where it is, said as Files says it: the list's line under the title.
+    const where = whereIs(b, r, names);
     return {
       id: r.id,
+      name,
       path,
       title: withoutSuffix(b, name) || baseName(path) || "Untitled",
       kind: kind.replace(/^\./, "").toUpperCase(),
       folder: b.path ? folderOf(path) : "",
-      // Where it is, said as Files says it: the list's line under the title.
-      place: whereIs(b, r, names).said,
+      place: where.said,
+      share: where.share,
+      within: where.folder,
       modified: seconds(r.updated_at) || 0,
       preview: r.preview || "",
     };
@@ -359,11 +371,14 @@ export function listView(b, data, key, openId = "") {
   const all = !key;
   const folder = key === TOP ? "" : key;
   const title = all ? `All ${b.label}` : (folder ? baseName(folder) : b.label);
-  const scope = all ? data.pages.slice().sort(byNewest)
-    : data.pages.filter((p) => p.folder === folder).sort(byNewest);
-  const subfolders = all ? [] : data.folders.filter((f) => f.path && folderOf(f.path) === folder);
+  const scopeOf = (d) => (all ? d.pages.slice() : d.pages.filter((p) => p.folder === folder)).sort(byNewest);
+  const subfoldersOf = (d) => (all ? [] : d.folders.filter((f) => f.path && folderOf(f.path) === folder));
+  let scope = scopeOf(data);
+  let subfolders = subfoldersOf(data);
 
-  const row = (p) => `<a class="row${p.id === openId ? " current" : ""}" href="${pageHash(b, p.id)}">
+  // Every row says which record it is, and has the ring Select fills.
+  const check = `<span class="check" aria-hidden="true">${icons.tick}</span>`;
+  const row = (p) => `<a class="row${p.id === openId ? " current" : ""}" data-id="${esc(p.id)}" href="${pageHash(b, p.id)}">${check}
       <span class="main"><span class="title-line"><span class="title">${esc(p.title)}</span>` +
       (p.kind ? `<span class="kind">${esc(p.kind)}</span>` : "") +
       `</span>
@@ -402,27 +417,140 @@ export function listView(b, data, key, openId = "") {
     listing.innerHTML = (folderRows ? `<div class="group">${folderRows}</div>` : "") + groups;
   };
 
+  // Several at once: Select beside the pen, then Move to or Delete, as Files has it.
+  const select = b.writes ? `<button class="choose" aria-pressed="false" hidden>Select</button>` : "";
+  const bar = !b.writes ? "" : `<div class="choose-bar" hidden>
+        <span class="count"></span>
+        <button type="button" class="all">All</button>
+        ${hasFolders ? `<button type="button" data-bulk="move" disabled>Move to…</button>` : ""}
+        <button type="button" class="danger" data-bulk="delete" disabled>Delete</button>
+      </div>`;
+
   return {
     title,
     backTo: hasFolders ? listHash(b, FOLDERS) : undefined,
     backLabel: "Folders",
-    html: `${heading(title, compose)}
+    html: `${heading(title, select + compose)}
       <div class="search">${icons.search}<input type="search" placeholder="Search" autocapitalize="none" autocorrect="off"></div>
+      ${bar}
       <div class="install-slot">${installCard()}</div>
       <div class="listing"></div>`,
     wire(root) {
       const listing = root.querySelector(".listing");
       const search = root.querySelector("input[type=search]");
-      show(listing, scope, subfolders);
+      const selectEl = root.querySelector(".heading .choose");
+      const barEl = root.querySelector(".choose-bar");
+      const mainEl = root.closest("main") || root;
+
+      // -- several at once ----------------------------------------------------------
+      // Select, or Shift or Ctrl with a click, picks; Shift from the last one
+      // picked takes the run between. Picked, a click picks rather than opens.
+      const picked = new Set();
+      let selecting = false;
+      let anchorId = null;
+      const byId = (id) => scope.find((p) => p.id === id);
+      const shownIds = () => [...listing.querySelectorAll(".row[data-id]")].map((el) => el.dataset.id);
+      const showSelection = () => {
+        if (!selectEl) return;
+        for (const id of [...picked]) if (!byId(id)) picked.delete(id);
+        mainEl.classList.toggle("selecting", selecting);
+        selectEl.hidden = !scope.length && !selecting;
+        selectEl.textContent = selecting ? "Done" : "Select";
+        selectEl.setAttribute("aria-pressed", String(selecting));
+        barEl.hidden = !selecting;
+        barEl.querySelector(".count").textContent = `${picked.size} selected`;
+        for (const button of barEl.querySelectorAll("[data-bulk]")) button.disabled = !picked.size;
+        for (const el of listing.querySelectorAll(".row[data-id]")) el.classList.toggle("picked", picked.has(el.dataset.id));
+      };
+      const setSelecting = (on) => {
+        selecting = on;
+        if (!on) { picked.clear(); anchorId = null; }
+        showSelection();
+      };
+      const draw = (items, subs, opts) => { show(listing, items, subs, opts); showSelection(); };
+      listing.addEventListener("click", (event) => {
+        const item = event.target.closest(".row[data-id]");
+        if (!item || !selectEl || !(selecting || event.ctrlKey || event.metaKey || event.shiftKey)) return;
+        event.preventDefault();
+        const id = item.dataset.id;
+        if (event.shiftKey && anchorId && byId(anchorId)) {
+          const ids = shownIds();
+          const [from, to] = [ids.indexOf(anchorId), ids.indexOf(id)].sort((p, q) => p - q);
+          for (const one of ids.slice(from, to + 1)) picked.add(one);
+        } else if (picked.has(id)) picked.delete(id);
+        else picked.add(id);
+        anchorId = id;
+        selecting = true;
+        showSelection();
+      });
+
+      // -- the list drawn again, after something on it changed ------------------------
+      // The page open beside it, when it is what changed, is gone or at a
+      // new address: the screen goes there instead.
+      const refresh = async () => {
+        try { data = await load(b); } catch (err) { toast(err.message); return; }
+        scope = scopeOf(data);
+        subfolders = subfoldersOf(data);
+        if (search.value.trim()) search.dispatchEvent(new Event("input"));
+        else draw(scope, subfolders);
+      };
+      const after = async (done) => {
+        if (done.said) toast(done.said);
+        if (openId && done.ids.includes(openId)) {
+          const now = done.now[openId];
+          replace(now ? pageHash(b, now) : listHash(b, key));
+          return renderRoute();
+        }
+        await refresh();
+      };
+
+      // -- the menu on a row, and the bar over several ---------------------------------
+      const files = filesScreen();
+      const act = async (p, what) => {
+        const done = await change(b, p, what, files);
+        if (done) await after(done);
+      };
+      contextMenus(listing, ".row[data-id]", (el) => {
+        const p = byId(el.dataset.id);
+        if (!p) return null;
+        const open = [{ label: "Open", run: () => go(pageHash(b, p.id)) }];
+        const inFiles = p.share ? folderInFiles(p.share, p.within) : "";
+        const where = inFiles ? [{ label: "Open folder in Files", run: () => go(inFiles) }] : [];
+        if (!b.writes) return [...open, ...where];
+        return [...open, { sep: true },
+          { label: "Rename…", run: () => act(p, "rename") },
+          { label: "Duplicate", run: () => act(p, "duplicate") },
+          ...(hasFolders ? [{ label: "Move to…", run: () => act(p, "move") }] : []),
+          ...where,
+          { sep: true },
+          { label: "Delete", tone: "danger", run: () => act(p, "delete") }];
+      });
+      if (selectEl) {
+        selectEl.addEventListener("click", () => setSelecting(!selecting));
+        barEl.querySelector(".all").addEventListener("click", () => {
+          for (const id of shownIds()) picked.add(id);
+          showSelection();
+        });
+        barEl.addEventListener("click", async (event) => {
+          const button = event.target.closest("[data-bulk]");
+          if (!button) return;
+          const done = await changeMany(b, scope.filter((p) => picked.has(p.id)), button.dataset.bulk, files);
+          if (!done) return;
+          setSelecting(false);
+          await after(done);
+        });
+      }
+
+      draw(scope, subfolders);
       let timer = null;
       let latest = 0;
       search.addEventListener("input", () => {
         const query = search.value.trim();
         clearTimeout(timer);
-        if (!query) { show(listing, scope, subfolders); return; }
+        if (!query) { draw(scope, subfolders); return; }
         const needle = query.toLowerCase();
         const local = scope.filter((p) => p.title.toLowerCase().includes(needle));
-        show(listing, local, [], { searching: true });
+        draw(local, [], { searching: true });
         if (!b.search) return;
         const request = ++latest;
         timer = setTimeout(async () => {
@@ -436,11 +564,85 @@ export function listView(b, data, key, openId = "") {
             if (!page || hits.has(page.id)) continue;
             hits.set(page.id, hit.preview ? { ...page, preview: hit.preview.replace(/^#+\s*/, "") } : page);
           }
-          show(listing, [...hits.values()].sort(byNewest), [], { searching: true });
+          draw([...hits.values()].sort(byNewest), [], { searching: true });
         }, SEARCH_DELAY);
       });
     },
   };
+}
+
+// -- what the menu on a row, and the bar over several, do ----------------------------
+const trashOf = (files) => (files && files.screen.trash ? [files.screen.trash] : []);
+const placeSaid = (to) => (to.folder ? baseName(to.folder) : to.label);
+// A file keeps the suffix it has — an Excel sheet stays one — else it gets the screen's.
+const suffixOf = (b, p) => p.name.slice(withoutSuffix(b, p.name).length) || b.suffix;
+
+/** What was done to one page from its row: `{ said, ids, now }` — the words
+    for it, the ids it touched, and for one at a new address (renamed or
+    moved, which for a record kept by its path is a new id) the new id by
+    the old — or null when nothing happened. A move is the record's path,
+    the folder picked from the share it is in. */
+async function change(b, p, what, files) {
+  try {
+    if (what === "rename") {
+      const stem = fileStem(await askText(`Rename the ${b.noun}`, p.title) || "");
+      if (!stem || stem === p.title) return null;
+      const renamed = await api("PATCH", recordsUrl(b.model.id, p.id), { fields: { [b.title]: stem + suffixOf(b, p) } });
+      return { said: "", ids: [p.id], now: { [p.id]: renamed.id } };
+    }
+    if (what === "duplicate") {
+      const made = await api("POST", recordsUrl(b.model.id, p.id) + "/copy", { fields: {} });
+      return { said: `Made ${withoutSuffix(b, String(made.fields[b.title] || ""))}`, ids: [], now: {} };
+    }
+    if (what === "move") {
+      const to = await pickFolder({
+        title: `Move “${p.title}” to`, model: b.model.id, within: p.share, start: p.within, button: "Move here", not: trashOf(files),
+      });
+      if (!to || to.folder === p.within) return null;
+      const moved = await api("PATCH", recordsUrl(b.model.id, p.id), { fields: { [b.path]: joinPath(to.folder, p.name) } });
+      return { said: `Moved ${p.title} to ${placeSaid(to)}`, ids: [p.id], now: { [p.id]: moved.id } };
+    }
+    if (what === "delete") {
+      if (!await ask(`Delete “${p.title}”?`)) return null;
+      await api("DELETE", recordsUrl(b.model.id, p.id));
+      return { said: `Deleted ${p.title}`, ids: [p.id], now: {} };
+    }
+  } catch (err) {
+    toast(err.message);
+  }
+  return null;
+}
+
+/** The same to several at once — one question, one folder picked. */
+async function changeMany(b, pages, what, files) {
+  const n = pages.length;
+  if (!n) return null;
+  const them = n === 1 ? `“${pages[0].title}”` : `${n} ${b.noun}s`;
+  try {
+    if (what === "delete") {
+      if (!await ask(`Delete ${them}?`)) return null;
+      for (const p of pages) await api("DELETE", recordsUrl(b.model.id, p.id));
+      return { said: `Deleted ${them}`, ids: pages.map((p) => p.id), now: {} };
+    }
+    if (what === "move") {
+      const to = await pickFolder({
+        title: `Move ${them} to`, model: b.model.id, within: pages[0].share, start: pages[0].within, button: "Move here", not: trashOf(files),
+      });
+      if (!to) return null;
+      const moving = pages.filter((p) => p.within !== to.folder);
+      if (!moving.length) return null;
+      const now = {};
+      for (const p of moving) {
+        const moved = await api("PATCH", recordsUrl(b.model.id, p.id), { fields: { [b.path]: joinPath(to.folder, p.name) } });
+        now[p.id] = moved.id;
+      }
+      const what_ = moving.length === 1 ? moving[0].title : `${moving.length} ${b.noun}s`;
+      return { said: `Moved ${what_} to ${placeSaid(to)}`, ids: moving.map((p) => p.id), now };
+    }
+  } catch (err) {
+    toast(err.message);
+  }
+  return null;
 }
 
 async function newFolder(b, parent) {

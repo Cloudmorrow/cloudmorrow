@@ -119,7 +119,6 @@
    Trash Empty, in the colour of what cannot be undone. */
 .heading .more, .heading .bin, .heading .find { color: var(--accent); }
 .heading .find svg { width: 20px; height: 20px; }
-.heading .choose { font-weight: 600; }
 /* The search field, open: it takes the room beside the title, and on a
    phone the title's too. Its hits say where they are, in the date's place. */
 .heading .find-input {
@@ -145,58 +144,9 @@ main.finding .heading .actions { flex: 1; min-width: 0; }
 .heading .empty-trash { color: var(--bad); gap: 6px; }
 
 /* -- several at once ------------------------------------------------------- */
-/* Selecting: a ring before every row and on every tile, filled on the ones
-   picked; the bar under the sort says how many, and what can be done. */
-.listing .check {
-  flex: none;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--muted);
-  border-radius: 50%;
-  color: var(--fill-ink);
-}
-.listing .check svg { visibility: hidden; }
-main.selecting .listing .check { display: inline-flex; }
-.listing .picked .check { border-color: var(--accent); background: var(--accent); }
-.listing .picked .check svg { visibility: visible; }
-.listing .row.picked { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+/* Selecting is the kit's (kit.css); a tile carries its ring in a corner. */
 .tile .check { position: absolute; top: 6px; left: 6px; z-index: 1; background: var(--card); }
 .tile.picked .thumb { outline: 2px solid var(--accent); outline-offset: -2px; }
-.choose-bar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin: -6px 0 14px;
-  padding: 2px 6px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow-x: auto;
-}
-.choose-bar .count {
-  flex: 1;
-  padding: 0 8px;
-  font-family: var(--display);
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.choose-bar button {
-  flex: none;
-  min-height: 36px;
-  padding: 0 10px;
-  color: var(--accent);
-  font-weight: 600;
-  font-size: 14px;
-  white-space: nowrap;
-}
-.choose-bar button.danger { color: var(--bad); }
-.choose-bar button:disabled { color: var(--muted); }
 
 /* A long press on a phone is the menu, not the browser's own. */
 .listing a { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
