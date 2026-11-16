@@ -28,6 +28,11 @@
 </p>
 
 <p align="center">
+  <a href="docs/images/quill-build.mp4"><img src="docs/images/quill-build.gif" width="100%" alt="Forty-five seconds: in a terminal an assistant writes a Quill called Plants, a plant-watering list; cm quill check passes it and cm quill install puts it on the cloud; a phone beside it shows the Plants tab appear and two plants added through the real app"></a>
+</p>
+<p align="center"><sub>An assistant writes a Quill, <code>cm quill install</code> puts it in the cloud, and the phone shows it. Nobody wrote a screen. (The terminal is replayed; the phone is the real app.)</sub></p>
+
+<p align="center">
   <img src="docs/images/desktop-tasks.webp" width="49%" alt="The Tasks Quill in a desktop browser: three lanes, To Do, Doing and Done, beside a sidebar listing every Quill">
   <img src="docs/images/tui-tasks.webp" width="49%" alt="The same Tasks board in the terminal app: three columns, the Quills in a sidebar, and a log along the bottom">
 </p>
