@@ -5,10 +5,11 @@ when it becomes visible, and it never has to care which of the two happened —
 `reload()` is the only entry point.
 
 Every pane that stands on its own starts the same way: a header line — its
-name in Sky, a few soft words about it, and on the right, faint, what it
-counts and when it last heard from the server — then its row of buttons, of
-which at most one is the amber primary action. A pane nested inside another
-(the Files pane's own views) leaves the header to its parent.
+name in Sky, a few soft words about it (or, where the pane walks a tree, the
+path to where you stand, each step a link back), and on the right, faint,
+what it counts and when it last heard from the server — then its row of
+buttons, of which at most one is the amber primary action. A pane nested
+inside another (the Files pane's own views) leaves the header to its parent.
 """
 
 from __future__ import annotations
@@ -24,6 +25,16 @@ from cloudmorrow.tui.theme import FAINT, MUTED, SKY
 from cloudmorrow.tui.widgets.toolbar import Action, Toolbar
 
 
+class HeadName(Static):
+    """The left of the header line. A link in it (`@click=jump(n)`) is a step
+    of the pane's path: the click lands here, and the pane is told which."""
+
+    def action_jump(self, index: int) -> None:
+        pane = next((node for node in self.ancestors if isinstance(node, Pane)), None)
+        if pane is not None:
+            pane.head_jump(int(index))
+
+
 class Pane(Vertical):
     """One tab's worth of workspace."""
 
@@ -37,6 +48,9 @@ class Pane(Vertical):
     SUMMARY = ""
     # Whether this pane draws the header line. Off for panes inside panes.
     HEAD = True
+    # When the line is short of room: whether the left (a path you steer by)
+    # is kept whole and the right gives first, or the left (a summary) gives.
+    HEAD_LEFT_FIRST = False
     # Buttons across the top; each one fires `act_<id>`.
     ACTIONS: tuple[Action, ...] = ()
 
@@ -48,7 +62,7 @@ class Pane(Vertical):
     def compose(self) -> ComposeResult:
         if self.HEAD:
             with Horizontal(classes="pane-head"):
-                yield Static(self._head_left(), classes="pane-name")
+                yield HeadName(self._head_left(), classes="pane-name")
                 yield Static("", classes="pane-read")
         if self.ACTIONS:
             yield Toolbar(list(self.ACTIONS), id=f"{self.id}-toolbar")
@@ -77,6 +91,9 @@ class Pane(Vertical):
             text.append(f"  {summary}", style=MUTED)
         return text
 
+    def head_jump(self, index: int) -> None:
+        """A step of the path in the header was clicked. Panes with a path go there."""
+
     def refresh_head(self) -> None:
         """Redraw the header line: the note or counts on the right, then fit the left."""
         if not self.HEAD:
@@ -96,14 +113,23 @@ class Pane(Vertical):
             parts.append(Text.from_markup(detail))
         if self.read_at is not None:
             parts.append(Text(f"read {self.read_at.strftime('%H:%M:%S')}", style=FAINT))
+        width = head.size.width
+        text = self._join(parts)
+        if width and self.HEAD_LEFT_FIRST and len(parts) > 1:
+            # The faint "read at" goes before the path loses a step.
+            if self._head_left().cell_len + text.cell_len + 2 > width:
+                text = self._join(parts[:-1])
+        right.update(text)
+        left.update(self._head_left(width - text.cell_len - 2 if width else None))
+
+    @staticmethod
+    def _join(parts: list[Text]) -> Text:
         text = Text(no_wrap=True)
         for index, part in enumerate(parts):
             if index:
                 text.append("  ·  ", style=FAINT)
             text.append_text(part)
-        right.update(text)
-        width = head.size.width
-        left.update(self._head_left(width - text.cell_len - 2 if width else None))
+        return text
 
     def on_resize(self, _event) -> None:
         self.refresh_head()
