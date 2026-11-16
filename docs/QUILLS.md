@@ -175,7 +175,8 @@ draws — a row, a card, a tile — opens the record's sheet, and has a menu
 (a right-click on a computer, a finger held on it on a phone) with Open
 and the actions on its datamodel, from whichever Quill declares them; a
 Quill declares the actions, never the menu
-([QUILLCODE.md](QUILLCODE.md), *Actions, on every surface*). The kit, and
+([QUILLCODE.md](QUILLCODE.md), *Actions, on every surface*). Every element
+is pictured, on a phone and in a browser, in [KIT.md](KIT.md). The kit, and
 what each element needs:
 
 | kit | binds | on the phone | on the full web app | in the terminal | on the command line |

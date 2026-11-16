@@ -29,6 +29,9 @@ surface. Reach for a **view** only when no kit element says it.
 | editing video: clips on video and audio tracks, cut, moved, blurred, exported | `kit = "timeline"` (docs/TIMELINE.md in the Cloudmorrow repository) |
 | a summary, a dashboard, numbers, a mix of the above, a record's own page | a **view** |
 
+Every element and the primitives that draw records are pictured, on a phone
+and in a browser, in docs/KIT.md in the Cloudmorrow repository.
+
 The kit's bindings are in CLAUDE.md ("The kit"). Every kit screen already
 opens a record sheet, with every field editable and every action on that
 datamodel as a button.

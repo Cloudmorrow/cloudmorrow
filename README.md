@@ -108,6 +108,8 @@ server, so a change to the terminal app needs no deploy to try.
   kit of screens, the rules it keeps, and the catalog.
 - [docs/QUILLCODE.md](docs/QUILLCODE.md): a Quill that runs code: views,
   actions, services, runtimes, the sandbox.
+- [docs/KIT.md](docs/KIT.md): every kit element and view primitive,
+  pictured on a phone and in a browser.
 - [docs/TIMELINE.md](docs/TIMELINE.md): the timeline kit, a video editor.
 - [docs/CELLS.md](docs/CELLS.md): the sheet kit, a spreadsheet of cells and
   formulas on every surface.
