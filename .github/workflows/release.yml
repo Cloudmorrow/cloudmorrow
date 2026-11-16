@@ -70,8 +70,11 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.whl dist/install.sh --clobber
           else
+            # The title is the tag's subject, so the list of releases reads
+            # as what changed; the notes are the pull requests since the
+            # last tag, which GitHub writes.
             gh release create "$TAG" dist/*.whl dist/install.sh \
-              --title "$TAG" \
-              --notes "$(git tag -l --format='%(contents)' "$TAG")" \
+              --title "$(git tag -l --format='%(contents:subject)' "$TAG")" \
+              --generate-notes \
               --verify-tag
           fi
