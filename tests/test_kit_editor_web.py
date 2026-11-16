@@ -18,6 +18,8 @@ EDITOR_CSS = (WEB / "kit_editor.css").read_text(encoding="utf-8")
 KIT_JS = (WEB / "kit.js").read_text(encoding="utf-8")
 PICTURES_JS = (WEB / "pictures.js").read_text(encoding="utf-8")
 APP_CSS = (WEB / "app.css").read_text(encoding="utf-8")
+KIT_CSS = (WEB / "kit.css").read_text(encoding="utf-8")
+GRID_CSS = (WEB / "kit_grid.css").read_text(encoding="utf-8")
 
 
 def test_the_editor_is_its_own_file_drawn_from_the_kit(client):
@@ -136,3 +138,37 @@ def test_the_record_calls_it_makes_exist(notes_quill, auth):
         f"/api/records/file/{renamed['id']}", headers=auth, json={"fields": {"text": "y"}, "rev": renamed["rev"]}
     )
     assert stale.status_code == 409 and stale.json()["detail"]["current"]["fields"]["text"] == "x"
+
+
+def test_every_row_has_a_menu_and_several_are_picked_at_once():
+    """A right-click or a long press on a row of the list (actions.js's menu):
+    Open, Rename, Duplicate, Move to, Open folder in Files, Delete — fewer
+    where less may be done. Select beside the pen, or Shift or Ctrl with a
+    click, picks several to move or delete at once. The kits over files draw
+    the same list (kit_docs.js, kit_cells.js), so they have it too."""
+    code = js_code(EDITOR_JS)
+    assert 'import { choose, contextMenus, filesScreen, folderInFiles } from "./actions.js";' in code
+    assert 'import { pickFolder } from "./filepick.js";' in code
+    listing = code[code.index("export function listView(") : code.index("async function change(")]
+    for label in ('"Open"', '"Rename…"', '"Duplicate"', '"Move to…"', '"Open folder in Files"', '"Delete"'):
+        assert f"label: {label}" in listing, label
+    assert 'contextMenus(listing, ".row[data-id]", (el) => {' in listing
+    # Reading alone, a row opens and says where it is, and nothing more.
+    assert "if (!b.writes) return [...open, ...where];" in listing
+    assert '<button class="choose" aria-pressed="false" hidden>Select</button>' in listing
+    assert 'data-bulk="move"' in listing and 'data-bulk="delete"' in listing
+    picks = "if (!item || !selectEl || !(selecting || event.ctrlKey || event.metaKey || event.shiftKey)) return;"
+    assert picks in listing
+    assert "for (const one of ids.slice(from, to + 1)) picked.add(one);" in listing
+    # The page open beside the list goes where it went, or away when it is gone.
+    assert "replace(now ? pageHash(b, now) : listHash(b, key));" in listing
+    # A duplicate is the record API's copy with nothing said; a move is the
+    # path, in the share the file is in; a file keeps the suffix it has.
+    change = code[code.index("async function change(") : code.index("async function changeMany(")]
+    assert '+ "/copy", { fields: {} }' in change
+    assert "{ fields: { [b.path]: joinPath(to.folder, p.name) } }" in change
+    assert "within: p.share, start: p.within" in change
+    assert "stem + suffixOf(b, p)" in change
+    # Selecting looks the same as in Files: one recipe, the kit's.
+    assert ".choose-bar {" in KIT_CSS and "main.selecting .listing .check" in KIT_CSS
+    assert ".choose-bar {" not in GRID_CSS and ".listing .check {" not in GRID_CSS

@@ -299,3 +299,58 @@
 .sheet-preview[aria-busy="true"] { aspect-ratio: 16 / 9; }
 .sheet-preview img, .sheet-preview video { display: block; width: 100%; max-height: 70dvh; object-fit: contain; background: var(--bg); }
 .sheet-preview img { cursor: zoom-in; }
+
+/* -- several at once ------------------------------------------------------- */
+/* Select beside a listing's title, then what can be done to what is picked:
+   a ring before every row, filled on the ones picked, and a bar over the
+   rows that says how many and offers the actions. Files and the list
+   beside a page draw it alike; nothing here is named for either. */
+.heading .choose { font-weight: 600; }
+.listing .check {
+  flex: none;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--muted);
+  border-radius: 50%;
+  color: var(--fill-ink);
+}
+.listing .check svg { visibility: hidden; }
+main.selecting .listing .check { display: inline-flex; }
+.listing .picked .check { border-color: var(--accent); background: var(--accent); }
+.listing .picked .check svg { visibility: visible; }
+.listing .row.picked { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.choose-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: -6px 0 14px;
+  padding: 2px 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+.choose-bar .count {
+  flex: 1;
+  padding: 0 8px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.choose-bar button {
+  flex: none;
+  min-height: 36px;
+  padding: 0 10px;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.choose-bar button.danger { color: var(--bad); }
+.choose-bar button:disabled { color: var(--muted); }

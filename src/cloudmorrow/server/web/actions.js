@@ -43,14 +43,21 @@ const quillById = (id) => quills.find((q) => q.id === id);
  * address) — or "" when nothing here shows files.
  */
 export function folderInFiles(share, folder = "") {
+  const files = filesScreen();
+  if (!files) return "";
+  return `#/q/${encodeURIComponent(files.quill.id)}/${encodeURIComponent(files.screen.id)}/${encodeURIComponent(share)}`
+    + (folder ? "/" + encodePath(folder) : "");
+}
+
+/** The screen that is Files — the first installed grid screen that groups
+    files by share, whichever Quill it is in — as `{quill, screen}`, or null. */
+export function filesScreen() {
   for (const quill of quills) {
     for (const screen of quill.screens || []) {
-      if (screen.kit !== "grid" || screen.group !== "share") continue;
-      return `#/q/${encodeURIComponent(quill.id)}/${encodeURIComponent(screen.id)}/${encodeURIComponent(share)}`
-        + (folder ? "/" + encodePath(folder) : "");
+      if (screen.kit === "grid" && screen.group === "share") return { quill, screen };
     }
   }
-  return "";
+  return null;
 }
 
 /** The screen's `suffix`: one, or a list; what files it is over. */

@@ -38,7 +38,7 @@ def test_every_row_has_the_path_under_its_title():
     line, the words isolated so the start is what the browser cuts."""
     editor_row = EDITOR_JS.split("const row = (p) =>", 1)[1].split("</a>`", 1)[0]
     assert '<span class="path"><bdi>${esc(p.place)}</bdi></span>' in editor_row
-    assert "place: whereIs(b, r, names).said" in EDITOR_JS
+    assert "const where = whereIs(b, r, names);" in EDITOR_JS and "place: where.said," in EDITOR_JS
     # The folder chip the All list had is gone: the path says it, on every list.
     assert 'class="where"' not in editor_row and "folderSmall" not in editor_row
     # The sheet's rows are the editor's.
@@ -70,14 +70,16 @@ def test_an_open_page_says_where_its_file_is_whole():
 def test_the_whole_path_is_a_way_to_its_folder_in_files():
     """A link to the folder in the first installed screen that shows files by
     share — the grid's own address — and plain words when nothing here does."""
-    assert 'import { choose, folderInFiles } from "./actions.js";' in EDITOR_JS
+    assert 'import { choose, contextMenus, filesScreen, folderInFiles } from "./actions.js";' in EDITOR_JS
     link = EDITOR_JS.split("const placeLink = (where) =>", 1)[1].split("\n};", 1)[0]
     assert 'where.share ? folderInFiles(where.share, where.folder) : ""' in link
     assert 'title="Open the folder in Files"' in link
     found = ACTIONS_JS.split("export function folderInFiles", 1)[1].split("\n}", 1)[0]
-    assert 'screen.kit !== "grid" || screen.group !== "share"' in found
-    assert "`#/q/${encodeURIComponent(quill.id)}/${encodeURIComponent(screen.id)}/" in found
+    assert "const files = filesScreen();" in found
+    assert "`#/q/${encodeURIComponent(files.quill.id)}/${encodeURIComponent(files.screen.id)}/" in found
     assert "${encodeURIComponent(share)}`" in found
     assert '(folder ? "/" + encodePath(folder) : "")' in found
+    files = ACTIONS_JS.split("export function filesScreen", 1)[1].split("\n}", 1)[0]
+    assert 'if (screen.kit === "grid" && screen.group === "share") return { quill, screen };' in files
     grid = (WEB / "kit_grid.js").read_text(encoding="utf-8")
     assert '`${at.base}/${encodeURIComponent(group)}` + (folder ? "/" + encodePath(folder) : "")' in grid
