@@ -301,7 +301,7 @@ Quill adds a button to another's records.
 
 `GET /api/quills/<quill>/views/<screen>?record=…&<params>` answers `{tree}`.
 The primitives are `cloudmorrow.quill.ui`, and every surface draws every
-one:
+one; [KIT.md](KIT.md) shows what the ones that draw records look like:
 
 | primitive | what it is |
 | --- | --- |
