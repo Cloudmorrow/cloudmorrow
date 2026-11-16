@@ -1,0 +1,44 @@
+name: Bug
+description: Something does not work the way the docs or the screen say it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. The version and the surface are the two things that make a bug findable; everything else can be short.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "`cm --version` on a computer, or the `version` from `https://<your cloud>/api/health`."
+      placeholder: "v0.93.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      multiple: true
+      options:
+        - Phone web app
+        - Browser on a computer
+        - Terminal app (cloudmorrow)
+        - Command line (cm)
+        - Server / installer
+        - Agent / desktop app
+        - Assistant (MCP)
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you saw. A screenshot or the log line helps.
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Server
+      description: "Operating system and database, if you know them."
+      placeholder: "Raspberry Pi OS 12, SQLite, installed with install-server.sh"

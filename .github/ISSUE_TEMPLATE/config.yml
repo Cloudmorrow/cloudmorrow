@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or idea
+    url: https://github.com/Cloudmorrow/cloudmorrow/discussions
+    about: Not sure it is a bug, want to show a Quill, or want to talk something through? Discussions.
+  - name: Security report
+    url: https://github.com/Cloudmorrow/cloudmorrow/security/advisories/new
+    about: A vulnerability goes through the private report form, never a public issue.

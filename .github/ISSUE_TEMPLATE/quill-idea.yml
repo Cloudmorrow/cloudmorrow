@@ -1,0 +1,34 @@
+name: Quill idea
+description: An app you wish existed, or one you are about to build and want to talk through first.
+labels: [quill]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A Quill is a small app with no UI code of its own. If you want to build it, [quill-template](https://github.com/Cloudmorrow/quill-template) and [docs/QUILLS.md](https://github.com/Cloudmorrow/cloudmorrow/blob/main/docs/QUILLS.md) are the starting points, and this issue is a fine place to ask questions on the way.
+  - type: input
+    id: name
+    attributes:
+      label: What it is, in one line
+      placeholder: "A plant-watering tracker for the household"
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: What data it keeps
+      description: "Which of the shared datamodels it would use (task, contact, event, file, ...) and what, if anything, it needs of its own."
+  - type: textarea
+    id: screens
+    attributes:
+      label: What its screens show
+      description: "A list, a board, a calendar, a form? Where it should appear on the phone and in the terminal."
+  - type: dropdown
+    id: who
+    attributes:
+      label: Who builds it
+      options:
+        - I will, and I may need a hand
+        - Anybody; I am describing something I would use
+    validations:
+      required: true

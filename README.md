@@ -133,9 +133,14 @@ server, so a change to the terminal app needs no deploy to try.
 
 ## Contributing
 
-Issues and pull requests are welcome. Run `pytest` and `ruff check src tests`
-before you push. If you add something that stores what a person wrote, seal
-it; the last section of [docs/ENCRYPTION.md](docs/ENCRYPTION.md) says how.
+Cloudmorrow is built by one person in Denmark, in the open, with a release
+most days. The fastest ways to help are to install it on a machine you have
+and report what happened, to write a Quill, or to fix a sentence that made
+you stop. [CONTRIBUTING.md](CONTRIBUTING.md) has the details, the test
+commands and the rules a pull request keeps. Questions and finished Quills go
+to [Discussions](https://github.com/Cloudmorrow/cloudmorrow/discussions);
+a vulnerability goes through the [private report
+form](SECURITY.md), never a public issue.
 
 A release is a git tag on main (`vX.Y.Z`), and the only version number there
 is. `make deploy` shows what is released and live and offers to release or
