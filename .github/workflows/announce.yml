@@ -1,0 +1,44 @@
+# When a release is published, say so where people read: Mastodon and
+# Bluesky, by scripts/announce.py. Each place needs its key as a repository
+# secret (the script's docstring names them); a place with no key is
+# skipped. So until the accounts exist this run does nothing but print the
+# post it would have sent, and the day the secrets are added every release
+# from then on is announced with nobody at a keyboard.
+name: Announce
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The release to announce again (v0.94.0)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: The release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "URL=$(gh release view "$TAG" --json url --jq .url)" >> "$GITHUB_ENV"
+          echo "SUBJECT=$(gh release view "$TAG" --json name --jq .name)" >> "$GITHUB_ENV"
+      - name: Post it
+        env:
+          MASTODON_URL: ${{ secrets.MASTODON_URL }}
+          MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
+        run: python scripts/announce.py "$TAG" "$SUBJECT" "$URL"
