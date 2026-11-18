@@ -98,6 +98,8 @@ tone = "primary"                      # neutral, primary, danger
 assistant = true                      # false: not an assistant's tool
 # timeout = "2m"                      # how long it has, up to 5m, for one that waits on something
                                       # outside — an answer from a model; left out, fifteen seconds
+# busy = "Importing calendar"         # said on its button, beside a spinner, while it runs: for one
+                                      # that takes a while; left out, the button spins and keeps its words
 # admin = true                        # an administrator's alone, like a screen marked admin: pressed
                                       # from the Quill's settings on its sheet under Administration,
                                       # on no bar or palette, and refused to anybody else

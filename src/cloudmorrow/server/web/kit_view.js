@@ -30,7 +30,7 @@ import {
 } from "./kit_calendar.js";
 import {
   choose, contextMenus, findAction, formFields, hideFromBar, linksFor, onRedrawHere, peopleList, press,
-  readFields, recordChoices, run, runStream, said, screenAt, wireFields,
+  readFields, recordChoices, run, runStream, said, screenAt, wireFields, working,
 } from "./actions.js";
 import { ask } from "./dialog.js";
 import { fileName, kindOf } from "./kit_grid.js";
@@ -559,14 +559,13 @@ function wireForms(v) {
       const { fields, problem } = readFields(form, action.fields);
       if (problem) { showError(problem); return; }
       if (action.confirm && !(await ask(action.confirm, { yes: action.label, tone: action.tone }))) return;
-      const submit = form.querySelector("[type=submit]");
-      submit.disabled = true;
+      const rest = working(form.querySelector("[type=submit]"), action);
       showError("");
       await run(v.at.quill, action, {
         record: n.record ? n.record.id : "", fields: { ...(n.values || {}), ...fields },
         here: v.at, after: v.draw, showError,
       });
-      if (submit.isConnected) submit.disabled = false;
+      rest();
     });
   }
 }

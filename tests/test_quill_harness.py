@@ -114,6 +114,10 @@ def test_fetch_is_answered_by_the_test_and_bound_by_the_manifest(tmp_path):
     with Harness(folder, datamodels=DATAMODELS) as q:
         q.fetch.add("https://api.example.com/today", json={"sky": "blue"})
         assert q.act("look", url="https://api.example.com/today").toast == "blue"
+        # What was asked for is on record, the wait with it: a Quill reading a
+        # slow feed says a long `timeout`, and its test can see that it did.
+        assert q.fetch.sent[-1]["url"] == "https://api.example.com/today"
+        assert q.fetch.sent[-1]["timeout"] == 20.0
         assert q.act("look", url="https://elsewhere.example.org/").refused
 
 

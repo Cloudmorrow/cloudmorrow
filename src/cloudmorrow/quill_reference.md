@@ -120,6 +120,7 @@ label = "Log a service"
 on = "vehicle"                     # optional: done to one record; the handler gets it first
 confirm = "Log it?"                # optional; tone = "primary" | "danger"; assistant = false
 # timeout = "2m"                   # up to 5m, for one that waits on something outside; else 15s
+# busy = "Importing…"                # said on its button, beside a spinner, while it runs
 # settings = true                  # a person's own setting: pressed from the settings screen alone
 # bar = false                      # not a chip on the bar under the title: a screen's own box runs it
 [actions.fields]                   # its form, checked before the code runs

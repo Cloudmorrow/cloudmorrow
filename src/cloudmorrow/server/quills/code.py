@@ -494,7 +494,7 @@ class HostCalls:
     def op_fetch(self, args: dict) -> dict:
         hostname, method, url, headers, body, timeout = self._fetch_request(args)
         if self.code.fetcher is not None:  # a test harness answers instead of the network
-            return self.code.fetcher(method, url, headers, body or b"")
+            return self.code.fetcher(method, url, headers, body or b"", timeout=timeout)
         opener = urllib.request.build_opener(_Redirects(self.manifest.fetch))
         request = urllib.request.Request(url, data=body, headers=headers, method=method)
         try:
@@ -515,7 +515,7 @@ class HostCalls:
     def op_fetch_open(self, args: dict) -> dict:
         hostname, method, url, headers, body, timeout = self._fetch_request(args)
         if self.code.fetcher is not None:
-            got = self.code.fetcher(method, url, headers, body or b"")
+            got = self.code.fetcher(method, url, headers, body or b"", timeout=timeout)
             reader = io.BytesIO(base64.b64decode(got.get("body") or ""))
             opened = _OpenFetch(hostname, int(got["status"]), dict(got.get("headers") or {}), reader)
         else:

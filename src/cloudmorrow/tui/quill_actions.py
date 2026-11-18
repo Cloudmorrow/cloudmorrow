@@ -30,6 +30,7 @@ The server's own words are used wherever it refuses (`{kind, message}`).
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from functools import partial
 from typing import Any
 
@@ -107,6 +108,23 @@ class ActionFields(FieldRows):
         return out
 
 
+@contextmanager
+def working(button: Button, action: dict) -> Iterator[None]:
+    """The button an action was pressed on, while the action runs: disabled,
+    and saying `busy` ("Importing calendar") when the manifest gives the
+    action one, so a press that takes a while is seen to be working rather
+    than stuck. The web shows the same words with a spinner."""
+    was = button.label
+    button.disabled = True
+    if action.get("busy"):
+        button.label = str(action["busy"])
+    try:
+        yield
+    finally:
+        button.label = was
+        button.disabled = False
+
+
 class ActionModal(Modal[list | None]):
     """An action's form as a dialog: its fields, and a button that runs it.
 
@@ -181,13 +199,14 @@ class ActionModal(Modal[list | None]):
             return
         self.say("")
         try:
-            effects = await press(
-                self.api,
-                str(self.quill["id"]),
-                str(self.action["id"]),
-                record=str((self.record or {}).get("id") or ""),
-                fields=fields,
-            )
+            with working(self.query_one("#action-submit", Button), self.action):
+                effects = await press(
+                    self.api,
+                    str(self.quill["id"]),
+                    str(self.action["id"]),
+                    record=str((self.record or {}).get("id") or ""),
+                    fields=fields,
+                )
         except AuthError:
             self.dismiss(None)
             await self.app.sign_out(message=SESSION_EXPIRED)

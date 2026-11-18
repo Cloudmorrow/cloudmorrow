@@ -23,6 +23,27 @@
   text-align: center;
 }
 .act-button:disabled { opacity: .5; cursor: default; }
+/* Busy: the action is running. The button keeps its colour so its words —
+   "Importing calendar" — read, and a spinner turns on it: a ring one dot
+   thick, drawn in eight steps so it turns the way a pixel would. The view's
+   own buttons and chips get the same spinner. */
+.act-button[aria-busy="true"], .act-chip[aria-busy="true"] { opacity: .85; cursor: progress; }
+.act-button[aria-busy="true"]::before, .act-chip[aria-busy="true"]::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: act-spin .8s steps(8) infinite;
+}
+.act-chip[aria-busy="true"]::before { margin-right: 6px; vertical-align: -1px; }
+@keyframes act-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .act-button[aria-busy="true"]::before, .act-chip[aria-busy="true"]::before { animation-duration: 2.4s; }
+}
 /* The one action a view or a form is for. Its states — the edge, the lit
    side under the pointer, the press — are every button's (base.css). */
 .act-button.primary {

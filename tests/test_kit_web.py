@@ -739,6 +739,23 @@ def test_a_views_button_shows_it_is_busy_while_its_action_runs():
     assert '.quill-view .act-button[aria-busy="true"]' in css
 
 
+def test_a_form_button_says_what_the_action_is_doing_while_it_runs():
+    """An action that takes a while — importing a calendar — says so on the
+    button it was pressed on: `busy` from the manifest in place of its words,
+    a spinner before them, and the button disabled until the action is over.
+    Both forms do it: the sheet an action's chip opens, and a view's own."""
+    actions = (WEB / "actions.js").read_text(encoding="utf-8")
+    assert "export function working(button, action)" in actions
+    assert "if (action.busy) button.textContent = action.busy;" in actions
+    assert 'button.setAttribute("aria-busy", "true");' in actions
+    assert 'const rest = working(form.querySelector("[type=submit]"), action);' in actions
+    view = (WEB / "kit_view.js").read_text(encoding="utf-8")
+    assert 'const rest = working(form.querySelector("[type=submit]"), action);' in view
+    css = (WEB / "actions.css").read_text(encoding="utf-8")
+    assert '.act-button[aria-busy="true"]::before, .act-chip[aria-busy="true"]::before {' in css
+    assert "animation: act-spin .8s steps(8) infinite;" in css
+
+
 # -- a Quill's own settings, behind the gear ---------------------------------------
 def test_a_settings_screen_is_behind_a_gear_on_the_title_and_never_under_the_tab():
     """A screen marked settings is the person's own settings for the Quill:

@@ -173,7 +173,7 @@ def parse_code(
         tone = item.get("tone", "neutral")
         if tone not in TONES:
             raise CodeSpecError(f"{where}: {thing} tone is one of {', '.join(TONES)}")
-        for key in ("confirm", "description"):
+        for key in ("confirm", "description", "busy"):
             if key in item and not isinstance(item[key], str):
                 raise CodeSpecError(f"{where}: {thing} {key} is words")
         if not isinstance(item.get("assistant", True), bool):

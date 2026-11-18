@@ -681,6 +681,25 @@ export async function applyEffects(effects, { quill, record = "", here = null, a
   return error;
 }
 
+/** The button an action was pressed on, while the action runs: disabled,
+    marked busy, a spinner on it and — for an action whose manifest says
+    `busy` ("Importing calendar") — those words in place of its own, so a
+    press that takes a while is seen to be working rather than stuck. The
+    function returned puts the button back. */
+export function working(button, action) {
+  if (!button) return () => {};
+  const was = button.textContent;
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  if (action.busy) button.textContent = action.busy;
+  return () => {
+    if (!button.isConnected) return;
+    button.textContent = was;
+    button.removeAttribute("aria-busy");
+    button.disabled = false;
+  };
+}
+
 // A form in a sheet: the action's label on it, its fields, and one button
 // that is the point of it — the sheet's amber, as Done is a sheet's.
 async function openForm(quill, action, { record, args, here, after }) {
@@ -709,13 +728,12 @@ async function openForm(quill, action, { record, args, here, after }) {
     // What the form did not ask for, the button still sends.
     const sent = { ...args, ...fields };
     if (action.confirm && !(await ask(action.confirm, { yes: action.label, tone: action.tone }))) return;
-    const submit = form.querySelector("[type=submit]");
-    submit.disabled = true;
+    const rest = working(form.querySelector("[type=submit]"), action);
     showError("");
     // A refusal or an `error` effect is said under the fields, and the form
     // stays with what was typed in it; anything else closes it.
     const error = await run(quill, action, { record, fields: sent, here, after, showError });
-    submit.disabled = false;
+    rest();
     if (!error) close();
   });
 }
