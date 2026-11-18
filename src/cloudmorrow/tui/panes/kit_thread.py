@@ -46,6 +46,7 @@ from cloudmorrow.tui.screens.modals import ConfirmModal, Modal, PromptModal
 from cloudmorrow.tui.theme import ACCENT, BAD, MUTED, SECOND
 from cloudmorrow.tui.widgets.kit_space import (
     NewSpaceModal,
+    PickPeopleModal,
     PickPersonModal,
     is_between,
     made_as,
@@ -324,11 +325,25 @@ class ThreadPane(KitPane):
             # Leaving is taking yourself out of it, which is writing it too.
             self.refused |= {"new_record", "new_space", "write_to", "add", "leave", "edit_space"}
         noun = str(self.space_model.get("label") or "space").lower()
-        actions = [
-            Action("new_space", f"New {noun}", "n", variant="primary", hint="Everybody's, or the people you pick"),
-        ]
-        if made_as(screen).get("direct"):
-            actions.append(Action("write_to", "Message", "m", hint="Write to one person"))
+        direct = made_as(screen).get("direct")
+        # Made between people and no other way: New is the picker, and nothing is made by name.
+        self.only_between = bool(direct) and not [how for how in made_as(screen) if how != "direct"]
+        if self.only_between:
+            actions = [
+                Action(
+                    "write_to",
+                    "New message",
+                    "n",
+                    variant="primary",
+                    hint="Pick who it is to; the conversation with them opens",
+                ),
+            ]
+        else:
+            actions = [
+                Action("new_space", f"New {noun}", "n", variant="primary", hint="Everybody's, or the people you pick"),
+            ]
+            if direct:
+                actions.append(Action("write_to", "Message", "m", hint="Write to somebody, or to several"))
         actions += [
             Action("reply", "Reply", "r", hint="Answer a line, in its thread"),
             Action("react", "React", "x", hint="An emoji on a line; yours again takes it back"),
@@ -337,6 +352,9 @@ class ThreadPane(KitPane):
             Action("edit_space", "Edit", "e", hint=f"Rename this {noun}, or delete it"),
             Action("leave", "Leave", "l", variant="error"),
         ]
+        if self.only_between:
+            # A conversation between people stays the people it was made between.
+            actions = [a for a in actions if a.id not in ("add", "leave")]
         self.ACTIONS = self.offer(actions)
         self.spaces: list[dict] = []
         self.lines: list[dict] = []
@@ -428,6 +446,12 @@ class ThreadPane(KitPane):
             if "new_space" in self.refused:
                 self.query_one("#conversation-text", Static).update("")
                 self.status(f"No {noun}s here.", note=True)
+                return
+            if self.only_between:
+                self.query_one("#conversation-text", Static).update(
+                    f"[{MUTED}]Press n and pick who it is to: one person, or several.[/]"
+                )
+                self.status(f"No {noun}s yet — press n to write to somebody.", note=True)
                 return
             self.query_one("#conversation-text", Static).update(
                 f"[{MUTED}]New {noun} asks whether everybody is in it or only the people you pick.[/]"
@@ -730,6 +754,9 @@ class ThreadPane(KitPane):
     async def act_new_space(self) -> None:
         if self.api is None:
             return
+        if self.only_between:
+            self.act_write_to()
+            return
         people = await self._people()
         wanted = await self.app.push_screen_wait(NewSpaceModal(self.space_model, people, screen=self.spec))
         if not wanted:
@@ -760,18 +787,21 @@ class ThreadPane(KitPane):
             return
         people = await self._people()
         who = await self.app.push_screen_wait(
-            PickPersonModal("Message somebody", people, detail="Everyone here can write to everyone.")
+            PickPeopleModal(
+                "New message", people, detail="Everyone here can write to everyone: one person, or several."
+            )
         )
         if not who:
             return
-        names = sorted({self.me, who})
+        names = sorted({self.me, *who})
         title = self.space_model.get("title") or "name"
+        # The conversation with exactly these people: the one there is, or a new one.
         try:
             made = await self.api.create_record(
                 self.space_model_id,
                 {title: " & ".join(names), **direct},
                 scope="shared",
-                members=[who],
+                members=list(who),
                 unique=True,
             )
         except ApiError as exc:

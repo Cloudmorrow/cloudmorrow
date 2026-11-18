@@ -298,7 +298,7 @@ the same rules, which are [CELLS.md](CELLS.md).
 
 A `thread` is the kit's conversation: things written (`body`) in spaces. Its
 `made_as` says what fields a space gets for how it is made — by its scope, or
-`direct`, a shared space found-or-made between you and the person you pick
+`direct`, a shared space found-or-made between you and the people you pick (one, or several: pills in a To box)
 and named for them — and the kit draws around it what every space has: making
 one, the people in it, adding and taking out, leaving. Channels is:
 

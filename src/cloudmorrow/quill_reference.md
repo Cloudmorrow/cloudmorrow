@@ -396,8 +396,8 @@ an administrator typed in, read by nobody through the record API.
 | timeline | model (a project: width, height, fps, tracks; optional crop, status, message, output), pieces (a datamodel with one link to the project: track, source, name, start, offset, length; optional volume, muted), media (where the material is: `{ share = "my-files", within = "Videos" }`); optional effects (a datamodel with one link to the pieces: kind, label, keyframes; optional strength), frames (an `[[apis]]` id that draws frames), export (an action on the project) | a video editor: material from the drive, video and audio tracks with pieces to move, trim and split, blurs that move by keyframes, a crop, export; live with sound on the web, real frames in the terminal (docs/TIMELINE.md) |
 
 A thread's `made_as` says what fields a space gets for how it is made — by
-scope, or `direct`: a shared space found-or-made between you and the person
-you pick, named for them (its fields must be indexed):
+scope, or `direct`: a shared space found-or-made between you and the people you pick
+(one, or several), named for them (its fields must be indexed):
 
 ```toml
 [screens.made_as]

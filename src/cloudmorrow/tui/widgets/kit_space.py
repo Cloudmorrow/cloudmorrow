@@ -16,7 +16,7 @@ spaces uses these rather than its own:
 - `PickPersonModal` is one person out of a list: whom to write to, whom to add.
 
 A screen may say how its spaces are made in `made_as`: scope (or `direct`, a
-shared space found-or-made between you and the person you pick) → the fields
+shared space found-or-made between you and the people you pick) → the fields
 a space gets that way. `made_as`, `is_between`, `people_in` and `space_name`
 read it; a space made between people is called after whoever else is in it.
 
@@ -30,6 +30,7 @@ from __future__ import annotations
 from typing import Any
 
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import (
     Button,
@@ -40,6 +41,7 @@ from textual.widgets import (
     RadioButton,
     RadioSet,
     Select,
+    SelectionList,
     Static,
 )
 from textual.widgets.option_list import Option
@@ -446,8 +448,83 @@ class PickPersonModal(Modal[str | None]):
         self.dismiss(None)
 
 
+class PickPeopleModal(Modal[list[str] | None]):
+    """Who a new conversation is to: one person, or several.
+
+    Space ticks a name, and the To line above the list says who is picked
+    so far; Enter, or the button, opens the conversation between exactly
+    those people. Dismisses with their usernames, or None.
+    """
+
+    BINDINGS = [("escape", "cancel", "Cancel"), Binding("enter", "open", "Open", priority=True)]
+
+    DEFAULT_CSS = """
+    PickPeopleModal #people-list { height: auto; max-height: 12; margin-bottom: 1; }
+    PickPeopleModal #to-line { margin-bottom: 1; }
+    """
+
+    NOBODY = f"[{MUTED}]nobody yet — space ticks a name[/]"
+
+    def __init__(self, title: str, people: list[dict], *, detail: str = "") -> None:
+        super().__init__()
+        self._title = title
+        self.people = people
+        self._detail = detail
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal", id="people-modal"):
+            yield Label(self._title, classes="modal-title")
+            if self._detail:
+                yield Static(self._detail, classes="modal-detail")
+            yield Static(f"[{MUTED}]To:[/] {self.NOBODY}", id="to-line")
+            if self.people:
+                yield SelectionList[str](*[(person_label(p), p["username"]) for p in self.people], id="people-list")
+            else:
+                yield Static(f"[{MUTED}]Nobody to pick.[/]")
+            with Horizontal(classes="modal-buttons"):
+                yield Button("Cancel", id="cancel")
+                yield Button("Open", variant="primary", id="open", disabled=True)
+
+    def on_mount(self) -> None:
+        if self.people:
+            self.query_one("#people-list", SelectionList).focus()
+
+    @property
+    def chosen(self) -> list[str]:
+        """The usernames ticked, in the list's order."""
+        if not self.people:
+            return []
+        picked = set(self.query_one("#people-list", SelectionList).selected)
+        return [p["username"] for p in self.people if p["username"] in picked]
+
+    def on_selection_list_selected_changed(self, event: SelectionList.SelectedChanged) -> None:
+        event.stop()
+        who = self.chosen
+        names = ", ".join(
+            _escape(next((p.get("display_name") or p["username"]) for p in self.people if p["username"] == u))
+            for u in who
+        )
+        self.query_one("#to-line", Static).update(f"[{MUTED}]To:[/] " + (f"[b]{names}[/]" if who else self.NOBODY))
+        self.query_one("#open", Button).disabled = not who
+
+    def action_open(self) -> None:
+        if self.chosen:
+            self.dismiss(self.chosen)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        event.stop()
+        if event.button.id == "open":
+            self.action_open()
+        else:
+            self.dismiss(None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 __all__ = [
     "NewSpaceModal",
+    "PickPeopleModal",
     "PickPersonModal",
     "SpaceModal",
     "is_between",
