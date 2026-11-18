@@ -320,15 +320,52 @@ def test_the_install_buttons_do_not_borrow_the_install_card():
 # -- the calendar, and spaces ----------------------------------------------------
 def test_a_subscribed_calendar_is_listed_apart_and_nothing_is_put_on_it():
     calendar = (WEB / "kit_calendar.js").read_text(encoding="utf-8")
-    kit = (WEB / "kit.js").read_text(encoding="utf-8")
+    calendar = re.sub(r"/\*.*?\*/", "", calendar, flags=re.DOTALL)
     spaces = (WEB / "kit_space.js").read_text(encoding="utf-8")
     # The binding, read once; the pen's "In" offers only the spaces that take things.
     assert 'subscribed: screen.subscribed || ""' in calendar
     assert "const writable = spaceList.filter((s) => !isSubscribed(b, s))" in calendar
     assert "writable.map((s) =>" in calendar
-    # Listed apart, under their own heading; a thing on one opens read.
+    # Listed apart, under their own label, with where each comes from.
     assert 'label: "Subscribed"' in calendar and "apart.is(s)" in spaces
-    assert "own.looked && await own.looked(record)" in kit
+    assert "`From ${subscribedFrom(b, s)}`" in calendar
+
+
+def test_the_calendars_are_behind_the_gear_with_the_rows_that_add_one_and_a_tick_each():
+    """The one gear the calendar screen has goes to its list of calendars:
+    yours (and under them the row that makes one), the subscribed ones (and
+    under them the row that presses the screen's `subscribe` action), and
+    everybody's. A tick on each takes a calendar off the month for now,
+    kept in the browser as the week-or-month choice is."""
+    calendar = js_code((WEB / "kit_calendar.js").read_text(encoding="utf-8"))
+    spaces = js_code((WEB / "kit_space.js").read_text(encoding="utf-8"))
+    # The gear, in the place the core's own gear takes, so there is one gear and not two.
+    assert '<a class="button settings" href="${at.base}/spaces"' in calendar
+    assert 'pixelIcon("settings")' in calendar
+    assert "glyphs.people" not in calendar
+    # The Quill's own settings, when it has any, are a row on that list.
+    assert 'more: at.settings ? { label: at.settings.label || "Settings", href: at.settings.href } : null' in calendar
+    # The subscribe row presses the action the screen names, and the list is drawn again.
+    assert 'subscribe: screen.subscribe || ""' in calendar
+    assert "(quill.actions || []).find((a) => a.id === b.subscribe)" in calendar
+    assert "press(quill, subscribe, { after: renderRoute })" in calendar
+    assert 'addRow(apart.add.label, { data: "data-add" })' in spaces
+    assert 'add.addEventListener("click", () => apart.add.press())' in spaces
+    # The row that makes one, under yours, for whoever may write spaces; no pen at the top.
+    assert "addRow(`New ${noun}`, { href: `${at.base}/newspace` })" in spaces
+    assert 'class="button compose" href="${at.base}/newspace"' not in spaces
+    # Three groups: yours, the ones from elsewhere, everybody's — the one everybody is in first.
+    assert 'group("Yours", yours' in spaces and 'group("Everybody\'s", everybodys)' in spaces
+    assert 'group("Shared"' not in spaces
+    assert 's.owner === session.user && s.scope !== "public" && !fromElsewhere(s)' in spaces
+    # A tick per row, and the things on an unticked calendar off the month.
+    assert '<label class="tick"><input type="checkbox" data-space="${esc(s.id)}"' in spaces
+    assert "shown.set(spaces.find((s) => s.id === box.dataset.space), box.checked)" in spaces
+    assert "const hidden = hiddenSpaces(remembered);" in calendar
+    assert "records.filter((r) => !hidden.has(r.fields[b.spaceField]))" in calendar
+    assert 'store.get(key + ".hidden")' in calendar
+    css = (WEB / "kit_space.css").read_text(encoding="utf-8")
+    assert ".row.space .tick input" in css and ".row.add .main" in css
 
 
 def test_the_calendar_asks_the_record_api_for_a_window_of_days():

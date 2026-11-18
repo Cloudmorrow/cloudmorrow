@@ -128,7 +128,7 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
             for name in screen.get("fields", []):
                 need(model, thing, name)
         elif kit == "calendar":
-            _check_calendar(screen, model, models, thing, need, where)
+            _check_calendar(manifest, screen, model, models, thing, need, where)
         elif kit == "timeline":
             _check_timeline(manifest, screen, model, model_of, thing, need, where)
         elif kit == "sheet":
@@ -370,8 +370,12 @@ def _check_pages(where: str, thing: str, screen: dict, model, need) -> None:
         raise QuillError(f'{where}: {thing} suffix is a file suffix, like ".md", or a list of them')
 
 
-def _check_calendar(screen: dict, model: Datamodel, models: dict[str, Datamodel], thing: str, need, where: str) -> None:
-    """A calendar: two moments, whether it is all day, and the spaces it is drawn from."""
+def _check_calendar(
+    manifest, screen: dict, model: Datamodel, models: dict[str, Datamodel], thing: str, need, where: str
+) -> None:
+    """A calendar: two moments, whether it is all day, the spaces it is drawn
+    from, and — for the ones from elsewhere — the field that says so and the
+    action that brings one in."""
     moments = ("datetime", "date")
     need(model, thing + " starts", screen.get("starts"), moments)
     need(model, thing + " ends", screen.get("ends"), moments)
@@ -390,6 +394,14 @@ def _check_calendar(screen: dict, model: Datamodel, models: dict[str, Datamodel]
         need(model, thing + " subtitle", screen["subtitle"])
     if screen.get("subscribed"):
         need(space, thing + " subscribed", screen["subscribed"], ("url", "string"))
+    if screen.get("subscribe"):
+        # The row under the subscribed spaces presses it: an action on no
+        # record, its form asking for the address.
+        if not screen.get("subscribed"):
+            raise QuillError(f"{where}: {thing} subscribe needs subscribed: the field of a {space.id} that says it is")
+        found = next((a for a in manifest.actions if a["id"] == screen["subscribe"]), None)
+        if found is None or found.get("on"):
+            raise QuillError(f"{where}: {thing} subscribe names one of its actions on no record")
 
 
 # A timeline's datamodels carry the kit's own field names (docs/TIMELINE.md):

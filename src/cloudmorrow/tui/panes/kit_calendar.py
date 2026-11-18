@@ -2,21 +2,27 @@
 
 Three columns' worth of one idea. On the left, every space the screen's
 things can be in that you can see — for a calendar Quill, the calendars:
-your own at the top, then the shared ones, then everybody's. In the middle,
-the month, a cell per day with a coloured dot for each thing on it. Under
-that, the day you are standing on, written out.
+yours at the top (your own, and the ones you made to share), then the ones
+subscribed from elsewhere, then everybody's (the one everybody is in, and
+the ones others shared with you). In the middle, the month, a cell per day
+with a coloured dot for each thing on it. Under that, the day you are
+standing on, written out.
 
-The list on the left is not a filter. Everything you can see is drawn in
+The list on the left is not a switch. Everything you can see is drawn in
 the month, in the colour of the space it is in, because a calendar you have
 to switch between is one that lets you double-book yourself. What the list
-picks is where a new thing goes, and which space `p`, `s` and `l` are about.
+picks is where a new thing goes, and which space `p` and `r` are about. The
+tick in front of each is the one way to see less: `v` takes a space off the
+month for now, and puts it back — for this sitting, on this terminal, and
+never a filter on the server.
 
 It is all read from the screen's bindings (docs/QUILLS.md, *Screens*):
 `starts` and `ends` are the two moments, `all_day` the optional bool,
 `space` the link to the spaces, `colour` the space's colour, `title` and
 `subtitle` what a line says, `subscribed` a field of the space that, filled,
 says it comes from elsewhere: drawn like the rest, listed after your own,
-and nothing put on it or changed on it here. Times are the times on the wall: a moment
+and nothing put on it or changed on it here; `subscribe` the Quill's action
+that brings one in, on `s`. Times are the times on the wall: a moment
 without a zone is drawn exactly as it is stored, and a bare date is a whole
 day whose end is the last day it is on.
 
@@ -42,6 +48,7 @@ from cloudmorrow.quill.screens import calendar_fields
 from cloudmorrow.tui.dates import days_of, month_start, shift_month, wall, weeks_of
 from cloudmorrow.tui.kitdata import can_write, field_of, title_of
 from cloudmorrow.tui.panes.kit import KitPane
+from cloudmorrow.tui.quill_actions import run_action
 from cloudmorrow.tui.theme import ACCENT, BAD, GOOD, LENS, MUTED, TEXT
 from cloudmorrow.tui.widgets.kit_space import NewSpaceModal, SpaceModal, make_space, scope_said
 from cloudmorrow.tui.widgets.toolbar import Action
@@ -161,23 +168,34 @@ def event_line(event: dict, *, me: str) -> str:
     return "  ".join(parts)
 
 
-def space_row(space: dict, model: dict, colour: str, *, me: str, subscribed: bool = False) -> tuple[str, str]:
-    """A space's two cells: what it is called, and who it is for — or that it
-    is subscribed, which says both: yours to see, nobody's here to write in."""
+def space_row(
+    space: dict, model: dict, colour: str, *, me: str, subscribed: bool = False, shown: bool = True
+) -> tuple[str, str]:
+    """A space's two cells: whether it is seen for now, its colour and what it
+    is called; and who it is for — or that it is subscribed, which says
+    both: yours to see, nobody's here to write in."""
     dot = colour_for((space.get("fields") or {}).get(colour)) if colour else colour_for("")
     who = scope_said(space)
     if subscribed:
         who = "subscribed"
-    elif space.get("scope") == "personal" and space.get("owner") != me:
-        who = space.get("owner", "")
-    return f"[{dot}]●[/] {escape(title_of(space, model))}", f"[{MUTED}]{who}[/]"
+    elif space.get("scope") != "public" and space.get("owner") != me:
+        who = f"{who} · {space.get('owner', '')}"
+    tick = "☑" if shown else f"[{MUTED}]☐[/]"
+    name = escape(title_of(space, model)) if shown else f"[{MUTED}]{escape(title_of(space, model))}[/]"
+    return f"{tick} [{dot}]●[/] {name}", f"[{MUTED}]{who}[/]"
 
 
-def space_order(space: dict, *, subscribed: bool = False) -> tuple:
-    """Yours first, then the ones you subscribed to, the shared ones, everybody's."""
+def space_order(space: dict, *, me: str, subscribed: bool = False) -> tuple:
+    """Yours first (your own, then the ones you made to share), then the
+    ones you subscribed to, then everybody's: the one everybody is in, then
+    the ones others shared with you."""
     if subscribed:
-        return (1,)
-    return ({"personal": 0, "shared": 2, "public": 3}.get(space.get("scope"), 4),)
+        return (1, 0)
+    if space.get("scope") == "public":
+        return (2, 0)
+    if space.get("owner") == me:
+        return (0, 0 if space.get("scope") == "personal" else 1)
+    return (2, 1)
 
 
 def settle_times(b: dict, fields: dict, record: dict | None) -> dict:
@@ -231,6 +249,8 @@ class CalendarPane(KitPane):
         Binding("n", "fire('new_record')", "New", show=False),
         Binding("e", "fire('open_record')", "Edit", show=False),
         Binding("c", "fire('new_space')", "New space", show=False),
+        Binding("s", "fire('subscribe')", "Subscribe", show=False),
+        Binding("v", "fire('toggle_space')", "See it or not", show=False),
         Binding("p", "fire('people')", "People", show=False),
         Binding("r", "fire('edit_space')", "Rename", show=False),
         Binding("t", "fire('today')", "Today", show=False),
@@ -246,8 +266,14 @@ class CalendarPane(KitPane):
         self.space_model: dict = self.models.get(self.space_model_id) or {}
         if not can_write(self.space_model):
             self.refused |= {"new_space", "edit_space"}
+        if self.subscribe_action() is None:
+            self.refused |= {"subscribe"}
         self.spaces: list[dict] = []
+        # Everything in the month, and the part of it on the spaces ticked.
+        self.found: list[dict] = []
         self.events: list[dict] = []
+        # The spaces unticked with `v`: off the month for this sitting.
+        self.hidden: set[str] = set()
         self.day = dt.date.today()
         self.shown = month_start(self.day)
         # The space a new thing goes in: whichever one the list is on.
@@ -260,6 +286,8 @@ class CalendarPane(KitPane):
                 Action("open_record", "Edit" if self.writes else "Open", "e", hint=f"The {self.noun} under the cursor"),
                 Action("delete_record", "Delete", "del"),
                 Action("new_space", f"New {space_noun}", "c", hint="Shared, or one everybody is in"),
+                Action("subscribe", "Subscribe", "s", hint=f"A {space_noun} published elsewhere, by its address"),
+                Action("toggle_space", "See it or not", "v", hint=f"Take this {space_noun} off the month for now"),
                 Action("people", "People", "p", hint=f"Who is in this {space_noun}: add, take out, leave"),
                 Action("edit_space", f"Rename {space_noun}", "r", hint="Its name and its colour"),
                 Action("today", "Today", "t"),
@@ -269,6 +297,12 @@ class CalendarPane(KitPane):
     @property
     def space_noun(self) -> str:
         return str(self.space_model.get("label") or self.space_model_id or "space").lower()
+
+    def subscribe_action(self) -> dict | None:
+        """The Quill's action that brings a space in from elsewhere, when the
+        screen names one (`subscribe`) and the Quill has it."""
+        wanted = self.b.get("subscribe") or ""
+        return next((a for a in self.quill.get("actions") or [] if wanted and a.get("id") == wanted), None)
 
     # -- layout --------------------------------------------------------------
     def content(self) -> ComposeResult:
@@ -343,7 +377,7 @@ class CalendarPane(KitPane):
         except ApiError as exc:
             await self.went_wrong(exc)
             return
-        self.spaces = sorted(spaces, key=lambda s: space_order(s, subscribed=self.is_subscribed(s)))
+        self.spaces = sorted(spaces, key=lambda s: space_order(s, me=self.me, subscribed=self.is_subscribed(s)))
         if self.space is None:
             mine = next((s for s in self.spaces if s.get("scope") == "personal"), None)
             self.space_id = (mine or (self.spaces[0] if self.spaces else {})).get("id", "")
@@ -368,14 +402,28 @@ class CalendarPane(KitPane):
             self.status(str(exc), error=True)
             return
         by_id = {s["id"]: s for s in self.spaces}
-        self.events = [occasion(r, self.b, by_id, self.space_model) for r in records]
+        self.found = [occasion(r, self.b, by_id, self.space_model) for r in records]
+        self._keep_shown()
+
+    def _keep_shown(self) -> None:
+        """The things on the spaces ticked: what the month and the day draw."""
+        space = self.b["space"]
+        in_space = lambda e: str((e["record"].get("fields") or {}).get(space) or "")  # noqa: E731
+        self.events = [e for e in self.found if in_space(e) not in self.hidden]
 
     def _draw_spaces(self) -> None:
         table = self.query_one("#calendar-table", DataTable)
         table.clear()
         for space in self.spaces:
             table.add_row(
-                *space_row(space, self.space_model, self.b["colour"], me=self.me, subscribed=self.is_subscribed(space))
+                *space_row(
+                    space,
+                    self.space_model,
+                    self.b["colour"],
+                    me=self.me,
+                    subscribed=self.is_subscribed(space),
+                    shown=space["id"] not in self.hidden,
+                )
             )
         for row, space in enumerate(self.spaces):
             if space["id"] == self.space_id:
@@ -550,6 +598,35 @@ class CalendarPane(KitPane):
             self.reload()
 
     # -- the spaces ------------------------------------------------------------------
+    def act_toggle_space(self) -> None:
+        """`v`: the space the list is on, off the month for now, or back on it."""
+        space = self.space
+        if space is None:
+            return
+        if space["id"] in self.hidden:
+            self.hidden.discard(space["id"])
+            self.status(f"{title_of(space, self.space_model)} is back on the month.")
+        else:
+            self.hidden.add(space["id"])
+            self.status(f"{title_of(space, self.space_model)} is off the month for now. v puts it back.")
+        self._keep_shown()
+        self._draw_spaces()
+        self._draw_month()
+        self._draw_day()
+
+    def act_subscribe(self) -> None:
+        self.subscribe()
+
+    @work(group="ui")
+    async def subscribe(self) -> None:
+        """`s`: the Quill's own action, asked and run as any action is; the
+        list has the new space once it has."""
+        action = self.subscribe_action()
+        if action is None:
+            return
+        if await run_action(self.app, self.quill, action):
+            self.reload()
+
     def act_new_space(self) -> None:
         self.new_space()
 

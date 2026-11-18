@@ -232,6 +232,8 @@ ends = "ends_at"
         (lambda m: m.replace('space = "calendar"', 'space = "title"'), "wants link"),
         (lambda m: m + 'all_day = "title"\n', "wants bool"),
         (lambda m: m + 'colour = "nothing"\n', "calendar does not have"),
+        (lambda m: m + 'subscribe = "subscribe"\n', "subscribe needs subscribed"),
+        (lambda m: m + 'subscribed = "name"\nsubscribe = "nothing"\n', "subscribe names one of its actions"),
     ],
 )
 def test_a_calendar_screen_binds_two_moments_and_a_space(tmp_path, change, says):
