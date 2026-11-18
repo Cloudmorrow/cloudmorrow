@@ -64,6 +64,9 @@ const picked = new Set();
 // What the last update in one go said, line by line, drawn again under the
 // buttons until the next one.
 let lastLog = [];
+// What the catalog is searched for. Kept while the panel is drawn again —
+// after an install, say — so the list does not jump back to everything.
+let catalogQuery = "";
 
 /** Back to the Quills side of Administration, from a sheet opened as a screen. */
 async function backToQuills() {
@@ -543,26 +546,59 @@ function drawCatalog(ctx) {
   list.innerHTML = `
     <p class="note">Quills for your cloud, from the Quill Catalog. Each one
       says what it adds before it is added, and its tabs appear for everybody
-      here once it is.</p>` +
+      here once it is.</p>
+    <div class="search catalog-search">${icons.search}<input type="search" placeholder="Search the catalog"
+      aria-label="Search the catalog" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
+      value="${esc(catalogQuery)}"></div>` +
     shelves.map((shelf) => {
       const here = catalog.quills.filter((q) => (known.has(q.category) ? q.category : "") === shelf.id);
       if (!here.length) return "";
-      return `<p class="group-label">${esc(shelf.label)}</p>` +
+      return `<section class="shelf"><p class="group-label">${esc(shelf.label)}</p>` +
         (shelf.description ? `<p class="shelf-note">${esc(shelf.description)}</p>` : "") +
-        `<div class="group">${here.map(catalogRow).join("")}</div>`;
-    }).join("");
+        `<div class="group">${here.map((q) => catalogRow(q, shelf.label)).join("")}</div></section>`;
+    }).join("") +
+    `<p class="empty none-match" hidden><b>No Quill matches</b>Try another word, or clear the search.</p>`;
   for (const row of list.querySelectorAll(".quill-row[data-id]")) wireRow(ctx, row);
+  const field = list.querySelector(".catalog-search input");
+  field.addEventListener("input", () => { catalogQuery = field.value; filterCatalog(list); });
+  filterCatalog(list);
 }
 
-function catalogRow(q) {
-  const state = q.update_available
-    ? `<span class="quill-chip new">update</span>`
-    : q.installed_version ? `<span class="quill-chip on">v${esc(q.installed_version)}</span>`
+/** Show the rows whose words hold every word searched for; a shelf with none
+    left goes, and an empty list says so. Nothing is asked of the server. */
+function filterCatalog(list) {
+  const words = catalogQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  let any = false;
+  for (const shelf of list.querySelectorAll(".shelf")) {
+    let left = 0;
+    for (const row of shelf.querySelectorAll(".quill-row[data-id]")) {
+      const match = words.every((w) => row.dataset.words.includes(w));
+      row.hidden = !match;
+      // The line between rows is drawn on the lower one; the first one shown
+      // has nothing above it to be divided from.
+      row.classList.toggle("first-shown", match && left === 0);
+      if (match) left += 1;
+    }
+    shelf.hidden = left === 0;
+    any = any || left > 0;
+  }
+  list.querySelector(".none-match").hidden = any;
+}
+
+function catalogRow(q, shelf = "") {
+  // Already here says so in words, with a tick, so it is told from the rest
+  // at a glance; a newer release says that beside it.
+  const state = q.installed_version
+    ? `<span class="quill-chip on installed">${icons.tick} Installed</span>` +
+      (q.update_available ? `<span class="quill-chip new">Update</span>` : "")
     : `<span class="quill-chip">Add</span>`;
   const by = q.publisher ? ` · ${q.publisher}` : "";
-  return `<div class="row quill-row${q.id === shown ? " current" : ""}" data-id="${esc(q.id)}" role="button" tabindex="0">
+  const words = [q.name, q.id, q.summary, q.publisher, shelf, q.installed_version ? "installed" : ""]
+    .filter(Boolean).join(" ").toLowerCase();
+  return `<div class="row quill-row${q.installed_version ? " is-installed" : ""}${q.id === shown ? " current" : ""}" data-id="${esc(q.id)}"
+    data-words="${esc(words)}" role="button" tabindex="0">
     <span class="main"><span class="title">${esc(q.name || q.id)}</span>
-    <span class="meta"><span class="preview">${esc((q.summary || "") + by)}</span></span></span>
+    <span class="meta"><span class="preview">${esc((q.installed_version ? `v${q.installed_version} · ` : "") + (q.summary || "") + by)}</span></span></span>
     ${state}${icons.chevronRight}</div>`;
 }
 
