@@ -1,0 +1,229 @@
+/* The kit's `photo`: the picture, its buttons, and the panels beside it.
+
+   A phone has it in one column — the picture on top, the buttons under
+   it, then the panels. A computer has the panels on the right of the
+   picture. The one amber fill is Export; amber lines are what you are
+   moving — the chosen words, the crop's box. Nothing here is named for one
+   Quill; the look is the timeline's, so the two editors feel like one. */
+
+.kit-photo { display: flex; flex-direction: column; padding-bottom: calc(24px + var(--bottom)); }
+.ph-desk { display: contents; }
+.ph-viewer { order: 1; min-width: 0; }
+.ph-side { order: 2; margin-top: 12px; }
+.ph-quiet { margin: 4px 4px 10px; color: var(--muted); font-size: 14px; }
+.ph-quiet-inline { color: var(--muted); font-weight: 400; }
+
+/* -- the header: export and how it is going -------------------------------- */
+.ph-headbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin: -8px 0 12px; }
+.ph-status {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tone, var(--muted));
+  font-size: 14px;
+  font-weight: 600;
+}
+.ph-spin {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: ph-spin .9s linear infinite;
+}
+@keyframes ph-spin { to { transform: rotate(360deg); } }
+.ph-head-actions { display: inline-flex; align-items: center; gap: 8px; margin-right: 4px; }
+.heading .ph-open { min-height: 36px; font-family: var(--display); font-weight: 600; }
+.heading a.button.ph-settings .pixel-icon { width: 20px; height: 20px; }
+
+/* -- the picture ------------------------------------------------------------- */
+.ph-stage-box { display: flex; justify-content: center; width: 100%; }
+.ph-stage {
+  position: relative;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ph-stage canvas { display: block; width: 100%; height: 100%; }
+.ph-over { position: absolute; inset: 0; }
+.ph-stage-words {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 16px;
+  color: #ddd;
+  font-size: 14px;
+  text-align: center;
+}
+.ph-stage-words[hidden] { display: none; }
+
+/* The boxes on the picture: a text's faint until chosen, then amber with a
+   corner to pull; the crop's in white with the rest dimmed around it. */
+.ph-box { position: absolute; touch-action: none; }
+.ph-box.text { border: 1px dashed rgba(255, 255, 255, .35); cursor: move; }
+.ph-box.text.on { border: 2px solid var(--action); box-shadow: 0 0 0 1px rgba(0, 0, 0, .5); }
+.ph-box.crop { border: 2px solid #fff; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .58); cursor: move; }
+.ph-box i {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border: 2px solid var(--action);
+  border-radius: 3px;
+  touch-action: none;
+}
+.ph-box.crop i { border-color: rgba(0, 0, 0, .6); }
+.ph-box [data-h="nw"] { left: 0; top: 0; cursor: nwse-resize; }
+.ph-box [data-h="n"] { left: 50%; top: 0; transform: translateX(-50%); cursor: ns-resize; }
+.ph-box [data-h="ne"] { right: 0; top: 0; cursor: nesw-resize; }
+.ph-box [data-h="e"] { right: 0; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.ph-box [data-h="se"] { right: 0; bottom: 0; cursor: nwse-resize; }
+.ph-box [data-h="s"] { left: 50%; bottom: 0; transform: translateX(-50%); cursor: ns-resize; }
+.ph-box [data-h="sw"] { left: 0; bottom: 0; cursor: nesw-resize; }
+.ph-box [data-h="w"] { left: 0; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.ph-box.text [data-h="se"] { right: -8px; bottom: -8px; border-radius: 50%; }
+@media (pointer: coarse) {
+  .ph-box i { width: 22px; height: 22px; border-radius: 6px; }
+  .ph-box.text [data-h="se"] { right: -12px; bottom: -12px; }
+}
+
+/* -- the buttons under the picture ----------------------------------------------- */
+.ph-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px; margin: 8px 0 0; }
+.ph-tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  height: 40px;
+  padding: 0 10px;
+  border-radius: var(--radius-control);
+  color: var(--accent);
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 600;
+}
+.ph-tools button:disabled { color: var(--muted); opacity: .45; cursor: default; }
+.ph-tools button:active { background: var(--card-2); }
+.ph-tools button.on { background: var(--fill); color: var(--fill-ink); }
+@media (max-width: 420px) { .ph-tools button span { display: none; } }
+
+/* -- the panels ------------------------------------------------------------------- */
+.ph-card { padding: 10px 14px 6px; }
+.ph-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+.ph-chips .act-chip { gap: 6px; }
+.ph-chips .act-chip.on, .ph-ratio.on { background: var(--fill); color: var(--fill-ink); border-color: transparent; }
+.ph-field { display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 14px; }
+.ph-field > span { flex: none; min-width: 4.6em; color: var(--muted); }
+.ph-field.small > span { min-width: 3.4em; }
+.ph-field input[type="text"], .ph-field input[type="number"], .ph-field select {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  background: var(--field);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  font: inherit;
+  outline: none;
+}
+.ph-field input:focus, .ph-field select:focus, .ph-words:focus { border-color: var(--accent); }
+.ph-field input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
+.ph-field output { flex: none; min-width: 3.2em; color: var(--muted); font-size: 14px; text-align: right; font-variant-numeric: tabular-nums; }
+.ph-words {
+  display: block;
+  width: 100%;
+  min-height: 60px;
+  margin: 4px 0 6px;
+  padding: 8px 10px;
+  background: var(--field);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  font: inherit;
+  resize: vertical;
+  outline: none;
+}
+.ph-size-now { margin: 0 4px 6px; font-size: 15px; }
+.ph-size-fields, .ph-crop-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; }
+.ph-size-fields input[type="number"], .ph-crop-fields input[type="number"] { width: 100%; }
+.ph-row-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.ph-row-buttons .act-chip { gap: 6px; }
+.ph-row-buttons .act-chip.primary { background: var(--fill); color: var(--fill-ink); border-color: transparent; }
+.ph-drop-text { color: var(--bad); }
+.ph-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ph-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--swatch);
+  border: 2px solid rgba(127, 127, 127, .4);
+  cursor: pointer;
+}
+.ph-swatch.on { border-color: var(--action); box-shadow: 0 0 0 2px var(--card); }
+.ph-swatch:disabled { cursor: default; opacity: .5; }
+.ph-colour { width: 32px; height: 26px; padding: 0 2px; background: var(--field); border: 1px solid var(--line); border-radius: 6px; }
+
+/* -- the edits, and the photos to start one from ---------------------------------- */
+.ph-edit .ph-thumb { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; overflow: hidden; border-radius: 8px; background: var(--card-2); color: var(--muted); }
+.ph-edit .ph-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.ph-photo-sheet { max-height: 80dvh; display: flex; flex-direction: column; }
+.ph-sheet-list { overflow-y: auto; padding: 0 12px 8px; }
+.ph-drive { display: flex; align-items: center; gap: 8px; margin: 0 4px 8px; color: var(--muted); font-size: 14px; }
+.ph-drive select {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  background: var(--field);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  font: inherit;
+}
+.ph-folder { margin: 12px 4px 6px; color: var(--muted); font-size: 13px; font-weight: 600; }
+.ph-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px 8px; margin: 0 0 6px; }
+.ph-tile { display: flex; flex-direction: column; gap: 4px; min-width: 0; border-radius: 8px; cursor: pointer; user-select: none; -webkit-user-select: none; outline: none; }
+.ph-tile:focus-visible .ph-tile-pic { box-shadow: 0 0 0 2px var(--accent); }
+.ph-tile.busy { opacity: .5; }
+.ph-tile-pic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  width: 100%;
+  overflow: hidden;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+}
+.ph-tile-pic svg { width: 24px; height: 24px; }
+.ph-tile-pic img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.ph-tile-name { overflow: hidden; font-size: 11px; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
+
+/* A phone's bar along the bottom would take the picture's room: the editor
+   goes without it, as the timeline does, with Back to the edits. */
+@media (max-width: 899px), (max-height: 599px) {
+  #app:has(main.kit-photo) > nav.tabs, #app:has(main.kit-photo) > nav.subtabs { display: none; }
+}
+
+/* -- a computer: the panels beside the picture ---------------------------------- */
+@media (min-width: 900px) and (min-height: 600px) {
+  #app:has(.kit-photo) { --column: 1400px; }
+  .kit-photo { display: block; }
+  .ph-side { margin-top: 0; }
+  .ph-desk { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); gap: 16px; align-items: start; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .ph-tools button:not(:disabled):not(.on):hover { background: var(--card-2); }
+  .ph-tile:hover .ph-tile-pic { border-color: var(--accent); }
+}

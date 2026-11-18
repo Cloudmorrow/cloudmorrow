@@ -131,6 +131,8 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
             _check_calendar(manifest, screen, model, models, thing, need, where)
         elif kit == "timeline":
             _check_timeline(manifest, screen, model, model_of, thing, need, where)
+        elif kit == "photo":
+            _check_photo(manifest, screen, model, model_of, thing, need, where)
         elif kit == "sheet":
             # A spreadsheet over `.cell` files: a title, and `cells`, the
             # text field the file's text is in (docs/CELLS.md); its pages
@@ -474,6 +476,59 @@ def _check_timeline(manifest: Manifest, screen: dict, model: Datamodel, model_of
         )
     if screen.get("frames") and screen["frames"] not in {api["id"] for api in manifest.apis}:
         raise QuillError(f"{where}: {thing} frames names one of its [[apis]] by id")
+    if screen.get("export"):
+        action = next((a for a in manifest.actions if a["id"] == screen["export"]), None)
+        if action is None or action.get("on") != model.id:
+            raise QuillError(f"{where}: {thing} export names one of its actions on {model.id}")
+
+
+# A photo editor's datamodels carry the kit's own field names (docs/PHOTO.md):
+# (field, kinds, required). The web app, the terminal and `cm` read them so.
+PHOTO_EDIT = (
+    ("source", ("string",), True),
+    ("width", ("int",), True),
+    ("height", ("int",), True),
+    ("rotate", ("int",), False),
+    ("mirror", ("bool",), False),
+    ("crop", ("json",), False),
+    ("out_width", ("int",), False),
+    ("out_height", ("int",), False),
+    ("status", ("enum",), False),
+    ("message", ("string", "text"), False),
+    ("output", ("string",), False),
+)
+PHOTO_TEXT = (
+    ("text", ("string", "text"), True),
+    ("x", ("decimal",), True),
+    ("y", ("decimal",), True),
+    ("size", ("decimal",), False),
+    ("colour", ("string",), False),
+)
+
+
+def _check_photo(manifest: Manifest, screen: dict, model: Datamodel, model_of, thing: str, need, where: str) -> None:
+    """A photo editor: an edit of one picture, the texts laid on it, and where the photos are."""
+
+    def fields(of: Datamodel, wanted: tuple, label: str) -> None:
+        for name, kinds, required in wanted:
+            if required or name in of.by_name:
+                need(of, f"{thing} {label}", name, kinds)
+
+    fields(model, PHOTO_EDIT, "edit")
+    if screen.get("texts"):
+        texts = model_of(thing + " texts", screen["texts"])
+        fields(texts, PHOTO_TEXT, "texts")
+        if not timeline_link(texts, model.id):
+            raise QuillError(f"{where}: {thing} texts {texts.id} has exactly one link to {model.id}")
+    media = screen.get("media", {})
+    if not isinstance(media, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in media.items()):
+        raise QuillError(
+            f'{where}: {thing} media is where the photos are: media = {{ share = "my-files", within = "Photos" }}'
+        )
+    if "file" not in manifest.models:
+        raise QuillError(f'{where}: {thing} edits files, so the Quill uses them: [uses] datamodels = ["file"]')
+    if screen.get("pictures") and screen["pictures"] not in {api["id"] for api in manifest.apis}:
+        raise QuillError(f"{where}: {thing} pictures names one of its [[apis]] by id")
     if screen.get("export"):
         action = next((a for a in manifest.actions if a["id"] == screen["export"]), None)
         if action is None or action.get("on") != model.id:

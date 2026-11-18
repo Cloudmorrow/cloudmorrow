@@ -172,13 +172,18 @@ def timeline_fields(screen: dict, model: dict, models: dict[str, dict]) -> dict:
     }
 
 
-def frames_path(quill: dict, screen: dict) -> str | None:
-    """Where the frames API answers: `/api/q/<quill>/<prefix>`, or None without one."""
-    api = next((a for a in quill.get("apis", []) if a.get("id") == screen.get("frames")), None)
+def api_path(quill: dict, api_id: str | None) -> str | None:
+    """Where one of the Quill's `[[apis]]` answers: `/api/q/<quill>/<prefix>`, or None without one."""
+    api = next((a for a in quill.get("apis", []) if a.get("id") == api_id), None)
     if api is None:
         return None
     prefix = str(api.get("prefix") or "").strip("/")
     return f"/api/q/{quill['id']}/{prefix}".rstrip("/")
+
+
+def frames_path(quill: dict, screen: dict) -> str | None:
+    """Where a timeline's frames API answers, or None without one."""
+    return api_path(quill, screen.get("frames"))
 
 
 def tracks_of(project: dict) -> list[dict]:
@@ -187,6 +192,33 @@ def tracks_of(project: dict) -> list[dict]:
     if isinstance(tracks, list) and all(isinstance(t, dict) and t.get("id") for t in tracks):
         return [{"kind": "video", "name": t["id"], **t} for t in tracks]
     return [dict(t) for t in TRACKS]
+
+
+# -- photos --------------------------------------------------------------------
+# The field names are the kit's own (docs/PHOTO.md); what a screen binds is
+# its two datamodels, where the photos are, and the Quill's pictures API and
+# export.
+
+
+def photo_fields(screen: dict, model: dict, models: dict[str, dict]) -> dict:
+    """What a photo editor draws from: the edits, the texts on them and the
+    link between, where the photos are, and the pictures API and export."""
+    texts = models.get(screen.get("texts") or "", {})
+    return {
+        "title": screen.get("title") or model.get("title") or "name",
+        "edit": model.get("id", screen.get("model", "")),
+        "texts": texts.get("id", ""),
+        "text_edit": _link_to(texts, model.get("id", "")) if texts else "",
+        "media": {str(k): str(v) for k, v in (screen.get("media") or {}).items()},
+        "pictures": screen.get("pictures") or "",
+        "export": screen.get("export") or "",
+        "fields": {f.get("name") for f in model.get("fields", [])},
+    }
+
+
+def pictures_path(quill: dict, screen: dict) -> str | None:
+    """Where a photo editor's pictures API answers, or None without one."""
+    return api_path(quill, screen.get("pictures"))
 
 
 # -- editors -------------------------------------------------------------------

@@ -1,0 +1,24 @@
+# One edit of one picture: how it is turned, what is kept, how big it comes
+# out, and how its export went. The field names are the photo kit's.
+
+[datamodel]
+id = "cropper.edit"
+version = 1
+label = "Edit"
+description = "A photo being edited: turned, cropped, resized, with words on it."
+scopes = ["personal"]
+title = "name"
+
+[fields]
+name = { kind = "string", required = true }
+source = { kind = "string", required = true, indexed = true, label = "Photo", description = "The file it is made from" }
+width = { kind = "int", description = "The photo's width in pixels; filled in when blank" }
+height = { kind = "int", description = "The photo's height in pixels; filled in when blank" }
+rotate = { kind = "int", default = 0, description = "Quarter turns clockwise, in degrees: 0, 90, 180 or 270" }
+mirror = { kind = "bool", default = false, description = "Flipped left to right" }
+crop = { kind = "json", description = "The part kept, in percent of the turned picture: {x, y, w, h}; blank keeps all of it" }
+out_width = { kind = "int", label = "Width", description = "The export's width in pixels; blank keeps the picture's" }
+out_height = { kind = "int", label = "Height", description = "The export's height in pixels; blank keeps the shape" }
+status = { kind = "enum", values = ["editing", "queued", "rendering", "done", "failed"], default = "editing", indexed = true }
+message = { kind = "string" }
+output = { kind = "string", label = "Export", description = "The last export's file" }

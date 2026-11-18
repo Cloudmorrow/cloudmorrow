@@ -1,0 +1,17 @@
+# Words laid on an edit's picture: where, how big, which colour.
+
+[datamodel]
+id = "cropper.text"
+version = 1
+label = "Text"
+description = "Words on an edited photo."
+scopes = ["personal"]
+title = "text"
+
+[fields]
+edit = { kind = "link", to = "cropper.edit", required = true, indexed = true, on_delete = "cascade" }
+text = { kind = "string", required = true }
+x = { kind = "decimal", required = true, default = 6, description = "The left edge, in percent of the picture's width" }
+y = { kind = "decimal", required = true, default = 6, description = "The top edge, in percent of the picture's height" }
+size = { kind = "decimal", default = 6, description = "How tall the letters are, in percent of the picture's height" }
+colour = { kind = "string", default = "#ffffff", description = "A hex colour" }

@@ -377,13 +377,13 @@ def test_the_calendar_asks_the_record_api_for_a_window_of_days():
         assert field not in code, field
     # Drawn by the kit, and its sheet changed by it, from its own file.
     own = (
-        "const OWN = { calendar: renderCalendar, thread: renderThread, timeline: renderTimeline,"
+        "const OWN = { calendar: renderCalendar, thread: renderThread, timeline: renderTimeline, photo: renderPhoto,"
         " view: renderView, data: renderData };"
     )
     assert own in KIT_JS
     assert (
-        "const SHEETS = { calendar: calendarSheet, timeline: timelineSheet, data: dataSheet, list: projectsSheet };"
-        in KIT_JS
+        "const SHEETS = { calendar: calendarSheet, timeline: timelineSheet, photo: photoSheet, data: dataSheet,"
+        " list: projectsSheet };" in KIT_JS
     )
 
 

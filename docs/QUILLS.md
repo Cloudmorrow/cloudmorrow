@@ -33,7 +33,7 @@ stay, in the shape every other Quill already reads.
 | **Foundational datamodel** | One of the standard datamodels in [`Cloudmorrow/datamodels`](https://github.com/Cloudmorrow/datamodels), the ones Cloudmorrow decides on. Grouped into **domains** — Tasks, Customers (CRM), Fleet, Calendars, Messaging, Notes, Secrets, Files — which you can choose at install on their own, with or without a Quill that uses them. |
 | **Extended datamodel** | What a Quill adds: fields of its own on a foundational datamodel (`fleet.odometer` on a `vehicle`), or a new datamodel under its own name (`fleet.service_visit`). Anybody's next Quill may use either. |
 | **Dataset** | Records that come with a Quill — reference data (car makes, country codes) or a starting record (your first board) — and, later, a named collection of records a person makes and shares ("Fleet 2026"). |
-| **Kit** | The fixed vocabulary of screens every surface can draw: `list`, `board`, `detail`, `form`, `calendar`, `thread`, `grid`, `editor`, `sheet`, `document`, `data`, `timeline`, and `view` — a screen a Quill's code draws from primitives. |
+| **Kit** | The fixed vocabulary of screens every surface can draw: `list`, `board`, `detail`, `form`, `calendar`, `thread`, `grid`, `editor`, `sheet`, `document`, `data`, `timeline`, `photo`, and `view` — a screen a Quill's code draws from primitives. |
 | **Quill code** | The Python a manifest names — views, actions, hooks, jobs, webhooks, APIs, machine handlers — run in a sandbox, through the gate. See [QUILLCODE.md](QUILLCODE.md). |
 | **Shelf** | What one person has: the server's Quills that are for them (everyone's, or an **audience** of circles and people), their own, and the ones shared with them. A **personal Quill** is one somebody installed for themselves; its key is `~owner.id`. See [SHARING.md](SHARING.md). |
 
@@ -193,6 +193,7 @@ what each element needs:
 | `grid` | `model` with content (`file`), `group` (a link: the places, picked first), `folder`, `kind` (an enum with `folder`), optional `size`, `modified`, `mime`, `deleted` and `deleted_from` (when a record went to the Trash, and where from: Restore in place of Rename and Move there, and Delete for good), `trash` (the name of the folder at the top of each group the server keeps them in: on the web a bin beside the plus, not among the folders, with Empty inside), `group_subtitle`, `group_open` (a bool on the group: false and it is listed, not opened), `group_writes` (a bool on the group: false and it opens with nothing that writes) | the groups, then folders and tiles, each with a menu; several picked at once; a search through a folder | the same, wider; drag and drop in, and rows onto folders | the groups in a table, then the folder, with the picture beside | `cm <quill> list [group] [folder]`, `get`, `put`, `add`, `copy`, `delete`, `restore` |
 | `data` | nothing: every datamodel the Quill has, or `models` (a list of ids) | the datamodels by domain, the records of one, the sheet of each — to look at | the same, wider | the datamodels down the left, a table of the records of one | `cm <quill> list [datamodel]`, `show <datamodel> <id>` |
 | `timeline` | `model` (the projects), `pieces`, optional `effects`, `media` (a share and a folder: the material), `frames` (an api that draws frames), `export` (an action); the fields are [TIMELINE.md](TIMELINE.md)'s | the projects, then the viewer over the tracks, the material as a sheet | the material, the viewer and the tracks together, live video with sound | frames where the terminal shows pictures, the tracks as rows of text, every edit on a key | `cm <quill> list`, `add`, `show`, `cut`, `trim`, `move`, `rm`, `frame`, `export` |
+| `photo` | `model` (the edits: one picture each), optional `texts` (the words on it), `media` (a share and a folder: the photos), `pictures` (an api that draws the picture), `export` (an action); the fields are [PHOTO.md](PHOTO.md)'s | the edits, then the picture with its buttons under it and the panels below | the panels beside the picture; the crop and the words dragged on it | the picture as it will export, the words listed beside it; keys for the rest | `cm <quill> list`, `add`, `show`, `turn`, `mirror`, `crop`, `size`, `text`, `move`, `rm`, `picture`, `export` |
 
 A `view` may name its pen: `compose = { action = "send", label = "New mail" }`
 is one of the Quill's actions drawn in the heading as a list's New is — the
@@ -289,6 +290,11 @@ and audio tracks, cut, trimmed and moved, blurs that follow keyframes, a
 crop, and an export by the Quill's own action. What its datamodels must
 have, the frames API its service answers, and what each surface does are
 [TIMELINE.md](TIMELINE.md).
+
+A `photo` is the kit's photo editor: one picture from the drive turned,
+mirrored, cropped, made another size, with words laid on it, and exported
+by the Quill's own action. What its datamodels must have, the pictures API
+its service answers, and what each surface does are [PHOTO.md](PHOTO.md).
 
 A `sheet` is the kit's spreadsheet: cells in rows and columns, numbers and
 text typed into them, and formulas that work the others out, Excel's way —
@@ -756,6 +762,7 @@ manifest written, checked and installed in one conversation.
 | the kit on the command line | `cli/quillrun/` (`cm <quill> …`), a module per kind of screen |
 | the sheet (a spreadsheet) | `quill/cells.py` (the cells and the formulas), web `kit_cells.js`, `kit_cells_rules.js`, `kit_cells.css`, terminal `tui/panes/kit_cells.py`, `cli/quillrun/cells.py`; see [CELLS.md](CELLS.md) |
 | the timeline (a video editor) | `quill/timeline.py` (the rules), web `kit_timeline.js`, `kit_timeline_rules.js`, `kit_timeline.css`, terminal `tui/panes/kit_timeline.py`, `client/timeline.py`, `cli/quillrun/timeline.py`; see [TIMELINE.md](TIMELINE.md) |
+| the photo editor | `quill/photo.py` (the rules), web `kit_photo.js`, `kit_photo_rules.js`, `kit_photo.css`, terminal `tui/panes/kit_photo.py`, `client/photo.py`, `cli/quillrun/photo.py`; see [PHOTO.md](PHOTO.md) |
 | what a screen's bindings mean (done lanes, space names, a calendar's and a grid's fields), for the terminal and the command line alike | `quill/screens.py` |
 | building one | `cli/quill.py` (`cm quill new/check/dev/add`), `quill_reference.md`, `quill_template/` |
 | the kit to an assistant | `server/mcptools.py` (generic record tools) |
