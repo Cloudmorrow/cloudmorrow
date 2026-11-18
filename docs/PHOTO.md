@@ -1,13 +1,15 @@
 # The photo kit
 
-`kit = "photo"` is a photo editor: one picture from the drive, turned,
-mirrored, cropped, made another size, with words laid on it, and exported
-as a new file. Cloudmorrow draws it on the web and the phone (the picture
-live, the crop and the words dragged on it), in the terminal (the picture
-as it will export, where the terminal can show pictures) and on the
-command line (`cm <quill> …`). A Quill declares it in TOML; the pixels — a
-preview of the edit, the export itself — come from the Quill's own
-service, with Pillow, which the server's Python has.
+`kit = "photo"` is a photo editor laid out like a simple picture program:
+one picture from the drive, turned, mirrored, cropped, made another size,
+with layers laid on it — words, marker strokes, and pieces copied out of
+the picture and pasted back — and saved over the photo or as a new file
+beside it. Cloudmorrow draws it on the web and the phone (the picture
+live, with tools, a selection, and the layers dragged on it), in the
+terminal (the picture as it will save, where the terminal can show
+pictures) and on the command line (`cm <quill> …`). A Quill declares it in
+TOML; the pixels — a preview of the edit, the saved file — come from the
+Quill's own service, with Pillow, which the server's Python has.
 
 ## The screen
 
@@ -18,10 +20,11 @@ kit = "photo"
 label = "Editor"
 model = "retouch.edit"            # an edit: one record per picture worked on
 title = "name"
-texts = "retouch.text"            # optional: the words laid on the picture
+layers = "retouch.layer"          # optional: what is laid on the picture
 media = { share = "my-files", within = "Photos" }   # where the photos are: file records
 pictures = "pictures"             # optional: the id of an [[apis]] that draws the picture
-export = "export"                 # optional: an action on the edit, the Export button
+save = "save"                     # optional: an action on the edit — Save, over the photo or as a new file
+export = "export"                 # optional: an action on the edit, with its form
 ```
 
 The field names below are the kit's: an edit's datamodels have them, with
@@ -37,30 +40,40 @@ these kinds, or `cm quill check` says which is missing.
 | `rotate` | int, optional | quarter turns clockwise, in degrees: 0, 90, 180 or 270 |
 | `mirror` | bool, optional | flipped left to right, after the turn |
 | `crop` | json, optional | the part kept, in percent of the turned picture: `{"x": 0, "y": 0, "w": 100, "h": 100}`; blank keeps all of it; never less than 5% each way |
-| `out_width`, `out_height` | int, optional | the export's size in pixels; blank is the cropped picture's; one of them given keeps the shape, both are taken as typed; at most 8192 each |
-| `status` | enum, optional | said in the header beside Export (`queued`, `rendering`, `done`, `failed` are toned) |
+| `out_width`, `out_height` | int, optional | the saved picture's size in pixels; blank is the cropped picture's; one of them given keeps the shape, both are taken as typed; at most 8192 each |
+| `status` | enum, optional | said in the header beside Save (`queued`, `rendering`, `done`, `failed` are toned) |
 | `message` | string, optional | said beside the status |
-| `output` | string, optional | the id of the last export's file record: the header offers to open it |
+| `output` | string, optional | the id of the last saved file record: the header offers to open it |
 
 What is done to the picture happens in this order: the turn, the mirror,
-the words, the crop, the size. So the words are placed on the turned
-picture and stay on the same part of the photo when the crop changes, and
-the crop is in percent of the turned picture too.
+the layers (lowest first), the crop, the size. So every layer is placed on
+the turned picture and stays on the same part of the photo when the crop
+changes, and the crop is in percent of the turned picture too.
 
-### A text (`texts`)
+### A layer (`layers`)
 
 | field | kind | |
 | --- | --- | --- |
 | *a link to the edit* | link | exactly one link to the edit's model, `on_delete = "cascade"` |
-| `text` | string or text | the words; a line break starts a new line |
-| `x`, `y` | decimal | the top left corner, in percent of the turned picture's width and height |
-| `size` | decimal, optional | how tall a line of letters is, in percent of the turned picture's height; 6 when blank |
+| `kind` | enum | `text`, `mark` or `piece` (all three values) |
+| `x`, `y` | decimal | the top left corner, in percent of the turned picture's width and height; a mark's first point |
+| `w`, `h` | decimal, optional | a piece: how big it is placed, in percent |
+| `text` | string or text, optional | words; a line break starts a new line |
+| `size` | decimal, optional | words: how tall a line of letters is, in percent of the picture's height; 6 when blank |
 | `colour` | string, optional | `#rrggbb`; white when blank |
+| `points` | json, optional | a mark: `[[x, y], …]` in percent, the stroke |
+| `width` | decimal, optional | a mark: how wide the stroke is, in percent of the picture's height; 1.5 when blank |
+| `opacity` | decimal, optional | a mark: 1 is solid (a pen), 0.4 see-through (a highlighter) |
+| `source` | json, optional | a piece: the part of the turned picture it is copied from, `{x, y, w, h}` in percent |
+| `hidden` | bool, optional | kept, but not drawn |
+| `order` | int, optional | stacking, lowest first; two the same go by when they were made |
 
-The words are drawn in the app's own letters (Barlow, semibold) with a
-thin dark edge, so they read on a light photo and a dark one. The web app
-draws them on the canvas in that font; a service draws them with the same
-font files, from the core's web folder, so the export is what was seen.
+Words are drawn in the app's own letters (Barlow, semibold) with a thin
+dark edge, so they read on a light photo and a dark one; a mark is a round
+stroke; a piece is the source's pixels, turned and mirrored as the edit
+is, scaled into its box. The web app draws all three on the canvas; a
+service draws them with Pillow and the same font files, from the core's
+web folder, so what is saved is what was seen.
 
 ### The pictures API (`pictures`)
 
@@ -70,7 +83,7 @@ An `[[apis]]` of the Quill (normally served by its service), answering:
 | --- | --- |
 | `GET <base>/info?file=<id>` | `{"width": 4000, "height": 3000, "image": true}`: the photo's size as taken, the camera's orientation applied |
 | `GET <base>/source?file=<id>&w=<px>` | `image/jpeg`: the photo as taken, `w` pixels wide |
-| `GET <base>/picture?edit=<id>&w=<px>` | `image/jpeg`: the edit as it would export — turned, mirrored, written on, cropped — `w` pixels wide |
+| `GET <base>/picture?edit=<id>&w=<px>` | `image/jpeg`: the edit as it would save — turned, mirrored, its layers on it, cropped — `w` pixels wide |
 
 `<base>` is `/api/q/<quill>/<prefix>`, the api's `prefix`:
 
@@ -85,7 +98,20 @@ Without `pictures`, the web app still edits (it draws the picture itself,
 from the server's large copy of the photo, and reads the photo's size from
 the file once); the terminal says in words what the edit does; and `cm
 <quill> picture` says there is none. A Quill with no service of its own
-can still be a photo editor on the web; the export needs one.
+can still be a photo editor on the web; saving needs one.
+
+### Save (`save`) and Export (`export`)
+
+`save` names an action on the edit with two fields, `overwrite` (bool) and
+`name` (string). The kit draws Save and asks, in a sheet of its own, whether
+to write over the photo or save as a new file by a name; then it presses
+the action with both fields answered, so no form opens. What the Quill does
+with them is its own: the Retouch Quill's service writes the result over the
+photo (the one before goes to the Trash) or beside it, and when it wrote
+over the photo it resets the edit — the turn, the crop, the size and the
+layers are in the picture now — so the editor shows the saved photo, ready
+for more. `export` names an action drawn with its own form, as the timeline's
+is; a screen may have either, or both.
 
 ## What each surface does
 
@@ -98,48 +124,62 @@ Media or Files) does the same from the other side: it makes the edit and
 answers `go("editor", edit=<id>)`, which opens it straight away. Opened with
 an `edit` parameter, the screen opens that edit's editor.
 
-**The editor.**
-- *The picture*: the source turned and mirrored as the edit says, every
-  text on it in its place, and the crop kept to — or, while cropping, the
-  whole picture with the crop drawn over it and the rest dimmed.
-- *Turn left, Turn right, Mirror*: a quarter turn each way, and a flip.
-- *Crop*: a mode in which the picture shows the crop box, to drag and
-  resize, or numbers to type; a shape to hold it to (square, 4 : 3, 3 : 2,
-  16 : 9, tall); Keep all of it; Done.
-- *Text*: Add text lays words in a corner, picked, with the panel ready to
-  take them. Words on the picture are pressed to pick them, dragged to
-  where they should be, and made bigger or smaller by their corner; the
-  panel has the words, the size, the colour (a few swatches and any
-  other), and Remove.
-- *Size*: what the export will be, and the usual sizes (as it is, half, a
-  quarter, 1920, 1280 or 800 wide, or another typed as width and height).
-- *Export*: runs the `export` action on the edit with its form, and the
-  header says the status and message as they change; when `output` is
-  set, Open shows the file.
+**The editor.** Tools down the left, the picture in the middle, panels on
+the right: the tool's options, the image, the layers.
+- *Move* (V): press a layer to pick it, drag it, pull a piece's corners or
+  a text's corner to size it. The panel has the layer's own numbers —
+  words, size and colour; a mark's colour, width and how solid; a piece's
+  place — with Duplicate, Hide and Remove.
+- *Select* (M): drag a box on the picture. Copy takes what is in it; Paste
+  (also ctrl+V, and the Paste tool) lays it on the picture as a piece, a
+  little to the side; Crop to it crops the picture to the box.
+- *Crop* (C): the picture shows the crop box, to drag and resize, or to
+  draw anew; a shape to hold it to (square, 4 : 3, 3 : 2, 16 : 9, tall);
+  numbers; Keep all of it; Done.
+- *Text* (T): press on the picture to put words there, picked, with the
+  panel ready to take them.
+- *Marker* (B): draw on the picture. The colour, the width (fine, medium,
+  thick) and the style (a pen, or a see-through highlighter) are the
+  panel's; each stroke is a layer.
+- *Turn left, Turn right, Mirror, Paste*: under the tools.
+- *Image*: what the saved picture will be, and the usual sizes (as it is,
+  half, a quarter, 1920, 1280 or 800 wide, or another typed as width and
+  height).
+- *Layers*: every layer, the top one first, each with an eye to hide it;
+  the chosen one has Bring forward, Send back and Remove. Duplicate (ctrl+D)
+  copies the chosen layer; Copy (ctrl+C) with a layer chosen and nothing
+  selected copies it for Paste.
+- *Save*: asks whether to write over the photo or save as a new file by
+  name, and the header says the status and message as they change; done,
+  Open shows the file. Delete takes the chosen layer off; Escape goes back
+  to Move, then lets go.
 
 **Web and phone.** The picture is a canvas: the server's large copy of the
 photo (`/thumb`, so a phone's HEIC needs no plug-in and a big photo comes
-quickly) drawn turned and mirrored, the words in the app's own font, and
-the crop over it. Everything is dragged with the mouse or a finger. The
-gear at the right of the title opens the edit's sheet. Keys: r turns
-right, R left, m mirrors, c crops, t adds words, delete takes the chosen
-words off, escape lets go.
+quickly) drawn turned and mirrored, every layer on it, and the crop over
+it. Everything is dragged with the mouse or a finger; on a phone the tools
+are a strip under the picture and the panels follow. The gear at the right
+of the title opens the edit's sheet.
 
 **Terminal.** The picture is the `pictures` API's `picture` of the edit,
 drawn with textual-image (Kitty, Sixel, or half-cells); without the API
-it is words. The texts are a list beside it. Keys: r turns right, R left,
-m mirrors, c crops from four typed numbers (C keeps the whole picture), s
-sets the size (`1920x1080`, a width, a percent, or `as is`), t lays words
-on the picture, enter on them opens their sheet, k moves them (`x y`,
-typed, with a size as a third number), x takes them off, e exports, o
-opens the export.
+it is words. The layers are a list beside it, the top one first. Keys: r
+turns right, R left, m mirrors, c crops from four typed numbers (C keeps
+the whole picture), s sets the size (`1920x1080`, a width, a percent, or
+`as is`), t lays words on the picture, enter on a layer opens its sheet, k
+moves it (`x y`, typed, with a size as a third number for words), h hides
+or shows it, shift+↑/↓ brings it forward or sends it back, x takes it off,
+w saves (the photo's name writes over it; another name is a new file), e
+exports, o opens what was saved.
 
 **Command line.** `cm <quill> list` lists the edits; `add <photo> [name]`
 starts one from a photo in the drive (by name, path or id); `show <edit>`
-prints what is done to it and the words on it; `turn <edit> [right|left|180]`,
-`mirror <edit>`, `crop <edit> <x y w h | all>`, `size <edit> <1920x1080 |
-1920 | 50% | as is>`; `text <edit> "words" [--at "x y"] [--size 8] [--colour
-amber]` lays words on it, `move <edit> <text> --at "x y" [--size] [--colour]`
-moves them, `rm <edit> <text>` takes them off; `picture <edit> [-o out.jpg]`
-saves the edit as it will export, from the pictures API; `export <edit>
-[format=png]` runs the action.
+(or `layers <edit>`) prints what is done to it and the layers on it, top
+first; `turn <edit> [right|left|180]`, `mirror <edit>`, `crop <edit> <x y w
+h | all>`, `size <edit> <1920x1080 | 1920 | 50% | as is>`; `text <edit>
+"words" [--at "x y"] [--size 8] [--colour amber]` lays words on it, `move
+<edit> <layer> --at "x y" [--size] [--colour]` moves a layer, `rm <edit>
+<layer>` takes it off; `picture <edit> [-o out.jpg]` saves the edit as it
+will save, from the pictures API; `save <edit>` writes over the photo and
+`save <edit> <name>` saves as a new file; `export <edit> [format=png]` runs
+the export action.

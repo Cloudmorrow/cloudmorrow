@@ -497,17 +497,27 @@ PHOTO_EDIT = (
     ("message", ("string", "text"), False),
     ("output", ("string",), False),
 )
-PHOTO_TEXT = (
-    ("text", ("string", "text"), True),
+PHOTO_LAYER = (
+    ("kind", ("enum",), True),
     ("x", ("decimal",), True),
     ("y", ("decimal",), True),
+    ("w", ("decimal",), False),
+    ("h", ("decimal",), False),
+    ("text", ("string", "text"), False),
     ("size", ("decimal",), False),
     ("colour", ("string",), False),
+    ("points", ("json",), False),
+    ("width", ("decimal",), False),
+    ("opacity", ("decimal",), False),
+    ("source", ("json",), False),
+    ("hidden", ("bool",), False),
+    ("order", ("int",), False),
 )
+LAYER_KINDS = ("text", "mark", "piece")
 
 
 def _check_photo(manifest: Manifest, screen: dict, model: Datamodel, model_of, thing: str, need, where: str) -> None:
-    """A photo editor: an edit of one picture, the texts laid on it, and where the photos are."""
+    """A photo editor: an edit of one picture, the layers laid on it, and where the photos are."""
 
     def fields(of: Datamodel, wanted: tuple, label: str) -> None:
         for name, kinds, required in wanted:
@@ -515,11 +525,16 @@ def _check_photo(manifest: Manifest, screen: dict, model: Datamodel, model_of, t
                 need(of, f"{thing} {label}", name, kinds)
 
     fields(model, PHOTO_EDIT, "edit")
-    if screen.get("texts"):
-        texts = model_of(thing + " texts", screen["texts"])
-        fields(texts, PHOTO_TEXT, "texts")
-        if not timeline_link(texts, model.id):
-            raise QuillError(f"{where}: {thing} texts {texts.id} has exactly one link to {model.id}")
+    if screen.get("layers"):
+        layers = model_of(thing + " layers", screen["layers"])
+        fields(layers, PHOTO_LAYER, "layers")
+        if not timeline_link(layers, model.id):
+            raise QuillError(f"{where}: {thing} layers {layers.id} has exactly one link to {model.id}")
+        missing = [k for k in LAYER_KINDS if k not in layers.by_name["kind"].values]
+        if missing:
+            raise QuillError(
+                f"{where}: {thing} layers kind has the values {', '.join(LAYER_KINDS)}; missing {', '.join(missing)}"
+            )
     media = screen.get("media", {})
     if not isinstance(media, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in media.items()):
         raise QuillError(
@@ -529,10 +544,20 @@ def _check_photo(manifest: Manifest, screen: dict, model: Datamodel, model_of, t
         raise QuillError(f'{where}: {thing} edits files, so the Quill uses them: [uses] datamodels = ["file"]')
     if screen.get("pictures") and screen["pictures"] not in {api["id"] for api in manifest.apis}:
         raise QuillError(f"{where}: {thing} pictures names one of its [[apis]] by id")
-    if screen.get("export"):
-        action = next((a for a in manifest.actions if a["id"] == screen["export"]), None)
-        if action is None or action.get("on") != model.id:
-            raise QuillError(f"{where}: {thing} export names one of its actions on {model.id}")
+    for binding in ("export", "save"):
+        if screen.get(binding):
+            action = next((a for a in manifest.actions if a["id"] == screen[binding]), None)
+            if action is None or action.get("on") != model.id:
+                raise QuillError(f"{where}: {thing} {binding} names one of its actions on {model.id}")
+    if screen.get("save"):
+        action = next(a for a in manifest.actions if a["id"] == screen["save"])
+        names = (
+            {f["name"] for f in action.get("fields", [])}
+            if isinstance(action.get("fields"), list)
+            else set(action.get("fields") or {})
+        )
+        if not {"overwrite", "name"} <= names:
+            raise QuillError(f"{where}: {thing} save is an action with the fields overwrite (bool) and name (string)")
 
 
 def runs_code(manifest: Manifest) -> list[str]:

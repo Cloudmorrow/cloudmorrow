@@ -193,7 +193,7 @@ what each element needs:
 | `grid` | `model` with content (`file`), `group` (a link: the places, picked first), `folder`, `kind` (an enum with `folder`), optional `size`, `modified`, `mime`, `deleted` and `deleted_from` (when a record went to the Trash, and where from: Restore in place of Rename and Move there, and Delete for good), `trash` (the name of the folder at the top of each group the server keeps them in: on the web a bin beside the plus, not among the folders, with Empty inside), `group_subtitle`, `group_open` (a bool on the group: false and it is listed, not opened), `group_writes` (a bool on the group: false and it opens with nothing that writes) | the groups, then folders and tiles, each with a menu; several picked at once; a search through a folder | the same, wider; drag and drop in, and rows onto folders | the groups in a table, then the folder, with the picture beside | `cm <quill> list [group] [folder]`, `get`, `put`, `add`, `copy`, `delete`, `restore` |
 | `data` | nothing: every datamodel the Quill has, or `models` (a list of ids) | the datamodels by domain, the records of one, the sheet of each — to look at | the same, wider | the datamodels down the left, a table of the records of one | `cm <quill> list [datamodel]`, `show <datamodel> <id>` |
 | `timeline` | `model` (the projects), `pieces`, optional `effects`, `media` (a share and a folder: the material), `frames` (an api that draws frames), `export` (an action); the fields are [TIMELINE.md](TIMELINE.md)'s | the projects, then the viewer over the tracks, the material as a sheet | the material, the viewer and the tracks together, live video with sound | frames where the terminal shows pictures, the tracks as rows of text, every edit on a key | `cm <quill> list`, `add`, `show`, `cut`, `trim`, `move`, `rm`, `frame`, `export` |
-| `photo` | `model` (the edits: one picture each), optional `texts` (the words on it), `media` (a share and a folder: the photos), `pictures` (an api that draws the picture), `export` (an action); the fields are [PHOTO.md](PHOTO.md)'s | the edits, then the picture with its buttons under it and the panels below | the panels beside the picture; the crop and the words dragged on it | the picture as it will export, the words listed beside it; keys for the rest | `cm <quill> list`, `add`, `show`, `turn`, `mirror`, `crop`, `size`, `text`, `move`, `rm`, `picture`, `export` |
+| `photo` | `model` (the edits: one picture each), optional `layers` (words, marker strokes and pieces laid on it), `media` (a share and a folder: the photos), `pictures` (an api that draws the picture), `save` (an action: over the photo, or as a new file), `export` (an action with its form); the fields are [PHOTO.md](PHOTO.md)'s | the picture with the tools as a strip under it and the panels below | tools down the left, the picture, the tool's options, the image and the layers on the right; the crop, a selection and the layers dragged on it | the picture as it will save, the layers listed beside it; keys for the rest | `cm <quill> list`, `add`, `show`, `layers`, `turn`, `mirror`, `crop`, `size`, `text`, `move`, `rm`, `picture`, `save`, `export` |
 
 A `view` may name its pen: `compose = { action = "send", label = "New mail" }`
 is one of the Quill's actions drawn in the heading as a list's New is — the
@@ -291,10 +291,12 @@ crop, and an export by the Quill's own action. What its datamodels must
 have, the frames API its service answers, and what each surface does are
 [TIMELINE.md](TIMELINE.md).
 
-A `photo` is the kit's photo editor: one picture from the drive turned,
-mirrored, cropped, made another size, with words laid on it, and exported
-by the Quill's own action. What its datamodels must have, the pictures API
-its service answers, and what each surface does are [PHOTO.md](PHOTO.md).
+A `photo` is the kit's photo editor, laid out like a simple picture
+program: one picture from the drive turned, mirrored, cropped, made another
+size, with layers on it — words, marker strokes, pieces copied and pasted
+— and saved over the photo or beside it by the Quill's own action. What its
+datamodels must have, the pictures API its service answers, and what each
+surface does are [PHOTO.md](PHOTO.md).
 
 A `sheet` is the kit's spreadsheet: cells in rows and columns, numbers and
 text typed into them, and formulas that work the others out, Excel's way —

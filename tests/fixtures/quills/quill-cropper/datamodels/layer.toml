@@ -1,0 +1,28 @@
+# What is laid on an edit's picture, bottom to top: words, marker strokes,
+# and pieces copied out of the picture. Placed on the turned picture before
+# the crop, so cropping keeps a layer on the same part of the photo.
+
+[datamodel]
+id = "cropper.layer"
+version = 1
+label = "Layer"
+description = "Words, a marker stroke, or a piece of the picture, laid on an edited photo."
+scopes = ["personal"]
+title = "text"
+
+[fields]
+edit = { kind = "link", to = "cropper.edit", required = true, indexed = true, on_delete = "cascade" }
+kind = { kind = "enum", values = ["text", "mark", "piece"], labels = ["Text", "Mark", "Piece"], default = "text", indexed = true }
+x = { kind = "decimal", required = true, default = 6, description = "The left edge, in percent of the picture's width" }
+y = { kind = "decimal", required = true, default = 6, description = "The top edge, in percent of the picture's height" }
+w = { kind = "decimal", description = "A piece: how wide it is placed, in percent" }
+h = { kind = "decimal", description = "A piece: how tall it is placed, in percent" }
+text = { kind = "string", description = "Words: a line break starts a new line" }
+size = { kind = "decimal", default = 6, description = "Words: how tall a line is, in percent of the picture's height" }
+colour = { kind = "string", default = "#ffffff", description = "A hex colour" }
+points = { kind = "json", description = "A mark: [[x, y], …] in percent" }
+width = { kind = "decimal", default = 1.5, description = "A mark: how wide the stroke is, in percent of the picture's height" }
+opacity = { kind = "decimal", default = 1, description = "A mark: 1 is solid, 0.4 a highlighter" }
+source = { kind = "json", description = "A piece: the part of the picture it is copied from, {x, y, w, h} in percent" }
+hidden = { kind = "bool", default = false, description = "Kept, but not drawn" }
+order = { kind = "int", default = 0, description = "Stacking: lowest first" }

@@ -19,9 +19,10 @@ kit = "photo"
 label = "Editor"
 model = "cropper.edit"
 title = "name"
-texts = "cropper.text"
+layers = "cropper.layer"
 media = { share = "my-files", within = "Photos" }
 export = "export"
+save = "save"
 
 [[actions]]
 id = "export"
@@ -31,3 +32,13 @@ tone = "primary"
 description = "Saves the edited picture as a new file beside the original."
 [actions.fields]
 format = { kind = "enum", values = ["jpeg", "png"], default = "jpeg" }
+
+[[actions]]
+id = "save"
+label = "Save"
+on = "cropper.edit"
+tone = "primary"
+description = "Saves the picture over the photo, or as a new file beside it."
+[actions.fields]
+overwrite = { kind = "bool", default = false }
+name = { kind = "string" }

@@ -233,9 +233,11 @@ and export. It is a chapter of its own, [TIMELINE.md](TIMELINE.md).
 
 ## A photo
 
-A `photo` is the photo editor: one picture from the drive, turned,
-mirrored, cropped, made another size, with words laid on it, and
-exported. It is a chapter of its own, [PHOTO.md](PHOTO.md).
+A `photo` is the photo editor, laid out like a simple picture program:
+one picture from the drive, turned, mirrored, cropped, made another size,
+with layers on it — words, marker strokes, pieces copied and pasted — and
+saved over the photo or beside it. It is a chapter of its own,
+[PHOTO.md](PHOTO.md).
 
 ## Views: a screen of your own
 
@@ -338,7 +340,7 @@ the same as the kit's own, for records a view has worked out itself.
 | things said in spaces | `thread` |
 | a look at every record | `data` |
 | video to cut | `timeline` |
-| a photo to crop, turn, resize or write on | `photo` |
+| a photo to crop, turn, resize, draw and write on, with layers | `photo` |
 | numbers to sum up, a page that is several of the above, a list beside what is open in it | a `view`: `stat`, `table`, `rows`, `cards`, `split` |
 
 When none of these says what your Quill needs, the kit grows — for every

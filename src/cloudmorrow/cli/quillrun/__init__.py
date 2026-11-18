@@ -99,9 +99,11 @@ start of its id, a text on it by its words or the start of its id:
     cm retouch size Beach 1920x1080    # or a width, a percent, or `as is`
     cm retouch text Beach "Summer" --at "6 6" --size 8 --colour amber
     cm retouch move Beach Summer --at "50 80"
-    cm retouch rm Beach Summer
-    cm retouch picture Beach -o beach.jpg   # as it will export, from the pictures API
-    cm retouch export Beach format=png      # the screen's export action
+    cm retouch layers Beach            # the words, marks and pieces on it, top first
+    cm retouch rm Beach Summer         # a layer, by its words or the start of its id
+    cm retouch picture Beach -o beach.jpg   # as it will save, from the pictures API
+    cm retouch save Beach              # over the photo (the old one goes to the Trash)
+    cm retouch save Beach "Beach edited.jpg"   # as a new file beside it
 
 A `list` that binds `vault` is projects: folders on your machines, each
 with a git repository and .env files kept in its vault (checkout.py):
@@ -167,7 +169,7 @@ from cloudmorrow.client.api import CloudmorrowClient
 # A timeline's words that no other screen has; a document's and a sheet's export is theirs too.
 TIMELINE_ONLY = ("cut", "trim", "rm", "frame", "export")
 # A photo editor's words that no other screen has (rm, move and export it shares).
-PHOTO_ONLY = ("turn", "mirror", "crop", "size", "text", "picture")
+PHOTO_ONLY = ("turn", "mirror", "crop", "size", "text", "picture", "save", "layers")
 # A document's word that no other screen has.
 DOCUMENT_ONLY = ("import",)
 ACTIONS = (
@@ -285,8 +287,11 @@ async def dispatch(
     found = _quill(await api.quills(), quill)
     declared = {a["id"]: a for a in found.get("actions", [])}
     shown = next((s for s in found.get("screens") or [] if s["id"] == screen_id or not screen_id), {})
-    # A timeline's, a photo's, a document's or a sheet's `export` is its screen's, whatever the action is called.
-    exports = shown.get("kit") in ("timeline", "photo", "document", "sheet") and action == "export"
+    # A timeline's, a photo's, a document's or a sheet's `export` is its screen's, whatever the action is
+    # called; so is a photo editor's `save`, which asks over the photo or beside it.
+    exports = (shown.get("kit") in ("timeline", "photo", "document", "sheet") and action == "export") or (
+        shown.get("kit") == "photo" and action == "save"
+    )
     if action in declared and not exports:
         await _press(api, found, declared[action], args, plain)
         return

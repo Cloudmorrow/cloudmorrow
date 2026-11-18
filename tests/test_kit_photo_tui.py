@@ -17,6 +17,7 @@ import pytest
 from PIL import Image
 from textual.widgets import DataTable, Input, Static
 
+from cloudmorrow.client.api import ApiError
 from cloudmorrow.quill import photo as ph
 from cloudmorrow.server.quills import QuillRegistry
 from cloudmorrow.tui.panes.kit_photo import PhotoPane, PickPhotoModal, viewer_words
@@ -83,10 +84,47 @@ def with_cropper(app, *, pictures: bool = False) -> None:
     ]
     client.record_store["cropper.edit"][0]["created_at"] = "2026-01-01T10:00:00"
     client.record_store["cropper.edit"][1]["created_at"] = "2026-10-01T10:00:00"
-    client.record_store["cropper.text"] = [
-        record_row("cropper.text", "r_t1", 0, edit="r_trip", text="Summer", x=6, y=6, size=8, colour="#f0a81e"),
+    client.record_store["cropper.layer"] = [
+        record_row(
+            "cropper.layer",
+            "r_t1",
+            0,
+            edit="r_trip",
+            kind="text",
+            text="Summer",
+            x=6,
+            y=6,
+            size=8,
+            colour="#f0a81e",
+            order=0,
+        ),
+        record_row(
+            "cropper.layer",
+            "r_m1",
+            1,
+            edit="r_trip",
+            kind="mark",
+            points=[[10, 10], [20, 20]],
+            x=10,
+            y=10,
+            colour="#e0323c",
+            width=1.5,
+            order=1,
+        ),
     ]
     plain = client.records
+    plain_record = client.record
+
+    async def record(model: str, record_id: str) -> dict:
+        # The fake serves files as notes; the photos here are the drive's.
+        if model == "file":
+            found = next((r for r in files() if r["id"] == record_id), None)
+            if found is None:
+                raise ApiError("no such record", status_code=404)
+            return found
+        return await plain_record(model, record_id)
+
+    client.record = record
 
     async def records(model: str, **where: object) -> list[dict]:
         if model == "file":
@@ -109,8 +147,9 @@ def with_cropper(app, *, pictures: bool = False) -> None:
 
     async def quill_action(quill_id, action_id, *, record="", fields=None):
         client.pressed.append((quill_id, action_id, record, dict(fields or {})))
-        await client.update_record("cropper.edit", record, {"status": "queued", "message": "as jpeg"})
-        return [{"effect": "toast", "text": "Queued"}]
+        message = "over the photo" if (fields or {}).get("overwrite") else f"as {(fields or {}).get('name') or 'jpeg'}"
+        await client.update_record("cropper.edit", record, {"status": "queued", "message": message})
+        return [{"effect": "toast", "text": "Saving"}]
 
     client.quill_action = quill_action
 
@@ -139,13 +178,21 @@ def edit(app, edit_id: str = "r_trip") -> dict:
     return next(e for e in app.client.record_store["cropper.edit"] if e["id"] == edit_id)["fields"]
 
 
+def layers(app) -> list[dict]:
+    return app.client.record_store["cropper.layer"]
+
+
 # -- words -----------------------------------------------------------------------------------
 def test_without_a_picture_the_viewer_says_what_the_edit_does():
     fields = {"width": 4000, "height": 3000, "rotate": 90, "mirror": True, "crop": {"x": 0, "y": 0, "w": 50, "h": 50}}
-    said = viewer_words(fields, [{"fields": {"text": "Hi"}}])
+    said = viewer_words(
+        fields,
+        [{"fields": {"kind": "text", "text": "Hi"}}, {"fields": {"kind": "mark", "points": [[1, 1]], "hidden": True}}],
+    )
     assert "4000 × 3000" in said and "turned 90°" in said and "mirrored" in said
-    # Turned, the picture is 3000 × 4000; half of that is kept.
+    # Turned, the picture is 3000 × 4000; half of that is kept. A hidden layer is not said.
     assert "cropped to 0 0 50 50" in said and "comes out" in said and "1500 × 2000" in said and "“Hi”" in said
+    assert "mark" not in said
     assert "not known" in viewer_words({}, [])
 
 
@@ -183,7 +230,7 @@ async def test_new_picks_a_photo_of_the_drive_and_opens_the_edit(app):
 
 
 # -- the editor -------------------------------------------------------------------------------
-async def test_the_editor_draws_the_head_the_words_and_the_texts(app):
+async def test_the_editor_draws_the_head_the_words_and_the_layers_top_first(app):
     with_cropper(app)
     async with app.run_test(size=(140, 40)) as pilot:
         pane = await open_trip(app, pilot)
@@ -192,15 +239,18 @@ async def test_the_editor_draws_the_head_the_words_and_the_texts(app):
         assert "Road trip" in head and "4000 × 3000" in head
         words = pane.query_one("#ph-viewer-words", Static)
         assert words.display and "Summer" in str(words.render())
-        texts = pane.query_one("#ph-texts", DataTable)
-        assert texts.row_count == 1 and "6 6 · 8% · #f0a81e" in str(texts.get_row_at(0)[1])
+        table = pane.query_one("#ph-layers", DataTable)
+        assert table.row_count == 2
+        # The mark is on top of the words: it is listed first.
+        assert "Mark" in str(table.get_row_at(0)[0]) and "2 points" in str(table.get_row_at(0)[1])
+        assert "Summer" in str(table.get_row_at(1)[0]) and "6 6 · 8%" in str(table.get_row_at(1)[1])
 
 
 async def test_turn_mirror_crop_and_size_write_the_edit(app):
     with_cropper(app)
     async with app.run_test(size=(140, 40)) as pilot:
         pane = await open_trip(app, pilot)
-        pane.query_one("#ph-texts", DataTable).focus()
+        pane.query_one("#ph-layers", DataTable).focus()
         await pilot.press("r")
         await settle(app, pilot)
         assert edit(app)["rotate"] == 90
@@ -233,33 +283,83 @@ async def test_turn_mirror_crop_and_size_write_the_edit(app):
         assert edit(app)["crop"] is None
 
 
-async def test_words_are_laid_on_moved_and_taken_off(app):
+async def test_layers_are_laid_on_moved_hidden_restacked_and_taken_off(app):
     with_cropper(app)
     async with app.run_test(size=(140, 40)) as pilot:
         pane = await open_trip(app, pilot)
-        store = app.client.record_store
+        table = pane.query_one("#ph-layers", DataTable)
+        table.focus()
         await pilot.press("t")
         await modal_up(pilot)
         app.screen.query_one(Input).value = "Hello"
         await pilot.press("enter")
         await settle(app, pilot)
-        made = store["cropper.text"][-1]["fields"]
-        assert (made["edit"], made["text"], made["x"], made["y"], made["size"]) == ("r_trip", "Hello", 6.0, 6.0, 6.0)
-        texts = pane.query_one("#ph-texts", DataTable)
-        assert texts.row_count == 2 and texts.cursor_row == 1
+        made = layers(app)[-1]["fields"]
+        assert (made["edit"], made["kind"], made["text"], made["x"], made["y"], made["order"]) == (
+            "r_trip",
+            "text",
+            "Hello",
+            6.0,
+            6.0,
+            2,
+        )
+        # On top, so first in the list, and the cursor on it.
+        assert table.row_count == 3 and table.cursor_row == 0
         await pilot.press("k")
         await modal_up(pilot)
         app.screen.query_one(Input).value = "50 80 12"
         await pilot.press("enter")
         await settle(app, pilot)
-        made = store["cropper.text"][-1]["fields"]
+        made = layers(app)[-1]["fields"]
         assert (made["x"], made["y"], made["size"]) == (50.0, 80.0, 12.0)
+        await pilot.press("h")
+        await settle(app, pilot)
+        assert layers(app)[-1]["fields"]["hidden"] is True
+        # Sent back one step: under the mark.
+        await pilot.press("shift+down")
+        await settle(app, pilot)
+        orders = {r["id"]: r["fields"].get("order") for r in layers(app)}
+        hello = layers(app)[-1]["id"]
+        assert orders[hello] == 1 and orders["r_m1"] == 2 and orders["r_t1"] == 0
+        assert table.cursor_row == 1
+        # The mark moves as a whole.
+        table.move_cursor(row=0)
+        await pilot.press("k")
+        await modal_up(pilot)
+        app.screen.query_one(Input).value = "20 20"
+        await pilot.press("enter")
+        await settle(app, pilot)
+        mark = next(r for r in layers(app) if r["id"] == "r_m1")["fields"]
+        assert mark["points"] == [[20.0, 20.0], [30.0, 30.0]]
         await pilot.press("x")
         await settle(app, pilot)
-        assert [t["id"] for t in store["cropper.text"]] == ["r_t1"]
+        assert all(r["id"] != "r_m1" for r in layers(app))
 
 
-async def test_export_runs_the_action_with_its_form_and_the_header_follows(app):
+async def test_save_asks_a_name_and_the_photos_name_writes_over_it(app):
+    with_cropper(app)
+    async with app.run_test(size=(140, 40)) as pilot:
+        pane = await open_trip(app, pilot)
+        await pilot.press("w")
+        await modal_up(pilot)
+        modal = app.screen
+        assert isinstance(modal, PromptModal) and modal.query_one(Input).value == "beach.jpg"
+        await pilot.press("enter")
+        await settle(app, pilot)
+        assert app.client.pressed == [("cropper", "save", "r_trip", {"overwrite": True, "name": "beach.jpg"})]
+        head = str(pane.query_one("#ph-head", Static).render())
+        assert "queued" in head and "over the photo" in head
+        assert pane._poll._active.is_set()
+        # Another name is a new file.
+        await pilot.press("w")
+        await modal_up(pilot)
+        app.screen.query_one(Input).value = "beach edited.png"
+        await pilot.press("enter")
+        await settle(app, pilot)
+        assert app.client.pressed[-1] == ("cropper", "save", "r_trip", {"overwrite": False, "name": "beach edited.png"})
+
+
+async def test_export_runs_the_action_with_its_form(app):
     with_cropper(app)
     async with app.run_test(size=(140, 40)) as pilot:
         pane = await open_trip(app, pilot)
@@ -268,8 +368,6 @@ async def test_export_runs_the_action_with_its_form_and_the_header_follows(app):
         await pilot.press("ctrl+s")
         await settle(app, pilot)
         assert app.client.pressed == [("cropper", "export", "r_trip", {"format": "jpeg"})]
-        head = str(pane.query_one("#ph-head", Static).render())
-        assert "queued" in head and "as jpeg" in head
         assert pane._poll._active.is_set()
 
 
@@ -316,7 +414,7 @@ def test_the_terminal_draws_a_photo_editor():
     assert ph.WHOLE == {"x": 0.0, "y": 0.0, "w": 100.0, "h": 100.0}
 
 
-@pytest.mark.parametrize("key", ["r", "m", "c", "s", "t"])
+@pytest.mark.parametrize("key", ["r", "m", "c", "s", "t", "w"])
 async def test_the_editors_keys_do_nothing_on_the_list(app, key):
     with_cropper(app)
     async with app.run_test(size=(140, 40)) as pilot:
@@ -324,4 +422,4 @@ async def test_the_editors_keys_do_nothing_on_the_list(app, key):
         await pilot.press(key)
         await settle(app, pilot)
         assert not pane.editing and app.screen is pane.screen
-        assert edit(app).get("rotate") in (None, 0)
+        assert edit(app).get("rotate") in (None, 0) and app.client.pressed == []

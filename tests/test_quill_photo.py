@@ -86,3 +86,53 @@ def test_a_text_has_the_kits_defaults_and_stays_inside():
     said = ph.text_of({"text": "Hi", "x": "120", "y": -3, "size": "0.1", "colour": "sky"})
     assert (said["x"], said["y"], said["size"], said["colour"]) == (100.0, 0.0, 0.5, "#5aa6e0")
     assert ph.text_said({"text": "Two\nlines", "x": 10, "y": 20}) == "'Two / lines' at 10 20, 6% tall, #ffffff"
+
+
+# -- layers -----------------------------------------------------------------------------
+def test_a_layer_is_a_text_a_mark_or_a_piece_with_the_kits_defaults():
+    text = ph.layer_of({"kind": "text", "text": "Hi"})
+    assert (text["kind"], text["x"], text["y"], text["size"], text["colour"], text["hidden"]) == (
+        "text",
+        6.0,
+        6.0,
+        6.0,
+        "#ffffff",
+        False,
+    )
+    mark = ph.layer_of(
+        {"kind": "mark", "points": [[1, 2], "junk", [300, -5]], "colour": "red", "width": 99, "hidden": True}
+    )
+    assert (
+        mark["points"] == [[1.0, 2.0], [100.0, 0.0]]
+        and mark["width"] == 25.0
+        and mark["opacity"] == 1.0
+        and mark["hidden"]
+    )
+    piece = ph.layer_of({"kind": "piece", "source": {"x": 10, "y": 10, "w": 30, "h": 20}, "x": 50, "y": 50})
+    assert piece["source"] == {"x": 10.0, "y": 10.0, "w": 30.0, "h": 20.0} and (piece["w"], piece["h"]) == (30.0, 20.0)
+    # A kind nobody knows is words.
+    assert ph.layer_of({"kind": "sticker"})["kind"] == "text"
+
+
+def test_layers_stack_by_order_then_by_age():
+    records = [
+        {"id": "b", "created_at": "2026-01-02", "fields": {"order": 0}},
+        {"id": "a", "created_at": "2026-01-01", "fields": {"order": 0}},
+        {"id": "c", "created_at": "2026-01-01", "fields": {"order": 5}},
+    ]
+    assert [r["id"] for r in ph.layers_in_order(records)] == ["a", "b", "c"]
+
+
+def test_a_layer_is_said():
+    assert (
+        ph.layer_said({"kind": "text", "text": "Two\nlines", "x": 10, "y": 20})
+        == "'Two / lines' at 10 20, 6% tall, #ffffff"
+    )
+    assert (
+        ph.layer_said({"kind": "mark", "points": [[1, 1], [2, 2]], "colour": "sky"})
+        == "a #5aa6e0 mark, 2 points, 1.5% wide"
+    )
+    assert (
+        ph.layer_said({"kind": "piece", "x": 10, "y": 10, "w": 25, "h": 20, "hidden": True})
+        == "a piece 25 × 20 at 10 10, hidden"
+    )

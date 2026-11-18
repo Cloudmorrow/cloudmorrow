@@ -196,22 +196,23 @@ def tracks_of(project: dict) -> list[dict]:
 
 # -- photos --------------------------------------------------------------------
 # The field names are the kit's own (docs/PHOTO.md); what a screen binds is
-# its two datamodels, where the photos are, and the Quill's pictures API and
-# export.
+# its two datamodels, where the photos are, and the Quill's pictures API,
+# export and save.
 
 
 def photo_fields(screen: dict, model: dict, models: dict[str, dict]) -> dict:
-    """What a photo editor draws from: the edits, the texts on them and the
-    link between, where the photos are, and the pictures API and export."""
-    texts = models.get(screen.get("texts") or "", {})
+    """What a photo editor draws from: the edits, the layers on them and the
+    link between, where the photos are, and the pictures API, export and save."""
+    layers = models.get(screen.get("layers") or "", {})
     return {
         "title": screen.get("title") or model.get("title") or "name",
         "edit": model.get("id", screen.get("model", "")),
-        "texts": texts.get("id", ""),
-        "text_edit": _link_to(texts, model.get("id", "")) if texts else "",
+        "layers": layers.get("id", ""),
+        "layer_edit": _link_to(layers, model.get("id", "")) if layers else "",
         "media": {str(k): str(v) for k, v in (screen.get("media") or {}).items()},
         "pictures": screen.get("pictures") or "",
         "export": screen.get("export") or "",
+        "save": screen.get("save") or "",
         "fields": {f.get("name") for f in model.get("fields", [])},
     }
 
