@@ -850,9 +850,10 @@ export function setBellCount(n) {
   for (const link of document.querySelectorAll(".bell-link")) link.outerHTML = bellLink();
 }
 
-/** The way to Me, in the bar's right corner. */
+/** The way to Me, in the bar's right corner: your photo, when you have one
+    (photos.js lays it over the icon). */
 export const meLink = () =>
-  `<a class="button me-link" href="#/me" aria-label="Me">${pixelIcon("me")}</a>`;
+  `<a class="button me-link" href="#/me" aria-label="Me"><span class="me-mark" data-photo="${esc(session.user)}">${pixelIcon("me")}</span></a>`;
 
 // A box that is as tall as what is written in it. Measuring means letting
 // it fall to one row for an instant, and a page that shrinks under a

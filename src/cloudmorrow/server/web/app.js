@@ -11,6 +11,7 @@ import "./quills.js";
 import "./rail.js";
 import "./format.js";
 import "./features.js";
+import "./photos.js";
 import "./me.js";
 import "./admin.js";
 import "./circlesadmin.js";

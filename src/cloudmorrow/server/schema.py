@@ -270,6 +270,9 @@ ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     # How a person's spelling is checked, as JSON: whether, the language,
     # the words they added (spelling.py); step 10.
     ("users", "spelling", "TEXT NOT NULL DEFAULT ''"),
+    # Their profile photo's stamp, or '' for none; the picture is in
+    # user_photos (photos.py). Step 11.
+    ("users", "photo", "TEXT NOT NULL DEFAULT ''"),
 )
 
 
@@ -438,6 +441,15 @@ def _spelling(conn: Connection) -> None:
     _columns(conn)
 
 
+def _photos(conn: Connection) -> None:
+    """People's profile photos (photos.py)."""
+    from cloudmorrow.server import photos
+
+    conn.executescript(photos.TABLES)
+    conn.commit()
+    _columns(conn)
+
+
 STEPS: tuple[Step, ...] = (
     Step(1, "the tables as they stood before they were versioned", _baseline),
     Step(2, "indexes for what an open screen and the retention sweep ask", _indexes_for_scale),
@@ -449,6 +461,7 @@ STEPS: tuple[Step, ...] = (
     Step(8, "the roles people hold, for approvals and flows", _roles),
     Step(9, "favorite apps on the person, and where a notification opens", _favorites_and_note_links),
     Step(10, "how a person's spelling is checked", _spelling),
+    Step(11, "people's profile photos", _photos),
 )
 
 VERSION = STEPS[-1].version

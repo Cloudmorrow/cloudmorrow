@@ -25,6 +25,9 @@ class UserOut(BaseModel):
     favorites: list[str] = []
     # How their spelling is checked: {check, language, words}.
     spelling: dict = {}
+    # Their profile photo's stamp, or '' for none: the picture is at
+    # /api/people/<username>/photo?v=<stamp>.
+    photo: str = ""
 
 
 class Favorites(BaseModel):

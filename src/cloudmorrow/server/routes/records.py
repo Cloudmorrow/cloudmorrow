@@ -30,6 +30,8 @@ from cloudmorrow.server import pages
 from cloudmorrow.server.backends import AttachmentTooBig
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_current_user, get_principal, get_state
+from cloudmorrow.server.photos import CONTENT_TYPE as PHOTO_TYPE
+from cloudmorrow.server.photos import PhotoStore
 from cloudmorrow.server.records import SEARCH_CAP, Principal, RecordError, UnknownRecordError
 from cloudmorrow.server.routes.errors import ERRORS, http_error
 from cloudmorrow.server.security import TokenError, create_media_token, decode_media_token
@@ -615,7 +617,34 @@ def list_people(state: AppState = Depends(get_state), user: User = Depends(get_c
     space a Quill has. Machines and service accounts are not people.
     """
     return [
-        {"username": u.username, "display_name": u.display_name or u.username}
+        {"username": u.username, "display_name": u.display_name or u.username, "photo": u.photo}
         for u in state.users.list()
         if u.is_active and u.user_type == "human" and u.username != user.username
     ]
+
+
+@people_router.get("/photos")
+def photo_stamps(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> dict[str, str]:
+    """Who on this server has a profile photo, and each one's stamp."""
+    return PhotoStore(state.users).stamps()
+
+
+@people_router.get("/{username}/photo")
+def photo(
+    username: str,
+    request: Request,
+    v: str = "",
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> Response:
+    """A person's profile photo, a small square WebP. Asked for with its stamp
+    (`?v=`), it is kept by the browser for good: a new photo has a new stamp."""
+    found = PhotoStore(state.users).get(username)
+    if found is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no photo")
+    data, stamp = found
+    tag = f'"{stamp}"'
+    if request.headers.get("if-none-match") == tag:
+        return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers={"ETag": tag})
+    keep = "private, max-age=31536000, immutable" if v == stamp else "private, no-cache"
+    return Response(data, media_type=PHOTO_TYPE, headers={"Cache-Control": keep, "ETag": tag})

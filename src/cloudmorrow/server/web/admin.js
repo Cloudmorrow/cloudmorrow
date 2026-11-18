@@ -27,6 +27,7 @@ import {
   api, app, esc, heading, icons, mount, nav, onShell, onSignOut, pixelArt, pixelIcon, registerScreen,
   registerTab, renderRoute, replace, session, setAdmin, store, tabs, toast, wireShell,
 } from "./core.js";
+import { avatar } from "./photos.js";
 import { circlesByPerson, domainsOf, drawCircles, rulesForm, rulesFrom, rulesSaid, wireRulesForm } from "./circlesadmin.js";
 import { drawRoles } from "./rolesadmin.js";
 import { drawQuills } from "./quillsadmin.js";
@@ -171,7 +172,7 @@ function userRow(user, circles) {
     ? `<span class="circles">${esc(circles.join(", "))}</span>`
     : `<span class="off">reaches no data</span>`;
   return `<a class="row user-row" href="#/adminuser/${encodeURIComponent(user.username)}">
-    <span class="avatar" aria-hidden="true">${esc(name.trim().charAt(0).toUpperCase() || "?")}</span>
+    ${avatar(name, user.username)}
     <span class="main">
       <span class="title">${esc(user.username)}</span>
       <span class="meta"><span class="preview">${barred}${within}${

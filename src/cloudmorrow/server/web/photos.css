@@ -1,0 +1,55 @@
+/* A person's photo, laid over the initial in their round mark (photos.js).
+   The mark keeps its own size and shape wherever it is drawn; the picture
+   only fills it. */
+
+[data-photo] { position: relative; overflow: hidden; }
+[data-photo] > img.photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  animation: photo-in .2s ease-out;
+}
+@keyframes photo-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { [data-photo] > img.photo { animation: none; } }
+
+/* -- your own, on Me ------------------------------------------------------------------------- */
+.who button.avatar { padding: 0; border: 0; cursor: pointer; font: inherit; font-size: 26px; font-weight: 700; }
+.who button.avatar:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* A small camera on the corner says it can be changed. */
+.who .photo-edit { position: relative; flex: none; }
+.who .photo-edit .badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.who .photo-edit .badge svg { width: 12px; height: 12px; }
+.who .photo-edit.busy button.avatar { opacity: .5; }
+.who .remove-photo {
+  display: block;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* -- yours, in the bar's corner --------------------------------------------------------------- */
+.me-link .me-mark { display: inline-flex; align-items: center; justify-content: center; }
+.me-link .me-mark.has-photo { width: 26px; height: 26px; border-radius: 50%; box-shadow: 0 0 0 1px var(--line-bright); }
