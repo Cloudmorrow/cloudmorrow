@@ -24,6 +24,27 @@
 .new-space .kinds input { margin-top: 15px; }
 .new-space .who-list .row { gap: 12px; }
 
+/* The list of spaces (renderSpaceList): the tick to see one or not for
+   now, then the dot, the name and the way to its page, in one row; and
+   under a group the row that adds another, in the accent, as a link is. */
+.row.space.ticked { padding: 0; }
+.row.space .tick { flex: none; display: flex; align-items: center; align-self: stretch; padding: 0 2px 0 14px; cursor: pointer; }
+.row.space .tick input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.row.space.ticked .open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 10px 12px 10px 6px;
+}
+.row.space:not(.ticked) .open { display: contents; }
+.row.space.ticked + .row.space.ticked::before { left: 80px; }
+.row.add .main { color: var(--accent); font-weight: 600; }
+.row.add .icon { color: var(--accent); }
+.row.add + .row::before, .row.space + .row.add::before { left: 16px; }
+
 /* What is on the right of a row here is a sentence, not data. */
 .row .said, .space-people .said {
   flex: none;

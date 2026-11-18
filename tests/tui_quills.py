@@ -524,6 +524,8 @@ class FakeQuills:
         self.record_calls: list[tuple[str, dict]] = []
         self.moves: list[tuple[str, dict, int | None]] = []
         self.quill_calls: list[tuple[str, str]] = []
+        # Every Quill action pressed: its id and the fields it was sent.
+        self.action_calls: list[tuple[str, dict]] = []
         # Every record read on its own, so a test can see a value was asked for.
         self.record_reads: list[tuple[str, str]] = []
         self._next_id = 100
@@ -531,6 +533,13 @@ class FakeQuills:
     # -- the Quills ------------------------------------------------------------
     async def quills(self) -> list[dict]:
         return copy.deepcopy(self.quill_list)
+
+    async def quill_action(
+        self, quill_id: str, action_id: str, *, record: str = "", fields: dict | None = None
+    ) -> list:
+        """An action pressed: remembered, and answered with no effects."""
+        self.action_calls.append((action_id, dict(fields or {})))
+        return []
 
     async def quill_catalog(self) -> dict:
         installed = {q["id"]: q["version"] for q in self.quill_list}

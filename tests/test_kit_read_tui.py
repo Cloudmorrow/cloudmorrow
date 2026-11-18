@@ -272,7 +272,8 @@ async def test_events_on_calendars_you_may_only_read(app):
             row.update(owner="guest", can_manage=False, members=["bram"])
     async with app.run_test(size=(140, 40)) as pilot:
         screen, pane = await open_calendar(app, pilot)
-        assert toolbar(pane) == ["new_record", "open_record", "delete_record", "people", "today"]
+        # Seeing a calendar or not for now is nobody's to refuse: it is yours, here.
+        assert toolbar(pane) == ["new_record", "open_record", "delete_record", "toggle_space", "people", "today"]
         for key in ("c", "r"):
             await pilot.press(key)
             await breathe(pilot)

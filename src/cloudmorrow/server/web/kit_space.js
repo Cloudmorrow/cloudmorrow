@@ -6,7 +6,10 @@
    kit element that draws things in spaces uses what is here rather than
    its own:
 
-     renderSpaceList   every space you can see, grouped by who can see it
+     renderSpaceList   every space you can see, grouped by whose it is:
+                       yours, the ones from elsewhere, everybody's — with
+                       the rows that make one and subscribe to one, and a
+                       tick on each to stop seeing it for now
      renderNewSpace    make one: its name, its other plain fields, who can
                        see it (a scope), and for a shared one its people
      renderWriteTo     pick who it is to — one person or several, as pills in
@@ -96,34 +99,66 @@ const personLabel = (p) => p.display_name && p.display_name !== p.username
   ? `${p.display_name} (${p.username})` : p.username;
 
 // -- the list ------------------------------------------------------------------------
-/** Every space of *model* you can see: yours, the shared ones, everybody's.
-    *dot* draws what goes before a name (a calendar's colour). */
-/** Every space you can see, grouped by who can see it. *apart* takes some
-    out into a group of their own — `{label, is, said}`: the ones `is` picks,
-    under `label`, each with what `said` says of it instead of its scope. */
-export async function renderSpaceList(at, model, { dot = () => "", back, backLabel, apart = null } = {}) {
+const PLUS = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 2.5v11M2.5 8h11"/></svg>';
+
+/** Every space you can see, in three groups: yours (your own, and the ones
+    you made to share), the ones from elsewhere, and everybody's (the one
+    everybody is in, and the ones others shared with you). Under yours is
+    the row that makes one, for whoever may write spaces.
+
+    *dot* draws what goes before a name (a calendar's colour). *apart* takes
+    the ones from elsewhere out into a group of their own — `{label, is,
+    said, add}`: the ones `is` picks, under `label`, each with what `said`
+    says of it instead of its scope, and `add` — `{label, press}` — the row
+    under them that brings in another. *shown* — `{is(space), set(space,
+    on)}` — puts a tick on every row: off, the space is not seen for now,
+    and what that means is the caller's. *more* — `{label, href}` — is a
+    last row to whatever else there is to set, the Quill's own settings. */
+export async function renderSpaceList(at, model, { dot = () => "", back, backLabel, apart = null, shown = null, more = null } = {}) {
   const spaces = await api("GET", recordsUrl(model.id));
   const plural = `${model.label}s`;
+  const noun = model.label.toLowerCase();
   const aside = (s) => (apart && apart.is(s) ? apart.said(s) : scopeSaid(s));
-  const row = (s) => `<a class="row has-icon" href="${sheetHash(at, model.id, s.id)}">
+  const row = (s) => {
+    const name = spaceName(model, s, at.screen);
+    return `<div class="row has-icon space${shown ? " ticked" : ""}">${shown
+      ? `<label class="tick"><input type="checkbox" data-space="${esc(s.id)}"${shown.is(s) ? " checked" : ""} aria-label="See ${esc(name)}"></label>` : ""}
+      <a class="open" href="${sheetHash(at, model.id, s.id)}">
       <span class="icon">${dot(s)}</span>
-      <span class="main"><span class="title">${esc(spaceName(model, s, at.screen))}</span>
+      <span class="main"><span class="title">${esc(name)}</span>
         <span class="meta"><span class="preview">${esc(aside(s))}${
           s.owner !== session.user && s.scope !== "public" ? ` · ${esc(s.owner)}'s` : ""}</span></span></span>
-      ${icons.chevronRight}</a>`;
-  const group = (label, rows) => (rows.length
-    ? `<p class="group-label">${label}</p><div class="group">${rows.map(row).join("")}</div>` : "");
-  const rest = apart ? spaces.filter((s) => !apart.is(s)) : spaces;
+      ${icons.chevronRight}</a></div>`;
+  };
+  const addRow = (label, { href = "", data = "" }) => (href
+    ? `<a class="row has-icon add" href="${href}">` : `<button type="button" class="row has-icon add" ${data}>`) +
+    `<span class="icon">${PLUS}</span><span class="main">${esc(label)}</span>` + (href ? "</a>" : "</button>");
+  const group = (label, rows, add = "") => (rows.length || add
+    ? `<p class="group-label">${label}</p><div class="group">${rows.map(row).join("")}${add}</div>` : "");
+  const fromElsewhere = (s) => !!(apart && apart.is(s));
+  // Yours: your own, and the ones you made to share — never the public one,
+  // which is everybody's whoever happened to make it.
+  const yours = spaces.filter((s) => s.owner === session.user && s.scope !== "public" && !fromElsewhere(s));
+  // Everybody's: the one everybody is in first, then the ones others shared with you.
+  const everybodys = spaces.filter((s) => !yours.includes(s) && !fromElsewhere(s))
+    .sort((a, b) => (a.scope === "public" ? 0 : 1) - (b.scope === "public" ? 0 : 1));
   mount(nav({ back, backLabel, title: plural }) + `
-    <main>
-      ${heading(plural, mayWrite(model) ? `<a class="button compose" href="${at.base}/newspace" aria-label="New ${esc(model.label.toLowerCase())}">${icons.compose}</a>` : "")}
-      ${group("Yours", rest.filter((s) => s.scope === "personal"))}
-      ${apart ? group(apart.label, spaces.filter(apart.is)) : ""}
-      ${group("Shared", rest.filter((s) => s.scope === "shared"))}
-      ${group("Everybody's", rest.filter((s) => s.scope === "public"))}
-      ${spaces.length ? "" : `<p class="empty mascot"><b>None yet</b>${mayWrite(model) ? "Make one with the pen above." : "When there is one, it will show up here."}</p>`}
+    <main class="space-list">
+      ${heading(plural)}
+      ${group("Yours", yours, mayWrite(model) ? addRow(`New ${noun}`, { href: `${at.base}/newspace` }) : "")}
+      ${apart ? group(apart.label, spaces.filter(apart.is), apart.add ? addRow(apart.add.label, { data: "data-add" }) : "") : ""}
+      ${group("Everybody's", everybodys)}
+      ${more ? `<div class="group"><a class="row" href="${more.href}"><span class="main">${esc(more.label)}</span>${icons.chevronRight}</a></div>` : ""}
+      ${spaces.length ? "" : `<p class="empty mascot"><b>None yet</b>${mayWrite(model) ? `Make one with the row above.` : "When there is one, it will show up here."}</p>`}
     </main>` + tabs(at.tab));
   wireShell();
+  if (shown) {
+    for (const box of app.querySelectorAll(".space .tick input")) {
+      box.addEventListener("change", () => shown.set(spaces.find((s) => s.id === box.dataset.space), box.checked));
+    }
+  }
+  const add = app.querySelector("[data-add]");
+  if (add && apart && apart.add) add.addEventListener("click", () => apart.add.press());
 }
 
 // -- making one ------------------------------------------------------------------------

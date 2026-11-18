@@ -112,6 +112,8 @@ def calendar_fields(screen: dict, model: dict) -> dict[str, str]:
         # A field of the space: filled, the space is subscribed from elsewhere —
         # drawn with the rest, and nothing put on it or changed on it here.
         "subscribed": screen.get("subscribed") or "",
+        # The Quill's action that brings one in from elsewhere, if it has one.
+        "subscribe": screen.get("subscribe") or "",
     }
 
 

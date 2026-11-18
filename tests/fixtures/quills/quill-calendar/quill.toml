@@ -55,6 +55,7 @@ starts = "starts_at"
 ends = "ends_at"
 all_day = "all_day"
 subscribed = "calendar.url"   # a calendar with an address comes from elsewhere: drawn, listed apart, read-only
+subscribe = "subscribe"       # the action that brings one in: the row under the subscribed ones, behind the gear
 
 # Everybody has exactly one calendar of their own, made the first time they
 # look, named after them. It is personal: nobody else sees it.
@@ -89,6 +90,7 @@ description = "A copy of the event seven days later, on the same calendar, at th
 [[actions]]
 id = "subscribe"
 label = "Subscribe to a calendar"
+settings = true               # on no bar: the row behind the gear presses it
 description = "A calendar published elsewhere, by its address: an .ics link, as Google Calendar, Outlook and the rest give out. It is drawn with yours in a colour of its own, read again every hour, and read-only: what is on it is theirs to change."
 [actions.fields]
 url = { kind = "url", required = true, label = "Address", description = "The feed's address, https://…ics" }

@@ -22,6 +22,7 @@ from cloudmorrow.tui.panes.kit_calendar import (
     space_row,
     when_said,
 )
+from cloudmorrow.tui.quill_actions import ActionModal
 from cloudmorrow.tui.screens.modals import ConfirmModal
 from cloudmorrow.tui.screens.record_sheet import RecordSheet
 from cloudmorrow.tui.widgets.kit_space import NewSpaceModal, SpaceModal
@@ -110,12 +111,18 @@ def test_a_thing_is_filed_under_every_day_it_covers():
     assert sorted(filed) == [dt.date(2026, 9, 19), dt.date(2026, 9, 20), dt.date(2026, 9, 21)]
 
 
-def test_a_calendar_says_who_it_is_for():
+def test_a_calendar_says_who_it_is_for_and_whether_it_is_seen():
     rows = calendar_records()["calendar"]
     model = CALENDAR_MODELS["calendar"]
     assert "only you" in space_row(rows[0], model, "colour", me="bram")[1]
     assert "2 people" in space_row(rows[1], model, "colour", me="bram")[1]
     assert "everyone" in space_row(rows[2], model, "colour", me="bram")[1]
+    # Somebody else's shared one says whose; a subscribed one says only that.
+    assert "· guest" in space_row({**rows[1], "owner": "guest"}, model, "colour", me="bram")[1]
+    assert "subscribed" in space_row(rows[1], model, "colour", me="bram", subscribed=True)[1]
+    # The tick in front: on, or off for now.
+    assert space_row(rows[0], model, "colour", me="bram")[0].startswith("☑ ")
+    assert "☐" in space_row(rows[0], model, "colour", me="bram", shown=False)[0]
 
 
 def test_the_wall_clock_is_drawn_as_it_is_and_a_zone_is_converted():
@@ -148,8 +155,49 @@ async def test_the_calendars_are_listed_with_your_own_at_the_top(app):
         table = pane.query_one("#calendar-table", DataTable)
         assert table.row_count == 3
         assert "bram" in str(table.get_row_at(0)[0])
+        # Yours: your own, then the one you made to share; then everybody's.
+        assert [s["id"] for s in pane.spaces] == ["r_mine", "r_house", "r_all"]
         # New things go in whichever one the list is standing on: your own.
         assert pane.space_id == "r_mine"
+
+
+async def test_a_calendar_somebody_else_shared_with_you_is_under_everybodys(app):
+    with_calendar(app)
+    for row in app.client.record_store["calendar"]:
+        if row["id"] == "r_house":
+            row.update(owner="guest", can_manage=False, members=["bram"])
+        if row["id"] == "r_all":
+            # Everybody's is everybody's whoever happened to make it.
+            row.update(owner="bram", can_manage=True)
+    async with app.run_test(size=(140, 40)) as pilot:
+        _, pane = await open_calendar(app, pilot)
+        # The one everybody is in first, then the ones others shared with you.
+        assert [s["id"] for s in pane.spaces] == ["r_mine", "r_all", "r_house"]
+        table = pane.query_one("#calendar-table", DataTable)
+        assert "· guest" in str(table.get_row_at(2)[1])
+
+
+async def test_v_takes_a_calendar_off_the_month_for_now_and_puts_it_back(app):
+    with_calendar(app)
+    async with app.run_test(size=(140, 40)) as pilot:
+        _, pane = await open_calendar(app, pilot)
+        assert "Bins out" in [e["title"] for e in pane.day_events()]
+        pane.query_one("#calendar-table", DataTable).focus()
+        await pilot.press("down")
+        await settle(app, pilot)
+        assert pane.space_id == "r_house"
+        pane.fire("toggle_space")
+        await settle(app, pilot)
+        # Its things are off the day and the month; the row says so; the rest stay.
+        titles = [e["title"] for e in pane.day_events()]
+        assert "Bins out" not in titles and "Dentist" in titles
+        table = pane.query_one("#calendar-table", DataTable)
+        assert "☐" in str(table.get_row_at(1)[0])
+        assert pane.hidden == {"r_house"}
+        pane.fire("toggle_space")
+        await settle(app, pilot)
+        assert "Bins out" in [e["title"] for e in pane.day_events()]
+        assert "☑" in str(table.get_row_at(1)[0])
 
 
 def with_subscription(app) -> None:
@@ -174,14 +222,14 @@ def with_subscription(app) -> None:
     app.client.record_store["event"].append(match)
 
 
-async def test_a_subscribed_calendar_is_listed_after_your_own_and_says_so(app):
+async def test_a_subscribed_calendar_is_listed_after_yours_and_says_so(app):
     with_calendar(app)
     with_subscription(app)
     async with app.run_test(size=(140, 40)) as pilot:
         _, pane = await open_calendar(app, pilot)
         table = pane.query_one("#calendar-table", DataTable)
-        assert [s["id"] for s in pane.spaces] == ["r_mine", "r_feed", "r_house", "r_all"]
-        assert "subscribed" in str(table.get_row_at(1)[1])
+        assert [s["id"] for s in pane.spaces] == ["r_mine", "r_house", "r_feed", "r_all"]
+        assert "subscribed" in str(table.get_row_at(2)[1])
         # Its things are on the day with everybody else's.
         titles = [e["title"] for e in pane.day_events()]
         assert "Match" in titles
@@ -193,6 +241,7 @@ async def test_nothing_goes_on_a_subscribed_calendar_and_what_is_on_it_is_read(a
     async with app.run_test(size=(140, 40)) as pilot:
         _, pane = await open_calendar(app, pilot)
         pane.query_one("#calendar-table", DataTable).focus()
+        await pilot.press("down")
         await pilot.press("down")
         await settle(app, pilot)
         assert pane.space_id == "r_feed"
@@ -217,6 +266,41 @@ async def test_nothing_goes_on_a_subscribed_calendar_and_what_is_on_it_is_read(a
         await modal_up(pilot)
         assert not isinstance(app.screen, ConfirmModal)
         assert any(r["id"] == "r_match" for r in app.client.record_store["event"])
+
+
+async def test_s_subscribes_through_the_quills_own_action_and_the_list_has_the_new_one(app):
+    """The screen names the action (`subscribe`); `s` presses it as any action
+    is pressed — its form asks for the address — and the list is read again."""
+    with_calendar(app)
+    with_subscription(app)
+    quill = app.client.quill_list[-1]
+    quill["screens"][0]["subscribe"] = "subscribe"
+    quill["actions"] = [
+        {
+            "id": "subscribe",
+            "label": "Subscribe to a calendar",
+            "settings": True,
+            "fields": [{"name": "url", "kind": "url", "label": "Address", "required": True}],
+        }
+    ]
+    async with app.run_test(size=(140, 40)) as pilot:
+        _, pane = await open_calendar(app, pilot)
+        assert "subscribe" not in pane.refused
+        pane.fire("subscribe")
+        await modal_up(pilot)
+        form = app.screen
+        assert isinstance(form, ActionModal)
+        form.query_one("#action-url", Input).value = "https://club.example/feed.ics"
+        await pilot.click("#action-submit")
+        await settle(app, pilot)
+        assert ("subscribe", {"url": "https://club.example/feed.ics"}) in app.client.action_calls
+
+
+async def test_without_a_subscribe_action_there_is_no_s(app):
+    with_calendar(app)
+    async with app.run_test(size=(140, 40)) as pilot:
+        _, pane = await open_calendar(app, pilot)
+        assert "subscribe" in pane.refused
 
 
 async def test_the_month_opens_on_this_one_and_the_day_on_today(app):
@@ -338,8 +422,11 @@ async def test_the_people_in_a_calendar_are_added_and_you_can_leave_one(app):
     async with app.run_test(size=(140, 40)) as pilot:
         _, pane = await open_calendar(app, pilot)
         pane.query_one("#calendar-table", DataTable).focus()
+        # Somebody else's shared one is under everybody's, after the one everybody is in.
+        await pilot.press("down")
         await pilot.press("down")
         await settle(app, pilot)
+        assert pane.space_id == "r_house"
         pane.fire("people")
         await modal_up(pilot)
         modal = app.screen

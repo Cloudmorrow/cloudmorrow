@@ -14,10 +14,16 @@
                     space comes from elsewhere: drawn like the rest, listed
                     apart, and nothing here puts anything on it or changes
                     what is on it
+     subscribe      optional: the Quill's action that brings one in from
+                    elsewhere (on no record): the row under the subscribed
+                    ones that presses it
 
    Every space you can see is drawn at once, because a calendar you have to
-   switch between is a calendar that lets you double-book yourself. The list
-   of spaces is for sharing them, not for hiding them; it is kit_space.js.
+   switch between is a calendar that lets you double-book yourself. Behind
+   the gear beside the title is the list of them (kit_space.js): yours,
+   the subscribed ones, everybody's, the rows that make one and subscribe
+   to one, and a tick on each to stop seeing it for now — on this device,
+   as the week-or-month choice is kept, and never a filter on the server.
 
    Times are the times on the wall. A moment with no zone is stored as it was
    typed and drawn as it is, so ten o'clock is ten o'clock in June and in
@@ -32,9 +38,10 @@
    on a sheet that says them. */
 
 import {
-  api, app, esc, heading, icons, localDay, localMinute, mount, nav, pad2, recordsUrl, renderRoute,
-  replace, store, tabs, wireShell,
+  api, app, esc, heading, icons, localDay, localMinute, mount, nav, pad2, pixelIcon, recordsUrl,
+  renderRoute, replace, store, tabs, wireShell,
 } from "./core.js";
+import { press } from "./actions.js";
 import { mayWrite, sheetHash } from "./kit.js";
 import { openSheet } from "./dialog.js";
 import { renderNewSpace, renderSpaceList } from "./kit_space.js";
@@ -46,7 +53,6 @@ export const COLOURS = ["cyan", "violet", "green", "amber", "rose"];
 const glyphs = {
   left: '<svg width="11" height="18" viewBox="0 0 11 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 1.5 2 9l6.5 7.5"/></svg>',
   right: '<svg width="11" height="18" viewBox="0 0 11 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 1.5 9 9l-6.5 7.5"/></svg>',
-  people: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M16 5.3a3.2 3.2 0 0 1 0 5.4M17.5 14.2A5.5 5.5 0 0 1 20.5 19"/></svg>',
 };
 
 // -- days, the way this file counts them -------------------------------------------
@@ -179,7 +185,23 @@ export function bindingsOf(quill, screen) {
     ends: screen.ends,
     allDay: screen.all_day || "",
     subscribed: screen.subscribed || "",
+    subscribe: screen.subscribe || "",
   };
+}
+
+// -- the spaces not seen for now ----------------------------------------------------------
+// Their ids, kept in the browser under the screen's key as the week-or-month
+// choice is: a tick on the list of spaces, and nothing on the server.
+export function hiddenSpaces(key) {
+  try {
+    return new Set(JSON.parse(store.get(key + ".hidden") || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+export function keepHidden(key, hidden) {
+  store.set(key + ".hidden", hidden.size ? JSON.stringify([...hidden]) : null);
 }
 
 /** Does this space come from elsewhere — a feed the person subscribed to? */
@@ -245,11 +267,32 @@ export async function renderCalendar(at, arg) {
   const { quill, screen } = at;
   const b = bindingsOf(quill, screen);
   const dot = (space) => `<i class="dot c-${colourOf(b, space)}" aria-hidden="true"></i>`;
+  const remembered = `kit.${at.tab}`;
+  const hidden = hiddenSpaces(remembered);
   if (arg === "spaces") {
+    // The list behind the gear: yours, the subscribed ones with the row that
+    // subscribes to another (the screen's `subscribe` action, pressed as any
+    // action is, the list drawn again once it has run), everybody's.
+    const subscribe = b.subscribe ? (quill.actions || []).find((a) => a.id === b.subscribe) : null;
     const apart = b.subscribed
-      ? { label: "Subscribed", is: (s) => isSubscribed(b, s), said: (s) => `From ${subscribedFrom(b, s)}` }
+      ? {
+        label: "Subscribed",
+        is: (s) => isSubscribed(b, s),
+        said: (s) => `From ${subscribedFrom(b, s)}`,
+        add: subscribe ? { label: subscribe.label, press: () => press(quill, subscribe, { after: renderRoute }) } : null,
+      }
       : null;
-    return renderSpaceList(at, b.spaceModel, { dot, back: at.base, backLabel: screen.label, apart });
+    return renderSpaceList(at, b.spaceModel, {
+      dot,
+      back: at.base,
+      backLabel: screen.label,
+      apart,
+      shown: {
+        is: (s) => !hidden.has(s.id),
+        set: (s, on) => { if (on) hidden.delete(s.id); else hidden.add(s.id); keepHidden(remembered, hidden); },
+      },
+      more: at.settings ? { label: at.settings.label || "Settings", href: at.settings.href } : null,
+    });
   }
   if (arg === "newspace") {
     return renderNewSpace(at, b.spaceModel, {
@@ -268,7 +311,6 @@ export async function renderCalendar(at, arg) {
     return renderRoute();
   }
 
-  const remembered = `kit.${at.tab}`;
   const picked = /^\d{4}-\d{2}-\d{2}$/.test(arg) ? arg : today();
   const view = wide() ? (store.get(remembered + ".view") || "week") : "month";
   const days = view === "week" ? weekOf(picked) : weeksOf(picked).flat();
@@ -278,15 +320,17 @@ export async function renderCalendar(at, arg) {
     eventsBetween(b, days[0], days[days.length - 1]),
   ]);
   const spaces = new Map(spaceList.map((s) => [s.id, s]));
-  const events = records.map((r) => occasion(b, r, spaces));
+  // A space unticked on the list is not drawn, for now, on this device.
+  const events = records.filter((r) => !hidden.has(r.fields[b.spaceField])).map((r) => occasion(b, r, spaces));
   const filed = byDay(events);
   const href = (event) => sheetHash(at, b.model.id, event.id);
 
   // Where a new one goes: the space you last put something in, else your own.
   // Never a subscribed one: what is on it is somebody else's to put there.
   const writable = spaceList.filter((s) => !isSubscribed(b, s));
-  let target = writable.find((s) => s.id === store.get(remembered + ".in")) ||
-    writable.find((s) => s.scope === "personal") || writable[0] || null;
+  const seen = writable.filter((s) => !hidden.has(s.id));
+  let target = seen.find((s) => s.id === store.get(remembered + ".in")) ||
+    seen.find((s) => s.scope === "personal") || seen[0] || writable[0] || null;
 
   const title = view === "week"
     ? `${shortDay(days[0])} – ${shortDay(days[6])}`
@@ -296,8 +340,12 @@ export async function renderCalendar(at, arg) {
       `<button type="button" role="radio" data-view="${v}"${v === view ? ' class="active" aria-checked="true"' : ' aria-checked="false"'}>${v === "week" ? "Week" : "Month"}</button>`).join("")}</div>`
     : "";
   const adds = mayWrite(b.model);
-  const actions = `<a class="button" href="${at.base}/spaces" aria-label="${esc(b.spaceModel.label)}s">${glyphs.people}</a>` +
-    (adds ? `<button class="compose" aria-label="New ${esc(b.model.label.toLowerCase())}">${icons.compose}</button>` : "");
+  // The pen for a new thing, and the gear to the list of spaces: the one
+  // gear this screen has, so the Quill's own settings, when it has any, are
+  // a row on that list rather than a second gear beside it.
+  const plural = `${b.spaceModel.label}s`;
+  const actions = (adds ? `<button class="compose" aria-label="New ${esc(b.model.label.toLowerCase())}">${icons.compose}</button>` : "") +
+    `<a class="button settings" href="${at.base}/spaces" aria-label="${esc(plural)}" title="${esc(plural)}">${pixelIcon("settings")}</a>`;
   const onThatDay = inOrder(filed.get(picked) || []);
   const dayList = `<p class="group-label day-label">${esc(longDay(picked))}
       ${picked === today() ? "" : `<button class="today-link" type="button">Today</button>`}</p>
