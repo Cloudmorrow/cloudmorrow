@@ -38,6 +38,7 @@ import {
   api, app, esc, heading, icons, mount, nav, onSignOut, recordsUrl, renderRoute, replace, session,
   tabs, toast, wireShell,
 } from "./core.js";
+import { avatar } from "./photos.js";
 import { mayWrite, sheetHash } from "./kit.js";
 import { ask } from "./dialog.js";
 
@@ -68,7 +69,9 @@ export function spaceName(model, space, screen, me = session.user) {
 export function spaceMark(model, space, screen, me = session.user) {
   if (isBetween(screen, space)) {
     const name = spaceName(model, space, screen, me);
-    return `<span class="avatar" aria-hidden="true">${esc(name.charAt(0).toUpperCase() || "?")}</span>`;
+    // Between two people, the mark is the other one's face.
+    const others = peopleIn(space).filter((who) => who !== me);
+    return avatar(name, others.length === 1 ? others[0] : "");
   }
   return `<span class="hash" aria-hidden="true">#</span>`;
 }
@@ -253,7 +256,7 @@ export async function renderWriteTo(at, model, { back, backLabel, opened }) {
       <div class="group people-list">${everyone.map((p) => `
         <button class="row person" type="button" data-who="${esc(p.username)}" aria-pressed="false"
           data-text="${esc(`${p.display_name || ""} ${p.username}`.toLowerCase())}">
-          <span class="avatar" aria-hidden="true">${esc((p.display_name || p.username).charAt(0).toUpperCase())}</span>
+          ${avatar(p.display_name || p.username, p.username)}
           <span class="main"><span class="title">${esc(p.display_name || p.username)}</span>
           ${p.display_name ? `<span class="meta"><span class="preview">${esc(p.username)}</span></span>` : ""}</span>
           <span class="picked-mark" aria-hidden="true">${icons.tick}</span></button>`).join("")}</div>
@@ -368,7 +371,7 @@ export async function spaceSection(model, record, { fixed = false } = {}) {
   const writes = mayWrite(model);
   const mayAdd = shared && !fixed && writes && (record.can_manage || inIt.includes(session.user));
   const outside = mayAdd ? (await people().catch(() => [])).filter((p) => !inIt.includes(p.username)) : [];
-  const who = (name) => `<div class="row member"><span class="avatar" aria-hidden="true">${esc(name.charAt(0).toUpperCase())}</span>
+  const who = (name) => `<div class="row member">${avatar(name, name)}
       <span class="main">${esc(name)}${name === session.user ? " (you)" : ""}${name === record.owner && !fixed ? ` <span class="said">made it</span>` : ""}</span>
       ${shared && !fixed && writes && record.can_manage && name !== record.owner
         ? `<button class="take-out" type="button" data-who="${esc(name)}" aria-label="Take ${esc(name)} out">Take out</button>` : ""}</div>`;

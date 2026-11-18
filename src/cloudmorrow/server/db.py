@@ -76,6 +76,8 @@ class User:
     favorites: list[str] = field(default_factory=list)
     # How their spelling is checked (spelling.py): {check, language, words}.
     spelling: dict = field(default_factory=dict)
+    # Their profile photo's stamp (photos.py), or '' for none.
+    photo: str = ""
 
 
 def _favorites(raw: str) -> list[str]:
@@ -122,6 +124,7 @@ def _row_to_user(row: Row) -> User:
         updated_at=row["updated_at"],
         favorites=_favorites(row["favorites"]),
         spelling=_spelling(row["spelling"]),
+        photo=row["photo"] or "",
     )
 
 
@@ -237,6 +240,7 @@ class UserStore:
             "system_uid",
             "favorites",
             "spelling",
+            "photo",
         }
         updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
         if not updates:
@@ -274,3 +278,5 @@ class UserStore:
             conn.execute("DELETE FROM circle_members WHERE username = ?", (username.strip().lower(),))
             if conn.table_exists("role_holders"):
                 conn.execute("DELETE FROM role_holders WHERE username = ?", (username.strip().lower(),))
+            if conn.table_exists("user_photos"):
+                conn.execute("DELETE FROM user_photos WHERE username = ?", (username.strip().lower(),))

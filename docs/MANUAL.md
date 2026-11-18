@@ -737,6 +737,16 @@ the top-right corner of every tab rather than a tab of its own, which is
 where a phone keeps it. What a screen makes — a note, a task, an event, a
 file — is the button beside its title.
 
+**Your photo**: tap the round mark with your initial at the top of **Me**
+and pick a picture; **Remove photo** under your name takes it away again.
+It is shown wherever you are — the corner of every screen, Administration's
+list of people, a conversation between two of you, who is in a channel.
+The browser shrinks the picture before it is sent, and the server keeps it
+cut to the square in its middle, 256 pixels a side, a few kilobytes: a
+phone's 5 MB photo is never what anybody loads. Somebody else's new photo
+shows up the next time you open the app, or within ten minutes. The
+terminal app keeps initials.
+
 Every installed Quill is an app — Notes, Tasks, Files, Calendar, Channels,
 Secrets on a fresh server. The bar along the bottom of a phone has Today,
 five of them and **More**, which opens every app in a sheet: the five are
@@ -2536,6 +2546,9 @@ curl -s $CLOUDMORROW/api/notifications -H "Authorization: Bearer $TOKEN"
 | `POST` | `/api/auth/login` | `{username, password}` → bearer token |
 | `GET` | `/api/auth/me` | the current user |
 | `POST` | `/api/auth/password` | change your own password |
+| `PUT`/`DELETE` | `/api/auth/photo` | your profile photo: the body is the picture, kept as a 256-pixel square WebP; answers `{photo: stamp}` |
+| `GET` | `/api/people/photos` | who has a profile photo, `{username: stamp}` |
+| `GET` | `/api/people/{username}/photo?v=<stamp>` | a profile photo; with its stamp it is cached for good |
 | `GET` | `/api/records/{model}/{id}/history` | who did what to a record, newest first — which fields, never a value |
 | `GET`/`PUT` | `/api/access/{username}` | one person's access, and their own rules replaced whole (administrators) |
 | `GET` | `/api/quills/{id}/brought` | what a Quill brought, with how many records hold each (administrators) |

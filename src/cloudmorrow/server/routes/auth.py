@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from cloudmorrow.server.db import User
 from cloudmorrow.server.deps import AppState, get_current_user, get_state
+from cloudmorrow.server.photos import MAX_UPLOAD, PhotoError, PhotoStore, PhotoUnavailable
 from cloudmorrow.server.schemas import Favorites, LoginRequest, PasswordChange, Spelling, TokenResponse, UserOut
 from cloudmorrow.server.security import (
     create_access_token,
@@ -29,6 +30,7 @@ def user_out(user: User) -> UserOut:
         created_at=user.created_at,
         favorites=user.favorites,
         spelling=user.spelling,
+        photo=user.photo,
     )
 
 
@@ -96,6 +98,32 @@ def set_spelling(
     sign in."""
     updated = state.users.update(user.username, spelling=payload.model_dump())
     return Spelling(**updated.spelling)
+
+
+@router.put("/photo")
+async def set_photo(
+    request: Request,
+    state: AppState = Depends(get_state),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Your profile photo. The body is the picture; the server keeps it cut to
+    a small square (photos.py), whatever size it came in at."""
+    size = int(request.headers.get("content-length") or 0)
+    if size > MAX_UPLOAD:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "that picture is too big")
+    data = await request.body()
+    try:
+        stamp = PhotoStore(state.users).put(user.username, data)
+    except PhotoUnavailable as exc:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, str(exc)) from exc
+    except PhotoError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {"photo": stamp}
+
+
+@router.delete("/photo", status_code=status.HTTP_204_NO_CONTENT)
+def remove_photo(state: AppState = Depends(get_state), user: User = Depends(get_current_user)) -> None:
+    PhotoStore(state.users).remove(user.username)
 
 
 @router.post("/password", status_code=status.HTTP_204_NO_CONTENT)
