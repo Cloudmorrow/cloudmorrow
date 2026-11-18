@@ -67,9 +67,9 @@ are in [docs/INSTALL.md](docs/INSTALL.md); the short version is at
 ## What is in the box
 
 Every Quill below comes from the [Quill Catalog](https://github.com/Cloudmorrow/quill-catalog),
-on the shelf the catalog keeps it on. The first four are the foundation,
-ticked on a fresh server; the rest are a tick away in the installer or under
-Administration.
+on the shelf the catalog keeps it on. Notes, Tasks, Calendar and Files are
+the foundation, ticked on a fresh server; the rest are a tick away in the
+installer or under Administration.
 
 | Shelf | Quills |
 | --- | --- |
