@@ -569,3 +569,22 @@ rows = [
   "XXXXXX......",
   "............",
 ]
+
+[[icons]]
+id = "messages"
+name = "Messages"
+tags = ["chat", "bubbles", "talk", "conversation", "sms", "texting"]
+rows = [
+  "............",
+  ".XXXXXXX....",
+  "XXXXXXXXX...",
+  "XXXXXXXXX...",
+  "XXXXXXXXX...",
+  ".XXXXXXX..X.",
+  "..XX....XX..",
+  ".X...XXXXXXX",
+  "....XXXXXXXX",
+  "....XXXXXXXX",
+  "....XXXXXXXX",
+  ".....XXXXXX.",
+]
