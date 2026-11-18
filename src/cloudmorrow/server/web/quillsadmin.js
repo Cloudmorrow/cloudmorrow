@@ -1040,6 +1040,14 @@ export function sections(plan, me) {
     they switch it on there, and needs this program: the agent on that computer fetches it then, checks it,
     and keeps it; the server does not.</p>` : ""));
 
+  // A bridge to another service: records it brings into a datamodel another
+  // quill draws — messages from Slack into a channel — each said to be from
+  // its sender outside, never from anybody here.
+  const delivers = (plan.quill_code && plan.quill_code.delivers) || [];
+  out.push(group("Brings in from outside", delivers.map((d) =>
+    row(esc(label(d.model)), esc(d.why))), delivers.length ? `<p class="shelf-note">Each one arrives as from
+    its sender outside this server, never as from anybody here, and is news to whoever it is for.</p>` : ""));
+
   const code = [
     ...(plan.services || []).map((s) => row(`Service ${esc(s.id)}`, esc((s.command || []).join(" ")))),
     ...(plan.webhooks || []).map((w) => row(`Webhook ${esc(w.id)}`, `POST /hooks/${esc(plan.id)}/${esc(w.path || w.id)}`)),

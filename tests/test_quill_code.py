@@ -958,3 +958,99 @@ def test_a_secret_of_an_introduced_datamodel_is_the_quills_own_code_to_read(aide
     # The Quill's own code reads it, as whoever is using the Quill.
     assert aide_press(client, guest, "peek").json()["effects"][0]["text"] == "sk-ant-1"
     assert aide_press(client, admin, "peek").json()["effects"][0]["text"] == "sk-ant-1"
+
+
+# -- delivering into a datamodel it uses: a bridge ---------------------------------------------
+BRIDGE_TOML = """
+[quill]
+id = "bridge"
+name = "Bridge"
+version = "1.0.0"
+summary = "Messages from another service, into a channel."
+category = "productivity"
+code = "quill.py"
+
+[uses]
+datamodels = ["channel", "message"]
+
+[[delivers]]
+model = "message"
+why = "to bring what is said elsewhere into the channel, as from its sender"
+
+[[webhooks]]
+id = "inbound"
+handler = "inbound"
+"""
+
+BRIDGE_PY = """
+from cloudmorrow.quill import webhook
+
+
+@webhook
+def inbound(ctx, request):
+    body = request.json()
+    channel = ctx.records.list("channel")[0]
+    made = ctx.records.create(
+        "message",
+        {"channel": channel.id, "body": body["text"]},
+        owner=body.get("owner") or ctx.user.username,
+        by=body.get("by") or None,
+    )
+    return {"id": made.id}
+"""
+
+
+def _bridge(tmp_path, toml=BRIDGE_TOML):
+    folder = tmp_path / "quill-bridge"
+    folder.mkdir()
+    (folder / "quill.toml").write_text(toml)
+    (folder / "quill.py").write_text(BRIDGE_PY)
+    return folder
+
+
+def test_a_bridge_delivers_into_a_datamodel_it_uses_only_as_from_outside(config, users, tmp_path):
+    client = TestClient(_app(config, users, "trusted"))
+    admin = {"Authorization": "Bearer " + token_for(client, *ADMIN)}
+    folder = _bridge(tmp_path)
+    plan = client.post("/api/quills/plan", json={"source": str(folder)}, headers=admin).json()
+    assert plan["quill_code"]["delivers"] == [
+        {"model": "message", "why": "to bring what is said elsewhere into the channel, as from its sender"}
+    ]
+    assert client.post("/api/quills", json={"source": str(folder)}, headers=admin).status_code == 201
+    channel = client.post(
+        "/api/records/channel", json={"fields": {"name": "general"}, "scope": "public"}, headers=admin
+    )
+    assert channel.status_code == 201, channel.text
+    secret = state_of(client).code.state.quill_tokens.webhook_secret("bridge", "inbound")
+
+    said = client.post(f"/hooks/bridge/inbound?token={secret}", json={"text": "hi from afar", "by": "Ada (Slack)"})
+    assert said.status_code == 200, said.text
+    messages = client.get("/api/records/message", headers=admin).json()
+    assert [(m["fields"]["body"], m["owner"]) for m in messages] == [("hi from afar", "Ada (Slack)")]
+
+    # Never as a person here: not as somebody else's own words, not by their name.
+    bare = client.post(f"/hooks/bridge/inbound?token={secret}", json={"text": "as you", "owner": GUEST[0]})
+    assert bare.status_code == 403 and "only as from outside" in bare.text
+    posing = client.post(f"/hooks/bridge/inbound?token={secret}", json={"text": "it's me", "by": GUEST[0]})
+    assert posing.status_code == 403 and "is somebody here" in posing.text
+    assert len(client.get("/api/records/message", headers=admin).json()) == 1
+
+
+def test_delivers_names_a_datamodel_the_quill_uses_and_says_why(tmp_path):
+    with pytest.raises(QuillError, match="does not name"):
+        parse_manifest(_manifest('code = "quill.py"\n[[delivers]]\nmodel = "message"\nwhy = "x"\n'))
+    with pytest.raises(QuillError, match="says why"):
+        parse_manifest(
+            _manifest('code = "quill.py"\n[uses]\ndatamodels = ["message"]\n[[delivers]]\nmodel = "message"\n')
+        )
+    with pytest.raises(QuillError, match="done by code"):
+        parse_manifest(_manifest('[uses]\ndatamodels = ["message"]\n[[delivers]]\nmodel = "message"\nwhy = "x"\n'))
+
+
+def test_the_terminal_install_sheet_says_what_a_bridge_brings_in():
+    from cloudmorrow.tui.panes.admin_quills import delivers_lines
+
+    plan = {"quill_code": {"delivers": [{"model": "message", "why": "from Slack"}]}}
+    said = "\n".join(delivers_lines(plan))
+    assert "Brings in from outside" in said and "message" in said and "from Slack" in said
+    assert delivers_lines({"quill_code": {}}) == []

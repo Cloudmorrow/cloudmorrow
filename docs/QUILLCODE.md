@@ -152,6 +152,10 @@ why = "to read each van's odometer from the tracker"
 key = "TRACKER_KEY"                   # a secret its code may read from the person's vault
 why = "to sign in to the tracker"
 
+# [[delivers]]                        # a datamodel it uses (not its own) that its jobs and
+# model = "message"                   # webhooks bring records into, each as from its sender
+# why = "to bring what is said in Slack into the channels linked to it"   # outside (by=)
+
 # [assistant]                         # its code is given an assistant's tools, as the person:
 # tools = true                        # the record tools over every datamodel their circles give
 # why = "to answer questions over your own data"   # them, every Quill's actions they may press, and
@@ -251,8 +255,14 @@ who it is `by=` — an outside address — and is then that sender's rather
 than Sam's: unread to Sam until they look, theirs to read and never to
 change. With `by=` it is a delivery even to the installer themself — their
 own mail comes in unread, from its sender, like anybody's. Only a job or a webhook may deliver, only a server Quill (never
-somebody's own), and only a datamodel the Quill itself introduced;
-anything else is refused. A view or an action, pressed by a person, writes
+somebody's own), and only a datamodel the Quill itself introduced —
+or one it uses and names in `[[delivers]]`, with why, which the install
+sheet shows under *Brings in from outside*. That is a bridge to another
+service: messages from Slack into a channel Channels draws. Into a
+datamodel it only uses, a delivery is always from outside — `by=` is
+required — so a bridge never puts words in the mouth of anybody here.
+For every delivery, `by=` may not be a person on this server: a sender
+from outside is never mistaken for one. Anything else is refused. A view or an action, pressed by a person, writes
 as that person and nobody else.
 
 A refusal arrives as an exception: `Refused`, `NotFound`, `Invalid`,

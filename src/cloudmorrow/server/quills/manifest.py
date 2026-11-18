@@ -118,6 +118,9 @@ class Manifest:
     hooks: tuple[dict, ...] = ()
     fetch: tuple[dict, ...] = ()
     secrets: tuple[dict, ...] = ()
+    # `[[delivers]]`: datamodels it uses that its jobs and webhooks bring in
+    # from outside, as from the sender (docs/QUILLCODE.md, Delivery).
+    delivers: tuple[dict, ...] = ()
     machine: tuple[dict, ...] = ()
     # `[assistant] tools = true`, with why: its code has an assistant's tools
     # (docs/QUILLCODE.md); {} when it does not.
@@ -211,6 +214,7 @@ class Manifest:
             "hooks": list(self.hooks),
             "fetch": list(self.fetch),
             "secrets": list(self.secrets),
+            "delivers": list(self.delivers),
             "machine": list(self.machine),
             "assistant": dict(self.assistant),
             "requires": {"runtimes": list(self.runtimes), "quills": list(self.quills)},
@@ -375,6 +379,14 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
             check_handlers(folder, code, where)
     except CodeSpecError as exc:
         raise QuillError(str(exc)) from exc
+    own = {m.id for m in introduces}
+    for item in code.delivers:
+        # A datamodel it introduced it delivers into already; [[delivers]] is
+        # the yes, on the install sheet, to bringing records into one it uses.
+        if item["model"] in own:
+            raise QuillError(f"{where}: {item['model']} is its own datamodel, delivered into without [[delivers]]")
+        if item["model"] not in uses:
+            raise QuillError(f"{where}: delivers {item['model']}, which [uses] datamodels does not name")
     for screen in screens:
         if "icon" in screen and not isinstance(screen["icon"], str):
             raise QuillError(f"{where}: screen {screen['id']!r} icon is a name from the icon library")
@@ -519,6 +531,7 @@ def parse_manifest(data: dict, folder: Path | None = None) -> Manifest:
         hooks=code.hooks,
         fetch=code.fetch,
         secrets=code.secrets,
+        delivers=code.delivers,
         machine=code.machine,
         assistant=code.assistant,
         runtimes=runtimes,

@@ -9,6 +9,8 @@
     [[apis]] handler = …               an API answered by code
     [[fetch]]                          the hosts its code may reach
     [[secrets]]                        the secrets its code may read, by key
+    [[delivers]]                       a datamodel it uses that its jobs and webhooks
+                                       bring in from outside, as from the sender
     [assistant] tools = true           its code has an assistant's tools, as the person
     [[machine]]                        code that runs on a person's own machine
 
@@ -64,6 +66,10 @@ class CodeSpec:
     hooks: tuple[dict, ...] = ()
     fetch: tuple[dict, ...] = ()
     secrets: tuple[dict, ...] = ()
+    # `[[delivers]] model = "message"`, with why: a datamodel the Quill uses
+    # (not its own) that its jobs and webhooks may deliver into, always as
+    # from somebody outside (`by=`) — a bridge to another service.
+    delivers: tuple[dict, ...] = ()
     machine: tuple[dict, ...] = ()
     # `[assistant] tools = true`, with why: its code is given an assistant's
     # tools, as the person it runs for (`ctx.assistant`); {} without.
@@ -242,6 +248,20 @@ def parse_code(
         if not str(item.get("why", "")).strip():
             raise CodeSpecError(f"{where}: the secret {key} says why; a person reads it")
 
+    delivers = _tables(data, "delivers", where)
+    seen_models: set[str] = set()
+    for item in delivers:
+        model = str(item.get("model", "")).strip()
+        if not model or model in seen_models:
+            raise CodeSpecError(f'{where}: every [[delivers]] names its own datamodel: model = "message"')
+        seen_models.add(model)
+        if not str(item.get("why", "")).strip():
+            raise CodeSpecError(f"{where}: delivers {model} says why; a person reads it")
+        if not code:
+            raise CodeSpecError(f'{where}: [[delivers]] is done by code: [quill] says code = "quill.py"')
+        item["model"] = model
+        item["why"] = str(item["why"]).strip()
+
     assistant = data.get("assistant", {})
     if not isinstance(assistant, dict):
         raise CodeSpecError(f"{where}: [assistant] is a table: tools = true, and why")
@@ -317,6 +337,7 @@ def parse_code(
         hooks=tuple(hooks),
         fetch=tuple(fetch),
         secrets=tuple(secrets),
+        delivers=tuple(delivers),
         machine=tuple(machine),
         assistant=assistant,
         needs=needs,

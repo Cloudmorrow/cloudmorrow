@@ -396,6 +396,11 @@ def print_plan(plan: dict) -> None:
             console.print(f"  reaches {escape(host)} — {escape(item['why'])}")
         for item in code.get("secrets", []):
             console.print(f"  reads your secret {escape(item['key'])} — {escape(item['why'])}")
+        for item in code.get("delivers", []):
+            console.print(
+                f"  brings {escape(item['model'])} records in from outside, as from their sender"
+                f" — {escape(item['why'])}"
+            )
         if code.get("assistant"):
             console.print(
                 "  has an assistant's tools, as you: everything an assistant may read and do for you"

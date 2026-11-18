@@ -489,6 +489,9 @@ def code_summary(manifest: Manifest) -> dict:
         ],
         "fetch": [{"host": f["host"], "why": f["why"]} for f in manifest.fetch],
         "secrets": [{"key": s["key"], "why": s["why"]} for s in manifest.secrets],
+        # Datamodels it uses that its jobs and webhooks bring records into,
+        # as from somebody outside: a bridge to another service.
+        "delivers": [{"model": d["model"], "why": d["why"]} for d in manifest.delivers],
         # An assistant's tools, as the person: everything an assistant may
         # read and do for them, through the gate (docs/QUILLCODE.md).
         "assistant": dict(manifest.assistant),
