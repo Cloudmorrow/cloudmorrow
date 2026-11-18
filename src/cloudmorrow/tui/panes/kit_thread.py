@@ -352,6 +352,9 @@ class ThreadPane(KitPane):
             Action("edit_space", "Edit", "e", hint=f"Rename this {noun}, or delete it"),
             Action("leave", "Leave", "l", variant="error"),
         ]
+        if self.only_between:
+            # A conversation between people stays the people it was made between.
+            actions = [a for a in actions if a.id not in ("add", "leave")]
         self.ACTIONS = self.offer(actions)
         self.spaces: list[dict] = []
         self.lines: list[dict] = []
