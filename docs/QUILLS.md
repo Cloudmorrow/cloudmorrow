@@ -490,7 +490,7 @@ Quill the catalog does not have is refused before anything is installed.
 Without a catalog to ask (a test harness, `cm quill dev --local` offline)
 it is installed alone and the plan says so (`quills_skipped`). A required
 Quill cannot be removed while one that needs it is here: the remove sheet
-says *CutMorrow needs media; remove it first*, before anything is dropped.
+says *Clipper needs media; remove it first*, before anything is dropped.
 Somebody's own Quill is satisfied by the server's Quill of that id, or else
 gets its own. It is one way: Media names nothing, and works alone. A
 requirement is about working together on screen, not about datamodels:

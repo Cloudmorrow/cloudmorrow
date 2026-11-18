@@ -69,7 +69,7 @@ are in [docs/INSTALL.md](docs/INSTALL.md); the short version is at
 | --- | --- |
 | **Notes, Tasks, Calendar, Files** | The foundation, ticked on a fresh server. Markdown files in folders; boards with three lanes; your calendar and the shared ones drawn together; a drive per person and shares a team keeps, mountable over WebDAV. |
 | **Channels, Secrets** | Standard too: a team's conversations with threads, mentions and push notifications; keys and passwords in sealed vaults, handed to a program with no file at all. |
-| **Every other Quill** | From the [Quill Catalog](https://github.com/Cloudmorrow/quill-catalog): CRM, Cells, Docs, Media, CutMorrow, DevProject. Each says what data it touches before you say yes, and takes its screens with it when it goes. |
+| **Every other Quill** | From the [Quill Catalog](https://github.com/Cloudmorrow/quill-catalog): CRM, Cells, Docs, Media, Clipper, DevProject. Each says what data it touches before you say yes, and takes its screens with it when it goes. |
 | **Three ways in** | A web app made for the phone, the same app grown up for a laptop browser, and a terminal app you can use with a mouse. One kit draws every Quill on all of them, and on the command line. |
 | **An assistant, if you want one** | The server speaks MCP. Claude or any other client reads and writes your records as you, after you say yes. Secrets are never on that list. |
 | **Encrypted at rest** | Notes, messages, events, tasks and secrets are ciphertext on disk under one key the server holds. You sign in with a password and never handle a key. |
