@@ -149,7 +149,21 @@ def sections_text(plan: dict) -> list[str]:
     lines += quill_lines(plan)
     lines += runtime_lines(plan)
     lines += machine_runtime_lines(plan)
+    lines += delivers_lines(plan)
     lines += code_lines(plan)
+    return lines
+
+
+def delivers_lines(plan: dict) -> list[str]:
+    """A bridge to another service: records it brings into a datamodel it uses."""
+    delivers = (plan.get("quill_code") or {}).get("delivers") or []
+    if not delivers:
+        return []
+    lines = ["", f"[b {ACCENT}]Brings in from outside[/]"]
+    for item in delivers:
+        lines.append(f"  [b]{escape(str(item.get('model', '?')))}[/]")
+        lines.append(f"    [{MUTED}]{escape(str(item.get('why') or ''))}[/]")
+    lines.append(f"  [{MUTED}]Each one as from its sender outside, never as from anybody here.[/]")
     return lines
 
 

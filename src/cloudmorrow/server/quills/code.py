@@ -289,7 +289,7 @@ class HostCalls:
         # A delivery from outside (by=) is one even to whoever the job runs as:
         # the administrator's own mail comes in unread, from its sender, too.
         if owner and (owner != self.principal.username or by):
-            self._may_deliver(model, owner)
+            self._may_deliver(model, owner, by)
         elif by:
             raise sdk.Invalid("by= says who a delivery is from: it goes with owner=")
         if by and not self.state.records.model(model).in_space:
@@ -307,18 +307,30 @@ class HostCalls:
         )
         return self._out(record)
 
-    def _may_deliver(self, model: str, owner: str) -> None:
+    def _may_deliver(self, model: str, owner: str, by: str = "") -> None:
         """Delivery: a job or a webhook of a server Quill makes a record of one of
         the Quill's own datamodels as somebody else's — mail into their inbox.
         The record is theirs from the start; the installer never sees it. A
         handler pressed by a person, and a Quill of somebody's own, never
-        write as anybody but who they run for."""
+        write as anybody but who they run for.
+
+        A datamodel it only uses — a channel's messages, for a bridge to
+        another service — it delivers into when its manifest says so in
+        `[[delivers]]`, which the install sheet shows, and only as from
+        somebody outside (*by*): it never puts words in a person's mouth.
+        Nor may *by* be anybody here, for any delivery: a sender from outside
+        is never mistaken for a person on this server."""
         if self.kind not in ("job", "webhook"):
             raise sdk.Refused("only a job or a webhook delivers a record to somebody")
         if self.manifest.personal:
             raise sdk.Refused("a Quill of somebody's own delivers to nobody")
         if model not in {m.id for m in self.manifest.introduces}:
-            raise sdk.Refused(f"{self.manifest.id} delivers only its own datamodels, not {model}")
+            if model not in {self.manifest.resolve(d["model"]) for d in self.manifest.delivers}:
+                raise sdk.Refused(f"{self.manifest.id} delivers only its own datamodels, not {model}")
+            if not by:
+                raise sdk.Refused(f"{self.manifest.id} delivers a {model} only as from outside: by= says who")
+        if by and self.state.users.get(by) is not None:
+            raise sdk.Refused(f"{by} is somebody here: by= is a sender from outside")
         found = self.state.users.get(owner)
         if found is None or not found.is_active:
             raise sdk.NotFound(f"nobody here is called {owner}")
