@@ -164,7 +164,10 @@ words in `body` and a bool in `mine` saying which side said it; `ask` names
 the action the box under the lines runs with what is typed, on `record`.
 What was sent is shown at once, with the other side thinking, until the
 action is done and the view is drawn again, so a turn that takes a while
-(give the action a `timeout`) reads as a chat does. `empty` is the greeting
+(give the action a `timeout`) reads as a chat does. Any other action that
+takes a while says so on its button: `busy = "Importing calendar"` in the
+manifest, and the button is disabled with those words and a spinner on it
+until the action is over (without `busy`, the spinner alone). `empty` is the greeting
 while there is nothing; `hint` a small line under the box. `close` names the
 action an X in the top right corner runs on `record` — the one that deletes
 the conversation — and that action's `confirm` ("Delete this conversation?")

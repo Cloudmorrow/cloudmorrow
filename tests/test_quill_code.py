@@ -282,6 +282,7 @@ def test_a_handler_the_code_does_not_have_is_refused(tmp_path):
         ('[[machine]]\nid = "m"\n', "why"),
         ('[[actions]]\nid = "go"\nlabel = "Go"\ntimeout = "soon"\n', "duration"),
         ('[[actions]]\nid = "go"\nlabel = "Go"\ntimeout = "10m"\n', "at most 5m"),
+        ('[[actions]]\nid = "go"\nlabel = "Go"\nbusy = 3\n', "busy is words"),
         ("[assistant]\ntools = true\n", "says why"),
         ('[assistant]\ntools = true\nwhy = "x"\nmodels = ["task"]\n', "knows tools and why"),
         ("[quill]\n", ""),

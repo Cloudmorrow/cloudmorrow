@@ -50,7 +50,7 @@ from rich.text import Text
 from textual import work
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
-from textual.widgets import Static, TabbedContent
+from textual.widgets import Button, Static, TabbedContent
 
 from cloudmorrow.client.api import ApiError, AuthError
 from cloudmorrow.tui.kitdata import (
@@ -69,6 +69,7 @@ from cloudmorrow.tui.quill_actions import (
     open_record,
     press,
     run_action,
+    working,
 )
 from cloudmorrow.tui.theme import BAD, MUTED
 from cloudmorrow.tui.widgets.toolbar import Action
@@ -295,13 +296,14 @@ class ViewPane(KitPane):
             return
         record = form.node.get("record") or None
         try:
-            effects = await press(
-                self.api,
-                str(self.quill["id"]),
-                str(form.action["id"]),
-                record=str((record or {}).get("id") or ""),
-                fields=fields,
-            )
+            with working(form.query_one(f"#{form.id}-submit", Button), form.action):
+                effects = await press(
+                    self.api,
+                    str(self.quill["id"]),
+                    str(form.action["id"]),
+                    record=str((record or {}).get("id") or ""),
+                    fields=fields,
+                )
         except AuthError as exc:
             await self.went_wrong(exc)
             return

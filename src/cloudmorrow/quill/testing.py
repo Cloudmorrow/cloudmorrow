@@ -181,8 +181,9 @@ class Fetches:
             "body": base64.b64encode(body).decode("ascii"),
         }
 
-    def __call__(self, method: str, url: str, headers: dict, body: bytes) -> dict:
-        self.sent.append({"method": method, "url": url, "headers": headers, "body": body})
+    def __call__(self, method: str, url: str, headers: dict, body: bytes, timeout: float | None = None) -> dict:
+        # `timeout` is how long the Quill asked to wait, after the gate's own cap.
+        self.sent.append({"method": method, "url": url, "headers": headers, "body": body, "timeout": timeout})
         found = self._answers.get((method, url))
         if found is None:
             return {"status": 404, "headers": {}, "body": base64.b64encode(b"no answer in the test").decode()}
