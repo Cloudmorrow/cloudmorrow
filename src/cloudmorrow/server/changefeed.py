@@ -11,7 +11,16 @@ their own, or one in a space they are in.
     event: hello      {"seq": 41}            the feed's position, first thing
     event: change     {"seq": 42, "model": "message", "id": "…", "space": "…",
                        "owner": "bram", "action": "created", "at": "…"}
+    event: quills     {}                     a Quill came, went or was switched:
+                                             ask /api/quills again for the menu
+    event: bye        {"reason": "restart"}  the server is stopping — an update —
+                                             and the stream ends; come back soon
     : ping                                   every so often, so the line stays up
+
+The notices (`quills`, `bye`) are for everybody listening and say nothing
+anybody could not ask for: each client asks its own question afterwards.
+`bye` goes out the moment the server is told to stop (`going`, from the
+signal, in cli.py), before the connections are closed.
 
 A client that drops comes back with `?since=<seq>` and gets what it missed
 of the last few thousand changes; before that horizon it asks `_since` for
@@ -68,6 +77,15 @@ class ChangeFeed:
         self._seq = 0
         # Each open stream: the loop it runs on, and the event that wakes it.
         self._waiting: set[tuple[asyncio.AbstractEventLoop, asyncio.Event]] = set()
+        # Notices for every stream, about no record: (number, event, data).
+        self._notes: deque[tuple[int, str, dict]] = deque(maxlen=64)
+        self._note = 0
+        # Why the server is stopping, once it is: every stream says bye.
+        self.leaving = ""
+
+    @property
+    def note(self) -> int:
+        return self._note
 
     @property
     def seq(self) -> int:
@@ -90,6 +108,10 @@ class ChangeFeed:
             self._seq += 1
             change = Change(self._seq, record.model, record.id, space, record.owner, action, record.updated_at)
             self._held.append(change)
+        self._wake()
+
+    def _wake(self) -> None:
+        with self._lock:
             waiting = list(self._waiting)
         for loop, event in waiting:
             try:
@@ -97,15 +119,35 @@ class ChangeFeed:
             except RuntimeError:  # its loop is gone with its stream
                 pass
 
+    def tell(self, name: str, data: dict | None = None) -> None:
+        """A notice for every open stream: `quills` when the menu should be asked again."""
+        with self._lock:
+            self._note += 1
+            self._notes.append((self._note, name, dict(data or {})))
+        self._wake()
+
+    def notes_since(self, note: int) -> list[tuple[int, str, dict]]:
+        with self._lock:
+            return [n for n in self._notes if n[0] > note]
+
+    def going(self, reason: str = "restart") -> None:
+        """The server is stopping: every stream says bye and ends, before the connections go."""
+        self.leaving = reason or "restart"
+        self._wake()
+
     # -- what a stream asks ------------------------------------------------------------
     def since(self, seq: int) -> list[Change]:
         with self._lock:
             return [c for c in self._held if c.seq > seq]
 
-    async def wait(self, seq: int, timeout: float) -> list[Change]:
-        """Changes after *seq*, as soon as there is one; none after *timeout* seconds."""
+    def _news(self, note: int | None) -> bool:
+        return bool(self.leaving) or (note is not None and self._note > note)
+
+    async def wait(self, seq: int, timeout: float, note: int | None = None) -> list[Change]:
+        """Changes after *seq*, as soon as there is one; none after *timeout* seconds.
+        With *note*, it also comes back early for a notice after it, or for bye."""
         found = self.since(seq)
-        if found:
+        if found or self._news(note):
             return found
         loop = asyncio.get_running_loop()
         event = asyncio.Event()
@@ -114,7 +156,7 @@ class ChangeFeed:
         try:
             # Something may have come between the look and the wait.
             found = self.since(seq)
-            if found:
+            if found or self._news(note):
                 return found
             try:
                 await asyncio.wait_for(event.wait(), timeout)
@@ -161,14 +203,26 @@ async def stream_changes(
 
     async def body() -> AsyncIterator[str]:
         cursor = feed.seq if since is None else since
+        note = feed.note
         yield f"retry: 3000\n{_event('hello', {'seq': feed.seq})}"
         sent = 0
         while True:
-            changes = await feed.wait(cursor, PING_SECONDS)
+            if feed.leaving:
+                yield _event("bye", {"reason": feed.leaving})
+                return
+            changes = await feed.wait(cursor, PING_SECONDS, note=note)
             if await request.is_disconnected():
                 return
+            if feed.leaving:
+                continue
+            notes = feed.notes_since(note)
+            for _, name, data in notes:
+                yield _event(name, data)
+            if notes:
+                note = notes[-1][0]
             if not changes:
-                yield ": ping\n\n"
+                if not notes:
+                    yield ": ping\n\n"
                 continue
             for change in changes:
                 cursor = change.seq

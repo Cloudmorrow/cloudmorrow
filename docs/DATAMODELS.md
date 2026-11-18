@@ -259,6 +259,16 @@ after N, for a script. The web app's thread screen listens this way and
 falls back to asking every few seconds while the stream is down
 (`web/changes.js`).
 
+Two notices come down the same stream to everybody, about no record.
+`event: quills` says a Quill was installed, removed, switched on or off, or
+shared: every open app asks for its Quills again and redraws its menu, and
+only its menu, a new tab lit for a moment. `event: bye` goes out the moment
+the server is told to stop — `systemctl restart` after an update over ssh,
+or the API's own restart — while the connections are still open, and the
+stream ends: every app shows *The server is updating* until the server
+answers again, and the web app reloads if the deploy is new
+(`web/updating.js`, `tui/screens/updating.py`).
+
 Scopes are `personal`, `shared` and `public`, as chat and calendar have them.
 Records of a datamodel that is not a space, and not in one, are personal:
 their owner's alone. So is a record of a datamodel that lives in spaces when

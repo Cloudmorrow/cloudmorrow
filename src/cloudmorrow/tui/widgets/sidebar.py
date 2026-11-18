@@ -107,6 +107,11 @@ class NavCard(Static, can_focus=False):
     def active(self) -> bool:
         return self.has_class("-active")
 
+    def arrive(self) -> None:
+        """A card that has just come — a Quill installed while you work: it lights up three times."""
+        for at, lit in enumerate((True, False, True, False, True, False)):
+            self.set_timer(0.01 + 0.3 * at, lambda lit=lit: self.set_class(lit, "-arrived"))
+
     def set_active(self, active: bool) -> None:
         self.set_class(active, "-active")
         self.redraw()

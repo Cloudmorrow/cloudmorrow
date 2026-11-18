@@ -197,6 +197,12 @@ def create_app(config: ServerConfig | None = None) -> FastAPI:
     # And every open screen hears of what changed, the moment it did.
     app.state.cloudmorrow.changes = changefeed.ChangeFeed(record_store)
     record_store.on_change.append(app.state.cloudmorrow.changes.listen)
+    # A Quill that comes, goes or is switched moves somebody's menu: every
+    # open app asks for its Quills again, and draws the menu alone.
+    told = app.state.cloudmorrow.changes.tell
+    quill_registry.listeners.append(lambda: told("quills"))
+    feature_store.listeners.append(lambda: told("quills"))
+    sharing_store.listeners.append(lambda: told("quills"))
     # Datamodels that live where they always have, served as records.
     record_store.backends["shares"] = SharesBackend(
         share_store,

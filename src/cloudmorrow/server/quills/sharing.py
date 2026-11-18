@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
 from pathlib import Path
 
 from cloudmorrow.server.database import Connection, Database
@@ -178,10 +179,19 @@ class SharingStore:
 
     def __init__(self, db: Database | Path) -> None:
         self.db = open_database(db)
+        # Told when a share is taken or taken away: somebody's menu moves.
+        self.listeners: list = []
         self._connect().close()
 
     def _connect(self) -> Connection:
         return self.db.connect()
+
+    def _told(self) -> None:
+        for listener in list(self.listeners):
+            try:
+                listener()
+            except Exception:  # a listener's trouble is not the share's
+                logging.getLogger("cloudmorrow.quills").exception("a sharing listener failed")
 
     # -- shares ------------------------------------------------------------------------
     def offer(self, owner: str, quill: str, username: str, *, by: str = "", rules: dict | None = None) -> dict:
@@ -266,7 +276,9 @@ class SharingStore:
                 (ACCEPTED if accepted else DECLINED, _now(), owner, quill, username),
             )
             conn.commit()
-            return self._share(conn, owner, quill, username)
+            share = self._share(conn, owner, quill, username)
+        self._told()
+        return share
 
     def revoke(self, owner: str, quill: str, username: str) -> None:
         """The owner takes it back, or the person leaves: the row goes."""
@@ -275,6 +287,7 @@ class SharingStore:
                 "DELETE FROM quill_shares WHERE owner = ? AND quill = ? AND username = ?", (owner, quill, username)
             )
             conn.commit()
+        self._told()
 
     def forget(self, owner: str, quill: str) -> None:
         """Every share of one Quill, gone with it."""

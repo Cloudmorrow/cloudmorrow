@@ -26,6 +26,7 @@ somebody turned off. A feature nobody has touched is on, at either level.
 from __future__ import annotations
 
 import datetime as dt
+import logging
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -96,7 +97,16 @@ class FeatureStore:
         # The installed Quills, each one more thing to switch. Asked on every
         # call, because installing one changes the answer.
         self._quills = quills or (lambda: ())
+        # Told after a switch, the server's or a person's: the menu moves.
+        self.listeners: list[Callable[[], None]] = []
         self._connect().close()
+
+    def _told(self) -> None:
+        for listener in list(self.listeners):
+            try:
+                listener()
+            except Exception:  # a listener's trouble is not the switch's
+                logging.getLogger("cloudmorrow.features").exception("a feature listener failed")
 
     def _connect(self) -> Connection:
         return self.db.connect()
@@ -160,6 +170,7 @@ class FeatureStore:
                 " updated_at = excluded.updated_at",
                 (key, int(bool(enabled)), changed_by, _now()),
             )
+        self._told()
         return next(row for row in self.list() if row["key"] == key)
 
     # -- and what each person wants of it --------------------------------------
@@ -218,6 +229,7 @@ class FeatureStore:
                 " updated_at = excluded.updated_at",
                 (username, key, int(bool(enabled)), _now()),
             )
+        self._told()
         return next(row for row in self.list_for(username) if row["key"] == key)
 
     def forget(self, username: str) -> None:

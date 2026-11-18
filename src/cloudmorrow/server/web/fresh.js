@@ -22,7 +22,8 @@ const GAP = 30 * 1000;
 
 let asked = 0;
 
-async function serving() {
+/** The deploy the server is serving now; "" while it cannot be reached (updating.js waits on it). */
+export async function serving() {
   try {
     const res = await fetch("/app/version", { cache: "no-store" });
     if (!res.ok) return "";

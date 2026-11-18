@@ -9,19 +9,29 @@
    The line drops now and then — a phone sleeps, a proxy times out — and
    comes back by itself, a little later each time it fails, and from where
    it left off (`?since=`). While it is down the screen's own timer is the
-   fallback; `live` says which it is right now. `stop()` ends it. */
+   fallback; `live` says which it is right now. `stop()` ends it.
+
+   Two more things come down the same line, for whoever asks: `onBye`
+   hears the server say it is stopping (an update: updating.js shows it),
+   and `onNotice(name, data)` every other notice — `quills`, when the menu
+   should be asked again. After a bye it comes back every second, not
+   slower and slower, because the server is only restarting. */
 
 import { apiStream } from "./core.js";
 
 const RETRY = 1000;
 const RETRY_MOST = 30000;
 
-export function listenChanges(onChange, { onState } = {}) {
+// For this long after a bye, the line is tried again every second.
+const RESTARTING = 3 * 60 * 1000;
+
+export function listenChanges(onChange, { onState, onBye, onNotice } = {}) {
   let stopped = false;
   let seq = null;
   let controller = null;
   let delay = RETRY;
-  const feed = { live: false, stop() { stopped = true; if (controller) controller.abort(); } };
+  let byeAt = 0;
+  const feed = { live: false, ended: false, stop() { stopped = true; if (controller) controller.abort(); } };
 
   const handle = (block) => {
     let id = null, name = "message", data = "";
@@ -35,7 +45,9 @@ export function listenChanges(onChange, { onState } = {}) {
     let parsed;
     try { parsed = JSON.parse(data); } catch { return; }
     if (name === "hello" && typeof parsed.seq === "number") seq = parsed.seq;
-    if (name === "change") onChange(parsed);
+    else if (name === "change") onChange(parsed);
+    else if (name === "bye") { byeAt = Date.now(); if (onBye) onBye(parsed); }
+    else if (onNotice) onNotice(name, parsed);
   };
 
   const run = async () => {
@@ -66,8 +78,9 @@ export function listenChanges(onChange, { onState } = {}) {
       if (onState) onState(false);
       if (stopped) break;
       await new Promise((resolve) => setTimeout(resolve, delay));
-      delay = Math.min(delay * 2, RETRY_MOST);
+      delay = Date.now() - byeAt < RESTARTING ? RETRY : Math.min(delay * 2, RETRY_MOST);
     }
+    feed.ended = true;
   };
   run();
   return feed;

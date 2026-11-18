@@ -108,7 +108,7 @@ class QuillCards:
         self._hidden_panes: dict[str, str] = {}
 
     # -- Quill cards -------------------------------------------------------
-    async def sync_quills(self) -> None:
+    async def sync_quills(self, *, live: bool = False) -> None:
         """A pane per screen of every installed Quill, and a card per Quill.
 
         Asked on sign-in and again whenever the features are (after an
@@ -116,6 +116,11 @@ class QuillCards:
         screen or datamodels did not change is left exactly as it is, cards
         and all; one that changed is drawn again, and one whose Quill went is
         taken out.
+
+        *live*, when the server said the Quills moved while you were working:
+        the pane you are in is not drawn again for a new version of its Quill
+        — that waits until the next time they are asked — so nothing you are
+        doing there is pulled out from under you.
         """
         client = self.app.client
         if client is None:
@@ -140,8 +145,11 @@ class QuillCards:
                     default=str,
                 )
                 wanted[screen_key(quill, screen)] = (quill, screen, signature)
+        here = (self.query_one("#panes", ContentSwitcher).current or "")[len("pane-") :]
         for key, signature in list(self._quill_panes.items()):
             if key not in wanted or wanted[key][2] != signature:
+                if live and key == here and key in wanted:
+                    continue
                 await self._drop_quill_pane(key)
         cloud = self.query_one("#nav-section-cloud", SectionLabel)
         # Which screens are under one card: a Quill's, when it has several.

@@ -29,6 +29,7 @@ import "./shares.js";
 import "./localbackups.js";
 import "./spelling.js";
 import "./fresh.js";
+import "./updating.js";
 import { start } from "./core.js";
 
 start();

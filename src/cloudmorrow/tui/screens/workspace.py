@@ -258,6 +258,28 @@ class WorkspaceScreen(QuillCards, Screen):
             return
         self.apply_features([row["key"] for row in features if row["enabled"]])
 
+    @work(exclusive=True, group="quills-moved")
+    async def quills_moved(self) -> None:
+        """The server says the Quills moved: the sidebar, and only the sidebar, again.
+
+        The cards and panes that did not change stay exactly as they are
+        (`sync_quills`), and so does the pane you are in. A card that is new
+        lights up for a moment."""
+        client = self.app.client
+        if client is None:
+            return
+        before = {card.nav_key for card in self.query(NavCard)}
+        await self.sync_quills(live=True)
+        try:
+            features = await client.my_features()
+        except ApiError:
+            features = None
+        if features is not None:
+            self.apply_features([row["key"] for row in features if row["enabled"]])
+        for card in self.query(NavCard):
+            if card.nav_key not in before and card.display:
+                card.arrive()
+
     def land(self) -> None:
         """Once, after sign-in: open on the first card, whichever it is.
 

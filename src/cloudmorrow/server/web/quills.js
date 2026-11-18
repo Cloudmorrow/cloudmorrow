@@ -27,7 +27,7 @@
    first bar is already right rather than growing a tab a beat later. */
 
 import {
-  api, go, loadIcons, onShell, onSignOut, parseHash, pixelArt, pixelIcon, redrawTabs, registerScreen, renderRoute,
+  api, app, go, loadIcons, onShell, onSignOut, parseHash, pixelArt, pixelIcon, redrawTabs, registerScreen, renderRoute,
   replace, session, store, tabSlot, toast,
 } from "./core.js";
 import { knowQuills, placeActionBar } from "./actions.js";
@@ -132,11 +132,13 @@ export function loadQuills() {
       const list = await api("GET", "/api/quills");
       store.set("quills", JSON.stringify(list));
       await loadIcons();
+      const before = { tabs: tabsShown(), quills: new Set(quills.map((q) => q.key || q.id)) };
       place(list);
       redrawTabs();
       // The switches are asked about per tab, and these tabs are new since
       // the last time they were asked.
       await loadFeatures();
+      markArrived(before);
     } catch { /* offline: the tabs stay as they were last drawn */ }
     return quills;
   })();
@@ -147,6 +149,35 @@ export function loadQuills() {
 export function refreshQuills() {
   loaded = null;
   return loadQuills();
+}
+
+/** The server says the Quills moved — here or by somebody (updating.js): the
+    menu, and only the menu, is asked for and drawn again. */
+export function quillsMoved() {
+  return refreshQuills();
+}
+
+// -- a tab that has just arrived --------------------------------------------------
+const tabsShown = () => [...app.querySelectorAll(":scope > nav.tabs [data-tab], :scope > nav.subtabs [data-tab]")]
+  .map((el) => el.dataset.tab).filter(Boolean);
+
+/** A moment of attention for each tab the menu did not have before (updating.css).
+    On a phone a new Quill is often not in the bar but in More: More gets it. The
+    first menu of all, drawn from nothing, is not news. */
+function markArrived(before) {
+  if (!before.tabs.length) return;
+  const had = new Set(before.tabs);
+  const fresh = [...app.querySelectorAll(":scope > nav.tabs [data-tab], :scope > nav.subtabs [data-tab]")]
+    // Only a tab that is on show: on a phone most Quills live in More, drawn
+    // in the bar but hidden there.
+    .filter((el) => el.dataset.tab && !had.has(el.dataset.tab) && el.getClientRects().length);
+  const arrived = quills.some((q) => !before.quills.has(q.key || q.id));
+  const more = app.querySelector(":scope > nav.tabs > .tab.more");
+  const marked = fresh.length ? fresh : arrived && more ? [more] : [];
+  for (const el of marked) {
+    el.classList.add("tab-arrived");
+    el.addEventListener("animationend", () => el.classList.remove("tab-arrived"), { once: true });
+  }
 }
 
 // -- the two addresses ----------------------------------------------------------
