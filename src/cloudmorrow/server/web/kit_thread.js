@@ -110,8 +110,10 @@ export async function renderThread(at, arg) {
   const back = at.base;
   const backLabel = at.screen.label;
   const opened = (made) => { replace(`${at.base}/${encodeURIComponent(made.id)}`); renderRoute(); };
+  if (first === "people" || (first === "new" && onlyBetween(at.screen))) {
+    return renderWriteTo(at, s.spaceModel, { back, backLabel, opened });
+  }
   if (first === "new") return renderNewSpace(at, s.spaceModel, { back, backLabel, opened });
-  if (first === "people") return renderWriteTo(at, s.spaceModel, { back, backLabel, opened });
   if (first && second === "about") {
     return renderSpaceAbout(at, s.spaceModel, first, {
       back: `${at.base}/${encodeURIComponent(first)}`,
@@ -182,10 +184,19 @@ function spaceGroups(at, s, spaces, active) {
   return group(plural(s.spaceModel.label), rooms) + group("Direct", two);
 }
 
+/** Spaces made between people and no other way: the pen is the one way in,
+    and it goes to the picker. */
+const onlyBetween = (screen) => {
+  const made = madeAs(screen);
+  return Boolean(made.direct) && !Object.keys(made).some((how) => how !== "direct");
+};
+
 function headActions(at, s) {
   if (!s.makes) return "";
-  const direct = madeAs(at.screen).direct;
-  return (direct ? `<a class="button write-to" href="${at.base}/people" aria-label="New message">${glyphs.people}</a>` : "") +
+  const made = madeAs(at.screen);
+  const named = Object.keys(made).some((how) => how !== "direct");
+  if (made.direct && !named) return `<a class="compose" href="${at.base}/people" aria-label="New message">${icons.compose}</a>`;
+  return (made.direct ? `<a class="button write-to" href="${at.base}/people" aria-label="New message">${glyphs.people}</a>` : "") +
     `<a class="compose" href="${at.base}/new" aria-label="New ${esc(s.spaceModel.label.toLowerCase())}">${icons.compose}</a>`;
 }
 

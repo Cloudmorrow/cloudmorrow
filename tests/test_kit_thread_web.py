@@ -64,6 +64,17 @@ def test_a_thread_takes_the_rest_of_its_address():
         assert part in THREAD_JS, part
 
 
+def test_a_new_message_is_to_the_people_picked_as_pills():
+    """Who it is to — one person, or several — as pills in a To box, each with
+    an X; the conversation with exactly those people opens, found or made."""
+    assert 'class="to-box"' in SPACE_JS and 'class="pill"' in SPACE_JS and 'class="remove"' in SPACE_JS
+    assert "members: others" in SPACE_JS and "unique: true" in SPACE_JS
+    assert ".to-box .pill {" in SPACE_CSS and ".to-box .pill .remove {" in SPACE_CSS
+    # Between people and no other way: the pen is the one way in, and it is the picker.
+    assert 'if (made.direct && !named) return `<a class="compose" href="${at.base}/people"' in THREAD_JS
+    assert 'first === "people" || (first === "new" && onlyBetween(at.screen))' in THREAD_JS
+
+
 def test_the_calls_it_makes_are_the_generic_ones(chat_quill, auth):
     """The same calls the thread makes, against a server with Chat installed."""
     client = chat_quill

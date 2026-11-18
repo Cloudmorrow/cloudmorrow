@@ -88,3 +88,65 @@
 .row.person svg { margin-left: auto; color: var(--muted); }
 .new-space .kinds .meta, .new-space .kinds .preview { white-space: normal; overflow: visible; }
 .new-space .who-list .row { align-items: center; }
+
+/* Who a new conversation is to (renderWriteTo): the To box at the top with
+   a pill per person picked — their name, and an X that takes them out — the
+   field in it that narrows the list, and the list under it, each one picked
+   ticked. The pill is the fill colour, as the unread count is. */
+.to-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  border-radius: 14px;
+  background: var(--card);
+}
+.to-box .to-label { margin-right: 2px; color: var(--muted); font-size: 16px; }
+.to-box .pills { display: contents; }
+.to-box .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 3px 4px 3px 11px;
+  border-radius: 999px;
+  background: var(--fill);
+  color: var(--fill-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+.to-box .pill > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.to-box .pill .remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: inherit;
+  opacity: .8;
+}
+.to-box .pill .remove:hover { opacity: 1; background: color-mix(in srgb, var(--fill-ink) 18%, transparent); }
+.to-box .to-search {
+  flex: 1;
+  min-width: 90px;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--ink);
+  font: inherit;
+  /* 16px or iOS zooms the page the moment the field is focused. */
+  font-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.to-box .to-search::placeholder { color: var(--muted); }
+.to-box .to-search::-webkit-search-cancel-button { display: none; }
+.row.person .picked-mark { margin-left: auto; visibility: hidden; }
+.row.person .picked-mark svg { color: var(--accent); }
+.row.person.picked .picked-mark { visibility: visible; }
+.row.person.picked .title { color: var(--accent); }
+.write-to-page .start:disabled { opacity: .5; }

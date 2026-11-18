@@ -9,7 +9,8 @@
      renderSpaceList   every space you can see, grouped by who can see it
      renderNewSpace    make one: its name, its other plain fields, who can
                        see it (a scope), and for a shared one its people
-     renderWriteTo     pick a person, and the space between the two of you
+     renderWriteTo     pick who it is to — one person or several, as pills in
+                       a To box — and the space between exactly those people
                        is found, or made (`made_as.direct` on the screen)
      renderSpaceAbout  what one is and who is in it, for a screen that
                        does not open spaces on the record sheet
@@ -227,27 +228,112 @@ export async function renderNewSpace(at, model, { back, backLabel, fields = asyn
 }
 
 // -- writing to somebody -------------------------------------------------------------
-/** Pick a person; the space between you and them opens, found or made. */
+const CROSS = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+
+/** Pick who it is to — one person, or several — and the conversation
+    between exactly those people opens: the one there is, or a new one.
+    The people picked stand as pills in the To box at the top, each with an
+    X that takes them out again; under it is everybody there is, narrowed
+    as a name is typed, each one picked ticked. */
 export async function renderWriteTo(at, model, { back, backLabel, opened }) {
   if (!mayWrite(model)) return notYours(model, back || at.base);
   const everyone = await people();
+  const nameOf = (who) => {
+    const p = everyone.find((x) => x.username === who);
+    return (p && p.display_name) || who;
+  };
   mount(nav({ back, backLabel, title: "New message" }) + `
-    <main>
+    <main class="write-to-page">
       <h1 class="large">New message</h1>
-      ${everyone.length ? `<div class="group">${everyone.map((p) => `
-        <button class="row person" data-who="${esc(p.username)}">
+      ${everyone.length ? `<form class="to-box">
+        <span class="to-label" id="to-label">To:</span>
+        <span class="pills" role="list" aria-labelledby="to-label"></span>
+        <input class="to-search" type="search" placeholder="Name" aria-label="Who it is to" autocomplete="off" autocapitalize="off">
+      </form>
+      <div class="group people-list">${everyone.map((p) => `
+        <button class="row person" type="button" data-who="${esc(p.username)}" aria-pressed="false"
+          data-text="${esc(`${p.display_name || ""} ${p.username}`.toLowerCase())}">
           <span class="avatar" aria-hidden="true">${esc((p.display_name || p.username).charAt(0).toUpperCase())}</span>
           <span class="main"><span class="title">${esc(p.display_name || p.username)}</span>
           ${p.display_name ? `<span class="meta"><span class="preview">${esc(p.username)}</span></span>` : ""}</span>
-          ${icons.chevronRight}</button>`).join("")}</div>`
+          <span class="picked-mark" aria-hidden="true">${icons.tick}</span></button>`).join("")}</div>
+      <p class="empty none-match" hidden><b>Nobody by that name</b></p>
+      <div class="group"><button class="row primary start" type="button" disabled>Pick who it is to</button></div>`
         : `<p class="empty"><b>Nobody else yet</b>There is only your account on this server.</p>`}
     </main>`);
   wireShell();
-  for (const button of app.querySelectorAll(".person")) {
-    button.addEventListener("click", async () => {
-      try { opened(await between(at, model, [button.dataset.who])); } catch (err) { toast(err.message); }
-    });
-  }
+  if (!everyone.length) return;
+  const chosen = [];
+  const pills = app.querySelector(".pills");
+  const search = app.querySelector(".to-search");
+  const start = app.querySelector(".start");
+  const noneMatch = app.querySelector(".none-match");
+  const rows = [...app.querySelectorAll(".person")];
+  const said = () => {
+    const names = chosen.map(nameOf);
+    if (!names.length) return "Pick who it is to";
+    if (names.length === 1) return `Write to ${names[0]}`;
+    if (names.length <= 3) return `Write to ${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+    return `Write to ${names.slice(0, 2).join(", ")} and ${names.length - 2} more`;
+  };
+  const draw = () => {
+    pills.innerHTML = chosen.map((who) => `<span class="pill" role="listitem"><span>${esc(nameOf(who))}</span>
+      <button type="button" class="remove" data-who="${esc(who)}" aria-label="Take ${esc(nameOf(who))} out">${CROSS}</button></span>`).join("");
+    for (const row of rows) {
+      const on = chosen.includes(row.dataset.who);
+      row.classList.toggle("picked", on);
+      row.setAttribute("aria-pressed", String(on));
+    }
+    start.disabled = !chosen.length;
+    start.textContent = said();
+  };
+  const narrow = () => {
+    const typed = search.value.trim().toLowerCase();
+    let shown = 0;
+    for (const row of rows) {
+      const hit = !typed || row.dataset.text.includes(typed);
+      row.hidden = !hit;
+      if (hit) shown += 1;
+    }
+    noneMatch.hidden = shown > 0;
+  };
+  const toggle = (who) => {
+    const index = chosen.indexOf(who);
+    if (index === -1) chosen.push(who);
+    else chosen.splice(index, 1);
+    draw();
+    search.value = "";
+    narrow();
+    search.focus();
+  };
+  for (const row of rows) row.addEventListener("click", () => toggle(row.dataset.who));
+  pills.addEventListener("click", (event) => {
+    const button = event.target.closest(".remove");
+    if (button) toggle(button.dataset.who);
+  });
+  search.addEventListener("input", narrow);
+  search.addEventListener("keydown", (event) => {
+    const typed = search.value.trim();
+    // Backspace on an empty field takes the last pill out; Enter picks the
+    // one name left by what was typed, or, with nothing typed, goes.
+    if (event.key === "Backspace" && !typed && chosen.length) {
+      event.preventDefault();
+      toggle(chosen[chosen.length - 1]);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const left = rows.filter((row) => !row.hidden && !chosen.includes(row.dataset.who));
+      if (typed && left.length === 1) toggle(left[0].dataset.who);
+      else if (!typed && chosen.length) start.click();
+    }
+  });
+  app.querySelector("form.to-box").addEventListener("submit", (event) => event.preventDefault());
+  start.addEventListener("click", async () => {
+    if (!chosen.length) return;
+    start.disabled = true;
+    try { opened(await between(at, model, chosen)); } catch (err) { toast(err.message); start.disabled = false; }
+  });
+  draw();
+  search.focus();
 }
 
 // An address for making one, reached by somebody who may only read them —
@@ -258,7 +344,8 @@ function notYours(model, where) {
   return renderRoute();
 }
 
-/** The space between you and *others*: the one there is, or a new one. */
+/** The space between you and *others* — one person, or several — with
+    exactly those people in it: the one there is, or a new one. */
 export async function between(at, model, others) {
   const names = [...new Set([session.user, ...others])].sort();
   return api("POST", recordsUrl(model.id), {

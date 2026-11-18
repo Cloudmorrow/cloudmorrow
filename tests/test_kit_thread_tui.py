@@ -12,10 +12,10 @@ pauses rather than `settle()`.
 
 from __future__ import annotations
 
-from textual.widgets import Checkbox, DataTable, Input, Static
+from textual.widgets import Button, Checkbox, DataTable, Input, Static
 
 from cloudmorrow.tui.panes.kit_thread import ThreadPane, render_lines
-from cloudmorrow.tui.widgets.kit_space import NewSpaceModal, PickPersonModal, space_name
+from cloudmorrow.tui.widgets.kit_space import NewSpaceModal, PickPeopleModal, space_name
 from tests.tui_chat import CHAT_MODELS, CHAT_SCREEN, line_row, space_row
 from tests.tui_harness import said, settle, start
 
@@ -213,8 +213,8 @@ async def test_writing_to_a_person_finds_the_conversation_with_them(app):
         pane.focus()
         await pilot.press("m")
         await breathe(pilot)
-        assert isinstance(app.screen, PickPersonModal)
-        app.screen.dismiss("guest")
+        assert isinstance(app.screen, PickPeopleModal)
+        app.screen.dismiss(["guest"])
         await settle(app, pilot)
         # The one there is, not a second.
         assert app.client.space_calls[-1] == ("found", "r_dm")
@@ -224,11 +224,34 @@ async def test_writing_to_a_person_finds_the_conversation_with_them(app):
         pane.query_one("#space-table", DataTable).focus()
         await pilot.press("m")
         await breathe(pilot)
-        assert isinstance(app.screen, PickPersonModal), (app.screen, app.focused)
-        app.screen.dismiss("ada")
+        assert isinstance(app.screen, PickPeopleModal), (app.screen, app.focused)
+        app.screen.dismiss(["ada"])
         await settle(app, pilot)
         made = app.client.space_calls[-1]
         assert made[0] == "made" and made[2:] == ("shared", ["ada"], {"name": "ada & bram", "kind": "direct"})
+
+
+async def test_writing_to_several_people_is_the_conversation_with_exactly_them(app):
+    async with app.run_test(size=(120, 36)) as pilot:
+        _, pane = await open_chat(app, pilot)
+        pane.focus()
+        await pilot.press("m")
+        await breathe(pilot)
+        modal = app.screen
+        assert isinstance(modal, PickPeopleModal)
+        # Space ticks a name; the To line says who is picked, and Open wakes up.
+        assert modal.query_one("#open", Button).disabled
+        await pilot.press("space")
+        await breathe(pilot)
+        assert modal.chosen and not modal.query_one("#open", Button).disabled
+        assert modal.chosen[0] in text_of(modal, "#to-line").lower()  # said by their display name
+        modal.dismiss(["ada", "guest"])
+        await settle(app, pilot)
+        made = app.client.space_calls[-1]
+        # Not the one with guest alone: a new one, with both in it.
+        assert made[0] == "made"
+        assert made[2:] == ("shared", ["ada", "guest"], {"name": "ada & bram & guest", "kind": "direct"})
+        assert "ada, guest" in text_of(pane, "#conversation-title")
 
 
 async def test_a_public_or_direct_space_is_not_added_to_or_left(app):
