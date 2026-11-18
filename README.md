@@ -76,7 +76,7 @@ installer or under Administration.
 | **Personal** | **Notes**: Markdown files in folders, with pictures, on your drive. **Files**: a drive per person and the shares a team keeps, mountable over WebDAV, with a Trash and backups of the folders on your own computers. **Morrow**: an assistant on your own cloud, a chat about anything you can see, and Quills of your own built when you ask. |
 | **Productivity** | **Tasks**: boards with three lanes. **Calendar**: your own calendar, the shared ones and everybody's drawn together, and calendars subscribed from elsewhere by their address. **Cells**: small spreadsheets, formulas included, that read and write Excel. **Docs**: a basic Word over `.docs` files and Word's own. |
 | **Communication** | **Channels**: a team's conversations with threads, mentions, reactions and push. **Messages**: conversations with one person or several. **Mail**: an inbox for everybody, name@your-cloud between you and your own domain to the world. **Slack**: a Channel and a Slack channel as one conversation. |
-| **Creative** | **Media**: every photo and video in your drive as a wall, filtered and starred. **CutMorrow**: a video editor on the timeline kit. **Retouch**: a photo editor: crop, turn, resize, write on it. |
+| **Creative** | **Media**: every photo and video in your drive as a wall, filtered and starred. **Clipper**: a video editor on the timeline kit. **Retouch**: a photo editor: crop, turn, resize, write on it. |
 | **Business** | **CRM**: organisations, people, a pipeline of deals, and what to do next. |
 | **Developer** | **Secrets**: keys and passwords in sealed vaults, handed to a program with no file at all. **DevProject**: your software projects, with their `.env` secrets on every machine. |
 
