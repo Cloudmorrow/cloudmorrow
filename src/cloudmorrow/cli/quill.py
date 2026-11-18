@@ -239,6 +239,10 @@ def preview(plan: dict) -> str:
             lines.extend(_timeline_sketch(plan, screen, title))
             lines.append("")
             continue
+        elif screen["kit"] == "photo":
+            lines.extend(_photo_sketch(plan, screen, title))
+            lines.append("")
+            continue
         elif screen["kit"] == "thread":
             space = fields.get(screen.get("space", ""), {}).get("to", "space")
             about = f" — <{screen['about']}>" if screen.get("about") else ""
@@ -287,6 +291,36 @@ def _timeline_sketch(plan: dict, screen: dict, title: str) -> list[str]:
         lines.append("  no frames API: the viewer says what is at the playhead, and Add asks a length")
     lines.append("  space plays, ←/→ a frame, [ ] trim, s split, m move, ↑/↓ track, x delete,")
     lines.append("  b blur, k keyframe, c crop" + (", e export" if export else "") + "; tab: material, tracks, effects")
+    return lines
+
+
+def _photo_sketch(plan: dict, screen: dict, title: str) -> list[str]:
+    """A photo editor as the terminal draws it: the picture, and the words on it beside."""
+    media = screen.get("media") or {}
+    where = " / ".join(str(media[k]) for k in ("share", "within") if media.get(k)) or "the drive"
+    pictures = screen.get("pictures")
+    texts = screen.get("texts")
+    export = next((a for a in plan.get("actions", []) if a.get("id") == screen.get("export")), None)
+    head = f"  <{title}>  <out_width>×<out_height> · <rotate>° · <crop>"
+    if export:
+        head += f"   <status> [ {export.get('label') or export['id']} e ]"
+    viewer = "<the picture, from " + pictures + ">" if pictures else "<what the edit does, in words>"
+    text_row = "<words>   <x y> · <size>% · <colour>" if texts else "—"
+    lines = [
+        f"  first the {screen['model']}s, newest first, with New (a photo from",
+        f"  {where}); one opens the editor:",
+        head,
+        f"  {'Picture':<34}│ Text on the picture",
+        f"  {viewer[:34]:<34}│ {text_row}",
+        f"  {'':<34}│ {text_row if texts else ''}",
+        f"  edits are {screen['model']}" + (f", texts {texts}" if texts else ""),
+    ]
+    if not pictures:
+        lines.append("  no pictures API: the viewer is words; a photo's size is read once")
+    lines.append("  r turns right, R left, m mirrors, c crops (C keeps all), s sizes,")
+    lines.append(
+        "  t writes, enter changes the words, k moves them, x takes them off" + (", e exports" if export else "")
+    )
     return lines
 
 

@@ -31,6 +31,8 @@ task board has to go on as much as a list of car services does.
   primitives, and kit_view.py turns the tree into widgets (widgets/view_nodes.py).
 - `timeline` is in kit_timeline.py: the projects, then one cut on its
   tracks, with the frames the Quill's service draws in the viewer.
+- `photo` is in kit_photo.py: the edits, then one picture turned, cropped,
+  sized and written on, drawn by the Quill's service as it will export.
 - `data` is in kit_data.py: the Quill's datamodels down the left, the
   records of one beside them, each opened in the sheet to look at.
 
@@ -485,6 +487,7 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     from cloudmorrow.tui.panes.kit_editor import EditorPane
     from cloudmorrow.tui.panes.kit_grid import GridPane
     from cloudmorrow.tui.panes.kit_grouped import GroupedListPane, draws_here
+    from cloudmorrow.tui.panes.kit_photo import PhotoPane
     from cloudmorrow.tui.panes.kit_projects import ProjectsPane
     from cloudmorrow.tui.panes.kit_thread import ThreadPane
     from cloudmorrow.tui.panes.kit_timeline import TimelinePane
@@ -522,4 +525,6 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
         return ThreadPane(quill, screen, **kwargs)
     if kit == "timeline":
         return TimelinePane(quill, screen, **kwargs)
+    if kit == "photo":
+        return PhotoPane(quill, screen, **kwargs)
     return None

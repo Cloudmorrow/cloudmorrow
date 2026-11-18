@@ -1,0 +1,33 @@
+# A small photo editor, for the kit's tests: edits of one picture each, with
+# words laid on them.
+[quill]
+id = "cropper"
+name = "Cropper"
+version = "1.0.0"
+summary = "Crop, turn and caption the photos in your drive."
+category = "personal"
+publisher = "Cloudmorrow"
+license = "MIT"
+code = "quill.py"
+
+[uses]
+datamodels = ["file"]
+
+[[screens]]
+id = "editor"
+kit = "photo"
+label = "Editor"
+model = "cropper.edit"
+title = "name"
+texts = "cropper.text"
+media = { share = "my-files", within = "Photos" }
+export = "export"
+
+[[actions]]
+id = "export"
+label = "Export"
+on = "cropper.edit"
+tone = "primary"
+description = "Saves the edited picture as a new file beside the original."
+[actions.fields]
+format = { kind = "enum", values = ["jpeg", "png"], default = "jpeg" }

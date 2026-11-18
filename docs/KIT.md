@@ -231,6 +231,12 @@ A `timeline` is the video editor: material from the drive, video and audio
 tracks, pieces to move, trim and split, effects that move by keyframes,
 and export. It is a chapter of its own, [TIMELINE.md](TIMELINE.md).
 
+## A photo
+
+A `photo` is the photo editor: one picture from the drive, turned,
+mirrored, cropped, made another size, with words laid on it, and
+exported. It is a chapter of its own, [PHOTO.md](PHOTO.md).
+
 ## Views: a screen of your own
 
 When the kit cannot say it, a screen names a handler in the Quill's code,
@@ -332,6 +338,7 @@ the same as the kit's own, for records a view has worked out itself.
 | things said in spaces | `thread` |
 | a look at every record | `data` |
 | video to cut | `timeline` |
+| a photo to crop, turn, resize or write on | `photo` |
 | numbers to sum up, a page that is several of the above, a list beside what is open in it | a `view`: `stat`, `table`, `rows`, `cards`, `split` |
 
 When none of these says what your Quill needs, the kit grows — for every

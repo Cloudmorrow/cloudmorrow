@@ -87,6 +87,22 @@ of its id or its name, a time is seconds or m:ss:
     cm cutter frame Holiday --at 3 -o frame.jpg   # the cut at 3 s, from the frames API
     cm cutter export Holiday format=webm          # the screen's export action
 
+A `photo` is edits of one picture each; an edit is named by its name or the
+start of its id, a text on it by its words or the start of its id:
+
+    cm retouch list                    # the edits, newest first
+    cm retouch add beach.jpg           # a new edit of a photo in the drive
+    cm retouch show Beach              # what is done to it, and the words on it
+    cm retouch turn Beach [left|180]   # a quarter turn clockwise, unless said
+    cm retouch mirror Beach
+    cm retouch crop Beach 10 10 80 80  # x y w h in percent; `all` keeps everything
+    cm retouch size Beach 1920x1080    # or a width, a percent, or `as is`
+    cm retouch text Beach "Summer" --at "6 6" --size 8 --colour amber
+    cm retouch move Beach Summer --at "50 80"
+    cm retouch rm Beach Summer
+    cm retouch picture Beach -o beach.jpg   # as it will export, from the pictures API
+    cm retouch export Beach format=png      # the screen's export action
+
 A `list` that binds `vault` is projects: folders on your machines, each
 with a git repository and .env files kept in its vault (checkout.py):
 
@@ -110,7 +126,7 @@ print as text:
 `cm tasks` works without the CLI knowing, when it starts, what is installed.
 
 Each kind of screen is a module of its own, as the TUI's are panes/kit_*:
-board, grouped (a list), calendar, editor, cells (a sheet), grid, thread and timeline, with records
+board, grouped (a list), calendar, editor, cells (a sheet), grid, thread, timeline and photo, with records
 for what a board, a list and a calendar share, screen for what they all do,
 and actions for a Quill's own code.
 """
@@ -133,6 +149,7 @@ from cloudmorrow.cli.quillrun.docs import _act_docs
 from cloudmorrow.cli.quillrun.editor import _act_editor
 from cloudmorrow.cli.quillrun.grid import _act_grid
 from cloudmorrow.cli.quillrun.history import _history
+from cloudmorrow.cli.quillrun.photo import _act_photo
 from cloudmorrow.cli.quillrun.projects import WORDS as PROJECT_WORDS
 from cloudmorrow.cli.quillrun.projects import _act_projects
 from cloudmorrow.cli.quillrun.records import _act_records
@@ -149,6 +166,8 @@ from cloudmorrow.client.api import CloudmorrowClient
 
 # A timeline's words that no other screen has; a document's and a sheet's export is theirs too.
 TIMELINE_ONLY = ("cut", "trim", "rm", "frame", "export")
+# A photo editor's words that no other screen has (rm, move and export it shares).
+PHOTO_ONLY = ("turn", "mirror", "crop", "size", "text", "picture")
 # A document's word that no other screen has.
 DOCUMENT_ONLY = ("import",)
 ACTIONS = (
@@ -168,6 +187,7 @@ ACTIONS = (
     "say",
     "history",
     *TIMELINE_ONLY,
+    *PHOTO_ONLY,
     *DOCUMENT_ONLY,
     *PROJECT_WORDS,
 )
@@ -197,7 +217,15 @@ def main(
     length: Annotated[str | None, typer.Option("--length", help="A timeline: how long the file is.")] = None,
     start: Annotated[str | None, typer.Option("--start", help="A timeline's trim: the new start.")] = None,
     end: Annotated[str | None, typer.Option("--end", help="A timeline's trim: the new end.")] = None,
-    out_file: Annotated[str, typer.Option("--out", "-o", help="A timeline's frame: where to save it.")] = "",
+    out_file: Annotated[
+        str, typer.Option("--out", "-o", help="A timeline's frame or a photo's picture: where to save it.")
+    ] = "",
+    size: Annotated[
+        str | None, typer.Option("--size", help="A photo's text: how tall, in percent of the picture.")
+    ] = None,
+    colour: Annotated[
+        str | None, typer.Option("--colour", "--color", help="A photo's text: a colour, as #rrggbb or a name.")
+    ] = None,
     path: Annotated[str, typer.Option("--path", help="Projects: the folder, instead of this one.")] = "",
     env: Annotated[str, typer.Option("--env", "-e", help="Projects' secrets: the environment, as local or prod.")] = "",
     file: Annotated[str, typer.Option("--file", "-f", help="Projects' secrets: the .env file.")] = "",
@@ -221,7 +249,16 @@ def main(
                 days=(first, last),
                 reveal=reveal,
                 raw=raw,
-                timing={"track": track, "at": at, "length": length, "start": start, "end": end, "out": out_file},
+                timing={
+                    "track": track,
+                    "at": at,
+                    "length": length,
+                    "start": start,
+                    "end": end,
+                    "out": out_file,
+                    "size": size,
+                    "colour": colour,
+                },
                 local={"path": path, "env": env, "file": file, "force": force, "plain": plain},
             )
 
@@ -248,8 +285,8 @@ async def dispatch(
     found = _quill(await api.quills(), quill)
     declared = {a["id"]: a for a in found.get("actions", [])}
     shown = next((s for s in found.get("screens") or [] if s["id"] == screen_id or not screen_id), {})
-    # A timeline's, a document's or a sheet's `export` is its screen's, whatever the action is called.
-    exports = shown.get("kit") in ("timeline", "document", "sheet") and action == "export"
+    # A timeline's, a photo's, a document's or a sheet's `export` is its screen's, whatever the action is called.
+    exports = shown.get("kit") in ("timeline", "photo", "document", "sheet") and action == "export"
     if action in declared and not exports:
         await _press(api, found, declared[action], args, plain)
         return
@@ -310,8 +347,13 @@ async def _act(
     if screen.kit == "timeline":
         await _act_timeline(api, screen, action, args, plain, timing or {})
         return
+    if screen.kit == "photo":
+        await _act_photo(api, screen, action, args, plain, timing or {})
+        return
     if action in TIMELINE_ONLY:
         fail(f"{action} is a timeline's; {screen.quill['id']} is a {screen.kit}")
+    if action in PHOTO_ONLY:
+        fail(f"{action} is a photo editor's; {screen.quill['id']} is a {screen.kit}")
     if action in DOCUMENT_ONLY:
         fail(f"{action} is a document's; {screen.quill['id']} is a {screen.kit}")
     await _act_records(api, screen, action, args, group, index, plain, days, reveal)

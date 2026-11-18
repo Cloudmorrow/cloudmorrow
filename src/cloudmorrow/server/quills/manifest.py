@@ -42,6 +42,7 @@ KIT = (
     "sheet",
     "document",
     "timeline",
+    "photo",
     "view",
     "data",
 )
@@ -60,6 +61,7 @@ KIT_READY = frozenset(
         "document",
         "thread",
         "timeline",
+        "photo",
         "view",
         "data",
     }

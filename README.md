@@ -116,6 +116,7 @@ server, so a change to the terminal app needs no deploy to try.
 - [docs/KIT.md](docs/KIT.md): every kit element and view primitive,
   pictured on a phone and in a browser.
 - [docs/TIMELINE.md](docs/TIMELINE.md): the timeline kit, a video editor.
+- [docs/PHOTO.md](docs/PHOTO.md): the photo kit, a photo editor.
 - [docs/CELLS.md](docs/CELLS.md): the sheet kit, a spreadsheet of cells and
   formulas on every surface.
 - [docs/SHARING.md](docs/SHARING.md): Quills of people's own: shared,
