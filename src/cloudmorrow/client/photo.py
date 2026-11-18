@@ -2,7 +2,8 @@
 
 The sums are cloudmorrow.quill.photo's; this is what turns one of them into
 records: an edit started from a photo in the drive, a turn, a crop, a size,
-the words laid on the picture. Both surfaces edit through a `Photo`, so a
+the layers laid on the picture (words, marker strokes, pieces), and a save
+over the photo or beside it. Both surfaces edit through a `Photo`, so a
 crop typed with `cm retouch crop` is the crop `c` makes in the terminal.
 """
 
@@ -36,12 +37,13 @@ class Photo:
         self.model: dict = models.get(screen["model"]) or {"id": screen["model"], "fields": []}
         self.bound = photo_fields(screen, self.model, models)
         self.edit_model: str = self.bound["edit"]
-        self.text_model: str = self.bound["texts"]
+        self.layer_model: str = self.bound["layers"]
         self.title: str = self.bound["title"]
         self.media: dict = self.bound["media"]
         self.pictures: str | None = pictures_path(quill, screen)
-        export = self.bound["export"]
-        self.export: dict | None = next((a for a in quill.get("actions", []) if a.get("id") == export), None)
+        actions = quill.get("actions", [])
+        self.export: dict | None = next((a for a in actions if a.get("id") == self.bound["export"]), None)
+        self.save_action: dict | None = next((a for a in actions if a.get("id") == self.bound["save"]), None)
 
     # -- reading -----------------------------------------------------------------
     async def edits(self) -> list[dict]:
@@ -49,12 +51,12 @@ class Photo:
         found = await self.api.records(self.edit_model)
         return sorted(reversed(found), key=lambda r: str(r.get("created_at") or ""), reverse=True)
 
-    async def texts(self, edit_id: str) -> list[dict]:
-        """The words on one edit, oldest first."""
-        if not self.text_model:
+    async def layers(self, edit_id: str) -> list[dict]:
+        """The layers on one edit, lowest first."""
+        if not self.layer_model:
             return []
-        found = await self.api.records(self.text_model, **{self.bound["text_edit"]: edit_id})
-        return sorted(found, key=lambda r: str(r.get("created_at") or ""))
+        found = await self.api.records(self.layer_model, **{self.bound["layer_edit"]: edit_id})
+        return ph.layers_in_order(found)
 
     async def material(self) -> list[dict]:
         """The photos under `media`, by folder and name."""
@@ -79,11 +81,21 @@ class Photo:
         return answer if isinstance(answer, dict) else None
 
     async def picture(self, edit_id: str, width: int) -> bytes:
-        """The edit as it would export, as a JPEG *width* pixels wide. Only with a pictures API."""
+        """The edit as it would save, as a JPEG *width* pixels wide. Only with a pictures API."""
         if not self.pictures:
             raise ApiError("this editor has no pictures API to draw the picture", status_code=404)
         response = await self.api.quill_api(self.pictures + "/picture", {"edit": edit_id, "w": int(width)})
         return response.content
+
+    async def source_file(self, edit: dict) -> dict | None:
+        """The photo's file record, for its name; None when it is gone."""
+        source = str((edit.get("fields") or {}).get("source") or "")
+        if not source:
+            return None
+        try:
+            return await self.api.record("file", source)
+        except ApiError:
+            return None
 
     # -- writing -----------------------------------------------------------------
     async def new_edit(self, file: dict, name: str = "") -> dict:
@@ -113,28 +125,46 @@ class Photo:
         return await self.update(edit, {"crop": None if whole else box})
 
     async def resize(self, edit: dict, size: dict) -> dict:
-        """The export's size: `out_width` and `out_height`, as photo.size_from answers."""
+        """The save's size: `out_width` and `out_height`, as photo.size_from answers."""
         return await self.update(edit, {"out_width": size.get("out_width"), "out_height": size.get("out_height")})
 
+    async def add_layer(self, edit: dict, kind: str, **fields) -> dict:
+        """A layer on top of the others: words (`text=`), a mark (`points=`), or a piece (`source=`)."""
+        if not self.layer_model:
+            raise ApiError("this editor has no layers: nothing to put on the picture", status_code=404)
+        if kind not in ph.KINDS:
+            raise ApiError(f"a layer is one of {', '.join(ph.KINDS)}, not {kind}", status_code=422)
+        on = await self.layers(edit["id"])
+        top = max((int(float((r.get("fields") or {}).get("order") or 0)) for r in on), default=-1) + 1
+        record = {self.bound["layer_edit"]: edit["id"], "kind": kind, "order": top, **ph.TEXT_AT}
+        if kind == "text":
+            record.update(size=ph.TEXT_SIZE, colour=ph.TEXT_COLOUR)
+        elif kind == "mark":
+            record.update(width=ph.MARK_WIDTH, opacity=ph.MARK_OPACITY, colour="#e0323c")
+        record.update({k: v for k, v in fields.items() if v is not None})
+        return await self.api.create_record(self.layer_model, record)
+
     async def add_text(self, edit: dict, words: str, **where) -> dict:
-        """Words on the picture: at `x`, `y`, `size` and `colour` when given, else the kit's start."""
-        if not self.text_model:
-            raise ApiError("this editor has no texts: nothing to write on the picture", status_code=404)
+        return await self.add_layer(edit, "text", text=words, **where)
+
+    async def set_layer(self, layer: dict, fields: dict) -> dict:
+        return await self.api.update_record(self.layer_model, layer["id"], fields)
+
+    async def remove_layer(self, layer: dict) -> None:
+        await self.api.delete_record(self.layer_model, layer["id"])
+
+    async def save(self, edit: dict, *, overwrite: bool, name: str = "") -> list[dict]:
+        """The save action pressed: over the photo, or as *name* beside it. The effects."""
+        if self.save_action is None:
+            raise ApiError("this editor has no save", status_code=404)
+        if not overwrite and not name.strip():
+            raise ApiError("saving as a new file needs a name", status_code=422)
+        source = await self.source_file(edit)
         fields = {
-            self.bound["text_edit"]: edit["id"],
-            "text": words,
-            **ph.TEXT_AT,
-            "size": ph.TEXT_SIZE,
-            "colour": ph.TEXT_COLOUR,
+            "overwrite": overwrite,
+            "name": name.strip() or str(((source or {}).get("fields") or {}).get("name") or ""),
         }
-        fields.update({k: v for k, v in where.items() if v is not None})
-        return await self.api.create_record(self.text_model, fields)
-
-    async def set_text(self, text: dict, fields: dict) -> dict:
-        return await self.api.update_record(self.text_model, text["id"], fields)
-
-    async def remove_text(self, text: dict) -> None:
-        await self.api.delete_record(self.text_model, text["id"])
+        return await self.api.quill_action(self.quill["id"], self.save_action["id"], record=edit["id"], fields=fields)
 
 
 __all__ = ["Photo", "is_photo"]

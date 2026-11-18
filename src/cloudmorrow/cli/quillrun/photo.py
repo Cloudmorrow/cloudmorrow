@@ -1,6 +1,6 @@
-"""A `photo` editor: edits of one picture each, and the words on them.
+"""A `photo` editor: edits of one picture each, and the layers on them.
 
-An edit is named by its name or the start of its id, a text on it by its
+An edit is named by its name or the start of its id, a layer on it by its
 words or the start of its id, a photo by its name, its path under the
 screen's `media`, or its id. The edits are the terminal's (client/photo.py),
 so a crop typed here is the crop `c` makes there.
@@ -24,7 +24,7 @@ from cloudmorrow.client.photo import Photo
 from cloudmorrow.console import TITLE
 from cloudmorrow.quill import photo as ph
 
-WORDS = "list, add, show, turn, mirror, crop, size, text, move, rm, picture and export"
+WORDS = "list, add, show, layers, turn, mirror, crop, size, text, move, rm, picture, save and export"
 
 
 def _status(fields: dict) -> str:
@@ -55,9 +55,9 @@ def _photo(material: list[dict], key: str) -> dict:
     return {}
 
 
-def _text(texts: list[dict], key: str) -> dict:
-    """A text by the start of its id, or its words."""
-    return _find(texts, key, "text")
+def _layer(layers: list[dict], key: str) -> dict:
+    """A layer by the start of its id, or its words."""
+    return _find(layers, key, "text")
 
 
 def _numbers(args: list[str], how_many: int, what: str) -> list[float]:
@@ -81,7 +81,7 @@ def _at(timing: dict) -> dict:
 
 
 def _text_fields(timing: dict) -> dict:
-    """What `--at`, `--size` and `--colour` say of a text."""
+    """What `--at`, `--size` and `--colour` say of a layer."""
     fields = _at(timing)
     if timing.get("size") is not None:
         try:
@@ -131,23 +131,13 @@ async def _act_photo(
     edit = await _edit(photo, args[0])
     rest = args[1:]
     name = escape(str(edit["fields"].get(photo.title) or edit["id"]))
-    if action == "show":
+    if action in ("show", "layers"):
         await _show(photo, edit, plain)
     elif action == "turn":
         said = (rest[0] if rest else "right").lower()
-        by = {
-            "right": 90,
-            "r": 90,
-            "cw": 90,
-            "90": 90,
-            "left": -90,
-            "l": -90,
-            "ccw": -90,
-            "-90": -90,
-            "270": -90,
-            "180": 180,
-            "round": 180,
-        }.get(said)
+        turns = {"right": 90, "r": 90, "cw": 90, "90": 90, "left": -90, "l": -90, "ccw": -90, "-90": -90, "270": -90}
+        turns.update({"180": 180, "round": 180})
+        by = turns.get(said)
         if by is None:
             fail(f"turn which way? {command} turn <edit> [right|left|180]")
         changed = await photo.rotate(edit, by)
@@ -179,23 +169,44 @@ async def _act_photo(
         if not rest:
             fail(f'what words? {command} text <edit> "words" [--at "x y"] [--size 8] [--colour amber]')
         made = await photo.add_text(edit, " ".join(rest), **_text_fields(timing))
-        quillrun.console.print(f"[green]On the picture:[/] {ph.text_said(made['fields'])} [dim]{_short(made['id'])}[/]")
+        quillrun.console.print(
+            f"[green]On the picture:[/] {ph.layer_said(made['fields'])} [dim]{_short(made['id'])}[/]"
+        )
     elif action in ("move", "rm"):
         if not rest:
-            fail(f"which text? {command} {action} <edit> <text> …")
-        text = _text(await photo.texts(edit["id"]), rest[0])
-        words = escape(str(text["fields"].get("text") or text["id"]))
+            fail(f"which layer? {command} {action} <edit> <layer> …")
+        layer = _layer(await photo.layers(edit["id"]), rest[0])
+        said = escape(ph.layer_said(layer["fields"]))
         if action == "rm":
-            await photo.remove_text(text)
-            quillrun.console.print(f"[green]Took off[/] {words}")
+            await photo.remove_layer(layer)
+            quillrun.console.print(f"[green]Took off[/] {said}")
             return
         fields = _text_fields(timing)
         if not fields:
-            fail(f'move where? {command} move <edit> <text> --at "x y" [--size 8] [--colour amber]')
-        changed = await photo.set_text(text, fields)
-        quillrun.console.print(f"[green]Moved[/] {ph.text_said(changed['fields'])}")
+            fail(f'move where? {command} move <edit> <layer> --at "x y" [--size 8] [--colour amber]')
+        shown = ph.layer_of(layer["fields"])
+        if shown["kind"] == "mark" and "x" in fields:
+            dx, dy = fields["x"] - shown["x"], fields["y"] - shown["y"]
+            fields["points"] = [
+                [min(max(px + dx, 0.0), 100.0), min(max(py + dy, 0.0), 100.0)] for px, py in shown["points"]
+            ]
+        changed = await photo.set_layer(layer, fields)
+        quillrun.console.print(f"[green]Moved[/] {escape(ph.layer_said(changed['fields']))}")
     elif action == "picture":
         await _picture(photo, edit, timing)
+    elif action == "save":
+        if photo.save_action is None:
+            fail(f"{screen.spec['id']} has no save")
+        source = await photo.source_file(edit)
+        photo_name = str(((source or {}).get("fields") or {}).get("name") or "")
+        wanted = " ".join(rest).strip()
+        overwrite = not wanted or wanted == photo_name
+        effects = await photo.save(edit, overwrite=overwrite, name=wanted or photo_name)
+        told = next((e.get("text") for e in effects if e.get("effect") in ("toast", "error")), "")
+        how = f"over {photo_name or 'the photo'}" if overwrite else f"as {wanted}"
+        quillrun.console.print(
+            f"[green]Saving[/] {name} {escape(how)}" + (f" [dim]{escape(str(told))}[/]" if told else "")
+        )
     elif action == "export":
         if photo.export is None:
             fail(f"{screen.spec['id']} has no export")
@@ -205,9 +216,9 @@ async def _act_photo(
 
 
 async def _show(photo: Photo, edit: dict, plain: bool) -> None:
-    texts = await photo.texts(edit["id"])
+    layers = await photo.layers(edit["id"])
     if plain:
-        quillrun.emit(json.dumps({"edit": edit, "texts": texts}, indent=2) + "\n")
+        quillrun.emit(json.dumps({"edit": edit, "layers": layers}, indent=2) + "\n")
         return
     f = edit["fields"]
     about = []
@@ -227,13 +238,38 @@ async def _show(photo: Photo, edit: dict, plain: bool) -> None:
     table = Table(
         title=f"{escape(str(f.get(photo.title) or ''))}  [dim]{escape(' · '.join(about))}[/]", title_style=TITLE
     )
-    for column in ("id", "words", "at", "size", "colour"):
+    for column in ("id", "layer", "at", "size", "colour"):
         table.add_column(column, style="dim" if column == "id" else None)
-    if not texts:
-        table.add_row("", "[dim]no words on it[/]", "", "", "")
-    for text in texts:
-        t = ph.text_of(text["fields"])
-        table.add_row(_short(text["id"]), escape(t["text"]), f"{t['x']:g} {t['y']:g}", f"{t['size']:g}%", t["colour"])
+    if not layers:
+        table.add_row("", "[dim]nothing on it[/]", "", "", "")
+    # The top layer first, as the editor lists them.
+    for record in reversed(layers):
+        layer = ph.layer_of(record["fields"])
+        hidden = " [dim](hidden)[/]" if layer["hidden"] else ""
+        if layer["kind"] == "text":
+            table.add_row(
+                _short(record["id"]),
+                escape(layer["text"]) + hidden,
+                f"{layer['x']:g} {layer['y']:g}",
+                f"{layer['size']:g}%",
+                layer["colour"],
+            )
+        elif layer["kind"] == "mark":
+            table.add_row(
+                _short(record["id"]),
+                f"mark, {len(layer['points'])} points" + hidden,
+                f"{layer['x']:g} {layer['y']:g}",
+                f"{layer['width']:g}% wide",
+                layer["colour"],
+            )
+        else:
+            table.add_row(
+                _short(record["id"]),
+                "piece" + hidden,
+                f"{layer['x']:g} {layer['y']:g}",
+                f"{layer['w']:g} × {layer['h']:g}",
+                "",
+            )
     quillrun.out.print(table)
 
 
@@ -252,5 +288,5 @@ async def _picture(photo: Photo, edit: dict, timing: dict) -> None:
     path.write_bytes(data)
     quillrun.console.print(
         f"[green]Saved[/] {escape(str(path))} "
-        f"[dim]{escape(str(edit['fields'].get(photo.title) or ''))}, as it will export[/]"
+        f"[dim]{escape(str(edit['fields'].get(photo.title) or ''))}, as it will save[/]"
     )

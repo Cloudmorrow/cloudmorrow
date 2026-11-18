@@ -1,4 +1,4 @@
-"""`cm <quill> …` for a photo editor: edits started, turned, cropped, sized and written on, against a real server.
+"""`cm <quill> …` for a photo editor: edits started, turned, cropped, sized, written on and saved, on a real server.
 
 The Cropper fixture has no pictures API, so an edit's size is what the
 record says, and `picture` says why there is none; the pictures API itself
@@ -86,7 +86,7 @@ def test_an_edit_is_started_from_a_photo_listed_and_shown(cm, cropper):
     listed = cm("list")
     assert "beach" in listed and "Pup" in listed
     shown = cm("show", "beach")
-    assert "size not known yet" in shown and "no words on it" in shown
+    assert "size not known yet" in shown and "nothing on it" in shown
 
 
 def test_turn_mirror_crop_and_size(cm, cropper):
@@ -114,7 +114,7 @@ def test_turn_mirror_crop_and_size(cm, cropper):
     assert "turned 180°" in shown and "4000 × 3000 as taken" in shown
 
 
-def test_words_are_laid_on_moved_and_taken_off(cm, cropper):
+def test_layers_are_laid_on_moved_listed_and_taken_off(cm, cropper):
     cm("add", "beach.jpg")
     said = cm("text", "beach", "Summer", "2026", at="10 80", size="8", colour="amber")
     assert "'Summer 2026' at 10 80, 8% tall, #f0a81e" in said
@@ -124,10 +124,23 @@ def test_words_are_laid_on_moved_and_taken_off(cm, cropper):
     assert "Moved 'Hi' at 50 50, 6% tall, #ffffff" in cm("move", "beach", "Hi", at="50 50")
     with pytest.raises(typer.Exit):
         cm("move", "beach", "Hi")
-    shown = cm("show", "beach")
-    assert "Summer 2026" in shown and "10 80" in shown and "#f0a81e" in shown
-    assert "Took off Hi" in cm("rm", "beach", "Hi")
-    assert [t["fields"]["text"] for t in records(cropper, "cropper.text")] == ["Summer 2026"]
+    # Stacked as they were made: the last on top, so first in the listing.
+    shown = cm("layers", "beach")
+    assert shown.index("Hi") < shown.index("Summer 2026") and "10 80" in shown and "#f0a81e" in shown
+    orders = [t["fields"]["order"] for t in records(cropper, "cropper.layer")]
+    assert sorted(orders) == [0, 1]
+    assert "Took off 'Hi'" in cm("rm", "beach", "Hi")
+    assert [t["fields"]["text"] for t in records(cropper, "cropper.layer")] == ["Summer 2026"]
+
+
+def test_save_writes_over_the_photo_or_beside_it(cm, cropper):
+    cm("add", "beach.jpg")
+    assert "Saving beach over beach.jpg" in cm("save", "beach")
+    edit = records(cropper, "cropper.edit")[0]["fields"]
+    assert (edit["status"], edit["message"]) == ("queued", "over the photo")
+    assert "Saving beach as beach edited.png" in cm("save", "beach", "beach edited.png")
+    assert records(cropper, "cropper.edit")[0]["fields"]["message"] == "as beach edited.png"
+    assert "queued — as beach edited.png" in cm("list")
 
 
 def test_export_runs_the_screens_action(cm, cropper):
@@ -135,7 +148,6 @@ def test_export_runs_the_screens_action(cm, cropper):
     assert "Queued" in cm("export", "beach", "format=png")
     edit = records(cropper, "cropper.edit")[0]["fields"]
     assert (edit["status"], edit["message"]) == ("queued", "as png")
-    assert "queued — as png" in cm("list")
 
 
 def test_picture_saves_the_edit_from_the_pictures_api(cm, cropper, monkeypatch, tmp_path):
@@ -178,7 +190,7 @@ def test_the_check_sketches_the_photo_editor(tmp_path):
     plan = QuillRegistry(tmp_path / "q", tmp_path / "d").plan(CROPPER, QUILL_CATALOG / "datamodels")
     sketch = preview(plan)
     assert "Editor (photo of cropper.edit)" in sketch
-    assert "[ Export e ]" in sketch and "Text on the picture" in sketch
+    assert "[ Save w ]" in sketch and "Layers, top first" in sketch
     assert "no pictures API" in sketch and "my-files / Photos" in sketch
     assert max(len(line) for line in sketch.splitlines()) <= 80
 

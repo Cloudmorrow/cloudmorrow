@@ -1,19 +1,22 @@
-/* The kit's `photo`: the picture, its buttons, and the panels beside it.
+/* The kit's `photo`: a simple picture program — the tools down the left,
+   the picture in the middle on a dark ground, the tool's options, the
+   image and the layers on the right.
 
-   A phone has it in one column — the picture on top, the buttons under
-   it, then the panels. A computer has the panels on the right of the
-   picture. The one amber fill is Export; amber lines are what you are
-   moving — the chosen words, the crop's box. Nothing here is named for one
-   Quill; the look is the timeline's, so the two editors feel like one. */
+   A phone has it in one column: the picture, the tools as a strip under
+   it, then the panels. The one amber fill is Save; amber lines are what you
+   are holding — the chosen layer, the crop's box — and the selection is a
+   dashed sky line. Nothing here is named for one Quill; the look is the
+   timeline's, so the two editors feel like one. */
 
 .kit-photo { display: flex; flex-direction: column; padding-bottom: calc(24px + var(--bottom)); }
 .ph-desk { display: contents; }
 .ph-viewer { order: 1; min-width: 0; }
-.ph-side { order: 2; margin-top: 12px; }
+.ph-tools { order: 2; }
+.ph-side { order: 3; margin-top: 12px; }
 .ph-quiet { margin: 4px 4px 10px; color: var(--muted); font-size: 14px; }
 .ph-quiet-inline { color: var(--muted); font-weight: 400; }
 
-/* -- the header: export and how it is going -------------------------------- */
+/* -- the header: save, and how it is going -------------------------------- */
 .ph-headbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin: -8px 0 12px; }
 .ph-status {
   flex: 1;
@@ -38,18 +41,58 @@
 .heading .ph-open { min-height: 36px; font-family: var(--display); font-weight: 600; }
 .heading a.button.ph-settings .pixel-icon { width: 20px; height: 20px; }
 
+/* -- the tools -------------------------------------------------------------- */
+.ph-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+  margin: 8px 0 0;
+}
+.ph-tool {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 58px;
+  height: 52px;
+  border-radius: var(--radius-control);
+  color: var(--accent);
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+.ph-tool:disabled { color: var(--muted); opacity: .45; cursor: default; }
+.ph-tool:active { background: var(--card-2); }
+.ph-tool[aria-pressed="true"], .ph-tool.on { background: var(--fill); color: var(--fill-ink); }
+.ph-tools-gap { display: none; }
+
 /* -- the picture ------------------------------------------------------------- */
-.ph-stage-box { display: flex; justify-content: center; width: 100%; }
+.ph-stage-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 10px;
+  background: #0d1117;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
 .ph-stage {
   position: relative;
   background: #000;
-  border-radius: 10px;
+  box-shadow: 0 2px 18px rgba(0, 0, 0, .5);
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
 }
 .ph-stage canvas { display: block; width: 100%; height: 100%; }
-.ph-over { position: absolute; inset: 0; }
+.ph-over { position: absolute; inset: 0; touch-action: none; }
+.ph-over[data-tool="marker"] { cursor: crosshair; }
+.ph-over[data-tool="select"], .ph-over[data-tool="crop"] { cursor: crosshair; }
+.ph-over[data-tool="text"] { cursor: text; }
 .ph-stage-words {
   position: absolute;
   inset: 0;
@@ -63,12 +106,22 @@
   text-align: center;
 }
 .ph-stage-words[hidden] { display: none; }
+.ph-footline {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 6px 4px 0;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
 
-/* The boxes on the picture: a text's faint until chosen, then amber with a
-   corner to pull; the crop's in white with the rest dimmed around it. */
+/* The boxes on the picture: the chosen layer's amber with corners to pull,
+   the selection a dashed sky line, the crop white with the rest dimmed. */
 .ph-box { position: absolute; touch-action: none; }
-.ph-box.text { border: 1px dashed rgba(255, 255, 255, .35); cursor: move; }
-.ph-box.text.on { border: 2px solid var(--action); box-shadow: 0 0 0 1px rgba(0, 0, 0, .5); }
+.ph-box.layer { border: 2px solid var(--action); box-shadow: 0 0 0 1px rgba(0, 0, 0, .5); cursor: move; }
+.ph-box.layer.mark { border-style: dashed; }
+.ph-box.select { border: 2px dashed var(--accent); box-shadow: 0 0 0 1px rgba(0, 0, 0, .5); cursor: move; }
 .ph-box.crop { border: 2px solid #fff; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .58); cursor: move; }
 .ph-box i {
   position: absolute;
@@ -80,6 +133,7 @@
   touch-action: none;
 }
 .ph-box.crop i { border-color: rgba(0, 0, 0, .6); }
+.ph-box.select i { border-color: var(--accent); }
 .ph-box [data-h="nw"] { left: 0; top: 0; cursor: nwse-resize; }
 .ph-box [data-h="n"] { left: 50%; top: 0; transform: translateX(-50%); cursor: ns-resize; }
 .ph-box [data-h="ne"] { right: 0; top: 0; cursor: nesw-resize; }
@@ -88,41 +142,22 @@
 .ph-box [data-h="s"] { left: 50%; bottom: 0; transform: translateX(-50%); cursor: ns-resize; }
 .ph-box [data-h="sw"] { left: 0; bottom: 0; cursor: nesw-resize; }
 .ph-box [data-h="w"] { left: 0; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
-.ph-box.text [data-h="se"] { right: -8px; bottom: -8px; border-radius: 50%; }
+.ph-box.layer.text [data-h="se"] { right: -8px; bottom: -8px; border-radius: 50%; }
 @media (pointer: coarse) {
   .ph-box i { width: 22px; height: 22px; border-radius: 6px; }
-  .ph-box.text [data-h="se"] { right: -12px; bottom: -12px; }
+  .ph-box.layer.text [data-h="se"] { right: -12px; bottom: -12px; }
 }
-
-/* -- the buttons under the picture ----------------------------------------------- */
-.ph-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px; margin: 8px 0 0; }
-.ph-tools button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 44px;
-  height: 40px;
-  padding: 0 10px;
-  border-radius: var(--radius-control);
-  color: var(--accent);
-  font-family: var(--display);
-  font-size: 15px;
-  font-weight: 600;
-}
-.ph-tools button:disabled { color: var(--muted); opacity: .45; cursor: default; }
-.ph-tools button:active { background: var(--card-2); }
-.ph-tools button.on { background: var(--fill); color: var(--fill-ink); }
-@media (max-width: 420px) { .ph-tools button span { display: none; } }
 
 /* -- the panels ------------------------------------------------------------------- */
+.ph-side > section { margin-bottom: 14px; }
 .ph-card { padding: 10px 14px 6px; }
-.ph-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+.ph-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
 .ph-chips .act-chip { gap: 6px; }
 .ph-chips .act-chip.on, .ph-ratio.on { background: var(--fill); color: var(--fill-ink); border-color: transparent; }
 .ph-field { display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 14px; }
 .ph-field > span { flex: none; min-width: 4.6em; color: var(--muted); }
 .ph-field.small > span { min-width: 3.4em; }
+.ph-field .ph-chips { margin: 0; }
 .ph-field input[type="text"], .ph-field input[type="number"], .ph-field select {
   flex: 1;
   min-width: 0;
@@ -158,7 +193,7 @@
 .ph-row-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 .ph-row-buttons .act-chip { gap: 6px; }
 .ph-row-buttons .act-chip.primary { background: var(--fill); color: var(--fill-ink); border-color: transparent; }
-.ph-drop-text { color: var(--bad); }
+.ph-drop-layer { color: var(--bad); }
 .ph-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .ph-swatch {
   width: 24px;
@@ -170,7 +205,42 @@
 }
 .ph-swatch.on { border-color: var(--action); box-shadow: 0 0 0 2px var(--card); }
 .ph-swatch:disabled { cursor: default; opacity: .5; }
-.ph-colour { width: 32px; height: 26px; padding: 0 2px; background: var(--field); border: 1px solid var(--line); border-radius: 6px; }
+.ph-marker-custom, .ph-layer-custom { width: 32px; height: 26px; padding: 0 2px; background: var(--field); border: 1px solid var(--line); border-radius: 6px; }
+
+/* Layers: the top one first, an eye each, the chosen one lit with its buttons. */
+.ph-count { margin-left: 6px; color: var(--muted); font-weight: 400; }
+.ph-layer-list { display: flex; flex-direction: column; gap: 2px; }
+.ph-layer {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 38px;
+  padding: 0 4px 0 2px;
+  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+.ph-layer.on { border-color: color-mix(in srgb, var(--action) 60%, var(--line)); }
+.ph-layer.hidden .ph-layer-name { color: var(--muted); text-decoration: line-through; }
+.ph-layer button { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; border-radius: 6px; color: var(--muted); }
+.ph-layer-pick { flex: 1; justify-content: flex-start !important; gap: 8px; padding: 0 4px; color: var(--ink) !important; font-size: 14px; }
+.ph-layer.on .ph-layer-pick { color: var(--action) !important; }
+.ph-layer-kind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--swatch) 35%, var(--card-2));
+  color: var(--ink);
+}
+.ph-layer-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ph-layer-drop { color: var(--bad) !important; }
+
+/* Save: over the photo, or as a new file. */
+.ph-save-choices { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.ph-save-choices .act-button { min-height: 44px; }
 
 /* -- the edits, and the photos to start one from ---------------------------------- */
 .ph-edit .ph-thumb { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; overflow: hidden; border-radius: 8px; background: var(--card-2); color: var(--muted); }
@@ -216,14 +286,29 @@
   #app:has(main.kit-photo) > nav.tabs, #app:has(main.kit-photo) > nav.subtabs { display: none; }
 }
 
-/* -- a computer: the panels beside the picture ---------------------------------- */
+/* -- a computer: tools, picture, panels, side by side ------------------------------ */
 @media (min-width: 900px) and (min-height: 600px) {
-  #app:has(.kit-photo) { --column: 1400px; }
+  #app:has(.kit-photo) { --column: 1500px; }
   .kit-photo { display: block; }
   .ph-side { margin-top: 0; }
-  .ph-desk { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); gap: 16px; align-items: start; }
+  .ph-desk { display: grid; grid-template-columns: 66px minmax(0, 1fr) minmax(280px, 330px); gap: 14px; align-items: start; }
+  .ph-tools {
+    order: 0;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-self: stretch;
+    margin: 0;
+    padding: 6px 4px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .ph-tools-gap { display: block; flex: none; height: 1px; margin: 6px 8px; background: var(--line); }
+  .ph-stage-box { min-height: 320px; }
+  .ph-side { max-height: calc(100vh - 150px); overflow-y: auto; padding-right: 2px; }
 }
 @media (hover: hover) and (pointer: fine) {
-  .ph-tools button:not(:disabled):not(.on):hover { background: var(--card-2); }
+  .ph-tool:not(:disabled):not([aria-pressed="true"]):not(.on):hover { background: var(--card-2); }
   .ph-tile:hover .ph-tile-pic { border-color: var(--accent); }
+  .ph-layer button:hover { background: var(--card-2); }
 }

@@ -2,10 +2,10 @@
 
 A photo edit (docs/PHOTO.md) is one picture from the drive and what is done
 to it, in this order: turned by a quarter turn or more (`rotate`), mirrored
-(`mirror`), with words laid on it (the texts, each at a place in percent of
-the turned picture and a size in percent of its height), cropped to a box
-in percent of the turned picture (`crop`), and made another size
-(`out_width`, `out_height`). The terminal and the command line work on
+(`mirror`), with layers laid on it in their order (words, marker strokes,
+and pieces copied out of the picture, each placed in percent of the turned
+picture), cropped to a box in percent of the turned picture (`crop`), and
+made another size (`out_width`, `out_height`). The terminal and the command line work on
 those numbers with what is here, and the web app's kit_photo_rules.js does
 the same sums in JavaScript: a change to a rule here is a change there.
 
@@ -21,10 +21,14 @@ The rules:
 - *A box* — the crop — is in percent of the turned picture; the whole
   picture is `WHOLE`, and a crop is never smaller than a twentieth each way
   (`crop_of`, `box_from`, from the timeline kit, which keeps boxes the same way).
-- *A text* is at `x`, `y` (its top left corner, in percent of the turned
-  picture, before the crop, so cropping keeps the words on the same part
-  of the photo) with `size` as percent of the turned picture's height;
-  `colour` is a hex colour (`colour_from`).
+- *A layer* has a `kind`: `text` (words at `x`, `y`, their top left corner,
+  `size` percent of the picture's height, a `colour`), `mark` (a marker
+  stroke: `points` in percent, `width` percent of the height, a `colour`,
+  an `opacity`) or `piece` (a rectangle `source` copied out of the turned
+  picture and placed at `x`, `y`, `w`, `h`). Every place is in percent of
+  the turned picture, before the crop, so cropping keeps a layer on the
+  same part of the photo. Layers stack by `order`, lowest first, then by
+  when they were made; a `hidden` layer is kept but not drawn (`layer_of`).
 - *The export's size* is the cropped picture's unless `out_width` or
   `out_height` says: one given keeps the picture's shape, both given are
   taken as typed (`output_size`). A size is typed as `1920x1080`, one
@@ -38,6 +42,14 @@ import re
 from cloudmorrow.quill.timeline import BOX, WHOLE, box_from, box_said, seconds
 
 __all__ = [
+    "KINDS",
+    "MARK_OPACITY",
+    "MARK_WIDTH",
+    "HIGHLIGHT_OPACITY",
+    "layer_of",
+    "layer_said",
+    "layers_in_order",
+    "points_of",
     "BOX",
     "LONGEST",
     "TEXT_AT",
@@ -67,6 +79,11 @@ LONGEST = 8192
 TEXT_AT = {"x": 6.0, "y": 6.0}
 TEXT_SIZE = 6.0
 TEXT_COLOUR = "#ffffff"
+# What a layer can be, and what a marker stroke starts as.
+KINDS = ("text", "mark", "piece")
+MARK_WIDTH = 1.5
+MARK_OPACITY = 1.0
+HIGHLIGHT_OPACITY = 0.4
 # A few colours by name, for the command line and the terminal.
 COLOURS = {
     "white": "#ffffff",
@@ -216,3 +233,77 @@ def text_said(fields: dict) -> str:
     t = text_of(fields)
     words = t["text"].replace("\n", " / ")
     return f"{words!r} at {t['x']:g} {t['y']:g}, {t['size']:g}% tall, {t['colour']}"
+
+
+# -- layers -----------------------------------------------------------------------
+def points_of(value: object) -> list[list[float]]:
+    """A mark's points, `[[x, y], …]` in percent, kept inside the picture; what is not a point is dropped."""
+    out: list[list[float]] = []
+    for item in value if isinstance(value, list) else []:
+        if isinstance(item, (list, tuple)) and len(item) == 2:
+            try:
+                x, y = float(item[0]), float(item[1])
+            except (TypeError, ValueError):
+                continue
+            out.append([min(max(x, 0.0), 100.0), min(max(y, 0.0), 100.0)])
+    return out
+
+
+def _box(value: object, fallback: dict | None = None) -> dict | None:
+    if not isinstance(value, dict):
+        return dict(fallback) if fallback else None
+    x = min(max(seconds(value.get("x")), 0.0), 100.0)
+    y = min(max(seconds(value.get("y")), 0.0), 100.0)
+    w = min(max(seconds(value.get("w"), 10.0), 0.5), 100.0 - x)
+    h = min(max(seconds(value.get("h"), 10.0), 0.5), 100.0 - y)
+    return {"x": x, "y": y, "w": w, "h": h}
+
+
+def layer_of(fields: dict) -> dict:
+    """A layer's fields as the kit draws them, by its kind: a text, a mark, or a piece."""
+    kind = str(fields.get("kind") or "text")
+    kind = kind if kind in KINDS else "text"
+    layer = {
+        "kind": kind,
+        "x": min(max(seconds(fields.get("x"), TEXT_AT["x"]), 0.0), 100.0),
+        "y": min(max(seconds(fields.get("y"), TEXT_AT["y"]), 0.0), 100.0),
+        "hidden": bool(fields.get("hidden")),
+        "order": _int(fields.get("order")),
+        "colour": colour_from(fields.get("colour")) or TEXT_COLOUR,
+    }
+    if kind == "text":
+        layer["text"] = str(fields.get("text") or "")
+        layer["size"] = min(max(seconds(fields.get("size"), TEXT_SIZE), 0.5), 100.0)
+    elif kind == "mark":
+        layer["points"] = points_of(fields.get("points"))
+        layer["width"] = min(max(seconds(fields.get("width"), MARK_WIDTH), 0.1), 25.0)
+        layer["opacity"] = min(max(seconds(fields.get("opacity"), MARK_OPACITY), 0.05), 1.0)
+    else:
+        layer["source"] = _box(fields.get("source"), {"x": 0, "y": 0, "w": 25, "h": 25})
+        layer["w"] = min(max(seconds(fields.get("w"), layer["source"]["w"]), 0.5), 100.0)
+        layer["h"] = min(max(seconds(fields.get("h"), layer["source"]["h"]), 0.5), 100.0)
+    return layer
+
+
+def layers_in_order(records: list[dict]) -> list[dict]:
+    """Records of layers, lowest first: by `order`, then by when they were made."""
+    return sorted(
+        records,
+        key=lambda r: (
+            _int((r.get("fields") or {}).get("order")),
+            str(r.get("created_at") or ""),
+            str(r.get("id") or ""),
+        ),
+    )
+
+
+def layer_said(fields: dict) -> str:
+    """`'Hello' at 6 6, 6% tall, #ffffff`; `a #e0323c mark, 12 points, 1.5% wide`; `a piece 25 × 25 at 10 10`."""
+    layer = layer_of(fields)
+    hidden = ", hidden" if layer["hidden"] else ""
+    if layer["kind"] == "text":
+        words = layer["text"].replace("\n", " / ")
+        return f"{words!r} at {layer['x']:g} {layer['y']:g}, {layer['size']:g}% tall, {layer['colour']}{hidden}"
+    if layer["kind"] == "mark":
+        return f"a {layer['colour']} mark, {len(layer['points'])} points, {layer['width']:g}% wide{hidden}"
+    return f"a piece {layer['w']:g} × {layer['h']:g} at {layer['x']:g} {layer['y']:g}{hidden}"

@@ -27,7 +27,7 @@ surface. Reach for a **view** only when no kit element says it.
 | documents: a basic Word, with Word files read and written | `kit = "document"` over the `.docs` and `.docx` files in a folder of the drive (`suffix = [".docs", ".docx"]`); Open from anywhere and Export as Word, PDF or Markdown come with it (docs/DOCS.md in the Cloudmorrow repository) |
 | files | `kit = "grid"` |
 | editing video: clips on video and audio tracks, cut, moved, blurred, exported | `kit = "timeline"` (docs/TIMELINE.md in the Cloudmorrow repository) |
-| editing a photo: turned, mirrored, cropped, resized, with words on it, exported | `kit = "photo"` (docs/PHOTO.md in the Cloudmorrow repository) |
+| editing a photo like a simple picture program: turned, mirrored, cropped, resized, layers of words, marker strokes and pasted pieces, saved over it or beside it | `kit = "photo"` (docs/PHOTO.md in the Cloudmorrow repository) |
 | a summary, a dashboard, numbers, a mix of the above, a record's own page | a **view** |
 
 Every element and the primitives that draw records are pictured, on a phone

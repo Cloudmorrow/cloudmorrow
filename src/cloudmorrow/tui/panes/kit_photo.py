@@ -2,20 +2,22 @@
 
 It opens on the edits, newest first, with New, which asks which photo of
 the drive to start from. An edit opens the editor (docs/PHOTO.md, *The
-editor*): the picture in the middle, the words laid on it listed on the
-right, and the edit's size, turn and crop said in the header.
+editor*): the picture in the middle, the layers on it listed on the right
+(words, marker strokes, pieces — the top one first), and the edit's size,
+turn and crop said in the header.
 
 The picture is the Quill's pictures API's `picture` of the edit — the
-export as it would be — drawn by textual-image: the real picture where the
+save as it would be — drawn by textual-image: the real picture where the
 terminal speaks Kitty or Sixel, half-cells elsewhere. Without a pictures
 API the viewer says in words what the edit does, and the edit's size is
 asked for the first time it is needed.
 
 Everything is a key (the spec's): r turns right, R left, m mirrors, c crops
-from four typed numbers, C keeps the whole picture, s sets the export's
-size, t lays words on the picture, enter on them changes the words, k moves
-them (x y, typed), x takes them off, e exports, o opens the export, and
-tab goes between the picture and the texts.
+from four typed numbers, C keeps the whole picture, s sets the save's
+size, t lays words on the picture, enter on a layer opens its sheet, k
+moves it (x y, typed), h hides or shows it, shift+↑/↓ brings it forward or
+sends it back, x takes it off, w saves (over the photo, or as a new file by
+name), e exports, o opens what was saved, and tab goes to the layers.
 
 The sums are cloudmorrow.quill.photo's and the writes client/photo.py's,
 which the command line uses too: a crop here and `cm <quill> crop` are the
@@ -45,10 +47,12 @@ from cloudmorrow.tui.widgets.picture import TerminalImage
 from cloudmorrow.tui.widgets.toolbar import Action
 from cloudmorrow.tui.words import escape, plural
 
-# How often the header asks after an export that is queued or rendering.
+# How often the header asks after a save that is queued or rendering.
 POLL_SECONDS = 2.0
 # How a status is toned in the header.
 STATUS_TONE = {"queued": LENS, "rendering": LENS, "done": GOOD, "failed": BAD}
+# What each kind of layer looks like in the list.
+GLYPH = {"text": "T", "mark": "✎", "piece": "▣"}
 
 # Which actions each of the two places has: the edits, and the editor.
 IN_LIST = frozenset({"new_record", "open", "delete_record", "refresh"})
@@ -62,8 +66,12 @@ IN_EDITOR = frozenset(
         "reset_crop",
         "size",
         "text",
-        "move_text",
+        "move_layer",
+        "hide_layer",
+        "layer_up",
+        "layer_down",
         "delete_record",
+        "save",
         "export",
         "open_output",
         "refresh",
@@ -71,7 +79,7 @@ IN_EDITOR = frozenset(
 )
 
 
-def viewer_words(fields: dict, texts: list[dict]) -> str:
+def viewer_words(fields: dict, layers: list[dict]) -> str:
     """What the edit does, said, for a terminal with no picture to show."""
     lines = []
     source = ph.source_size(fields)
@@ -87,8 +95,14 @@ def viewer_words(fields: dict, texts: list[dict]) -> str:
     out = ph.size_said(fields)
     if out:
         lines.append(f"comes out [b]{out}[/]")
-    for text in texts:
-        lines.append(f"[{ACCENT}]“{escape(str((text.get('fields') or {}).get('text') or ''))}”[/]")
+    for record in layers:
+        layer = ph.layer_of(record.get("fields") or {})
+        if layer["hidden"]:
+            continue
+        if layer["kind"] == "text":
+            lines.append(f"[{ACCENT}]“{escape(layer['text'])}”[/]")
+        else:
+            lines.append(f"[{MUTED}]{escape(ph.layer_said(record.get('fields') or {}))}[/]")
     return "\n".join(lines)
 
 
@@ -155,15 +169,32 @@ class PhotoPane(KitPane):
         Binding("C", "fire('reset_crop')", "Whole picture", show=False),
         Binding("s", "fire('size')", "Size", show=False),
         Binding("t", "fire('text')", "Text", show=False),
-        Binding("k", "fire('move_text')", "Move text", show=False),
+        Binding("k", "fire('move_layer')", "Move layer", show=False),
+        Binding("h", "fire('hide_layer')", "Hide or show", show=False),
+        Binding("shift+up", "fire('layer_up')", "Bring forward", show=False),
+        Binding("shift+down", "fire('layer_down')", "Send back", show=False),
         Binding("x", "fire('delete_record')", "Delete", show=False),
+        Binding("w", "fire('save')", "Save", show=False),
         Binding("e", "fire('export')", "Export", show=False),
-        Binding("o", "fire('open_output')", "Open the export", show=False),
+        Binding("o", "fire('open_output')", "Open what was saved", show=False),
         Binding("f5", "fire('refresh')", "Refresh", show=False),
         Binding("tab", "cycle(1)", "Next panel", show=False),
         Binding("shift+tab", "cycle(-1)", "Last panel", show=False),
     ]
-    WRITING = KitPane.WRITING | {"turn_right", "turn_left", "mirror", "crop", "reset_crop", "size", "text", "move_text"}
+    WRITING = KitPane.WRITING | {
+        "turn_right",
+        "turn_left",
+        "mirror",
+        "crop",
+        "reset_crop",
+        "size",
+        "text",
+        "move_layer",
+        "hide_layer",
+        "layer_up",
+        "layer_down",
+        "save",
+    }
 
     DEFAULT_CSS = """
     PhotoPane {
@@ -176,8 +207,8 @@ class PhotoPane(KitPane):
         #ph-viewer-caption { height: 1; }
         #ph-picture { width: auto; height: auto; }
         #ph-viewer-words { height: 1fr; }
-        #ph-texts-col { width: 40; padding: 0 1; border-left: solid $line; }
-        #ph-texts { height: 1fr; }
+        #ph-layers-col { width: 42; padding: 0 1; border-left: solid $line; }
+        #ph-layers { height: 1fr; }
         .ph-title { height: 1; color: $muted; }
     }
     """
@@ -186,9 +217,10 @@ class PhotoPane(KitPane):
         super().__init__(quill, screen, **kwargs)
         self.photo = Photo(None, quill, screen)
         self.edits: list[dict] = []
-        # The edit open in the editor, and the words on it.
+        # The edit open in the editor, the layers on it (lowest first), and its photo.
         self.edit: dict | None = None
-        self.texts: list[dict] = []
+        self.stack: list[dict] = []
+        self.source: dict | None = None
         # What a Quill's `go` asked for: `edit` opens that one's editor.
         self.params: dict = {}
         # One picture on its way at a time; a change meanwhile asks again once it lands.
@@ -201,9 +233,11 @@ class PhotoPane(KitPane):
             Action("turn_right", "Turn", "r", hint="A quarter turn clockwise; shift-r the other way"),
             Action("mirror", "Mirror", "m"),
             Action("crop", "Crop", "c", hint="The part kept, as x y w h in percent; shift-c keeps all of it"),
-            Action("size", "Size", "s", hint="The export's size: 1920x1080, a width, or a percent"),
-            Action("text", "Text", "t", hint="Words on the picture; enter changes them, k moves them"),
+            Action("size", "Size", "s", hint="What it comes out as: 1920x1080, a width, or a percent"),
+            Action("text", "Text", "t", hint="Words on the picture; enter changes a layer, k moves it, h hides it"),
         ]
+        if self.photo.save_action is not None:
+            actions.append(Action("save", str(self.photo.save_action.get("label") or "Save"), "w", variant="primary"))
         if self.photo.export is not None:
             actions.append(Action("export", str(self.photo.export.get("label") or "Export"), "e"))
         actions += [
@@ -222,10 +256,16 @@ class PhotoPane(KitPane):
         return (self.edit or {}).get("fields") or {}
 
     @property
-    def text(self) -> dict | None:
-        """The text the texts' cursor is on."""
-        row = self.query_one("#ph-texts", DataTable).cursor_row
-        return self.texts[row] if 0 <= row < len(self.texts) else None
+    def shown(self) -> list[dict]:
+        """The layers as the list shows them: the top one first."""
+        return list(reversed(self.stack))
+
+    @property
+    def picked(self) -> dict | None:
+        """The layer the layers' cursor is on."""
+        row = self.query_one("#ph-layers", DataTable).cursor_row
+        shown = self.shown
+        return shown[row] if 0 <= row < len(shown) else None
 
     def fire(self, name: str) -> None:
         # Each place has its own actions; the other's keys do nothing here.
@@ -253,13 +293,13 @@ class PhotoPane(KitPane):
                         if TerminalImage is not None and self.photo.pictures:
                             yield TerminalImage(id="ph-picture")
                         yield Static("", id="ph-viewer-words")
-                    with Vertical(id="ph-texts-col"):
-                        yield Static("Text on the picture", classes="ph-title")
-                        yield DataTable(id="ph-texts", cursor_type="row", show_header=False)
+                    with Vertical(id="ph-layers-col"):
+                        yield Static("Layers, top first", classes="ph-title")
+                        yield DataTable(id="ph-layers", cursor_type="row", show_header=False)
 
     def on_mount(self) -> None:
         self.query_one("#ph-edits", DataTable).add_columns("NAME", "SIZE", "STATUS", "MADE")
-        self.query_one("#ph-texts", DataTable).add_columns("words", "where")
+        self.query_one("#ph-layers", DataTable).add_columns("layer", "where")
         self._poll = self.set_interval(POLL_SECONDS, self._poll_status, pause=True)
 
     def card_status(self) -> tuple[str, str] | None:
@@ -267,12 +307,12 @@ class PhotoPane(KitPane):
             return None
         busy = [e for e in self.edits if (e.get("fields") or {}).get("status") in ("queued", "rendering")]
         if busy:
-            return "news", f"{len(busy)} exporting"
+            return "news", f"{len(busy)} saving"
         return "ok", plural(len(self.edits), self.noun)
 
     def status_detail(self) -> str:
         if self.editing:
-            return f"[{MUTED}]{plural(len(self.texts), 'text')}[/]"
+            return f"[{MUTED}]{plural(len(self.stack), 'layer')}[/]"
         return f"[{MUTED}]{plural(len(self.edits), self.noun)}[/]"
 
     def reload(self) -> None:
@@ -328,11 +368,12 @@ class PhotoPane(KitPane):
         self.draw_editor()
 
     async def _fetch_editor(self) -> bool:
-        """The edit and its texts again. False when it failed."""
+        """The edit and its layers again. False when it failed."""
         assert self.edit is not None
         try:
             self.edit = await self.api.record(self.photo.edit_model, self.edit["id"])
-            self.texts = await self.photo.texts(self.edit["id"])
+            self.stack = await self.photo.layers(self.edit["id"])
+            self.source = await self.photo.source_file(self.edit)
         except ApiError as exc:
             if exc.status_code == 404:
                 # Gone from under us: back to the list.
@@ -355,7 +396,7 @@ class PhotoPane(KitPane):
     def draw_editor(self) -> None:
         self._show("ph-editor")
         self.draw_head()
-        self.draw_texts()
+        self.draw_layers()
         self.draw_now()
 
     def draw_head(self) -> None:
@@ -378,19 +419,27 @@ class PhotoPane(KitPane):
                 said += f" [{MUTED}]{escape(str(f['message']))}[/]"
             parts.append(said)
         if f.get("output"):
-            parts.append(f"[{GOOD}]exported[/] [{MUTED}]o opens it[/]")
+            parts.append(f"[{GOOD}]saved[/] [{MUTED}]o opens it[/]")
         self.query_one("#ph-head", Static).update("   ".join(parts))
 
-    def draw_texts(self) -> None:
-        table = self.query_one("#ph-texts", DataTable)
+    def draw_layers(self) -> None:
+        table = self.query_one("#ph-layers", DataTable)
         row = table.cursor_row
         table.clear()
-        for text in self.texts:
-            t = ph.text_of(text.get("fields") or {})
-            where = f"{t['x']:g} {t['y']:g} · {t['size']:g}% · {t['colour']}"
-            table.add_row(escape(t["text"].replace("\n", " / ")), Text(where, style=MUTED), key=text["id"])
-        if self.texts:
-            table.move_cursor(row=min(max(row, 0), len(self.texts) - 1))
+        for record in self.shown:
+            layer = ph.layer_of(record.get("fields") or {})
+            label = Text(f"{GLYPH[layer['kind']]} ", style=layer["colour"] if layer["kind"] != "text" else ACCENT)
+            words = layer["text"].replace("\n", " / ") if layer["kind"] == "text" else layer["kind"].capitalize()
+            label.append(words, style=f"{MUTED} strike" if layer["hidden"] else "")
+            if layer["kind"] == "text":
+                where = f"{layer['x']:g} {layer['y']:g} · {layer['size']:g}%"
+            elif layer["kind"] == "mark":
+                where = f"{len(layer['points'])} points · {layer['width']:g}%"
+            else:
+                where = f"{layer['x']:g} {layer['y']:g} · {layer['w']:g} × {layer['h']:g}"
+            table.add_row(label, Text(where, style=MUTED), key=record["id"])
+        if self.stack:
+            table.move_cursor(row=min(max(row, 0), len(self.stack) - 1))
         else:
             table.add_row(Text("None yet: t lays words on the picture.", style=MUTED), "")
 
@@ -406,11 +455,11 @@ class PhotoPane(KitPane):
             self.want_picture()
         else:
             words.display = True
-            words.update(viewer_words(f, self.texts))
+            words.update(viewer_words(f, self.stack))
 
     # -- the picture -------------------------------------------------------------------------
     def want_picture(self) -> None:
-        """The edit as it would export: now, or as soon as the one on its way lands."""
+        """The edit as it would save: now, or as soon as the one on its way lands."""
         if self.edit is None or not self.photo.pictures:
             return
         if self._fetching:
@@ -454,20 +503,20 @@ class PhotoPane(KitPane):
 
     # -- moving about ----------------------------------------------------------------------------
     def action_cycle(self, step: int) -> None:
-        """Tab: in the editor the texts are the one thing to be on; elsewhere, the next widget."""
+        """Tab: in the editor the layers are the one thing to be on; elsewhere, the next widget."""
         if not self.editing:
             self.app.action_focus_next() if step > 0 else self.app.action_focus_previous()
             return
-        self.query_one("#ph-texts", DataTable).focus()
+        self.query_one("#ph-layers", DataTable).focus()
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         event.stop()
         if event.data_table.id == "ph-edits":
             self.act_open()
-        elif event.data_table.id == "ph-texts":
-            text = self.text
-            if text is not None:
-                self.change_text(text)
+        elif event.data_table.id == "ph-layers":
+            layer = self.picked
+            if layer is not None:
+                self.change_layer(layer)
 
     # -- the edits ----------------------------------------------------------------------------------
     def act_open(self) -> None:
@@ -478,10 +527,11 @@ class PhotoPane(KitPane):
 
     def open_edit(self, edit: dict) -> None:
         self.edit = edit
-        self.texts = []
+        self.stack = []
+        self.source = None
         self._show("ph-editor")
         self.load_editor()
-        self.call_after_refresh(lambda: self.query_one("#ph-texts", DataTable).focus())
+        self.call_after_refresh(lambda: self.query_one("#ph-layers", DataTable).focus())
 
     def act_back(self) -> None:
         self._poll.pause()
@@ -521,9 +571,9 @@ class PhotoPane(KitPane):
             if 0 <= table.cursor_row < len(self.edits):
                 self.delete_edit(self.edits[table.cursor_row])
             return
-        text = self.text
-        if text is not None:
-            self.remove_text(text)
+        layer = self.picked
+        if layer is not None:
+            self.remove_layer(layer)
 
     @work(group="ui")
     async def delete_edit(self, edit: dict) -> None:
@@ -556,6 +606,14 @@ class PhotoPane(KitPane):
             self.status("You may only look at this.", error=True)
             return None
         return self.edit
+
+    def _need_layer(self) -> dict | None:
+        if self._need_edit() is None:
+            return None
+        layer = self.picked
+        if layer is None:
+            self.status("No layer: t lays words on the picture.", error=True)
+        return layer
 
     def act_turn_right(self) -> None:
         if (edit := self._need_edit()) is not None:
@@ -639,12 +697,12 @@ class PhotoPane(KitPane):
         if await self._try(self.photo.resize(self.edit, size)):
             await self.edited(f"Comes out {ph.size_said(self.edit_fields) or 'as it is'}.")
 
-    # -- texts -------------------------------------------------------------------------------------------
+    # -- layers ------------------------------------------------------------------------------------------
     def act_text(self) -> None:
         if self._need_edit() is None:
             return
-        if not self.photo.text_model:
-            self.status("This editor has no texts.", error=True)
+        if not self.photo.layer_model:
+            self.status("This editor has no layers.", error=True)
             return
         self.add_text()
 
@@ -657,33 +715,36 @@ class PhotoPane(KitPane):
             return
         if await self._try(self.photo.add_text(self.edit, words.strip())):
             await self.edited(f"“{words.strip()}” is on the picture: k moves it, enter changes it.")
-            table = self.query_one("#ph-texts", DataTable)
-            table.move_cursor(row=table.row_count - 1)
+            self.query_one("#ph-layers", DataTable).move_cursor(row=0)
 
     @work(group="ui")
-    async def change_text(self, text: dict) -> None:
-        """Enter on a text: its sheet, to change the words, the size and the colour."""
-        result = await self.open_sheet(text, model_id=self.photo.text_model, only=["text", "size", "colour", "x", "y"])
+    async def change_layer(self, layer: dict) -> None:
+        """Enter on a layer: its sheet, to change what it is made of."""
+        kind = ph.layer_of(layer.get("fields") or {})["kind"]
+        only = {
+            "text": ["text", "size", "colour", "x", "y", "hidden"],
+            "mark": ["colour", "width", "opacity", "hidden"],
+            "piece": ["x", "y", "w", "h", "hidden"],
+        }[kind]
+        result = await self.open_sheet(layer, model_id=self.photo.layer_model, only=only)
         if result is not None:
             await self.edited("Changed." if result != "deleted" else "Taken off.")
 
-    def act_move_text(self) -> None:
-        if self._need_edit() is None:
-            return
-        text = self.text
-        if text is None:
-            self.status("No text to move: t lays words on the picture.", error=True)
-            return
-        self.move_text(text)
+    def act_move_layer(self) -> None:
+        if (layer := self._need_layer()) is not None:
+            self.move_layer(layer)
 
     @work(group="ui")
-    async def move_text(self, text: dict) -> None:
-        t = ph.text_of(text.get("fields") or {})
+    async def move_layer(self, layer: dict) -> None:
+        fields = layer.get("fields") or {}
+        shown = ph.layer_of(fields)
         asked = await self.app.push_screen_wait(
             PromptModal(
                 "Where",
-                value=f"{t['x']:g} {t['y']:g}",
-                detail=f"[{MUTED}]x y: the top left corner, in percent of the picture; a third number is the size.[/]",
+                value=f"{shown['x']:g} {shown['y']:g}",
+                detail=f"[{MUTED}]x y: the top left corner, in percent of the picture"
+                + ("; a third number is the size." if shown["kind"] == "text" else ".")
+                + "[/]",
             )
         )
         if not asked:
@@ -696,18 +757,91 @@ class PhotoPane(KitPane):
         except ValueError:
             self.status("Give two numbers, x y, or three with the size.", error=True)
             return
-        fields = {"x": min(max(numbers[0], 0.0), 100.0), "y": min(max(numbers[1], 0.0), 100.0)}
-        if len(numbers) == 3:
-            fields["size"] = min(max(numbers[2], 0.5), 100.0)
-        if await self._try(self.photo.set_text(text, fields)):
-            await self.edited(f"Moved to {fields['x']:g} {fields['y']:g}.")
+        x, y = min(max(numbers[0], 0.0), 100.0), min(max(numbers[1], 0.0), 100.0)
+        changes: dict = {"x": x, "y": y}
+        if shown["kind"] == "mark":
+            # A mark moves as a whole: its points go by as much as its corner does.
+            dx, dy = x - shown["x"], y - shown["y"]
+            changes["points"] = [
+                [min(max(px + dx, 0.0), 100.0), min(max(py + dy, 0.0), 100.0)] for px, py in shown["points"]
+            ]
+        if len(numbers) == 3 and shown["kind"] == "text":
+            changes["size"] = min(max(numbers[2], 0.5), 100.0)
+        if await self._try(self.photo.set_layer(layer, changes)):
+            await self.edited(f"Moved to {x:g} {y:g}.")
+
+    def act_hide_layer(self) -> None:
+        if (layer := self._need_layer()) is not None:
+            self.hide_layer(layer)
 
     @work(group="ui")
-    async def remove_text(self, text: dict) -> None:
-        if await self._try(self.photo.remove_text(text)):
+    async def hide_layer(self, layer: dict) -> None:
+        hidden = not bool((layer.get("fields") or {}).get("hidden"))
+        if await self._try(self.photo.set_layer(layer, {"hidden": hidden})):
+            await self.edited("Hidden." if hidden else "Shown again.")
+
+    def act_layer_up(self) -> None:
+        if (layer := self._need_layer()) is not None:
+            self.restack(layer, 1)
+
+    def act_layer_down(self) -> None:
+        if (layer := self._need_layer()) is not None:
+            self.restack(layer, -1)
+
+    @work(group="ui")
+    async def restack(self, layer: dict, by: int) -> None:
+        """The layer one step forward or back: every layer's order is its place, written where it changed."""
+        order = list(self.stack)
+        index = next((i for i, r in enumerate(order) if r["id"] == layer["id"]), -1)
+        to = index + by
+        if index < 0 or not 0 <= to < len(order):
+            self.status("It is at the top already." if by > 0 else "It is at the bottom already.")
+            return
+        order.insert(to, order.pop(index))
+        for i, record in enumerate(order):
+            if int(float((record.get("fields") or {}).get("order") or 0)) != i:
+                if not await self._try(self.photo.set_layer(record, {"order": i})):
+                    return
+        await self.edited("Brought forward." if by > 0 else "Sent back.")
+        table = self.query_one("#ph-layers", DataTable)
+        table.move_cursor(row=len(order) - 1 - to)
+
+    @work(group="ui")
+    async def remove_layer(self, layer: dict) -> None:
+        if await self._try(self.photo.remove_layer(layer)):
             await self.edited("Taken off the picture.")
 
-    # -- the export -------------------------------------------------------------------------------------
+    # -- saving --------------------------------------------------------------------------------------
+    def act_save(self) -> None:
+        if self.photo.save_action is None:
+            self.status("This editor has no save.", error=True)
+            return
+        if self._need_edit() is not None:
+            self.save()
+
+    @work(group="ui")
+    async def save(self) -> None:
+        photo_name = str(((self.source or {}).get("fields") or {}).get("name") or "")
+        asked = await self.app.push_screen_wait(
+            PromptModal(
+                "Save as",
+                value=photo_name,
+                detail=f"[{MUTED}]Keep the photo's name to write over it (the one before goes to the Trash); "
+                "another name is a new file beside it.[/]",
+            )
+        )
+        if asked is None or not asked.strip():
+            return
+        name = asked.strip()
+        overwrite = bool(photo_name) and name == photo_name
+        try:
+            await self.photo.save(self.edit, overwrite=overwrite, name=name)
+        except ApiError as exc:
+            await self.went_wrong(exc)
+            return
+        await self.edited(f"Saving over {photo_name}." if overwrite else f"Saving as {name}.")
+        self._poll.resume()
+
     def act_export(self) -> None:
         if self.photo.export is None:
             self.status("This editor has no export.", error=True)
@@ -722,7 +856,7 @@ class PhotoPane(KitPane):
             self._poll.resume()
 
     async def _poll_status(self) -> None:
-        """While an export is queued or rendering, the header follows it."""
+        """While a save is queued or rendering, the header follows it; done, the edit is read again."""
         if self.edit is None:
             self._poll.pause()
             return
@@ -733,18 +867,19 @@ class PhotoPane(KitPane):
         self.draw_head()
         if self.edit_fields.get("status") not in ("queued", "rendering"):
             self._poll.pause()
+            self.load_editor()
 
     def act_open_output(self) -> None:
         output = self.edit_fields.get("output")
         if not output:
-            self.status("Nothing exported yet.", error=True)
+            self.status("Nothing saved yet.", error=True)
             return
         self.open_output(str(output))
 
     @work(group="ui")
     async def open_output(self, file_id: str) -> None:
         if "file" not in self.models:
-            self.status(f"The export is file {file_id}.")
+            self.status(f"The file is {file_id}.")
             return
         try:
             record = await self.api.record("file", file_id)

@@ -295,32 +295,41 @@ def _timeline_sketch(plan: dict, screen: dict, title: str) -> list[str]:
 
 
 def _photo_sketch(plan: dict, screen: dict, title: str) -> list[str]:
-    """A photo editor as the terminal draws it: the picture, and the words on it beside."""
+    """A photo editor as the terminal draws it: the picture, and the layers on it beside."""
     media = screen.get("media") or {}
     where = " / ".join(str(media[k]) for k in ("share", "within") if media.get(k)) or "the drive"
     pictures = screen.get("pictures")
-    texts = screen.get("texts")
-    export = next((a for a in plan.get("actions", []) if a.get("id") == screen.get("export")), None)
+    layers = screen.get("layers")
+    actions = {a.get("id"): a for a in plan.get("actions", [])}
+    save = actions.get(screen.get("save"))
+    export = actions.get(screen.get("export"))
     head = f"  <{title}>  <out_width>×<out_height> · <rotate>° · <crop>"
-    if export:
+    if save:
+        head += f"   <status> [ {save.get('label') or save['id']} w ]"
+    elif export:
         head += f"   <status> [ {export.get('label') or export['id']} e ]"
     viewer = "<the picture, from " + pictures + ">" if pictures else "<what the edit does, in words>"
-    text_row = "<words>   <x y> · <size>% · <colour>" if texts else "—"
+    rows = (
+        ["T <words>   <x y> · <size>%", "✎ Mark      <n> points · <width>%", "▣ Piece     <x y> · <w> × <h>"]
+        if layers
+        else ["—"]
+    )
     lines = [
         f"  first the {screen['model']}s, newest first, with New (a photo from",
         f"  {where}); one opens the editor:",
         head,
-        f"  {'Picture':<34}│ Text on the picture",
-        f"  {viewer[:34]:<34}│ {text_row}",
-        f"  {'':<34}│ {text_row if texts else ''}",
-        f"  edits are {screen['model']}" + (f", texts {texts}" if texts else ""),
+        f"  {'Picture':<34}│ Layers, top first",
+        f"  {viewer[:34]:<34}│ {rows[0]}",
     ]
+    for row in rows[1:]:
+        lines.append(f"  {'':<34}│ {row}")
+    lines.append(f"  edits are {screen['model']}" + (f", layers {layers}" if layers else ""))
     if not pictures:
         lines.append("  no pictures API: the viewer is words; a photo's size is read once")
-    lines.append("  r turns right, R left, m mirrors, c crops (C keeps all), s sizes,")
-    lines.append(
-        "  t writes, enter changes the words, k moves them, x takes them off" + (", e exports" if export else "")
-    )
+    lines.append("  r turns right, R left, m mirrors, c crops (C keeps all), s sizes, t writes,")
+    tail = ", w saves" if save else ""
+    tail += ", e exports" if export else ""
+    lines.append("  enter edits a layer, k moves it, h hides it, x removes it" + tail)
     return lines
 
 
