@@ -164,6 +164,15 @@
     border-title-color: $primary;
 }
 
+/* A card that has just come — a Quill installed while you work: lit three
+   times (NavCard.arrive). */
+.nav-card.-arrived {
+    background: $primary 35%;
+    border-top: round $cloud;
+    border-left: round $cloud;
+    border-title-color: $text;
+}
+
 /* Administration: the server, not your things — one line each, and no air
    between; the same when the sidebar is narrow and every card is a line. */
 .nav-card.-small, .nav-card.-line {

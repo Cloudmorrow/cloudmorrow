@@ -535,6 +535,12 @@ and restarts onto the new code; the command waits for it to come back and
 prints the commit it came back on. With nothing new to pull it says so and
 stops.
 
+Everybody with the app open sees it happen: the moment the server restarts,
+the web app, the phone and the terminal app say *The server is updating —
+hold on for a sec* over whatever they are doing, and carry on by themselves
+when it is back; a web page on the new code reloads itself, unless an editor
+in it holds words not yet saved.
+
 So a release is two things:
 
 ```bash

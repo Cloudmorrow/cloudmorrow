@@ -128,25 +128,53 @@ def serve(
         from cloudmorrow.server.app import create_app
 
         hosts = config.hosts
+        served = create_app(config)
         if len(hosts) == 1:
-            uvicorn.run(
-                create_app(config),
-                host=hosts[0],
-                port=config.port,
-                forwarded_allow_ips=config.forwarded_allow_ips,
-                timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
+            server = _serving(
+                uvicorn.Config(
+                    served,
+                    host=hosts[0],
+                    port=config.port,
+                    forwarded_allow_ips=config.forwarded_allow_ips,
+                    timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
+                )
             )
+            server.run()
             return
         # Several addresses: uvicorn takes one host, but serves any sockets
         # it is handed, so each is bound here.
-        server = uvicorn.Server(
+        server = _serving(
             uvicorn.Config(
-                create_app(config),
+                served,
                 forwarded_allow_ips=config.forwarded_allow_ips,
                 timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
             )
         )
         server.run(sockets=[_listen(h, config.port) for h in hosts])
+
+
+def _serving(config):
+    """A uvicorn server for *config*, which first tells every open app the server is going."""
+    import uvicorn
+
+    class Server(uvicorn.Server):
+        """uvicorn, which first tells every open app the server is going.
+
+        The signal that stops it — systemd's restart after an update over ssh,
+        or the API's own after an update from the page — is the moment: every
+        change stream says bye then, while the connections are still open, and
+        each app shows that the server is updating until it is back. uvicorn's
+        own shutdown hooks run only after those connections are closed.
+        """
+
+        def handle_exit(self, sig, frame) -> None:
+            state = getattr(self.config.app, "state", None)
+            feed = getattr(getattr(state, "cloudmorrow", None), "changes", None)
+            if feed is not None:
+                feed.going("restart")
+            super().handle_exit(sig, frame)
+
+    return Server(config)
 
 
 def _listen(host: str, port: int) -> socket.socket:

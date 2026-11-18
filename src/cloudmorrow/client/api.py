@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
 
@@ -148,6 +150,38 @@ class CloudmorrowClient:
 
     async def health(self) -> dict:
         return (await self._request("GET", "/api/health")).json()
+
+    async def notices(self) -> AsyncIterator[tuple[str, dict]]:
+        """The change feed's notices, as (event, data), for as long as the line is up.
+
+        Every event but the record changes themselves: `quills` when the
+        Quills moved, `bye` when the server is stopping for an update — the
+        stream ends after it. Raises AuthError for an ended session and
+        ApiError when the server cannot be reached."""
+        try:
+            async with self._client.stream(
+                "GET", "/api/changes", headers=self._headers(None), timeout=httpx.Timeout(None, connect=5.0)
+            ) as response:
+                if response.status_code == 401:
+                    raise AuthError("signed out", status_code=401)
+                if response.status_code >= 400:
+                    raise ApiError(f"the change feed answered {response.status_code}", status_code=response.status_code)
+                name, data = "", ""
+                async for line in response.aiter_lines():
+                    if line.startswith("event:"):
+                        name = line[6:].strip()
+                    elif line.startswith("data:"):
+                        data += line[5:].strip()
+                    elif not line:
+                        if name and name not in ("hello", "change"):
+                            try:
+                                said = json.loads(data or "{}")
+                            except ValueError:
+                                said = {}
+                            yield name, said if isinstance(said, dict) else {}
+                        name, data = "", ""
+        except httpx.HTTPError as exc:
+            raise ApiError.unreachable(self.config.api_url, exc) from exc
 
     async def client_release(self) -> dict:
         """The package this server hands out, for `cloudmorrow update`."""

@@ -18,6 +18,7 @@ from cloudmorrow.client.config import ClientConfig, StoredCredentials, clear_cre
 from cloudmorrow.tui.kitdata import SESSION_EXPIRED
 from cloudmorrow.tui.screens.login import LoginScreen
 from cloudmorrow.tui.screens.splash import SplashScreen
+from cloudmorrow.tui.screens.updating import UpdatingModal
 from cloudmorrow.tui.screens.workspace import WorkspaceScreen
 from cloudmorrow.tui.theme import CLOUDMORROW_THEME
 from cloudmorrow.tui.widgets.bottombar import BottomBar
@@ -27,6 +28,10 @@ QUIT_WINDOW = 3.0
 # How long the logo stays up at the start. A stored session comes back in a
 # few milliseconds, and a logo gone in a few milliseconds is a flicker.
 SPLASH_DWELL = 0.5
+
+
+# For this long after a bye, the change feed is tried again every second.
+RESTARTING = 180.0
 
 
 class CloudmorrowApp(App):
@@ -203,8 +208,50 @@ class CloudmorrowApp(App):
         client.vault = None
         self.sub_title = username
         await self.switch_screen(WorkspaceScreen())
+        self.listen()
+
+    # -- what the server says to everybody -----------------------------------
+    @work(exclusive=True, group="listen")
+    async def listen(self) -> None:
+        """The change feed's notices, for as long as somebody is signed in.
+
+        `bye`: the server is stopping for an update — the updating modal, until
+        it is back. `quills`: a Quill came, went or was switched — the sidebar
+        is asked for again, and nothing else moves. The line is tried again
+        when it drops: every second while the server is restarting, slower
+        and slower otherwise."""
+        delay, bye_at = 1.0, 0.0
+        while self.client is not None:
+            client = self.client
+            notices = getattr(client, "notices", None)
+            if notices is None:
+                return
+            try:
+                async for name, _ in notices():
+                    delay = 1.0
+                    if name == "bye":
+                        bye_at = monotonic()
+                        self.server_going()
+                    elif name == "quills":
+                        self.quills_moved()
+            except AuthError:
+                return
+            except ApiError:
+                pass
+            await asyncio.sleep(delay)
+            delay = 1.0 if monotonic() - bye_at < RESTARTING else min(delay * 2, 30.0)
+
+    def server_going(self) -> None:
+        if not any(isinstance(screen, UpdatingModal) for screen in self.screen_stack):
+            self.push_screen(UpdatingModal())
+
+    def quills_moved(self) -> None:
+        for screen in self.screen_stack:
+            if isinstance(screen, WorkspaceScreen):
+                screen.quills_moved()
 
     async def sign_out(self, message: str = "") -> None:
+        self.workers.cancel_group(self, "listen")
         clear_credentials()
         self.credentials = None
         if self.client is not None:

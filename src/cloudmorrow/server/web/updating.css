@@ -1,0 +1,61 @@
+/* The server is updating (updating.js): a sheet over everything, nothing to
+   press, four pixel blocks taking turns to hop while it waits. And a tab that
+   has just arrived in the menu (quills.js): it slides in lit, and lights up
+   once more. Quiet for whoever asked for less motion. */
+
+.updating-backdrop { z-index: 1000; cursor: progress; }
+.updating-sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 24px 32px;
+  text-align: center;
+}
+.updating-said {
+  margin: 14px 0 0;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.updating-more { margin: 0; max-width: 30ch; color: var(--muted); }
+
+.updating-mark { display: flex; align-items: flex-end; gap: 6px; height: 34px; }
+.updating-mark i {
+  display: block;
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  animation: updating-hop 1.2s steps(6, end) infinite;
+}
+.updating-mark i:nth-child(2) { animation-delay: .15s; background: var(--fill-hover); }
+.updating-mark i:nth-child(3) { animation-delay: .3s; background: var(--fill); }
+.updating-mark i:nth-child(4) { animation-delay: .45s; background: var(--fill-hover); }
+@keyframes updating-hop {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-18px); }
+}
+
+/* -- a tab that has just arrived --------------------------------------------- */
+nav.tabs .tab-arrived {
+  animation: tab-arrived 2.4s ease-out 1;
+  border-radius: var(--radius-button);
+}
+@keyframes tab-arrived {
+  0% { transform: translateX(-12px); opacity: 0; }
+  12% { transform: none; opacity: 1; background: color-mix(in srgb, var(--accent) 30%, transparent); box-shadow: 0 0 0 2px var(--accent); }
+  40% { background: color-mix(in srgb, var(--accent) 30%, transparent); box-shadow: 0 0 0 2px var(--accent); }
+  55% { background: transparent; box-shadow: 0 0 0 0 transparent; }
+  70% { background: color-mix(in srgb, var(--accent) 30%, transparent); box-shadow: 0 0 0 2px var(--accent); }
+  100% { background: transparent; box-shadow: 0 0 0 0 transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .updating-mark i { animation-duration: 2.4s; animation-timing-function: steps(2, end); }
+  nav.tabs .tab-arrived { animation: tab-arrived-still 2.4s ease-out 1; }
+  @keyframes tab-arrived-still {
+    0%, 60% { background: color-mix(in srgb, var(--accent) 30%, transparent); box-shadow: 0 0 0 2px var(--accent); }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
+}
