@@ -128,6 +128,13 @@
   white-space: nowrap;
 }
 .quill-chip.on { border-color: var(--accent); color: var(--accent); }
+/* In the catalog, one that is already here: said in words, with a tick. */
+.quill-chip.installed { display: inline-flex; align-items: center; gap: 5px; }
+.quill-chip.installed svg { width: 10px; height: 9px; }
+.quill-chip.installed + .quill-chip { margin-left: 6px; }
+.catalog-search { margin: 4px 0 14px; }
+.quill-list .shelf[hidden], .quill-list .quill-row[hidden] { display: none; }
+.quill-list .quill-row.first-shown::before { display: none; }
 /* New to this server: the platform grows, so it is the platform's blue —
    noticed, and not the screen's one amber fill. */
 .quill-chip.new { border-color: transparent; background: var(--fill); color: var(--fill-ink); }
