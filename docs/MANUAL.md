@@ -1264,7 +1264,11 @@ it says so in the log and tries again at the next start.
 
 #### In the web app
 
-**Me → Administration → Quills**: the catalog by category. A Quill's sheet
+**Me → Administration → Quills**: the catalog by category, with a search
+field above it that narrows the list as you type — by name, what it does,
+who made it or its shelf (`installed` finds the ones you have). A Quill
+already on the server says **✓ Installed**, and **Update** beside it when
+the catalog has a newer release. A Quill's sheet
 says what it adds — datamodels, screens, jobs, and whether it runs code —
 then **Install**. The installed ones are above the catalog, each with its
 switch and **Remove**.

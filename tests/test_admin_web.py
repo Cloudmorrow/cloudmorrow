@@ -410,3 +410,15 @@ def test_a_tab_in_quills_closes_the_sheet_beside_the_old_one():
     tabs = source[source.index('panel.querySelectorAll(".quill-tabs button")') : source.index("const ctx = { panel")]
     assert "if (button.dataset.tab === which) return;" in tabs
     assert tabs.index('shown = "";') < tabs.index("drawQuills(panel);")
+
+
+def test_the_catalog_is_searched_and_says_what_is_installed():
+    quills = (WEB / "quillsadmin.js").read_text(encoding="utf-8")
+    # A search field over the catalog, filtering the rows already drawn.
+    assert 'placeholder="Search the catalog"' in quills
+    assert "function filterCatalog(list)" in quills
+    assert 'class="empty none-match" hidden' in quills
+    # What is already here says so in words, with a tick.
+    assert "${icons.tick} Installed" in quills
+    css = (WEB / "quillsadmin.css").read_text(encoding="utf-8")
+    assert ".quill-list .quill-row[hidden] { display: none; }" in css.replace(".quill-list .shelf[hidden], ", "")
