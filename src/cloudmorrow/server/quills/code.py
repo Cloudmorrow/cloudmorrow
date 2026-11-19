@@ -59,6 +59,7 @@ from typing import TYPE_CHECKING
 
 from cloudmorrow.quill import context as sdk
 from cloudmorrow.quill import ui
+from cloudmorrow.quill.only import fits
 from cloudmorrow.sandbox import CALL_TIMEOUT, Failed, Guest, InProcessGuest, SandboxError
 from cloudmorrow.server.datamodels import parse_duration
 from cloudmorrow.server.quills import Manifest
@@ -869,6 +870,8 @@ class QuillCode:
                 args["record"] = plain_record(manifest, found.to_dict())
             except STORE_ERRORS as exc:
                 raise CodeError(_kind(exc), str(_host_error(exc))) from exc
+            if not fits(action, args["record"].get("fields")):
+                raise CodeError("refused", f"{action['label']} is not for this {action['on']}")
         elif record:
             raise CodeError("invalid", f"{action['label']} is not done to a record")
         # An action that waits on something outside says how long it has (`timeout`).

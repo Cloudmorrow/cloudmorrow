@@ -966,7 +966,7 @@ export async function renderRecordSheet(at, modelId, id, arg) {
           body.kind === "json" && record.fields[body.name] != null ? JSON.stringify(record.fields[body.name], null, 2) : record.fields[body.name] ?? "")}</textarea>` : ""}
       </div>
       ${people}
-      ${screen.kit === "data" ? "" : sheetSection(model.id)}
+      ${screen.kit === "data" ? "" : sheetSection(model.id, record)}
       <div class="own-slot"></div>
       <div class="history-slot"></div>
     </main>`);

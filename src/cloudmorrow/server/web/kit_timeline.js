@@ -20,7 +20,7 @@
    of its box, and the crop either shown (as a box to move, outside it
    dimmed) or kept to. The tracks, a row each, with the pieces to scale, to
    choose, drag, trim, split, mute and delete. The selected piece's place and
-   effects, with their keyframes. And the header's export, which says how
+   effects, with their keyframes. And the header's export and save, which say how
    it is going.
 
    Sound is every audible piece at the playhead, each through its own
@@ -109,6 +109,7 @@ export function bindingsOf(at) {
     media: screen.media || {},
     frames: framesPath(quill, screen),
     exportAction: screen.export ? (quill.actions || []).find((a) => a.id === screen.export) || null : null,
+    saveAction: screen.save ? (quill.actions || []).find((a) => a.id === screen.save) || null : null,
   };
 }
 
@@ -288,6 +289,7 @@ async function renderEditorFor(at, b, id) {
     t: 0, playing: false, from: 0, since: 0,
     zoom: 0,                     // pixels a second on the tracks; 0 until they are measured
     selected: "", effect: "", cropping: false,
+    sourceFile: null,            // the file the project was started from: its name, for Save
     dirty: true, alive: true, writing: Promise.resolve(),
     writes: mayWrite(b.pieces),
     writesEffects: !!b.effects && mayWrite(b.effects),
@@ -367,6 +369,17 @@ async function renderEditorFor(at, b, id) {
   watchExport(ed);
   loadMaterial(ed);
   fillBlanks(ed);
+  loadSourceFile(ed);
+}
+
+/** The file the project was started from, when it was: what Save writes over, by name. */
+async function loadSourceFile(ed) {
+  const source = ed.b.has.has("source") ? String(ed.project.fields.source || "") : "";
+  if (!source || !ed.b.saveAction) return;
+  try {
+    ed.sourceFile = await api("GET", recordsUrl("file", source));
+  } catch { ed.sourceFile = null; }
+  if (ed.alive) drawHeader(ed);
 }
 
 /** A piece a Quill made without a length (it could not read the source) gets
@@ -1090,16 +1103,22 @@ function drawHeader(ed) {
   const message = ed.b.has.has("message") ? String(f.message || "") : "";
   const shownStatus = status && status !== "editing" ? status[0].toUpperCase() + status.slice(1) : "";
   const exportable = ed.b.exportAction;
+  // Save writes over the file the project was started from: only with one.
+  const savable = ed.b.saveAction && ed.sourceFile ? ed.b.saveAction : null;
   const output = ed.b.has.has("output") && f.output ? String(f.output) : "";
+  const busy = BUSY.has(status);
   bar.innerHTML =
-    `<span class="tl-status${tone ? " tone-" + tone : ""}">${BUSY.has(status) ? '<i class="tl-spin"></i>' : ""}` +
+    `<span class="tl-status${tone ? " tone-" + tone : ""}">${busy ? '<i class="tl-spin"></i>' : ""}` +
     `${esc(shownStatus)}${shownStatus && message ? " · " : ""}${esc(message)}</span>`;
   bar.hidden = !(shownStatus || message);
   buttons.innerHTML =
     (output ? `<button type="button" class="tl-open">Open</button>` : "") +
-    (exportable ? `<button type="button" class="act-button primary tl-export"${BUSY.has(status) ? " disabled" : ""}>${esc(exportable.label)}</button>` : "");
+    (exportable ? `<button type="button" class="act-button${savable ? "" : " primary"} tl-export"${busy ? " disabled" : ""}>${esc(exportable.label)}</button>` : "") +
+    (savable ? `<button type="button" class="act-button primary tl-save"${busy || !ed.writesProject ? " disabled" : ""}>${esc(savable.label)}</button>` : "");
   const open = buttons.querySelector(".tl-open");
   if (open) open.addEventListener("click", () => openOutput(ed, output));
+  const save = buttons.querySelector(".tl-save");
+  if (save) save.addEventListener("click", () => { pause(ed); saveSheet(ed); });
   const button = buttons.querySelector(".tl-export");
   if (button) {
     button.addEventListener("click", () => {
@@ -1111,6 +1130,63 @@ function drawHeader(ed) {
       });
     });
   }
+}
+
+/** Save: over the file the project was started from, or as a new file
+    beside it, by name. The action is pressed with `overwrite` and `name`
+    answered, so no form opens; the Quill's renderer does the rest. */
+function saveSheet(ed) {
+  const action = ed.b.saveAction;
+  if (!action || !ed.writesProject || !ed.sourceFile) return;
+  const fileName = String(ed.sourceFile.fields.name || "");
+  const dot = fileName.lastIndexOf(".");
+  const stem = dot > 0 ? fileName.slice(0, dot) : fileName;
+  const suffix = dot > 0 ? fileName.slice(dot) : "";
+  const { sheet, close } = openSheet(
+    `<form class="act-form tl-save-sheet" novalidate>
+      <p class="act-sheet-title">Save ${esc(String(ed.project.fields[ed.b.title] || "").trim() || "the video")}</p>
+      <p class="act-description">Write over <b>${esc(fileName)}</b>, or save as a new file beside it. The file as it was goes to the Trash when you write over it.</p>
+      <div class="tl-save-choices">
+        <button type="button" class="act-button primary" data-save="overwrite">Overwrite ${esc(fileName)}</button>
+        <button type="button" class="act-button" data-save="as">Save as…</button>
+      </div>
+      <div class="group fields tl-save-as" hidden>
+        <label class="row field kind-string"><span class="main">Name</span>
+          <input type="text" data-field="name" aria-label="Name" value="${esc(stem + " edited" + suffix)}" autocapitalize="sentences" enterkeyhint="go"></label>
+      </div>
+      <p class="act-error" role="alert" hidden></p>
+      <div class="act-buttons"><button type="button" class="act-button" data-cancel>Cancel</button>
+        <button type="submit" class="act-button primary tl-save-go" hidden>Save</button></div>
+    </form>`, "act-form-sheet");
+  const form = sheet.querySelector("form");
+  const errorEl = form.querySelector(".act-error");
+  const showError = (text) => { errorEl.textContent = text; errorEl.hidden = !text; };
+  const run = async (args) => {
+    for (const button of form.querySelectorAll("button")) button.disabled = true;
+    try {
+      await press(ed.at.quill, action, { record: ed.id, args, here: { quill: ed.at.quill, screen: ed.at.screen }, after: () => refreshProject(ed) });
+      close();
+    } catch (err) {
+      for (const button of form.querySelectorAll("button")) button.disabled = false;
+      showError(said(err));
+    }
+  };
+  form.querySelector("[data-cancel]").addEventListener("click", close);
+  form.querySelector('[data-save="overwrite"]').addEventListener("click", () => run({ overwrite: true, name: fileName }));
+  form.querySelector('[data-save="as"]').addEventListener("click", () => {
+    form.querySelector(".tl-save-as").hidden = false;
+    form.querySelector(".tl-save-go").hidden = false;
+    form.querySelector(".tl-save-choices").hidden = true;
+    const input = form.querySelector('[data-field="name"]');
+    input.focus();
+    input.setSelectionRange(0, stem.length + " edited".length);
+  });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const name = form.querySelector('[data-field="name"]').value.trim();
+    if (!name) { showError("Give the file a name"); return; }
+    run({ overwrite: false, name });
+  });
 }
 
 /** The project's status, message and output as they are now; asked again

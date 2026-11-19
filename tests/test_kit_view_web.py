@@ -267,4 +267,4 @@ def test_every_row_card_and_tile_has_the_shared_menu():
     assert "recordChoices(record, {" in code
     actions = js_code(ACTIONS_JS)
     assert "export function recordChoices(" in actions
-    assert 'label: "Open"' in actions and "actionsOn(record.model)" in actions
+    assert 'label: "Open"' in actions and "actionsOn(record.model, record)" in actions

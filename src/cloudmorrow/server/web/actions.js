@@ -75,9 +75,27 @@ const actionIn = (quill, id) => (quill && quill.actions || []).find((a) => a.id 
 /** An action by its Quill's id and its own. */
 export const findAction = (quillId, actionId) => actionIn(quillById(quillId), actionId);
 
-/** Every action on a record of *modelId*, across the Quills: [{quill, action}]. */
-export const actionsOn = (modelId) => quills.flatMap((quill) =>
-  (quill.actions || []).filter((a) => a.on === modelId).map((action) => ({ quill, action })));
+/** Whether a record with *fields* is one the action is for: its `only`, a
+    table of field → pattern (or patterns), every one of which must match
+    the field's value as text, `*` for anything and `?` for one letter, case
+    not minding. The same sums as cloudmorrow/quill/only.py. */
+export function fits(action, fields) {
+  const only = action && action.only;
+  if (!only || typeof only !== "object") return true;
+  const f = fields || {};
+  return Object.entries(only).every(([name, patterns]) => {
+    const value = f[name] === null || f[name] === undefined ? "" : String(f[name]).toLowerCase();
+    return (Array.isArray(patterns) ? patterns : [patterns]).some((pattern) => {
+      const re = new RegExp("^" + String(pattern).toLowerCase().replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".") + "$");
+      return re.test(value);
+    });
+  });
+}
+
+/** Every action on a record of *modelId*, across the Quills: [{quill, action}];
+    with the *record*, only the ones for it. */
+export const actionsOn = (modelId, record = null) => quills.flatMap((quill) =>
+  (quill.actions || []).filter((a) => a.on === modelId && (!record || fits(a, record.fields))).map((action) => ({ quill, action })));
 /** A Quill's actions that are on nothing: pressed from its screens. */
 // On no record, and not settings: an administrator's are drawn by the
 // Quill's admin screen on its sheet under Administration, and a person's own
@@ -264,7 +282,7 @@ export function recordChoices(record, { open = "", extra = [], here = hereNow(),
     choices.push({ label: action.label, tone: action.tone, run: () => press(quill, action, { record: record.id, here, after }) });
   };
   extra.forEach(add);
-  const own = actionsOn(record.model).filter(({ quill, action }) => !seen.has(`${quill.id}/${action.id}`));
+  const own = actionsOn(record.model, record).filter(({ quill, action }) => !seen.has(`${quill.id}/${action.id}`));
   if (own.length && choices.length) choices.push({ sep: true });
   own.forEach(add);
   return choices;
@@ -787,8 +805,8 @@ async function redrawHere() {
 }
 
 /** The actions on the record sheet: every one on this datamodel, by Quill. */
-export function sheetSection(modelId) {
-  const found = actionsOn(modelId);
+export function sheetSection(modelId, record = null) {
+  const found = actionsOn(modelId, record);
   if (!found.length) return "";
   const byQuill = new Map();
   for (const { quill, action } of found) {

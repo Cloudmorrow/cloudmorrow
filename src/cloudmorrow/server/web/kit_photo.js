@@ -13,18 +13,24 @@
      #/q/<quill>/<screen>/<id>     one edit in the editor
      #/q/<quill>/<screen>/edit=<id>   the same, as a Quill's `go` says it
 
-   The editor is laid out as a simple picture program: the tools down the
-   left (Move, Select, Crop, Text, Marker, and the turns), the picture in
-   the middle on a dark ground, and on the right the tool's options, the
-   image's turn and size, and the layers, newest on top. The picture is a
-   canvas the source is drawn on, turned and mirrored as the edit says,
-   every layer on it in its order in the app's own font, and the crop either
-   kept to or — with the Crop tool — shown as a box to move, the rest dimmed.
-   A layer is picked by pressing it, dragged to where it should be, and
-   sized by its corners; the Marker draws strokes; Select draws a box to
-   copy a piece of the picture, which Paste lays on it as a layer, or to
-   crop to. Save asks whether to write over the photo or save as a new
-   file; Export is the Quill's action with its form.
+   The editor is laid out as a simple picture program: a bar across the
+   top with Resize, Export and Save (and how the last save went), the tools
+   down the left (Move, Select, Crop, Text, Marker, and the turns), the
+   picture in the middle on a dark ground, and on the right the tool's
+   options and the layers, newest on top. The picture is a canvas the
+   source is drawn on, turned and mirrored as the edit says, every layer on
+   it in its order in the app's own font, and the crop either kept to or —
+   with the Crop tool — shown as a box to move, the rest dimmed. A layer is
+   picked by pressing it, dragged to where it should be, and sized by its
+   corners; the Marker draws strokes; Select draws a box to copy a piece of
+   the picture, which Paste lays on it as a layer, or to crop to. Resize
+   asks, in a sheet, what size the saved picture should be; Save asks
+   whether to write over the photo or save as a new file; Export is the
+   Quill's action with its form.
+
+   A drag — a box moved or sized, a stroke, a box drawn out — is held by
+   the overlay over the picture, never by the box itself: the box is drawn
+   anew as it moves, and a pointer held by an element that is gone lets go.
 
    The source is drawn from the server's large copy of it (`/thumb`), so a
    phone's photo comes quickly and a HEIC needs no plug-in here; its true
@@ -66,6 +72,7 @@ const glyphs = {
   up: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8.5 4-4 4 4"/></svg>',
   down: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 5.5 4 4 4-4"/></svg>',
   close: '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m2.5 2.5 7 7M9.5 2.5l-7 7"/></svg>',
+  resize: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="15" height="15" rx="2"/><path d="M11 6h3v3M9 14H6v-3M14 6l-4 4M6 14l4-4"/></svg>',
 };
 // How big a tile's picture is asked for, and the picture that is edited.
 const TILE = 256;
@@ -80,6 +87,8 @@ const TOOLS = [
   ["move", "Move", "V"], ["select", "Select", "M"], ["crop", "Crop", "C"], ["text", "Text", "T"], ["marker", "Marker", "B"],
 ];
 const HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
+// The tools that make layers: offered only when the screen has them.
+const LAYER_TOOLS = new Set(["text", "marker"]);
 
 // -- the screen's bindings ---------------------------------------------------------------
 const linkTo = (model, to) => {
@@ -335,18 +344,20 @@ async function renderEditorFor(at, b, id) {
   const title = String(ed.edit.fields[b.title] || "").trim() || "Untitled";
   const tool = ([id, label, key]) =>
     `<button type="button" class="ph-tool" data-tool="${id}" aria-pressed="${id === ed.tool}" title="${label} (${key})">${glyphs[id]}<span>${label}</span></button>`;
+  // Without layers there are no words, strokes or pieces: those tools are not offered.
+  const tools = TOOLS.filter(([id]) => b.layers || !LAYER_TOOLS.has(id));
   mount(nav({ back: at.base, backLabel: at.screen.label, title }) + `
     <main class="kit-photo">
-      ${heading(title, `<span class="ph-head-actions"></span><a class="button ph-settings" href="${sheetHash(at, b.model.id, id)}" aria-label="${esc(b.model.label)} settings" title="${esc(b.model.label)} settings">${pixelIcon("settings")}</a>`)}
-      <div class="ph-headbar" role="status"></div>
+      ${heading(title, `<a class="button ph-settings" href="${sheetHash(at, b.model.id, id)}" aria-label="${esc(b.model.label)} settings" title="${esc(b.model.label)} settings">${pixelIcon("settings")}</a>`)}
+      <div class="ph-bar"><span class="ph-status" role="status"></span><span class="ph-bar-actions"></span></div>
       <div class="ph-desk">
         <nav class="ph-tools" aria-label="Tools">
-          ${TOOLS.map(tool).join("")}
+          ${tools.map(tool).join("")}
           <span class="ph-tools-gap"></span>
           <button type="button" class="ph-tool ph-act" data-turn="-90" title="Turn left (shift+R)"${ed.writes ? "" : " disabled"}>${glyphs.left}<span>Left</span></button>
           <button type="button" class="ph-tool ph-act" data-turn="90" title="Turn right (R)"${ed.writes ? "" : " disabled"}>${glyphs.right}<span>Right</span></button>
           <button type="button" class="ph-tool ph-act ph-mirror" aria-pressed="false" title="Mirror"${ed.writes ? "" : " disabled"}>${glyphs.mirror}<span>Mirror</span></button>
-          <button type="button" class="ph-tool ph-act ph-paste" title="Paste (ctrl+V)"${ed.writesLayers ? "" : " disabled"}>${glyphs.paste}<span>Paste</span></button>
+          ${b.layers ? `<button type="button" class="ph-tool ph-act ph-paste" title="Paste (ctrl+V)"${ed.writesLayers ? "" : " disabled"}>${glyphs.paste}<span>Paste</span></button>` : ""}
         </nav>
         <section class="ph-viewer">
           <div class="ph-stage-box"><div class="ph-stage">
@@ -357,7 +368,6 @@ async function renderEditorFor(at, b, id) {
         </section>
         <aside class="ph-side">
           <section class="ph-options" aria-label="The tool"></section>
-          <section class="ph-image" aria-label="The image"></section>
           <section class="ph-layers" aria-label="Layers"></section>
         </aside>
       </div>
@@ -638,7 +648,10 @@ function drawFootline(ed) {
   const fields = f(ed);
   const src = sourceSize(fields);
   const out = outputSize(fields);
-  const sizes = src ? `${src.w} × ${src.h}${out && (out.w !== src.w || out.h !== src.h) ? ` → ${out.w} × ${out.h}` : ""}` : "";
+  const turn = rotationOf(fields);
+  const how = [turn ? `turned ${turn}°` : "", mirrored(fields) ? "mirrored" : ""].filter(Boolean).join(", ");
+  const sizes = (src ? `${src.w} × ${src.h}${out && (out.w !== src.w || out.h !== src.h) ? ` → ${out.w} × ${out.h}` : ""}` : "") +
+    (how ? ` · ${how}` : "");
   const hints = {
     move: "Press a layer to pick it; drag to move, pull a corner to size it.",
     select: "Drag a box on the picture: Copy it, or Crop to it.",
@@ -667,8 +680,10 @@ function placeOverlay(ed) {
       ? `<div class="ph-box select" data-what="select" style="${boxStyle(ed.selection, view)}">${handles(HANDLES)}</div>` : "";
     return;
   }
+  // The Marker draws wherever it is pressed, so no box is in the way; Text
+  // keeps the box of the words just laid, to move them, and nothing else's.
   const layer = chosen(ed);
-  if (!layer || layer.hidden) { ed.over.innerHTML = ""; return; }
+  if (!layer || layer.hidden || ed.tool === "marker" || (ed.tool === "text" && layer.kind !== "text")) { ed.over.innerHTML = ""; return; }
   const box = layerBox(layer, picture(ed), ed.boxes.get(layer.id));
   const grips = !ed.writesLayers ? "" : layer.kind === "piece" ? handles(HANDLES) : layer.kind === "text" ? handles(["se"]) : "";
   ed.over.innerHTML = `<div class="ph-box layer ${layer.kind}" data-what="layer" style="${boxStyle(box, view)}">${grips}</div>`;
@@ -703,8 +718,13 @@ function wireOverlay(ed) {
   ed.over.addEventListener("pointerdown", (event) => {
     if (event.button > 0) return;
     const box = event.target.closest(".ph-box");
-    if (box) { dragBox(ed, box, event); return; }
     const at = pointAt(ed, event);
+    if (box) {
+      // The crop box over the whole picture has nowhere to go: a press on it, off its handles, draws a new one.
+      if (box.dataset.what === "crop" && !event.target.dataset.h && wholeFrame(crop(ed)) && ed.writes) rubberBand(ed, event, at, "crop");
+      else dragBox(ed, box, event);
+      return;
+    }
     if (ed.tool === "marker") { drawStroke(ed, event, at); return; }
     if (ed.tool === "select") { rubberBand(ed, event, at, "select"); return; }
     if (ed.tool === "crop") { if (ed.writes) rubberBand(ed, event, at, "crop"); return; }
@@ -727,7 +747,8 @@ function dragBox(ed, el, event) {
   const may = what === "crop" ? ed.writes : what === "select" ? true : ed.writesLayers && !!layer;
   if (!may) return;
   event.preventDefault();
-  el.setPointerCapture(event.pointerId);
+  const over = ed.over;
+  over.setPointerCapture(event.pointerId);
   const handle = event.target.dataset.h || "";
   const rect = ed.stage.getBoundingClientRect();
   const view = viewOf(ed);
@@ -786,14 +807,14 @@ function dragBox(ed, el, event) {
     }
   };
   const up = () => {
-    for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) el.removeEventListener(type, up);
-    el.removeEventListener("pointermove", move);
+    for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) over.removeEventListener(type, up);
+    over.removeEventListener("pointermove", move);
     if (!last) return;
     if (what === "crop") saveCrop(ed, last);
     else if (what === "layer") { drawSide(ed); write(ed, () => patch(ed.b.layers.id, layer.id, last)); }
   };
-  el.addEventListener("pointermove", move);
-  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) el.addEventListener(type, up);
+  over.addEventListener("pointermove", move);
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) over.addEventListener(type, up);
 }
 
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -866,6 +887,7 @@ function choose(ed, id) {
 
 function setTool(ed, tool) {
   if (tool === "crop" && !ed.writes) return;
+  if (LAYER_TOOLS.has(tool) && !ed.b.layers) return;
   ed.tool = tool;
   if (tool !== "select") ed.selection = null;
   for (const button of ed.root.querySelectorAll(".ph-tool[data-tool]")) {
@@ -1000,7 +1022,8 @@ function wireTools(ed) {
     button.addEventListener("click", () => turn(ed, Number(button.dataset.turn)));
   }
   ed.root.querySelector(".ph-mirror").addEventListener("click", () => mirror(ed));
-  ed.root.querySelector(".ph-paste").addEventListener("click", () => paste(ed));
+  const pasteButton = ed.root.querySelector(".ph-paste");
+  if (pasteButton) pasteButton.addEventListener("click", () => paste(ed));
   ed.over.dataset.tool = ed.tool;
 }
 
@@ -1045,10 +1068,10 @@ function wireKeys(ed) {
   addEventListener("keydown", ed.onKey);
 }
 
-// -- the header: save, export, and how it is going -------------------------------------------------
+// -- the bar: resize, save, export, and how it is going --------------------------------------------
 function drawHeader(ed) {
-  const bar = ed.root.querySelector(".ph-headbar");
-  const buttons = ed.root.querySelector(".ph-head-actions");
+  const bar = ed.root.querySelector(".ph-bar .ph-status");
+  const buttons = ed.root.querySelector(".ph-bar-actions");
   const fields = f(ed);
   const status = ed.b.has.has("status") ? String(fields.status || "") : "";
   const tone = TONES[status] || "";
@@ -1056,14 +1079,16 @@ function drawHeader(ed) {
   const shownStatus = status && status !== "editing" ? status[0].toUpperCase() + status.slice(1) : "";
   const output = ed.b.has.has("output") && fields.output ? String(fields.output) : "";
   const busy = BUSY.has(status);
-  bar.innerHTML =
-    `<span class="ph-status${tone ? " tone-" + tone : ""}">${busy ? '<i class="ph-spin"></i>' : ""}` +
-    `${esc(shownStatus)}${shownStatus && message ? " · " : ""}${esc(message)}</span>`;
-  bar.hidden = !(shownStatus || message);
+  bar.className = `ph-status${tone ? " tone-" + tone : ""}`;
+  bar.innerHTML = `${busy ? '<i class="ph-spin"></i>' : ""}${esc(shownStatus)}${shownStatus && message ? " · " : ""}${esc(message)}`;
+  const resizes = ed.b.has.has("out_width") && ed.b.has.has("out_height");
   buttons.innerHTML =
-    (output ? `<button type="button" class="ph-open">Open</button>` : "") +
+    (resizes ? `<button type="button" class="act-button ph-resize"${ed.writes ? "" : " disabled"}>${glyphs.resize}<span>Resize</span></button>` : "") +
+    (output ? `<button type="button" class="act-button ph-open">Open</button>` : "") +
     (ed.b.exportAction ? `<button type="button" class="act-button ph-export"${busy ? " disabled" : ""}>${esc(ed.b.exportAction.label)}</button>` : "") +
     (ed.b.saveAction ? `<button type="button" class="act-button primary ph-save"${busy || !ed.writes ? " disabled" : ""}>${esc(ed.b.saveAction.label)}</button>` : "");
+  const resize = buttons.querySelector(".ph-resize");
+  if (resize) resize.addEventListener("click", () => resizeSheet(ed));
   const open = buttons.querySelector(".ph-open");
   if (open) open.addEventListener("click", () => openOutput(ed, output));
   const exportButton = buttons.querySelector(".ph-export");
@@ -1074,6 +1099,54 @@ function drawHeader(ed) {
   }
   const saveButton = buttons.querySelector(".ph-save");
   if (saveButton) saveButton.addEventListener("click", () => saveSheet(ed));
+}
+
+/** Resize: what the saved picture will be — the usual sizes, or a width and
+    a height typed — in a sheet; each choice is written as it is made. */
+function resizeSheet(ed) {
+  if (!ed.writes || !ed.b.has.has("out_width")) return;
+  const { sheet, close } = openSheet(`<div class="ph-resize-sheet">
+      <p class="act-sheet-title">Resize</p>
+      <div class="ph-resize-body"></div>
+      <p class="ph-quiet">One of them keeps the shape; both are taken as typed. The picture itself is not touched until you save.</p>
+      <div class="act-buttons"><button type="button" class="act-button primary" data-done>Done</button></div>
+    </div>`, "act-form-sheet");
+  const body = sheet.querySelector(".ph-resize-body");
+  const fill = () => {
+    const fields = f(ed);
+    const cropped = croppedSize(fields);
+    const out = outputSize(fields);
+    const same = (size) => !!size && Number(size.out_width || 0) === Number(fields.out_width || 0) &&
+      Number(size.out_height || 0) === Number(fields.out_height || 0);
+    const chips = SIZES.map(([value, label]) =>
+      `<button type="button" class="act-chip ph-size-chip${same(sizeFrom(value, cropped)) ? " on" : ""}" data-size-pick="${esc(value)}">${esc(label)}</button>`).join("");
+    body.innerHTML = `<p class="ph-size-now">${out
+      ? `<b>${out.w} × ${out.h}</b> pixels${cropped && (out.w !== cropped.w || out.h !== cropped.h) ? ` <span class="ph-quiet-inline">from ${cropped.w} × ${cropped.h}</span>` : ""}`
+      : `<span class="ph-quiet-inline">The photo's size is not known yet.</span>`}</p>
+      <div class="ph-chips">${chips}</div>
+      <div class="ph-size-fields">
+        ${number("Width", 'data-size="out_width"', esc(String(fields.out_width || "")), `min="1" max="8192" placeholder="${cropped ? cropped.w : ""}"`)}
+        ${number("Height", 'data-size="out_height"', esc(String(fields.out_height || "")), `min="1" max="8192" placeholder="${cropped ? cropped.h : ""}"`)}
+      </div>`;
+    for (const chip of body.querySelectorAll("[data-size-pick]")) {
+      chip.addEventListener("click", () => {
+        const value = chip.dataset.sizePick;
+        const size = value ? sizeFrom(value, croppedSize(f(ed))) : { out_width: null, out_height: null };
+        if (!size) { toast("The photo's size is not known yet"); return; }
+        setEdit(ed, size);
+        fill();
+      });
+    }
+    for (const input of body.querySelectorAll("[data-size]")) {
+      input.addEventListener("change", () => {
+        const value = input.value.trim() ? clamp(Math.round(Number(input.value)), 1, 8192) : null;
+        setEdit(ed, { [input.dataset.size]: value });
+        fill();
+      });
+    }
+  };
+  fill();
+  sheet.querySelector("[data-done]").addEventListener("click", close);
 }
 
 /** Save: over the photo, or as a new file beside it, by name. The action is
@@ -1191,7 +1264,6 @@ function drawSide(ed) {
   }
   const layer = chosen(ed);
   side.querySelector(".ph-options").innerHTML = optionsPanel(ed, layer);
-  side.querySelector(".ph-image").innerHTML = imagePanel(ed);
   side.querySelector(".ph-layers").innerHTML = layersPanel(ed);
   ed.sideStale = false;
   wireSide(ed, side, layer);
@@ -1283,29 +1355,6 @@ function layerOptions(ed, layer) {
     </div>`;
 }
 
-/** The image: its turn, and the size it comes out at. */
-function imagePanel(ed) {
-  const fields = f(ed);
-  const cropped = croppedSize(fields);
-  const out = outputSize(fields);
-  const own = !!(Number(fields.out_width) > 0 || Number(fields.out_height) > 0);
-  const same = (size) => !!size && Number(size.out_width || 0) === Number(fields.out_width || 0) &&
-    Number(size.out_height || 0) === Number(fields.out_height || 0);
-  const usual = SIZES.map(([value, label]) => [value, label, same(sizeFrom(value, cropped))]);
-  const options = usual.map(([value, label, on]) => `<option value="${esc(value)}"${on ? " selected" : ""}>${esc(label)}</option>`).join("") +
-    `<option value="custom"${own && !usual.some(([, , on]) => on) ? " selected" : ""}>Another size…</option>`;
-  const dis = ed.writes && ed.b.has.has("out_width") ? "" : "disabled";
-  const turn = rotationOf(fields);
-  return `<p class="group-label">Image</p>
-    <p class="ph-size-now">${out ? `<b>${out.w} × ${out.h}</b> pixels${cropped && (out.w !== cropped.w || out.h !== cropped.h) ? ` <span class="ph-quiet-inline">from ${cropped.w} × ${cropped.h}</span>` : ""}` : `<span class="ph-quiet-inline">The photo's size is not known yet.</span>`}
-      ${turn || mirrored(fields) ? `<span class="ph-quiet-inline"> · ${turn ? `turned ${turn}°` : ""}${turn && mirrored(fields) ? ", " : ""}${mirrored(fields) ? "mirrored" : ""}</span>` : ""}</p>
-    ${field("Make it", `<select class="ph-size-pick" aria-label="Size" ${dis}>${options}</select>`)}
-    <div class="ph-size-fields"${own ? "" : " hidden"}>
-      ${number("Width", 'data-size="out_width"', esc(String(fields.out_width || "")), `min="1" max="8192" placeholder="${cropped ? cropped.w : ""}" ${dis}`)}
-      ${number("Height", 'data-size="out_height"', esc(String(fields.out_height || "")), `min="1" max="8192" placeholder="${cropped ? cropped.h : ""}" ${dis}`)}
-    </div>`;
-}
-
 /** Every layer, the top one first, with its eye; the chosen one lit. */
 function layersPanel(ed) {
   if (!ed.b.layers) return "";
@@ -1353,24 +1402,6 @@ function wireSide(ed, side, layer) {
   on(".ph-mark-style", "click", (event) => { marker.opacity = Number(event.currentTarget.dataset.opacity); drawSide(ed); });
   // Text.
   on(".ph-add-text", "click", () => addText(ed));
-  // Image.
-  on(".ph-size-pick", "change", (event) => {
-    const value = event.target.value;
-    if (value === "custom") {
-      side.querySelector(".ph-size-fields").hidden = false;
-      side.querySelector('[data-size="out_width"]').focus();
-      return;
-    }
-    const size = value ? sizeFrom(value, croppedSize(f(ed))) : { out_width: null, out_height: null };
-    if (!size) { toast("The photo's size is not known yet"); return; }
-    setEdit(ed, size);
-  });
-  on("[data-size]", "change", (event) => {
-    const input = event.currentTarget;
-    const value = input.value.trim() ? clamp(Math.round(Number(input.value)), 1, 8192) : null;
-    input.blur();
-    setEdit(ed, { [input.dataset.size]: value });
-  });
   // The chosen layer.
   if (layer) {
     const words = side.querySelector(".ph-words");

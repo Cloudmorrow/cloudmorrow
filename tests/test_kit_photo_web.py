@@ -69,6 +69,28 @@ def test_the_tools_the_save_and_the_source():
     assert "run({ overwrite: false, name })" in code
     # Export is the action with its form, as the timeline's is.
     assert "press(ed.at.quill, ed.b.exportAction," in code
+    # Resize is a sheet from the bar, not a panel; the saved size is written as it is chosen.
+    assert "function resizeSheet(ed)" in code and 'class="act-button ph-resize"' in code
+    assert "imagePanel" not in code and "ph-size-pick" not in code
+
+
+def test_a_drag_is_held_by_the_overlay_and_the_marker_meets_no_box():
+    """A box is drawn anew as it moves, so the pointer is held by the overlay, which
+    stays; a press on the whole-picture crop box draws a new crop; the Marker
+    tool draws no layer box to get in the way of a stroke."""
+    code = js_code(PHOTO_JS)
+    drag = code[code.index("function dragBox(ed, el, event)") : code.index("const r2 = ")]
+    assert "over.setPointerCapture(event.pointerId)" in drag and "el.setPointerCapture" not in drag
+    assert 'over.addEventListener("pointermove", move)' in drag and "el.addEventListener" not in drag
+    for name in ("rubberBand", "drawStroke"):
+        body = code[code.index(f"function {name}(ed, event, from") :]
+        body = body[: body.index("\n}\n")]
+        assert "ed.over.setPointerCapture(event.pointerId)" in body, name
+    assert 'wholeFrame(crop(ed)) && ed.writes) rubberBand(ed, event, at, "crop")' in code
+    overlay = code[code.index("function placeOverlay(ed)") : code.index("function pointAt(ed, event)")]
+    assert 'ed.tool === "marker"' in overlay
+    # Without layers, the tools that make them are not offered.
+    assert "TOOLS.filter(([id]) => b.layers || !LAYER_TOOLS.has(id))" in code
     # A Quill's go("editor", edit=<id>) opens the editor.
     assert 'new URLSearchParams(arg).get("edit")' in code
     # The words are drawn in the app's own font, as the service draws them.

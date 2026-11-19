@@ -110,7 +110,7 @@ def test_a_view_screen_is_drawn_by_its_own_file():
 def test_every_record_sheet_has_the_actions_on_its_datamodel():
     sheet = js_code(_function(KIT_JS, "renderRecordSheet"))
     # Every sheet but a data screen's, which is for looking (kit_data.js).
-    assert '${screen.kit === "data" ? "" : sheetSection(model.id)}' in sheet
+    assert '${screen.kit === "data" ? "" : sheetSection(model.id, record)}' in sheet
     assert "wireSheetSection(app," in sheet
     # Read-only sheets have them too: the gate says no if the code writes.
     assert sheet.index("wireSheetSection(app,") < sheet.index("if (looked) return;")

@@ -27,7 +27,11 @@
 .tl-side { order: 3; margin-top: 8px; }
 .tl-quiet { margin: 4px 4px 10px; color: var(--muted); font-size: 14px; }
 
-/* -- the header: export and how it is going -------------------------------- */
+/* Save: over the file the project came from, or as a new file. */
+.tl-save-choices { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.tl-save-choices .act-button { min-height: 44px; }
+
+/* -- the header: export, save and how it is going -------------------------- */
 .tl-headbar {
   display: flex;
   align-items: center;

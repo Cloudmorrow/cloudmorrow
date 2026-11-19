@@ -14,6 +14,7 @@ from cloudmorrow.cli.quillrun.screen import (
     _find,
 )
 from cloudmorrow.client.api import CloudmorrowClient
+from cloudmorrow.quill.only import fits
 
 
 def _labels(quill: dict) -> dict[str, str]:
@@ -67,7 +68,10 @@ async def _press(api: CloudmorrowClient, quill: dict, action: dict, args: list[s
         model = quill["models"].get(action["on"])
         if model is None:
             fail(f"{action['on']} is not yours to reach here")
-        record = _find(await api.records(action["on"]), args[0], model["title"])["id"]
+        found = _find(await api.records(action["on"]), args[0], model["title"])
+        if not fits(action, found.get("fields")):
+            fail(f"{action['label']} is not for that {str(model.get('label') or action['on']).lower()}")
+        record = found["id"]
         args = args[1:]
     fields = {f["name"]: f for f in action["fields"]}
     given: dict = {}

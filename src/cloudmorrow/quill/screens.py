@@ -168,6 +168,7 @@ def timeline_fields(screen: dict, model: dict, models: dict[str, dict]) -> dict:
         "media": {str(k): str(v) for k, v in (screen.get("media") or {}).items()},
         "frames": screen.get("frames") or "",
         "export": screen.get("export") or "",
+        "save": screen.get("save") or "",
         "fields": {f.get("name") for f in model.get("fields", [])},
     }
 
