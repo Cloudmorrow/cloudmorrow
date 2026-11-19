@@ -13,6 +13,7 @@ command and a tool for the person's assistant.
 id = "log-service"             # lowercase and -; also its cm command
 label = "Log a service"        # what the button says
 on = "vehicle"                 # optional: done to one record of this datamodel
+# only = { kind = "van" }      # and only on the ones that fit: field = pattern(s), * and ?
 tone = "primary"               # neutral (default), primary, danger
 confirm = "Log it?"            # optional: asked before it runs
 description = "…"              # optional: more words, for the assistant's tool

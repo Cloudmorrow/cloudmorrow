@@ -1,6 +1,6 @@
-/* The kit's `photo`: a simple picture program — the tools down the left,
-   the picture in the middle on a dark ground, the tool's options, the
-   image and the layers on the right.
+/* The kit's `photo`: a simple picture program — a bar across the top with
+   Resize, Export and Save, the tools down the left, the picture in the
+   middle on a dark ground, the tool's options and the layers on the right.
 
    A phone has it in one column: the picture, the tools as a strip under
    it, then the panels. The one amber fill is Save; amber lines are what you
@@ -16,8 +16,8 @@
 .ph-quiet { margin: 4px 4px 10px; color: var(--muted); font-size: 14px; }
 .ph-quiet-inline { color: var(--muted); font-weight: 400; }
 
-/* -- the header: save, and how it is going -------------------------------- */
-.ph-headbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin: -8px 0 12px; }
+/* -- the bar: resize, export, save, and how the last save went ------------- */
+.ph-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin: -4px 0 12px; }
 .ph-status {
   flex: 1;
   min-width: 0;
@@ -28,6 +28,10 @@
   font-size: 14px;
   font-weight: 600;
 }
+.ph-bar-actions { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.ph-bar-actions .act-button { display: inline-flex; align-items: center; gap: 6px; }
+.ph-resize-sheet .ph-chips { margin: 8px 0 12px; }
+.ph-resize-sheet .ph-size-now { margin: 4px 4px 8px; }
 .ph-spin {
   width: 12px;
   height: 12px;
@@ -37,8 +41,6 @@
   animation: ph-spin .9s linear infinite;
 }
 @keyframes ph-spin { to { transform: rotate(360deg); } }
-.ph-head-actions { display: inline-flex; align-items: center; gap: 8px; margin-right: 4px; }
-.heading .ph-open { min-height: 36px; font-family: var(--display); font-weight: 600; }
 .heading a.button.ph-settings .pixel-icon { width: 20px; height: 20px; }
 
 /* -- the tools -------------------------------------------------------------- */

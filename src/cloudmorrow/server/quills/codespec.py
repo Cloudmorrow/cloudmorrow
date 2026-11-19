@@ -151,6 +151,24 @@ def parse_code(
         on = item.get("on", "")
         if on and not isinstance(on, str):
             raise CodeSpecError(f"{where}: {thing} on is a datamodel")
+        if "only" in item:
+            only = item["only"]
+            words = (
+                f"{where}: {thing} only says which records it is for: "
+                'only = { kind = "file", name = ["*.jpg", "*.png"] }'
+            )
+            if not on:
+                raise CodeSpecError(f"{where}: {thing} only goes with on: it says which of those records it is for")
+            if not isinstance(only, dict) or not only:
+                raise CodeSpecError(words)
+            for name, patterns in only.items():
+                items = patterns if isinstance(patterns, list) else [patterns]
+                if (
+                    not re.match(r"^[a-z_][a-z0-9_]*$", str(name))
+                    or not items
+                    or not all(isinstance(x, str) and x for x in items)
+                ):
+                    raise CodeSpecError(words)
         raw = item.get("fields", {})
         if not isinstance(raw, dict):
             raise CodeSpecError(f"{where}: {thing} [actions.fields] is a table of fields")

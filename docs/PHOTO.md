@@ -124,8 +124,9 @@ Media or Files) does the same from the other side: it makes the edit and
 answers `go("editor", edit=<id>)`, which opens it straight away. Opened with
 an `edit` parameter, the screen opens that edit's editor.
 
-**The editor.** Tools down the left, the picture in the middle, panels on
-the right: the tool's options, the image, the layers.
+**The editor.** A bar across the top — Resize, Export, Save, and how the
+last save went — tools down the left, the picture in the middle, panels
+on the right: the tool's options, the layers.
 - *Move* (V): press a layer to pick it, drag it, pull a piece's corners or
   a text's corner to size it. The panel has the layer's own numbers —
   words, size and colour; a mark's colour, width and how solid; a piece's
@@ -141,18 +142,22 @@ the right: the tool's options, the image, the layers.
 - *Marker* (B): draw on the picture. The colour, the width (fine, medium,
   thick) and the style (a pen, or a see-through highlighter) are the
   panel's; each stroke is a layer.
-- *Turn left, Turn right, Mirror, Paste*: under the tools.
-- *Image*: what the saved picture will be, and the usual sizes (as it is,
-  half, a quarter, 1920, 1280 or 800 wide, or another typed as width and
-  height).
+- *Turn left, Turn right, Mirror, Paste*: under the tools. Under the
+  picture, the photo's size, the saved picture's when it differs, and the
+  turn.
+- *Resize*: on the bar; a sheet with what the saved picture will be and
+  the usual sizes (as it is, half, a quarter, 1920, 1280 or 800 wide, or
+  another typed as width and height). Each choice is written as it is
+  made; the picture itself changes when it is saved.
 - *Layers*: every layer, the top one first, each with an eye to hide it;
   the chosen one has Bring forward, Send back and Remove. Duplicate (ctrl+D)
   copies the chosen layer; Copy (ctrl+C) with a layer chosen and nothing
   selected copies it for Paste.
-- *Save*: asks whether to write over the photo or save as a new file by
-  name, and the header says the status and message as they change; done,
-  Open shows the file. Delete takes the chosen layer off; Escape goes back
-  to Move, then lets go.
+- *Save*: on the bar; asks whether to write over the photo or save as a
+  new file by name, and the bar says the status and message as they
+  change; done, Open shows the file. Export, when the screen has one, is
+  there too. Delete takes the chosen layer off; Escape goes back to Move,
+  then lets go. A screen without `layers` offers no Text, Marker or Paste.
 
 **Web and phone.** The picture is a canvas: the server's large copy of the
 photo (`/thumb`, so a phone's HEIC needs no plug-in and a big photo comes

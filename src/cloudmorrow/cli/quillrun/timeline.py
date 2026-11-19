@@ -26,7 +26,7 @@ from cloudmorrow.console import TITLE
 from cloudmorrow.quill import timeline as tl
 from cloudmorrow.quill.screens import tracks_of
 
-WORDS = "list, show, add, cut, trim, move, rm, frame and export"
+WORDS = "list, show, add, cut, trim, move, rm, frame, save and export"
 
 
 def _time(value: str | float | None, what: str) -> float:
@@ -122,6 +122,22 @@ async def _act_timeline(
         if line.export is None:
             fail(f"{screen.spec['id']} has no export")
         await _press(api, screen.quill, line.export, [project["id"], *rest], plain)
+    elif action == "save":
+        if line.save_action is None:
+            fail(f"{screen.spec['id']} has no save")
+        source = await line.source_file(project)
+        file_name = str(((source or {}).get("fields") or {}).get("name") or "")
+        if not file_name:
+            fail("this project was not started from a file: there is nothing to write over; export it instead")
+        wanted = " ".join(rest).strip()
+        overwrite = not wanted or wanted == file_name
+        effects = await line.save(project, overwrite=overwrite, name=wanted or file_name)
+        told = next((e.get("text") for e in effects if e.get("effect") in ("toast", "error")), "")
+        how = f"over {file_name}" if overwrite else f"as {wanted}"
+        quillrun.console.print(
+            f"[green]Saving[/] {escape(str(project['fields'].get(line.title) or ''))} {escape(how)}"
+            + (f" [dim]{escape(str(told))}[/]" if told else "")
+        )
     elif action == "frame":
         await _frame(line, project, timing)
     elif action in ("cut", "trim", "move", "rm"):

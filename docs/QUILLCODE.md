@@ -92,6 +92,10 @@ model = "vehicle"                     # what it is about: circles fit it by this
 id = "log-service"
 label = "Log a service"
 on = "vehicle"                        # done to one vehicle, wherever one is drawn
+# only = { kind = "van" }             # and only on the vehicles that fit: each key a field of
+                                      # it, each value a pattern or a list of them (`*` anything,
+                                      # `?` one letter, case not minding); a record that does
+                                      # not fit has no button, and the server refuses the press
 handler = "log_service"               # the id with _ for -, when left out
 confirm = "Log it?"                   # optional: asked first
 tone = "primary"                      # neutral, primary, danger
@@ -303,7 +307,10 @@ The form is checked before the code runs — required fields, kinds, enum
 values, links to records the person can see — and an action `on` a
 datamodel is only ever given a record the person can see. `on` may name
 another Quill's datamodel the Quill uses or was granted: that is how one
-Quill adds a button to another's records.
+Quill adds a button to another's records. `only` narrows it to the records
+that fit — *Edit this photo* on `file` with `only = { name = ["*.jpg",
+"*.png"] }` is on the photos and on nothing else — and the server refuses the
+press on any other.
 
 `POST /api/quills/<quill>/actions/<action>` with `{record, fields}` answers
 `{effects: [...]}`; a refusal is 400 (invalid), 403 (refused) or 404, with

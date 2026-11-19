@@ -176,7 +176,7 @@ class RecordSheet(Modal[dict | str | None]):
                 if self.record is not None:
                     yield Static("", id="sheet-history", classes="sheet-history")
             if self.record is not None and self.run_action is not None:
-                self.actions = actions_on(installed(self.app), self.model_id)
+                self.actions = actions_on(installed(self.app), self.model_id, self.record.get("fields") or {})
             if self.actions:
                 with Horizontal(id="sheet-actions"):
                     for index, (_quill, action) in enumerate(self.actions):

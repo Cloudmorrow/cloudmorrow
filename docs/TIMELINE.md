@@ -25,6 +25,7 @@ effects = "vidmorrow.effect"      # optional: what is done to a piece, by keyfra
 media = { share = "my-files", within = "Videos" }   # where the media is first: file records
 frames = "frames"                 # optional: the id of an [[apis]] that draws frames
 export = "export"                 # optional: an action on the project, the Export button
+save = "save"                     # optional: an action on the project — Save, over the file it came from or as a new file
 ```
 
 The field names below are the kit's: a timeline's datamodels have them, with
@@ -39,6 +40,7 @@ these kinds, or `cm quill check` says which is missing.
 | `fps` | decimal | frames per second; blank until the first piece sets it |
 | `tracks` | json | the tracks, top to bottom: `[{"id": "V1", "kind": "video", "name": "Video 1"}, …, {"id": "A1", "kind": "audio", "name": "Audio 1"}]`; blank means V2, V1, A1, A2 |
 | `crop` | json, optional | the part of the picture kept, in percent: `{"x": 0, "y": 0, "w": 100, "h": 100}`; blank is all of it |
+| `source` | string, optional | the file record the project was started from (*Edit this video*), which Save writes over; blank for a project made from nothing |
 | `status` | enum, optional | said in the header beside Export (`queued`, `rendering`, `done`, `failed` are toned) |
 | `message` | string, optional | said beside the status |
 | `output` | string, optional | the id of the last export's file record: the header offers to open it |
@@ -170,6 +172,14 @@ that project's editor straight away.
 - *Export*: runs the `export` action on the project with its form, and the
   header says the status and message as they change; when `output` is set,
   Open shows the file.
+- *Save*: with `save`, and on a project that has a `source`, the header
+  has Save beside Export: it asks, in a sheet of the kit's own, whether to
+  write over that file or save as a new file by a name, then presses the
+  action with `overwrite` (bool) and `name` (string) answered, so no form
+  opens. What the Quill does with them is its own: Clipper's renderer
+  writes the result over the video (the one before goes to the Trash) or
+  beside it. `save` is an action on the project with those two fields, and
+  the project has a string field `source`.
 
 **Web and phone.** Live playback in the browser: every piece seen at the
 playhead — a `<video>` each, an `<img>` for a photo — drawn on a canvas
@@ -185,8 +195,9 @@ playhead and fetches frames a few times a second, without sound. Tracks are
 rows of text blocks. Keys: space play/pause, ←/→ a frame (with shift a
 second), [ and ] trim the selected piece's start or end to the playhead, s
 split, m move to the playhead, ↑/↓ another track, x delete, b add a blur,
-k set a keyframe from typed numbers, c crop, e export, tab between
-material, tracks and effects.
+k set a keyframe from typed numbers, c crop, e export, w save (the
+file's own name writes over it; another name is a new file beside it),
+tab between material, tracks and effects.
 
 **Command line.** `cm <quill> list` lists the projects; `add <name>
 [size=1920x1080]` makes one; `show <project>`
@@ -194,4 +205,5 @@ prints the tracks and pieces with times; `add <project> <file> [--track V1]
 [--at 0] [--length 5]` (a photo is five seconds long unless `--length` says), `cut <project> <piece> <at>`, `trim <project> <piece> --start/--end <s>`,
 `move <project> <piece> --at <s> [--track]`, `rm <project> <piece>`;
 `frame <project> --at <s> [-o frame.jpg]`; `export <project>` runs the
-action.
+action; `save <project> [name]` writes over the file the project came from,
+or saves as *name* beside it.

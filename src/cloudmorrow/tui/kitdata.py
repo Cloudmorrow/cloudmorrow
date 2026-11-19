@@ -19,6 +19,7 @@ import re
 from typing import Any
 
 from cloudmorrow.client.api import ApiError, ConflictError
+from cloudmorrow.quill.only import fits
 from cloudmorrow.tui.dates import as_local
 
 # A subtask is a checkbox line in the body, the same one the note editor ticks.
@@ -173,10 +174,14 @@ def installed(app: Any) -> list[dict]:
     return [q for q in (getattr(app, "quills", None) or []) if q.get("enabled", True)]
 
 
-def actions_on(quills: list[dict], model_id: str) -> list[tuple[dict, dict]]:
-    """Every (Quill, action) `on` *model_id*, in the Quills' order: the sheet's buttons."""
+def actions_on(quills: list[dict], model_id: str, fields: dict | None = None) -> list[tuple[dict, dict]]:
+    """Every (Quill, action) `on` *model_id*, in the Quills' order: the sheet's
+    buttons. With a record's *fields*, only the ones for that record (`only`)."""
     return [
-        (quill, action) for quill in quills for action in quill.get("actions") or [] if action.get("on") == model_id
+        (quill, action)
+        for quill in quills
+        for action in quill.get("actions") or []
+        if action.get("on") == model_id and (fields is None or fits(action, fields))
     ]
 
 

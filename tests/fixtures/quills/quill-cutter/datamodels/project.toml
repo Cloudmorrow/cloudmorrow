@@ -12,6 +12,7 @@ height = { kind = "int" }
 fps = { kind = "decimal" }
 tracks = { kind = "json" }
 crop = { kind = "json" }
+source = { kind = "string" }
 status = { kind = "enum", values = ["editing", "queued", "rendering", "done", "failed"], default = "editing" }
 message = { kind = "string" }
 output = { kind = "string" }

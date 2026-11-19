@@ -22,6 +22,7 @@ pieces = "cutter.piece"
 effects = "cutter.effect"
 media = { share = "my-files", within = "Videos" }
 export = "export"
+save = "save"
 
 [[actions]]
 id = "export"
@@ -31,3 +32,13 @@ tone = "primary"
 description = "Renders the cut to a new video beside the originals."
 [actions.fields]
 format = { kind = "enum", values = ["mp4", "webm"], default = "mp4" }
+
+[[actions]]
+id = "save"
+label = "Save"
+on = "cutter.project"
+tone = "primary"
+description = "Saves the cut over the video it came from, or as a new file beside it."
+[actions.fields]
+overwrite = { kind = "bool", default = false }
+name = { kind = "string" }

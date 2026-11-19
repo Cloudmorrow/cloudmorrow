@@ -18,7 +18,7 @@ Everything is a key (the spec's): space plays, ←/→ step a frame (with
 shift a second), [ and ] trim the selected piece to the playhead, s splits
 it there, m moves it there, ↑/↓ to another track of its kind, x deletes it,
 b puts a blur on it, k sets the blur's keyframe at the playhead from four
-typed numbers, c crops, e exports, and tab goes between the material, the
+typed numbers, c crops, e exports, w saves over the file it came from, and tab goes between the material, the
 tracks and the effects. On the tracks, enter picks the piece at the
 playhead (again for the one under it), a click picks one, and a drag moves
 it, snapping to the edges near it.
@@ -389,6 +389,7 @@ class TimelinePane(KitPane):
         Binding("c", "fire('crop')", "Crop", show=False),
         Binding("C", "fire('reset_crop')", "Whole picture", show=False),
         Binding("e", "fire('export')", "Export", show=False),
+        Binding("w", "fire('save')", "Save", show=False),
         Binding("o", "fire('open_output')", "Open the export", show=False),
         Binding("u", "fire('mute')", "Mute", show=False),
         Binding("v", "fire('volume')", "Volume", show=False),
@@ -469,6 +470,8 @@ class TimelinePane(KitPane):
         ]
         if self.line.export is not None:
             actions.append(Action("export", str(self.line.export.get("label") or "Export"), "e"))
+        if self.line.save_action is not None and self.project_fields.get("source"):
+            actions.append(Action("save", str(self.line.save_action.get("label") or "Save"), "w", variant="primary"))
         actions += [
             Action("delete_record", "Delete", "del"),
             Action("refresh", "Refresh", "r"),
@@ -1330,6 +1333,43 @@ class TimelinePane(KitPane):
         if ran:
             await self.edited("Exporting.")
             self._poll.resume()
+
+    # -- saving over the file it came from ------------------------------------------------------------
+    def act_save(self) -> None:
+        if self.line.save_action is None:
+            self.status("This timeline has no save.", error=True)
+            return
+        if self.project is None:
+            return
+        if not self.project_fields.get("source"):
+            self.status("This project was not started from a file: Export it instead.", error=True)
+            return
+        self.save()
+
+    @work(group="ui")
+    async def save(self) -> None:
+        self.stop()
+        source = await self.line.source_file(self.project)
+        file_name = str(((source or {}).get("fields") or {}).get("name") or "")
+        asked = await self.app.push_screen_wait(
+            PromptModal(
+                "Save as",
+                value=file_name,
+                detail=f"[{MUTED}]Keep the file's name to write over it (the one before goes to the Trash); "
+                "another name is a new file beside it.[/]",
+            )
+        )
+        if asked is None or not asked.strip():
+            return
+        name = asked.strip()
+        overwrite = bool(file_name) and name == file_name
+        try:
+            await self.line.save(self.project, overwrite=overwrite, name=name)
+        except ApiError as exc:
+            await self.went_wrong(exc)
+            return
+        await self.edited(f"Saving over {file_name}." if overwrite else f"Saving as {name}.")
+        self._poll.resume()
 
     async def _poll_status(self) -> None:
         """While an export is queued or rendering, the header follows it."""

@@ -32,10 +32,39 @@ class Timeline:
         self.title: str = self.bound["title"]
         self.media: dict = self.bound["media"]
         self.frames: str | None = frames_path(quill, screen)
+        actions = quill.get("actions", [])
         export = self.bound["export"]
-        self.export: dict | None = next((a for a in quill.get("actions", []) if a.get("id") == export), None)
+        self.export: dict | None = next((a for a in actions if a.get("id") == export), None)
+        self.save_action: dict | None = next((a for a in actions if a.get("id") == self.bound["save"]), None)
 
     # -- reading -----------------------------------------------------------------
+    async def source_file(self, project: dict) -> dict | None:
+        """The file the project was started from, for its name; None when there is none, or it is gone."""
+        source = str((project.get("fields") or {}).get("source") or "")
+        if not source:
+            return None
+        try:
+            return await self.api.record("file", source)
+        except ApiError:
+            return None
+
+    async def save(self, project: dict, *, overwrite: bool, name: str = "") -> list[dict]:
+        """The save action pressed: over the file the project came from, or as *name* beside it. The effects."""
+        if self.save_action is None:
+            raise ApiError("this editor has no save", status_code=404)
+        if not overwrite and not name.strip():
+            raise ApiError("saving as a new file needs a name", status_code=422)
+        source = await self.source_file(project)
+        if overwrite and source is None:
+            raise ApiError("this project was not started from a file: there is nothing to write over", status_code=422)
+        fields = {
+            "overwrite": overwrite,
+            "name": name.strip() or str(((source or {}).get("fields") or {}).get("name") or ""),
+        }
+        return await self.api.quill_action(
+            self.quill["id"], self.save_action["id"], record=project["id"], fields=fields
+        )
+
     async def projects(self) -> list[dict]:
         """Every project, newest first."""
         found = await self.api.records(self.project_model)

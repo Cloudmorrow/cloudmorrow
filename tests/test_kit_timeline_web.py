@@ -74,6 +74,11 @@ def test_media_plays_from_links_and_the_export_is_the_actions():
     assert 'recordsUrl("file", fileId, "/media")' in code
     assert "LINK_SPARE" in code and "Date.parse(made.expires)" in code
     assert "press(ed.at.quill, exportable," in code
+    # Save, with a `save` binding and a project that came from a file: a sheet of the
+    # kit's own presses the action with both fields answered.
+    assert "saveAction: screen.save ?" in code and "function saveSheet(ed)" in code
+    assert "run({ overwrite: true, name: fileName })" in code and "run({ overwrite: false, name })" in code
+    assert "const savable = ed.b.saveAction && ed.sourceFile ? ed.b.saveAction : null" in code
     # A Quill's go("editor", project=<id>) opens the editor.
     assert 'new URLSearchParams(arg).get("project")' in code
 

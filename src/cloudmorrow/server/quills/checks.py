@@ -193,7 +193,10 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
     for action in manifest.actions:
         thing = f"action {action['id']!r}"
         if action.get("on"):
-            model_of(thing, action["on"])
+            on = model_of(thing, action["on"])
+            for name in action.get("only") or {}:
+                if name not in on.by_name:
+                    raise QuillError(f"{where}: {thing} only names {name!r}, which is no field of {on.id}")
         for spec in action["fields"]:
             if spec["kind"] == "link":
                 model_of(f"{thing} field {spec['name']!r}", spec["to"])
@@ -414,6 +417,7 @@ TIMELINE_PROJECT = (
     ("fps", ("decimal",), True),
     ("tracks", ("json",), True),
     ("crop", ("json",), False),
+    ("source", ("string",), False),
     ("status", ("enum",), False),
     ("message", ("string", "text"), False),
     ("output", ("string",), False),
@@ -476,10 +480,13 @@ def _check_timeline(manifest: Manifest, screen: dict, model: Datamodel, model_of
         )
     if screen.get("frames") and screen["frames"] not in {api["id"] for api in manifest.apis}:
         raise QuillError(f"{where}: {thing} frames names one of its [[apis]] by id")
-    if screen.get("export"):
-        action = next((a for a in manifest.actions if a["id"] == screen["export"]), None)
-        if action is None or action.get("on") != model.id:
-            raise QuillError(f"{where}: {thing} export names one of its actions on {model.id}")
+    for binding in ("export", "save"):
+        if screen.get(binding):
+            action = next((a for a in manifest.actions if a["id"] == screen[binding]), None)
+            if action is None or action.get("on") != model.id:
+                raise QuillError(f"{where}: {thing} {binding} names one of its actions on {model.id}")
+    if screen.get("save"):
+        _check_save(manifest, screen, model, thing, where)
 
 
 # A photo editor's datamodels carry the kit's own field names (docs/PHOTO.md):
@@ -516,6 +523,23 @@ PHOTO_LAYER = (
 LAYER_KINDS = ("text", "mark", "piece")
 
 
+def _check_save(manifest: Manifest, screen: dict, model: Datamodel, thing: str, where: str) -> None:
+    """A kit's Save: an action on the edit (the project) with `overwrite` and `name`,
+    and, for a timeline, a `source` on the project to write over."""
+    action = next(a for a in manifest.actions if a["id"] == screen["save"])
+    names = (
+        {f["name"] for f in action.get("fields", [])}
+        if isinstance(action.get("fields"), list)
+        else set(action.get("fields") or {})
+    )
+    if not {"overwrite", "name"} <= names:
+        raise QuillError(f"{where}: {thing} save is an action with the fields overwrite (bool) and name (string)")
+    if screen.get("kit") == "timeline" and "source" not in model.by_name:
+        raise QuillError(
+            f"{where}: {thing} save writes over the project's source, so {model.id} has a string field source"
+        )
+
+
 def _check_photo(manifest: Manifest, screen: dict, model: Datamodel, model_of, thing: str, need, where: str) -> None:
     """A photo editor: an edit of one picture, the layers laid on it, and where the photos are."""
 
@@ -550,14 +574,7 @@ def _check_photo(manifest: Manifest, screen: dict, model: Datamodel, model_of, t
             if action is None or action.get("on") != model.id:
                 raise QuillError(f"{where}: {thing} {binding} names one of its actions on {model.id}")
     if screen.get("save"):
-        action = next(a for a in manifest.actions if a["id"] == screen["save"])
-        names = (
-            {f["name"] for f in action.get("fields", [])}
-            if isinstance(action.get("fields"), list)
-            else set(action.get("fields") or {})
-        )
-        if not {"overwrite", "name"} <= names:
-            raise QuillError(f"{where}: {thing} save is an action with the fields overwrite (bool) and name (string)")
+        _check_save(manifest, screen, model, thing, where)
 
 
 def runs_code(manifest: Manifest) -> list[str]:
