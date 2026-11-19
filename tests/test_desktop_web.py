@@ -21,6 +21,7 @@ PHONE_SAFE = {
     ".tabs .rail-section",
     ".tabs .tab.admin",
     ".tabs .tab.used",
+    ".tabs .rail-search",
 }
 
 
@@ -194,3 +195,17 @@ def test_a_quill_is_one_tab_with_its_screens_under_it() -> None:
     assert "#app:has(> nav.subtabs) main { padding-bottom:" in base
     assert ".subtabs { display: none; }" in desktop
     assert ".tabs .tab.sub {\n    display: flex;" in desktop
+
+
+def test_search_opens_from_slash_ctrl_k_and_the_foot_of_the_rail() -> None:
+    search = (WEB / "search.js").read_text()
+    assert 'event.key === "/"' in search
+    assert 'k === "k"' in search and "metaKey : event.ctrlKey" in search
+    # Captured ahead of the browser, whose Ctrl K is the address bar's search.
+    assert "}, true);" in search
+    core = (WEB / "core.js").read_text()
+    assert 'class="rail-search"' in core and "Type <kbd>/</kbd> or" in core
+    assert 'import "./search.js";' in (WEB / "app.js").read_text()
+    assert '@import "./search.css";' in (WEB / "app.css").read_text()
+    # `/` is Search's now, not the screen's own filter.
+    assert 'case "/"' not in (WEB / "desktop.js").read_text()

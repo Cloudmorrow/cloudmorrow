@@ -7,7 +7,7 @@
    learn that the screen does not already say.
 
      Esc      the sheet, or the field you are in, or the back button
-     /        the search field
+     /        Search, in the middle of the screen (search.js, with Ctrl K)
      n        the pen beside the title, whatever this screen makes one of
      j k      down and up the list
      ↑ ↓      the same, once the list has the keyboard
@@ -49,14 +49,6 @@ function click(selector) {
   return !!el;
 }
 
-function search() {
-  const field = app.querySelector(".search input");
-  if (!field) return false;
-  field.focus();
-  field.select();
-  return true;
-}
-
 addEventListener("keydown", (event) => {
   if (!desk() || event.defaultPrevented) return;
   if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -79,7 +71,6 @@ addEventListener("keydown", (event) => {
 
   let took = false;
   switch (event.key) {
-    case "/": took = search(); break;
     case "n": took = click(".heading .compose") || click(".heading .add"); break;
     case "j": case "ArrowDown": took = move(1, event.key === "j"); break;
     case "k": case "ArrowUp": took = move(-1, event.key === "k"); break;

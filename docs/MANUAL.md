@@ -816,8 +816,17 @@ pointer is on it, and at the head the first letter of your cloud's name,
 which turns over under the pointer to the button that unfolds it again. The
 rail stays folded on that device until you unfold it.
 
-The keys are the ones already on the screen: `Esc` is the back button (or the
-field you are in), `/` is the search box, `n` is the pen beside the title
+**Search** is one field in the middle of the screen, for everything: `/`
+(whatever key makes a slash on your keyboard — Shift 7 on a Danish one) or
+`Ctrl K` (`⌘K` on a Mac) opens it from anywhere, and so does the bar at the
+foot of the rail, which says so. The apps come first, and the screens inside
+them, so `/ ta Enter` is Tasks; once you have typed two letters the things in
+your apps follow by name — notes, tasks, files and whatever else a Quill
+lists, five per app, each in the app it belongs to. `↑` and `↓` pick, `Enter`
+opens, `Esc` puts it away.
+
+The other keys are the ones already on the screen: `Esc` is the back button (or the
+field you are in), `n` is the pen beside the title
 (which opens the sheet that makes a new one: there is no line on the page to
 type a new one into),
 `j` and `k` — and the arrows, once the list has the keyboard — walk the rows,

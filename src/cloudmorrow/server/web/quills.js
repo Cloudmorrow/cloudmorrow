@@ -53,6 +53,9 @@ const fillTabs = tabSlot();
 let quills = [];
 let loaded = null;   // the one request in flight, so a burst of screens asks once
 
+/** The Quills you have, as the server fitted them to you (search.js reads them). */
+export const quillList = () => quills;
+
 const tabName = (quill, screen) => `${quill.id}.${screen.id}`;
 export const screenHash = (quill, screen) =>
   `#/q/${encodeURIComponent(quill.id)}/${encodeURIComponent(screen.id)}`;
