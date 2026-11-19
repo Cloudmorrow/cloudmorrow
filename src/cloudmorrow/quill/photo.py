@@ -49,6 +49,12 @@ __all__ = [
     "layer_of",
     "layer_said",
     "layers_in_order",
+    "groups_of",
+    "layer_of_element",
+    "elements_in_order",
+    "drawn",
+    "new_layer_id",
+    "FIRST_LAYER",
     "points_of",
     "BOX",
     "LONGEST",
@@ -286,7 +292,7 @@ def layer_of(fields: dict) -> dict:
 
 
 def layers_in_order(records: list[dict]) -> list[dict]:
-    """Records of layers, lowest first: by `order`, then by when they were made."""
+    """Records of elements, lowest first: by `order`, then by when they were made."""
     return sorted(
         records,
         key=lambda r: (
@@ -295,6 +301,62 @@ def layers_in_order(records: list[dict]) -> list[dict]:
             str(r.get("id") or ""),
         ),
     )
+
+
+# -- the layers: groups the elements are on ---------------------------------------
+# An edit's `layers` is a list, the lowest first: `[{"id": "1", "name": "Layer 1",
+# "hidden": false}, …]`. Every element names its layer by id (`layer`); one that
+# names none, or one that is gone, is on the first. An edit that says nothing has
+# one layer.
+FIRST_LAYER = {"id": "1", "name": "Layer 1", "hidden": False}
+
+
+def groups_of(fields: dict) -> list[dict]:
+    """The edit's layers, lowest first; at least one."""
+    out: list[dict] = []
+    seen: set[str] = set()
+    for i, item in enumerate(fields.get("layers") if isinstance(fields.get("layers"), list) else []):
+        if not isinstance(item, dict):
+            continue
+        ident = str(item.get("id") or i + 1)
+        if ident in seen:
+            continue
+        seen.add(ident)
+        out.append(
+            {"id": ident, "name": str(item.get("name") or f"Layer {len(out) + 1}"), "hidden": bool(item.get("hidden"))}
+        )
+    return out or [dict(FIRST_LAYER)]
+
+
+def layer_of_element(fields: dict, groups: list[dict]) -> str:
+    """Which layer an element is on: its `layer`, when that is one of the edit's; else the first."""
+    said = str(fields.get("layer") or "")
+    return said if any(g["id"] == said for g in groups) else groups[0]["id"]
+
+
+def elements_in_order(records: list[dict], groups: list[dict]) -> list[dict]:
+    """Records of elements as they are drawn: by their layer, lowest first, then as `layers_in_order`."""
+    place = {g["id"]: i for i, g in enumerate(groups)}
+    return sorted(layers_in_order(records), key=lambda r: place[layer_of_element(r.get("fields") or {}, groups)])
+
+
+def drawn(records: list[dict], groups: list[dict]) -> list[dict]:
+    """The elements that are seen, in drawing order: not hidden, and on a layer that is not hidden."""
+    hidden = {g["id"] for g in groups if g["hidden"]}
+    return [
+        r
+        for r in elements_in_order(records, groups)
+        if not (r.get("fields") or {}).get("hidden") and layer_of_element(r.get("fields") or {}, groups) not in hidden
+    ]
+
+
+def new_layer_id(groups: list[dict]) -> str:
+    """An id no layer of the edit has."""
+    taken = {g["id"] for g in groups}
+    n = len(groups) + 1
+    while str(n) in taken:
+        n += 1
+    return str(n)
 
 
 def layer_said(fields: dict) -> str:

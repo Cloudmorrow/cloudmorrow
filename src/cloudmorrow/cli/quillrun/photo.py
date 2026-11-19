@@ -24,7 +24,7 @@ from cloudmorrow.client.photo import Photo
 from cloudmorrow.console import TITLE
 from cloudmorrow.quill import photo as ph
 
-WORDS = "list, add, show, layers, turn, mirror, crop, size, text, move, rm, picture, save and export"
+WORDS = "list, add, show, layers, layer, turn, mirror, crop, size, text, move, rm, picture, save and export"
 
 
 def _status(fields: dict) -> str:
@@ -56,8 +56,17 @@ def _photo(material: list[dict], key: str) -> dict:
 
 
 def _layer(layers: list[dict], key: str) -> dict:
-    """A layer by the start of its id, or its words."""
+    """An element by the start of its id, or its words."""
     return _find(layers, key, "text")
+
+
+def _group(groups: list[dict], key: str) -> dict:
+    """A layer by its name, or its id."""
+    wanted = key.strip().lower()
+    found = next((g for g in groups if g["name"].lower() == wanted or g["id"] == wanted), None)
+    if found is None:
+        fail(f"no layer called {key!r}; the layers are " + ", ".join(g["name"] for g in groups))
+    return found
 
 
 def _numbers(args: list[str], how_many: int, what: str) -> list[float]:
@@ -165,6 +174,8 @@ async def _act_photo(
             fail(str(exc))
         changed = await photo.resize(edit, size)
         quillrun.console.print(f"[green]{name}[/] comes out {ph.size_said(changed['fields']) or 'as it is'}")
+    elif action == "layer":
+        await _layer_word(photo, edit, rest, command)
     elif action == "text":
         if not rest:
             fail(f'what words? {command} text <edit> "words" [--at "x y"] [--size 8] [--colour amber]')
@@ -215,10 +226,54 @@ async def _act_photo(
         fail(f"a photo editor has {WORDS}, not {action}")
 
 
+async def _layer_word(photo: Photo, edit: dict, rest: list[str], command: str) -> None:
+    """`layer <edit> add [name]`, `hide|show|rm <layer>`, `rename <layer> <name>`: the edit's layers."""
+    how = f"{command} layer <edit> add [name] | hide <layer> | show <layer> | rename <layer> <name> | rm <layer>"
+    if not photo.grouped:
+        fail("this editor has one layer and no more")
+    if not rest:
+        fail(how)
+    word, args = rest[0].lower(), rest[1:]
+    groups = photo.groups(edit)
+    if word in ("add", "new"):
+        name = " ".join(args).strip() or f"Layer {len(groups) + 1}"
+        await photo.new_group(edit, name)
+        quillrun.console.print(f"[green]On top:[/] {escape(name)}")
+        return
+    if not args:
+        fail(how)
+    group = _group(groups, args[0])
+    if word in ("hide", "show"):
+        hidden = word == "hide"
+        await photo.set_groups(edit, [{**g, "hidden": hidden} if g["id"] == group["id"] else g for g in groups])
+        quillrun.console.print(f"[green]{'Hidden' if hidden else 'Shown'}:[/] {escape(group['name'])}")
+    elif word == "rename":
+        name = " ".join(args[1:]).strip()
+        if not name:
+            fail(f"rename to what? {command} layer <edit> rename <layer> <name>")
+        await photo.set_groups(edit, [{**g, "name": name} if g["id"] == group["id"] else g for g in groups])
+        quillrun.console.print(f"[green]Named[/] {escape(name)}")
+    elif word in ("rm", "remove"):
+        if len(groups) < 2:
+            fail("the last layer stays: hide it, or take off what is on it")
+        on = [
+            r
+            for r in await photo.layers(edit["id"], edit["fields"])
+            if ph.layer_of_element(r["fields"], groups) == group["id"]
+        ]
+        if on:
+            fail(f"{group['name']} has {len(on)} on it: rm them first, or hide it")
+        await photo.set_groups(edit, [g for g in groups if g["id"] != group["id"]])
+        quillrun.console.print(f"[green]Gone:[/] {escape(group['name'])}")
+    else:
+        fail(how)
+
+
 async def _show(photo: Photo, edit: dict, plain: bool) -> None:
-    layers = await photo.layers(edit["id"])
+    layers = await photo.layers(edit["id"], edit["fields"])
+    groups = photo.groups(edit)
     if plain:
-        quillrun.emit(json.dumps({"edit": edit, "layers": layers}, indent=2) + "\n")
+        quillrun.emit(json.dumps({"edit": edit, "layers": groups, "elements": layers}, indent=2) + "\n")
         return
     f = edit["fields"]
     about = []
@@ -240,16 +295,25 @@ async def _show(photo: Photo, edit: dict, plain: bool) -> None:
     )
     for column in ("id", "layer", "at", "size", "colour"):
         table.add_column(column, style="dim" if column == "id" else None)
-    if not layers:
-        table.add_row("", "[dim]nothing on it[/]", "", "", "")
-    # The top layer first, as the editor lists them.
-    for record in reversed(layers):
+    # The top layer first, as the editor lists them, and under each what is on it.
+    rows: list[tuple[dict | None, dict | None]] = []
+    for group in reversed(groups):
+        rows.append((group, None))
+        on = [r for r in layers if ph.layer_of_element(r["fields"], groups) == group["id"]]
+        rows.extend((group, r) for r in reversed(on))
+    for group, record in rows:
+        if record is None:
+            said = f"[bold]{escape(group['name'])}[/]" + (" [dim](hidden)[/]" if group["hidden"] else "")
+            table.add_row("", said, "", "", "")
+            if not any(r is not None and g["id"] == group["id"] for g, r in rows):
+                table.add_row("", "  [dim]nothing on it[/]", "", "", "")
+            continue
         layer = ph.layer_of(record["fields"])
         hidden = " [dim](hidden)[/]" if layer["hidden"] else ""
         if layer["kind"] == "text":
             table.add_row(
                 _short(record["id"]),
-                escape(layer["text"]) + hidden,
+                "  " + escape(layer["text"]) + hidden,
                 f"{layer['x']:g} {layer['y']:g}",
                 f"{layer['size']:g}%",
                 layer["colour"],
@@ -257,7 +321,7 @@ async def _show(photo: Photo, edit: dict, plain: bool) -> None:
         elif layer["kind"] == "mark":
             table.add_row(
                 _short(record["id"]),
-                f"mark, {len(layer['points'])} points" + hidden,
+                f"  mark, {len(layer['points'])} points" + hidden,
                 f"{layer['x']:g} {layer['y']:g}",
                 f"{layer['width']:g}% wide",
                 layer["colour"],
@@ -265,7 +329,7 @@ async def _show(photo: Photo, edit: dict, plain: bool) -> None:
         else:
             table.add_row(
                 _short(record["id"]),
-                "piece" + hidden,
+                "  piece" + hidden,
                 f"{layer['x']:g} {layer['y']:g}",
                 f"{layer['w']:g} × {layer['h']:g}",
                 "",

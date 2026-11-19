@@ -22,3 +22,4 @@ out_height = { kind = "int", label = "Height", description = "The export's heigh
 status = { kind = "enum", values = ["editing", "queued", "rendering", "done", "failed"], default = "editing", indexed = true }
 message = { kind = "string" }
 output = { kind = "string", label = "Export", description = "The last export's file" }
+layers = { kind = "json" }

@@ -38,6 +38,9 @@ class Photo:
         self.bound = photo_fields(screen, self.model, models)
         self.edit_model: str = self.bound["edit"]
         self.layer_model: str = self.bound["layers"]
+        # Layers as groups need the edit's `layers` and the element's `layer`.
+        element_fields = {f.get("name") for f in (models.get(self.layer_model) or {}).get("fields", [])}
+        self.grouped: bool = "layers" in self.bound["fields"] and "layer" in element_fields
         self.title: str = self.bound["title"]
         self.media: dict = self.bound["media"]
         self.pictures: str | None = pictures_path(quill, screen)
@@ -51,12 +54,29 @@ class Photo:
         found = await self.api.records(self.edit_model)
         return sorted(reversed(found), key=lambda r: str(r.get("created_at") or ""), reverse=True)
 
-    async def layers(self, edit_id: str) -> list[dict]:
-        """The layers on one edit, lowest first."""
+    async def layers(self, edit_id: str, fields: dict | None = None) -> list[dict]:
+        """The elements on one edit in drawing order: by their layer, lowest
+        first (with the edit's *fields*, which say the layers), then by order."""
         if not self.layer_model:
             return []
         found = await self.api.records(self.layer_model, **{self.bound["layer_edit"]: edit_id})
-        return ph.layers_in_order(found)
+        return ph.elements_in_order(found, ph.groups_of(fields or {}))
+
+    def groups(self, edit: dict) -> list[dict]:
+        """The edit's layers, lowest first; one at least."""
+        return ph.groups_of(edit.get("fields") or {})
+
+    async def set_groups(self, edit: dict, groups: list[dict]) -> dict:
+        """The edit's layers written: `[{id, name, hidden}, …]`, lowest first."""
+        return await self.update(edit, {"layers": groups})
+
+    async def new_group(self, edit: dict, name: str = "") -> dict:
+        """A new layer on top of the edit's; the edit as it is after."""
+        groups = self.groups(edit)
+        ident = ph.new_layer_id(groups)
+        return await self.set_groups(
+            edit, [*groups, {"id": ident, "name": name.strip() or f"Layer {len(groups) + 1}", "hidden": False}]
+        )
 
     async def material(self) -> list[dict]:
         """The photos under `media`, by folder and name."""
@@ -134,9 +154,15 @@ class Photo:
             raise ApiError("this editor has no layers: nothing to put on the picture", status_code=404)
         if kind not in ph.KINDS:
             raise ApiError(f"a layer is one of {', '.join(ph.KINDS)}, not {kind}", status_code=422)
-        on = await self.layers(edit["id"])
+        on = await self.layers(edit["id"], edit.get("fields"))
         top = max((int(float((r.get("fields") or {}).get("order") or 0)) for r in on), default=-1) + 1
         record = {self.bound["layer_edit"]: edit["id"], "kind": kind, "order": top, **ph.TEXT_AT}
+        # On the top layer, unless one is named: the kit's current layer is the top one too.
+        if self.grouped:
+            groups = self.groups(edit)
+            wanted = str(fields.pop("layer", "") or "")
+            match = next((g for g in groups if g["id"] == wanted or g["name"].lower() == wanted.lower()), None)
+            record["layer"] = (match or groups[-1])["id"]
         if kind == "text":
             record.update(size=ph.TEXT_SIZE, colour=ph.TEXT_COLOUR)
         elif kind == "mark":

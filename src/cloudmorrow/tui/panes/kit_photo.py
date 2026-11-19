@@ -70,6 +70,7 @@ IN_EDITOR = frozenset(
         "hide_layer",
         "layer_up",
         "layer_down",
+        "new_layer",
         "delete_record",
         "save",
         "export",
@@ -170,7 +171,8 @@ class PhotoPane(KitPane):
         Binding("s", "fire('size')", "Size", show=False),
         Binding("t", "fire('text')", "Text", show=False),
         Binding("k", "fire('move_layer')", "Move layer", show=False),
-        Binding("h", "fire('hide_layer')", "Hide or show", show=False),
+        Binding("h", "fire('hide_layer')", "Hide or show the layer", show=False),
+        Binding("l", "fire('new_layer')", "New layer", show=False),
         Binding("shift+up", "fire('layer_up')", "Bring forward", show=False),
         Binding("shift+down", "fire('layer_down')", "Send back", show=False),
         Binding("x", "fire('delete_record')", "Delete", show=False),
@@ -193,6 +195,7 @@ class PhotoPane(KitPane):
         "hide_layer",
         "layer_up",
         "layer_down",
+        "new_layer",
         "save",
     }
 
@@ -234,7 +237,15 @@ class PhotoPane(KitPane):
             Action("mirror", "Mirror", "m"),
             Action("crop", "Crop", "c", hint="The part kept, as x y w h in percent; shift-c keeps all of it"),
             Action("size", "Size", "s", hint="What it comes out as: 1920x1080, a width, or a percent"),
-            Action("text", "Text", "t", hint="Words on the picture; enter changes a layer, k moves it, h hides it"),
+            Action(
+                "text", "Text", "t", hint="Words on the picture, on the top layer; enter changes them, k moves them"
+            ),
+            Action(
+                "new_layer",
+                "Layer",
+                "l",
+                hint="A new layer on top; h hides a layer, enter names it, shift-↑/↓ moves it",
+            ),
         ]
         if self.photo.save_action is not None:
             actions.append(Action("save", str(self.photo.save_action.get("label") or "Save"), "w", variant="primary"))
@@ -256,16 +267,43 @@ class PhotoPane(KitPane):
         return (self.edit or {}).get("fields") or {}
 
     @property
-    def shown(self) -> list[dict]:
-        """The layers as the list shows them: the top one first."""
-        return list(reversed(self.stack))
+    def groups(self) -> list[dict]:
+        """The edit's layers, lowest first; one at least."""
+        return ph.groups_of(self.edit_fields)
 
     @property
-    def picked(self) -> dict | None:
-        """The layer the layers' cursor is on."""
+    def shown(self) -> list[tuple[str, dict]]:
+        """The rows of the list, top first: each layer, then the elements on it."""
+        groups = self.groups
+        rows: list[tuple[str, dict]] = []
+        for group in reversed(groups):
+            rows.append(("layer", group))
+            on = [r for r in self.stack if ph.layer_of_element(r.get("fields") or {}, groups) == group["id"]]
+            rows.extend(("element", r) for r in reversed(on))
+        return rows
+
+    def _row(self) -> tuple[str, dict] | None:
         row = self.query_one("#ph-layers", DataTable).cursor_row
         shown = self.shown
         return shown[row] if 0 <= row < len(shown) else None
+
+    @property
+    def picked(self) -> dict | None:
+        """The element the list's cursor is on, or None on a layer's row."""
+        found = self._row()
+        return found[1] if found and found[0] == "element" else None
+
+    @property
+    def picked_group(self) -> dict | None:
+        """The layer the cursor is on: its own row, or that of an element on it."""
+        found = self._row()
+        if found is None:
+            return None
+        if found[0] == "layer":
+            return found[1]
+        groups = self.groups
+        ident = ph.layer_of_element(found[1].get("fields") or {}, groups)
+        return next(g for g in groups if g["id"] == ident)
 
     def fire(self, name: str) -> None:
         # Each place has its own actions; the other's keys do nothing here.
@@ -312,7 +350,7 @@ class PhotoPane(KitPane):
 
     def status_detail(self) -> str:
         if self.editing:
-            return f"[{MUTED}]{plural(len(self.stack), 'layer')}[/]"
+            return f"[{MUTED}]{plural(len(self.groups), 'layer')}, {plural(len(self.stack), 'element')}[/]"
         return f"[{MUTED}]{plural(len(self.edits), self.noun)}[/]"
 
     def reload(self) -> None:
@@ -372,7 +410,7 @@ class PhotoPane(KitPane):
         assert self.edit is not None
         try:
             self.edit = await self.api.record(self.photo.edit_model, self.edit["id"])
-            self.stack = await self.photo.layers(self.edit["id"])
+            self.stack = await self.photo.layers(self.edit["id"], self.edit_fields)
             self.source = await self.photo.source_file(self.edit)
         except ApiError as exc:
             if exc.status_code == 404:
@@ -426,11 +464,22 @@ class PhotoPane(KitPane):
         table = self.query_one("#ph-layers", DataTable)
         row = table.cursor_row
         table.clear()
-        for record in self.shown:
-            layer = ph.layer_of(record.get("fields") or {})
-            label = Text(f"{GLYPH[layer['kind']]} ", style=layer["colour"] if layer["kind"] != "text" else ACCENT)
+        shown = self.shown
+        hidden_groups = {g["id"] for g in self.groups if g["hidden"]}
+        for kind, item in shown:
+            if kind == "layer":
+                label = Text("▾ ", style=MUTED)
+                label.append(item["name"], style=f"bold {MUTED} strike" if item["hidden"] else "bold")
+                where = "hidden" if item["hidden"] else ""
+                table.add_row(label, Text(where, style=MUTED), key=f"layer:{item['id']}")
+                continue
+            record = item
+            fields = record.get("fields") or {}
+            layer = ph.layer_of(fields)
+            dim = layer["hidden"] or ph.layer_of_element(fields, self.groups) in hidden_groups
+            label = Text(f"  {GLYPH[layer['kind']]} ", style=layer["colour"] if layer["kind"] != "text" else ACCENT)
             words = layer["text"].replace("\n", " / ") if layer["kind"] == "text" else layer["kind"].capitalize()
-            label.append(words, style=f"{MUTED} strike" if layer["hidden"] else "")
+            label.append(words, style=f"{MUTED} strike" if dim else "")
             if layer["kind"] == "text":
                 where = f"{layer['x']:g} {layer['y']:g} · {layer['size']:g}%"
             elif layer["kind"] == "mark":
@@ -438,10 +487,7 @@ class PhotoPane(KitPane):
             else:
                 where = f"{layer['x']:g} {layer['y']:g} · {layer['w']:g} × {layer['h']:g}"
             table.add_row(label, Text(where, style=MUTED), key=record["id"])
-        if self.stack:
-            table.move_cursor(row=min(max(row, 0), len(self.stack) - 1))
-        else:
-            table.add_row(Text("None yet: t lays words on the picture.", style=MUTED), "")
+        table.move_cursor(row=min(max(row, 0), len(shown) - 1))
 
     def draw_now(self) -> None:
         """The caption, and the picture or the words."""
@@ -514,9 +560,14 @@ class PhotoPane(KitPane):
         if event.data_table.id == "ph-edits":
             self.act_open()
         elif event.data_table.id == "ph-layers":
-            layer = self.picked
-            if layer is not None:
-                self.change_layer(layer)
+            found = self._row()
+            if found is None:
+                return
+            if found[0] == "layer":
+                if self._need_edit() is not None:
+                    self.rename_group(found[1])
+            else:
+                self.change_layer(found[1])
 
     # -- the edits ----------------------------------------------------------------------------------
     def act_open(self) -> None:
@@ -574,6 +625,8 @@ class PhotoPane(KitPane):
         layer = self.picked
         if layer is not None:
             self.remove_layer(layer)
+        elif (group := self.picked_group) is not None and self._need_edit() is not None:
+            self.remove_group(group)
 
     @work(group="ui")
     async def delete_edit(self, edit: dict) -> None:
@@ -612,8 +665,15 @@ class PhotoPane(KitPane):
             return None
         layer = self.picked
         if layer is None:
-            self.status("No layer: t lays words on the picture.", error=True)
+            self.status("No element under the cursor: t lays words on the picture.", error=True)
         return layer
+
+    def _need_group(self) -> dict | None:
+        if self._need_edit() is None or not self.photo.grouped:
+            if self.editing and not self.photo.grouped:
+                self.status("This editor has one layer.", error=True)
+            return None
+        return self.picked_group
 
     def act_turn_right(self) -> None:
         if (edit := self._need_edit()) is not None:
@@ -715,16 +775,16 @@ class PhotoPane(KitPane):
             return
         if await self._try(self.photo.add_text(self.edit, words.strip())):
             await self.edited(f"“{words.strip()}” is on the picture: k moves it, enter changes it.")
-            self.query_one("#ph-layers", DataTable).move_cursor(row=0)
+            self.query_one("#ph-layers", DataTable).move_cursor(row=1)
 
     @work(group="ui")
     async def change_layer(self, layer: dict) -> None:
         """Enter on a layer: its sheet, to change what it is made of."""
         kind = ph.layer_of(layer.get("fields") or {})["kind"]
         only = {
-            "text": ["text", "size", "colour", "x", "y", "hidden"],
-            "mark": ["colour", "width", "opacity", "hidden"],
-            "piece": ["x", "y", "w", "h", "hidden"],
+            "text": ["text", "size", "colour", "x", "y"],
+            "mark": ["colour", "width", "opacity"],
+            "piece": ["x", "y", "w", "h"],
         }[kind]
         result = await self.open_sheet(layer, model_id=self.photo.layer_model, only=only)
         if result is not None:
@@ -770,23 +830,100 @@ class PhotoPane(KitPane):
         if await self._try(self.photo.set_layer(layer, changes)):
             await self.edited(f"Moved to {x:g} {y:g}.")
 
-    def act_hide_layer(self) -> None:
-        if (layer := self._need_layer()) is not None:
-            self.hide_layer(layer)
+    # -- the layers: groups the elements are on ------------------------------------------------------
+    def act_new_layer(self) -> None:
+        if self._need_edit() is None:
+            return
+        if not self.photo.grouped:
+            self.status("This editor has one layer.", error=True)
+            return
+        self.new_group()
 
     @work(group="ui")
-    async def hide_layer(self, layer: dict) -> None:
-        hidden = not bool((layer.get("fields") or {}).get("hidden"))
-        if await self._try(self.photo.set_layer(layer, {"hidden": hidden})):
-            await self.edited("Hidden." if hidden else "Shown again.")
+    async def new_group(self) -> None:
+        name = await self.app.push_screen_wait(
+            PromptModal(
+                "New layer",
+                value=f"Layer {len(self.groups) + 1}",
+                detail=f"[{MUTED}]On top; what you add next lands on it.[/]",
+            )
+        )
+        if name is None:
+            return
+        if await self._try(self.photo.new_group(self.edit, name)):
+            await self.edited(f"{name.strip() or 'The new layer'} is on top.")
+            self.query_one("#ph-layers", DataTable).move_cursor(row=0)
+
+    @work(group="ui")
+    async def rename_group(self, group: dict) -> None:
+        if not self.photo.grouped:
+            return
+        name = await self.app.push_screen_wait(PromptModal("The layer's name", value=group["name"]))
+        if not name or not name.strip() or name.strip() == group["name"]:
+            return
+        groups = [{**g, "name": name.strip()} if g["id"] == group["id"] else g for g in self.groups]
+        if await self._try(self.photo.set_groups(self.edit, groups)):
+            await self.edited(f"Named {name.strip()}.")
+
+    def act_hide_layer(self) -> None:
+        if (group := self._need_group()) is not None:
+            self.hide_group(group)
+
+    @work(group="ui")
+    async def hide_group(self, group: dict) -> None:
+        hidden = not group["hidden"]
+        groups = [{**g, "hidden": hidden} if g["id"] == group["id"] else g for g in self.groups]
+        if await self._try(self.photo.set_groups(self.edit, groups)):
+            await self.edited(f"{group['name']} is hidden." if hidden else f"{group['name']} is shown again.")
+
+    @work(group="ui")
+    async def remove_group(self, group: dict) -> None:
+        if not self.photo.grouped:
+            return
+        groups = self.groups
+        if len(groups) < 2:
+            self.status("The last layer stays: hide it, or take off what is on it.", error=True)
+            return
+        on = [r for r in self.stack if ph.layer_of_element(r.get("fields") or {}, groups) == group["id"]]
+        if on:
+            self.status(
+                f"{group['name']} has {plural(len(on), 'element')} on it: take them off first, or hide it.", error=True
+            )
+            return
+        if await self._try(self.photo.set_groups(self.edit, [g for g in groups if g["id"] != group["id"]])):
+            await self.edited(f"{group['name']} is gone.")
 
     def act_layer_up(self) -> None:
-        if (layer := self._need_layer()) is not None:
-            self.restack(layer, 1)
+        found = self._row()
+        if found is None or self._need_edit() is None:
+            return
+        if found[0] == "layer":
+            self.move_group(found[1], 1)
+        else:
+            self.restack(found[1], 1)
 
     def act_layer_down(self) -> None:
-        if (layer := self._need_layer()) is not None:
-            self.restack(layer, -1)
+        found = self._row()
+        if found is None or self._need_edit() is None:
+            return
+        if found[0] == "layer":
+            self.move_group(found[1], -1)
+        else:
+            self.restack(found[1], -1)
+
+    @work(group="ui")
+    async def move_group(self, group: dict, by: int) -> None:
+        if not self.photo.grouped:
+            return
+        groups = list(self.groups)
+        index = next(i for i, g in enumerate(groups) if g["id"] == group["id"])
+        to = index + by
+        if not 0 <= to < len(groups):
+            self.status("It is at the top already." if by > 0 else "It is at the bottom already.")
+            return
+        groups.insert(to, groups.pop(index))
+        if await self._try(self.photo.set_groups(self.edit, groups)):
+            await self.edited(f"{group['name']} brought forward." if by > 0 else f"{group['name']} sent back.")
 
     @work(group="ui")
     async def restack(self, layer: dict, by: int) -> None:
@@ -804,7 +941,8 @@ class PhotoPane(KitPane):
                     return
         await self.edited("Brought forward." if by > 0 else "Sent back.")
         table = self.query_one("#ph-layers", DataTable)
-        table.move_cursor(row=len(order) - 1 - to)
+        at = next((i for i, (k, r) in enumerate(self.shown) if k == "element" and r["id"] == layer["id"]), 0)
+        table.move_cursor(row=at)
 
     @work(group="ui")
     async def remove_layer(self, layer: dict) -> None:

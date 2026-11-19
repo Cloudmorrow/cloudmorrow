@@ -20,7 +20,7 @@ kit = "photo"
 label = "Editor"
 model = "retouch.edit"            # an edit: one record per picture worked on
 title = "name"
-layers = "retouch.layer"          # optional: what is laid on the picture
+elements = "retouch.layer"        # optional: what is laid on the picture, each on one of the edit's layers
 media = { share = "my-files", within = "Photos" }   # where the photos are: file records
 pictures = "pictures"             # optional: the id of an [[apis]] that draws the picture
 save = "save"                     # optional: an action on the edit — Save, over the photo or as a new file
@@ -41,6 +41,7 @@ these kinds, or `cm quill check` says which is missing.
 | `mirror` | bool, optional | flipped left to right, after the turn |
 | `crop` | json, optional | the part kept, in percent of the turned picture: `{"x": 0, "y": 0, "w": 100, "h": 100}`; blank keeps all of it; never less than 5% each way |
 | `out_width`, `out_height` | int, optional | the saved picture's size in pixels; blank is the cropped picture's; one of them given keeps the shape, both are taken as typed; at most 8192 each |
+| `layers` | json, optional | the layers, lowest first: `[{"id": "1", "name": "Layer 1", "hidden": false}, …]`; blank is one layer. A layer is a group: everything added lands on the current one, and layers are hidden, renamed and reordered as a whole |
 | `status` | enum, optional | said in the header beside Save (`queued`, `rendering`, `done`, `failed` are toned) |
 | `message` | string, optional | said beside the status |
 | `output` | string, optional | the id of the last saved file record: the header offers to open it |
@@ -50,12 +51,17 @@ the layers (lowest first), the crop, the size. So every layer is placed on
 the turned picture and stays on the same part of the photo when the crop
 changes, and the crop is in percent of the turned picture too.
 
-### A layer (`layers`)
+### An element (`elements`)
+
+What is laid on the picture — words, a marker stroke, a piece — one record
+each, on one of the edit's layers. (`layers` was the binding's first name
+and is still read.)
 
 | field | kind | |
 | --- | --- | --- |
 | *a link to the edit* | link | exactly one link to the edit's model, `on_delete = "cascade"` |
 | `kind` | enum | `text`, `mark` or `piece` (all three values) |
+| `layer` | string, optional | the id of the layer it is on; blank, or one the edit no longer has, is the first layer. Without this field and the edit's `layers`, the editor has one layer and offers no more |
 | `x`, `y` | decimal | the top left corner, in percent of the turned picture's width and height; a mark's first point |
 | `w`, `h` | decimal, optional | a piece: how big it is placed, in percent |
 | `text` | string or text, optional | words; a line break starts a new line |
@@ -66,7 +72,7 @@ changes, and the crop is in percent of the turned picture too.
 | `opacity` | decimal, optional | a mark: 1 is solid (a pen), 0.4 see-through (a highlighter) |
 | `source` | json, optional | a piece: the part of the turned picture it is copied from, `{x, y, w, h}` in percent |
 | `hidden` | bool, optional | kept, but not drawn |
-| `order` | int, optional | stacking, lowest first; two the same go by when they were made |
+| `order` | int, optional | stacking within its layer, lowest first; two the same go by when they were made. Layers come first: everything on a lower layer is under everything on a higher one |
 
 Words are drawn in the app's own letters (Barlow, semibold) with a thin
 dark edge, so they read on a light photo and a dark one; a mark is a round
@@ -153,10 +159,18 @@ on the right: the tool's options, the layers.
   the usual sizes (as it is, half, a quarter, 1920, 1280 or 800 wide, or
   another typed as width and height). Each choice is written as it is
   made; the picture itself changes when it is saved.
-- *Layers*: every layer, the top one first, each with an eye to hide it;
-  the chosen one has Bring forward, Send back and Remove. Duplicate (ctrl+D)
-  copies the chosen layer; Copy (ctrl+C) with a layer chosen and nothing
-  selected copies it for Paste.
+- *Layers*: pinned to the foot of the right-hand column, as tall as the
+  picture, so they stay put while the tool's options above them change.
+  Every layer, the top one first, with its eye and how many things are on
+  it; the current one lit. New words, strokes and pieces land on the
+  current layer; a press on a layer makes it current (and lets go of an
+  element on another), a second press renames it; the eye hides it with
+  everything on it (H); New layer (N) makes an empty one on top; the
+  current one has Bring forward, Send back and Remove, which asks when
+  there is something on it. The last layer stays. Picking an element on
+  the picture makes its layer current. Duplicate (ctrl+D) copies the
+  chosen element onto the current layer; Copy (ctrl+C) with an element
+  chosen and nothing selected copies it for Paste.
 - *Save*: on the bar; asks whether to write over the photo or save as a
   new file by name, and the bar says the status and message as they
   change; done, Open shows the file. Export, when the screen has one, is
@@ -172,12 +186,15 @@ of the title opens the edit's sheet.
 
 **Terminal.** The picture is the `pictures` API's `picture` of the edit,
 drawn with textual-image (Kitty, Sixel, or half-cells); without the API
-it is words. The layers are a list beside it, the top one first. Keys: r
+it is words. Beside it, the layers, the top one first, each with what is
+on it under it. Keys: r
 turns right, R left, m mirrors, c crops from four typed numbers (C keeps
 the whole picture), s sets the size (`1920x1080`, a width, a percent, or
-`as is`), t lays words on the picture, enter on a layer opens its sheet, k
-moves it (`x y`, typed, with a size as a third number for words), h hides
-or shows it, shift+↑/↓ brings it forward or sends it back, x takes it off,
+`as is`), t lays words on the picture (on the top layer), enter on an
+element opens its sheet, k moves it (`x y`, typed, with a size as a third
+number for words), shift+↑/↓ brings it forward or sends it back, x takes
+it off; l makes a new layer on top, enter on a layer names it, h hides or
+shows it with everything on it, shift+↑/↓ moves it, x takes an empty one away,
 w saves (the photo's name writes over it; another name is a new file), e
 exports, o opens what was saved.
 
@@ -188,7 +205,10 @@ first; `turn <edit> [right|left|180]`, `mirror <edit>`, `crop <edit> <x y w
 h | all>`, `size <edit> <1920x1080 | 1920 | 50% | as is>`; `text <edit>
 "words" [--at "x y"] [--size 8] [--colour amber]` lays words on it, `move
 <edit> <layer> --at "x y" [--size] [--colour]` moves a layer, `rm <edit>
-<layer>` takes it off; `picture <edit> [-o out.jpg]` saves the edit as it
+<element>` takes it off; `layers <edit>` lists the layers and what is on
+each; `layer <edit> add [name]` makes one on top (new words and marks land
+on the top layer), `layer <edit> hide|show|rm <layer>` and `layer <edit>
+rename <layer> <name>` do as they say; `picture <edit> [-o out.jpg]` saves the edit as it
 will save, from the pictures API; `save <edit>` writes over the photo and
 `save <edit> <name>` saves as a new file; `export <edit> [format=png]` runs
 the export action.

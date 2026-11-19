@@ -210,8 +210,10 @@
 .ph-swatch:disabled { cursor: default; opacity: .5; }
 .ph-marker-custom, .ph-layer-custom { width: 32px; height: 26px; padding: 0 2px; background: var(--field); border: 1px solid var(--line); border-radius: 6px; }
 
-/* Layers: the top one first, an eye each, the chosen one lit with its buttons. */
-.ph-count { margin-left: 6px; color: var(--muted); font-weight: 400; }
+/* Layers: the top one first, an eye each, the current one lit with its buttons. */
+.ph-layers-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ph-layers-head .group-label { margin-right: auto; }
+.ph-layer-count { margin-left: auto; padding-left: 8px; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .ph-layer-list { display: flex; flex-direction: column; gap: 2px; }
 .ph-layer {
   display: flex;
@@ -226,7 +228,7 @@
 .ph-layer.on { border-color: color-mix(in srgb, var(--action) 60%, var(--line)); }
 .ph-layer.hidden .ph-layer-name { color: var(--muted); text-decoration: line-through; }
 .ph-layer button { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; border-radius: 6px; color: var(--muted); }
-.ph-layer-pick { flex: 1; justify-content: flex-start !important; gap: 8px; padding: 0 4px; color: var(--ink) !important; font-size: 14px; }
+.ph-layer-pick { flex: 1; min-width: 0; justify-content: flex-start !important; gap: 8px; padding: 0 6px; color: var(--ink) !important; font-size: 14px; }
 .ph-layer.on .ph-layer-pick { color: var(--action) !important; }
 .ph-layer-kind {
   display: inline-flex;
@@ -299,6 +301,7 @@
     order: 0;
     flex-direction: column;
     flex-wrap: nowrap;
+    justify-content: flex-start;
     align-self: stretch;
     margin: 0;
     padding: 6px 4px;
@@ -308,7 +311,11 @@
   }
   .ph-tools-gap { display: block; flex: none; height: 1px; margin: 6px 8px; background: var(--line); }
   .ph-stage-box { min-height: 320px; }
-  .ph-side { max-height: calc(100vh - 150px); overflow-y: auto; padding-right: 2px; }
+  /* As tall as the picture (kit_photo.js sets the height): the options scroll,
+     the layers are pinned to the foot and do not jump as the options change. */
+  .ph-side { display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding-right: 2px; }
+  .ph-side .ph-options { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-bottom: 0; }
+  .ph-side .ph-layers { flex: 0 1 auto; max-height: 50%; overflow-y: auto; margin: auto 0 0; padding-top: 10px; border-top: 1px solid var(--line); }
 }
 @media (hover: hover) and (pointer: fine) {
   .ph-tool:not(:disabled):not([aria-pressed="true"]):not(.on):hover { background: var(--card-2); }

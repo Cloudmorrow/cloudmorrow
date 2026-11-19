@@ -210,12 +210,53 @@ export function layerOf(fields) {
   return layer;
 }
 
-/** Records of layers, lowest first: by `order`, then by when they were made. */
+/** Records of elements, lowest first: by `order`, then by when they were made. */
 export function layersInOrder(records) {
   return [...records].sort((a, b) =>
     (int(a.fields.order) - int(b.fields.order)) ||
     String(a.created_at || "").localeCompare(String(b.created_at || "")) ||
     String(a.id).localeCompare(String(b.id)));
+}
+
+// -- the layers: groups the elements are on ----------------------------------------
+// An edit's `layers` is a list, the lowest first: [{id, name, hidden}, …]. Every
+// element names its layer by id (`layer`); one that names none, or one that is
+// gone, is on the first. An edit that says nothing has one layer.
+export const FIRST_LAYER = { id: "1", name: "Layer 1", hidden: false };
+
+/** The edit's layers, lowest first; at least one. */
+export function groupsOf(fields) {
+  const out = [];
+  const seen = new Set();
+  (Array.isArray(fields.layers) ? fields.layers : []).forEach((item, i) => {
+    if (!item || typeof item !== "object") return;
+    const id = String(item.id || i + 1);
+    if (seen.has(id)) return;
+    seen.add(id);
+    out.push({ id, name: String(item.name || `Layer ${out.length + 1}`), hidden: !!item.hidden });
+  });
+  return out.length ? out : [{ ...FIRST_LAYER }];
+}
+
+/** Which layer an element is on: its `layer`, when that is one of the edit's; else the first. */
+export function layerOfElement(fields, groups) {
+  const said = String(fields.layer || "");
+  return groups.some((g) => g.id === said) ? said : groups[0].id;
+}
+
+/** Records of elements as they are drawn: by their layer, lowest first, then as layersInOrder. */
+export function elementsInOrder(records, groups) {
+  const place = new Map(groups.map((g, i) => [g.id, i]));
+  return layersInOrder(records).map((r, i) => [r, i]).sort((a, b) =>
+    (place.get(layerOfElement(a[0].fields, groups)) - place.get(layerOfElement(b[0].fields, groups))) || (a[1] - b[1])).map(([r]) => r);
+}
+
+/** An id no layer of the edit has. */
+export function newLayerId(groups) {
+  const taken = new Set(groups.map((g) => g.id));
+  let n = groups.length + 1;
+  while (taken.has(String(n))) n += 1;
+  return String(n);
 }
 
 /** What a layer is called in a list: its words, or its kind. */
