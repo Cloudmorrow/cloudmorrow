@@ -500,12 +500,14 @@ PHOTO_EDIT = (
     ("crop", ("json",), False),
     ("out_width", ("int",), False),
     ("out_height", ("int",), False),
+    ("layers", ("json",), False),
     ("status", ("enum",), False),
     ("message", ("string", "text"), False),
     ("output", ("string",), False),
 )
 PHOTO_LAYER = (
     ("kind", ("enum",), True),
+    ("layer", ("string",), False),
     ("x", ("decimal",), True),
     ("y", ("decimal",), True),
     ("w", ("decimal",), False),
@@ -549,11 +551,14 @@ def _check_photo(manifest: Manifest, screen: dict, model: Datamodel, model_of, t
                 need(of, f"{thing} {label}", name, kinds)
 
     fields(model, PHOTO_EDIT, "edit")
-    if screen.get("layers"):
-        layers = model_of(thing + " layers", screen["layers"])
-        fields(layers, PHOTO_LAYER, "layers")
+    # The elements laid on the picture: `elements`, or `layers` as it was first called.
+    if screen.get("elements") and screen.get("layers") and screen["elements"] != screen["layers"]:
+        raise QuillError(f"{where}: {thing} elements and layers name the same datamodel; say elements")
+    if screen.get("elements") or screen.get("layers"):
+        layers = model_of(thing + " elements", screen.get("elements") or screen["layers"])
+        fields(layers, PHOTO_LAYER, "elements")
         if not timeline_link(layers, model.id):
-            raise QuillError(f"{where}: {thing} layers {layers.id} has exactly one link to {model.id}")
+            raise QuillError(f"{where}: {thing} elements {layers.id} has exactly one link to {model.id}")
         missing = [k for k in LAYER_KINDS if k not in layers.by_name["kind"].values]
         if missing:
             raise QuillError(

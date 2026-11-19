@@ -55,7 +55,7 @@ def test_the_cropper_plans(registry):
     plan = registry.plan(CROPPER, QUILL_CATALOG / "datamodels")
     assert plan["id"] == "cropper"
     (screen,) = plan["screens"]
-    assert screen["kit"] == "photo" and screen["layers"] == "cropper.layer"
+    assert screen["kit"] == "photo" and screen["elements"] == "cropper.layer"
     assert screen["export"] == "export" and screen["save"] == "save"
 
 
@@ -102,10 +102,10 @@ def test_a_photo_editor_says_what_is_missing(registry, tmp_path, change, said):
 
 def test_the_layers_and_the_save_are_optional(registry, tmp_path):
     plan = registry.plan(
-        cropper_copy(tmp_path, **{"quill.toml": ('layers = "cropper.layer"\nmedia', "media")}),
+        cropper_copy(tmp_path, **{"quill.toml": ('elements = "cropper.layer"\nmedia', "media")}),
         QUILL_CATALOG / "datamodels",
     )
-    assert "layers" not in plan["screens"][0]
+    assert "elements" not in plan["screens"][0]
     plan = registry.plan(
         cropper_copy(tmp_path, **{"quill.toml": ('save = "save"\n', "")}), QUILL_CATALOG / "datamodels"
     )

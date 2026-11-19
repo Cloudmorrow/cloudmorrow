@@ -202,9 +202,10 @@ def tracks_of(project: dict) -> list[dict]:
 
 
 def photo_fields(screen: dict, model: dict, models: dict[str, dict]) -> dict:
-    """What a photo editor draws from: the edits, the layers on them and the
-    link between, where the photos are, and the pictures API, export and save."""
-    layers = models.get(screen.get("layers") or "", {})
+    """What a photo editor draws from: the edits, the elements on them (words,
+    marks, pieces: `elements`, or `layers` as it was first called) and the link
+    between, where the photos are, and the pictures API, export and save."""
+    layers = models.get(screen.get("elements") or screen.get("layers") or "", {})
     return {
         "title": screen.get("title") or model.get("title") or "name",
         "edit": model.get("id", screen.get("model", "")),

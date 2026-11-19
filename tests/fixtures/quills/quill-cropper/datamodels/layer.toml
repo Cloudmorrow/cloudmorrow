@@ -26,3 +26,4 @@ opacity = { kind = "decimal", default = 1, description = "A mark: 1 is solid, 0.
 source = { kind = "json", description = "A piece: the part of the picture it is copied from, {x, y, w, h} in percent" }
 hidden = { kind = "bool", default = false, description = "Kept, but not drawn" }
 order = { kind = "int", default = 0, description = "Stacking: lowest first" }
+layer = { kind = "string" }

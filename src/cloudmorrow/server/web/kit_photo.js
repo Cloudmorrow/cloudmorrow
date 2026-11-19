@@ -2,9 +2,10 @@
 
    A photo screen names a datamodel with the kit's own field names
    (docs/PHOTO.md): the edit (`model`) — one picture from the drive, how it
-   is turned and mirrored, the part of it kept, and the size it comes out —
-   and, optionally, the layers laid on it (`layers`: words, marker strokes,
-   and pieces copied out of the picture); where the photos are (`media`, a
+   is turned and mirrored, the part of it kept, the size it comes out, and
+   its layers — and, optionally, the elements laid on it (`elements`: words,
+   marker strokes, and pieces copied out of the picture, each on one of the
+   layers); where the photos are (`media`, a
    filter on the drive's file records); and, optionally, a pictures API, an
    export action (with its form) and a save action (overwrite the photo, or
    save as a new file beside it).
@@ -16,8 +17,10 @@
    The editor is laid out as a simple picture program: a bar across the
    top with Resize, Export and Save (and how the last save went), the tools
    down the left (Select, Move, Marquee, Crop, Text, Marker, and the
-   turns), the picture in the middle on a dark ground, and on the right the tool's
-   options and the layers, newest on top. The picture is a canvas the
+   turns), the picture in the middle on a dark ground, and on the right the
+   tool's options with, pinned to the bottom, the layers, the top one first.
+   A layer is a group: everything added lands on the current one, and
+   layers are hidden, shown, renamed and reordered as a whole. The picture is a canvas the
    source is drawn on, turned and mirrored as the edit says, every layer on
    it in its order in the app's own font, and the crop either kept to or —
    with the Crop tool — shown as a box to move, the rest dimmed. A layer is
@@ -48,12 +51,13 @@ import {
 } from "./core.js";
 import { aOr, mayWrite, plural, sheetHash } from "./kit.js";
 import { press, said } from "./actions.js";
-import { openSheet } from "./dialog.js";
+import { ask, askText, openSheet } from "./dialog.js";
 import {
-  boxBetween, boxWithRatio, clamp, COLOURS, colourFrom, cropOf, croppedSize, fitBox, HIGHLIGHT_OPACITY, isPhoto,
-  layerBox, layerLabel, layerOf, layersInOrder, MARK_OPACITY, MARK_WIDTH, MARK_WIDTHS, markBox, mirrored, movedMark,
-  nearMark, outputSize, pictureSize, picturesPath, RATIOS, ratioOf, rotationOf, SIZES, sizeFrom, sourceSize,
-  TEXT_AT, TEXT_COLOUR, TEXT_SIZE, textLines, thinned, topOrder, turned, wholeFrame,
+  boxBetween, boxWithRatio, clamp, COLOURS, colourFrom, cropOf, croppedSize, elementsInOrder, fitBox, groupsOf,
+  HIGHLIGHT_OPACITY, isPhoto, layerBox, layerLabel, layerOf, layerOfElement, MARK_OPACITY, MARK_WIDTH, MARK_WIDTHS,
+  markBox, mirrored, movedMark, nearMark, newLayerId, outputSize, pictureSize, picturesPath, RATIOS, ratioOf,
+  rotationOf, SIZES, sizeFrom, sourceSize, TEXT_AT, TEXT_COLOUR, TEXT_SIZE, textLines, thinned, topOrder, turned,
+  wholeFrame,
 } from "./kit_photo_rules.js";
 
 const glyphs = {
@@ -106,7 +110,8 @@ const linkTo = (model, to) => {
 export function bindingsOf(at) {
   const { quill, screen } = at;
   const model = quill.models[screen.model];
-  const layers = screen.layers ? quill.models[screen.layers] || null : null;
+  const elements = screen.elements || screen.layers;
+  const layers = elements ? quill.models[elements] || null : null;
   const files = quill.models.file || null;
   const action = (id) => (id ? (quill.actions || []).find((a) => a.id === id) || null : null);
   return {
@@ -116,6 +121,8 @@ export function bindingsOf(at) {
     layers,
     files,
     layerEdit: layers ? linkTo(layers, model.id) : "",
+    // Layers as groups need the edit's `layers` and the element's `layer`; without them there is one layer.
+    grouped: layers ? model.fields.some((f) => f.name === "layers") && layers.fields.some((f) => f.name === "layer") : false,
     media: screen.media || {},
     pictures: picturesPath(quill, screen),
     exportAction: action(screen.export),
@@ -312,7 +319,8 @@ async function loadEdit(b, id) {
     api("GET", recordsUrl(b.model.id, id)),
     b.layers ? api("GET", recordsUrl(b.layers.id) + `?${encodeURIComponent(b.layerEdit)}=${encodeURIComponent(id)}`) : Promise.resolve([]),
   ]);
-  return { edit, layers: layersInOrder(layers).map(layerFrom) };
+  const groups = groupsOf(edit.fields);
+  return { edit, groups, layers: elementsInOrder(layers, groups).map((r) => ({ ...layerFrom(r), layer: layerOfElement(r.fields, groups) })) };
 }
 
 async function renderEditorFor(at, b, id) {
@@ -333,7 +341,8 @@ async function renderEditorFor(at, b, id) {
     turnedKey: "",
     sourceFile: null,            // the photo's file record: its name, for Save
     tool: HOME, ratio: "",
-    selected: "",                // the layer being worked on
+    selected: "",                // the element being worked on
+    current: "",                 // the layer new elements land on: set from the groups below
     selection: null,             // the Select tool's box, in percent of the picture
     stroke: null,                // a marker stroke being drawn: its points
     alive: true, writing: Promise.resolve(),
@@ -341,6 +350,7 @@ async function renderEditorFor(at, b, id) {
     writesLayers: !!b.layers && mayWrite(b.layers),
     boxes: new Map(),            // where each text is on the picture, in percent, as last drawn
   };
+  ed.current = ed.groups[ed.groups.length - 1].id;
   if (live) live.stop();
   live = ed;
   ed.stop = () => stopEditor(ed);
@@ -416,6 +426,16 @@ function stopEditor(ed) {
 const f = (ed) => ed.edit.fields;
 const layerById = (ed, id) => ed.layers.find((l) => l.id === id) || null;
 const chosen = (ed) => layerById(ed, ed.selected);
+const groupById = (ed, id) => ed.groups.find((g) => g.id === id) || null;
+/** Whether an element is drawn: not hidden, on a layer that is not hidden. */
+const visible = (ed, layer) => !layer.hidden && !(groupById(ed, layer.layer) || {}).hidden;
+/** The elements in drawing order again, after a layer moved or one was added. */
+function resort(ed) {
+  const place = new Map(ed.groups.map((g, i) => [g.id, i]));
+  ed.layers = ed.layers.map((l, i) => [l, i]).sort((a, b) =>
+    ((place.get(a[0].layer) ?? 0) - (place.get(b[0].layer) ?? 0)) || (a[0].order - b[0].order) ||
+    String(a[0].created_at || "").localeCompare(String(b[0].created_at || "")) || (a[1] - b[1])).map(([l]) => l);
+}
 const crop = (ed) => cropOf(f(ed).crop);
 const cropping = (ed) => ed.tool === "crop";
 const viewOf = (ed) => (cropping(ed) ? { x: 0, y: 0, w: 100, h: 100 } : crop(ed));
@@ -442,6 +462,7 @@ async function reload(ed) {
     return;
   }
   if (!chosen(ed)) ed.selected = "";
+  if (!groupById(ed, ed.current)) ed.current = ed.groups[ed.groups.length - 1].id;
   redraw(ed);
 }
 
@@ -536,6 +557,17 @@ function fitStage(ed) {
     ed.canvas.width = canvasW;
     ed.canvas.height = canvasH;
   }
+  syncSide(ed);
+}
+
+/** On a computer the side column is as tall as the picture's, so the layers
+    sit at its foot and stay put while the tool's options grow and shrink. */
+function syncSide(ed) {
+  const side = ed.root.querySelector(".ph-side");
+  const viewer = ed.root.querySelector(".ph-viewer");
+  if (!side || !viewer) return;
+  const desk = matchMedia("(min-width: 900px) and (min-height: 600px)").matches;
+  side.style.height = desk ? `${viewer.offsetHeight}px` : "";
 }
 
 /** The source as the edit turns and mirrors it, drawn once into a canvas of
@@ -581,7 +613,7 @@ function paint(ed) {
   if (base) ctx.drawImage(base, 0, 0, pic.w, pic.h);
   ed.boxes.clear();
   for (const layer of ed.layers) {
-    if (layer.hidden) continue;
+    if (!visible(ed, layer)) continue;
     if (layer.kind === "text") paintText(ed, ctx, layer, pic);
     else if (layer.kind === "mark") paintMark(ctx, layer, pic);
     else if (base) paintPiece(ctx, base, layer, pic);
@@ -690,7 +722,7 @@ function placeOverlay(ed) {
   // The Marker draws wherever it is pressed, so no box is in the way; Text
   // keeps the box of the words just laid, to move them, and nothing else's.
   const layer = chosen(ed);
-  if (!layer || layer.hidden || ed.tool === "marker" || (ed.tool === "text" && layer.kind !== "text")) { ed.over.innerHTML = ""; return; }
+  if (!layer || !visible(ed, layer) || ed.tool === "marker" || (ed.tool === "text" && layer.kind !== "text")) { ed.over.innerHTML = ""; return; }
   const box = layerBox(layer, picture(ed), ed.boxes.get(layer.id));
   const grips = !ed.writesLayers ? "" : layer.kind === "piece" ? handles(HANDLES) : layer.kind === "text" ? handles(["se"]) : "";
   ed.over.innerHTML = `<div class="ph-box layer ${layer.kind}" data-what="layer" style="${boxStyle(box, view)}">${grips}</div>`;
@@ -710,7 +742,7 @@ function pointAt(ed, event) {
 function layerAt(ed, x, y) {
   const pic = picture(ed);
   for (const layer of [...ed.layers].reverse()) {
-    if (layer.hidden) continue;
+    if (!visible(ed, layer)) continue;
     if (layer.kind === "mark") {
       if (nearMark(layer, x, y, Math.max(layer.width, 1.5))) return layer;
       continue;
@@ -887,6 +919,8 @@ function saveCrop(ed, box) {
 
 function choose(ed, id) {
   ed.selected = id;
+  const layer = chosen(ed);
+  if (layer && groupById(ed, layer.layer)) ed.current = layer.layer;
   placeOverlay(ed);
   drawSide(ed);
 }
@@ -916,18 +950,83 @@ function mirror(ed) {
   setEdit(ed, { mirror: !mirrored(f(ed)) });
 }
 
-/** A new layer on top of the others, chosen. */
+/** A new element on top of the others on the current layer, chosen. */
 function addLayer(ed, fields, then = null) {
   if (!ed.writesLayers) return;
+  const group = groupById(ed, ed.current) || ed.groups[ed.groups.length - 1];
   const record = { [ed.b.layerEdit]: ed.id, order: topOrder(ed.layers), ...fields };
+  if (ed.b.grouped) record.layer = group.id;
+  // Something put on a hidden layer would not be seen: the layer is shown again.
+  if (group.hidden) setGroups(ed, ed.groups.map((g) => (g.id === group.id ? { ...g, hidden: false } : g)), false);
   write(ed, async () => {
     const made = await api("POST", recordsUrl(ed.b.layers.id), { fields: record });
-    ed.layers.push(layerFrom(made));
+    ed.layers.push({ ...layerFrom(made), layer: group.id });
+    resort(ed);
     ed.selected = made.id;
     paint(ed);
     drawSide(ed);
     if (then) then(made);
   });
+}
+
+// -- the layers: groups of elements --------------------------------------------------------------
+/** The edit's layers set to *groups*, drawn, and written (with `grouped`; else kept in the page alone). */
+function setGroups(ed, groups, redrawAll = true) {
+  ed.groups = groups;
+  if (!groupById(ed, ed.current)) ed.current = groups[groups.length - 1].id;
+  resort(ed);
+  if (redrawAll) { paint(ed); drawSide(ed); }
+  if (ed.b.grouped && ed.writes) write(ed, () => patch(ed.b.model.id, ed.id, { layers: groups }));
+}
+
+/** A new layer on top, empty, the current one. */
+function addGroup(ed) {
+  if (!ed.b.grouped || !ed.writes) return;
+  const id = newLayerId(ed.groups);
+  ed.current = id;
+  ed.selected = "";
+  setGroups(ed, [...ed.groups, { id, name: `Layer ${ed.groups.length + 1}`, hidden: false }]);
+}
+
+function toggleGroup(ed, id) {
+  if (!ed.b.grouped || !ed.writes) return;
+  setGroups(ed, ed.groups.map((g) => (g.id === id ? { ...g, hidden: !g.hidden } : g)));
+}
+
+/** The layer one step up or down the stack. */
+function moveGroup(ed, id, by) {
+  const index = ed.groups.findIndex((g) => g.id === id);
+  const to = index + by;
+  if (index < 0 || to < 0 || to >= ed.groups.length) return;
+  const groups = [...ed.groups];
+  groups.splice(index, 1);
+  groups.splice(to, 0, ed.groups[index]);
+  setGroups(ed, groups);
+}
+
+async function renameGroup(ed, id) {
+  const group = groupById(ed, id);
+  if (!group || !ed.b.grouped || !ed.writes) return;
+  const name = await askText("What is the layer called?", group.name, { yes: "Rename" });
+  if (name === null || !name.trim() || name.trim() === group.name) return;
+  setGroups(ed, ed.groups.map((g) => (g.id === id ? { ...g, name: name.trim() } : g)));
+}
+
+/** A layer taken away, and everything on it; the last layer stays. */
+async function removeGroup(ed, id) {
+  const group = groupById(ed, id);
+  if (!group || !ed.b.grouped || !ed.writes) return;
+  if (ed.groups.length < 2) { toast("The last layer stays: hide it, or take off what is on it"); return; }
+  const on = ed.layers.filter((l) => l.layer === id);
+  if (on.length) {
+    const sure = await ask(`Remove ${group.name} and the ${on.length === 1 ? "one thing" : `${on.length} things`} on it?`, { yes: "Remove", tone: "danger" });
+    if (!sure) return;
+  }
+  ed.layers = ed.layers.filter((l) => l.layer !== id);
+  if (on.some((l) => l.id === ed.selected)) ed.selected = "";
+  if (ed.current === id) ed.current = "";
+  setGroups(ed, ed.groups.filter((g) => g.id !== id));
+  if (on.length && ed.writesLayers) write(ed, async () => { for (const l of on) await api("DELETE", recordsUrl(ed.b.layers.id, l.id)); });
 }
 
 /** Words on the picture — where it was pressed, or in a corner — picked,
@@ -1003,20 +1102,6 @@ function duplicate(ed, layer) {
   addLayer(ed, copyOf(fieldsOf(layer)));
 }
 
-/** The chosen layer one step up or down the stack: every layer's `order` is its place, written where it changed. */
-function restack(ed, layer, by) {
-  const index = ed.layers.indexOf(layer);
-  const to = index + by;
-  if (index < 0 || to < 0 || to >= ed.layers.length) return;
-  ed.layers.splice(index, 1);
-  ed.layers.splice(to, 0, layer);
-  const changes = [];
-  ed.layers.forEach((l, i) => { if (l.order !== i) { l.order = i; changes.push([l.id, i]); } });
-  paint(ed);
-  drawSide(ed);
-  write(ed, async () => { for (const [id, order] of changes) await patch(ed.b.layers.id, id, { order }); });
-}
-
 // -- the buttons and the keys ----------------------------------------------------------------------
 function drawTools(ed) {
   const mirrorButton = ed.root.querySelector(".ph-mirror");
@@ -1066,7 +1151,8 @@ function wireKeys(ed) {
       b: () => setTool(ed, "marker"),
       r: () => turn(ed, 90),
       R: () => turn(ed, -90),
-      h: () => layer && setLayer(ed, layer, { hidden: !layer.hidden }),
+      h: () => toggleGroup(ed, ed.current),
+      n: () => addGroup(ed),
       Delete: () => removeLayer(ed, layer),
       Backspace: () => removeLayer(ed, layer),
       Escape: () => { if (ed.tool !== HOME) setTool(ed, HOME); else choose(ed, ""); },
@@ -1361,27 +1447,30 @@ function layerOptions(ed, layer) {
     </div>
     <div class="ph-row-buttons">
       ${ed.writesLayers ? `<button type="button" class="act-chip ph-duplicate">${glyphs.copy}<span>Duplicate</span></button>
-      <button type="button" class="act-chip ph-hide">${layer.hidden ? glyphs.eyeOff : glyphs.eye}<span>${layer.hidden ? "Show" : "Hide"}</span></button>
       <button type="button" class="act-chip ph-drop-layer">${icons.trash}<span>Remove</span></button>` : ""}
     </div>`;
 }
 
-/** Every layer, the top one first, with its eye; the chosen one lit. */
+/** Every layer, the top one first, with its eye and what is on it; the
+    current one lit, with its buttons. New words, strokes and pieces land
+    on the current layer; a press on a layer makes it current, a second
+    press renames it. */
 function layersPanel(ed) {
   if (!ed.b.layers) return "";
-  const glyphFor = { text: glyphs.text, mark: glyphs.marker, piece: glyphs.piece };
-  const rows = [...ed.layers].reverse().map((layer) => {
-    const on = layer.id === ed.selected;
-    return `<div class="ph-layer${on ? " on" : ""}${layer.hidden ? " hidden" : ""}" data-layer="${esc(layer.id)}">
-      <button type="button" class="ph-layer-eye" aria-label="${layer.hidden ? "Show" : "Hide"}" title="${layer.hidden ? "Show" : "Hide"}"${ed.writesLayers ? "" : " disabled"}>${layer.hidden ? glyphs.eyeOff : glyphs.eye}</button>
-      <button type="button" class="ph-layer-pick"><span class="ph-layer-kind" style="--swatch:${esc(layer.colour)}">${glyphFor[layer.kind]}</span><span class="ph-layer-name">${esc(layerLabel(layer))}</span></button>
-      ${on && ed.writesLayers ? `<button type="button" class="ph-layer-move" data-by="1" aria-label="Up" title="Bring forward">${glyphs.up}</button>
+  const may = ed.b.grouped && ed.writes;
+  const rows = [...ed.groups].reverse().map((group) => {
+    const on = group.id === ed.current;
+    const count = ed.layers.filter((l) => l.layer === group.id).length;
+    return `<div class="ph-layer${on ? " on" : ""}${group.hidden ? " hidden" : ""}" data-group="${esc(group.id)}">
+      <button type="button" class="ph-layer-eye" aria-label="${group.hidden ? "Show" : "Hide"}" title="${group.hidden ? "Show" : "Hide"}"${may ? "" : " disabled"}>${group.hidden ? glyphs.eyeOff : glyphs.eye}</button>
+      <button type="button" class="ph-layer-pick" title="${on && may ? "Rename" : "Work on this layer"}"><span class="ph-layer-name">${esc(group.name)}</span><span class="ph-layer-count">${count ? `${count} on it` : "empty"}</span></button>
+      ${on && may ? `<button type="button" class="ph-layer-move" data-by="1" aria-label="Up" title="Bring forward">${glyphs.up}</button>
       <button type="button" class="ph-layer-move" data-by="-1" aria-label="Down" title="Send back">${glyphs.down}</button>
-      <button type="button" class="ph-layer-drop" aria-label="Remove" title="Remove">${glyphs.close}</button>` : ""}
+      <button type="button" class="ph-layer-drop" aria-label="Remove" title="Remove the layer and what is on it">${glyphs.close}</button>` : ""}
     </div>`;
   }).join("");
-  return `<p class="group-label">Layers <span class="ph-count">${ed.layers.length || ""}</span></p>
-    <div class="ph-layer-list">${rows || `<p class="ph-quiet">Nothing on the picture yet: words, marker strokes and pasted pieces land here.</p>`}</div>`;
+  return `<div class="ph-layers-head"><p class="group-label">Layers</p>${may ? `<button type="button" class="act-chip ph-layer-new" title="New layer (N)">+ New layer</button>` : ""}</div>
+    <div class="ph-layer-list">${rows}</div>`;
 }
 
 function wireSide(ed, side, layer) {
@@ -1440,21 +1529,23 @@ function wireSide(ed, side, layer) {
       placeOverlay(ed);
     });
     on(".ph-duplicate", "click", () => duplicate(ed, layer));
-    on(".ph-hide", "click", () => { setLayer(ed, layer, { hidden: !layer.hidden }); placeOverlay(ed); drawSide(ed); });
     on(".ph-drop-layer", "click", () => removeLayer(ed, layer));
   }
   // Layers.
+  on(".ph-layer-new", "click", () => addGroup(ed));
   for (const row of side.querySelectorAll(".ph-layer")) {
-    const id = row.dataset.layer;
-    const it = layerById(ed, id);
+    const id = row.dataset.group;
     row.querySelector(".ph-layer-pick").addEventListener("click", () => {
-      if (ed.tool === "crop" || ed.tool === "marquee") setTool(ed, HOME);
-      choose(ed, ed.selected === id ? "" : id);
+      if (ed.current === id) { renameGroup(ed, id); return; }
+      ed.current = id;
+      if (chosen(ed) && chosen(ed).layer !== id) ed.selected = "";
+      placeOverlay(ed);
+      drawSide(ed);
     });
-    row.querySelector(".ph-layer-eye").addEventListener("click", () => { if (it) { setLayer(ed, it, { hidden: !it.hidden }); placeOverlay(ed); drawSide(ed); } });
-    for (const move of row.querySelectorAll(".ph-layer-move")) move.addEventListener("click", () => restack(ed, it, Number(move.dataset.by)));
+    row.querySelector(".ph-layer-eye").addEventListener("click", () => toggleGroup(ed, id));
+    for (const move of row.querySelectorAll(".ph-layer-move")) move.addEventListener("click", () => moveGroup(ed, id, Number(move.dataset.by)));
     const drop = row.querySelector(".ph-layer-drop");
-    if (drop) drop.addEventListener("click", () => removeLayer(ed, it));
+    if (drop) drop.addEventListener("click", () => removeGroup(ed, id));
   }
   // Drawn again once the typing is over, if something changed while it went on.
   side.addEventListener("focusout", () => { if (ed.sideStale) setTimeout(() => ed.alive && drawSide(ed), 0); }, { once: true });

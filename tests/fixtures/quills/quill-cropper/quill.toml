@@ -19,7 +19,7 @@ kit = "photo"
 label = "Editor"
 model = "cropper.edit"
 title = "name"
-layers = "cropper.layer"
+elements = "cropper.layer"
 media = { share = "my-files", within = "Photos" }
 export = "export"
 save = "save"

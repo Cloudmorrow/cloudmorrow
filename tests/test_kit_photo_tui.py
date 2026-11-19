@@ -240,10 +240,11 @@ async def test_the_editor_draws_the_head_the_words_and_the_layers_top_first(app)
         words = pane.query_one("#ph-viewer-words", Static)
         assert words.display and "Summer" in str(words.render())
         table = pane.query_one("#ph-layers", DataTable)
-        assert table.row_count == 2
-        # The mark is on top of the words: it is listed first.
-        assert "Mark" in str(table.get_row_at(0)[0]) and "2 points" in str(table.get_row_at(0)[1])
-        assert "Summer" in str(table.get_row_at(1)[0]) and "6 6 · 8%" in str(table.get_row_at(1)[1])
+        # The one layer first, then what is on it: the mark is on top of the words, so it is listed first.
+        assert table.row_count == 3
+        assert "Layer 1" in str(table.get_row_at(0)[0])
+        assert "Mark" in str(table.get_row_at(1)[0]) and "2 points" in str(table.get_row_at(1)[1])
+        assert "Summer" in str(table.get_row_at(2)[0]) and "6 6 · 8%" in str(table.get_row_at(2)[1])
 
 
 async def test_turn_mirror_crop_and_size_write_the_edit(app):
@@ -303,8 +304,8 @@ async def test_layers_are_laid_on_moved_hidden_restacked_and_taken_off(app):
             6.0,
             2,
         )
-        # On top, so first in the list, and the cursor on it.
-        assert table.row_count == 3 and table.cursor_row == 0
+        # On top, so first under its layer, and the cursor on it.
+        assert table.row_count == 4 and table.cursor_row == 1
         await pilot.press("k")
         await modal_up(pilot)
         app.screen.query_one(Input).value = "50 80 12"
@@ -312,18 +313,22 @@ async def test_layers_are_laid_on_moved_hidden_restacked_and_taken_off(app):
         await settle(app, pilot)
         made = layers(app)[-1]["fields"]
         assert (made["x"], made["y"], made["size"]) == (50.0, 80.0, 12.0)
+        # h hides the layer the cursor is on, with everything on it; again shows it.
         await pilot.press("h")
         await settle(app, pilot)
-        assert layers(app)[-1]["fields"]["hidden"] is True
+        assert edit(app)["layers"] == [{"id": "1", "name": "Layer 1", "hidden": True}]
+        await pilot.press("h")
+        await settle(app, pilot)
+        assert edit(app)["layers"][0]["hidden"] is False
         # Sent back one step: under the mark.
         await pilot.press("shift+down")
         await settle(app, pilot)
         orders = {r["id"]: r["fields"].get("order") for r in layers(app)}
         hello = layers(app)[-1]["id"]
         assert orders[hello] == 1 and orders["r_m1"] == 2 and orders["r_t1"] == 0
-        assert table.cursor_row == 1
+        assert table.cursor_row == 2
         # The mark moves as a whole.
-        table.move_cursor(row=0)
+        table.move_cursor(row=1)
         await pilot.press("k")
         await modal_up(pilot)
         app.screen.query_one(Input).value = "20 20"
