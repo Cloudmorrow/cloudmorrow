@@ -67,6 +67,9 @@ let lastLog = [];
 // What the catalog is searched for. Kept while the panel is drawn again —
 // after an install, say — so the list does not jump back to everything.
 let catalogQuery = "";
+// Whether the Quills already here are left out of the catalog: this
+// device's, like the search, and kept between visits.
+let hideInstalled = store.get("quills.catalog.hide-installed") === "1";
 
 /** Back to the Quills side of Administration, from a sheet opened as a screen. */
 async function backToQuills() {
@@ -549,7 +552,8 @@ function drawCatalog(ctx) {
       here once it is.</p>
     <div class="search catalog-search">${icons.search}<input type="search" placeholder="Search the catalog"
       aria-label="Search the catalog" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
-      value="${esc(catalogQuery)}"></div>` +
+      value="${esc(catalogQuery)}"></div>
+    <label class="catalog-hide"><input type="checkbox"${hideInstalled ? " checked" : ""}> Hide installed Quills</label>` +
     shelves.map((shelf) => {
       const here = catalog.quills.filter((q) => (known.has(q.category) ? q.category : "") === shelf.id);
       if (!here.length) return "";
@@ -557,10 +561,16 @@ function drawCatalog(ctx) {
         (shelf.description ? `<p class="shelf-note">${esc(shelf.description)}</p>` : "") +
         `<div class="group">${here.map((q) => catalogRow(q, shelf.label)).join("")}</div></section>`;
     }).join("") +
-    `<p class="empty none-match" hidden><b>No Quill matches</b>Try another word, or clear the search.</p>`;
+    `<p class="empty none-match" hidden><b>No Quill matches</b>Try another word, clear the search, or show the installed ones.</p>`;
   for (const row of list.querySelectorAll(".quill-row[data-id]")) wireRow(ctx, row);
   const field = list.querySelector(".catalog-search input");
   field.addEventListener("input", () => { catalogQuery = field.value; filterCatalog(list); });
+  const hide = list.querySelector(".catalog-hide input");
+  hide.addEventListener("change", () => {
+    hideInstalled = hide.checked;
+    store.set("quills.catalog.hide-installed", hideInstalled ? "1" : "");
+    filterCatalog(list);
+  });
   filterCatalog(list);
 }
 
@@ -572,7 +582,8 @@ function filterCatalog(list) {
   for (const shelf of list.querySelectorAll(".shelf")) {
     let left = 0;
     for (const row of shelf.querySelectorAll(".quill-row[data-id]")) {
-      const match = words.every((w) => row.dataset.words.includes(w));
+      const match = words.every((w) => row.dataset.words.includes(w)) &&
+        !(hideInstalled && row.classList.contains("is-installed"));
       row.hidden = !match;
       // The line between rows is drawn on the lower one; the first one shown
       // has nothing above it to be divided from.
