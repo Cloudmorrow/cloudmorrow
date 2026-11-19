@@ -69,3 +69,20 @@ def test_a_current_database_runs_no_step_again(tmp_path, monkeypatch):
 
 def test_steps_are_numbered_in_order_from_one():
     assert [step.version for step in schema.STEPS] == list(range(1, len(schema.STEPS) + 1))
+
+
+@sqlite_only
+def test_a_cloud_from_before_local_backups_gets_their_table(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "cloud.db"
+    connect(path).close()
+    # As a cloud made before local backups stood after step 11.
+    old = sqlite3.connect(path)
+    old.executescript("DROP TABLE local_syncs; PRAGMA user_version = 11;")
+    old.close()
+
+    conn = connect(path)
+    assert schema.version_of(conn) == schema.VERSION
+    assert conn.table_exists("local_syncs")
+    conn.close()
