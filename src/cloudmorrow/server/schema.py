@@ -450,6 +450,22 @@ def _photos(conn: Connection) -> None:
     _columns(conn)
 
 
+def _tables_added_to_step_one(conn: Connection) -> None:
+    """The tables written into step 1 after it had already run here.
+
+    Local backups' `local_syncs` went into SCHEMA rather than a step of its
+    own, so a cloud older than it never got the table and every machine's
+    `/api/agent/syncs` was a 500. Every statement in SCHEMA and the stores'
+    tables says IF NOT EXISTS, so running them again makes only what is
+    missing.
+    """
+    conn.executescript(SCHEMA)
+    for table in _store_tables():
+        conn.executescript(table)
+    conn.commit()
+    _columns(conn)
+
+
 STEPS: tuple[Step, ...] = (
     Step(1, "the tables as they stood before they were versioned", _baseline),
     Step(2, "indexes for what an open screen and the retention sweep ask", _indexes_for_scale),
@@ -462,6 +478,7 @@ STEPS: tuple[Step, ...] = (
     Step(9, "favorite apps on the person, and where a notification opens", _favorites_and_note_links),
     Step(10, "how a person's spelling is checked", _spelling),
     Step(11, "people's profile photos", _photos),
+    Step(12, "the tables put into step 1 after it ran, local backups' among them", _tables_added_to_step_one),
 )
 
 VERSION = STEPS[-1].version
