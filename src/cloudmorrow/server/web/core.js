@@ -951,6 +951,8 @@ function placeGear() {
 // Which tab was last lit, for the screens that draw none of their own.
 let lastTab = "";
 const ON_PHONE = 5;
+// Search's other key, as this computer writes it (search.js answers it).
+const SEARCH_KEY = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || "") ? "⌘K" : "Ctrl K";
 const DOTS = ["........", "........", "........", "XX.XX.XX", "XX.XX.XX", "........", "........", "........"];
 const FOLD = ["........", "...X..X.", "..X..X..", ".X..X...", ".X..X...", "..X..X..", "...X..X.", "........"];
 const UNFOLD = ["........", ".X..X...", "..X..X..", "...X..X.", "...X..X.", "..X..X..", ".X..X...", "........"];
@@ -1007,6 +1009,9 @@ export function tabs(active) {
     shelves(own.filter((t) => t.section)).map((s) => section(s.title, s.tabs)).join("") +
     section("Your cloud", shown.filter((t) => t.cloud)) +
     section("Administration", shown.filter((t) => t.admin)) +
+    // Search's key, said at the foot of the rail; a click opens it too (search.js).
+    `<button type="button" class="rail-search" aria-label="Search" title="Search">${icons.search}` +
+    `<span class="rail-search-words">Type <kbd>/</kbd> or <kbd>${SEARCH_KEY}</kbd> to search</span></button>` +
     `</nav>` + (opened ? `<nav class="subtabs" aria-label="${esc(opened.label)}">${opened.screens.map(drawItem).join("")}</nav>` : "");
 }
 

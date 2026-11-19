@@ -27,6 +27,8 @@
 .tabs .rail-section { display: none; }
 .tabs .tab.admin { display: none; }
 .tabs .tab.used { display: none; }
+/* Search's key at the foot of the rail: a phone has no keys. */
+.tabs .rail-search { display: none; }
 
 @media (min-width: 900px) and (min-height: 600px) {
   :root {
@@ -182,6 +184,29 @@
   }
   .tabs .tab.admin { display: flex; }
   .tabs .tab.used { display: flex; }
+
+  /* -- search, at the foot of the rail ----------------------------------------- */
+  /* Pushed to the bottom however few the apps, and kept there however many. */
+  .tabs .rail-search {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+    margin-top: auto;
+    padding: 12px 12px calc(10px + var(--bottom));
+    margin-bottom: calc(-12px - var(--bottom));
+    border-top: 1px solid var(--line);
+    background: var(--bar);
+    color: var(--bar-muted);
+    font-size: 13px;
+    text-align: left;
+  }
+  .tabs .rail-search > svg { flex: none; }
+  .tabs .rail-search:hover { color: var(--bar-ink); }
+  :root.rail-folded .tabs .rail-search { justify-content: center; padding-left: 0; padding-right: 0; }
+  :root.rail-folded .tabs .rail-search-words { display: none; }
 
   /* -- the rail folded -------------------------------------------------------- */
   /* A strip down the left with the icons alone: the shelves are a line
