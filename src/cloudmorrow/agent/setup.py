@@ -9,6 +9,7 @@ good notes client.
 
 from __future__ import annotations
 
+import asyncio
 import platform
 import socket
 from dataclasses import dataclass
@@ -85,7 +86,9 @@ async def ensure_agent(
         return SetupResult(True, False, agent_config.name)
 
     try:
-        result = service.install()
+        # In a thread: restarting a running agent waits for it to stop, and a
+        # login on Textual's or the desktop's event loop must not freeze meanwhile.
+        result = await asyncio.to_thread(service.install)
     except Exception as exc:  # a service manager we cannot drive is not fatal
         return SetupResult(True, False, agent_config.name, str(exc))
     return SetupResult(True, result.installed, agent_config.name, result.detail)

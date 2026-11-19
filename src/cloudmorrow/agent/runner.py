@@ -6,7 +6,7 @@ import logging
 import platform
 import signal
 import socket
-import time
+import threading
 from dataclasses import dataclass
 
 from cloudmorrow.agent.client import AgentApiError, AgentClient
@@ -34,7 +34,10 @@ class AgentRunner:
         self.config = config
         self.client = client or AgentClient(config)
         self.stats = RunnerStats()
-        self._stop = False
+        # Set by stop(): ends the loop and cuts short the wait between ticks,
+        # so a service stop (SIGTERM) is obeyed at once, not after a backoff
+        # of up to five minutes that systemd would kill us for.
+        self._stopping = threading.Event()
         # Quills' machine handlers switched on here (agent/quills.py).
         self.quills = MachineQuills(config, self.client)
         # The folders here the person backs up into My Files (agent/sync.py).
@@ -42,7 +45,11 @@ class AgentRunner:
 
     def stop(self, *_: object) -> None:
         log.info("stopping after the current job")
-        self._stop = True
+        self._stopping.set()
+
+    @property
+    def _stop(self) -> bool:
+        return self._stopping.is_set()
 
     def install_signal_handlers(self) -> None:
         for sig in (signal.SIGINT, signal.SIGTERM):
@@ -136,5 +143,5 @@ class AgentRunner:
             ticks += 1
             if self._stop or (max_ticks is not None and ticks >= max_ticks):
                 break
-            time.sleep(backoff or self.config.poll_seconds)
+            self._stopping.wait(backoff or self.config.poll_seconds)
         return self.stats
