@@ -127,18 +127,22 @@ an `edit` parameter, the screen opens that edit's editor.
 **The editor.** A bar across the top — Resize, Export, Save, and how the
 last save went — tools down the left, the picture in the middle, panels
 on the right: the tool's options, the layers.
-- *Move* (V): press a layer to pick it, drag it, pull a piece's corners or
-  a text's corner to size it. The panel has the layer's own numbers —
-  words, size and colour; a mark's colour, width and how solid; a piece's
-  place — with Duplicate, Hide and Remove.
-- *Select* (M): drag a box on the picture. Copy takes what is in it; Paste
+- *Select* (V), the first tool and the one everything comes back to: press
+  a layer to pick it, drag it, pull a piece's corners or a text's corner to
+  size it. The panel has the layer's own numbers — words, size and colour;
+  a mark's colour, width and how solid; a piece's place — with Duplicate,
+  Hide and Remove.
+- *Move* (G): the chosen layer follows the hand wherever the picture is
+  pressed, for a stroke or a small piece that is hard to take hold of.
+- *Marquee* (M): drag a box on the picture. Copy takes what is in it; Paste
   (also ctrl+V, and the Paste tool) lays it on the picture as a piece, a
   little to the side; Crop to it crops the picture to the box.
 - *Crop* (C): the picture shows the crop box, to drag and resize, or to
   draw anew; a shape to hold it to (square, 4 : 3, 3 : 2, 16 : 9, tall);
   numbers; Keep all of it; Done.
 - *Text* (T): press on the picture to put words there, picked, with the
-  panel ready to take them.
+  panel ready to take them; the tool is Select again at once, so the next
+  press moves or sizes the words, or picks something else.
 - *Marker* (B): draw on the picture. The colour, the width (fine, medium,
   thick) and the style (a pen, or a see-through highlighter) are the
   panel's; each stroke is a layer.
@@ -156,8 +160,8 @@ on the right: the tool's options, the layers.
 - *Save*: on the bar; asks whether to write over the photo or save as a
   new file by name, and the bar says the status and message as they
   change; done, Open shows the file. Export, when the screen has one, is
-  there too. Delete takes the chosen layer off; Escape goes back to Move,
-  then lets go. A screen without `layers` offers no Text, Marker or Paste.
+  there too. Delete takes the chosen layer off; Escape goes back to Select,
+  then lets go — it never leaves the editor. A screen without `layers` offers no Text, Marker or Paste.
 
 **Web and phone.** The picture is a canvas: the server's large copy of the
 photo (`/thumb`, so a phone's HEIC needs no plug-in and a big photo comes

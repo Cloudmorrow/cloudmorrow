@@ -93,7 +93,8 @@
 .ph-stage canvas { display: block; width: 100%; height: 100%; }
 .ph-over { position: absolute; inset: 0; touch-action: none; }
 .ph-over[data-tool="marker"] { cursor: crosshair; }
-.ph-over[data-tool="select"], .ph-over[data-tool="crop"] { cursor: crosshair; }
+.ph-over[data-tool="marquee"], .ph-over[data-tool="crop"] { cursor: crosshair; }
+.ph-over[data-tool="move"] { cursor: move; }
 .ph-over[data-tool="text"] { cursor: text; }
 .ph-stage-words {
   position: absolute;

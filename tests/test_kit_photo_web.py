@@ -59,8 +59,11 @@ def test_it_never_opens_a_browser_window():
 def test_the_tools_the_save_and_the_source():
     code = js_code(PHOTO_JS)
     # The five tools, and the turns beside them.
-    for tool in ("move", "select", "crop", "text", "marker"):
+    for tool in ("select", "move", "marquee", "crop", "text", "marker"):
         assert f'["{tool}", ' in code, tool
+    # Select is first and the one everything comes back to; words laid hand back to it.
+    assert 'const HOME = "select"' in code and "tool: HOME," in code
+    assert "if (ed.tool !== HOME) setTool(ed, HOME);\n    const words" in code
     # The source is the server's large copy; the saved file opens through a media link.
     assert "/thumb?size=" in code and "const LARGE = 2048" in code
     assert 'recordsUrl("file", fileId, "/media")' in code
@@ -79,7 +82,7 @@ def test_a_drag_is_held_by_the_overlay_and_the_marker_meets_no_box():
     stays; a press on the whole-picture crop box draws a new crop; the Marker
     tool draws no layer box to get in the way of a stroke."""
     code = js_code(PHOTO_JS)
-    drag = code[code.index("function dragBox(ed, el, event)") : code.index("const r2 = ")]
+    drag = code[code.index("function dragBox(ed, what, event, handle)") : code.index("const r2 = ")]
     assert "over.setPointerCapture(event.pointerId)" in drag and "el.setPointerCapture" not in drag
     assert 'over.addEventListener("pointermove", move)' in drag and "el.addEventListener" not in drag
     for name in ("rubberBand", "drawStroke"):

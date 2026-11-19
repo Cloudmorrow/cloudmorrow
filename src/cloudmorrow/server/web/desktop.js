@@ -54,14 +54,15 @@ addEventListener("keydown", (event) => {
   if (event.metaKey || event.ctrlKey || event.altKey) return;
 
   // Escape is the only one that answers while you are writing, and all it
-  // does is put the field down. The editors save on their own, so there
-  // is nothing to lose by pressing it.
+  // does is put the field down. It closes a sheet; it never leaves a screen
+  // — an editor's Escape is its own (back to its first tool, let go of what
+  // is held), and nobody loses their place in an app to a stray key.
   if (event.key === "Escape") {
     if (document.querySelector(".sheet-backdrop .sheet-row.cancel")) {
       click(".sheet-backdrop .sheet-row.cancel");
     } else if (typing(document.activeElement)) {
       document.activeElement.blur();
-    } else if (!click(".nav [data-back]")) {
+    } else {
       return;
     }
     event.preventDefault();
