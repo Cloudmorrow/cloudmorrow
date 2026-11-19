@@ -132,7 +132,18 @@
 .quill-chip.installed { display: inline-flex; align-items: center; gap: 5px; }
 .quill-chip.installed svg { width: 10px; height: 9px; }
 .quill-chip.installed + .quill-chip { margin-left: 6px; }
-.catalog-search { margin: 4px 0 14px; }
+.catalog-search { margin: 4px 0 8px; }
+/* Leave out what is already here (quillsadmin.js). */
+.catalog-hide {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px 4px;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+.catalog-hide input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
 .quill-list .shelf[hidden], .quill-list .quill-row[hidden] { display: none; }
 .quill-list .quill-row.first-shown::before { display: none; }
 /* New to this server: the platform grows, so it is the platform's blue —

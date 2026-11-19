@@ -1275,7 +1275,9 @@ it says so in the log and tries again at the next start.
 
 **Me → Administration → Quills**: the catalog by category, with a search
 field above it that narrows the list as you type — by name, what it does,
-who made it or its shelf (`installed` finds the ones you have). A Quill
+who made it or its shelf (`installed` finds the ones you have), and
+**Hide installed Quills** under it to see only what you could add (the tick
+stays on that device). A Quill
 already on the server says **✓ Installed**, and **Update** beside it when
 the catalog has a newer release. A Quill's sheet
 says what it adds — datamodels, screens, jobs, and whether it runs code —

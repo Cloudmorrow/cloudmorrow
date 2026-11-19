@@ -196,13 +196,17 @@
     gap: 10px;
     margin-top: auto;
     padding: 12px 12px calc(10px + var(--bottom));
-    margin-bottom: calc(-12px - var(--bottom));
     border-top: 1px solid var(--line);
     background: var(--bar);
     color: var(--bar-muted);
     font-size: 13px;
     text-align: left;
   }
+  /* The bar is the rail's foot, so the rail has no padding under it (a
+     sticky bar stops at that padding's edge and would cover the last app);
+     the last app keeps its room above the bar instead. */
+  .tabs:has(> .rail-search) { padding-bottom: 0; }
+  .tabs > :has(+ .rail-search) { margin-bottom: 12px; }
   .tabs .rail-search > svg { flex: none; }
   .tabs .rail-search:hover { color: var(--bar-ink); }
   :root.rail-folded .tabs .rail-search { justify-content: center; padding-left: 0; padding-right: 0; }
