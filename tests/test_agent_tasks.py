@@ -125,3 +125,25 @@ def test_config_roundtrip(tmp_path):
     assert loaded.agent_token == "bca_1"
     assert loaded.allow_shell is True
     assert "shell" in loaded.capabilities
+
+
+def test_a_stop_cuts_the_backoff_short() -> None:
+    """SIGTERM during a five-minute backoff must end the loop at once, or
+    systemd waits 90 seconds and kills it, and a sign-in that restarts the
+    agent waits along with it."""
+    import threading
+    import time as _time
+
+    from cloudmorrow.agent.client import AgentApiError
+    from cloudmorrow.agent.runner import AgentRunner
+
+    class Failing:
+        def heartbeat(self, *_: object) -> None:
+            raise AgentApiError("Internal Server Error")
+
+    config = AgentConfig(server_url="https://x/", agent_token="bca_1", poll_seconds=300)
+    runner = AgentRunner(config, client=Failing())
+    threading.Timer(0.2, runner.stop).start()
+    started = _time.monotonic()
+    runner.run_forever()
+    assert _time.monotonic() - started < 5
