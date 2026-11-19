@@ -15,15 +15,17 @@
 
    The editor is laid out as a simple picture program: a bar across the
    top with Resize, Export and Save (and how the last save went), the tools
-   down the left (Move, Select, Crop, Text, Marker, and the turns), the
-   picture in the middle on a dark ground, and on the right the tool's
+   down the left (Select, Move, Marquee, Crop, Text, Marker, and the
+   turns), the picture in the middle on a dark ground, and on the right the tool's
    options and the layers, newest on top. The picture is a canvas the
    source is drawn on, turned and mirrored as the edit says, every layer on
    it in its order in the app's own font, and the crop either kept to or —
    with the Crop tool — shown as a box to move, the rest dimmed. A layer is
    picked by pressing it, dragged to where it should be, and sized by its
-   corners; the Marker draws strokes; Select draws a box to copy a piece of
-   the picture, which Paste lays on it as a layer, or to crop to. Resize
+   corners; the Marker draws strokes; Marquee draws a box to copy a piece
+   of the picture, which Paste lays on it as a layer, or to crop to. Select
+   is the tool one comes back to: Escape, Done, Paste, and words just laid
+   all hand back to it, so the next press picks and moves. Resize
    asks, in a sheet, what size the saved picture should be; Save asks
    whether to write over the photo or save as a new file; Export is the
    Quill's action with its form.
@@ -55,8 +57,9 @@ import {
 } from "./kit_photo_rules.js";
 
 const glyphs = {
+  select: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 2.5v13l3.4-3.2 2.3 5.2 2.6-1.2-2.3-5h4.8z"/></svg>',
   move: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v16M2 10h16"/><path d="m7 5 3-3 3 3M7 15l3 3 3-3M5 7l-3 3 3 3M15 7l3 3-3 3"/></svg>',
-  select: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 2.5"><rect x="3" y="3" width="14" height="14" rx="1.5"/></svg>',
+  marquee: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 2.5"><rect x="3" y="3" width="14" height="14" rx="1.5"/></svg>',
   crop: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 1.5V15h13.5M1.5 5H15v13.5"/></svg>',
   text: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5V3h12v2.5M10 3v14M7.5 17h5"/></svg>',
   marker: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 1-4 9.5-9.5a1.8 1.8 0 0 1 2.5 0l.5.5a1.8 1.8 0 0 1 0 2.5L7 16z"/><path d="m12 5 3 3M3 17h5"/></svg>',
@@ -84,8 +87,11 @@ const POLL = 3000;
 const WIDEST = 2048;             // the most pixels across the canvas draws
 const NEW_WORDS = "Your words";  // what a new text says until it is written
 const TOOLS = [
-  ["move", "Move", "V"], ["select", "Select", "M"], ["crop", "Crop", "C"], ["text", "Text", "T"], ["marker", "Marker", "B"],
+  ["select", "Select", "V"], ["move", "Move", "G"], ["marquee", "Marquee", "M"], ["crop", "Crop", "C"], ["text", "Text", "T"],
+  ["marker", "Marker", "B"],
 ];
+// The tool everything comes back to: Escape, Done, Paste, words just laid.
+const HOME = "select";
 const HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 // The tools that make layers: offered only when the screen has them.
 const LAYER_TOOLS = new Set(["text", "marker"]);
@@ -326,7 +332,7 @@ async function renderEditorFor(at, b, id) {
     turnedPic: null,             // the source turned and mirrored, as a canvas: what a piece is cut from
     turnedKey: "",
     sourceFile: null,            // the photo's file record: its name, for Save
-    tool: "move", ratio: "",
+    tool: HOME, ratio: "",
     selected: "",                // the layer being worked on
     selection: null,             // the Select tool's box, in percent of the picture
     stroke: null,                // a marker stroke being drawn: its points
@@ -653,8 +659,9 @@ function drawFootline(ed) {
   const sizes = (src ? `${src.w} × ${src.h}${out && (out.w !== src.w || out.h !== src.h) ? ` → ${out.w} × ${out.h}` : ""}` : "") +
     (how ? ` · ${how}` : "");
   const hints = {
-    move: "Press a layer to pick it; drag to move, pull a corner to size it.",
-    select: "Drag a box on the picture: Copy it, or Crop to it.",
+    select: "Press a layer to pick it; drag to move, pull a corner to size it.",
+    move: "Drag anywhere to move the chosen layer; press another to pick it.",
+    marquee: "Drag a box on the picture: Copy it, or Crop to it.",
     crop: "Drag the box or draw a new one; Done keeps it.",
     text: "Press on the picture to put words there.",
     marker: "Draw on the picture.",
@@ -675,7 +682,7 @@ function placeOverlay(ed) {
     ed.over.innerHTML = `<div class="ph-box crop" data-what="crop" style="${boxStyle(crop(ed), view)}">${ed.writes ? handles(HANDLES) : ""}</div>`;
     return;
   }
-  if (ed.tool === "select") {
+  if (ed.tool === "marquee") {
     ed.over.innerHTML = ed.selection
       ? `<div class="ph-box select" data-what="select" style="${boxStyle(ed.selection, view)}">${handles(HANDLES)}</div>` : "";
     return;
@@ -722,34 +729,33 @@ function wireOverlay(ed) {
     if (box) {
       // The crop box over the whole picture has nowhere to go: a press on it, off its handles, draws a new one.
       if (box.dataset.what === "crop" && !event.target.dataset.h && wholeFrame(crop(ed)) && ed.writes) rubberBand(ed, event, at, "crop");
-      else dragBox(ed, box, event);
+      else dragBox(ed, box.dataset.what, event, event.target.dataset.h || "");
       return;
     }
     if (ed.tool === "marker") { drawStroke(ed, event, at); return; }
-    if (ed.tool === "select") { rubberBand(ed, event, at, "select"); return; }
+    if (ed.tool === "marquee") { rubberBand(ed, event, at, "select"); return; }
     if (ed.tool === "crop") { if (ed.writes) rubberBand(ed, event, at, "crop"); return; }
     const hit = layerAt(ed, at.x, at.y);
     if (hit) {
       choose(ed, hit.id);
-      const again = ed.over.querySelector(".ph-box.layer");
-      if (again) dragBox(ed, again, event);
+      dragBox(ed, "layer", event, "");
       return;
     }
+    // Move: the chosen layer follows the hand, wherever it is pressed.
+    if (ed.tool === "move" && chosen(ed)) { dragBox(ed, "layer", event, ""); return; }
     if (ed.tool === "text") { addText(ed, at); return; }
     choose(ed, "");
   });
 }
 
-/** A box held: moved, or sized by a handle. The crop, the selection, or the chosen layer. */
-function dragBox(ed, el, event) {
-  const what = el.dataset.what;
+/** A box held: moved, or sized by *handle*. The crop, the selection, or the chosen layer. */
+function dragBox(ed, what, event, handle) {
   const layer = what === "layer" ? chosen(ed) : null;
   const may = what === "crop" ? ed.writes : what === "select" ? true : ed.writesLayers && !!layer;
   if (!may) return;
   event.preventDefault();
   const over = ed.over;
   over.setPointerCapture(event.pointerId);
-  const handle = event.target.dataset.h || "";
   const rect = ed.stage.getBoundingClientRect();
   const view = viewOf(ed);
   const pic = picture(ed);
@@ -889,7 +895,7 @@ function setTool(ed, tool) {
   if (tool === "crop" && !ed.writes) return;
   if (LAYER_TOOLS.has(tool) && !ed.b.layers) return;
   ed.tool = tool;
-  if (tool !== "select") ed.selection = null;
+  if (tool !== "marquee") ed.selection = null;
   for (const button of ed.root.querySelectorAll(".ph-tool[data-tool]")) {
     button.setAttribute("aria-pressed", String(button.dataset.tool === tool));
   }
@@ -924,11 +930,15 @@ function addLayer(ed, fields, then = null) {
   });
 }
 
-/** Words on the picture — where it was pressed, or in a corner — picked, the panel ready. */
+/** Words on the picture — where it was pressed, or in a corner — picked,
+    the panel ready to take them, and the tool back to Select: the next
+    press moves or sizes them, or picks something else, rather than laying
+    more words. */
 function addText(ed, at = null) {
   if (!ed.writesLayers) return;
   const where = at ? { x: r2(at.x), y: r2(at.y) } : { x: TEXT_AT.x, y: clamp(TEXT_AT.y + ed.layers.length * TEXT_SIZE * 1.4, 0, 90) };
   addLayer(ed, { kind: "text", text: NEW_WORDS, ...where, size: TEXT_SIZE, colour: TEXT_COLOUR }, () => {
+    if (ed.tool !== HOME) setTool(ed, HOME);
     const words = ed.root.querySelector(".ph-words");
     if (words) { words.focus(); words.select(); }
   });
@@ -985,7 +995,7 @@ function paste(ed) {
   } else {
     addLayer(ed, copyOf(clipboard.fields));
   }
-  if (ed.tool !== "move") setTool(ed, "move");
+  if (ed.tool !== HOME) setTool(ed, HOME);
 }
 
 function duplicate(ed, layer) {
@@ -1048,8 +1058,9 @@ function wireKeys(ed) {
       return;
     }
     const keys = {
-      v: () => setTool(ed, "move"),
-      m: () => setTool(ed, "select"),
+      v: () => setTool(ed, "select"),
+      g: () => setTool(ed, "move"),
+      m: () => setTool(ed, "marquee"),
       c: () => setTool(ed, "crop"),
       t: () => setTool(ed, "text"),
       b: () => setTool(ed, "marker"),
@@ -1058,7 +1069,7 @@ function wireKeys(ed) {
       h: () => layer && setLayer(ed, layer, { hidden: !layer.hidden }),
       Delete: () => removeLayer(ed, layer),
       Backspace: () => removeLayer(ed, layer),
-      Escape: () => { if (ed.tool !== "move") setTool(ed, "move"); else choose(ed, ""); },
+      Escape: () => { if (ed.tool !== HOME) setTool(ed, HOME); else choose(ed, ""); },
     };
     const run = keys[event.key];
     if (!run) return;
@@ -1278,13 +1289,13 @@ function optionsPanel(ed, layer) {
   const title = TOOLS.find(([id]) => id === ed.tool)[1];
   let body = "";
   if (ed.tool === "crop") body = cropOptions(ed);
-  else if (ed.tool === "select") body = selectOptions(ed);
+  else if (ed.tool === "marquee") body = selectOptions(ed);
   else if (ed.tool === "marker") body = markerOptions();
   else if (ed.tool === "text" && !layer) {
     body = `<p class="ph-quiet">Press on the picture to put words there.</p>
       ${ed.writesLayers ? `<div class="ph-row-buttons"><button type="button" class="act-chip ph-add-text">${glyphs.text}<span>Add text</span></button></div>` : ""}`;
   }
-  if (layer && ed.tool !== "crop" && ed.tool !== "select") body += layerOptions(ed, layer);
+  if (layer && ed.tool !== "crop" && ed.tool !== "marquee") body += layerOptions(ed, layer);
   if (!body) body = `<p class="ph-quiet">Press a layer on the picture, or pick one in Layers.</p>`;
   return `<p class="group-label">${esc(title)}</p>${body}`;
 }
@@ -1376,7 +1387,7 @@ function layersPanel(ed) {
 function wireSide(ed, side, layer) {
   const on = (selector, type, fn) => { for (const el of side.querySelectorAll(selector)) el.addEventListener(type, fn); };
   // Crop.
-  on(".ph-crop-done", "click", () => setTool(ed, "move"));
+  on(".ph-crop-done", "click", () => setTool(ed, HOME));
   on(".ph-crop-reset", "click", () => saveCrop(ed, { x: 0, y: 0, w: 100, h: 100 }));
   on(".ph-ratio", "click", (event) => {
     ed.ratio = event.currentTarget.dataset.ratio;
@@ -1393,7 +1404,7 @@ function wireSide(ed, side, layer) {
   // Select.
   on(".ph-copy", "click", () => copySelection(ed));
   on(".ph-copy-paste", "click", () => { copySelection(ed); paste(ed); });
-  on(".ph-crop-to", "click", () => { if (ed.selection) { saveCrop(ed, fitBox(ed.selection, 5)); ed.selection = null; setTool(ed, "move"); } });
+  on(".ph-crop-to", "click", () => { if (ed.selection) { saveCrop(ed, fitBox(ed.selection, 5)); ed.selection = null; setTool(ed, HOME); } });
   on(".ph-unselect", "click", () => { ed.selection = null; placeOverlay(ed); drawSide(ed); });
   // Marker.
   on(".ph-marker-colour", "click", (event) => { marker.colour = event.currentTarget.dataset.colour; drawSide(ed); });
@@ -1437,7 +1448,7 @@ function wireSide(ed, side, layer) {
     const id = row.dataset.layer;
     const it = layerById(ed, id);
     row.querySelector(".ph-layer-pick").addEventListener("click", () => {
-      if (ed.tool === "crop" || ed.tool === "select") setTool(ed, "move");
+      if (ed.tool === "crop" || ed.tool === "marquee") setTool(ed, HOME);
       choose(ed, ed.selected === id ? "" : id);
     });
     row.querySelector(".ph-layer-eye").addEventListener("click", () => { if (it) { setLayer(ed, it, { hidden: !it.hidden }); placeOverlay(ed); drawSide(ed); } });
