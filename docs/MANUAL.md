@@ -826,11 +826,10 @@ lists, five per app, each in the app it belongs to. `↑` and `↓` pick, `Enter
 opens, `Esc` puts it away.
 
 The other keys are the ones already on the screen: `Esc` is the back button (or the
-field you are in), `n` is the pen beside the title
-(which opens the sheet that makes a new one: there is no line on the page to
-type a new one into),
-`j` and `k` — and the arrows, once the list has the keyboard — walk the rows,
-and `Enter` opens the one you are on.
+field you are in), the arrows walk the rows once the list has the keyboard,
+and `Enter` opens the one you are on. No letter is a key: a stray letter, or
+dictation that lands on the page rather than in a field, never makes or opens
+anything.
 
 None of it changes the phone: `desktop.css` is one media query, and the few
 rules outside it hide the parts that are only ever for the rail.

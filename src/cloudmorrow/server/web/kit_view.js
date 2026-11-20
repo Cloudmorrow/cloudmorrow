@@ -1152,7 +1152,6 @@ function openViewer(v, n, index, from) {
     if (event.key === "Escape") { event.preventDefault(); close(); }
     else if (event.key === "ArrowLeft") { event.preventDefault(); step(-1); }
     else if (event.key === "ArrowRight") { event.preventDefault(); step(1); }
-    else if (event.key === "f" || event.key === "F") { event.preventDefault(); whole(); }
   };
   const whole = () => {
     if (!box.requestFullscreen) return;

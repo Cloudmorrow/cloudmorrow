@@ -209,3 +209,13 @@ def test_search_opens_from_slash_ctrl_k_and_the_foot_of_the_rail() -> None:
     assert '@import "./search.css";' in (WEB / "app.css").read_text()
     # `/` is Search's now, not the screen's own filter.
     assert 'case "/"' not in (WEB / "desktop.js").read_text()
+
+
+def test_no_letter_is_a_key_on_the_page() -> None:
+    # A stray letter, or dictation landing on the page rather than in a
+    # field, must never make or open anything: "n" once made a sheet named
+    # after whatever was said next. `/` and Ctrl K (search.js) stay.
+    desktop = (WEB / "desktop.js").read_text()
+    assert not re.search(r'case "[a-zA-Z]"', desktop)
+    view = (WEB / "kit_view.js").read_text()
+    assert not re.search(r'event\.key === "[a-zA-Z]"', view)
