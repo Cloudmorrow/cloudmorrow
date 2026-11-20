@@ -102,7 +102,8 @@ class Chess:
 
 # -- what a game says ---------------------------------------------------------------
 def moves_of(fields: dict) -> list[str]:
-    return [str(m) for m in fields.get("moves") or []]
+    """The moves to draw: the computer's last kept back while it is still thinking it over."""
+    return ch.shown_moves(fields)
 
 
 def game_of(fields: dict) -> ch.Game:
@@ -170,6 +171,8 @@ def status(fields: dict, me: str, game: ch.Game | None = None) -> str:
     offered = str(fields.get("draw") or "")
     if offered and offered != me and side:
         return f"{offered} offers a draw"
+    if ch.thinking(fields):
+        return f"{name_of(fields, turn)} is thinking"
     if side and turn == side:
         return "Your move"
     return f"{name_of(fields, turn)} to move"

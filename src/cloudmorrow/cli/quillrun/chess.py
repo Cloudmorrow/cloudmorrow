@@ -124,7 +124,9 @@ async def _act_chess(
         colour = str(timing.get("colour") or "").strip().lower()
         if colour:
             offered = [v for v, _ in board.choices("colour")]
-            if offered and colour not in offered:
+            if not offered:
+                fail("the colours are the game's to choose here: they take turns from one game to the next")
+            if colour not in offered:
                 fail("--colour is " + ", ".join(offered))
             fields["colour"] = colour
         elif board.choices("colour"):

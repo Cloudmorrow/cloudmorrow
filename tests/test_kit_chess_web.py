@@ -183,3 +183,38 @@ def test_the_browser_clock_is_pythons(tmp_path):
     )
     assert left == {"w": 285_000, "b": 300_000}
     assert (short, long, said) == ("0:07.3", "1:01", "Black won on time")
+
+
+def test_the_board_is_heard_and_the_sound_can_be_switched_off(client):
+    sound = (WEB / "kit_chess_sound.js").read_text(encoding="utf-8")
+    assert client.get(f"/app/{asset_version()}/kit_chess_sound.js").status_code == 200
+    code = js_code(CHESS_JS)
+    # Woken by a press (a browser plays nothing before one), heard for every move made or seen arriving.
+    assert "wake();" in code and "play(kindOf(" in code and 'play("end")' in code
+    # Made here, no files; the choice is the browser's own, kept where a private window may refuse it.
+    assert "AudioContext" in sound and ".mp3" not in sound and ".wav" not in sound
+    assert "try { localStorage.setItem" in sound
+
+
+def test_a_dragged_piece_put_back_does_not_slide_from_a_corner():
+    code = js_code(CHESS_JS)
+    # The piece follows the pointer from where it stands, and is put back without a slide.
+    assert "translate(${event.clientX - d.middle.x}px" in code
+    assert 'd.el.classList.add("still")' in code
+    assert "left: 0; top: 0" not in CHESS_CSS
+
+
+@node
+def test_the_browser_keeps_a_computers_move_back_as_python_does(tmp_path):
+    fields = {
+        "computer": "black",
+        "moves": ["e2e4", "e7e5", "g1f3", "b8c6"],
+        "answer_at": "2026-11-20T10:00:03Z",
+        "clock": 300,
+        "white_left": 290_000,
+        "black_left": 280_000,
+        "turn_at": "2026-11-20T10:00:03Z",
+    }
+    early = 1_795_168_802_000  # 10:00:02Z
+    (left,) = run(tmp_path, ["timeLeft", fields, early])
+    assert left == {"w": 290_000, "b": 281_000}
