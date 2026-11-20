@@ -77,6 +77,7 @@ installer or under Administration.
 | **Productivity** | **Tasks**: boards with three lanes. **Calendar**: your own calendar, the shared ones and everybody's drawn together, and calendars subscribed from elsewhere by their address. **Cells**: small spreadsheets, formulas included, that read and write Excel. **Docs**: a basic Word over `.docs` files and Word's own. |
 | **Communication** | **Channels**: a team's conversations with threads, mentions, reactions and push. **Messages**: conversations with one person or several. **Mail**: an inbox for everybody, name@your-cloud between you and your own domain to the world. **Slack**: a Channel and a Slack channel as one conversation. |
 | **Creative** | **Media**: every photo and video in your drive as a wall, filtered and starred. **Clipper**: a video editor on the timeline kit. **Retouch**: a photo editor: crop, turn, resize, write on it. |
+| **Games** | **Chess**: against the people on your cloud, or Morrow, who goes up a level each time you beat him; no limit, 10 or 5 minutes on the clock. |
 | **Business** | **CRM**: organisations, people, a pipeline of deals, and what to do next. |
 | **Developer** | **Secrets**: keys and passwords in sealed vaults, handed to a program with no file at all. **DevProject**: your software projects, with their `.env` secrets on every machine. |
 
@@ -85,7 +86,7 @@ And what the server itself brings, whichever Quills are on it:
 | | |
 | --- | --- |
 | **Three ways in** | A web app made for the phone, the same app grown up for a laptop browser with a rail that folds, and a terminal app you can use with a mouse. One kit draws every Quill on all of them, on the command line as `cm <quill>`, and as tools for an assistant. Nobody writes three screens. |
-| **The kit** | List, board, calendar, grid, editor, document, sheet, thread, timeline, gallery, photo, data, and a view a Quill's code draws from primitives. Every row has the same right-click menu, every form the same fields, and an action that takes a while says so on its button. Pictured, element by element, in [docs/KIT.md](docs/KIT.md). |
+| **The kit** | List, board, calendar, grid, editor, document, sheet, thread, timeline, gallery, photo, chess, data, and a view a Quill's code draws from primitives. Every row has the same right-click menu, every form the same fields, and an action that takes a while says so on its button. Pictured, element by element, in [docs/KIT.md](docs/KIT.md). |
 | **People** | Accounts with a photo, a display name and a language; circles that say who may use which data; roles that say who is responsible. Me holds your photo, your favorites, your Quill switches and your devices. |
 | **Spelling** | The cloud's own spellchecker, in a document and a note, with the dictionaries you pick from the catalog: seventeen languages, nothing sent anywhere. |
 | **Told, not polled** | A bell in every app, Web Push to a phone's home screen and a computer's browser, a count on the icon. The apps hear the server: "updating" while it restarts, the menu changing as Quills come and go. |
@@ -156,7 +157,8 @@ Making Quills:
 - [docs/DOCS.md](docs/DOCS.md), [docs/CELLS.md](docs/CELLS.md),
   [docs/TIMELINE.md](docs/TIMELINE.md), [docs/PHOTO.md](docs/PHOTO.md): the
   document, sheet, timeline and photo kits, each a file format and an
-  editor on every surface.
+  editor on every surface; [docs/CHESS.md](docs/CHESS.md), the chess kit,
+  a board with clocks.
 
 Why it is like this:
 

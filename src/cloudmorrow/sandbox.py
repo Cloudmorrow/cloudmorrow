@@ -61,7 +61,7 @@ MEMORY_LIMIT = 256 * 1024 * 1024
 START_TIMEOUT = 30.0
 CALL_TIMEOUT = 15.0
 
-SDK_FILES = ("__init__.py", "context.py", "dispatch.py", "effects.py", "guest.py", "registry.py", "ui.py")
+SDK_FILES = ("__init__.py", "chess.py", "context.py", "dispatch.py", "effects.py", "guest.py", "registry.py", "ui.py")
 
 
 class SandboxError(RuntimeError):

@@ -239,6 +239,13 @@ with layers on it — words, marker strokes, pieces copied and pasted — and
 saved over the photo or beside it. It is a chapter of its own,
 [PHOTO.md](PHOTO.md).
 
+## A chess board
+
+A `chess` board is games between the people on a cloud, or against a
+computer the Quill plays: the board seen from above, the pieces moved by
+a press or a drag, the clocks, the moves, resign and draw. It is a
+chapter of its own, [CHESS.md](CHESS.md).
+
 ## Views: a screen of your own
 
 When the kit cannot say it, a screen names a handler in the Quill's code,
@@ -341,6 +348,7 @@ the same as the kit's own, for records a view has worked out itself.
 | a look at every record | `data` |
 | video to cut | `timeline` |
 | a photo to crop, turn, resize, draw and write on, with layers | `photo` |
+| games of chess, with a clock | `chess` |
 | numbers to sum up, a page that is several of the above, a list beside what is open in it | a `view`: `stat`, `table`, `rows`, `cards`, `split` |
 
 When none of these says what your Quill needs, the kit grows — for every

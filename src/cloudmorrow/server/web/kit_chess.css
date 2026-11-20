@@ -1,0 +1,252 @@
+/* The kit's chess board (kit_chess.js): a flat board seen from above, green
+   and cream, the pieces flat on it; the players and their clocks above and
+   below it; the moves and the buttons beside it on a computer, under it on
+   a phone. The board's colours are the board's own, the same light or dark. */
+
+.kit-chess {
+  --cg-light: #ecedd3;
+  --cg-dark: #7a9a58;
+  --cg-last: rgba(247, 236, 92, .55);
+  --cg-chosen: rgba(247, 236, 92, .75);
+  --cg-hint: rgba(20, 30, 10, .22);
+}
+
+/* -- the games ------------------------------------------------------------------ */
+.cg-row { gap: 12px; }
+.cg-row-board { flex: none; width: 44px; height: 44px; border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 1px var(--line); }
+.cg-thumb { display: block; width: 100%; height: 100%; }
+.cg-thumb-light { fill: #ecedd3; }
+.cg-thumb-dark { fill: #7a9a58; }
+.cg-row.current { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.cg-row.current .title { color: var(--accent); }
+.cg-standing { margin-right: 6px; color: var(--muted); }
+.cg-standing.yours { color: var(--action); font-weight: 600; }
+.cg-level {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--card-2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  vertical-align: 2px;
+}
+
+/* -- the board -------------------------------------------------------------------- */
+.cg-stage { min-width: 0; }
+.cg-play { display: flex; flex-direction: column; gap: 6px; }
+.cg-board {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, .35);
+}
+.cg-squares { position: absolute; inset: 0; display: grid; grid-template: repeat(8, 1fr) / repeat(8, 1fr); }
+.cg-sq { position: relative; }
+.cg-sq.light { background: var(--cg-light); }
+.cg-sq.dark { background: var(--cg-dark); }
+.cg-sq.last::after, .cg-sq.selected::after { content: ""; position: absolute; inset: 0; background: var(--cg-last); }
+.cg-sq.selected::after { background: var(--cg-chosen); }
+.cg-sq.check { background-image: radial-gradient(circle, rgba(255, 40, 40, .95) 0%, rgba(230, 30, 30, .6) 40%, rgba(200, 0, 0, 0) 72%); }
+.cg-sq.over { box-shadow: inset 0 0 0 4px rgba(255, 255, 255, .7); }
+.cg-rank, .cg-file {
+  position: absolute;
+  z-index: 1;
+  font-family: var(--display);
+  font-size: clamp(9px, 1.6vmin, 13px);
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+.cg-rank { top: 4%; left: 5%; }
+.cg-file { right: 5%; bottom: 4%; }
+.cg-sq.light .cg-rank, .cg-sq.light .cg-file { color: var(--cg-dark); }
+.cg-sq.dark .cg-rank, .cg-sq.dark .cg-file { color: var(--cg-light); }
+
+.cg-marks, .cg-pieces { position: absolute; inset: 0; pointer-events: none; }
+.cg-mark {
+  position: absolute;
+  left: calc(var(--col) * 12.5%);
+  top: calc(var(--row) * 12.5%);
+  width: 12.5%;
+  height: 12.5%;
+  z-index: 2;
+}
+.cg-mark.cg-dot::before {
+  content: "";
+  position: absolute;
+  inset: 36%;
+  border-radius: 50%;
+  background: var(--cg-hint);
+}
+.cg-mark.cg-ring::before {
+  content: "";
+  position: absolute;
+  inset: 3%;
+  border-radius: 50%;
+  border: solid var(--cg-hint);
+  border-width: calc(min(100vw, 100dvh) * .006 + 3px);
+}
+.cg-piece {
+  position: absolute;
+  left: calc(var(--col) * 12.5%);
+  top: calc(var(--row) * 12.5%);
+  width: 12.5%;
+  height: 12.5%;
+  z-index: 3;
+  transition: left .18s ease-out, top .18s ease-out;
+}
+.cg-piece.still { transition: none; }
+.cg-piece.dragging { left: 0; top: 0; z-index: 9; transition: none; filter: drop-shadow(0 6px 6px rgba(0, 0, 0, .35)); }
+.cg-piece .cg-art { display: block; width: 100%; height: 100%; }
+.cg-board.movable .cg-sq { cursor: pointer; }
+
+/* What a pawn at the end becomes: four pieces in a column from that square. */
+.cg-promo {
+  position: absolute;
+  left: calc(var(--col) * 12.5%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  width: 12.5%;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, .5);
+  overflow: hidden;
+}
+.cg-promo.down { top: 0; }
+.cg-promo.up { bottom: 0; flex-direction: column-reverse; }
+.cg-promo button { aspect-ratio: 1; padding: 6%; background: #fff; }
+.cg-promo button:hover { background: #e8eedc; }
+.cg-promo .cg-art { width: 100%; height: 100%; }
+.cg-promo .cg-promo-x { aspect-ratio: auto; height: 28px; color: #555; background: #f1f1ec; }
+
+/* -- the players --------------------------------------------------------------------- */
+.cg-bar { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.cg-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: var(--card-2);
+  color: var(--ink);
+  font-family: var(--display);
+  font-weight: 700;
+  overflow: hidden;
+}
+.cg-avatar.white { background: #e9e9e2; color: #2b2b2b; }
+.cg-avatar.black { background: #3a3a3a; color: #f0f0ea; }
+.cg-avatar.computer { background: var(--cg-dark, #7a9a58); }
+.cg-avatar .cg-art { width: 30px; height: 30px; }
+.cg-who { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.cg-name { font-family: var(--display); font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cg-line { color: var(--muted); font-size: 13px; }
+.cg-taken { display: flex; align-items: center; min-height: 16px; }
+.cg-small { width: 16px; height: 16px; margin-right: -5px; }
+.cg-ahead { margin-left: 9px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.cg-clock {
+  flex: none;
+  min-width: 92px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--muted);
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.cg-clock.running { background: #f4f4ee; color: #1b1b1b; }
+.cg-clock.low { color: var(--bad); }
+.cg-clock.running.low { background: #ffd9de; color: #b0102a; }
+
+/* -- beside the board: what is happening, the moves, the buttons ----------------------- */
+.cg-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cg-status { margin: 0; font-family: var(--display); font-size: 18px; font-weight: 600; }
+.cg-status.yours { color: var(--action); }
+.cg-status.over { color: var(--accent); }
+.cg-moves { overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.cg-moves ol { margin: 0; padding: 4px 0; list-style: none; }
+.cg-moves li { display: grid; grid-template-columns: 38px 1fr 1fr; align-items: center; }
+.cg-moves li:nth-child(even) { background: color-mix(in srgb, var(--card-2) 60%, transparent); }
+.cg-n { padding-left: 10px; color: var(--muted); font-size: 13px; }
+.cg-move { padding: 4px 8px; border-radius: 4px; text-align: left; font-weight: 600; font-size: 15px; }
+.cg-move.now { background: var(--fill); color: var(--fill-ink); }
+.cg-none { margin: 0; padding: 12px; color: var(--muted); font-size: 14px; }
+.cg-steps { display: flex; gap: 6px; }
+.cg-steps:empty { display: none; }
+.cg-step { flex: 1; min-height: 34px; padding: 0; font-size: 20px; }
+.cg-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.cg-buttons:empty { display: none; }
+.cg-buttons .act-button { flex: 1; }
+
+/* -- the new game sheet ----------------------------------------------------------------- */
+.cg-opponents {
+  display: flex;
+  flex-direction: column;
+  margin: 0 12px 12px;
+  max-height: 40dvh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.cg-opponent { display: flex; align-items: center; gap: 12px; padding: 8px 12px; text-align: left; }
+.cg-opponent + .cg-opponent { border-top: 1px solid var(--line); }
+.cg-opponent.active { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.cg-opponent.active .cg-name { color: var(--accent); }
+.cg-sheet .segments { margin-left: 12px; margin-right: 12px; }
+.cg-sheet .group-label { margin-left: 12px; }
+
+/* -- a phone: the board edge to edge, the rest under it ------------------------------------ */
+.kit-chess.phone { padding: 0 0 calc(16px + var(--bottom, 0px)); }
+.kit-chess.phone .cg-play { gap: 4px; }
+.kit-chess.phone .cg-bar { padding: 0 12px; }
+.kit-chess.phone .cg-board { border-radius: 0; box-shadow: none; }
+.kit-chess.phone .cg-side { padding: 10px 12px 0; }
+.kit-chess.phone .cg-moves { max-height: 168px; }
+.kit-chess.phone .cg-clock { min-width: 80px; font-size: 20px; }
+.kit-chess .empty { margin-top: 40px; }
+
+/* -- side by side, on a computer -------------------------------------------------------- */
+@media (min-width: 900px) and (min-height: 600px) {
+  #app:has(main.kit-chess.split) { --column: 1500px; }
+  main.kit-chess.split {
+    display: grid;
+    grid-template-columns: minmax(250px, 320px) 1fr;
+    padding: 0 16px;
+  }
+  .split .cg-games {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0 16px 24px 0;
+    border-right: 1px solid var(--line);
+  }
+  .split .cg-stage {
+    container-type: inline-size;
+    min-width: 0;
+    padding: 12px 0 24px 24px;
+  }
+  .split .cg-room { display: flex; justify-content: center; align-items: flex-start; gap: 24px; }
+  .split .cg-play { flex: none; width: min(calc(100cqw - 304px), calc(100dvh - 190px), 760px); }
+  .split .cg-side { flex: none; width: 280px; align-self: stretch; max-height: min(calc(100dvh - 130px), 860px); }
+  .split .cg-moves { flex: 1; min-height: 120px; }
+  .split .cg-pick { margin: 18vh auto 0; }
+}
+/* A narrow column on a computer: the moves and buttons under the board. */
+@container (max-width: 780px) {
+  .split .cg-room { flex-direction: column; align-items: center; gap: 12px; }
+  .split .cg-play, .split .cg-side { width: min(100cqw, calc(100dvh - 190px)); }
+  .split .cg-side { align-self: center; max-height: none; }
+  .split .cg-moves { flex: none; max-height: 180px; }
+}

@@ -43,6 +43,7 @@ KIT = (
     "document",
     "timeline",
     "photo",
+    "chess",
     "view",
     "data",
 )
@@ -62,6 +63,7 @@ KIT_READY = frozenset(
         "thread",
         "timeline",
         "photo",
+        "chess",
         "view",
         "data",
     }

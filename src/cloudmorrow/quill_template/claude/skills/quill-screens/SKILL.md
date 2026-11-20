@@ -28,6 +28,7 @@ surface. Reach for a **view** only when no kit element says it.
 | files | `kit = "grid"` |
 | editing video: clips on video and audio tracks, cut, moved, blurred, exported | `kit = "timeline"` (docs/TIMELINE.md in the Cloudmorrow repository) |
 | editing a photo like a simple picture program: turned, mirrored, cropped, resized, layers of words, marker strokes and pasted pieces, saved over it or beside it | `kit = "photo"` (docs/PHOTO.md in the Cloudmorrow repository) |
+| games of chess between people, or against a computer the Quill plays, with a clock | `kit = "chess"` (docs/CHESS.md in the Cloudmorrow repository) |
 | a summary, a dashboard, numbers, a mix of the above, a record's own page | a **view** |
 
 Every element and the primitives that draw records are pictured, on a phone

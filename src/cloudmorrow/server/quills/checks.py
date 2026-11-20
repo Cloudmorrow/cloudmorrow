@@ -133,6 +133,8 @@ def _check_bindings(manifest: Manifest, models: dict[str, Datamodel]) -> None:
             _check_timeline(manifest, screen, model, model_of, thing, need, where)
         elif kit == "photo":
             _check_photo(manifest, screen, model, model_of, thing, need, where)
+        elif kit == "chess":
+            _check_chess(manifest, screen, model, model_of, thing, need, where)
         elif kit == "sheet":
             # A spreadsheet over `.cell` files: a title, and `cells`, the
             # text field the file's text is in (docs/CELLS.md); its pages
@@ -580,6 +582,49 @@ def _check_photo(manifest: Manifest, screen: dict, model: Datamodel, model_of, t
                 raise QuillError(f"{where}: {thing} {binding} names one of its actions on {model.id}")
     if screen.get("save"):
         _check_save(manifest, screen, model, thing, where)
+
+
+# A chess board's datamodels carry the kit's own field names (docs/CHESS.md):
+# (field, kinds, required).
+CHESS_GAME = (
+    ("white", ("string",), True),
+    ("black", ("string",), True),
+    ("moves", ("json",), True),
+    ("computer", ("string", "enum"), False),
+    ("level", ("int",), False),
+    ("clock", ("int",), False),
+    ("white_left", ("int",), False),
+    ("black_left", ("int",), False),
+    ("turn_at", ("datetime",), False),
+    ("result", ("string", "enum"), False),
+    ("reason", ("string", "enum"), False),
+    ("draw", ("string",), False),
+)
+CHESS_COMPUTER = (("name", ("string",), True), ("level", ("int",), False))
+
+
+def _check_chess(manifest: Manifest, screen: dict, model: Datamodel, model_of, thing: str, need, where: str) -> None:
+    """A chess board: the games, the action a move is played with, the one a game is started with."""
+    for name, kinds, required in CHESS_GAME:
+        if required or name in model.by_name:
+            need(model, f"{thing} game", name, kinds)
+    if screen.get("computers"):
+        computers = model_of(thing + " computers", screen["computers"])
+        for name, kinds, required in CHESS_COMPUTER:
+            if required or name in computers.by_name:
+                need(computers, f"{thing} computers", name, kinds)
+    actions = {a["id"]: a for a in manifest.actions}
+
+    def names(action: dict) -> set:
+        fields = action.get("fields") or {}
+        return {f["name"] for f in fields} if isinstance(fields, list) else set(fields)
+
+    play = actions.get(screen.get("play") or "")
+    if play is None or play.get("on") != model.id or "move" not in names(play):
+        raise QuillError(f"{where}: {thing} play names one of its actions on {model.id}, with a field move")
+    start = actions.get(screen.get("start") or "")
+    if start is None or start.get("on") or "opponent" not in names(start):
+        raise QuillError(f"{where}: {thing} start names one of its actions on no record, with a field opponent")
 
 
 def runs_code(manifest: Manifest) -> list[str]:

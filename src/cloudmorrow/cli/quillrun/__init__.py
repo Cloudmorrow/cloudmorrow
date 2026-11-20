@@ -105,6 +105,16 @@ start of its id, a text on it by its words or the start of its id:
     cm retouch save Beach              # over the photo (the old one goes to the Trash)
     cm retouch save Beach "Beach edited.jpg"   # as a new file beside it
 
+A `chess` board is games; a game is named by its name or the start of its
+id, an opponent by their username or a computer's name:
+
+    cm chess list                      # the games, the one moved in last first
+    cm chess new sara --clock 5m --colour white   # or Morrow; --clock none, 5m, 10m
+    cm chess show 8f2c                 # the board, the clocks, the moves
+    cm chess move 8f2c Nf3             # or g1f3, O-O, exd5, e8=Q
+    cm chess draw 8f2c                 # offer one, or take the one offered
+    cm chess resign 8f2c
+
 A `list` that binds `vault` is projects: folders on your machines, each
 with a git repository and .env files kept in its vault (checkout.py):
 
@@ -128,7 +138,7 @@ print as text:
 `cm tasks` works without the CLI knowing, when it starts, what is installed.
 
 Each kind of screen is a module of its own, as the TUI's are panes/kit_*:
-board, grouped (a list), calendar, editor, cells (a sheet), grid, thread, timeline and photo, with records
+board, grouped (a list), calendar, editor, cells (a sheet), grid, thread, timeline, photo and chess, with records
 for what a board, a list and a calendar share, screen for what they all do,
 and actions for a Quill's own code.
 """
@@ -146,6 +156,8 @@ from cloudmorrow.cli.common import client, console, emit, fail, out, run  # noqa
 from cloudmorrow.cli.quillrun.actions import _list_actions, _press, _view
 from cloudmorrow.cli.quillrun.board import _lane_named, _lanes  # noqa: F401
 from cloudmorrow.cli.quillrun.cells import _act_cells
+from cloudmorrow.cli.quillrun.chess import WORDS as CHESS_ONLY
+from cloudmorrow.cli.quillrun.chess import _act_chess
 from cloudmorrow.cli.quillrun.data import _act_data
 from cloudmorrow.cli.quillrun.docs import _act_docs
 from cloudmorrow.cli.quillrun.editor import _act_editor
@@ -172,6 +184,7 @@ TIMELINE_ONLY = ("cut", "trim", "rm", "frame", "export")
 PHOTO_ONLY = ("turn", "mirror", "crop", "size", "text", "picture", "save", "layers")
 # A document's word that no other screen has.
 DOCUMENT_ONLY = ("import",)
+# A chess board's words that no other screen has (list, show and move it shares): CHESS_ONLY, from chess.py.
 ACTIONS = (
     "list",
     "add",
@@ -191,6 +204,7 @@ ACTIONS = (
     *TIMELINE_ONLY,
     *PHOTO_ONLY,
     *DOCUMENT_ONLY,
+    *CHESS_ONLY,
     *PROJECT_WORDS,
 )
 
@@ -226,7 +240,11 @@ def main(
         str | None, typer.Option("--size", help="A photo's text: how tall, in percent of the picture.")
     ] = None,
     colour: Annotated[
-        str | None, typer.Option("--colour", "--color", help="A photo's text: a colour, as #rrggbb or a name.")
+        str | None,
+        typer.Option("--colour", "--color", help="A photo's text: a colour; a new chess game: white, black or random."),
+    ] = None,
+    clock: Annotated[
+        str | None, typer.Option("--clock", help="A new chess game: how long each side has, as none, 5m or 10m.")
     ] = None,
     path: Annotated[str, typer.Option("--path", help="Projects: the folder, instead of this one.")] = "",
     env: Annotated[str, typer.Option("--env", "-e", help="Projects' secrets: the environment, as local or prod.")] = "",
@@ -260,6 +278,7 @@ def main(
                     "out": out_file,
                     "size": size,
                     "colour": colour,
+                    "clock": clock,
                 },
                 local={"path": path, "env": env, "file": file, "force": force, "plain": plain},
             )
@@ -355,10 +374,15 @@ async def _act(
     if screen.kit == "photo":
         await _act_photo(api, screen, action, args, plain, timing or {})
         return
+    if screen.kit == "chess":
+        await _act_chess(api, screen, action, args, plain, timing or {})
+        return
     if action in TIMELINE_ONLY:
         fail(f"{action} is a timeline's; {screen.quill['id']} is a {screen.kit}")
     if action in PHOTO_ONLY:
         fail(f"{action} is a photo editor's; {screen.quill['id']} is a {screen.kit}")
     if action in DOCUMENT_ONLY:
         fail(f"{action} is a document's; {screen.quill['id']} is a {screen.kit}")
+    if action in CHESS_ONLY:
+        fail(f"{action} is a chess board's; {screen.quill['id']} is a {screen.kit}")
     await _act_records(api, screen, action, args, group, index, plain, days, reveal)

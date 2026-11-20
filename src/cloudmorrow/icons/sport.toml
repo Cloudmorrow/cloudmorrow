@@ -569,3 +569,22 @@ rows = [
   ".X..........",
   "............",
 ]
+
+[[icons]]
+id = "chess"
+name = "Chess"
+tags = ["chess", "knight", "game", "board game", "play"]
+rows = [
+  "............",
+  "....X.X.....",
+  "...XXXXX....",
+  "..XXXXXXX...",
+  ".XX.XXXXXX..",
+  "XXXXXXXXXX..",
+  "XXX..XXXXX..",
+  ".X..XXXXXX..",
+  "...XXXXXXX..",
+  "...XXXXXX...",
+  "..XXXXXXXX..",
+  "..XXXXXXXX..",
+]
