@@ -33,8 +33,9 @@ import { peopleList, run } from "./actions.js";
 import { ask, openSheet } from "./dialog.js";
 import { listenChanges } from "./changes.js";
 import {
-  clockText, DRAWN, Game, nameOf, PROMOTIONS, saidOf, timeLeft, uciOf, WHITE_WINS,
+  clockText, DRAWN, Game, nameOf, PROMOTIONS, saidOf, shownMoves, thinking, timeLeft, uciOf, WHITE_WINS,
 } from "./kit_chess_rules.js";
+import { kindOf, play, setSound, soundOn, wake } from "./kit_chess_sound.js";
 import { piece, pieceName, sprite, thumb } from "./kit_chess_pieces.js";
 
 const desk = () => matchMedia("(min-width: 900px) and (min-height: 600px)").matches;
@@ -250,7 +251,7 @@ function openBoard(s, stage, record) {
     s,
     record,
     fields: record.fields,
-    game: new Game(record.fields.moves || []),
+    game: new Game(shownMoves(record.fields)),
     mine: sideOf(record.fields),
     selected: -1,
     targets: [],
@@ -261,6 +262,7 @@ function openBoard(s, stage, record) {
     animate: null,          // {from, to} for the move to slide in
     drag: null,
     promo: null,
+    ended: !!record.fields.result,   // the end has been heard, or was before the game was opened
   };
   g.flipped = g.mine === "b";
   stage.innerHTML = `<div class="cg-room">
@@ -270,7 +272,7 @@ function openBoard(s, stage, record) {
       <div class="cg-bar bottom"></div>
     </div>
     <aside class="cg-side">
-      <p class="cg-status" role="status"></p>
+      <div class="cg-head"><p class="cg-status" role="status"></p><button class="cg-sound" aria-pressed="false"></button></div>
       <div class="cg-moves" aria-label="Moves"></div>
       <div class="cg-steps"></div>
       <div class="cg-buttons"></div>
@@ -278,8 +280,9 @@ function openBoard(s, stage, record) {
   g.root = stage;
   g.board = stage.querySelector(".cg-board");
   wireBoard(g);
+  wireSound(g);
+  holdBack(g);
   drawAll(g);
-  if (g.fields.computer && !g.fields.result && turnOf(g) !== g.mine && g.mine) g.thinking = true;
 
   const reload = async () => {
     try {
@@ -295,7 +298,7 @@ function openBoard(s, stage, record) {
   });
   const ticker = setInterval(() => tick(g), TICK);
   const poller = setInterval(() => { if (!feed.live && !g.pending) reload(); }, POLL);
-  live = { stop: () => { clearInterval(ticker); clearInterval(poller); feed.stop(); closePromo(g); } };
+  live = { stop: () => { clearInterval(ticker); clearInterval(poller); clearTimeout(g.held); feed.stop(); closePromo(g); } };
   holdUntilLeft();
 }
 
@@ -308,18 +311,31 @@ async function refreshList(s) {
   } catch { /* the next one */ }
 }
 
-/** A fresher copy of the game from the server: drawn, the newest move slid in. */
+/** The computer's move is kept back until the game says it is to be seen
+    (`answer_at`): until then it is thinking, its clock running; then the
+    move is played on the board, as if it had just been made. */
+function holdBack(g) {
+  clearTimeout(g.held);
+  const held = thinking(g.fields);
+  g.thinking = held > 0;
+  if (held) g.held = setTimeout(() => take(g, g.record), held + 20);
+}
+
+/** A fresher copy of the game from the server: drawn, the newest move slid in and heard. */
 function take(g, fresh) {
-  const before = (g.fields.moves || []).length;
+  const before = g.game.moves.length;
   g.record = fresh;
   g.fields = fresh.fields;
-  g.game = new Game(fresh.fields.moves || []);
-  g.thinking = false;
+  holdBack(g);
+  g.game = new Game(shownMoves(g.fields));
   const after = g.game.moves.length;
   if (after > before && after) {
     const last = g.game.moves[after - 1];
     g.animate = { from: last.from, to: last.to };
+    play(kindOf(g.game.sans[after - 1]));
   }
+  // The end is heard once, after the move that ended it.
+  if (g.fields.result && !g.thinking && !g.ended) { g.ended = true; setTimeout(() => play("end"), 250); }
   if (g.viewing !== null && g.viewing >= after) g.viewing = null;
   if (!g.fields.result) g.claimed = false;
   g.selected = -1;
@@ -331,7 +347,7 @@ function take(g, fresh) {
 
 const turnOf = (g) => g.game.turn;
 const isLive = (g) => !g.fields.result;
-const myTurn = (g) => isLive(g) && !!g.mine && turnOf(g) === g.mine && !g.pending && g.viewing === null;
+const myTurn = (g) => isLive(g) && !!g.mine && turnOf(g) === g.mine && !g.pending && !g.thinking && g.viewing === null;
 const shownPosition = (g) => g.game.positions[g.viewing === null ? g.game.positions.length - 1 : g.viewing];
 
 function drawAll(g) {
@@ -471,7 +487,7 @@ function tick(g, force = false) {
 function drawSide(g) {
   const f = g.fields;
   const status = g.root.querySelector(".cg-status");
-  let said = standing(g.s, f);
+  let said = g.thinking ? "" : standing(g.s, f);
   if (g.thinking || (g.pending && f.computer)) said = `${nameIn(g.s, f, g.mine === "w" ? "b" : "w")} is thinking…`;
   else if (isLive(g) && f.draw && f.draw !== me() && g.mine) said = `${nameIn(g.s, f, g.mine === "w" ? "b" : "w")} offers a draw`;
   else if (isLive(g) && f.draw === me()) said = "You offered a draw";
@@ -515,6 +531,24 @@ function drawSide(g) {
   if (again) again.addEventListener("click", () => rematch(g, again));
   const fresh = buttons.querySelector("[data-new]");
   if (fresh) fresh.addEventListener("click", () => newGame(g.s));
+}
+
+const SPEAKER = {
+  on: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5h3l4-3.5v12l-4-3.5H3z"/><path d="M13.5 7a4 4 0 0 1 0 6M15.8 4.8a7 7 0 0 1 0 10.4"/></svg>',
+  off: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5h3l4-3.5v12l-4-3.5H3z"/><path d="m13.5 7.5 5 5M18.5 7.5l-5 5"/></svg>',
+};
+
+function wireSound(g) {
+  const button = g.root.querySelector(".cg-sound");
+  const show = () => {
+    const on = soundOn();
+    button.innerHTML = on ? SPEAKER.on : SPEAKER.off;
+    button.setAttribute("aria-pressed", String(on));
+    button.setAttribute("aria-label", on ? "Sound on" : "Sound off");
+    button.title = on ? "Sound on" : "Sound off";
+  };
+  button.addEventListener("click", () => { setSound(!soundOn()); show(); if (soundOn()) play("move"); });
+  show();
 }
 
 const moveCell = (san, ply, at) =>
@@ -566,6 +600,7 @@ const own = (g, sq) => {
 function wireBoard(g) {
   const board = g.board;
   board.addEventListener("pointerdown", (event) => {
+    wake();
     if (event.button !== 0 || g.promo) return;
     const sq = squareFromPoint(g, event.clientX, event.clientY);
     if (sq < 0) return;
@@ -583,7 +618,10 @@ function wireBoard(g) {
     const again = g.selected === sq;
     choose(g, sq);
     const el = board.querySelector(`.cg-piece[data-sq="${sq}"]`);
-    g.drag = { from: sq, el, x: event.clientX, y: event.clientY, moved: false, again, id: event.pointerId };
+    const box = el ? el.getBoundingClientRect() : null;
+    // Where the pointer is on the piece: the piece's middle goes under the pointer as it is dragged.
+    const middle = box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : { x: event.clientX, y: event.clientY };
+    g.drag = { from: sq, el, x: event.clientX, y: event.clientY, middle, moved: false, again, id: event.pointerId };
     board.setPointerCapture(event.pointerId);
   });
   board.addEventListener("pointermove", (event) => {
@@ -591,11 +629,9 @@ function wireBoard(g) {
     if (!d || d.id !== event.pointerId) return;
     if (!d.moved && Math.hypot(event.clientX - d.x, event.clientY - d.y) < 4) return;
     d.moved = true;
-    const box = board.getBoundingClientRect();
-    const size = box.width / 8;
     if (d.el) {
       d.el.classList.add("dragging");
-      d.el.style.transform = `translate(${event.clientX - box.left - size / 2}px, ${event.clientY - box.top - size / 2}px)`;
+      d.el.style.transform = `translate(${event.clientX - d.middle.x}px, ${event.clientY - d.middle.y}px)`;
     }
     const over = squareFromPoint(g, event.clientX, event.clientY);
     for (const el of board.querySelectorAll(".cg-sq.over")) el.classList.remove("over");
@@ -610,7 +646,14 @@ function wireBoard(g) {
     g.drag = null;
     if (board.hasPointerCapture(event.pointerId)) board.releasePointerCapture(event.pointerId);
     for (const el of board.querySelectorAll(".cg-sq.over")) el.classList.remove("over");
-    if (d.el) { d.el.classList.remove("dragging"); d.el.style.transform = ""; }
+    // Put down where it was picked up: straight back, without sliding there.
+    if (d.el) {
+      d.el.classList.add("still");
+      d.el.classList.remove("dragging");
+      d.el.style.transform = "";
+      d.el.getBoundingClientRect();
+      d.el.classList.remove("still");
+    }
     if (!d.moved) {
       // A second press on the chosen piece lets it go.
       if (d.again && event.type === "pointerup") unchoose(g);
@@ -666,6 +709,7 @@ function closePromo(g) {
 async function send(g, move, slide) {
   const played = g.game.play(move);
   if (!played) return;
+  play(kindOf(g.game.sans[g.game.sans.length - 1]));
   g.selected = -1;
   g.targets = [];
   g.pending = true;
@@ -766,12 +810,13 @@ async function newGame(s, given = {}) {
   });
 }
 
-/** The same two again, the colours the other way round, the same clock. */
+/** The same two again, the same clock: the colours the other way round, or as the Quill decides. */
 function rematch(g, button) {
   const f = g.fields;
   const theirSide = g.mine === "w" ? "black" : "white";
   let opponent = g.mine === "w" ? f.black : f.white;
   const fields = { colour: g.mine === "w" ? "black" : "white" };
+  if (!fieldIn(g.s.b.start, "colour")) delete fields.colour;
   if (fieldIn(g.s.b.start, "clock")) fields.clock = String(f.clock || 0);
   button.disabled = true;
   const go = async () => {

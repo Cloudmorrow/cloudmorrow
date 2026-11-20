@@ -286,7 +286,24 @@ export class Game {
 }
 
 // -- the clock --------------------------------------------------------------------------------
-/** What each side has left, in milliseconds, at `now` — or null for a game with no clock. */
+/** How much longer, in milliseconds, the computer's last move is kept back (`answer_at`): 0 once it is shown. */
+export function thinking(fields, now = Date.now()) {
+  const moves = fields.moves || [];
+  const answer = fields.answer_at ? Date.parse(fields.answer_at) : NaN;
+  if (!fields.computer || !moves.length || Number.isNaN(answer)) return 0;
+  const last = moves.length % 2 === 1 ? "w" : "b";
+  if (last !== (fields.computer === "white" ? "w" : "b")) return 0;
+  return Math.max(0, answer - now);
+}
+
+/** The moves to draw now: all, but the computer's last while it is still thinking it over. */
+export function shownMoves(fields, now = Date.now()) {
+  const moves = (fields.moves || []).slice();
+  return thinking(fields, now) ? moves.slice(0, -1) : moves;
+}
+
+/** What each side has left, in milliseconds, at `now` — or null for a game with no clock.
+    While the computer's move is kept back, its clock is the one running. */
 export function timeLeft(fields, now = Date.now()) {
   if (!fields.clock) return null;
   const full = Number(fields.clock) * 1000;
@@ -294,10 +311,12 @@ export function timeLeft(fields, now = Date.now()) {
     w: fields.white_left != null ? Number(fields.white_left) : full,
     b: fields.black_left != null ? Number(fields.black_left) : full,
   };
+  const held = thinking(fields, now);
+  if (held && !fields.result) left[fields.computer === "white" ? "w" : "b"] += held;
   const since = fields.turn_at ? Date.parse(fields.turn_at) : NaN;
   if (Number.isNaN(since) || fields.result) return left;
   const side = (fields.moves || []).length % 2 === 0 ? "w" : "b";
-  left[side] = Math.max(0, left[side] - (now - since));
+  left[side] = Math.max(0, left[side] - Math.max(0, now - since));
   return left;
 }
 

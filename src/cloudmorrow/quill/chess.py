@@ -532,12 +532,41 @@ def _when(value) -> dt.datetime | None:
     return when if when.tzinfo else when.replace(tzinfo=dt.UTC)
 
 
+def _now(now: dt.datetime | None) -> dt.datetime:
+    now = now or dt.datetime.now(dt.UTC)
+    return now if now.tzinfo else now.replace(tzinfo=dt.UTC)
+
+
+def thinking(fields: dict, now: dt.datetime | None = None) -> int:
+    """How much longer, in milliseconds, the computer's last move is kept back: 0 when it is shown.
+
+    A computer works its move out at once, but is made to take a while over it,
+    as a person would: `answer_at` says when the move it made is to be seen."""
+    side = fields.get("computer")
+    moves = fields.get("moves") or []
+    answer = _when(fields.get("answer_at"))
+    if not side or not moves or answer is None:
+        return 0
+    last = "w" if len(moves) % 2 == 1 else "b"
+    if last != ("w" if side == "white" else "b"):
+        return 0
+    return max(0, int((answer - _now(now)).total_seconds() * 1000))
+
+
+def shown_moves(fields: dict, now: dt.datetime | None = None) -> list[str]:
+    """The moves to draw now: all of them, but the computer's last while it is still thinking it over."""
+    moves = [str(m) for m in fields.get("moves") or []]
+    return moves[:-1] if thinking(fields, now) else moves
+
+
 def time_left(fields: dict, now: dt.datetime | None = None) -> dict[str, int] | None:
     """What each side has left, in milliseconds, now — or None for a game with no clock.
 
     `white_left` and `black_left` are as of the last move; the side to move
     has been thinking since `turn_at`, which is empty until both sides have
-    moved once and after the game is over: the clock stands then."""
+    moved once and after the game is over: the clock stands then. While a
+    computer's move is still kept back (`thinking`), its clock is the one
+    running, down to what it will have left once the move is seen."""
     if not fields.get("clock"):
         return None
     full = int(fields["clock"]) * 1000
@@ -545,14 +574,15 @@ def time_left(fields: dict, now: dt.datetime | None = None) -> dict[str, int] | 
         "w": int(fields.get("white_left") if fields.get("white_left") is not None else full),
         "b": int(fields.get("black_left") if fields.get("black_left") is not None else full),
     }
+    now = _now(now)
+    held = thinking(fields, now)
+    if held and not fields.get("result"):
+        left["w" if fields.get("computer") == "white" else "b"] += held
     since = _when(fields.get("turn_at"))
     if since is None or fields.get("result"):
         return left
     side = "w" if len(fields.get("moves") or []) % 2 == 0 else "b"
-    now = now or dt.datetime.now(dt.UTC)
-    if now.tzinfo is None:
-        now = now.replace(tzinfo=dt.UTC)
-    left[side] = max(0, left[side] - int((now - since).total_seconds() * 1000))
+    left[side] = max(0, left[side] - max(0, int((now - since).total_seconds() * 1000)))
     return left
 
 

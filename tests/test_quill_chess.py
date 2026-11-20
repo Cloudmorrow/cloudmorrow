@@ -191,3 +191,29 @@ def test_a_game_with_a_field_of_the_wrong_kind_is_refused(tmp_path):
     registry = QuillRegistry(tmp_path / "quills", tmp_path / "datamodels")
     with pytest.raises(QuillError, match="'moves' is a string; it wants json"):
         registry.plan(folder, QUILL_CATALOG / "datamodels")
+
+
+# -- the computer taking its time ---------------------------------------------------------
+def test_a_computers_move_is_kept_back_until_its_answer_is_due():
+    at = dt.datetime(2026, 11, 20, 10, 0, 0, tzinfo=dt.UTC)
+    fields = {
+        "computer": "black",
+        "moves": ["e2e4", "e7e5", "g1f3", "b8c6"],
+        "answer_at": "2026-11-20T10:00:03Z",
+        "clock": 300,
+        "white_left": 290_000,
+        "black_left": 280_000,
+        "turn_at": "2026-11-20T10:00:03Z",
+    }
+    # A second before: his last move is not shown, he is thinking, his clock running down to what he will have.
+    early = at + dt.timedelta(seconds=2)
+    assert ch.thinking(fields, early) == 1000
+    assert ch.shown_moves(fields, early) == ["e2e4", "e7e5", "g1f3"]
+    assert ch.time_left(fields, early) == {"w": 290_000, "b": 281_000}
+    # Once it is due: the move is there, and the person's clock runs from then.
+    late = at + dt.timedelta(seconds=5)
+    assert ch.thinking(fields, late) == 0 and len(ch.shown_moves(fields, late)) == 4
+    assert ch.time_left(fields, late) == {"w": 288_000, "b": 280_000}
+    # A move of the person's is never kept back, nor anything between people.
+    assert ch.thinking({**fields, "moves": fields["moves"][:3]}, early) == 0
+    assert ch.thinking({**fields, "computer": ""}, early) == 0

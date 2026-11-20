@@ -104,8 +104,9 @@
   transition: left .18s ease-out, top .18s ease-out;
 }
 .cg-piece.still { transition: none; }
-.cg-piece.dragging { left: 0; top: 0; z-index: 9; transition: none; filter: drop-shadow(0 6px 6px rgba(0, 0, 0, .35)); }
-.cg-piece .cg-art { display: block; width: 100%; height: 100%; }
+.cg-piece.dragging { z-index: 9; transition: none; filter: drop-shadow(0 6px 6px rgba(0, 0, 0, .35)); }
+/* Air round every piece, so none touches the edges of its square. */
+.cg-piece .cg-art { display: block; width: 84%; height: 84%; margin: 8%; }
 .cg-board.movable .cg-sq { cursor: pointer; }
 
 /* What a pawn at the end becomes: four pieces in a column from that square. */
@@ -125,7 +126,7 @@
 .cg-promo.up { bottom: 0; flex-direction: column-reverse; }
 .cg-promo button { aspect-ratio: 1; padding: 6%; background: #fff; }
 .cg-promo button:hover { background: #e8eedc; }
-.cg-promo .cg-art { width: 100%; height: 100%; }
+.cg-promo .cg-art { width: 100%; height: 100%; margin: 0; }
 .cg-promo .cg-promo-x { aspect-ratio: auto; height: 28px; color: #555; background: #f1f1ec; }
 
 /* -- the players --------------------------------------------------------------------- */
@@ -172,6 +173,11 @@
 
 /* -- beside the board: what is happening, the moves, the buttons ----------------------- */
 .cg-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cg-head { display: flex; align-items: center; gap: 8px; }
+.cg-head .cg-status { flex: 1; }
+.cg-sound { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 6px; color: var(--muted); }
+.cg-sound[aria-pressed="true"] { color: var(--accent); }
+@media (hover: hover) and (pointer: fine) { .cg-sound:hover { color: var(--ink); background: var(--card); } }
 .cg-status { margin: 0; font-family: var(--display); font-size: 18px; font-weight: 600; }
 .cg-status.yours { color: var(--action); }
 .cg-status.over { color: var(--accent); }

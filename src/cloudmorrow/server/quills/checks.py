@@ -596,6 +596,7 @@ CHESS_GAME = (
     ("white_left", ("int",), False),
     ("black_left", ("int",), False),
     ("turn_at", ("datetime",), False),
+    ("answer_at", ("datetime",), False),
     ("result", ("string", "enum"), False),
     ("reason", ("string", "enum"), False),
     ("draw", ("string",), False),
