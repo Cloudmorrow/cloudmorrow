@@ -378,7 +378,7 @@ def test_the_calendar_asks_the_record_api_for_a_window_of_days():
     # Drawn by the kit, and its sheet changed by it, from its own file.
     own = (
         "const OWN = { calendar: renderCalendar, thread: renderThread, timeline: renderTimeline, photo: renderPhoto,"
-        " view: renderView, data: renderData };"
+        " chess: renderChess, view: renderView, data: renderData };"
     )
     assert own in KIT_JS
     assert (

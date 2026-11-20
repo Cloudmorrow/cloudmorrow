@@ -1,0 +1,17 @@
+# A computer to play: Morrow, one for each person, with his level against
+# them. He starts at level 1 and goes up one each time they beat him, to
+# level 10; losing or drawing leaves him where he is.
+[datamodel]
+id = "chessboard.computer"
+version = 1
+label = "Computer"
+description = "Morrow, the computer you play, and the level he has reached against you."
+scopes = ["personal"]
+title = "name"
+
+[fields]
+name = { kind = "string", required = true }
+level = { kind = "int", default = 1 }
+won = { kind = "int", default = 0 }
+lost = { kind = "int", default = 0 }
+drawn = { kind = "int", default = 0 }

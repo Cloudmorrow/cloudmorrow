@@ -224,6 +224,25 @@ def pictures_path(quill: dict, screen: dict) -> str | None:
     return api_path(quill, screen.get("pictures"))
 
 
+# -- chess ---------------------------------------------------------------------
+# The field names are the kit's own (docs/CHESS.md); a screen binds the games,
+# the action a move is played with, the one a game is started with, and the
+# computers there are to play.
+
+
+def chess_fields(screen: dict, model: dict, models: dict[str, dict]) -> dict:
+    """What a chess board draws from."""
+    computers = models.get(screen.get("computers") or "", {})
+    return {
+        "title": screen.get("title") or model.get("title") or "name",
+        "game": model.get("id", screen.get("model", "")),
+        "play": screen.get("play") or "",
+        "start": screen.get("start") or "",
+        "computers": computers.get("id", ""),
+        "fields": {f.get("name") for f in model.get("fields", [])},
+    }
+
+
 # -- editors -------------------------------------------------------------------
 # A screen binds a title, a body and, when the pages sit in folders, a path.
 # `where` is the filters every listing, search and folder call is made with

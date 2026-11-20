@@ -33,6 +33,9 @@ task board has to go on as much as a list of car services does.
   tracks, with the frames the Quill's service draws in the viewer.
 - `photo` is in kit_photo.py: the edits, then one picture turned, cropped,
   sized and written on, drawn by the Quill's service as it will export.
+- `chess` is in kit_chess.py: the games, then one board, the clocks either
+  side of it and the moves beside, a move typed or clicked and kept by the
+  Quill's own `play` action.
 - `data` is in kit_data.py: the Quill's datamodels down the left, the
   records of one beside them, each opened in the sheet to look at.
 
@@ -482,6 +485,7 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
     from cloudmorrow.tui.panes.kit_board import BoardPane
     from cloudmorrow.tui.panes.kit_calendar import CalendarPane
     from cloudmorrow.tui.panes.kit_cells import CellsPane
+    from cloudmorrow.tui.panes.kit_chess import ChessPane
     from cloudmorrow.tui.panes.kit_data import DataPane
     from cloudmorrow.tui.panes.kit_docs import DocsPane
     from cloudmorrow.tui.panes.kit_editor import EditorPane
@@ -527,4 +531,6 @@ def pane_for(quill: dict, screen: dict, **kwargs) -> KitPane | None:
         return TimelinePane(quill, screen, **kwargs)
     if kit == "photo":
         return PhotoPane(quill, screen, **kwargs)
+    if kit == "chess":
+        return ChessPane(quill, screen, **kwargs)
     return None

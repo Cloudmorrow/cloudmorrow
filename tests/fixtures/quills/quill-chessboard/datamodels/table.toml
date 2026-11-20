@@ -1,0 +1,17 @@
+# A table: where two people's games are, shared between exactly them, or a
+# person's own games against a computer, kept to themselves. Being at the
+# table is seeing its games and playing in them; the Quill's code finds the
+# one table between two people from either side before it makes one.
+[datamodel]
+id = "chessboard.table"
+version = 1
+label = "Table"
+description = "Where the games between two people are, or one person's against the computer."
+scopes = ["personal", "shared"]
+title = "name"
+space = true
+
+[fields]
+name = { kind = "string", required = true }
+# Between people, or a person and a computer.
+kind = { kind = "enum", values = ["people", "computer"], labels = ["People", "Computer"], default = "people", indexed = true }

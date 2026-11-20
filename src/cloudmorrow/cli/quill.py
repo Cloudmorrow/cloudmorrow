@@ -243,6 +243,10 @@ def preview(plan: dict) -> str:
             lines.extend(_photo_sketch(plan, screen, title))
             lines.append("")
             continue
+        elif screen["kit"] == "chess":
+            lines.extend(_chess_sketch(plan, screen, title))
+            lines.append("")
+            continue
         elif screen["kit"] == "thread":
             space = fields.get(screen.get("space", ""), {}).get("to", "space")
             about = f" — <{screen['about']}>" if screen.get("about") else ""
@@ -291,6 +295,29 @@ def _timeline_sketch(plan: dict, screen: dict, title: str) -> list[str]:
         lines.append("  no frames API: the viewer says what is at the playhead, and Add asks a length")
     lines.append("  space plays, ←/→ a frame, [ ] trim, s split, m move, ↑/↓ track, x delete,")
     lines.append("  b blur, k keyframe, c crop" + (", e export" if export else "") + "; tab: material, tracks, effects")
+    return lines
+
+
+def _chess_sketch(plan: dict, screen: dict, title: str) -> list[str]:
+    """A chess board as the terminal draws it: the board, the clocks either side, the moves beside."""
+    actions = {a.get("id"): a for a in plan.get("actions", [])}
+    play = actions.get(screen.get("play"), {})
+    start = actions.get(screen.get("start"), {})
+    computers = screen.get("computers")
+    lines = [
+        f"  first the {screen['model']}s, the one moved in last first, with New",
+        f"  ({start.get('label') or start.get('id') or 'start'}: whom against"
+        + (f", {computers} too" if computers else "")
+        + ", how long, which colour); one opens the board:",
+        f"  <{title}>  <time> · <your move | who is to move | how it ended>",
+        "  ┌────────────────────────┐  <them>  <clock>     │ 1. e4  e5",
+        "  │ ♜ ♞ ♝ ♛ ♚ ♝ ♞ ♜   …    │                     │ 2. Nf3 Nc6",
+        "  │ ♟ ♟ ♟ ♟ ♟ ♟ ♟ ♟   …    │  <you>   <clock>     │ 3. …",
+        "  └────────────────────────┘",
+        f"  [ a move: Nf3 or g1f3 ]  → {play.get('label') or play.get('id') or 'play'}, the Quill's code keeps it",
+        "  n new game, r resigns, d offers a draw (or takes the one offered);",
+        "  the clock runs on the screen, and a fallen flag is claimed by itself",
+    ]
     return lines
 
 

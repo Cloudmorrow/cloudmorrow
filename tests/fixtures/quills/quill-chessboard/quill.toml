@@ -1,0 +1,48 @@
+# A small chess Quill, for the kit's tests: games between people, and a
+# computer that plays the first legal move it finds.
+[quill]
+id = "chessboard"
+name = "Chessboard"
+version = "1.0.0"
+summary = "Chess against the people on your cloud, or the computer."
+category = "games"
+publisher = "Cloudmorrow"
+license = "MIT"
+code = "quill.py"
+
+[uses]
+datamodels = []
+
+[[screens]]
+id = "games"
+kit = "chess"
+label = "Chess"
+model = "chessboard.game"
+title = "name"
+play = "play"
+start = "start"
+computers = "chessboard.computer"
+
+[[actions]]
+id = "start"
+label = "New game"
+tone = "primary"
+bar = false
+[actions.fields]
+opponent = { kind = "string", required = true, suggest = "people" }
+clock = { kind = "enum", values = ["0", "600", "300"], labels = ["No limit", "10 minutes", "5 minutes"], default = "600" }
+colour = { kind = "enum", values = ["random", "white", "black"], labels = ["Either", "White", "Black"], default = "random" }
+
+[[actions]]
+id = "play"
+label = "Play"
+on = "chessboard.game"
+bar = false
+[actions.fields]
+move = { kind = "string", required = true }
+
+[[datasets]]
+id = "computer"
+model = "chessboard.computer"
+seed = "per-owner"
+records = [{ name = "Computer", level = 1 }]

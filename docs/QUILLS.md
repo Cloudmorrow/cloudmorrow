@@ -28,12 +28,12 @@ stay, in the shape every other Quill already reads.
 | **Core** | This repository. Accounts, sealing, the record store, the gate, the Quill runtime, the kit renderers for every surface, the CLI, the MCP server. Nothing a person would call an app. |
 | **Quill** | A software package: one repository with a `quill.toml` at its root, and a `quill.py` when it has code. It declares the data it uses, the screens it shows, what can be done in it, and the jobs, hooks, webhooks, APIs and services it runs. |
 | **Quill Catalog** | [`Cloudmorrow/quill-catalog`](https://github.com/Cloudmorrow/quill-catalog): one `catalog.toml` naming every published Quill, its repository, a pinned release and a category. Your server reads it; a pull request adds to it. |
-| **Category** | Where a Quill is shelved: in the catalog, and in the web app's rail and the terminal app's sidebar, where its tab stands under the category's heading. Personal, Productivity, Communication, Creative, Home, Business, Developer, … in the catalog's order. |
+| **Category** | Where a Quill is shelved: in the catalog, and in the web app's rail and the terminal app's sidebar, where its tab stands under the category's heading. Personal, Productivity, Communication, Creative, Games, Home, Business, Developer, … in the catalog's order. |
 | **Datamodel** | A kind of data with standard fields: `task`, `contact`, `vehicle`. Records belong to the person, never to a Quill. |
 | **Foundational datamodel** | One of the standard datamodels in [`Cloudmorrow/datamodels`](https://github.com/Cloudmorrow/datamodels), the ones Cloudmorrow decides on. Grouped into **domains** — Tasks, Customers (CRM), Fleet, Calendars, Messaging, Notes, Secrets, Files — which you can choose at install on their own, with or without a Quill that uses them. |
 | **Extended datamodel** | What a Quill adds: fields of its own on a foundational datamodel (`fleet.odometer` on a `vehicle`), or a new datamodel under its own name (`fleet.service_visit`). Anybody's next Quill may use either. |
 | **Dataset** | Records that come with a Quill — reference data (car makes, country codes) or a starting record (your first board) — and, later, a named collection of records a person makes and shares ("Fleet 2026"). |
-| **Kit** | The fixed vocabulary of screens every surface can draw: `list`, `board`, `detail`, `form`, `calendar`, `thread`, `grid`, `editor`, `sheet`, `document`, `data`, `timeline`, `photo`, and `view` — a screen a Quill's code draws from primitives. |
+| **Kit** | The fixed vocabulary of screens every surface can draw: `list`, `board`, `detail`, `form`, `calendar`, `thread`, `grid`, `editor`, `sheet`, `document`, `data`, `timeline`, `photo`, `chess`, and `view` — a screen a Quill's code draws from primitives. |
 | **Quill code** | The Python a manifest names — views, actions, hooks, jobs, webhooks, APIs, machine handlers — run in a sandbox, through the gate. See [QUILLCODE.md](QUILLCODE.md). |
 | **Shelf** | What one person has: the server's Quills that are for them (everyone's, or an **audience** of circles and people), their own, and the ones shared with them. A **personal Quill** is one somebody installed for themselves; its key is `~owner.id`. See [SHARING.md](SHARING.md). |
 
@@ -194,6 +194,7 @@ what each element needs:
 | `data` | nothing: every datamodel the Quill has, or `models` (a list of ids) | the datamodels by domain, the records of one, the sheet of each — to look at | the same, wider | the datamodels down the left, a table of the records of one | `cm <quill> list [datamodel]`, `show <datamodel> <id>` |
 | `timeline` | `model` (the projects), `pieces`, optional `effects`, `media` (a share and a folder: the material), `frames` (an api that draws frames), `export` (an action); the fields are [TIMELINE.md](TIMELINE.md)'s | the projects, then the viewer over the tracks, the material as a sheet | the material, the viewer and the tracks together, live video with sound | frames where the terminal shows pictures, the tracks as rows of text, every edit on a key | `cm <quill> list`, `add`, `show`, `cut`, `trim`, `move`, `rm`, `frame`, `export` |
 | `photo` | `model` (the edits: one picture each), optional `layers` (words, marker strokes and pieces laid on it), `media` (a share and a folder: the photos), `pictures` (an api that draws the picture), `save` (an action: over the photo, or as a new file), `export` (an action with its form); the fields are [PHOTO.md](PHOTO.md)'s | the picture with the tools as a strip under it and the panels below | tools down the left, the picture, the tool's options, the image and the layers on the right; the crop, a selection and the layers dragged on it | the picture as it will save, the layers listed beside it; keys for the rest | `cm <quill> list`, `add`, `show`, `layers`, `turn`, `mirror`, `crop`, `size`, `text`, `move`, `rm`, `picture`, `save`, `export` |
+| `chess` | `model` (the games), `play` (an action on a game, with a field `move`), `start` (an action on no record, with a field `opponent`, and `clock` and `colour` enums offered as they are), optional `computers` (a datamodel: `name`, `level`); the fields are [CHESS.md](CHESS.md)'s | the games, your move first, then the board with the clocks above and below it and the moves under it | the games, the board, the clocks and the moves side by side | the board in text, the clocks, the moves; a move typed, `n`, `d`, `r` | `cm <quill> list`, `show`, `new`, `move`, `draw`, `resign` |
 
 A `view` may name its pen: `compose = { action = "send", label = "New mail" }`
 is one of the Quill's actions drawn in the heading as a list's New is — the
@@ -297,6 +298,12 @@ size, with layers on it — words, marker strokes, pieces copied and pasted
 — and saved over the photo or beside it by the Quill's own action. What its
 datamodels must have, the pictures API its service answers, and what each
 surface does are [PHOTO.md](PHOTO.md).
+
+A `chess` board is games of chess between the people on a cloud, or
+against a computer the Quill's code plays, with a chess clock or without.
+The rules are the core's (`cloudmorrow.quill.chess`, in the sandbox too);
+the Quill's `play` action checks and keeps each move. The fields, the two
+actions and what each surface does are [CHESS.md](CHESS.md).
 
 A `sheet` is the kit's spreadsheet: cells in rows and columns, numbers and
 text typed into them, and formulas that work the others out, Excel's way —
@@ -764,6 +771,7 @@ manifest written, checked and installed in one conversation.
 | the kit on the command line | `cli/quillrun/` (`cm <quill> …`), a module per kind of screen |
 | the sheet (a spreadsheet) | `quill/cells.py` (the cells and the formulas), web `kit_cells.js`, `kit_cells_rules.js`, `kit_cells.css`, terminal `tui/panes/kit_cells.py`, `cli/quillrun/cells.py`; see [CELLS.md](CELLS.md) |
 | the timeline (a video editor) | `quill/timeline.py` (the rules), web `kit_timeline.js`, `kit_timeline_rules.js`, `kit_timeline.css`, terminal `tui/panes/kit_timeline.py`, `client/timeline.py`, `cli/quillrun/timeline.py`; see [TIMELINE.md](TIMELINE.md) |
+| the chess board | `quill/chess.py` (the rules, in the SDK), web `kit_chess.js`, `kit_chess_rules.js`, `kit_chess_pieces.js`, `kit_chess.css`, terminal `tui/panes/kit_chess.py`, `cli/quillrun/chess.py`; see [CHESS.md](CHESS.md) |
 | the photo editor | `quill/photo.py` (the rules), web `kit_photo.js`, `kit_photo_rules.js`, `kit_photo.css`, terminal `tui/panes/kit_photo.py`, `client/photo.py`, `cli/quillrun/photo.py`; see [PHOTO.md](PHOTO.md) |
 | what a screen's bindings mean (done lanes, space names, a calendar's and a grid's fields), for the terminal and the command line alike | `quill/screens.py` |
 | building one | `cli/quill.py` (`cm quill new/check/dev/add`), `quill_reference.md`, `quill_template/` |

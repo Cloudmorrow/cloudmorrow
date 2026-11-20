@@ -39,6 +39,8 @@ import { renderThread } from "./kit_thread.js";
 import { renderTimeline, timelineSheet } from "./kit_timeline.js";
 // A photo is a photo editor: one picture turned, cropped, resized, with words on it.
 import { photoSheet, renderPhoto } from "./kit_photo.js";
+// A chess board: games between people, or against the computer, with clocks.
+import { renderChess } from "./kit_chess.js";
 // A view is a Quill's own screen, drawn from the tree its code returns.
 import { renderView } from "./kit_view.js";
 import { dataSheet, renderData } from "./kit_data.js";
@@ -229,10 +231,10 @@ export function dragLanes(root, { card, lane, group, drop }) {
 // The kit elements this file draws. The server refuses to install a screen
 // of any other kind until every surface draws it, and a test holds this
 // list to the server's; the check below is for a server newer than the page.
-export const DRAWS = ["list", "board", "detail", "form", "calendar", "grid", "editor", "sheet", "document", "thread", "timeline", "photo", "view", "data"];
+export const DRAWS = ["list", "board", "detail", "form", "calendar", "grid", "editor", "sheet", "document", "thread", "timeline", "photo", "chess", "view", "data"];
 
 // Each element that is more than rows is a file of its own: kit_<kit>.js.
-const OWN = { calendar: renderCalendar, thread: renderThread, timeline: renderTimeline, photo: renderPhoto, view: renderView, data: renderData };
+const OWN = { calendar: renderCalendar, thread: renderThread, timeline: renderTimeline, photo: renderPhoto, chess: renderChess, view: renderView, data: renderData };
 // And what it changes on the record sheet, if anything: kit_<kit>.js again.
 const SHEETS = { calendar: calendarSheet, timeline: timelineSheet, photo: photoSheet, data: dataSheet, list: projectsSheet };
 

@@ -1,0 +1,43 @@
+# A game of chess: who plays white and who black, the moves played (as a
+# program writes them: e2e4, e7e8q), the clock, and how it ended. The field
+# names are the chess kit's (docs/CHESS.md in the Cloudmorrow repository);
+# the Quill's code is what checks a move and keeps it. Either player may
+# play in it, so it is nobody's alone; a new game tells the other player.
+[datamodel]
+id = "chessboard.game"
+version = 1
+label = "Game"
+description = "A game of chess between two people, or a person and Morrow."
+scopes = ["personal", "shared"]
+title = "name"
+in_space = "table"
+
+[fields]
+table = { kind = "link", to = "chessboard.table", required = true, indexed = true, on_delete = "cascade" }
+name = { kind = "string", required = true }
+# A person's username, or the computer's name when it plays that side.
+white = { kind = "string", required = true, indexed = true }
+black = { kind = "string", required = true, indexed = true }
+moves = { kind = "json" }
+# Which side the computer plays, when one does: white or black.
+computer = { kind = "string" }
+# The computer's level when the game began.
+level = { kind = "int" }
+# Seconds each side starts with; none is no limit.
+clock = { kind = "int" }
+# What each side had left after its last move, in milliseconds.
+white_left = { kind = "int" }
+black_left = { kind = "int" }
+# Since when the side to move has been thinking: empty until both have moved, and once it is over.
+turn_at = { kind = "datetime" }
+# 1-0, 0-1 or 1/2-1/2 once it is over, and why.
+result = { kind = "string", indexed = true }
+reason = { kind = "string" }
+# Who has offered a draw, until the other answers or a move is made.
+draw = { kind = "string" }
+
+[[notify]]
+when = "created"
+to = "members"
+push = true
+unread = true
