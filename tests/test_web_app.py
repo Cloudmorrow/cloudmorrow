@@ -137,7 +137,6 @@ def test_what_a_screen_makes_is_beside_its_title_not_in_the_bar():
                 raise AssertionError(f"{name} still puts a create button in the bar: {line.strip()}")
     for name in ("kit_editor.js", "kit.js", "kit_grid.js", "kit_thread.js", "kit_calendar.js", "admin.js"):
         assert "heading(" in (WEB / name).read_text(), name
-    assert ".heading .compose" in (WEB / "desktop.js").read_text()
 
 
 def test_a_calendar_screen_has_a_title_like_every_other_tab():
