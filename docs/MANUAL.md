@@ -60,7 +60,10 @@ mentions them only as examples.
   and it is `~/Fileshares/media` here, or `/Volumes/media` on a Mac. Finder
   does the mounting on macOS with nothing installed; on Linux it is
   `rclone`. Made, shared and mounted from the **Files** tab as well, which
-  is the Files Quill: the files themselves stay where they are.
+  is the Files Quill: the files themselves stay where they are. A mount
+  stays mounted: after a restart the machine's agent mounts again every
+  share mounted there (within its first half minute), until
+  `cloudmorrow share unmount` takes it away.
 - **The count on the icon.** Channels is why the web app has push. An app
   on a home screen is not running most of the time, so nothing it could poll
   would keep its badge right — a real Web Push wakes a service worker, which
@@ -226,6 +229,7 @@ src/cloudmorrow/
     templates/       the install page and install.sh
     web/             the app for the browser: one page, a core, and a file per feature
   agent/             the local agent: config, tasks, poll loop
+    remounts.py      the shares mounted here, mounted again after a restart
   desktop/           the desktop app: the web app in a pywebview window, and the
                      bridge that lets it mount shares here (`cloudmorrow app`)
   tui/               Textual client

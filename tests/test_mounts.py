@@ -41,6 +41,8 @@ class Shell:
 
 @pytest.fixture()
 def linux(monkeypatch):
+    # Not a systemd service, whatever ran the tests: no scope around rclone.
+    monkeypatch.delenv("INVOCATION_ID", raising=False)
     monkeypatch.setattr(mounts, "platform", lambda: "linux")
     monkeypatch.setattr(mounts.shutil, "which", lambda name: f"/usr/bin/{name}")
 
@@ -180,3 +182,72 @@ def test_unmount_on_a_mac_uses_diskutil(macos, monkeypatch):
 
 def test_a_quote_in_the_secret_does_not_break_the_script():
     assert mounts.applescript_string('a"b\\c') == '"a\\"b\\\\c"'
+
+
+# -- after a restart ------------------------------------------------------------
+
+
+def _rclone_mounts(shell: Shell) -> list[list[str]]:
+    return [command for command, _ in shell.calls if "mount" in command and ":webdav:" in command]
+
+
+def test_restore_mounts_again_what_is_written_down_and_gone(linux, monkeypatch, tmp_path):
+    monkeypatch.setattr(mounts, "_run", Shell())
+    monkeypatch.setattr(mounts.os.path, "ismount", lambda path: False)
+    mounts.mount("media", URL, "bram", "the-token", path=tmp_path / "media")
+    mounts.mount("family", URL + "x/", "bram", "the-token", path=tmp_path / "family")
+    shell = Shell()
+    monkeypatch.setattr(mounts, "_run", shell)
+    done = mounts.restore("bram", "the-token")
+    assert sorted(done) == ["family", "media"]
+    assert all(isinstance(m, mounts.Mount) for m in done.values())
+    assert {command[3] for command in _rclone_mounts(shell)} == {str(tmp_path / "media"), str(tmp_path / "family")}
+
+
+def test_restore_leaves_what_is_still_mounted_and_what_it_is_told_to_skip(linux, monkeypatch, tmp_path):
+    monkeypatch.setattr(mounts, "_run", Shell())
+    monkeypatch.setattr(mounts.os.path, "ismount", lambda path: False)
+    mounts.mount("media", URL, "bram", "the-token", path=tmp_path / "media")
+    mounts.mount("family", URL, "bram", "the-token", path=tmp_path / "family")
+    shell = Shell()
+    monkeypatch.setattr(mounts, "_run", shell)
+    monkeypatch.setattr(mounts.os.path, "ismount", lambda path: Path(path).name == "media")
+    assert mounts.restore("bram", "the-token", skip={"family"}) == {}
+    assert _rclone_mounts(shell) == []
+
+
+def test_one_share_that_will_not_mount_does_not_keep_the_others_away(linux, monkeypatch, tmp_path):
+    monkeypatch.setattr(mounts, "_run", Shell())
+    monkeypatch.setattr(mounts.os.path, "ismount", lambda path: False)
+    mounts.mount("media", URL, "bram", "the-token", path=tmp_path / "media")
+    mounts.mount("family", URL, "bram", "the-token", path=tmp_path / "family")
+    (tmp_path / "media" / "stray.txt").write_text("x")
+    done = mounts.restore("bram", "the-token")
+    assert isinstance(done["media"], mounts.MountError)
+    assert isinstance(done["family"], mounts.Mount)
+    # Still written down: it is tried again later, not forgotten.
+    assert mounts.lookup("media") is not None
+
+
+def test_a_dead_fuse_mount_is_cleared_before_mounting(linux, monkeypatch, tmp_path):
+    shell = Shell()
+    monkeypatch.setattr(mounts, "_run", shell)
+    monkeypatch.setattr(mounts.os.path, "ismount", lambda path: False)
+    monkeypatch.setattr(mounts, "_dead", lambda path: True)
+    mounts.mount("media", URL, "bram", "the-token", path=tmp_path / "media")
+    assert shell.commands("fusermount3") == [["fusermount3", "-uz", str(tmp_path / "media")]]
+
+
+def test_as_a_service_rclone_runs_in_a_scope_of_its_own(linux, monkeypatch, tmp_path):
+    runtime = tmp_path / "run"
+    runtime.mkdir()
+    (runtime / "bus").write_text("")
+    monkeypatch.setenv("INVOCATION_ID", "abc")
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(runtime))
+    shell = Shell()
+    monkeypatch.setattr(mounts, "_run", shell)
+    monkeypatch.setattr(mounts.os.path, "ismount", lambda path: False)
+    mounts.mount("media", URL, "bram", "the-token", path=tmp_path / "media")
+    (command,) = _rclone_mounts(shell)
+    assert command[:5] == ["systemd-run", "--user", "--scope", "--quiet", "--collect"]
+    assert command[6] == "mount"

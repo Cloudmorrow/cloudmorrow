@@ -21,10 +21,15 @@ password is written anywhere.
 What was mounted, and where, is written to `mounts.json` beside the client
 config — per machine, since the same share is at a different path on each —
 so the TUI can say "mounted at …" and `share unmount` knows what to undo.
+It is also what brings them back: a mount does not outlive a reboot, so the
+local agent, which starts with the machine, mounts every share written down
+here that is not mounted any more (`restore`, run from agent/remounts.py).
+Only `share unmount` takes a share off the list.
 """
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import shutil
@@ -161,6 +166,32 @@ def mount_share(share: dict, username: str, secret: str, *, path: Path | None = 
     return mount(share["name"], share["url"], username, secret, path=path)
 
 
+def restore(
+    username: str, secret: str, *, skip: set[str] | frozenset[str] = frozenset()
+) -> dict[str, Mount | MountError]:
+    """Mount again every share this machine mounted that is not mounted now.
+
+    What comes back is each share tried, with the mount or what went wrong:
+    one share that will not come back does not keep the others away. Names in
+    *skip* are left for now (the agent waits a while after a failure).
+    """
+    done: dict[str, Mount | MountError] = {}
+    for name, record in all_mounts().items():
+        if name in skip or record.active or not record.url:
+            continue
+        try:
+            if platform() == MACOS:
+                mounted = _mount_finder(name, record.url, username, secret)
+            else:
+                mounted = _mount_rclone(name, record.url, username, secret, record.path)
+        except (MountError, OSError, subprocess.SubprocessError) as exc:
+            done[name] = exc if isinstance(exc, MountError) else MountError(f"could not mount {name}: {exc}")
+            continue
+        remember(mounted)
+        done[name] = mounted
+    return done
+
+
 def unmount(name: str) -> Mount:
     """Unmount a share this machine mounted, and forget it."""
     mounted = lookup(name)
@@ -242,6 +273,8 @@ def _mount_rclone(name: str, url: str, username: str, secret: str, path: Path) -
     if binary is None:
         raise MountError(rclone.hint())
     path = Path(path).expanduser()
+    if _dead(path):
+        _clear_dead(path)
     if os.path.ismount(path):
         raise MountError(f"something is already mounted at {path}")
     path.mkdir(parents=True, exist_ok=True)
@@ -289,10 +322,44 @@ def _mount_rclone(name: str, url: str, username: str, secret: str, path: Path) -
     # keeps whatever it inherited, and a pipe held open is a `run` that never
     # returns. What went wrong is read back out of the log instead.
     with log.open("a", encoding="utf-8") as sink:
-        result = _run(command, env=env, stdout=sink, stderr=sink)
+        result = _run(_own_scope() + command, env=env, stdout=sink, stderr=sink)
     if result.returncode != 0:
         raise _failed(f"could not mount {name}", result, log)
     return Mount(name=name, path=path, url=url, tool="rclone")
+
+
+def _dead(path: Path) -> bool:
+    """A FUSE mount whose rclone is gone: still in the mount table, but every
+    look at it says "Transport endpoint is not connected"."""
+    try:
+        os.stat(path)
+    except OSError as exc:
+        return exc.errno == errno.ENOTCONN
+    return False
+
+
+def _clear_dead(path: Path) -> None:
+    """Take a dead mount out of the way (lazily: nothing is behind it anyway)."""
+    for command in (["fusermount3", "-uz", str(path)], ["fusermount", "-uz", str(path)]):
+        if shutil.which(command[0]) is not None and _run(command).returncode == 0:
+            return
+
+
+def _own_scope() -> list[str]:
+    """What runs rclone in a systemd scope of its own, when we are a service.
+
+    The agent is a systemd unit, and everything it starts lives in the unit's
+    group — which systemd empties when the unit stops. rclone would go with
+    every restart of the agent (an update does one), and a share would vanish
+    under whatever had a file open on it. In a scope of its own it stays.
+    From a terminal there is nothing to escape, and nothing is added.
+    """
+    if not os.environ.get("INVOCATION_ID") or shutil.which("systemd-run") is None:
+        return []
+    runtime = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
+    if not (runtime / "bus").exists():
+        return []
+    return ["systemd-run", "--user", "--scope", "--quiet", "--collect"]
 
 
 def _unmount_path(path: Path) -> None:
