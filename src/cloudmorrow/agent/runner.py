@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from cloudmorrow.agent.client import AgentApiError, AgentClient
 from cloudmorrow.agent.config import AgentConfig
 from cloudmorrow.agent.quills import MachineQuills
+from cloudmorrow.agent.remounts import Remounts
 from cloudmorrow.agent.sync import LocalSyncs
 from cloudmorrow.agent.tasks import TaskError, run_task
 
@@ -42,6 +43,8 @@ class AgentRunner:
         self.quills = MachineQuills(config, self.client)
         # The folders here the person backs up into My Files (agent/sync.py).
         self.syncs = LocalSyncs(config, self.client)
+        # The shares mounted here, mounted again after a restart (agent/remounts.py).
+        self.remounts = Remounts()
 
     def stop(self, *_: object) -> None:
         log.info("stopping after the current job")
@@ -110,8 +113,18 @@ class AgentRunner:
         except Exception:  # a backup must not stop the agent
             log.exception("a local backup failed")
 
+    def run_remounts(self) -> None:
+        try:
+            self.remounts.tick()
+        except Exception:  # a share must not stop the agent
+            log.exception("mounting the shares again failed")
+
     def tick(self) -> None:
         """One heartbeat, then drain whatever work is waiting."""
+        # First, and before the server is asked anything: the mounts need only
+        # the share's own address, and an unreachable server must not keep
+        # them away.
+        self.run_remounts()
         self.client.heartbeat(socket.gethostname(), platform.platform())
         self.stats.heartbeats += 1
         while not self._stop and self.run_one_job():
